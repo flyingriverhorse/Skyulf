@@ -1,9 +1,9 @@
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 import pytest
 import pytest_asyncio
-import numpy as np
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker

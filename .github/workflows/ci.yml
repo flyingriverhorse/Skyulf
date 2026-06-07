@@ -56,14 +56,15 @@ jobs:
         run: |
           uv pip install --system -r requirements-ci.txt
 
-      - name: Lint (flake8)
+      - name: Lint (ruff)
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=22 --max-line-length=120 --statistics
+          ruff check .
+          # Non-blocking style/stats surface (informational; mirrors old flake8 --exit-zero).
+          ruff check . --statistics || true
 
-      - name: Format check (black)
+      - name: Format check (ruff)
         run: |
-          black --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+          ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Type check (ty)
         run: |

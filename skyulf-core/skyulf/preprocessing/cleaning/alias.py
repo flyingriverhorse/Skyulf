@@ -7,12 +7,12 @@ from typing import Any, Dict, Tuple
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine
 from .._artifacts import AliasReplacementArtifact
 from .._helpers import auto_detect_text_columns as _auto_detect_text_columns
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
 from ._common import ALIAS_PUNCTUATION_TABLE, COMMON_BOOLEAN_ALIASES, COUNTRY_ALIAS_MAP
 
 

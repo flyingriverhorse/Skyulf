@@ -18,16 +18,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from backend.middleware.rate_limiter import limiter
-from fastapi.staticfiles import StaticFiles
 
 # Use absolute imports to fix import issues
 from backend.config import get_settings
 from backend.data_ingestion.router import router as data_ingestion_router
 from backend.data_ingestion.router import sources_router as data_sources_router
 from backend.database.engine import close_db, create_tables, init_db
+from backend.eda.router import router as eda_router
+from backend.exceptions.core import SkyulfException
 from backend.exceptions.handlers import (
     _record_error,
     generic_http_exception_handler,
@@ -36,19 +37,19 @@ from backend.exceptions.handlers import (
     skyulf_exception_handler,
     validation_exception_handler,
 )
-from backend.exceptions.core import SkyulfException
 from backend.health.routes import router as health_router
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
-from backend.utils.logging_utils import setup_universal_logging
+from backend.middleware.rate_limiter import limiter
 
 # from core.feature_engineering.routes import router as feature_engineering_router
 from backend.ml_pipeline.api import router as ml_pipeline_router
 from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
-from backend.eda.router import router as eda_router
 from backend.monitoring.router import router as monitoring_router
-from backend.realtime import connection_manager, router as realtime_router
+from backend.realtime import connection_manager
+from backend.realtime import router as realtime_router
+from backend.utils.logging_utils import setup_universal_logging
 
 # Configure logging
 setup_universal_logging()
@@ -269,7 +270,8 @@ def create_app() -> FastAPI:
     # Rate limiting
     app.state.limiter = limiter
     app.add_exception_handler(  # type: ignore[arg-type]
-        RateLimitExceeded, _rate_limit_exceeded_handler  # ty: ignore[invalid-argument-type]
+        RateLimitExceeded,
+        _rate_limit_exceeded_handler,  # ty: ignore[invalid-argument-type]
     )
 
     # Add middleware (order matters!)

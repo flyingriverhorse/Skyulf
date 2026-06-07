@@ -49,8 +49,11 @@ try:
     from sklearn.ensemble import IsolationForest  # noqa: F401
     from sklearn.impute import SimpleImputer  # noqa: F401
     from sklearn.preprocessing import StandardScaler  # noqa: F401
-    from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor  # noqa: F401
-    from sklearn.tree import _tree  # noqa: F401  # ty: ignore[unresolved-import]
+    from sklearn.tree import (  # noqa: F401
+        DecisionTreeClassifier,
+        DecisionTreeRegressor,
+        _tree,  # noqa: F401  # ty: ignore[unresolved-import]
+    )
 
     SKLEARN_AVAILABLE = True
 except ImportError:

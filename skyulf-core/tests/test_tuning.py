@@ -2,9 +2,9 @@
 
 from typing import Any, cast
 
-from skyulf.modeling.classification import LogisticRegressionCalculator
-from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling._tuning.engine import TuningCalculator
+from skyulf.modeling._tuning.schemas import TuningConfig
+from skyulf.modeling.classification import LogisticRegressionCalculator
 
 
 def test_tuner_grid_search(sample_classification_data):

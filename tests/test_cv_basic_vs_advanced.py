@@ -13,6 +13,8 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
+from skyulf.modeling._tuning import TuningCalculator, TuningConfig
+from skyulf.modeling._tuning.engine import TuningApplier
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.classification import (
     LogisticRegressionApplier,
@@ -22,8 +24,6 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling._tuning import TuningCalculator, TuningConfig
-from skyulf.modeling._tuning.engine import TuningApplier
 
 
 @pytest.fixture
@@ -203,9 +203,9 @@ def test_advanced_tuning_nested_cv_uses_standard_fold(
 
     # Confirm it ran as stratified_k_fold, NOT nested_cv
     assert result["cv_config"]["cv_type"] == "stratified_k_fold"
-    assert (
-        "inner_folds" not in result["cv_config"]
-    ), "Should NOT have inner_folds — that means _perform_nested_cv ran"
+    assert "inner_folds" not in result["cv_config"], (
+        "Should NOT have inner_folds — that means _perform_nested_cv ran"
+    )
 
 
 def test_basic_vs_advanced_metric_keys_match(
@@ -356,9 +356,9 @@ def test_classification_nested_cv_uses_stratified(
     is_classification = getattr(calc, "problem_type", "") == "classification"
     post_cv_type = "stratified_k_fold" if is_classification else "k_fold"
 
-    assert (
-        post_cv_type == "stratified_k_fold"
-    ), "Classification should downgrade to stratified_k_fold"
+    assert post_cv_type == "stratified_k_fold", (
+        "Classification should downgrade to stratified_k_fold"
+    )
 
     cv_est = StatefulEstimator(calc, applier, "cv_node")
     result = cv_est.cross_validate(

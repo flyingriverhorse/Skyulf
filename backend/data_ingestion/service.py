@@ -1,4 +1,3 @@
-from backend.exceptions.core import SkyulfException
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -16,6 +15,7 @@ from backend.data_ingestion.schemas.ingestion import (
 )
 from backend.data_ingestion.tasks import ingest_data_task
 from backend.database.models import DataSource
+from backend.exceptions.core import SkyulfException
 from backend.services.data_service import DataService
 
 logger = logging.getLogger(__name__)

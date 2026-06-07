@@ -5,10 +5,10 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models import (
-    DataSource,
-    Deployment,
     AdvancedTuningJob,
     BasicTrainingJob,
+    DataSource,
+    Deployment,
 )
 from backend.ml_pipeline._services.job_service import JobService
 
@@ -297,6 +297,7 @@ class ModelRegistryService:
         List artifacts for a specific job (Training or Tuning).
         """
         from typing import Union
+
         from backend.ml_pipeline.artifacts.local import LocalArtifactStore
         from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 

@@ -1,4 +1,5 @@
 from typing import Any, Protocol, Tuple, runtime_checkable
+
 import pandas as pd
 
 

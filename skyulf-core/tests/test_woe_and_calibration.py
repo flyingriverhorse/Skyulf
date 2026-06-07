@@ -69,7 +69,8 @@ def test_calibrated_classifier_registered_and_predicts():
 
     rng = np.random.default_rng(0)
     X = pd.DataFrame(
-        rng.normal(size=(40, 3)), columns=["a", "b", "c"]  # ty: ignore[invalid-argument-type]
+        rng.normal(size=(40, 3)),
+        columns=["a", "b", "c"],  # ty: ignore[invalid-argument-type]
     )
     y = pd.Series((X["a"] + X["b"] > 0).astype(int))
 
@@ -90,7 +91,8 @@ def test_calibrated_classifier_selectable_base_estimator():
 
     rng = np.random.default_rng(1)
     X = pd.DataFrame(
-        rng.normal(size=(40, 3)), columns=["a", "b", "c"]  # ty: ignore[invalid-argument-type]
+        rng.normal(size=(40, 3)),
+        columns=["a", "b", "c"],  # ty: ignore[invalid-argument-type]
     )
     y = pd.Series((X["a"] + X["b"] > 0).astype(int))
 
@@ -107,7 +109,8 @@ def test_calibrated_classifier_unknown_base_estimator_falls_back():
 
     rng = np.random.default_rng(2)
     X = pd.DataFrame(
-        rng.normal(size=(30, 2)), columns=["a", "b"]  # ty: ignore[invalid-argument-type]
+        rng.normal(size=(30, 2)),
+        columns=["a", "b"],  # ty: ignore[invalid-argument-type]
     )
     y = pd.Series((X["a"] > 0).astype(int))
 

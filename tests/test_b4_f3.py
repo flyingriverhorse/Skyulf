@@ -12,7 +12,6 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -219,8 +218,9 @@ class TestApiUsesB4:
 def client_with_celery():
     """TestClient with USE_CELERY=True and run_pipeline_batch_task.delay mocked."""
     from fastapi.testclient import TestClient
-    from backend.main import app
+
     from backend.config import get_settings
+    from backend.main import app
 
     mock_task_result = MagicMock()
     mock_task_result.id = "celery-task-id-123"

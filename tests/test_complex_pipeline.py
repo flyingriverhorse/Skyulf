@@ -4,6 +4,8 @@ import shutil
 import numpy as np
 import pandas as pd
 import pytest
+
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.base import StatefulTransformer
 
@@ -19,8 +21,6 @@ from skyulf.preprocessing.imputation import (
     SimpleImputerCalculator,
 )
 from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
-
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 
 @pytest.fixture

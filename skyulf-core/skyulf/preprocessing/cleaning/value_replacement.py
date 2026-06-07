@@ -7,11 +7,11 @@ import pandas as pd
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine
 from .._artifacts import ValueReplacementArtifact
 from .._helpers import resolve_valid_columns
 from .._schema import SkyulfSchema
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
 
 
 def _is_mapping_like(obj: Any) -> bool:

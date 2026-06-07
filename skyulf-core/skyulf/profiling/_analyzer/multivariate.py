@@ -106,7 +106,7 @@ class MultivariateMixin(_AnalyzerState):
                     )
                     components_list.append(
                         PCAComponent(
-                            component=f"PC{i+1}",
+                            component=f"PC{i + 1}",
                             explained_variance_ratio=float(pca.explained_variance_ratio_[i]),
                             top_features=top_features,
                         )

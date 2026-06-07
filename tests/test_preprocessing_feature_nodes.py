@@ -1,4 +1,5 @@
 import pandas as pd
+
 from skyulf.preprocessing.feature_generation import (
     FeatureGenerationApplier,
     FeatureGenerationCalculator,

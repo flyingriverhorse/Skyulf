@@ -17,7 +17,6 @@ from backend.ml_pipeline._internal._schemas import (
 from backend.ml_pipeline.api import _build_node_registry
 from backend.ml_pipeline.constants import StepType
 
-
 # ---------------------------------------------------------------------------
 # Helper: build representative PipelineConfigModel instances
 # ---------------------------------------------------------------------------

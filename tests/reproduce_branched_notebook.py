@@ -63,7 +63,7 @@ for label, n in [
     ("full single", nb3),
     ("compact single", nb4),
 ]:
-    assert any(
-        "How to set `DATA_PATH`" in "".join(c.get("source", [])) for c in n["cells"]
-    ), f"{label} missing DATA_PATH guidance"
+    assert any("How to set `DATA_PATH`" in "".join(c.get("source", [])) for c in n["cells"]), (
+        f"{label} missing DATA_PATH guidance"
+    )
 print("All assertions passed.")

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Optional, Tuple, Union
 
 import pandas as pd
+
 from skyulf.engines import SkyulfDataFrame
 
 # Payload for a split slot: engine-neutral frame, pandas frame, or (X, y) tuple.

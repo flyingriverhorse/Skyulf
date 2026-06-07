@@ -7,9 +7,8 @@ Subclasses of Settings that override defaults for development, production, and t
 Uses model_post_init to set overrides — avoids Pydantic "shadows parent" warnings.
 """
 
-from typing import Any, Dict
-
 import logging
+from typing import Any, Dict
 
 from backend.config.base import Settings
 

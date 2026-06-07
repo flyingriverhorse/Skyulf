@@ -1,5 +1,5 @@
-from typing import Any, Dict, Optional, Type
 import logging
+from typing import Any, Dict, Optional, Type
 
 logger = logging.getLogger(__name__)
 

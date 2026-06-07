@@ -59,9 +59,9 @@ def _numeric_frame(draw: st.DrawFn, *, min_rows: int = 5, max_rows: int = 50) ->
 
 def _assert_artifacts_equal(pd_params: Any, pl_params: Any) -> None:
     """Compare two params dicts, treating numeric lists as approx-equal."""
-    assert set(pd_params.keys()) == set(
-        pl_params.keys()
-    ), f"Key mismatch: pandas={set(pd_params)} polars={set(pl_params)}"
+    assert set(pd_params.keys()) == set(pl_params.keys()), (
+        f"Key mismatch: pandas={set(pd_params)} polars={set(pl_params)}"
+    )
     for key, pd_val in pd_params.items():
         pl_val = pl_params[key]
         if isinstance(pd_val, list) and pd_val and isinstance(pd_val[0], (int, float)):
@@ -83,9 +83,9 @@ def _assert_bounds_equal(
     assert pd_params.get("type") == pl_params.get("type")
     pd_bounds: Dict[str, Any] = pd_params.get(bounds_key, {})
     pl_bounds: Dict[str, Any] = pl_params.get(bounds_key, {})
-    assert set(pd_bounds.keys()) == set(
-        pl_bounds.keys()
-    ), f"Bounds column mismatch: pandas={set(pd_bounds)} polars={set(pl_bounds)}"
+    assert set(pd_bounds.keys()) == set(pl_bounds.keys()), (
+        f"Bounds column mismatch: pandas={set(pd_bounds)} polars={set(pl_bounds)}"
+    )
     for col, pd_b in pd_bounds.items():
         pl_b = pl_bounds[col]
         for stat_key in pd_b:

@@ -1,5 +1,6 @@
 import polars as pl
-from skyulf.modeling.classification import LogisticRegressionCalculator, LogisticRegressionApplier
+
+from skyulf.modeling.classification import LogisticRegressionApplier, LogisticRegressionCalculator
 from skyulf.modeling.cross_validation import perform_cross_validation
 
 

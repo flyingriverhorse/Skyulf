@@ -4,7 +4,7 @@ Tests each model: instantiate → fit → predict → verify metrics.
 Covers classification (9 models) and regression (11 models).
 """
 
-from typing import cast, Any
+from typing import Any, cast
 
 import pandas as pd
 import pytest
@@ -56,8 +56,8 @@ def regression_dataset() -> SplitDataset:
 class TestLogisticRegression:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            LogisticRegressionCalculator,
             LogisticRegressionApplier,
+            LogisticRegressionCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -72,8 +72,8 @@ class TestLogisticRegression:
 
     def test_evaluate(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            LogisticRegressionCalculator,
             LogisticRegressionApplier,
+            LogisticRegressionCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -90,8 +90,8 @@ class TestLogisticRegression:
 class TestRandomForestClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            RandomForestClassifierCalculator,
             RandomForestClassifierApplier,
+            RandomForestClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -107,7 +107,7 @@ class TestRandomForestClassifier:
 
 class TestSVC:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
-        from skyulf.modeling.classification import SVCCalculator, SVCApplier
+        from skyulf.modeling.classification import SVCApplier, SVCCalculator
 
         estimator = StatefulEstimator(
             node_id="svc",
@@ -121,8 +121,8 @@ class TestSVC:
 class TestKNeighborsClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            KNeighborsClassifierCalculator,
             KNeighborsClassifierApplier,
+            KNeighborsClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -137,8 +137,8 @@ class TestKNeighborsClassifier:
 class TestDecisionTreeClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            DecisionTreeClassifierCalculator,
             DecisionTreeClassifierApplier,
+            DecisionTreeClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -153,8 +153,8 @@ class TestDecisionTreeClassifier:
 class TestGradientBoostingClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            GradientBoostingClassifierCalculator,
             GradientBoostingClassifierApplier,
+            GradientBoostingClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -171,8 +171,8 @@ class TestGradientBoostingClassifier:
 class TestAdaBoostClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            AdaBoostClassifierCalculator,
             AdaBoostClassifierApplier,
+            AdaBoostClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -188,7 +188,7 @@ class TestAdaBoostClassifier:
 
 class TestGaussianNB:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
-        from skyulf.modeling.classification import GaussianNBCalculator, GaussianNBApplier
+        from skyulf.modeling.classification import GaussianNBApplier, GaussianNBCalculator
 
         estimator = StatefulEstimator(
             node_id="gnb",
@@ -202,7 +202,7 @@ class TestGaussianNB:
 class TestXGBClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         pytest.importorskip("xgboost")
-        from skyulf.modeling.classification import XGBClassifierCalculator, XGBClassifierApplier
+        from skyulf.modeling.classification import XGBClassifierApplier, XGBClassifierCalculator
 
         estimator = StatefulEstimator(
             node_id="xgbc",
@@ -222,7 +222,7 @@ class TestXGBClassifier:
 
 class TestLinearRegression:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
-        from skyulf.modeling.regression import LinearRegressionCalculator, LinearRegressionApplier
+        from skyulf.modeling.regression import LinearRegressionApplier, LinearRegressionCalculator
 
         estimator = StatefulEstimator(
             node_id="linreg",
@@ -235,7 +235,7 @@ class TestLinearRegression:
 
 class TestRidgeRegression:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
-        from skyulf.modeling.regression import RidgeRegressionCalculator, RidgeRegressionApplier
+        from skyulf.modeling.regression import RidgeRegressionApplier, RidgeRegressionCalculator
 
         estimator = StatefulEstimator(
             node_id="ridge",
@@ -248,7 +248,7 @@ class TestRidgeRegression:
 
 class TestLassoRegression:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
-        from skyulf.modeling.regression import LassoRegressionCalculator, LassoRegressionApplier
+        from skyulf.modeling.regression import LassoRegressionApplier, LassoRegressionCalculator
 
         estimator = StatefulEstimator(
             node_id="lasso",
@@ -262,8 +262,8 @@ class TestLassoRegression:
 class TestElasticNetRegression:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            ElasticNetRegressionCalculator,
             ElasticNetRegressionApplier,
+            ElasticNetRegressionCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -278,8 +278,8 @@ class TestElasticNetRegression:
 class TestRandomForestRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            RandomForestRegressorCalculator,
             RandomForestRegressorApplier,
+            RandomForestRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -294,8 +294,8 @@ class TestRandomForestRegressor:
 
     def test_evaluate_regression_metrics(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            RandomForestRegressorCalculator,
             RandomForestRegressorApplier,
+            RandomForestRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -313,7 +313,7 @@ class TestRandomForestRegressor:
 
 class TestSVR:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
-        from skyulf.modeling.regression import SVRCalculator, SVRApplier
+        from skyulf.modeling.regression import SVRApplier, SVRCalculator
 
         estimator = StatefulEstimator(
             node_id="svr",
@@ -327,8 +327,8 @@ class TestSVR:
 class TestKNeighborsRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            KNeighborsRegressorCalculator,
             KNeighborsRegressorApplier,
+            KNeighborsRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -343,8 +343,8 @@ class TestKNeighborsRegressor:
 class TestDecisionTreeRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            DecisionTreeRegressorCalculator,
             DecisionTreeRegressorApplier,
+            DecisionTreeRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -359,8 +359,8 @@ class TestDecisionTreeRegressor:
 class TestGradientBoostingRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            GradientBoostingRegressorCalculator,
             GradientBoostingRegressorApplier,
+            GradientBoostingRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -376,7 +376,7 @@ class TestGradientBoostingRegressor:
 
 class TestAdaBoostRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
-        from skyulf.modeling.regression import AdaBoostRegressorCalculator, AdaBoostRegressorApplier
+        from skyulf.modeling.regression import AdaBoostRegressorApplier, AdaBoostRegressorCalculator
 
         estimator = StatefulEstimator(
             node_id="abr",
@@ -392,7 +392,7 @@ class TestAdaBoostRegressor:
 class TestXGBRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         pytest.importorskip("xgboost")
-        from skyulf.modeling.regression import XGBRegressorCalculator, XGBRegressorApplier
+        from skyulf.modeling.regression import XGBRegressorApplier, XGBRegressorCalculator
 
         estimator = StatefulEstimator(
             node_id="xgbr",
@@ -413,8 +413,8 @@ class TestXGBRegressor:
 class TestExtraTreesClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            ExtraTreesClassifierCalculator,
             ExtraTreesClassifierApplier,
+            ExtraTreesClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -429,8 +429,8 @@ class TestExtraTreesClassifier:
 
     def test_evaluate(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            ExtraTreesClassifierCalculator,
             ExtraTreesClassifierApplier,
+            ExtraTreesClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -449,8 +449,8 @@ class TestExtraTreesClassifier:
 class TestExtraTreesRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            ExtraTreesRegressorCalculator,
             ExtraTreesRegressorApplier,
+            ExtraTreesRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -465,8 +465,8 @@ class TestExtraTreesRegressor:
 
     def test_evaluate(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            ExtraTreesRegressorCalculator,
             ExtraTreesRegressorApplier,
+            ExtraTreesRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -485,8 +485,8 @@ class TestExtraTreesRegressor:
 class TestHistGradientBoostingClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         from skyulf.modeling.classification import (
-            HistGradientBoostingClassifierCalculator,
             HistGradientBoostingClassifierApplier,
+            HistGradientBoostingClassifierCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -502,15 +502,17 @@ class TestHistGradientBoostingClassifier:
     def test_handles_nan(self, classification_dataset: SplitDataset) -> None:
         """HistGradientBoosting is natively NaN-tolerant — no imputation needed."""
         import numpy as np
+
         from skyulf.modeling.classification import (
-            HistGradientBoostingClassifierCalculator,
             HistGradientBoostingClassifierApplier,
+            HistGradientBoostingClassifierCalculator,
         )
 
         ds = classification_dataset
         # Inject NaN into training set
-        import pandas as _pd
         from typing import cast as _cast
+
+        import pandas as _pd
 
         train_with_nan = _pd.DataFrame(_cast(_pd.DataFrame, ds.train)).copy()
         train_with_nan.iloc[0, 0] = np.nan
@@ -533,8 +535,8 @@ class TestHistGradientBoostingClassifier:
 class TestHistGradientBoostingRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            HistGradientBoostingRegressorCalculator,
             HistGradientBoostingRegressorApplier,
+            HistGradientBoostingRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -549,8 +551,8 @@ class TestHistGradientBoostingRegressor:
 
     def test_evaluate(self, regression_dataset: SplitDataset) -> None:
         from skyulf.modeling.regression import (
-            HistGradientBoostingRegressorCalculator,
             HistGradientBoostingRegressorApplier,
+            HistGradientBoostingRegressorCalculator,
         )
 
         estimator = StatefulEstimator(
@@ -569,7 +571,7 @@ class TestHistGradientBoostingRegressor:
 class TestLGBMClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
         pytest.importorskip("lightgbm")
-        from skyulf.modeling.classification import LGBMClassifierCalculator, LGBMClassifierApplier
+        from skyulf.modeling.classification import LGBMClassifierApplier, LGBMClassifierCalculator
 
         estimator = StatefulEstimator(
             node_id="lgbmc",
@@ -583,7 +585,7 @@ class TestLGBMClassifier:
 
     def test_evaluate(self, classification_dataset: SplitDataset) -> None:
         pytest.importorskip("lightgbm")
-        from skyulf.modeling.classification import LGBMClassifierCalculator, LGBMClassifierApplier
+        from skyulf.modeling.classification import LGBMClassifierApplier, LGBMClassifierCalculator
 
         estimator = StatefulEstimator(
             node_id="lgbmc",
@@ -601,7 +603,7 @@ class TestLGBMClassifier:
 class TestLGBMRegressor:
     def test_fit_predict(self, regression_dataset: SplitDataset) -> None:
         pytest.importorskip("lightgbm")
-        from skyulf.modeling.regression import LGBMRegressorCalculator, LGBMRegressorApplier
+        from skyulf.modeling.regression import LGBMRegressorApplier, LGBMRegressorCalculator
 
         estimator = StatefulEstimator(
             node_id="lgbmr",
@@ -615,7 +617,7 @@ class TestLGBMRegressor:
 
     def test_evaluate(self, regression_dataset: SplitDataset) -> None:
         pytest.importorskip("lightgbm")
-        from skyulf.modeling.regression import LGBMRegressorCalculator, LGBMRegressorApplier
+        from skyulf.modeling.regression import LGBMRegressorApplier, LGBMRegressorCalculator
 
         estimator = StatefulEstimator(
             node_id="lgbmr",

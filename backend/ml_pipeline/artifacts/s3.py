@@ -1,7 +1,8 @@
+import logging
 import os
 from typing import Any, Optional
+
 import joblib
-import logging
 
 from .store import ArtifactStore
 

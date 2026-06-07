@@ -1,12 +1,12 @@
-import sys
 import os
+import sys
 
 # Setup path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../skyulf-core")))
 
-from skyulf.registry import NodeRegistry as SkyulfRegistry
 from backend.ml_pipeline.constants import StepType  # noqa: F401
+from skyulf.registry import NodeRegistry as SkyulfRegistry
 
 dynamic_ids = set(SkyulfRegistry.get_all_metadata().keys())
 

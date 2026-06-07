@@ -1,5 +1,7 @@
-import polars as pl
 from typing import Dict, Optional, cast
+
+import polars as pl
+
 from backend.data_ingestion.connectors.base import BaseConnector
 
 

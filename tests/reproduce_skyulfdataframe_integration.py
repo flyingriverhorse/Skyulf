@@ -1,13 +1,14 @@
-import sys
 import os
+import sys
+
 import pandas as pd
 
 # Add local skyulf-core to path
 sys.path.append(os.path.join(os.getcwd(), "skyulf-core"))
 
-from skyulf.pipeline import SkyulfPipeline
 from skyulf.engines.pandas_engine import PandasEngine
 from skyulf.engines.protocol import SkyulfDataFrame
+from skyulf.pipeline import SkyulfPipeline
 
 
 def test_skyulfdataframe_integration():

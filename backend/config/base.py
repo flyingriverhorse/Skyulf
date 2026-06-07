@@ -7,11 +7,10 @@ Combines all domain mixins into one flat ``Settings`` class.
 Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 """
 
-from typing import Any, List, cast
-
 import logging
 import os
 import urllib.parse
+from typing import Any, List, cast
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
