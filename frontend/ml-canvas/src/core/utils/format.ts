@@ -212,6 +212,8 @@ export interface EnsembleSummary {
   passthrough?: boolean | undefined;
   weights?: number[] | undefined;
   nJobs?: number | undefined;
+  calibrateBaseModels?: boolean | undefined;
+  calibrationMethod?: string | undefined;
   isStacking: boolean;
 }
 
@@ -246,6 +248,12 @@ export const extractEnsembleSummary = (
     passthrough: isStacking && typeof bucket.passthrough === 'boolean' ? bucket.passthrough : undefined,
     weights: !isStacking ? weights : undefined,
     nJobs: typeof bucket.n_jobs === 'number' ? bucket.n_jobs : undefined,
+    // Calibration is classification-only; surface it when enabled.
+    calibrateBaseModels: bucket.calibrate_base_models === true ? true : undefined,
+    calibrationMethod:
+      bucket.calibrate_base_models === true && typeof bucket.calibration_method === 'string'
+        ? bucket.calibration_method
+        : undefined,
     isStacking,
   };
 };

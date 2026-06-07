@@ -19,6 +19,8 @@ type RunMode = 'basic' | 'advanced';
 
 export interface EnsembleConfig {
   task: Task;
+  // Set once the user manually toggles Task; suppresses target-dtype auto-detection.
+  task_manual?: boolean;
   strategy: Strategy;
   model_type: string;
   base_estimators: string[];
@@ -33,6 +35,11 @@ export interface EnsembleConfig {
   weights?: Record<string, number>;
   // Base models fit in parallel. 1 = sequential, -1 = all cores.
   n_jobs?: number;
+  // Classification only: wrap each base classifier in CalibratedClassifierCV so
+  // its predicted probabilities are well-calibrated (better soft voting/stacking).
+  calibrate_base_models?: boolean;
+  calibration_method?: 'sigmoid' | 'isotonic';
+  calibration_cv?: number;
   target_column: string;
   cv_enabled: boolean;
   cv_folds: number;
@@ -122,6 +129,29 @@ function defaultFinalEstimator(task: Task): string {
 
 function defaultMetric(task: Task): string {
   return task === 'classification' ? 'accuracy' : 'r2';
+}
+
+/**
+ * Infer the ML task from the target column's profile, mirroring the backend EDA
+ * heuristic (`skyulf.profiling`): float → regression, boolean / string /
+ * categorical → classification, integer → classification only when it is
+ * low-cardinality (reads as discrete class labels) otherwise regression.
+ * Returns ``null`` when the dtype is unknown so callers keep the current task.
+ */
+function inferTaskFromColumn(col: ColumnProfile | undefined): Task | null {
+  if (!col) return null;
+  const dt = String(col.dtype).toLowerCase();
+  if (dt.includes('bool')) return 'classification';
+  if (dt.includes('object') || dt.includes('string') || dt.includes('category') || dt.includes('text')) {
+    return 'classification';
+  }
+  if (dt.includes('float') || dt.includes('double') || dt.includes('decimal')) {
+    return 'regression';
+  }
+  if (dt.includes('int')) {
+    return col.unique_count > 0 && col.unique_count <= 20 ? 'classification' : 'regression';
+  }
+  return null;
 }
 
 function metricOptions(task: Task): Option[] {
@@ -350,6 +380,57 @@ function ParallelJobsSection({ config, update }: { config: EnsembleConfig; updat
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+    </div>
+  );
+}
+
+/** Classification only: wrap each base classifier in CalibratedClassifierCV. */
+function CalibrationSection({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  if (config.task !== 'classification') return null;
+  const enabled = config.calibrate_base_models === true;
+  return (
+    <div className="space-y-1.5">
+      <div>
+        <label className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => { update({ calibrate_base_models: e.target.checked }); }}
+            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          />
+          Calibrate base models
+        </label>
+        <p className="mt-1 pl-6 text-xs text-gray-500 dark:text-gray-400">
+          Wrap each base classifier in CalibratedClassifierCV so its probabilities are
+          well-calibrated — improves soft voting and stacking.
+        </p>
+      </div>
+      {enabled && (
+        <div className="grid grid-cols-2 gap-3 pl-6">
+          <div>
+            <span className="block text-xs text-gray-500 mb-1">Method</span>
+            <select
+              value={config.calibration_method ?? 'sigmoid'}
+              onChange={(e) => { update({ calibration_method: e.target.value as 'sigmoid' | 'isotonic' }); }}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+            >
+              <option value="sigmoid">Sigmoid (Platt)</option>
+              <option value="isotonic">Isotonic</option>
+            </select>
+          </div>
+          <div>
+            <span className="block text-xs text-gray-500 mb-1">CV Folds</span>
+            <input
+              type="number"
+              min={2}
+              max={10}
+              value={config.calibration_cv ?? 3}
+              onChange={(e) => { update({ calibration_cv: Number(e.target.value) }); }}
+              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -640,7 +721,10 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
   onChange: (c: EnsembleConfig) => void;
   nodeId?: string;
 }) {
-  const [containerRef] = useElementSize();
+  const [containerRef, { width }] = useElementSize();
+  // Wide enough (expanded node view) to split the form into two side-by-side
+  // columns instead of one long scroll; the sidebar stays single-column.
+  const isWide = width >= 560;
   const [showCV, setShowCV] = useState(false);
   const [showBaseParams, setShowBaseParams] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_ensemble'));
@@ -735,7 +819,9 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
     }
 
     // 3. Resolve base estimators & parameter maps from all connected nodes
-    const taskToUse = detectedTask || config.task;
+    // Honour a manual task choice: once the user picks a task by hand
+    // (`task_manual`), wiring a model must not force it back.
+    const taskToUse = config.task_manual ? config.task : (detectedTask || config.task);
     const resolvedBaseEstimators: string[] = [];
     const resolvedBaseParams: Record<string, Record<string, unknown>> = {
       ...(config.base_estimator_params || {}),
@@ -774,7 +860,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
     // 5. Build state comparison patch and fire onChange conditionally
     const patch: Partial<EnsembleConfig> = {};
 
-    if (detectedTask && detectedTask !== config.task) {
+    if (detectedTask && detectedTask !== config.task && !config.task_manual) {
       patch.task = detectedTask;
       patch.model_type = resolveModelId(detectedTask, config.strategy);
     }
@@ -870,9 +956,50 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamTarget, config.target_column]);
 
+  // Are any model nodes wired into this ensemble? When so, the auto-sync effect
+  // above drives the task from those nodes, so the target-dtype inference below
+  // stands down to avoid the two paths fighting over `config.task`.
+  const hasWiredModel = useMemo(() => {
+    if (!nodeId) return false;
+    return edges.some((e) => {
+      if (e.target !== nodeId) return false;
+      const src = nodes.find((n) => n.id === e.source);
+      return (
+        !!src &&
+        ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'].includes(
+          src.data.definitionType as string,
+        )
+      );
+    });
+  }, [nodeId, edges, nodes]);
+
+  // Auto-detect the task from the chosen target column's dtype/cardinality, the
+  // same way the EDA profiler infers it, so the four ensemble ids stay aligned
+  // with the target without the user toggling Task by hand. Only flips when the
+  // inference actually disagrees with the current task, and stands down once the
+  // user has manually picked a task (`task_manual`).
+  useEffect(() => {
+    if (hasWiredModel || config.task_manual || !config.target_column) return;
+    const col = availableColumns.find((c) => c.name === config.target_column);
+    const inferred = inferTaskFromColumn(col);
+    if (inferred && inferred !== config.task) {
+      onChange({
+        ...config,
+        task: inferred,
+        model_type: resolveModelId(inferred, config.strategy),
+        base_estimators: defaultBaseEstimators(inferred),
+        final_estimator: defaultFinalEstimator(inferred),
+        metric: defaultMetric(inferred),
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasWiredModel, config.task_manual, config.target_column, config.strategy, availableColumns]);
+
   const onTask = (task: Task) => {
     update({
       task,
+      // Manual choice locks the task so auto-detection stops overriding it.
+      task_manual: true,
       model_type: resolveModelId(task, config.strategy),
       base_estimators: defaultBaseEstimators(task),
       final_estimator: defaultFinalEstimator(task),
@@ -902,9 +1029,28 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-1 pb-4 space-y-5">
-        <div className="space-y-1.5">
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Task</span>
+      <div className="flex-1 overflow-y-auto px-1 pb-4">
+        <div className={isWide ? 'grid grid-cols-2 gap-x-6 gap-y-5 items-start' : 'space-y-5'}>
+          {/* Left column: primary setup */}
+          <div className="space-y-5">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Task</span>
+            {config.task_manual ? (
+              <button
+                type="button"
+                onClick={() => { update({ task_manual: false }); }}
+                className="text-[10px] text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5"
+                title="Re-enable automatic detection from the target column"
+              >
+                <Sparkles className="w-2.5 h-2.5" /> Auto-detect
+              </button>
+            ) : (
+              <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5" title="Inferred from the target column's type">
+                <Sparkles className="w-2.5 h-2.5" /> Auto
+              </span>
+            )}
+          </div>
           <SegmentedToggle
             options={[{ label: 'Classification', value: 'classification' }, { label: 'Regression', value: 'regression' }]}
             value={config.task}
@@ -953,11 +1099,17 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           )}
         </div>
 
-        <StrategyOptions config={config} update={update} options={currentOptions} />
+        <TargetSelector config={config} update={update} columns={availableColumns} />
+          </div>
+
+          {/* Right column: strategy options, tuning, calibration, CV */}
+          <div className="space-y-5">
+            <StrategyOptions config={config} update={update} options={currentOptions} />
 
         <VotingWeightsSection config={config} update={update} optionLabels={optionLabelMap(currentOptions)} />
 
         <ParallelJobsSection config={config} update={update} />
+        <CalibrationSection config={config} update={update} />
 
         {isAdvanced && <AdvancedTuningOptions config={config} update={update} />}
 
@@ -966,13 +1118,13 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           <span>Models like SVC/KNN/Logistic Regression benefit from a <strong>Scaler</strong> node upstream.</span>
         </div>
 
-        <TargetSelector config={config} update={update} columns={availableColumns} />
-
         {!isAdvanced && (
           <BaseParamsSection config={config} update={update} open={showBaseParams} setOpen={setShowBaseParams} options={currentOptions} />
         )}
 
         <CrossValidationSection config={config} update={update} showCV={showCV} setShowCV={setShowCV} columns={availableColumns} />
+        </div>
+        </div>
       </div>
 
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
@@ -985,7 +1137,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
         >
           {isAdvanced ? <Sparkles className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
           <span className="text-sm font-semibold">
-            {isAdvanced ? 'Start Ensemble Tuning' : 'Start Ensemble Training'}
+            {isAdvanced ? 'Start Ensemble Modeling' : 'Start Ensemble Training'}
           </span>
         </button>
       </div>

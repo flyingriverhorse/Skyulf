@@ -534,6 +534,12 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                                                                 <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{ensemble.nJobs === -1 ? 'All cores' : ensemble.nJobs}</span>
                                                                             </div>
                                                                         )}
+                                                                        {ensemble.calibrateBaseModels && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Calibration:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{ensemble.calibrationMethod === 'isotonic' ? 'Isotonic' : 'Sigmoid'}</span>
+                                                                            </div>
+                                                                        )}
                                                                     </>
                                                                 )}
                                                                 <div>
