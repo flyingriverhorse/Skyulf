@@ -9,7 +9,7 @@ import pandas as pd
 # --- Optional Dependencies ---
 fuzz: Any = None
 try:
-    from rapidfuzz import (  # type: ignore[import-not-found]
+    from rapidfuzz import (  # type: ignore[import-not-found]  # ty: ignore[unresolved-import]
         fuzz as _fuzz,
     )
 
