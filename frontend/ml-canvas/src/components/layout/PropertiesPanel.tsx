@@ -190,6 +190,12 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
   // canvas / engine / UI all agree on which types are auto-parallel.
   const isAutoParallel = isAutoParallelType(definitionType);
 
+  // The Ensemble node's fan-in is one dataset edge plus N model-spec edges
+  // (base learners), not a column merge — so the "resolve overlapping columns"
+  // strategy is meaningless here. The pipeline converter separates these inputs
+  // by source type and never column-merges them.
+  const isEnsemble = definitionType === 'EnsembleNode';
+
   // Modeling nodes expose an explicit Multi-Input Mode toggle (merge / parallel).
   // When the user picks "parallel", merging is skipped at runtime, so the
   // strategy dropdown would be misleading. Hide it in that case.
@@ -197,8 +203,8 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
 
   // Only expose the strategy when the node actually merges: multi-input
   // node with 2+ distinct upstream sources, not an auto-parallel terminal,
-  // and not explicitly set to parallel execution.
-  if (!canMerge || incomingSourceCount < 2 || isAutoParallel || isParallelMode) return null;
+  // not an ensemble (model-spec fan-in), and not explicitly set to parallel.
+  if (!canMerge || incomingSourceCount < 2 || isAutoParallel || isEnsemble || isParallelMode) return null;
 
   const current = getMergeStrategy(selectedNode.data);
 
