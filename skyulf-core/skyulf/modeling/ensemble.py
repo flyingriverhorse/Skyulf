@@ -21,8 +21,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import (
+    AdaBoostClassifier,
+    AdaBoostRegressor,
+    ExtraTreesClassifier,
+    ExtraTreesRegressor,
     GradientBoostingClassifier,
     GradientBoostingRegressor,
+    HistGradientBoostingClassifier,
+    HistGradientBoostingRegressor,
     RandomForestClassifier,
     RandomForestRegressor,
     StackingClassifier,
@@ -30,11 +36,37 @@ from sklearn.ensemble import (
     VotingClassifier,
     VotingRegressor,
 )
-from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
+from sklearn.linear_model import (
+    ElasticNet,
+    Lasso,
+    LinearRegression,
+    LogisticRegression,
+    Ridge,
+)
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+
+# Optional gradient-boosting libraries. Mirrors the guarded imports in
+# ``modeling.classification`` / ``modeling.regression`` — when the wheel is not
+# installed the base learner is simply absent from the selectable factories.
+try:
+    from xgboost import XGBClassifier, XGBRegressor  # ty: ignore[unresolved-import]
+
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+
+try:
+    from lightgbm import (  # ty: ignore[unresolved-import]
+        LGBMClassifier,
+        LGBMRegressor,
+    )
+
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
@@ -49,7 +81,10 @@ logger = logging.getLogger(__name__)
 BASE_ESTIMATORS_CLF: Dict[str, Callable[[], BaseEstimator]] = {
     "logistic_regression": lambda: LogisticRegression(max_iter=1000),
     "random_forest": lambda: RandomForestClassifier(n_estimators=100, random_state=42),
+    "extra_trees": lambda: ExtraTreesClassifier(n_estimators=100, random_state=42),
     "gradient_boosting": lambda: GradientBoostingClassifier(random_state=42),
+    "hist_gradient_boosting": lambda: HistGradientBoostingClassifier(random_state=42),
+    "adaboost": lambda: AdaBoostClassifier(random_state=42),
     "decision_tree": lambda: DecisionTreeClassifier(random_state=42),
     "gaussian_nb": lambda: GaussianNB(),
     "svc": lambda: SVC(probability=True, random_state=42),
@@ -59,12 +94,27 @@ BASE_ESTIMATORS_CLF: Dict[str, Callable[[], BaseEstimator]] = {
 BASE_ESTIMATORS_REG: Dict[str, Callable[[], BaseEstimator]] = {
     "linear_regression": lambda: LinearRegression(),
     "ridge": lambda: Ridge(),
+    "lasso": lambda: Lasso(),
+    "elasticnet": lambda: ElasticNet(),
     "random_forest": lambda: RandomForestRegressor(n_estimators=100, random_state=42),
+    "extra_trees": lambda: ExtraTreesRegressor(n_estimators=100, random_state=42),
     "gradient_boosting": lambda: GradientBoostingRegressor(random_state=42),
+    "hist_gradient_boosting": lambda: HistGradientBoostingRegressor(random_state=42),
+    "adaboost": lambda: AdaBoostRegressor(random_state=42),
     "decision_tree": lambda: DecisionTreeRegressor(random_state=42),
     "svr": lambda: SVR(),
     "knn": lambda: KNeighborsRegressor(),
 }
+
+# Append the optional boosters only when their library is importable so the
+# selectable set always matches what can actually be constructed at fit time.
+if XGBOOST_AVAILABLE:
+    BASE_ESTIMATORS_CLF["xgboost"] = lambda: XGBClassifier(random_state=42)
+    BASE_ESTIMATORS_REG["xgboost"] = lambda: XGBRegressor(random_state=42)
+
+if LIGHTGBM_AVAILABLE:
+    BASE_ESTIMATORS_CLF["lightgbm"] = lambda: LGBMClassifier(random_state=42, verbose=-1)
+    BASE_ESTIMATORS_REG["lightgbm"] = lambda: LGBMRegressor(random_state=42, verbose=-1)
 
 
 class _BaseEnsembleCalculator(SklearnCalculator):

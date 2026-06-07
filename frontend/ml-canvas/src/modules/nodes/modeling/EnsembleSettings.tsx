@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles,
 } from 'lucide-react';
@@ -8,6 +8,10 @@ import { MultiSelectChips } from './components/MultiSelectChips';
 import { BaseModelParamsEditor } from './components/BaseModelParamsEditor';
 import { HelpTooltip } from './components/HelpTooltip';
 import type { ColumnProfile } from '../../../core/api/client';
+import { registryApi } from '../../../core/api/registry';
+import { StrategySettingsModal } from './components/StrategySettingsModal';
+import { Settings2 } from 'lucide-react';
+import { useGraphStore } from '../../../core/store/useGraphStore';
 
 type Task = 'classification' | 'regression';
 type Strategy = 'voting' | 'stacking';
@@ -38,15 +42,21 @@ export interface EnsembleConfig {
   metric: string;
   tune_base_models: boolean;
   random_state: number;
+  strategy_params?: Record<string, unknown>;
 }
 
 type Option = { label: string; value: string };
 
 // Base learners mirrored from skyulf.modeling.ensemble (BASE_ESTIMATORS_*).
+// Optional boosters (xgboost / lightgbm) are omitted from this manual picker
+// (optional wheels) but are auto-detected when wired in from a model node.
 const CLF_OPTIONS: Option[] = [
   { label: 'Logistic Regression', value: 'logistic_regression' },
   { label: 'Random Forest', value: 'random_forest' },
+  { label: 'Extra Trees', value: 'extra_trees' },
   { label: 'Gradient Boosting', value: 'gradient_boosting' },
+  { label: 'Hist Gradient Boosting', value: 'hist_gradient_boosting' },
+  { label: 'AdaBoost', value: 'adaboost' },
   { label: 'Decision Tree', value: 'decision_tree' },
   { label: 'Gaussian Naive Bayes', value: 'gaussian_nb' },
   { label: 'Support Vector Classifier', value: 'svc' },
@@ -56,15 +66,36 @@ const CLF_OPTIONS: Option[] = [
 const REG_OPTIONS: Option[] = [
   { label: 'Linear Regression', value: 'linear_regression' },
   { label: 'Ridge', value: 'ridge' },
+  { label: 'Lasso', value: 'lasso' },
+  { label: 'ElasticNet', value: 'elasticnet' },
   { label: 'Random Forest', value: 'random_forest' },
+  { label: 'Extra Trees', value: 'extra_trees' },
   { label: 'Gradient Boosting', value: 'gradient_boosting' },
+  { label: 'Hist Gradient Boosting', value: 'hist_gradient_boosting' },
+  { label: 'AdaBoost', value: 'adaboost' },
   { label: 'Decision Tree', value: 'decision_tree' },
   { label: 'Support Vector Regressor', value: 'svr' },
   { label: 'K-Nearest Neighbors', value: 'knn' },
 ];
 
-function baseOptions(task: Task): Option[] {
-  return task === 'classification' ? CLF_OPTIONS : REG_OPTIONS;
+function baseOptions(task: Task, availableIds?: Set<string>, currentSelection: string[] = []): Option[] {
+  const base = task === 'classification' ? [...CLF_OPTIONS] : [...REG_OPTIONS];
+  if (task === 'classification') {
+    if ((availableIds && availableIds.has('xgboost_classifier')) || currentSelection.includes('xgboost')) {
+      base.push({ label: 'XGBoost', value: 'xgboost' });
+    }
+    if ((availableIds && availableIds.has('lgbm_classifier')) || currentSelection.includes('lightgbm')) {
+      base.push({ label: 'LightGBM', value: 'lightgbm' });
+    }
+  } else {
+    if ((availableIds && availableIds.has('xgboost_regressor')) || currentSelection.includes('xgboost')) {
+      base.push({ label: 'XGBoost', value: 'xgboost' });
+    }
+    if ((availableIds && availableIds.has('lgbm_regressor')) || currentSelection.includes('lightgbm')) {
+      base.push({ label: 'LightGBM', value: 'lightgbm' });
+    }
+  }
+  return base;
 }
 
 function resolveModelId(task: Task, strategy: Strategy): string {
@@ -108,8 +139,57 @@ const SEARCH_STRATEGIES: Option[] = [
   { label: 'Halving Grid', value: 'halving_grid' },
 ];
 
-function optionLabelMap(task: Task): Record<string, string> {
-  return Object.fromEntries(baseOptions(task).map((o) => [o.value, o.label]));
+const LOOKUP_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', Record<string, string>> = {
+  classification: {
+    logistic_regression: 'logistic_regression',
+    random_forest_classifier: 'random_forest',
+    extra_trees_classifier: 'extra_trees',
+    gradient_boosting_classifier: 'gradient_boosting',
+    hist_gradient_boosting_classifier: 'hist_gradient_boosting',
+    adaboost_classifier: 'adaboost',
+    decision_tree_classifier: 'decision_tree',
+    gaussian_nb: 'gaussian_nb',
+    svc: 'svc',
+    k_neighbors_classifier: 'knn',
+    xgboost_classifier: 'xgboost',
+    lgbm_classifier: 'lightgbm',
+  },
+  regression: {
+    linear_regression: 'linear_regression',
+    ridge_regression: 'ridge',
+    lasso_regression: 'lasso',
+    elasticnet_regression: 'elasticnet',
+    random_forest_regressor: 'random_forest',
+    extra_trees_regressor: 'extra_trees',
+    gradient_boosting_regressor: 'gradient_boosting',
+    hist_gradient_boosting_regressor: 'hist_gradient_boosting',
+    adaboost_regressor: 'adaboost',
+    decision_tree_regressor: 'decision_tree',
+    svr: 'svr',
+    k_neighbors_regressor: 'knn',
+    xgboost_regressor: 'xgboost',
+    lgbm_regressor: 'lightgbm',
+  },
+};
+
+function lookupTaskFromModelType(modelType: string): 'classification' | 'regression' | null {
+  if (modelType in LOOKUP_BASE_KEY_BY_MODEL_TYPE.classification) return 'classification';
+  if (modelType in LOOKUP_BASE_KEY_BY_MODEL_TYPE.regression) return 'regression';
+  if (modelType.endsWith('_classifier') || modelType === 'logistic_regression' || modelType === 'gaussian_nb' || modelType === 'svc') {
+    return 'classification';
+  }
+  if (modelType.endsWith('_regressor') || modelType === 'linear_regression' || modelType.includes('regression') || modelType === 'svr') {
+    return 'regression';
+  }
+  return null;
+}
+
+function resolveEnsembleBaseKey(modelType: string, task: Task): string | null {
+  return LOOKUP_BASE_KEY_BY_MODEL_TYPE[task][modelType] ?? null;
+}
+
+function optionLabelMap(options: Option[]): Record<string, string> {
+  return Object.fromEntries(options.map((o) => [o.value, o.label]));
 }
 
 type UpdateFn = (patch: Partial<EnsembleConfig>) => void;
@@ -141,7 +221,7 @@ function SegmentedToggle({ options, value, onSelect }: {
 }
 
 /** Strategy-specific options: voting type (clf voting) or final estimator + CV (stacking). */
-function StrategyOptions({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+function StrategyOptions({ config, update, options }: { config: EnsembleConfig; update: UpdateFn; options: Option[] }) {
   if (config.strategy === 'voting') {
     if (config.task !== 'classification') return null;
     return (
@@ -164,7 +244,7 @@ function StrategyOptions({ config, update }: { config: EnsembleConfig; update: U
           onChange={(e) => { update({ final_estimator: e.target.value }); }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
         >
-          {baseOptions(config.task).map((opt) => (
+          {options.map((opt) => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
@@ -336,6 +416,12 @@ function TargetSelector({ config, update, columns }: {
 
 /** Tuning controls shown in Advanced mode: search strategy, trial budget, metric. */
 function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  const [showStrategyModal, setShowStrategyModal] = useState(false);
+  const showStrategyBtn =
+    config.search_strategy === 'halving_grid' ||
+    config.search_strategy === 'halving_random' ||
+    config.search_strategy === 'optuna';
+
   return (
     <div className="space-y-3 p-3 rounded-lg border border-purple-100 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/10">
       <div className="flex items-center gap-1.5">
@@ -344,10 +430,27 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <span className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">Search Strategy</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Search Strategy</span>
+            {showStrategyBtn && (
+              <button
+                type="button"
+                onClick={() => { setShowStrategyModal(true); }}
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 p-0.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition group flex items-center justify-center"
+                title={`${config.search_strategy.replace('_', ' ')} Settings`}
+              >
+                <Settings2 size={13} className="group-hover:rotate-45 transition-transform duration-300" />
+              </button>
+            )}
+          </div>
           <select
             value={config.search_strategy}
-            onChange={(e) => { update({ search_strategy: e.target.value }); }}
+            onChange={(e) => {
+              update({
+                search_strategy: e.target.value,
+                strategy_params: {} // clear params on change to prevent carryover
+              });
+            }}
             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
           >
             {SEARCH_STRATEGIES.map((opt) => (
@@ -390,16 +493,28 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
           (e.g. <code>random_forest__n_estimators</code>) in addition to the ensemble&apos;s own.
         </span>
       </label>
+
+      {showStrategyModal && (
+        <StrategySettingsModal
+          isOpen={showStrategyModal}
+          onClose={() => { setShowStrategyModal(false); }}
+          onSave={(p) => { update({ strategy_params: p as Record<string, unknown> }); }}
+          strategy={config.search_strategy}
+          initialConfig={config.strategy_params}
+          modelKey={config.model_type}
+        />
+      )}
     </div>
   );
 }
 
 /** Collapsible per-base-model fixed hyperparameter editor (Basic mode). */
-function BaseParamsSection({ config, update, open, setOpen }: {
+function BaseParamsSection({ config, update, open, setOpen, options }: {
   config: EnsembleConfig;
   update: UpdateFn;
   open: boolean;
   setOpen: (v: boolean) => void;
+  options: Option[];
 }) {
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -420,7 +535,7 @@ function BaseParamsSection({ config, update, open, setOpen }: {
             task={config.task}
             baseEstimators={config.base_estimators ?? []}
             finalEstimator={config.strategy === 'stacking' ? config.final_estimator : undefined}
-            optionLabels={optionLabelMap(config.task)}
+            optionLabels={optionLabelMap(options)}
             baseParams={config.base_estimator_params ?? {}}
             finalParams={config.final_estimator_params ?? {}}
             onChange={(baseParams, finalParams) => {
@@ -444,7 +559,221 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_ensemble'));
   const { availableColumns, upstreamTarget, runJob } = useTrainingNodeContext(nodeId);
 
+  const [availableModelIds, setAvailableModelIds] = useState<Set<string>>(new Set());
+
+  // Fetch available models from backend registry to check for XGBoost/LightGBM
+  useEffect(() => {
+    let active = true;
+    registryApi.getAllNodes()
+      .then((nodes) => {
+        if (active) {
+          setAvailableModelIds(new Set(nodes.map((n) => n.id)));
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to resolve model registry for ensemble settings:', err);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const currentOptions = useMemo(() => {
+    const selected = [
+      ...(config.base_estimators ?? []),
+      ...(config.final_estimator ? [config.final_estimator] : []),
+    ];
+    return baseOptions(config.task, availableModelIds, selected);
+  }, [config.task, availableModelIds, config.base_estimators, config.final_estimator]);
+
   const update: UpdateFn = (patch) => { onChange({ ...config, ...patch }); };
+
+  const nodes = useGraphStore((s) => s.nodes);
+  const edges = useGraphStore((s) => s.edges);
+
+  // Auto-sync ensemble configuration when model nodes are connected on the canvas
+  useEffect(() => {
+    if (!nodeId) return;
+
+    // Find direct incoming model nodes from the canvas
+    const incomingEdges = edges.filter((e) => e.target === nodeId);
+    const incomingModels: any[] = [];
+
+    for (const edge of incomingEdges) {
+      const src = nodes.find((n) => n.id === edge.source);
+      if (src && ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'].includes(src.data.definitionType as string)) {
+        incomingModels.push(src);
+      }
+    }
+
+    if (incomingModels.length === 0) return;
+
+    // 1. Detect Task (classification / regression)
+    let detectedTask: Task | null = null;
+    for (const m of incomingModels) {
+      const mt = m.data.model_type as string;
+      if (mt) {
+        const t = lookupTaskFromModelType(mt);
+        if (t) {
+          detectedTask = t;
+          break;
+        }
+      }
+    }
+
+    // 2. Identify the Run Mode, search strategy, trial count, and metric
+    let detectedRunMode: RunMode = 'basic';
+    let detectedSearchStrategy = config.search_strategy;
+    let detectedTrials = config.n_trials;
+    let detectedMetric = config.metric;
+
+    const advancedNode = incomingModels.find(
+      (m) =>
+        m.data.definitionType === 'advanced_tuning' ||
+        m.data.definitionType === 'hyperparameter_tuning' ||
+        m.data.run_mode === 'advanced'
+    );
+
+    if (advancedNode) {
+      detectedRunMode = 'advanced';
+      if (advancedNode.data.search_strategy) {
+        detectedSearchStrategy = advancedNode.data.search_strategy;
+      }
+      if (advancedNode.data.n_trials) {
+        detectedTrials = advancedNode.data.n_trials;
+      }
+      if (advancedNode.data.metric) {
+        detectedMetric = advancedNode.data.metric;
+      }
+    }
+
+    // 3. Resolve base estimators & parameter maps from all connected nodes
+    const taskToUse = detectedTask || config.task;
+    const resolvedBaseEstimators: string[] = [];
+    const resolvedBaseParams: Record<string, Record<string, unknown>> = {
+      ...(config.base_estimator_params || {}),
+    };
+
+    for (const m of incomingModels) {
+      const mt = m.data.model_type as string;
+      if (mt) {
+        const baseKey = resolveEnsembleBaseKey(mt, taskToUse);
+        if (baseKey) {
+          if (!resolvedBaseEstimators.includes(baseKey)) {
+            resolvedBaseEstimators.push(baseKey);
+          }
+          // Merge hyperparameters to base params so they pre-fill the form
+          const hp = m.data.hyperparameters || m.data.search_space || m.data.params;
+          if (hp && typeof hp === 'object' && Object.keys(hp as object).length > 0) {
+            resolvedBaseParams[baseKey] = {
+              ...(resolvedBaseParams[baseKey] || {}),
+              ...(hp as Record<string, unknown>),
+            };
+          }
+        }
+      }
+    }
+
+    // 4. Trace target column and cross-validation from the first incoming model
+    const firstModel = incomingModels[0];
+    const detectedTarget = firstModel.data.target_column || config.target_column;
+    const detectedCVEnabled = firstModel.data.cv_enabled !== undefined ? firstModel.data.cv_enabled : config.cv_enabled;
+    const detectedCVFolds = firstModel.data.cv_folds || config.cv_folds;
+    const detectedCVType = firstModel.data.cv_type || config.cv_type;
+    const detectedCVShuffle = firstModel.data.cv_shuffle !== undefined ? firstModel.data.cv_shuffle : config.cv_shuffle;
+    const detectedCVRandomState = firstModel.data.cv_random_state || config.cv_random_state;
+    const detectedCVTimeColumn = firstModel.data.cv_time_column || config.cv_time_column;
+
+    // 5. Build state comparison patch and fire onChange conditionally
+    const patch: Partial<EnsembleConfig> = {};
+
+    if (detectedTask && detectedTask !== config.task) {
+      patch.task = detectedTask;
+      patch.model_type = resolveModelId(detectedTask, config.strategy);
+    }
+
+    if (detectedRunMode !== config.run_mode) {
+      patch.run_mode = detectedRunMode;
+    }
+
+    if (detectedSearchStrategy !== config.search_strategy) {
+      patch.search_strategy = detectedSearchStrategy;
+    }
+
+    if (detectedTrials !== config.n_trials) {
+      patch.n_trials = detectedTrials;
+    }
+
+    if (detectedMetric !== config.metric) {
+      patch.metric = detectedMetric;
+    }
+
+    const isBaseDiff =
+      resolvedBaseEstimators.length > 0 &&
+      (resolvedBaseEstimators.length !== config.base_estimators?.length ||
+        !resolvedBaseEstimators.every((v) => config.base_estimators?.includes(v)));
+
+    if (isBaseDiff) {
+      patch.base_estimators = resolvedBaseEstimators;
+    }
+
+    if (detectedTarget && detectedTarget !== config.target_column) {
+      patch.target_column = detectedTarget;
+    }
+
+    if (detectedCVEnabled !== config.cv_enabled) {
+      patch.cv_enabled = detectedCVEnabled;
+    }
+
+    if (detectedCVFolds !== config.cv_folds) {
+      patch.cv_folds = detectedCVFolds;
+    }
+
+    if (detectedCVType !== config.cv_type) {
+      patch.cv_type = detectedCVType;
+    }
+
+    if (detectedCVShuffle !== config.cv_shuffle) {
+      patch.cv_shuffle = detectedCVShuffle;
+    }
+
+    if (detectedCVRandomState !== config.cv_random_state) {
+      patch.cv_random_state = detectedCVRandomState;
+    }
+
+    if (detectedCVTimeColumn !== config.cv_time_column) {
+      patch.cv_time_column = detectedCVTimeColumn;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      onChange({
+        ...config,
+        ...patch,
+        base_estimator_params: resolvedBaseParams,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    nodeId,
+    edges,
+    nodes,
+    config.task,
+    config.strategy,
+    config.run_mode,
+    config.search_strategy,
+    config.n_trials,
+    config.metric,
+    config.base_estimators,
+    config.target_column,
+    config.cv_enabled,
+    config.cv_folds,
+    config.cv_type,
+    config.cv_shuffle,
+    config.cv_random_state,
+    config.cv_time_column,
+    config.base_estimator_params,
+    onChange,
+  ]);
 
   // Auto-fill the target from an upstream Feature/Target split (once, when empty).
   useEffect(() => {
@@ -521,10 +850,14 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           </div>
           <p className="text-[11px] text-gray-500 dark:text-gray-400">Click to add or remove each model in the ensemble.</p>
           <MultiSelectChips
-            options={baseOptions(config.task)}
+            options={currentOptions}
             selected={config.base_estimators ?? []}
             onChange={(vals) => { update({ base_estimators: vals as string[] }); }}
           />
+          <p className="text-[10px] text-gray-400 dark:text-gray-500">
+            Tip: wire model nodes into this ensemble&apos;s input to use them as base
+            learners automatically — connected models override the selection above.
+          </p>
           {tooFewModels && (
             <div className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
@@ -533,7 +866,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
           )}
         </div>
 
-        <StrategyOptions config={config} update={update} />
+        <StrategyOptions config={config} update={update} options={currentOptions} />
 
         {isAdvanced && <AdvancedTuningOptions config={config} update={update} />}
 
@@ -545,7 +878,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
         <TargetSelector config={config} update={update} columns={availableColumns} />
 
         {!isAdvanced && (
-          <BaseParamsSection config={config} update={update} open={showBaseParams} setOpen={setShowBaseParams} />
+          <BaseParamsSection config={config} update={update} open={showBaseParams} setOpen={setShowBaseParams} options={currentOptions} />
         )}
 
         <CrossValidationSection config={config} update={update} showCV={showCV} setShowCV={setShowCV} columns={availableColumns} />

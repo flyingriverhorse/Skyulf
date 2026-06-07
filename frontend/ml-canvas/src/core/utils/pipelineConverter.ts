@@ -5,6 +5,102 @@ import { StepType as BackendStepType } from '../constants/stepTypes';
 import { getMergeStrategy } from '../types/nodeData';
 import { registry } from '../registry/NodeRegistry';
 
+// Canvas node `definitionType`s that represent a trained-model spec. When one of
+// these feeds an Ensemble node it acts as a *base-learner spec provider* (Phase 2):
+// the ensemble reads its `model_type` + `hyperparameters` and re-fits it itself —
+// sklearn Voting/Stacking always refit their base estimators, so only the recipe
+// (not the fitted weights) is reused.
+const MODEL_SOURCE_TYPES = new Set([
+  'model_training',
+  'basic_training',
+  'hyperparameter_tuning',
+  'advanced_tuning',
+]);
+
+// Maps a full training-node `model_type` back to the short ensemble base-learner
+// key the core resolver understands. Mirrors `_BASE_KEY_TO_REGISTRY_*` in
+// `skyulf.modeling.hyperparameters._registry` (inverted). Unsupported model types
+// (xgboost, lightgbm, extra_trees, …) are intentionally absent — the ensemble core
+// only supports these base learners, so anything else is skipped.
+const ENSEMBLE_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', Record<string, string>> = {
+  classification: {
+    logistic_regression: 'logistic_regression',
+    random_forest_classifier: 'random_forest',
+    extra_trees_classifier: 'extra_trees',
+    gradient_boosting_classifier: 'gradient_boosting',
+    hist_gradient_boosting_classifier: 'hist_gradient_boosting',
+    adaboost_classifier: 'adaboost',
+    decision_tree_classifier: 'decision_tree',
+    gaussian_nb: 'gaussian_nb',
+    svc: 'svc',
+    k_neighbors_classifier: 'knn',
+    xgboost_classifier: 'xgboost',
+    lgbm_classifier: 'lightgbm',
+  },
+  regression: {
+    linear_regression: 'linear_regression',
+    ridge_regression: 'ridge',
+    lasso_regression: 'lasso',
+    elasticnet_regression: 'elasticnet',
+    random_forest_regressor: 'random_forest',
+    extra_trees_regressor: 'extra_trees',
+    gradient_boosting_regressor: 'gradient_boosting',
+    hist_gradient_boosting_regressor: 'hist_gradient_boosting',
+    adaboost_regressor: 'adaboost',
+    decision_tree_regressor: 'decision_tree',
+    svr: 'svr',
+    k_neighbors_regressor: 'knn',
+    xgboost_regressor: 'xgboost',
+    lgbm_regressor: 'lightgbm',
+  },
+};
+
+const isModelSourceType = (defType: unknown): boolean =>
+  typeof defType === 'string' && MODEL_SOURCE_TYPES.has(defType);
+
+/** Resolve a connected model node's `model_type` to an ensemble base key, or null. */
+const resolveEnsembleBaseKey = (modelType: unknown, task: unknown): string | null => {
+  if (typeof modelType !== 'string') return null;
+  const t = task === 'regression' ? 'regression' : 'classification';
+  return ENSEMBLE_BASE_KEY_BY_MODEL_TYPE[t][modelType] ?? null;
+};
+
+interface WiredBaseSpec {
+  baseEstimators: string[];
+  baseParams: Record<string, Record<string, unknown>>;
+  modelSourceIds: Set<string>;
+}
+
+/**
+ * Collect base-learner specs from the model nodes wired into an ensemble's input.
+ * Returns the resolved base keys, their per-model hyperparameters, and the set of
+ * source node ids (so they can be excluded from the ensemble's data `inputs`).
+ */
+const collectWiredBaseSpecs = (
+  nodes: Node[],
+  incomingEdges: Edge[],
+  task: unknown,
+): WiredBaseSpec => {
+  const baseEstimators: string[] = [];
+  const baseParams: Record<string, Record<string, unknown>> = {};
+  const modelSourceIds = new Set<string>();
+
+  for (const edge of incomingEdges) {
+    const src = nodes.find((n) => n.id === edge.source);
+    if (!src || !isModelSourceType(src.data.definitionType)) continue;
+    modelSourceIds.add(src.id);
+    const key = resolveEnsembleBaseKey(src.data.model_type, task);
+    if (!key) continue;
+    if (!baseEstimators.includes(key)) baseEstimators.push(key);
+    const hp = src.data.hyperparameters;
+    if (hp && typeof hp === 'object' && Object.keys(hp as object).length > 0) {
+      baseParams[key] = hp as Record<string, unknown>;
+    }
+  }
+
+  return { baseEstimators, baseParams, modelSourceIds };
+};
+
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
     const visited = new Set<string>();
@@ -39,6 +135,10 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       // ensures the backend sees one logical input even though the canvas
       // shows multiple visual edges from the splitter handles.
       const inputs = Array.from(new Set(incomingEdges.map(e => e.source)));
+      // Data inputs actually emitted for this node. The Ensemble branch trims
+      // model-spec sources out of this list (Phase 2) so the backend only sees
+      // the dataset edge and never tries to load a model node as a Dataset.
+      let nodeInputs = inputs;
 
       if (node.data.definitionType === 'dataset_node') {
         stepType = BackendStepType.DATA_LOADER;
@@ -232,6 +332,40 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               execution_mode: node.data.execution_mode
           };
       } else if (node.data.definitionType === 'EnsembleNode') {
+          // Phase 2: auto-detect base learners wired into the ensemble's input.
+          // Model nodes (training/tuning) connected here act as base-learner spec
+          // providers — their `model_type` + `hyperparameters` are read and the
+          // ensemble re-fits them. When any model node is wired, it OVERRIDES the
+          // in-node base-estimator selection; otherwise the in-node chips are used.
+          const wired = collectWiredBaseSpecs(nodes, incomingEdges, node.data.task);
+          const hasWired = wired.baseEstimators.length > 0;
+          const baseEstimators = hasWired ? wired.baseEstimators : node.data.base_estimators;
+          const baseEstimatorParams = hasWired
+              ? { ...(node.data.base_estimator_params as Record<string, unknown> | undefined ?? {}), ...wired.baseParams }
+              : node.data.base_estimator_params;
+          // Drop model-spec sources from the data inputs so the backend only
+          // receives the dataset edge (a model node is not a loadable Dataset).
+          if (wired.modelSourceIds.size > 0) {
+              const directData = inputs.filter(id => !wired.modelSourceIds.has(id));
+              if (directData.length > 0) {
+                  // The ensemble has its own dataset edge — use it as-is.
+                  nodeInputs = directData;
+              } else {
+                  // Common flow: split → model → ensemble (no direct data edge).
+                  // Base learners are spec-only, so the ensemble refits them on
+                  // its OWN data — inherit the data the wired models consume so
+                  // the pipeline still resolves a training dataset. Deduped, and
+                  // model-node sources are excluded to avoid loops.
+                  const inherited = new Set<string>();
+                  for (const mid of wired.modelSourceIds) {
+                      for (const e of edges.filter(ed => ed.target === mid)) {
+                          if (!wired.modelSourceIds.has(e.source)) inherited.add(e.source);
+                      }
+                  }
+                  nodeInputs = Array.from(inherited);
+              }
+          }
+
           // Ensembles can run two ways. Basic training fits the meta-estimator
           // with the chosen base learners as-is; advanced tuning runs the same
           // ensemble through the hyperparameter search engine (the backend
@@ -244,15 +378,16 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   execution_mode: node.data.execution_mode,
                   tuning_config: {
                       strategy: node.data.search_strategy,
+                      strategy_params: node.data.strategy_params || {},
                       metric: node.data.metric,
                       n_trials: node.data.n_trials,
                       // Structural selection the backend resolves into the model.
-                      base_estimators: node.data.base_estimators,
+                      base_estimators: baseEstimators,
                       final_estimator: node.data.final_estimator,
                       voting: node.data.voting,
                       cv: node.data.cv,
                       tune_base_models: node.data.tune_base_models,
-                      base_estimator_params: node.data.base_estimator_params,
+                      base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params,
                       cv_enabled: node.data.cv_enabled,
                       cv_folds: node.data.cv_folds,
@@ -269,11 +404,11 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   target_column: node.data.target_column,
                   model_type: node.data.model_type,
                   hyperparameters: {
-                      base_estimators: node.data.base_estimators,
+                      base_estimators: baseEstimators,
                       voting: node.data.voting,
                       final_estimator: node.data.final_estimator,
                       cv: node.data.cv,
-                      base_estimator_params: node.data.base_estimator_params,
+                      base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params
                   },
                   cv_enabled: node.data.cv_enabled,
@@ -337,11 +472,34 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           if (displayName) merged._display_name = displayName;
           return merged;
         })(),
-        inputs: inputs
+        inputs: nodeInputs
       });
 
       const outgoingEdges = edges.filter(e => e.source === nodeId);
       outgoingEdges.forEach(e => queue.push(e.target));
+    }
+
+    // Phase 2: a model node wired ONLY into ensemble(s) is a base-learner spec
+    // provider, not a standalone trainer. The ensemble re-fits it from its spec,
+    // so drop its own training step to avoid double-training (and to keep the
+    // results tabs free of a redundant standalone model).
+    const ensembleIds = new Set(
+      nodes.filter(n => n.data.definitionType === 'EnsembleNode').map(n => n.id),
+    );
+    if (ensembleIds.size > 0) {
+      const specOnlyIds = new Set<string>();
+      for (const sn of sortedNodes) {
+        const src = nodes.find(n => n.id === sn.node_id);
+        if (!src || !isModelSourceType(src.data.definitionType)) continue;
+        const outs = edges.filter(e => e.source === sn.node_id);
+        if (outs.length > 0 && outs.every(e => ensembleIds.has(e.target))) {
+          specOnlyIds.add(sn.node_id);
+        }
+      }
+      for (let i = sortedNodes.length - 1; i >= 0; i--) {
+        const sn = sortedNodes[i];
+        if (sn && specOnlyIds.has(sn.node_id)) sortedNodes.splice(i, 1);
+      }
     }
 
     // Prune dead-end branches: reverse-walk from terminal/seed nodes,

@@ -179,6 +179,53 @@ export const useGraphStore = create<GraphState>()(
         return;
       }
 
+      // Warn: a model node from a DIFFERENT dataset lineage is wired into an
+      // ensemble. Base learners are spec-only (the ensemble refits them on its
+      // own data), so mixing models trained on unrelated datasets is almost
+      // always a wiring mistake — surface it before the edge is committed.
+      const modelSourceTypes = ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'];
+      if (targetType === 'EnsembleNode' && modelSourceTypes.includes(sourceType)) {
+        // Trace a node back to the dataset_node root(s) it derives from.
+        const rootsOf = (startId: string): Set<string> => {
+          const roots = new Set<string>();
+          const seen = new Set<string>();
+          const stack = [startId];
+          while (stack.length > 0) {
+            const cur = stack.pop()!;
+            if (seen.has(cur)) continue;
+            seen.add(cur);
+            const n = nodes.find((x) => x.id === cur);
+            if (n?.data.definitionType === 'dataset_node') {
+              roots.add(cur);
+              continue;
+            }
+            for (const e of edges.filter((ed) => ed.target === cur)) stack.push(e.source);
+          }
+          return roots;
+        };
+        const sourceRoots = rootsOf(connection.source!);
+        // Existing lineage of the ensemble = roots of everything already wired in.
+        const ensembleRoots = new Set<string>();
+        for (const e of edges.filter((ed) => ed.target === connection.target)) {
+          for (const r of rootsOf(e.source)) ensembleRoots.add(r);
+        }
+        const disjoint =
+          ensembleRoots.size > 0 &&
+          sourceRoots.size > 0 &&
+          ![...sourceRoots].some((r) => ensembleRoots.has(r));
+        if (disjoint) {
+          // window.confirm: see note above on sync onConnect contract.
+          const proceed = window.confirm(
+            'Warning: this model comes from a different dataset than the ensemble\'s ' +
+            'other inputs.\n\n' +
+            'The ensemble re-fits every base learner on a single dataset, so mixing ' +
+            'models trained on unrelated data is usually a wiring mistake.\n\n' +
+            'Click OK to connect anyway, or Cancel to abort.'
+          );
+          if (!proceed) return;
+        }
+      }
+
       // Warn: X/Y Split without prior Train-Test Split
       if (sourceType === 'feature_target_split') {
         let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
@@ -235,6 +282,10 @@ export const useGraphStore = create<GraphState>()(
       const autoParallelTypes = ['data_preview'];
       if (autoParallelTypes.includes(targetType)) {
         // Skip both confirms below; each input becomes its own preview tab.
+      } else if (targetType === 'EnsembleNode') {
+        // Ensemble nodes auto-detect their inputs (Phase 2): one dataset edge +
+        // N model-spec edges. The converter separates them by source type, so a
+        // fan-in here is NOT a column merge — suppress the merge confirm.
       } else if (isNewSource && uniqueSourceCount >= 2 && modelTypes.includes(targetType)) {
         // window.confirm: see note above on sync onConnect contract.
         const proceed = window.confirm(

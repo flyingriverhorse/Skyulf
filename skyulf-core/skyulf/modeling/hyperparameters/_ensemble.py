@@ -9,10 +9,16 @@ factory tables in :mod:`skyulf.modeling.ensemble`.
 from ._field import HyperparameterField
 
 # Selectable base learners, mirrored from ``ensemble.BASE_ESTIMATORS_*``.
+# Optional boosters (xgboost / lightgbm) are intentionally omitted from this
+# manual picker because they depend on optional wheels; they are still picked up
+# automatically when a trained XGBoost/LightGBM node is wired into the ensemble.
 _CLF_OPTIONS = [
     {"label": "Logistic Regression", "value": "logistic_regression"},
     {"label": "Random Forest", "value": "random_forest"},
+    {"label": "Extra Trees", "value": "extra_trees"},
     {"label": "Gradient Boosting", "value": "gradient_boosting"},
+    {"label": "Hist Gradient Boosting", "value": "hist_gradient_boosting"},
+    {"label": "AdaBoost", "value": "adaboost"},
     {"label": "Decision Tree", "value": "decision_tree"},
     {"label": "Gaussian Naive Bayes", "value": "gaussian_nb"},
     {"label": "Support Vector Classifier", "value": "svc"},
@@ -22,8 +28,13 @@ _CLF_OPTIONS = [
 _REG_OPTIONS = [
     {"label": "Linear Regression", "value": "linear_regression"},
     {"label": "Ridge", "value": "ridge"},
+    {"label": "Lasso", "value": "lasso"},
+    {"label": "ElasticNet", "value": "elasticnet"},
     {"label": "Random Forest", "value": "random_forest"},
+    {"label": "Extra Trees", "value": "extra_trees"},
     {"label": "Gradient Boosting", "value": "gradient_boosting"},
+    {"label": "Hist Gradient Boosting", "value": "hist_gradient_boosting"},
+    {"label": "AdaBoost", "value": "adaboost"},
     {"label": "Decision Tree", "value": "decision_tree"},
     {"label": "Support Vector Regressor", "value": "svr"},
     {"label": "K-Nearest Neighbors", "value": "knn"},

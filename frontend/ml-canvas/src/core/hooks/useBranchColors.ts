@@ -13,6 +13,22 @@ import {
 // matching tab in the Results panel).
 const TERMINAL_TYPES = new Set([...EXECUTION_MODE_AWARE_TYPES]);
 
+// Training/tuning node types that can act as ensemble base-learner spec
+// providers. Mirrors `MODEL_SOURCE_TYPES` in `pipelineConverter.ts`. A model
+// node wired ONLY into ensemble(s) is a base learner, not a standalone
+// experiment, so it must not get its own branch color / Path tab — the
+// ensemble's branch already covers the whole `data → model → ensemble` chain.
+const MODEL_SOURCE_TYPES = new Set([
+  'model_training',
+  'basic_training',
+  'hyperparameter_tuning',
+  'advanced_tuning',
+]);
+
+// The ensemble meta-model node. It is the real terminal whenever base models
+// feed it, so it must be branch-eligible even though it is not mode-aware.
+const ENSEMBLE_TYPE = 'EnsembleNode';
+
 /** Generate n evenly-spaced, high-saturation HSL colors with a golden-angle offset for variety. */
 export function generateBranchColors(count: number): string[] {
   const colors: string[] = [];
@@ -56,9 +72,33 @@ export function useBranchColors(nodes: Node[], edges: Edge[]): Map<string, Branc
   return useMemo(() => {
     const colorMap = new Map<string, BranchEdgeInfo>();
 
-    // Find connected training/tuning/preview-leaf nodes
+    // Ensemble nodes are real terminals: when base models feed an ensemble
+    // those models are spec providers, and the ensemble's branch covers the
+    // whole upstream chain. Treat the ensemble like a training terminal.
+    const ensembleIds = new Set(
+      nodes.filter(n => n.data.definitionType === ENSEMBLE_TYPE).map(n => n.id),
+    );
+
+    // A model node is a "spec-only" base learner when it has outgoing edges
+    // and every one of them feeds an ensemble. Such nodes are folded into the
+    // ensemble branch (no separate Path color/label) — mirroring the
+    // spec-only drop in `pipelineConverter.ts` so canvas labels and the
+    // Preview Results tabs stay in lockstep.
+    const isSpecOnlyBaseModel = (nodeId: string, defType: unknown): boolean => {
+      if (ensembleIds.size === 0) return false;
+      if (!(typeof defType === 'string' && MODEL_SOURCE_TYPES.has(defType))) return false;
+      const outs = edges.filter(e => e.source === nodeId);
+      return outs.length > 0 && outs.every(e => ensembleIds.has(e.target));
+    };
+
+    // Find connected training/tuning terminals + ensemble terminals, excluding
+    // base models that exist purely to feed an ensemble.
     const terminals = nodes.filter(
-      n => TERMINAL_TYPES.has(n.data.definitionType as string) && edges.some(e => e.target === n.id)
+      n =>
+        (TERMINAL_TYPES.has(n.data.definitionType as string) ||
+          n.data.definitionType === ENSEMBLE_TYPE) &&
+        edges.some(e => e.target === n.id) &&
+        !isSpecOnlyBaseModel(n.id, n.data.definitionType),
     );
 
     // Also treat raw data leaves (nodes with no downstream consumers) as
