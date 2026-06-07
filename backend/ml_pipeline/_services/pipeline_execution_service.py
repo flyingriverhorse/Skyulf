@@ -109,7 +109,8 @@ def execute_pipeline(
             # Throttle DB writes to avoid row-level locking churn.
             if (datetime.now() - last_log_update).total_seconds() > 2:
                 try:
-                    assert job is not None
+                    if job is None:
+                        raise RuntimeError(f"Job {job_id} is no longer available for log update.")
                     job.logs = list(job_logs)
                     session.commit()
                     last_log_update = datetime.now()

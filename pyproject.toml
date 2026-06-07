@@ -196,3 +196,13 @@ skyulf-core = { workspace = true }
 members = [
     "skyulf-core",
 ]
+
+[tool.bandit]
+# Bandit B101 (assert_used) flags every `assert`. In pytest suites `assert` is the
+# idiomatic, correct construct, so we exclude test trees from Bandit entirely.
+exclude_dirs = ["tests", "skyulf-core/tests", "temp", ".venv", "node_modules", "frontend"]
+
+[tool.bandit.assert_used]
+# Belt-and-suspenders: even if a test file is scanned outside the excluded dirs
+# (e.g. conftest.py or a stray *_test.py), do not report asserts there.
+skips = ["*/tests/*", "*_test.py", "*test_*.py", "*/conftest.py"]
