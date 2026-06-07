@@ -172,9 +172,7 @@ def test_stacking_classifier_ignores_weights():
 def test_ensemble_n_jobs_passthrough():
     X, y = _clf_data(14)
     calc = NodeRegistry.get_calculator("voting_classifier")()
-    model = calc.fit(
-        X, y, {"base_estimators": ["random_forest", "decision_tree"], "n_jobs": -1}
-    )
+    model = calc.fit(X, y, {"base_estimators": ["random_forest", "decision_tree"], "n_jobs": -1})
 
     assert model.n_jobs == -1
 
@@ -432,9 +430,7 @@ def test_build_ensemble_search_space_calibrated_nested_keys():
     assert any(k.startswith("random_forest__estimator__") for k in space)
     assert any(k.startswith("decision_tree__estimator__") for k in space)
     # The un-nested form must NOT appear — it would hit the wrapper, not the model.
-    assert not any(
-        k.startswith("random_forest__") and "__estimator__" not in k for k in space
-    )
+    assert not any(k.startswith("random_forest__") and "__estimator__" not in k for k in space)
 
 
 def test_advanced_tuning_with_calibration_routes_nested_params():
