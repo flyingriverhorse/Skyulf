@@ -343,6 +343,18 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           const baseEstimatorParams = hasWired
               ? { ...(node.data.base_estimator_params as Record<string, unknown> | undefined ?? {}), ...wired.baseParams }
               : node.data.base_estimator_params;
+          // Voting only: turn the per-model weight map into a list aligned to the
+          // resolved base estimators (sklearn `weights=`). Sent only when the user
+          // set at least one non-default weight, so equal weighting stays implicit.
+          const ensembleNJobs = node.data.n_jobs;
+          let votingWeights: number[] | undefined;
+          if (node.data.strategy === 'voting') {
+              const weightMap = node.data.weights as Record<string, number> | undefined;
+              const baseList = (baseEstimators as string[] | undefined) ?? [];
+              if (weightMap && baseList.length > 0 && baseList.some((k) => typeof weightMap[k] === 'number' && weightMap[k] !== 1)) {
+                  votingWeights = baseList.map((k) => (typeof weightMap[k] === 'number' ? weightMap[k] : 1));
+              }
+          }
           // Drop model-spec sources from the data inputs so the backend only
           // receives the dataset edge (a model node is not a loadable Dataset).
           if (wired.modelSourceIds.size > 0) {
@@ -387,6 +399,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       voting: node.data.voting,
                       cv: node.data.cv,
                       passthrough: node.data.passthrough,
+                      weights: votingWeights,
+                      n_jobs: ensembleNJobs,
                       tune_base_models: node.data.tune_base_models,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params,
@@ -410,6 +424,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       final_estimator: node.data.final_estimator,
                       cv: node.data.cv,
                       passthrough: node.data.passthrough,
+                      weights: votingWeights,
+                      n_jobs: ensembleNJobs,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params
                   },
