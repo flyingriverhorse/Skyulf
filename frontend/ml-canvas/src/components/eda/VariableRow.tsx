@@ -1,8 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { toPng } from 'html-to-image';
-import { 
-    ChevronDown, 
-    ChevronRight, 
+import {
+    ChevronDown,
+    ChevronRight,
     Download,
     Eye,
     EyeOff,
@@ -27,10 +27,10 @@ interface VariableRowProps {
     handleAddFilter: (column: string, value: string | number, operator: string) => void;
 }
 
-export const VariableRow: React.FC<VariableRowProps> = ({ 
-    profile, 
-    isExpanded, 
-    onToggleExpand, 
+export const VariableRow: React.FC<VariableRowProps> = ({
+    profile,
+    isExpanded,
+    onToggleExpand,
     onToggleExclude,
     isExcluded,
     handleAddFilter
@@ -46,7 +46,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
     } else if (profile.categorical_stats?.top_k) {
         miniChartData = profile.categorical_stats.top_k.slice(0, 10).map((k) => ({ name: String(k.value), count: k.count }));
     }
-    
+
     // Fallback for mini chart data if not directly available in standard path
     if (miniChartData.length === 0 && profile.dtype === 'Numeric' && profile.numeric_stats) {
         // Can't really plot without histogram data
@@ -137,10 +137,10 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                     <div className="h-8 w-24 hidden sm:block opacity-70">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={miniChartData}>
-                                <Bar 
-                                    dataKey="count" 
-                                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'} 
-                                    radius={[1, 1, 0, 0]} 
+                                <Bar
+                                    dataKey="count"
+                                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'}
+                                    radius={[1, 1, 0, 0]}
                                 />
                             </BarChart>
                         </ResponsiveContainer>
@@ -152,14 +152,14 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 
     return (
         <div className={`border rounded-lg mb-2 transition-all ${isExpanded ? 'border-primary/50 shadow-md bg-card/50' : 'border-border bg-card'}`}>
-            <div 
+            <div
                 className="flex items-center p-3 hover:bg-accent/50 cursor-pointer rounded-t-lg"
                 {...clickableProps(onToggleExpand)}
             >
                 <div className="mr-2 text-muted-foreground">
                     {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                 </div>
-                
+
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-sm truncate">{profile.name}</span>
@@ -169,7 +169,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                         {profile.is_unique && <Badge variant="secondary" className="text-[10px] h-5">ID</Badge>}
                         {profile.is_constant && <Badge variant="destructive" className="text-[10px] h-5">Constant</Badge>}
                     </div>
-                    
+
                     {!isExpanded && renderSummary()}
                 </div>
 
@@ -183,8 +183,8 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                              <InfoTooltip text="Green bar indicates the percentage of valid (non-null) data. Full green means no missing values." align="end" size="sm" />
                         </div>
                         <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                            <div 
-                                className={`h-full ${profile.missing_percentage > 0 ? 'bg-amber-400' : 'bg-green-500'}`} 
+                            <div
+                                className={`h-full ${profile.missing_percentage > 0 ? 'bg-amber-400' : 'bg-green-500'}`}
                                 style={{ width: `${Math.max(100 - profile.missing_percentage, 0)}%` }}
                             />
                         </div>
@@ -209,7 +209,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
             {isExpanded && (
                 <div className="p-4 border-t border-border bg-card/30 animate-in slide-in-from-top-2 duration-200">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-                        
+
                         {/* Stats Column */}
                         <div className="space-y-4">
                             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Statistics</h4>
@@ -261,7 +261,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                                         </div>
                                         {profile.numeric_stats.skewness != null && (
                                             <div className="text-[10px] text-muted-foreground pl-2">
-                                                {Math.abs(profile.numeric_stats.skewness) < 0.5 ? '↳ Symmetric' : 
+                                                {Math.abs(profile.numeric_stats.skewness) < 0.5 ? '↳ Symmetric' :
                                                  Math.abs(profile.numeric_stats.skewness) < 1 ? '↳ Moderately Skewed' : '↳ Highly Skewed'}
                                             </div>
                                         )}
@@ -271,7 +271,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                                         </div>
                                         {profile.numeric_stats.kurtosis != null && (
                                             <div className="text-[10px] text-muted-foreground pl-2">
-                                                {Math.abs(profile.numeric_stats.kurtosis) < 0.5 ? '↳ Mesokurtic (Normal-like)' : 
+                                                {Math.abs(profile.numeric_stats.kurtosis) < 0.5 ? '↳ Mesokurtic (Normal-like)' :
                                                  profile.numeric_stats.kurtosis > 0 ? '↳ Leptokurtic (Heavy Tails)' : '↳ Platykurtic (Light Tails)'}
                                             </div>
                                         )}

@@ -17,8 +17,8 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ text, align = 'center'
     // If we don't have the shadcn component yet, let's stick to a portal-safe implementation.
     // Ideally, we should use Radix UI TooltipPrimitive to solve clipping.
     // The previous implementation was relative positioning which causes clipping in overflow hidden containers.
-    
-    // Changing to fixed positioning with standard HTML title is the simplest fallback if libraries are missing, 
+
+    // Changing to fixed positioning with standard HTML title is the simplest fallback if libraries are missing,
     // but the user wants "align and show automatically properly".
     // Let's use standard Radix UI if possible since package.json has @radix-ui/react-tooltip.
 

@@ -72,7 +72,7 @@ export const Layout: React.FC = () => {
             </h1>
           )}
         </div>
-        
+
         <nav className="flex-1 p-2 space-y-2">
           <NavLink to="/" active={isActive('/')} icon={<LayoutDashboard size={20} />} collapsed={isCollapsed}>
             Dashboard
@@ -110,7 +110,7 @@ export const Layout: React.FC = () => {
         </nav>
 
         <div className={`${isCollapsed ? 'p-2' : 'p-4'} border-t border-slate-800 space-y-4`}>
-          <button 
+          <button
             onClick={toggleTheme}
             className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} w-full ${isCollapsed ? 'px-2' : 'px-4'} py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors`}
             title={isDarkMode ? 'Light Mode' : 'Dark Mode'}
@@ -135,8 +135,8 @@ const NavLink = ({ to, children, active, icon, collapsed, badge }: { to: string,
     to={to}
     aria-current={active ? 'page' : undefined}
     className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'} ${collapsed ? 'px-2' : 'px-4'} py-3 rounded-md text-sm font-medium transition-colors ${
-      active 
-        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm' 
+      active
+        ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm'
         : 'text-slate-400 hover:text-white hover:bg-slate-800'
     }`}
     title={collapsed ? (children as string) : undefined}

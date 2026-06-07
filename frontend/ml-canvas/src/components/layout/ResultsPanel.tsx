@@ -172,13 +172,13 @@ export const ResultsPanel: React.FC = () => {
     : allNodeIds;
 
   return (
-    <div 
+    <div
       className={`absolute bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 z-20 flex flex-col ${
         isResultsPanelExpanded ? 'h-96' : 'h-10'
       }`}
     >
       {/* Header */}
-      <div 
+      <div
         className="flex items-center justify-between px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
         {...clickableProps(() => setResultsPanelExpanded(!isResultsPanelExpanded))}
       >

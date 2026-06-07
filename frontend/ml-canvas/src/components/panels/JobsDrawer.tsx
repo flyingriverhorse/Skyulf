@@ -8,12 +8,12 @@ import { JobCard } from './jobs/JobCard';
 import { JobDetailsView } from './jobs/JobDetailsView';
 
 export const JobsDrawer: React.FC = () => {
-  const { 
-    isDrawerOpen, 
-    toggleDrawer, 
-    jobs, 
-    isLoading, 
-    activeTab, 
+  const {
+    isDrawerOpen,
+    toggleDrawer,
+    jobs,
+    isLoading,
+    activeTab,
     setTab,
     fetchJobs,
     hasMore,
@@ -49,7 +49,7 @@ export const JobsDrawer: React.FC = () => {
   if (!isDrawerOpen) return null;
 
   const tabJobs = jobs.filter(job => job.job_type === activeTab);
-  
+
   // Derive unique model types and statuses from current tab's jobs
   const modelTypes = [...new Set(tabJobs.map(j => j.model_type).filter(Boolean))] as string[];
   const statuses = [...new Set(tabJobs.map(j => j.status))];
@@ -71,14 +71,14 @@ export const JobsDrawer: React.FC = () => {
     <div className="fixed inset-0 z-50 flex justify-center items-center">
       {/* Backdrop */}
       {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
-      <div 
+      <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={() => toggleDrawer(false)}
       />
-      
+
       {/* Modal Content */}
       <div className="relative w-[1200px] max-w-[95vw] h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-lg flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
-        
+
         {selectedJob ? (
             <JobDetailsView job={selectedJob} onBack={() => { setSelectedJob(null); }} onClose={() => toggleDrawer(false)} />
         ) : (
@@ -87,14 +87,14 @@ export const JobsDrawer: React.FC = () => {
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
                 <h2 className="font-semibold text-gray-800 dark:text-gray-100">Job History</h2>
                 <div className="flex items-center gap-2">
-                    <button 
+                    <button
                     onClick={() => fetchJobs()}
                     className={`p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 ${isLoading ? 'animate-spin' : ''}`}
                     title="Refresh"
                     >
                     <RefreshCw className="w-4 h-4" />
                     </button>
-                    <button 
+                    <button
                     onClick={() => toggleDrawer(false)}
                     className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
                     >
@@ -151,8 +151,8 @@ export const JobsDrawer: React.FC = () => {
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
                 <button
                     className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'advanced_tuning' 
-                        ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/20' 
+                    activeTab === 'advanced_tuning'
+                        ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/20'
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
                     onClick={() => setTab('advanced_tuning')}
@@ -161,8 +161,8 @@ export const JobsDrawer: React.FC = () => {
                 </button>
                 <button
                     className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'basic_training' 
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20' 
+                    activeTab === 'basic_training'
+                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
                         : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}
                     onClick={() => setTab('basic_training')}
@@ -273,10 +273,10 @@ export const JobsDrawer: React.FC = () => {
                                 </div>
                             )}
                         />
-                        
+
                         {hasMore && (
                             <div className="flex-none flex justify-center pt-2 pb-4">
-                                <button 
+                                <button
                                     onClick={() => loadMoreJobs()}
                                     disabled={isLoading}
                                     className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50 flex items-center gap-1"
@@ -295,4 +295,3 @@ export const JobsDrawer: React.FC = () => {
     </div>
   );
 };
-

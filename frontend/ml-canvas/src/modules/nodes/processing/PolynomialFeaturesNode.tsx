@@ -23,7 +23,7 @@ const ColumnSelector: React.FC<{
   label?: string;
 }> = ({ columns, selected, onChange, label }) => {
   const [search, setSearch] = useState('');
-  
+
   const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
 
   const toggle = (col: string) => {
@@ -90,7 +90,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
   icon: Zap,
   inputs: [{ id: 'in', label: 'Input Dataset', type: 'dataset' }],
   outputs: [{ id: 'out', label: 'Transformed Data', type: 'dataset' }],
-  
+
   getDefaultConfig: () => ({
     columns: [],
     degree: 2,
@@ -113,7 +113,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
     const datasetId = upstreamData.find((d) => d.datasetId)?.datasetId as string | undefined;
     const { data: schema } = useDatasetSchema(datasetId);
     const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-    
+
     // Filter for numeric columns as polynomial features usually apply to numbers
     const numericColumns = schema ? Object.values(schema.columns)
       .filter((col) => ['int', 'float', 'number', 'double', 'long'].some(t => col.dtype.toLowerCase().includes(t)))
@@ -131,7 +131,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
     return (
       <div className="space-y-2 min-w-[280px]">
         <div className="border rounded-md bg-card">
-          <div 
+          <div
             className="flex items-center justify-between p-2 cursor-pointer hover:bg-accent/50 transition-colors"
             {...clickableProps(toggleExpand)}
           >
@@ -144,7 +144,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
 
           {config.isExpanded && (
             <div className="p-3 space-y-4 border-t">
-              
+
               <ColumnSelector
                 label="Input Columns (Numeric)"
                 columns={numericColumns}
@@ -206,7 +206,7 @@ export const PolynomialFeaturesNode: NodeDefinition = {
                     />
                     <span className="text-xs">Include Bias</span>
                   </label>
-                  
+
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"

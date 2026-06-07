@@ -226,7 +226,7 @@ export const EDAPage: React.FC = () => {
         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
           <BarChart2 className="w-16 h-16 mb-4 opacity-20" />
           <p className="mb-4">No analysis found for this dataset.</p>
-          
+
           <div className="flex flex-col items-center space-y-4">
             <div className="w-64 space-y-2">
                 <input
@@ -236,7 +236,7 @@ export const EDAPage: React.FC = () => {
                 placeholder="Target Column (Optional)"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 />
-                
+
                 <div className="flex items-center space-x-2">
                     <select
                         value={taskType}
@@ -313,10 +313,10 @@ export const EDAPage: React.FC = () => {
 
     return (
       <div className="flex h-full w-full overflow-hidden bg-white dark:bg-gray-900">
-        <EDASidebar 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            profile={profile} 
+        <EDASidebar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            profile={profile}
             filters={filters}
           columns={allColumns}
             excludedCols={excludedColsDraft}
@@ -328,11 +328,11 @@ export const EDAPage: React.FC = () => {
             onToggleExclude={handleToggleExclude}
             onApplyExcluded={handleApplyExcluded}
         />
-        
+
         <div className="flex-1 overflow-y-auto p-6 pt-4 bg-gray-50 dark:bg-gray-900/50">
             {activeTab === 'dashboard' && (
-                <DashboardTab 
-                    profile={profile} 
+                <DashboardTab
+                    profile={profile}
                     onToggleExclude={handleToggleExclude}
                     excludedCols={excludedColsDraft}
                 />
@@ -343,11 +343,11 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'pca' && (
-                <PCATab 
-                    profile={profile} 
-                    isPCA3D={scatter.isPCA3D} 
-                    setIsPCA3D={(v) => setScatter({ isPCA3D: v })} 
-                    downloadChart={downloadChart} 
+                <PCATab
+                    profile={profile}
+                    isPCA3D={scatter.isPCA3D}
+                    setIsPCA3D={(v) => setScatter({ isPCA3D: v })}
+                    downloadChart={downloadChart}
                 />
             )}
 
@@ -356,7 +356,7 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'target' && !!profile.target_col && !!profile.target_correlations && (
-                <TargetAnalysisTab 
+                <TargetAnalysisTab
                     profile={profile}
                     downloadChart={downloadChart}
                     history={history}
@@ -367,14 +367,14 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'timeseries' && !!profile.timeseries && (
-                <TimeSeriesTab 
+                <TimeSeriesTab
                     profile={profile}
                     downloadChart={downloadChart}
                 />
             )}
 
             {activeTab === 'variables' && (
-                <VariablesTab 
+                <VariablesTab
                     profile={profile}
                     handleToggleExclude={handleToggleExclude}
                     handleAddFilter={handleAddFilter}
@@ -382,7 +382,7 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'bivariate' && (
-                <BivariateTab 
+                <BivariateTab
                     profile={profile}
                     downloadChart={downloadChart}
                     scatterX={scatter.x}
@@ -403,7 +403,7 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'correlations' && (!!profile.correlations || !!profile.correlations_with_target) && (
-                <CorrelationsTab 
+                <CorrelationsTab
                     profile={profile}
                 />
             )}
@@ -417,7 +417,7 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'decomposition' && selectedDataset && (
-                <DecompositionTab 
+                <DecompositionTab
                     datasetId={selectedDataset}
                 columns={allColumns}
                     initialFilters={filters}
@@ -425,7 +425,7 @@ export const EDAPage: React.FC = () => {
             )}
 
             {activeTab === 'sample' && profile.sample_data && (
-                <SampleDataTab 
+                <SampleDataTab
                     profile={profile}
                 excludedCols={excludedColsDraft}
                     handleToggleExclude={handleToggleExclude}
@@ -440,7 +440,7 @@ export const EDAPage: React.FC = () => {
     <div className="flex flex-col h-full w-full overflow-hidden bg-white dark:bg-slate-950">
       {/* Top Navigation Bar */}
       <header className="flex-none h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 px-4 flex items-center justify-between gap-4 z-20 shadow-sm">
-        
+
         {/* Left: Title & Dataset */}
         <div className="flex items-center gap-6">
             <div>
@@ -453,7 +453,7 @@ export const EDAPage: React.FC = () => {
             </div>
 
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
-            
+
             <div className="flex flex-col">
                 <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</span>
                 <select
@@ -516,8 +516,8 @@ export const EDAPage: React.FC = () => {
                 onClick={() => selectedDataset && runAnalysis()}
                 disabled={!selectedDataset || analyzing}
                 className={`ml-2 px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center shadow-sm ${
-                    existingReport 
-                        ? 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50' 
+                    existingReport
+                        ? 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50'
                         : 'bg-blue-600 text-white hover:bg-blue-700 border border-transparent'
                 }`}
             >
@@ -538,8 +538,8 @@ export const EDAPage: React.FC = () => {
                     Load Saved
                 </button>
             )}
-            
-            <button 
+
+            <button
                 onClick={() => setShowHistoryModal(true)}
                 className="flex items-center px-3 py-1.5 text-sm font-medium text-gray-600 bg-gray-50 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
             >
@@ -562,7 +562,7 @@ export const EDAPage: React.FC = () => {
                             if (match) loadSpecificReport(match.id);
                         }}
                         className={`px-2 py-0.5 text-xs rounded-full border transition-colors flex items-center ${
-                            report?.profile_data?.target_col === target 
+                            report?.profile_data?.target_col === target
                             ? 'bg-blue-50 text-blue-600 border-blue-200 font-medium'
                             : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
                         }`}
@@ -581,7 +581,7 @@ export const EDAPage: React.FC = () => {
       </div>
 
       {/* Jobs History Modal */}
-      <JobsHistoryModal 
+      <JobsHistoryModal
         isOpen={showHistoryModal}
         onClose={() => setShowHistoryModal(false)}
         history={history}

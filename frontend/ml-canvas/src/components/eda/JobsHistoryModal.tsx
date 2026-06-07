@@ -142,7 +142,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
             ) : (
               <div className="space-y-3">
                 {history.map((job) => (
-                  <div 
+                  <div
                     key={job.id}
                     {...clickableProps(() => handleJobClick(job))}
                     className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 cursor-pointer transition-all group"
@@ -179,7 +179,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="text-right flex items-center gap-4">
                       {/* Cancel Button for Pending/Running Jobs */}
                       {(job.status === 'PENDING' || job.status === 'STARTED' || job.status === 'RUNNING') && (
@@ -196,7 +196,7 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                             )}
                         </button>
                       )}
-                      
+
                       {/* Note: excluded_columns is not available in history list summary */}
                     </div>
                   </div>

@@ -27,24 +27,24 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
             const MAX_COLS = 20;
             const columns = data.columns.slice(0, MAX_COLS);
             const values = data.values.slice(0, MAX_COLS).map((row: number[]) => row.slice(0, MAX_COLS));
-            
+
             const cellSize = 60;
-            
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
-            
+
             ctx.font = '12px sans-serif';
             let maxLabelWidth = 0;
             columns.forEach((col: string) => {
                 const w = ctx.measureText(col).width;
                 if (w > maxLabelWidth) maxLabelWidth = w;
             });
-            
+
             const labelWidth = maxLabelWidth + 40;
             const headerHeight = (maxLabelWidth * 0.7) + 60;
             const titleHeight = 60;
-            
+
             const width = labelWidth + (columns.length * cellSize) + 50;
             const height = headerHeight + (columns.length * cellSize) + titleHeight + 50;
 
@@ -96,7 +96,7 @@ export const CorrelationsTab: React.FC<CorrelationsTabProps> = ({
             columns.forEach((col: string, j: number) => {
                 const x = labelWidth + (j * cellSize) + (cellSize/2);
                 const y = headerHeight + titleHeight - 10;
-                
+
                 ctx.translate(x, y);
                 ctx.rotate(-Math.PI / 4);
                 ctx.fillStyle = theme.textColor;

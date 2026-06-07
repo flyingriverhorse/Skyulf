@@ -16,7 +16,7 @@ interface DashboardTabProps {
 interface MissingRow { name: string; value: number }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExclude, excludedCols = [] }) => {
-    
+
     const dataTypeData = useMemo(() => {
         if (!profile?.columns) return [];
         const counts: Record<string, number> = {};
@@ -41,7 +41,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
     return (
         <div className="space-y-6">
             <OverviewCards profile={profile} />
-            
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Data Types Chart */}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -66,7 +66,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip 
+                                <Tooltip
                                     contentStyle={getTooltipContentStyle()}
                                 />
                                 <Legend verticalAlign="bottom" height={36}/>
@@ -91,9 +91,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                             {item.name}
                                         </div>
                                         <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-                                            <div 
+                                            <div
                                                 className="h-full rounded-full transition-all duration-500"
-                                                style={{ 
+                                                style={{
                                                     width: `${item.value}%`,
                                                     backgroundColor: `hsl(10, 80%, ${60 - (index * 2)}%)`
                                                 }}
@@ -106,8 +106,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                             <button
                                                 onClick={() => onToggleExclude(item.name, !isExcluded)}
                                                 className={`p-1.5 rounded-md transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 ${
-                                                    isExcluded 
-                                                    ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 opacity-100' 
+                                                    isExcluded
+                                                    ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 opacity-100'
                                                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300'
                                                 }`}
                                                 title={isExcluded ? "Include Column" : "Exclude Column"}

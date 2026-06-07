@@ -93,7 +93,7 @@ export const StrategySettingsModal: React.FC<StrategySettingsModalProps> = ({
         } else if (isOptuna && typeof finalConfig.timeout === 'string') {
             finalConfig.timeout = parseInt(finalConfig.timeout, 10);
         }
-        
+
         onSave(finalConfig);
         onClose();
     };

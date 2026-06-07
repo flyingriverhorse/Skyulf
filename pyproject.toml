@@ -58,6 +58,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     "rapidfuzz>=3.6.1,<4.0.0",
     "vadersentiment>=3.3.2,<4.0.0",
+    "ty>=0.0.44",
 ]
 
 [project.optional-dependencies]

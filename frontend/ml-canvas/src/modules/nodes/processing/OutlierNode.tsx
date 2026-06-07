@@ -12,17 +12,17 @@ import { Recommendation } from '../../../core/api/client';
 interface OutlierConfig {
   method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope';
   columns: string[];
-  
+
   // IQR
   multiplier?: number;
-  
+
   // Z-Score
   threshold?: number;
-  
+
   // Winsorize
   lower_percentile?: number;
   upper_percentile?: number;
-  
+
   // Elliptic Envelope
   contamination?: number;
 }
@@ -35,25 +35,25 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   // Recursive search for datasetId
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
-  
+
   const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
     const visited = new Set<string>();
     const queue = [currentNodeId];
-    
+
     while (queue.length > 0) {
       const id = queue.shift();
       if (!id) continue;
       if (visited.has(id)) continue;
       visited.add(id);
-      
+
       const node = nodes.find(n => n.id === id);
       if (!node) continue;
-      
+
       // If this is NOT the current node, check if it has datasetId
       if (id !== currentNodeId && node.data?.datasetId) {
         return node.data.datasetId as string;
       }
-      
+
       const incomers = getIncomers(node, nodes, edges);
       for (const incomer of incomers) {
         queue.push(incomer.id);
@@ -65,7 +65,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   const datasetId = findUpstreamDatasetId(nodeId || '');
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  
+
   const backendRecommendations = useRecommendations(nodeId || '', {
     types: ['outlier_removal', 'cleaning'],
     suggestedNodeTypes: ['OutlierRemoval', 'outlier'],
@@ -74,7 +74,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  
+
   // Responsive Layout
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
@@ -92,7 +92,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   }, []);
 
   // Filter for numeric columns only
-  const numericColumns = schema 
+  const numericColumns = schema
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .filter(c => !droppedUpstream.has(c.name))
@@ -113,15 +113,15 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   const renderFeedback = () => {
     if (!nodeResult || !nodeResult.metrics) return null;
     const m = nodeResult.metrics;
-    
+
     // Check for rows removed (common for IQR, ZScore, Elliptic)
     const rowsRemoved = m.rows_removed as number | undefined;
     const rowsRemaining = m.rows_remaining as number | undefined;
     const rowsTotal = m.rows_total as number | undefined ?? ((rowsRemoved ?? 0) + (rowsRemaining ?? 0));
-    
+
     // Check for bounds (IQR, Winsorize)
     const bounds = m.bounds as Record<string, { lower: number, upper: number }> | undefined;
-    
+
     // Check for stats (ZScore)
     const stats = m.stats as Record<string, { mean: number, std: number }> | undefined;
 
@@ -154,7 +154,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
                 {getTargetExplanation()}
             </div>
         </div>
-        
+
         {warnings && warnings.length > 0 && (
           <div className="p-2 bg-yellow-50 text-yellow-800 rounded border border-yellow-200">
             <div className="font-medium mb-1">Warnings</div>
@@ -165,7 +165,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
             </ul>
           </div>
         )}
-        
+
         {config.method === 'winsorize' ? (
              <div className="flex justify-between items-center p-2 bg-background rounded border">
                 <span className="text-muted-foreground">Values Clipped</span>
@@ -242,12 +242,12 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   const renderRecommendations = () => {
     // Combine backend recommendations with runtime feedback
     const runtimeRecommendations: Recommendation[] = [];
-    
+
     if (nodeResult && nodeResult.metrics) {
         const m = nodeResult.metrics;
         const rowsRemoved = m.rows_removed as number | undefined;
         const rowsTotal = m.rows_total as number | undefined;
-        
+
         // If rowsTotal is missing but we have rowsRemoved, we can still give some feedback
         const effectiveRowsTotal = rowsTotal ?? (m[`${config.method === 'elliptic_envelope' ? 'EllipticEnvelope' : config.method === 'zscore' ? 'ZScore' : config.method === 'winsorize' ? 'Winsorize' : 'IQR'}_rows_total`] as number | undefined);
 
@@ -315,10 +315,10 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
           </div>
         )}
       </div>
-      
+
       {/* Main Content */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div>
@@ -414,7 +414,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
               <p className="text-xs text-muted-foreground">Expected proportion of outliers in the dataset.</p>
             </div>
           )}
-          
+
           {/* Feedback Section (Wide) */}
           {isWide && (
             <>
@@ -423,7 +423,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
             </>
           )}
         </div>
-        
+
         {/* Right Column: Columns */}
         <div className={`flex flex-col h-full min-h-[200px] border rounded-md overflow-hidden ${isWide ? '' : 'shrink-0'}`}>
            <div className="p-2 border-b bg-muted/30 flex flex-col gap-2">

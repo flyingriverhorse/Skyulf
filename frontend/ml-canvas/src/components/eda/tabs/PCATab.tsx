@@ -39,8 +39,8 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                         <button
                             onClick={() => setIsPCA3D(!isPCA3D)}
                             className={`p-2 rounded-md border transition-colors flex items-center gap-2 text-sm ${
-                                isPCA3D 
-                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' 
+                                isPCA3D
+                                    ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
                                     : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
                             }`}
                         >
@@ -53,10 +53,10 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                 <div id="pca-chart">
                 {profile.pca_data ? (
                     isPCA3D ? (
-                        <ThreeDScatterPlot 
-                            data={profile.pca_data} 
-                            xKey="x" 
-                            yKey="y" 
+                        <ThreeDScatterPlot
+                            data={profile.pca_data}
+                            xKey="x"
+                            yKey="y"
                             zKey="z"
                             labelKey="label"
                             xLabel="PC1"
@@ -64,10 +64,10 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                             zLabel="PC3"
                         />
                     ) : (
-                        <CanvasScatterPlot 
-                            data={profile.pca_data} 
-                            xKey="x" 
-                            yKey="y" 
+                        <CanvasScatterPlot
+                            data={profile.pca_data}
+                            xKey="x"
+                            yKey="y"
                             labelKey="label"
                             xLabel="Principal Component 1 (PC1)"
                             yLabel="Principal Component 2 (PC2)"
@@ -85,7 +85,7 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                     <div className="text-sm text-blue-700 dark:text-blue-300">
                         <p className="font-medium mb-1">About this visualization</p>
                         <p>
-                            This chart shows a {isPCA3D ? '3D' : '2D'} projection of your data using Principal Component Analysis (PCA). 
+                            This chart shows a {isPCA3D ? '3D' : '2D'} projection of your data using Principal Component Analysis (PCA).
                             Points that are close together share similar characteristics across all numeric features.
                         </p>
                         <p className="mt-1 text-xs opacity-80">

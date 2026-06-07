@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new feature! 
+        Thanks for suggesting a new feature!
         Please check the [Roadmap](https://github.com/flyingriverhorse/Skyulf/blob/master/ROADMAP.md) first to see if it's already planned.
 
   - type: input

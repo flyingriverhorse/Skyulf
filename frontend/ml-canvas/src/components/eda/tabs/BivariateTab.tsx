@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-    Download, 
-    ScatterChart as ScatterIcon, 
-    Box 
+import {
+    Download,
+    ScatterChart as ScatterIcon,
+    Box
 } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { ThreeDScatterPlot, type ScatterPoint } from '../ThreeDScatterPlot';
@@ -59,12 +59,12 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <Download className="w-4 h-4" />
                 </button>
             </div>
-            
+
             <div className="flex flex-wrap gap-4 mb-6 items-end">
                 <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">X Axis</span>
-                    <select 
-                        value={scatterX} 
+                    <select
+                        value={scatterX}
                         onChange={(e) => setScatterX(e.target.value)}
                         className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
@@ -79,8 +79,8 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 </div>
                 <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Y Axis</span>
-                    <select 
-                        value={scatterY} 
+                    <select
+                        value={scatterY}
                         onChange={(e) => setScatterY(e.target.value)}
                         className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
@@ -93,12 +93,12 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         }
                     </select>
                 </div>
-                
+
                 {is3D && (
                     <div>
                         <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Z Axis</span>
-                        <select 
-                            value={scatterZ} 
+                        <select
+                            value={scatterZ}
                             onChange={(e) => setScatterZ(e.target.value)}
                             className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                         >
@@ -115,8 +115,8 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
 
                 <div>
                     <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color By</span>
-                    <select 
-                        value={scatterColor} 
+                    <select
+                        value={scatterColor}
                         onChange={(e) => setScatterColor(e.target.value)}
                         className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
                     >
@@ -132,8 +132,8 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 <button
                     onClick={() => setIs3D(!is3D)}
                     className={`p-2 rounded-md border transition-colors ${
-                        is3D 
-                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300' 
+                        is3D
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-300'
                             : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
                     }`}
                     title="Toggle 3D View"
@@ -145,10 +145,10 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
             <div id="bivariate-chart">
             {scatterX && scatterY ? (
                 is3D && scatterZ ? (
-                    <ThreeDScatterPlot 
-                        data={(profile.sample_data ?? []) as ScatterPoint[]} 
-                        xKey={scatterX} 
-                        yKey={scatterY} 
+                    <ThreeDScatterPlot
+                        data={(profile.sample_data ?? []) as ScatterPoint[]}
+                        xKey={scatterX}
+                        yKey={scatterY}
                         zKey={scatterZ}
                         labelKey={scatterColor || undefined}
                         xLabel={scatterX}
@@ -156,10 +156,10 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         zLabel={scatterZ}
                     />
                 ) : (
-                    <CanvasScatterPlot 
-                        data={(profile.sample_data ?? []) as ScatterPoint[]} 
-                        xKey={scatterX} 
-                        yKey={scatterY} 
+                    <CanvasScatterPlot
+                        data={(profile.sample_data ?? []) as ScatterPoint[]}
+                        xKey={scatterX}
+                        yKey={scatterY}
                         labelKey={scatterColor || undefined}
                         xLabel={scatterX}
                         yLabel={scatterY}

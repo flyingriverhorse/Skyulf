@@ -1,21 +1,21 @@
 import React from 'react';
-import { 
-    Calendar, 
-    Download, 
-    Info 
+import {
+    Calendar,
+    Download,
+    Info
 } from 'lucide-react';
-import { 
-    ResponsiveContainer, 
-    LineChart, 
-    CartesianGrid, 
-    XAxis, 
-    YAxis, 
-    Tooltip, 
-    Legend, 
-    Line, 
-    BarChart, 
-    Bar, 
-    ReferenceLine 
+import {
+    ResponsiveContainer,
+    LineChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    Line,
+    BarChart,
+    Bar,
+    ReferenceLine
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
@@ -45,22 +45,22 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     <div className="flex items-center gap-2">
                         {profile.timeseries.stationarity_test && (
                             <div className={`text-xs px-3 py-1 rounded-full border flex items-center gap-1 ${
-                                profile.timeseries.stationarity_test.is_stationary 
-                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300' 
+                                profile.timeseries.stationarity_test.is_stationary
+                                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-300'
                                     : 'bg-yellow-50 border-yellow-200 text-yellow-700 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-300'
                             }`}>
                                 <InfoTooltip text="Augmented Dickey-Fuller Test. Stationary (p<0.05) means the data has constant mean/variance over time. Non-Stationary (p>=0.05) means it has a trend or seasonality." />
-                                <span className="font-semibold">ADF Test:</span> {profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} 
+                                <span className="font-semibold">ADF Test:</span> {profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'}
                                 <span className="opacity-75 ml-1">(p={profile.timeseries.stationarity_test.p_value.toFixed(3)})</span>
                             </div>
                         )}
                         <button
                             onClick={() => downloadChart(
-                                'trend-chart', 
-                                'trend-analysis', 
-                                'Trend Analysis', 
+                                'trend-chart',
+                                'trend-analysis',
+                                'Trend Analysis',
                                 `Date Column: ${profile.timeseries.date_col}`,
-                                profile.timeseries.stationarity_test ? 
+                                profile.timeseries.stationarity_test ?
                                     `ADF Test: ${profile.timeseries.stationarity_test.is_stationary ? 'Stationary' : 'Non-Stationary'} (p=${profile.timeseries.stationarity_test.p_value.toFixed(3)})` : undefined
                             )}
                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
@@ -74,24 +74,24 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={profile.timeseries.trend}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis 
-                                dataKey="date" 
-                                tick={{ fontSize: 12 }} 
+                            <XAxis
+                                dataKey="date"
+                                tick={{ fontSize: 12 }}
                                 minTickGap={30}
                             />
                             <YAxis />
-                            <Tooltip 
+                            <Tooltip
                                 contentStyle={getTooltipContentStyle()}
                                 labelStyle={{ color: '#9ca3af' }}
                             />
                             <Legend />
                             {Object.keys(profile.timeseries.trend[0]?.values || {}).map((key, idx) => (
-                                <Line 
+                                <Line
                                     key={key}
-                                    type="monotone" 
-                                    dataKey={`values.${key}`} 
+                                    type="monotone"
+                                    dataKey={`values.${key}`}
                                     name={key}
-                                    stroke={COLORS[idx % COLORS.length]} 
+                                    stroke={COLORS[idx % COLORS.length]}
                                     dot={false}
                                     strokeWidth={2}
                                 />
@@ -127,7 +127,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="day" tick={{ fontSize: 12 }} />
                                 <YAxis />
-                                <Tooltip 
+                                <Tooltip
                                     contentStyle={getTooltipContentStyle()}
                                     cursor={{fill: 'transparent'}}
                                 />
@@ -159,7 +159,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                             <YAxis />
-                            <Tooltip 
+                            <Tooltip
                                 contentStyle={getTooltipContentStyle()}
                                 cursor={{fill: 'transparent'}}
                             />
@@ -178,7 +178,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             <div className="group relative ml-2">
                                 <Info className="w-4 h-4 text-gray-400 cursor-help" />
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none text-center">
-                                    Shows how much the current value depends on past values (lags). 
+                                    Shows how much the current value depends on past values (lags).
                                     High bars indicate repeating patterns or seasonality.
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
                                 </div>
@@ -196,13 +196,13 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={profile.timeseries.autocorrelation} margin={{ bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis 
-                                        dataKey="lag" 
-                                        tick={{ fontSize: 12 }} 
+                                    <XAxis
+                                        dataKey="lag"
+                                        tick={{ fontSize: 12 }}
                                         label={{ value: 'Lag (Days)', position: 'insideBottom', offset: -15, fontSize: 12 }}
                                     />
                                     <YAxis domain={[-1, 1]} />
-                                    <Tooltip 
+                                    <Tooltip
                                         contentStyle={getTooltipContentStyle()}
                                         cursor={{fill: 'transparent'}}
                                         formatter={(value: number) => [value.toFixed(3), 'Correlation']}

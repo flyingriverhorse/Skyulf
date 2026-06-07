@@ -50,7 +50,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                 {/* Confusion Matrix */}
                                                 <div className="flex flex-col items-center justify-center relative group" id={`${splitName}-confusion-matrix`}>
                                                     <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
-                                                       <button 
+                                                       <button
                                                          onClick={() => void handleDownload(`${splitName}-confusion-matrix`, `${splitName}_confusion_matrix`)}
                                                          disabled={downloadingChart === `${splitName}-confusion-matrix`}
                                                          className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
@@ -263,7 +263,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                 {splitData.y_proba && (
                                                     <div className="h-[340px] w-full relative group" id={`${splitName}-roc`}>
                                                         <div className="absolute top-0 right-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
-                                                           <button 
+                                                           <button
                                                              onClick={() => void handleDownload(`${splitName}-roc`, `${splitName}_roc_curve`)}
                                                              disabled={downloadingChart === `${splitName}-roc`}
                                                              className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"

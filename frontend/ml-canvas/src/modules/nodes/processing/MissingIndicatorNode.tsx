@@ -53,7 +53,7 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
           Connect a dataset node to see available columns.
         </div>
       )}
-      
+
       {isLoading && !!datasetId && (
         <div className="text-xs text-muted-foreground animate-pulse">
           Loading schema...
@@ -87,9 +87,9 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
 
         {/* Search & Actions */}
         <div className="space-y-2 mb-2">
-          <input 
-            type="text" 
-            placeholder="Search columns..." 
+          <input
+            type="text"
+            placeholder="Search columns..."
             className="block w-full px-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary outline-none"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); }}

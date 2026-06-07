@@ -54,8 +54,8 @@ export const CanvasPage: React.FC = () => {
       if (processedRef.current) return;
 
       // Check if we already have this dataset on the canvas
-      const alreadyExists = nodes.some(n => 
-        n.type === 'dataset_node' && 
+      const alreadyExists = nodes.some(n =>
+        n.type === 'dataset_node' &&
         (n.data as { datasetId?: string })?.datasetId === sourceId
       );
 
@@ -69,10 +69,10 @@ export const CanvasPage: React.FC = () => {
 
       // Mark as processed to prevent duplicates
       processedRef.current = true;
-      
+
       // Add the node
       addNode('dataset_node', { x: 100, y: 100 }, { datasetId: sourceId });
-      
+
       // Clean up URL
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('source_id');

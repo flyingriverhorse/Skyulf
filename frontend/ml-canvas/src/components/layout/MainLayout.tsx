@@ -58,7 +58,7 @@ export const MainLayout: React.FC = () => {
     <div className="flex h-full w-full bg-background overflow-hidden flex-col">
       <JobsDrawer />
       <Navbar />
-      
+
       {activeView === 'canvas' ? (
         <div className="flex flex-1 overflow-hidden relative">
           {!readOnly && <Sidebar />}
