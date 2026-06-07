@@ -28,6 +28,11 @@ export interface EnsembleConfig {
   // Stacking only: feed the original features to the meta-learner alongside
   // the base models' predictions.
   passthrough?: boolean;
+  // Voting only: per-base-model relative weights, keyed by base-learner key so
+  // they stay aligned when the selection is reordered. Missing key → weight 1.
+  weights?: Record<string, number>;
+  // Base models fit in parallel. 1 = sequential, -1 = all cores.
+  n_jobs?: number;
   target_column: string;
   cv_enabled: boolean;
   cv_folds: number;
@@ -280,6 +285,71 @@ function StrategyOptions({ config, update, options }: { config: EnsembleConfig; 
           Let the meta-learner also see the original features, not just the base predictions.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Voting only: per-base-model relative weights (sklearn `weights=`). */
+function VotingWeightsSection({ config, update, optionLabels }: {
+  config: EnsembleConfig;
+  update: UpdateFn;
+  optionLabels: Record<string, string>;
+}) {
+  const bases = config.base_estimators ?? [];
+  if (config.strategy !== 'voting' || bases.length === 0) return null;
+  const weights = config.weights ?? {};
+  const setWeight = (key: string, value: number) => {
+    update({ weights: { ...weights, [key]: value } });
+  };
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Weights</span>
+        <HelpTooltip text="Relative weight of each base model when averaging votes/probabilities. Leave at 1 for equal weighting; raise a model's weight to trust it more." />
+      </div>
+      <div className="space-y-1.5">
+        {bases.map((key) => (
+          <div key={key} className="flex items-center gap-2">
+            <span className="flex-1 text-xs text-gray-700 dark:text-gray-300 truncate">{optionLabels[key] ?? key}</span>
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              value={weights[key] ?? 1}
+              onChange={(e) => { setWeight(key, Number(e.target.value)); }}
+              className="w-20 border border-gray-300 dark:border-gray-600 rounded-lg p-1.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Parallel base-model fitting (sklearn `n_jobs`). Applies to all ensembles. */
+function ParallelJobsSection({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
+  const options: Option[] = [
+    { label: 'Sequential (1)', value: '1' },
+    { label: '2 cores', value: '2' },
+    { label: '4 cores', value: '4' },
+    { label: '8 cores', value: '8' },
+    { label: 'All cores (-1)', value: '-1' },
+  ];
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1">
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Parallel Jobs</span>
+        <HelpTooltip text="How many base models to fit in parallel. -1 uses all CPU cores; 1 trains sequentially." />
+      </div>
+      <select
+        value={String(config.n_jobs ?? 1)}
+        onChange={(e) => { update({ n_jobs: Number(e.target.value) }); }}
+        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 outline-none"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -884,6 +954,10 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
         </div>
 
         <StrategyOptions config={config} update={update} options={currentOptions} />
+
+        <VotingWeightsSection config={config} update={update} optionLabels={optionLabelMap(currentOptions)} />
+
+        <ParallelJobsSection config={config} update={update} />
 
         {isAdvanced && <AdvancedTuningOptions config={config} update={update} />}
 

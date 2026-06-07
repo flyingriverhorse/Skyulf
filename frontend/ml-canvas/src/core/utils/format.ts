@@ -210,6 +210,8 @@ export interface EnsembleSummary {
   finalEstimator?: string | undefined;
   voting?: string | undefined;
   passthrough?: boolean | undefined;
+  weights?: number[] | undefined;
+  nJobs?: number | undefined;
   isStacking: boolean;
 }
 
@@ -229,6 +231,10 @@ export const extractEnsembleSummary = (
   const baseEstimators = Array.isArray(raw)
     ? raw.filter((v): v is string => typeof v === 'string')
     : [];
+  const rawWeights = bucket.weights;
+  const weights = Array.isArray(rawWeights) && rawWeights.every((w) => typeof w === 'number')
+    ? (rawWeights as number[])
+    : undefined;
   return {
     baseEstimators,
     finalEstimator: typeof bucket.final_estimator === 'string' ? bucket.final_estimator : undefined,
@@ -238,6 +244,8 @@ export const extractEnsembleSummary = (
     // node-default values from the other strategy never leak into the UI.
     voting: !isStacking && typeof bucket.voting === 'string' ? bucket.voting : undefined,
     passthrough: isStacking && typeof bucket.passthrough === 'boolean' ? bucket.passthrough : undefined,
+    weights: !isStacking ? weights : undefined,
+    nJobs: typeof bucket.n_jobs === 'number' ? bucket.n_jobs : undefined,
     isStacking,
   };
 };

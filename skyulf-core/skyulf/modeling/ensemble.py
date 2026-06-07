@@ -155,7 +155,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         params = dict(self._default_params)
         if self._tuning_base_config:
             resolved = self._resolve_estimators(dict(self._tuning_base_config))
-            for key in ("estimators", "final_estimator", "voting", "cv", "passthrough"):
+            for key in ("estimators", "final_estimator", "voting", "cv", "passthrough", "weights", "n_jobs"):
                 if key in resolved:
                     params[key] = resolved[key]
         return params
@@ -185,6 +185,8 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             "voting",
             "cv",
             "passthrough",
+            "weights",
+            "n_jobs",
             "base_estimator_params",
             "final_estimator_params",
         )
@@ -284,6 +286,13 @@ class _BaseEnsembleCalculator(SklearnCalculator):
 
     def _clean_meta_keys(self, bucket: Dict[str, Any], final_params: Any = None) -> None:
         """Keep only the meta-keys valid for this estimator family."""
+        # ``n_jobs`` (parallel base-model fitting) is valid for every family;
+        # coerce to int and drop anything malformed so sklearn never sees junk.
+        if "n_jobs" in bucket:
+            try:
+                bucket["n_jobs"] = int(bucket["n_jobs"])
+            except (TypeError, ValueError):
+                bucket.pop("n_jobs", None)
         if self.IS_STACKING:
             bucket["final_estimator"] = self._resolve_final_estimator(
                 bucket.pop("final_estimator", None), final_params
@@ -302,6 +311,17 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             bucket.pop("passthrough", None)
             if not self.HAS_VOTING:
                 bucket.pop("voting", None)
+            # ``weights`` (per-base-model relative weight) is Voting-only. Keep it
+            # only when it is a list/tuple matching the estimator count; otherwise
+            # drop it so sklearn falls back to equal weighting instead of raising.
+            weights = bucket.get("weights")
+            estimators = bucket.get("estimators") or []
+            if not (
+                isinstance(weights, (list, tuple))
+                and len(weights) == len(estimators)
+                and len(weights) > 0
+            ):
+                bucket.pop("weights", None)
 
     @staticmethod
     def _absorb_nested_keys(

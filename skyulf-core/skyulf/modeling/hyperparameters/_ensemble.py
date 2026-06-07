@@ -81,6 +81,20 @@ _PASSTHROUGH_FIELD = HyperparameterField(
     ),
 )
 
+_N_JOBS_FIELD = HyperparameterField(
+    name="n_jobs",
+    label="Parallel Jobs",
+    type="number",
+    default=1,
+    min=-1,
+    max=32,
+    description=(
+        "Number of base models fit in parallel. 1 = sequential, -1 = use all "
+        "CPU cores. Speeds up fitting when you have several independent base "
+        "learners."
+    ),
+)
+
 
 def _base_estimators_field(options, default):
     return HyperparameterField(
@@ -98,6 +112,7 @@ VOTING_CLASSIFIER_PARAMS = [
         _CLF_OPTIONS, ["random_forest", "logistic_regression", "gradient_boosting"]
     ),
     _VOTING_FIELD,
+    _N_JOBS_FIELD,
 ]
 
 STACKING_CLASSIFIER_PARAMS = [
@@ -112,12 +127,14 @@ STACKING_CLASSIFIER_PARAMS = [
     ),
     _CV_FIELD,
     _PASSTHROUGH_FIELD,
+    _N_JOBS_FIELD,
 ]
 
 VOTING_REGRESSOR_PARAMS = [
     _base_estimators_field(
         _REG_OPTIONS, ["linear_regression", "random_forest", "gradient_boosting"]
     ),
+    _N_JOBS_FIELD,
 ]
 
 STACKING_REGRESSOR_PARAMS = [
@@ -132,4 +149,5 @@ STACKING_REGRESSOR_PARAMS = [
     ),
     _CV_FIELD,
     _PASSTHROUGH_FIELD,
+    _N_JOBS_FIELD,
 ]

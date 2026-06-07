@@ -130,6 +130,67 @@ def test_voting_classifier_ignores_passthrough():
     assert len(preds) == len(X)
 
 
+def test_voting_classifier_applies_weights():
+    X, y = _clf_data(11)
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    model = calc.fit(
+        X,
+        y,
+        {"base_estimators": ["random_forest", "decision_tree"], "weights": [2, 1]},
+    )
+
+    assert list(model.weights) == [2, 1]
+
+
+def test_voting_classifier_drops_mismatched_weights():
+    X, y = _clf_data(12)
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    # Weight list shorter than the estimator list → dropped (equal weighting)
+    # instead of raising inside VotingClassifier.fit.
+    model = calc.fit(
+        X,
+        y,
+        {"base_estimators": ["random_forest", "decision_tree"], "weights": [2]},
+    )
+
+    assert model.weights is None
+
+
+def test_stacking_classifier_ignores_weights():
+    X, y = _clf_data(13)
+    calc = NodeRegistry.get_calculator("stacking_classifier")()
+    # ``weights`` is Voting-only; Stacking must not receive it.
+    model = calc.fit(
+        X,
+        y,
+        {"base_estimators": ["random_forest", "decision_tree"], "weights": [2, 1]},
+    )
+
+    assert not hasattr(model, "weights")
+
+
+def test_ensemble_n_jobs_passthrough():
+    X, y = _clf_data(14)
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    model = calc.fit(
+        X, y, {"base_estimators": ["random_forest", "decision_tree"], "n_jobs": -1}
+    )
+
+    assert model.n_jobs == -1
+
+
+def test_stacking_n_jobs_passthrough():
+    X, y = _clf_data(15)
+    calc = NodeRegistry.get_calculator("stacking_classifier")()
+    model = calc.fit(
+        X,
+        y,
+        {"base_estimators": ["random_forest", "decision_tree"], "cv": 3, "n_jobs": 2},
+    )
+
+    assert model.n_jobs == 2
+
+
 def test_voting_regressor_predicts_finite():
     X, y = _reg_data()
     calc = NodeRegistry.get_calculator("voting_regressor")()

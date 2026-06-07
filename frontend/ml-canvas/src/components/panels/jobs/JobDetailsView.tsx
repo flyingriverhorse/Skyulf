@@ -520,6 +520,20 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                                                                 <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{ensemble.voting}</span>
                                                                             </div>
                                                                         )}
+                                                                        {!ensemble.isStacking && ensemble.weights && ensemble.weights.length === ensemble.baseEstimators.length && (
+                                                                            <div className="col-span-2">
+                                                                                <span className="text-gray-500">Model Weights:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                                                                    {ensemble.baseEstimators.map((m, i) => `${formatBaseEstimator(m)}: ${ensemble.weights?.[i]}`).join(', ')}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                        {typeof ensemble.nJobs === 'number' && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Parallel Jobs:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{ensemble.nJobs === -1 ? 'All cores' : ensemble.nJobs}</span>
+                                                                            </div>
+                                                                        )}
                                                                     </>
                                                                 )}
                                                                 <div>

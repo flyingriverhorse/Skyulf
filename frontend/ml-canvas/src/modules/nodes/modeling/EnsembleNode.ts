@@ -24,6 +24,7 @@ export const EnsembleNode = createModelingNode({
     final_estimator: 'logistic_regression',
     cv: 5,
     passthrough: false,
+    n_jobs: 1,
     cv_enabled: true,
     cv_folds: 5,
     cv_type: 'k_fold',
