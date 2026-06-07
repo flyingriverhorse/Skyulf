@@ -12,12 +12,12 @@ from typing import Any, Dict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 from backend.ml_pipeline._services.job_service import JobService
 from backend.ml_pipeline._services.prediction_utils import (
     decode_int_like,
     extract_target_label_encoder,
 )
+from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 
 logger = logging.getLogger(__name__)
 

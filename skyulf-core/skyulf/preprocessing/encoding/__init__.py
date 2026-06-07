@@ -15,7 +15,7 @@ All public names are re-exported here so existing imports such as
 continue to work unchanged.
 """
 
-from ._common import detect_categorical_columns, _exclude_target_column
+from ._common import _exclude_target_column, detect_categorical_columns
 from .dummy import DummyEncoderApplier, DummyEncoderCalculator
 from .hash import HashEncoderApplier, HashEncoderCalculator
 from .label import LabelEncoderApplier, LabelEncoderCalculator

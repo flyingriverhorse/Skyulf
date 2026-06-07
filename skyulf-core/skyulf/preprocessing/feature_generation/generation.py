@@ -7,9 +7,9 @@ import pandas as pd
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
+from .._artifacts import FeatureGenerationArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from .._artifacts import FeatureGenerationArtifact
 from ._common import DEFAULT_EPSILON
 from ._pandas_ops import _featgen_apply_pandas
 from ._polars_ops import _featgen_apply_polars

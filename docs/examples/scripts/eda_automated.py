@@ -10,14 +10,15 @@ Requirements:
 """
 
 import polars as pl
-from sklearn.datasets import load_iris
 from rich.console import Console
 from rich.panel import Panel
+from sklearn.datasets import load_iris
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 from skyulf.profiling.visualizer import EDAVisualizer
 
 console = Console()
+
 
 def main():
     console.print(Panel.fit("Skyulf Automated EDA", style="bold purple"))
@@ -26,7 +27,7 @@ def main():
     iris = load_iris()
     df = pl.DataFrame(iris.data, schema=iris.feature_names)
     df = df.with_columns(pl.Series("target", iris.target))
-    
+
     console.print(f"Loaded Iris dataset: {df.shape[0]} rows, {df.shape[1]} columns")
 
     # 2. Run Analysis
@@ -37,12 +38,13 @@ def main():
     # 3. Visualize Results (The Easy Way)
     # This single class handles all the rich terminal output and matplotlib plots
     viz = EDAVisualizer(profile, df)
-    
+
     # Print the dashboard
     viz.summary()
-    
+
     # Show the plots
     viz.plot()
+
 
 if __name__ == "__main__":
     main()

@@ -2,16 +2,16 @@
 
 from typing import Any, Dict, cast
 
+from sklearn.feature_selection import VarianceThreshold
+
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, resolve_columns
-from sklearn.feature_selection import VarianceThreshold
-
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine
 from .._artifacts import VarianceThresholdArtifact
 from .._helpers import to_pandas
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
 from ._common import _drop_selected_pandas, _drop_selected_polars
 
 

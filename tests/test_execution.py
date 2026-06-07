@@ -1,11 +1,11 @@
 import pandas as pd
 import pytest
 
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.constants import StepType
-from backend.data.catalog import FileSystemCatalog
 
 
 @pytest.fixture

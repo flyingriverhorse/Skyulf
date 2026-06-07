@@ -1,11 +1,11 @@
 """Tests for Phase 2 parallel pipeline branch partitioning."""
 
-from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline._execution.graph_utils import (
-    partition_parallel_pipeline,
     _collect_ancestors,
     _split_connected_components,
+    partition_parallel_pipeline,
 )
+from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 
 
 def _make_node(

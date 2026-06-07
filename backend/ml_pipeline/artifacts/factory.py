@@ -1,11 +1,11 @@
-import os
 import logging
-from typing import TYPE_CHECKING, Tuple, Optional
+import os
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from backend.config import get_settings
-from backend.ml_pipeline.artifacts.store import ArtifactStore
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
+from backend.ml_pipeline.artifacts.store import ArtifactStore
 
 if TYPE_CHECKING:
     from backend.ml_pipeline.artifacts.discovery import ArtifactDiscovery

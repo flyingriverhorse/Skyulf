@@ -1,25 +1,25 @@
-from backend.exceptions.core import SkyulfException
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from fastapi.responses import Response
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
-from pydantic import BaseModel
-from typing import Optional, List, Any, cast
+import logging
+from typing import Any, List, Optional, cast
 
 import orjson
+import pandas as pd
+import polars as pl
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi.responses import Response
+from pydantic import BaseModel
+from sqlalchemy import desc, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.dependencies import get_db
-from backend.database.models import EDAReport, DataSource
+from backend.celery_app import celery_app
 from backend.config import get_settings
-from backend.eda.tasks import run_eda_background, generate_profile_celery
+from backend.database.models import DataSource, EDAReport
+from backend.dependencies import get_db
+from backend.eda.tasks import generate_profile_celery, run_eda_background
+from backend.exceptions.core import SkyulfException
+from backend.middleware.rate_limiter import limiter
 from backend.services.data_service import DataService
 from backend.utils.file_utils import extract_file_path_from_source
-from backend.celery_app import celery_app
 from skyulf.profiling.analyzer import EDAAnalyzer
-from backend.middleware.rate_limiter import limiter
-import logging
-import polars as pl
-import pandas as pd
 
 logger = logging.getLogger(__name__)
 

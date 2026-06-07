@@ -6,7 +6,7 @@ This is the async equivalent of the Flask db/data_sources/postgres_queries.py
 import logging
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import column, literal_column, select, table, update, delete
+from sqlalchemy import column, delete, literal_column, select, table, update
 from sqlalchemy import text as sa_text
 
 from backend.config import Settings

@@ -159,8 +159,7 @@ def _full_branch_section(
     branch_only = [n for n in preprocess if n.node_id not in shared_ids]
     algo = nb._model_algorithm(model) if model is not None else "none"
     title = (
-        f"## {section_no}. Branch {letter} — "
-        f"{model.step_type if model else 'no model'} (`{algo}`)"
+        f"## {section_no}. Branch {letter} — {model.step_type if model else 'no model'} (`{algo}`)"
     )
     cells: List[Dict[str, Any]] = [
         md_cell(

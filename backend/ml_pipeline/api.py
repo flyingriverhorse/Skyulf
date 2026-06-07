@@ -23,17 +23,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from ._internal._routers.jobs import get_job_evaluation  # noqa: F401  (re-exported)
-from ._internal._routers.jobs import router as _jobs_router
-from ._internal._routers.meta import _build_node_registry  # noqa: F401  (re-exported)
-from ._internal._routers.meta import router as _meta_router
-from ._internal._routers.notebook_export import router as _notebook_export_router
-from ._internal._routers.pipelines_io import router as _pipelines_io_router
-from ._internal._routers.preview import router as _preview_router
-from ._internal._routers.run_pipeline import _get_submit_lock  # noqa: F401  (re-exported)
-from ._internal._routers.run_pipeline import router as _run_router
-from ._internal._routers.schema_preview import router as _schema_preview_router
-
 # Schema / helper / advisor re-exports — used by tests and callers that
 # imported these directly from `backend.ml_pipeline.api` before the E9 split.
 from ._internal import (  # noqa: F401  (re-exported)
@@ -52,6 +41,16 @@ from ._internal import (  # noqa: F401  (re-exported)
 )
 from ._internal import branch_label as _branch_label  # noqa: F401
 from ._internal import prettify_model_type as _prettify_model_type  # noqa: F401
+from ._internal._routers.jobs import get_job_evaluation  # noqa: F401  (re-exported)
+from ._internal._routers.jobs import router as _jobs_router
+from ._internal._routers.meta import _build_node_registry  # noqa: F401  (re-exported)
+from ._internal._routers.meta import router as _meta_router
+from ._internal._routers.notebook_export import router as _notebook_export_router
+from ._internal._routers.pipelines_io import router as _pipelines_io_router
+from ._internal._routers.preview import router as _preview_router
+from ._internal._routers.run_pipeline import _get_submit_lock  # noqa: F401  (re-exported)
+from ._internal._routers.run_pipeline import router as _run_router
+from ._internal._routers.schema_preview import router as _schema_preview_router
 
 # Single public router; main.py mounts this under `/ml-pipeline`.
 router = APIRouter(tags=["ML Pipeline"])

@@ -1,24 +1,26 @@
 import time
+
+import numpy as np
 import pandas as pd
 import polars as pl
-import numpy as np
+
+from skyulf.preprocessing.bucketing import KBinsDiscretizerApplier, KBinsDiscretizerCalculator
+from skyulf.preprocessing.cleaning import TextCleaningApplier, TextCleaningCalculator
 
 # --- Import All Nodes ---
-from skyulf.preprocessing.drop_and_missing import DropMissingRowsCalculator, DropMissingRowsApplier
-from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
-from skyulf.preprocessing.outliers import ZScoreCalculator, ZScoreApplier
-from skyulf.preprocessing.cleaning import TextCleaningCalculator, TextCleaningApplier
-from skyulf.preprocessing.bucketing import KBinsDiscretizerCalculator, KBinsDiscretizerApplier
+from skyulf.preprocessing.drop_and_missing import DropMissingRowsApplier, DropMissingRowsCalculator
+from skyulf.preprocessing.encoding import OneHotEncoderApplier, OneHotEncoderCalculator
 from skyulf.preprocessing.feature_generation import (
-    PolynomialFeaturesCalculator,
     PolynomialFeaturesApplier,
+    PolynomialFeaturesCalculator,
 )
 from skyulf.preprocessing.feature_selection import (
-    VarianceThresholdCalculator,
     VarianceThresholdApplier,
+    VarianceThresholdCalculator,
 )
-from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
-from skyulf.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
+from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
+from skyulf.preprocessing.outliers import ZScoreApplier, ZScoreCalculator
+from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
 
 
 def generate_dataset(n_rows: int = 100_000):

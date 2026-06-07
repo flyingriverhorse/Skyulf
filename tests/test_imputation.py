@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+
 from skyulf.preprocessing.imputation import (
     IterativeImputerApplier,
     IterativeImputerCalculator,

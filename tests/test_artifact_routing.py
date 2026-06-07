@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from backend.ml_pipeline.tasks import run_pipeline_task
 
 

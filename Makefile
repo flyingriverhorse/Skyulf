@@ -1,7 +1,7 @@
 # © 2025 Murat Unsal — Skyulf Project
 # Makefile — common shortcuts for developers
 
-.PHONY: start dev frontend-dev backend-dev docker stop install lint typecheck test clean help
+.PHONY: start dev frontend-dev backend-dev docker stop install lint format typecheck test clean help
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*##' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-15s %s\n", $$1, $$2}'
@@ -40,8 +40,11 @@ install: ## Install all Python dependencies in a virtualenv
 	pip install --upgrade pip
 	pip install -r requirements-fastapi.txt
 
-lint: ## Run flake8 linting (critical errors only)
-	flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+lint: ## Run ruff linting (critical errors + import sort)
+	ruff check .
+
+format: ## Auto-format the codebase with ruff (replaces black)
+	ruff format .
 
 typecheck: ## Run ty (Astral) type checking on backend + skyulf-core
 	ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py

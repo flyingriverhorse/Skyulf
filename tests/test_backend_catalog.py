@@ -1,9 +1,10 @@
 import os
 import shutil
+import sys
 import tempfile
+
 import pandas as pd
 import pytest
-import sys
 
 # Add root to path
 sys.path.append(os.getcwd())

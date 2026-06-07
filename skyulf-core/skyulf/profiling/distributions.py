@@ -1,8 +1,10 @@
 import logging
-import polars as pl
 from typing import List, Optional, cast
-from .schemas import HistogramBin
+
 import numpy as np
+import polars as pl
+
+from .schemas import HistogramBin
 
 logger = logging.getLogger(__name__)
 

@@ -21,9 +21,9 @@ from sklearn.model_selection import (
     TimeSeriesSplit,
 )
 
-from ..base import BaseModelApplier, BaseModelCalculator
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
+from ..base import BaseModelApplier, BaseModelCalculator
 from .schemas import TuningConfig, TuningResult
 
 logger = logging.getLogger(__name__)

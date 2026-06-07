@@ -18,8 +18,8 @@ Alternatively, without uv:
 - Full suite (may require services): `uv run pytest -q`
 
 ## Lint & typecheck
-- Black/Isort: `uv run black . && uv run isort .`
-- Flake8: `uv run flake8`
+- Format: `uv run ruff format .`
+- Lint (with import sort + autofix): `uv run ruff check --fix .`
 - Ty (instead of MyPy): `uv run ty`
 
 ## Commit style

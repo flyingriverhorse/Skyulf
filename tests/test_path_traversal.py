@@ -5,8 +5,8 @@ import tempfile
 
 import pytest
 
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.data.catalog import FileSystemCatalog
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 # ── LocalArtifactStore ──────────────────────────────────────────────
 

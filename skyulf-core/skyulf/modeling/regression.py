@@ -7,7 +7,7 @@ from sklearn.ensemble import (
     HistGradientBoostingRegressor,
     RandomForestRegressor,
 )
-from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
+from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, Ridge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor

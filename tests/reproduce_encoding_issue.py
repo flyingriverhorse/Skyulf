@@ -1,5 +1,6 @@
 import pandas as pd
-from skyulf.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
+
+from skyulf.preprocessing.encoding import LabelEncoderApplier, LabelEncoderCalculator
 
 
 def test_label_encoding_flow():

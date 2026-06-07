@@ -1,8 +1,9 @@
-import polars as pl
-import pandas as pd
 import numpy as np
+import pandas as pd
+import polars as pl
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
+
 from skyulf.profiling.analyzer import EDAAnalyzer
 
 

@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Union
+
 import pandas as pd
+
 from ..engines import SkyulfDataFrame
 
 

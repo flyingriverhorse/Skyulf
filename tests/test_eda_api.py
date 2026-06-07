@@ -1,9 +1,10 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+from backend.config import get_settings
 from backend.database.models import DataSource, EDAReport
 from backend.main import app
-from backend.config import get_settings
 
 # Setup async engine for tests
 settings = get_settings()
@@ -29,8 +30,8 @@ def client():
 async def test_trigger_analysis_creates_report(client, db_session):
     # 1. Create a dummy data source
     # We need to use a unique source_id to avoid conflicts if DB is persistent
-    import uuid
     import os
+    import uuid
 
     unique_id = str(uuid.uuid4())
 

@@ -5,10 +5,11 @@ Covers: scaling, imputation, encoding, outliers, cleaning, feature_selection,
 feature_generation, drop_and_missing, bucketing, transformations, casting.
 """
 
+from typing import List, cast
+
 import numpy as np
 import pandas as pd
 import pytest
-from typing import cast, List
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -99,7 +100,7 @@ class TestStandardScaler:
         assert len(cast(List[float], params["scale"])) == 2
 
     def test_apply_centers_and_scales(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
+        from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
 
         calc = StandardScalerCalculator()
         applier = StandardScalerApplier()
@@ -112,7 +113,7 @@ class TestStandardScaler:
         assert abs(result["b"].mean()) < 0.1
 
     def test_apply_with_nan_passthrough(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
+        from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
 
         calc = StandardScalerCalculator()
         applier = StandardScalerApplier()
@@ -132,7 +133,7 @@ class TestStandardScaler:
         assert params == {}
 
     def test_with_mean_false(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
+        from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
 
         calc = StandardScalerCalculator()
         applier = StandardScalerApplier()
@@ -154,7 +155,7 @@ class TestMinMaxScaler:
         assert "columns" in params
 
     def test_apply_scales_to_range(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.scaling import MinMaxScalerCalculator, MinMaxScalerApplier
+        from skyulf.preprocessing.scaling import MinMaxScalerApplier, MinMaxScalerCalculator
 
         calc = MinMaxScalerCalculator()
         applier = MinMaxScalerApplier()
@@ -167,7 +168,7 @@ class TestMinMaxScaler:
 
 class TestRobustScaler:
     def test_fit_and_apply(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.scaling import RobustScalerCalculator, RobustScalerApplier
+        from skyulf.preprocessing.scaling import RobustScalerApplier, RobustScalerCalculator
 
         calc = RobustScalerCalculator()
         applier = RobustScalerApplier()
@@ -183,7 +184,7 @@ class TestRobustScaler:
 
 class TestMaxAbsScaler:
     def test_fit_and_apply(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.scaling import MaxAbsScalerCalculator, MaxAbsScalerApplier
+        from skyulf.preprocessing.scaling import MaxAbsScalerApplier, MaxAbsScalerCalculator
 
         calc = MaxAbsScalerCalculator()
         applier = MaxAbsScalerApplier()
@@ -201,7 +202,7 @@ class TestMaxAbsScaler:
 
 class TestSimpleImputer:
     def test_mean_imputation(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
+        from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
 
         calc = SimpleImputerCalculator()
         applier = SimpleImputerApplier()
@@ -213,7 +214,7 @@ class TestSimpleImputer:
         assert result["b"].isna().sum() == 0
 
     def test_median_imputation(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
+        from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
 
         calc = SimpleImputerCalculator()
         applier = SimpleImputerApplier()
@@ -222,7 +223,7 @@ class TestSimpleImputer:
         assert result["a"].isna().sum() == 0
 
     def test_constant_imputation(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
+        from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
 
         calc = SimpleImputerCalculator()
         applier = SimpleImputerApplier()
@@ -236,7 +237,7 @@ class TestSimpleImputer:
 
 class TestKNNImputer:
     def test_knn_imputation(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.imputation import KNNImputerCalculator, KNNImputerApplier
+        from skyulf.preprocessing.imputation import KNNImputerApplier, KNNImputerCalculator
 
         calc = KNNImputerCalculator()
         applier = KNNImputerApplier()
@@ -249,8 +250,8 @@ class TestKNNImputer:
 class TestIterativeImputer:
     def test_iterative_imputation(self, numeric_df: pd.DataFrame) -> None:
         from skyulf.preprocessing.imputation import (
-            IterativeImputerCalculator,
             IterativeImputerApplier,
+            IterativeImputerCalculator,
         )
 
         calc = IterativeImputerCalculator()
@@ -267,7 +268,7 @@ class TestIterativeImputer:
 
 class TestOneHotEncoder:
     def test_fit_and_apply(self, categorical_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
+        from skyulf.preprocessing.encoding import OneHotEncoderApplier, OneHotEncoderCalculator
 
         calc = OneHotEncoderCalculator()
         applier = OneHotEncoderApplier()
@@ -280,7 +281,7 @@ class TestOneHotEncoder:
         assert any("blue" in c.lower() for c in result.columns)
 
     def test_drop_original(self, categorical_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.encoding import OneHotEncoderCalculator, OneHotEncoderApplier
+        from skyulf.preprocessing.encoding import OneHotEncoderApplier, OneHotEncoderCalculator
 
         calc = OneHotEncoderCalculator()
         applier = OneHotEncoderApplier()
@@ -291,7 +292,7 @@ class TestOneHotEncoder:
 
 class TestOrdinalEncoder:
     def test_fit_and_apply(self, categorical_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.encoding import OrdinalEncoderCalculator, OrdinalEncoderApplier
+        from skyulf.preprocessing.encoding import OrdinalEncoderApplier, OrdinalEncoderCalculator
 
         calc = OrdinalEncoderCalculator()
         applier = OrdinalEncoderApplier()
@@ -303,7 +304,7 @@ class TestOrdinalEncoder:
 
 class TestLabelEncoder:
     def test_fit_and_apply(self, categorical_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
+        from skyulf.preprocessing.encoding import LabelEncoderApplier, LabelEncoderCalculator
 
         calc = LabelEncoderCalculator()
         applier = LabelEncoderApplier()
@@ -316,7 +317,7 @@ class TestLabelEncoder:
 
 class TestTargetEncoder:
     def test_fit_and_apply(self, categorical_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.encoding import TargetEncoderCalculator, TargetEncoderApplier
+        from skyulf.preprocessing.encoding import TargetEncoderApplier, TargetEncoderCalculator
 
         calc = TargetEncoderCalculator()
         applier = TargetEncoderApplier()
@@ -334,9 +335,8 @@ class TestTargetEncoder:
 
 
 class TestHashEncoder:
-
     def test_fit_and_apply(self, categorical_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.encoding import HashEncoderCalculator, HashEncoderApplier
+        from skyulf.preprocessing.encoding import HashEncoderApplier, HashEncoderCalculator
 
         calc = HashEncoderCalculator()
         applier = HashEncoderApplier()
@@ -362,7 +362,7 @@ class TestIQROutlier:
         assert "upper" in params["bounds"]["value"]
 
     def test_apply_filters_outliers(self, outlier_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.outliers import IQRCalculator, IQRApplier
+        from skyulf.preprocessing.outliers import IQRApplier, IQRCalculator
 
         calc = IQRCalculator()
         applier = IQRApplier()
@@ -374,7 +374,7 @@ class TestIQROutlier:
 
 class TestZScoreOutlier:
     def test_fit_and_apply(self, outlier_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.outliers import ZScoreCalculator, ZScoreApplier
+        from skyulf.preprocessing.outliers import ZScoreApplier, ZScoreCalculator
 
         calc = ZScoreCalculator()
         applier = ZScoreApplier()
@@ -387,7 +387,7 @@ class TestZScoreOutlier:
 
 class TestWinsorize:
     def test_fit_and_apply(self, outlier_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.outliers import WinsorizeCalculator, WinsorizeApplier
+        from skyulf.preprocessing.outliers import WinsorizeApplier, WinsorizeCalculator
 
         calc = WinsorizeCalculator()
         applier = WinsorizeApplier()
@@ -406,7 +406,7 @@ class TestWinsorize:
 
 class TestDeduplication:
     def test_removes_duplicates(self) -> None:
-        from skyulf.preprocessing.drop_and_missing import DeduplicateCalculator, DeduplicateApplier
+        from skyulf.preprocessing.drop_and_missing import DeduplicateApplier, DeduplicateCalculator
 
         df = pd.DataFrame(
             {
@@ -424,8 +424,8 @@ class TestDeduplication:
 class TestDropMissingColumns:
     def test_drops_mostly_null_columns(self) -> None:
         from skyulf.preprocessing.drop_and_missing import (
-            DropMissingColumnsCalculator,
             DropMissingColumnsApplier,
+            DropMissingColumnsCalculator,
         )
 
         df = pd.DataFrame(
@@ -446,8 +446,8 @@ class TestDropMissingColumns:
 class TestDropMissingRows:
     def test_drops_rows_with_na(self) -> None:
         from skyulf.preprocessing.drop_and_missing import (
-            DropMissingRowsCalculator,
             DropMissingRowsApplier,
+            DropMissingRowsCalculator,
         )
 
         df = pd.DataFrame(
@@ -466,8 +466,8 @@ class TestDropMissingRows:
 class TestMissingIndicator:
     def test_adds_indicator_column(self) -> None:
         from skyulf.preprocessing.drop_and_missing import (
-            MissingIndicatorCalculator,
             MissingIndicatorApplier,
+            MissingIndicatorCalculator,
         )
 
         df = pd.DataFrame(
@@ -496,7 +496,7 @@ class TestMissingIndicator:
 
 class TestTextCleaning:
     def test_strips_and_lowercases(self, text_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.cleaning import TextCleaningCalculator, TextCleaningApplier
+        from skyulf.preprocessing.cleaning import TextCleaningApplier, TextCleaningCalculator
 
         calc = TextCleaningCalculator()
         applier = TextCleaningApplier()
@@ -519,8 +519,8 @@ class TestTextCleaning:
 class TestValueReplacement:
     def test_replaces_values(self) -> None:
         from skyulf.preprocessing.cleaning import (
-            ValueReplacementCalculator,
             ValueReplacementApplier,
+            ValueReplacementCalculator,
         )
 
         df = pd.DataFrame({"status": ["active", "inactive", "active", "pending"]})
@@ -545,7 +545,7 @@ class TestValueReplacement:
 
 class TestGeneralBinning:
     def test_equal_width_binning(self) -> None:
-        from skyulf.preprocessing.bucketing import GeneralBinningCalculator, GeneralBinningApplier
+        from skyulf.preprocessing.bucketing import GeneralBinningApplier, GeneralBinningCalculator
 
         df = pd.DataFrame({"age": list(range(0, 100))})
         calc = GeneralBinningCalculator()
@@ -558,8 +558,8 @@ class TestGeneralBinning:
 class TestKBinsDiscretizer:
     def test_fit_and_apply(self) -> None:
         from skyulf.preprocessing.bucketing import (
-            KBinsDiscretizerCalculator,
             KBinsDiscretizerApplier,
+            KBinsDiscretizerCalculator,
         )
 
         df = pd.DataFrame({"value": np.random.normal(50, 10, 100)})
@@ -578,8 +578,8 @@ class TestKBinsDiscretizer:
 class TestSimpleTransformation:
     def test_log_transformation(self) -> None:
         from skyulf.preprocessing.transformations import (
-            SimpleTransformationCalculator,
             SimpleTransformationApplier,
+            SimpleTransformationCalculator,
         )
 
         df = pd.DataFrame({"value": [1.0, 10.0, 100.0, 1000.0, 10000.0]})
@@ -600,8 +600,8 @@ class TestSimpleTransformation:
 class TestPowerTransformer:
     def test_yeo_johnson(self) -> None:
         from skyulf.preprocessing.transformations import (
-            PowerTransformerCalculator,
             PowerTransformerApplier,
+            PowerTransformerCalculator,
         )
 
         np.random.seed(42)
@@ -621,8 +621,8 @@ class TestPowerTransformer:
 class TestVarianceThreshold:
     def test_removes_low_variance(self) -> None:
         from skyulf.preprocessing.feature_selection import (
-            VarianceThresholdCalculator,
             VarianceThresholdApplier,
+            VarianceThresholdCalculator,
         )
 
         df = pd.DataFrame(
@@ -642,8 +642,8 @@ class TestVarianceThreshold:
 class TestCorrelationThreshold:
     def test_removes_highly_correlated(self) -> None:
         from skyulf.preprocessing.feature_selection import (
-            CorrelationThresholdCalculator,
             CorrelationThresholdApplier,
+            CorrelationThresholdCalculator,
         )
 
         np.random.seed(42)
@@ -671,8 +671,8 @@ class TestCorrelationThreshold:
 class TestPolynomialFeatures:
     def test_generates_polynomial_features(self) -> None:
         from skyulf.preprocessing.feature_generation import (
-            PolynomialFeaturesCalculator,
             PolynomialFeaturesApplier,
+            PolynomialFeaturesCalculator,
         )
 
         df = pd.DataFrame(
@@ -696,7 +696,7 @@ class TestPolynomialFeatures:
 
 class TestCasting:
     def test_cast_to_int(self) -> None:
-        from skyulf.preprocessing.casting import CastingCalculator, CastingApplier
+        from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
 
         df = pd.DataFrame({"value": [1.0, 2.0, 3.0, 4.0, 5.0]})
         calc = CastingCalculator()
@@ -707,7 +707,7 @@ class TestCasting:
         assert result["value"].dtype in [np.int64, np.int32, int, pd.Int64Dtype()]
 
     def test_cast_to_string(self) -> None:
-        from skyulf.preprocessing.casting import CastingCalculator, CastingApplier
+        from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
 
         df = pd.DataFrame({"value": [1, 2, 3]})
         calc = CastingCalculator()
@@ -726,7 +726,7 @@ class TestTuplePassthrough:
     """Verify that nodes correctly handle (X, y) tuple inputs."""
 
     def test_scaler_with_tuple(self) -> None:
-        from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
+        from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
 
         X = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, 5.0], "b": [10.0, 20.0, 30.0, 40.0, 50.0]})
         y = pd.Series([0, 1, 0, 1, 0])
@@ -740,7 +740,7 @@ class TestTuplePassthrough:
         assert len(y_out) == 5
 
     def test_imputer_with_tuple(self) -> None:
-        from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
+        from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
 
         X = pd.DataFrame({"a": [1.0, np.nan, 3.0, 4.0, 5.0]})
         y = pd.Series([0, 1, 0, 1, 0])

@@ -1,14 +1,14 @@
 import functools
+import time
+import tracemalloc
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Mapping, Optional, TypeVar, Union, cast
 
 import pandas as pd
-import time
-import tracemalloc
-from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
+from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
 from ._schema import SkyulfSchema
 
 # TypeVar lets the specific NodeArtifact TypedDict flow through fit_method

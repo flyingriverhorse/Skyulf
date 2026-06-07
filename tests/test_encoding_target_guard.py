@@ -9,6 +9,7 @@ import logging
 
 import pandas as pd
 import pytest
+
 from skyulf.preprocessing.encoding import (
     DummyEncoderCalculator,
     HashEncoderCalculator,

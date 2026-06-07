@@ -4,6 +4,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.engine import get_async_session
+
 from .service import DataIngestionService
 
 

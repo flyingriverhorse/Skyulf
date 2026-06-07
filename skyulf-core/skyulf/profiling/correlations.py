@@ -1,7 +1,9 @@
 import logging
-import polars as pl
-import numpy as np
 from typing import List, Optional, cast
+
+import numpy as np
+import polars as pl
+
 from .schemas import CorrelationMatrix
 
 logger = logging.getLogger(__name__)

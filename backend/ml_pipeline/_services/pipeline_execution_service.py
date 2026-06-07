@@ -23,9 +23,7 @@ from backend.realtime.events import JobEvent, publish_job_event
 logger = logging.getLogger(__name__)
 
 
-def execute_pipeline(
-    job_id: str, pipeline_config_dict: dict, session: Session
-) -> None:  # noqa: C901
+def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) -> None:  # noqa: C901
     """Run a full ML pipeline for *job_id* using the supplied sync *session*.
 
     Raises nothing — all exceptions are caught, written to the job row, and

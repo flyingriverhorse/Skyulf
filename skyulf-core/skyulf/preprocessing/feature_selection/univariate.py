@@ -6,10 +6,10 @@ from typing import Any, Dict, cast
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine
 from .._artifacts import UnivariateSelectionArtifact
 from .._helpers import to_pandas
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
 from ._common import (
     _build_univariate_selector,
     _drop_selected_pandas,

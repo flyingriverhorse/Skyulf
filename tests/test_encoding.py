@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+
 from skyulf.preprocessing.encoding import (
     DummyEncoderApplier,
     DummyEncoderCalculator,

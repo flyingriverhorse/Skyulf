@@ -1,7 +1,8 @@
+import logging
 import unittest
+
 import numpy as np
 import polars as pl
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -9,73 +10,73 @@ logger = logging.getLogger("TestPolarsSuite")
 
 # --- Import All Nodes ---
 # Bucketing
-from skyulf.preprocessing.bucketing import KBinsDiscretizerCalculator, KBinsDiscretizerApplier
+from skyulf.preprocessing.bucketing import KBinsDiscretizerApplier, KBinsDiscretizerCalculator
 
 # Casting
-from skyulf.preprocessing.casting import CastingCalculator, CastingApplier
+from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
 
 # Cleaning
 from skyulf.preprocessing.cleaning import (
-    TextCleaningCalculator,
-    TextCleaningApplier,
-    InvalidValueReplacementCalculator,
-    InvalidValueReplacementApplier,
-    ValueReplacementCalculator,
-    ValueReplacementApplier,
-    AliasReplacementCalculator,
     AliasReplacementApplier,
+    AliasReplacementCalculator,
+    InvalidValueReplacementApplier,
+    InvalidValueReplacementCalculator,
+    TextCleaningApplier,
+    TextCleaningCalculator,
+    ValueReplacementApplier,
+    ValueReplacementCalculator,
 )
 
 # Drop and Missing
 from skyulf.preprocessing.drop_and_missing import (
-    DeduplicateCalculator,
     DeduplicateApplier,
-    DropMissingColumnsCalculator,
+    DeduplicateCalculator,
     DropMissingColumnsApplier,
-    DropMissingRowsCalculator,
+    DropMissingColumnsCalculator,
     DropMissingRowsApplier,
-    MissingIndicatorCalculator,
+    DropMissingRowsCalculator,
     MissingIndicatorApplier,
+    MissingIndicatorCalculator,
 )
 
 # Encoding
 from skyulf.preprocessing.encoding import (
-    OneHotEncoderCalculator,
     OneHotEncoderApplier,
-    OrdinalEncoderCalculator,
+    OneHotEncoderCalculator,
     OrdinalEncoderApplier,
-    TargetEncoderCalculator,
+    OrdinalEncoderCalculator,
     TargetEncoderApplier,
+    TargetEncoderCalculator,
 )
 
 # Feature Generation
 from skyulf.preprocessing.feature_generation import (
-    FeatureGenerationCalculator,
     FeatureGenerationApplier,
-    PolynomialFeaturesCalculator,
+    FeatureGenerationCalculator,
     PolynomialFeaturesApplier,
+    PolynomialFeaturesCalculator,
 )
 
 # Feature Selection
 from skyulf.preprocessing.feature_selection import (
-    VarianceThresholdCalculator,
-    VarianceThresholdApplier,
-    CorrelationThresholdCalculator,
     CorrelationThresholdApplier,
-    UnivariateSelectionCalculator,
-    UnivariateSelectionApplier,
-    ModelBasedSelectionCalculator,
+    CorrelationThresholdCalculator,
     ModelBasedSelectionApplier,
+    ModelBasedSelectionCalculator,
+    UnivariateSelectionApplier,
+    UnivariateSelectionCalculator,
+    VarianceThresholdApplier,
+    VarianceThresholdCalculator,
 )
 
 # Imputation
 from skyulf.preprocessing.imputation import (
-    SimpleImputerCalculator,
-    SimpleImputerApplier,
-    KNNImputerCalculator,
-    KNNImputerApplier,
-    IterativeImputerCalculator,
     IterativeImputerApplier,
+    IterativeImputerCalculator,
+    KNNImputerApplier,
+    KNNImputerCalculator,
+    SimpleImputerApplier,
+    SimpleImputerCalculator,
 )
 
 # Inspection
@@ -83,38 +84,38 @@ from skyulf.preprocessing.inspection import DatasetProfileCalculator
 
 # Outliers
 from skyulf.preprocessing.outliers import (
-    IQRCalculator,
-    IQRApplier,
-    ZScoreCalculator,
-    ZScoreApplier,
-    WinsorizeCalculator,
-    WinsorizeApplier,
-    ManualBoundsCalculator,
-    ManualBoundsApplier,
-    EllipticEnvelopeCalculator,
     EllipticEnvelopeApplier,
-)
-
-# Scaling
-from skyulf.preprocessing.scaling import (
-    StandardScalerCalculator,
-    StandardScalerApplier,
-    MinMaxScalerCalculator,
-    MinMaxScalerApplier,
+    EllipticEnvelopeCalculator,
+    IQRApplier,
+    IQRCalculator,
+    ManualBoundsApplier,
+    ManualBoundsCalculator,
+    WinsorizeApplier,
+    WinsorizeCalculator,
+    ZScoreApplier,
+    ZScoreCalculator,
 )
 
 # Resampling
 from skyulf.preprocessing.resampling import (
-    OversamplingCalculator,
     OversamplingApplier,
+    OversamplingCalculator,
+)
+
+# Scaling
+from skyulf.preprocessing.scaling import (
+    MinMaxScalerApplier,
+    MinMaxScalerCalculator,
+    StandardScalerApplier,
+    StandardScalerCalculator,
 )
 
 # Transformations
 from skyulf.preprocessing.transformations import (
-    SimpleTransformationCalculator,
-    SimpleTransformationApplier,
-    PowerTransformerCalculator,
     PowerTransformerApplier,
+    PowerTransformerCalculator,
+    SimpleTransformationApplier,
+    SimpleTransformationCalculator,
 )
 
 

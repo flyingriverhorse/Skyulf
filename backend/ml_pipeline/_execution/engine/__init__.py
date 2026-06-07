@@ -24,23 +24,23 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from ...artifacts.store import ArtifactStore
-from ...constants import StepType
 from skyulf.data.catalog import DataCatalog
 
-from ._artifacts import ArtifactsMixin
-from ._feature_eng import FeatureEngMixin
-from ._merge import MergeMixin
-from ._node_runners import NodeRunnersMixin
-from ._warning_capture import WarningCaptureHandler
+from ...artifacts.store import ArtifactStore
+from ...constants import StepType
+from .._schema_graph import predict_schemas, schemas_to_dict
 from ..schemas import (
     NodeConfig,
     NodeExecutionResult,
     PipelineConfig,
     PipelineExecutionResult,
 )
-from .._schema_graph import predict_schemas, schemas_to_dict
 from ..summary import build_summary
+from ._artifacts import ArtifactsMixin
+from ._feature_eng import FeatureEngMixin
+from ._merge import MergeMixin
+from ._node_runners import NodeRunnersMixin
+from ._warning_capture import WarningCaptureHandler
 
 logger = logging.getLogger(__name__)
 
@@ -59,9 +59,9 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         self.artifact_store = artifact_store
         self.catalog = catalog
         self.log_callback = log_callback
-        self.executed_transformers: List[Any] = (
-            []
-        )  # Track fitted transformers for inference pipeline
+        self.executed_transformers: List[
+            Any
+        ] = []  # Track fitted transformers for inference pipeline
         self._results: Dict[str, NodeExecutionResult] = {}
         self._node_configs: Dict[str, NodeConfig] = {}
         # Engine-emitted advisories surfaced via PipelineExecutionResult.

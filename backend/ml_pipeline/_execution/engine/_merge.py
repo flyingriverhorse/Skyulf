@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class MergeMixin:
-
     # Type-only stubs so ty can resolve attributes/methods provided by
     # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
     _node_configs: Dict[str, NodeConfig]
@@ -86,7 +85,7 @@ class MergeMixin:
         strat = cfg.params.get("_merge_strategy", "last_wins")
         if strat not in ("last_wins", "first_wins"):
             self.log(
-                f"Node {node_id}: unknown merge strategy '{strat}', " "falling back to 'last_wins'."
+                f"Node {node_id}: unknown merge strategy '{strat}', falling back to 'last_wins'."
             )
             return "last_wins"
         return strat
@@ -295,8 +294,7 @@ class MergeMixin:
             x_frames = [a[0] for a in artifacts if isinstance(a[0], pd.DataFrame)]
             if not x_frames:
                 raise ValueError(
-                    f"Node {node.node_id}: cannot merge (X, y) tuples - "
-                    "X parts are not DataFrames."
+                    f"Node {node.node_id}: cannot merge (X, y) tuples - X parts are not DataFrames."
                 )
             merged_x = self._merge_frames(x_frames, node.node_id, "X")
             return (merged_x, artifacts[0][1])

@@ -1,6 +1,6 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
 try:
     import polars as pl
@@ -9,86 +9,78 @@ try:
 except ImportError:
     HAS_POLARS = False
 
-from skyulf.preprocessing.scaling import (
-    StandardScalerCalculator,
-    StandardScalerApplier,
-    MinMaxScalerCalculator,
-    MinMaxScalerApplier,
-    RobustScalerCalculator,
-    RobustScalerApplier,
-    MaxAbsScalerCalculator,
-    MaxAbsScalerApplier,
-)
-from skyulf.preprocessing.imputation import (
-    SimpleImputerCalculator,
-    SimpleImputerApplier,
-    KNNImputerCalculator,
-    KNNImputerApplier,
-    IterativeImputerCalculator,
-    IterativeImputerApplier,
-)
-from skyulf.preprocessing.encoding import (
-    OneHotEncoderCalculator,
-    OneHotEncoderApplier,
-    OrdinalEncoderCalculator,
-    OrdinalEncoderApplier,
-    TargetEncoderCalculator,
-    TargetEncoderApplier,
-    HashEncoderCalculator,
-    HashEncoderApplier,
-    DummyEncoderCalculator,
-    DummyEncoderApplier,
-    LabelEncoderCalculator,
-    LabelEncoderApplier,
-)
 from skyulf.preprocessing.bucketing import (
-    GeneralBinningCalculator,
-    GeneralBinningApplier,
-    KBinsDiscretizerCalculator,
-    KBinsDiscretizerApplier,
-    CustomBinningCalculator,
     CustomBinningApplier,
+    CustomBinningCalculator,
+    GeneralBinningApplier,
+    GeneralBinningCalculator,
+    KBinsDiscretizerApplier,
+    KBinsDiscretizerCalculator,
 )
-from skyulf.preprocessing.outliers import (
-    IQRCalculator,
-    IQRApplier,
-    ZScoreCalculator,
-    ZScoreApplier,
-    WinsorizeCalculator,
-    WinsorizeApplier,
-    ManualBoundsCalculator,
-    ManualBoundsApplier,
-    EllipticEnvelopeCalculator,
-    EllipticEnvelopeApplier,
-)
-from skyulf.preprocessing.casting import CastingCalculator, CastingApplier
+from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
 from skyulf.preprocessing.cleaning import (
-    TextCleaningApplier,
-    ValueReplacementApplier,
     AliasReplacementApplier,
     InvalidValueReplacementApplier,
-)
-from skyulf.preprocessing.feature_generation import (
-    PolynomialFeaturesCalculator,
-    PolynomialFeaturesApplier,
-    FeatureGenerationCalculator,
-    FeatureGenerationApplier,
-)
-from skyulf.preprocessing.imputation import (
-    SimpleImputerCalculator,
-    SimpleImputerApplier,
-    KNNImputerCalculator,
-    KNNImputerApplier,
-    IterativeImputerCalculator,
-    IterativeImputerApplier,
+    TextCleaningApplier,
+    ValueReplacementApplier,
 )
 from skyulf.preprocessing.drop_and_missing import (
     DeduplicateApplier,
-    DropMissingColumnsCalculator,
     DropMissingColumnsApplier,
+    DropMissingColumnsCalculator,
     DropMissingRowsApplier,
-    MissingIndicatorCalculator,
     MissingIndicatorApplier,
+    MissingIndicatorCalculator,
+)
+from skyulf.preprocessing.encoding import (
+    DummyEncoderApplier,
+    DummyEncoderCalculator,
+    HashEncoderApplier,
+    HashEncoderCalculator,
+    LabelEncoderApplier,
+    LabelEncoderCalculator,
+    OneHotEncoderApplier,
+    OneHotEncoderCalculator,
+    OrdinalEncoderApplier,
+    OrdinalEncoderCalculator,
+    TargetEncoderApplier,
+    TargetEncoderCalculator,
+)
+from skyulf.preprocessing.feature_generation import (
+    FeatureGenerationApplier,
+    FeatureGenerationCalculator,
+    PolynomialFeaturesApplier,
+    PolynomialFeaturesCalculator,
+)
+from skyulf.preprocessing.imputation import (
+    IterativeImputerApplier,
+    IterativeImputerCalculator,
+    KNNImputerApplier,
+    KNNImputerCalculator,
+    SimpleImputerApplier,
+    SimpleImputerCalculator,
+)
+from skyulf.preprocessing.outliers import (
+    EllipticEnvelopeApplier,
+    EllipticEnvelopeCalculator,
+    IQRApplier,
+    IQRCalculator,
+    ManualBoundsApplier,
+    ManualBoundsCalculator,
+    WinsorizeApplier,
+    WinsorizeCalculator,
+    ZScoreApplier,
+    ZScoreCalculator,
+)
+from skyulf.preprocessing.scaling import (
+    MaxAbsScalerApplier,
+    MaxAbsScalerCalculator,
+    MinMaxScalerApplier,
+    MinMaxScalerCalculator,
+    RobustScalerApplier,
+    RobustScalerCalculator,
+    StandardScalerApplier,
+    StandardScalerCalculator,
 )
 
 
