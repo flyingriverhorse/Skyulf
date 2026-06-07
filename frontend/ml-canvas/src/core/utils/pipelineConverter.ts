@@ -231,6 +231,60 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               cv_time_column: node.data.cv_time_column,
               execution_mode: node.data.execution_mode
           };
+      } else if (node.data.definitionType === 'EnsembleNode') {
+          // Ensembles can run two ways. Basic training fits the meta-estimator
+          // with the chosen base learners as-is; advanced tuning runs the same
+          // ensemble through the hyperparameter search engine (the backend
+          // auto-builds a nested `<name>__<param>` space when none is sent).
+          if (node.data.run_mode === 'advanced') {
+              stepType = BackendStepType.ADVANCED_TUNING;
+              params = {
+                  target_column: node.data.target_column,
+                  algorithm: node.data.model_type,
+                  execution_mode: node.data.execution_mode,
+                  tuning_config: {
+                      strategy: node.data.search_strategy,
+                      metric: node.data.metric,
+                      n_trials: node.data.n_trials,
+                      // Structural selection the backend resolves into the model.
+                      base_estimators: node.data.base_estimators,
+                      final_estimator: node.data.final_estimator,
+                      voting: node.data.voting,
+                      cv: node.data.cv,
+                      tune_base_models: node.data.tune_base_models,
+                      base_estimator_params: node.data.base_estimator_params,
+                      final_estimator_params: node.data.final_estimator_params,
+                      cv_enabled: node.data.cv_enabled,
+                      cv_folds: node.data.cv_folds,
+                      cv_type: node.data.cv_type,
+                      cv_shuffle: node.data.cv_shuffle,
+                      cv_random_state: node.data.cv_random_state,
+                      cv_time_column: node.data.cv_time_column,
+                      random_state: node.data.random_state
+                  }
+              };
+          } else {
+              stepType = BackendStepType.BASIC_TRAINING;
+              params = {
+                  target_column: node.data.target_column,
+                  model_type: node.data.model_type,
+                  hyperparameters: {
+                      base_estimators: node.data.base_estimators,
+                      voting: node.data.voting,
+                      final_estimator: node.data.final_estimator,
+                      cv: node.data.cv,
+                      base_estimator_params: node.data.base_estimator_params,
+                      final_estimator_params: node.data.final_estimator_params
+                  },
+                  cv_enabled: node.data.cv_enabled,
+                  cv_folds: node.data.cv_folds,
+                  cv_type: node.data.cv_type,
+                  cv_shuffle: node.data.cv_shuffle,
+                  cv_random_state: node.data.cv_random_state,
+                  cv_time_column: node.data.cv_time_column,
+                  execution_mode: node.data.execution_mode
+              };
+          }
       } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === BackendStepType.ADVANCED_TUNING) {
           stepType = BackendStepType.ADVANCED_TUNING;
           params = {

@@ -4,6 +4,12 @@ from typing import Any, Dict, List
 
 from ._bayes import GAUSSIAN_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
+from ._ensemble import (
+    STACKING_CLASSIFIER_PARAMS,
+    STACKING_REGRESSOR_PARAMS,
+    VOTING_CLASSIFIER_PARAMS,
+    VOTING_REGRESSOR_PARAMS,
+)
 from ._linear import (
     ELASTICNET_REGRESSION_PARAMS,
     LASSO_REGRESSION_PARAMS,
@@ -55,6 +61,10 @@ MODEL_HYPERPARAMETERS = {
     "lgbm_regressor": LGBM_PARAMS,
     "gaussian_nb": GAUSSIAN_NB_PARAMS,
     "calibrated_classifier": CALIBRATED_CLASSIFIER_PARAMS,
+    "voting_classifier": VOTING_CLASSIFIER_PARAMS,
+    "stacking_classifier": STACKING_CLASSIFIER_PARAMS,
+    "voting_regressor": VOTING_REGRESSOR_PARAMS,
+    "stacking_regressor": STACKING_REGRESSOR_PARAMS,
 }
 
 
@@ -185,6 +195,15 @@ DEFAULT_SEARCH_SPACES: Dict[str, Any] = {
     },
     "calibrated_classifier": {
         "method": ["sigmoid", "isotonic"],
+        "cv": [3, 5, 10],
+    },
+    "voting_classifier": {
+        "voting": ["soft", "hard"],
+    },
+    "stacking_classifier": {
+        "cv": [3, 5, 10],
+    },
+    "stacking_regressor": {
         "cv": [3, 5, 10],
     },
     "extra_trees_classifier": {
@@ -364,6 +383,15 @@ GRID_SEARCH_SPACES: Dict[str, Any] = {
         "method": ["sigmoid", "isotonic"],
         "cv": [3, 5],
     },
+    "voting_classifier": {
+        "voting": ["soft", "hard"],
+    },
+    "stacking_classifier": {
+        "cv": [3, 5],
+    },
+    "stacking_regressor": {
+        "cv": [3, 5],
+    },
     "extra_trees_classifier": {
         "n_estimators": [100, 200, 500],
         "max_depth": [5, 10, 20],
@@ -418,3 +446,63 @@ def get_default_search_space(model_key: str, strategy: str = "random") -> Dict[s
     if strategy in _GRID_STRATEGIES:
         return GRID_SEARCH_SPACES.get(model_key, DEFAULT_SEARCH_SPACES.get(model_key, {}))
     return DEFAULT_SEARCH_SPACES.get(model_key, {})
+
+
+# ---------------------------------------------------------------------------
+# Ensemble nested search spaces
+# Maps each selectable base-learner key (as used by ``skyulf.modeling.ensemble``)
+# to its registry key so its parameter grid can be expanded into nested
+# ``<name>__<param>`` keys understood by sklearn's Voting/Stacking estimators.
+# ---------------------------------------------------------------------------
+_BASE_KEY_TO_REGISTRY_CLF: Dict[str, str] = {
+    "logistic_regression": "logistic_regression",
+    "random_forest": "random_forest_classifier",
+    "gradient_boosting": "gradient_boosting_classifier",
+    "decision_tree": "decision_tree_classifier",
+    "gaussian_nb": "gaussian_nb",
+    "svc": "svc",
+    "knn": "k_neighbors_classifier",
+}
+
+_BASE_KEY_TO_REGISTRY_REG: Dict[str, str] = {
+    "linear_regression": "linear_regression",
+    "ridge": "ridge_regression",
+    "random_forest": "random_forest_regressor",
+    "gradient_boosting": "gradient_boosting_regressor",
+    "decision_tree": "decision_tree_regressor",
+    "svr": "svr",
+    "knn": "k_neighbors_regressor",
+}
+
+
+def build_ensemble_search_space(
+    ensemble_key: str,
+    base_estimators: List[str],
+    final_estimator: str = "",
+    strategy: str = "random",
+    problem_type: str = "classification",
+) -> Dict[str, Any]:
+    """Expand an ensemble's base learners into a nested tuning search space.
+
+    Combines the ensemble's own meta-params (``voting`` / ``cv``) with each
+    chosen base learner's parameter grid, prefixed as ``<name>__<param>`` so
+    sklearn's Voting/Stacking estimators route them to the right sub-model.
+    The stacking ``final_estimator`` is prefixed as ``final_estimator__<param>``.
+    Unknown keys are skipped.
+    """
+    space: Dict[str, Any] = dict(get_default_search_space(ensemble_key, strategy))
+    mapping = (
+        _BASE_KEY_TO_REGISTRY_CLF if problem_type == "classification" else _BASE_KEY_TO_REGISTRY_REG
+    )
+    for key in base_estimators or []:
+        reg_key = mapping.get(key)
+        if not reg_key:
+            continue
+        for param, values in get_default_search_space(reg_key, strategy).items():
+            space[f"{key}__{param}"] = values
+    if final_estimator:
+        reg_key = mapping.get(final_estimator)
+        if reg_key:
+            for param, values in get_default_search_space(reg_key, strategy).items():
+                space[f"final_estimator__{param}"] = values
+    return space
