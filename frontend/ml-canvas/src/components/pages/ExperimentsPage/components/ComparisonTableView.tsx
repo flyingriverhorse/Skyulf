@@ -7,6 +7,9 @@ import {
   getMetricDescription,
   getHyperparamDescription,
   getTrainingConfigDescription,
+  isEnsembleModelType,
+  extractEnsembleSummary,
+  formatBaseEstimator,
 } from '../../../../core/utils/format';
 import { getJobScoringMetric, shortRunId } from '../utils/jobMeta';
 
@@ -81,6 +84,52 @@ export const ComparisonTableView: React.FC<Props> = ({
                 </td>
               ))}
             </tr>
+            {/* Base Models — only when at least one selected run is an ensemble.
+                Resolves the structural selection from best_params is impossible
+                (it's structural, not tuned), so we read the nested hyperparameters
+                for basic runs and the tuning_config for advanced runs. */}
+            {selectedJobs.some(job => isEnsembleModelType(job.model_type)) && (() => {
+              const summaryFor = (job: JobInfo) => {
+                if (!isEnsembleModelType(job.model_type)) return null;
+                let bucket: Record<string, unknown> | undefined;
+                if (job.job_type === 'advanced_tuning') {
+                  const cfg = (job.config as Record<string, unknown>) ||
+                    (job.graph?.nodes as GraphNode[] | undefined)?.find(n => n.node_id === job.node_id)?.params;
+                  bucket = cfg?.tuning_config as Record<string, unknown> | undefined;
+                } else {
+                  const hp = job.hyperparameters as Record<string, unknown> | undefined;
+                  const nested = hp?.hyperparameters;
+                  bucket = (nested && typeof nested === 'object' && !Array.isArray(nested))
+                    ? nested as Record<string, unknown>
+                    : hp;
+                }
+                return extractEnsembleSummary(job.model_type, bucket);
+              };
+              const summaries = selectedJobs.map(summaryFor);
+              const anyStacking = summaries.some(s => s?.isStacking);
+              return (
+                <>
+                  <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Base Models</td>
+                    {summaries.map((s, ci) => (
+                      <td key={selectedJobs[ci]?.job_id ?? ci} className="px-4 py-2 text-gray-600 dark:text-gray-300">
+                        {s ? (s.baseEstimators.length > 0 ? s.baseEstimators.map(formatBaseEstimator).join(', ') : '—') : '—'}
+                      </td>
+                    ))}
+                  </tr>
+                  {anyStacking && (
+                    <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Final Estimator</td>
+                      {summaries.map((s, ci) => (
+                        <td key={selectedJobs[ci]?.job_id ?? ci} className="px-4 py-2 text-gray-600 dark:text-gray-300">
+                          {s?.isStacking ? (s.finalEstimator ? formatBaseEstimator(s.finalEstimator) : '—') : '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </>
+              );
+            })()}
             {/* Pipeline Steps — preprocessing/splits/etc that fed each terminal */}
             <tr
               className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
