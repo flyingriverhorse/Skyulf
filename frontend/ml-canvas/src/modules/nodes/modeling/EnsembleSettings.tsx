@@ -25,6 +25,9 @@ export interface EnsembleConfig {
   voting: 'soft' | 'hard';
   final_estimator: string;
   cv: number;
+  // Stacking only: feed the original features to the meta-learner alongside
+  // the base models' predictions.
+  passthrough?: boolean;
   target_column: string;
   cv_enabled: boolean;
   cv_folds: number;
@@ -262,6 +265,20 @@ function StrategyOptions({ config, update, options }: { config: EnsembleConfig; 
           onChange={(e) => { update({ cv: Number(e.target.value) }); }}
           className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 text-sm bg-white dark:bg-gray-800 dark:text-gray-100"
         />
+      </div>
+      <div>
+        <label className="flex items-center gap-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={config.passthrough === true}
+            onChange={(e) => { update({ passthrough: e.target.checked }); }}
+            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+          />
+          Passthrough features
+        </label>
+        <p className="mt-1 pl-6 text-xs text-gray-500 dark:text-gray-400">
+          Let the meta-learner also see the original features, not just the base predictions.
+        </p>
       </div>
     </div>
   );
