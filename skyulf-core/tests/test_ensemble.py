@@ -191,6 +191,76 @@ def test_stacking_n_jobs_passthrough():
     assert model.n_jobs == 2
 
 
+def test_voting_classifier_calibrates_base_models():
+    X, y = _clf_data(16)
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    applier = NodeRegistry.get_applier("voting_classifier")()
+    model = calc.fit(
+        X,
+        y,
+        {
+            "base_estimators": ["random_forest", "decision_tree"],
+            "voting": "soft",
+            "calibrate_base_models": True,
+            "calibration_method": "sigmoid",
+            "calibration_cv": 3,
+        },
+    )
+
+    from sklearn.calibration import CalibratedClassifierCV
+
+    assert [name for name, _ in model.estimators] == ["random_forest", "decision_tree"]
+    assert all(isinstance(est, CalibratedClassifierCV) for _, est in model.estimators)
+    assert all(est.method == "sigmoid" for _, est in model.estimators)
+    # Calibration transport keys must not leak into the sklearn constructor.
+    assert not hasattr(model, "calibrate_base_models")
+
+    proba = applier.predict_proba(X, model)
+    assert proba is not None
+    assert ((proba.to_numpy() >= 0) & (proba.to_numpy() <= 1)).all()
+
+
+def test_stacking_classifier_calibrates_base_models():
+    X, y = _clf_data(17)
+    calc = NodeRegistry.get_calculator("stacking_classifier")()
+    model = calc.fit(
+        X,
+        y,
+        {
+            "base_estimators": ["random_forest", "decision_tree"],
+            "cv": 3,
+            "calibrate_base_models": True,
+            "calibration_method": "isotonic",
+        },
+    )
+
+    from sklearn.calibration import CalibratedClassifierCV
+
+    assert all(isinstance(est, CalibratedClassifierCV) for _, est in model.estimators)
+    assert all(est.method == "isotonic" for _, est in model.estimators)
+
+
+def test_voting_regressor_ignores_calibration():
+    X, y = _reg_data(3)
+    calc = NodeRegistry.get_calculator("voting_regressor")()
+    # Calibration is classification-only; the regressor must ignore the flag and
+    # never wrap its base learners (nor leak the transport keys).
+    model = calc.fit(
+        X,
+        y,
+        {
+            "base_estimators": ["linear_regression", "random_forest"],
+            "calibrate_base_models": True,
+            "calibration_method": "sigmoid",
+        },
+    )
+
+    from sklearn.calibration import CalibratedClassifierCV
+
+    assert not any(isinstance(est, CalibratedClassifierCV) for _, est in model.estimators)
+    assert not hasattr(model, "calibrate_base_models")
+
+
 def test_voting_regressor_predicts_finite():
     X, y = _reg_data()
     calc = NodeRegistry.get_calculator("voting_regressor")()
@@ -344,3 +414,60 @@ def test_advanced_tuning_runs_and_applies_nested_params():
     # …and the tuned nested param was routed onto the base model.
     assert model.get_params()["decision_tree__max_depth"] in (2, 3)
     assert "decision_tree__max_depth" in result.best_params
+
+
+def test_build_ensemble_search_space_calibrated_nested_keys():
+    """With calibration on, base params live under ``<name>__estimator__<param>``."""
+    from skyulf.modeling.hyperparameters import build_ensemble_search_space
+
+    space = build_ensemble_search_space(
+        "voting_classifier",
+        ["random_forest", "decision_tree"],
+        strategy="grid",
+        problem_type="classification",
+        calibrate_base_models=True,
+    )
+
+    # Keys route through the CalibratedClassifierCV wrapper (one level deeper).
+    assert any(k.startswith("random_forest__estimator__") for k in space)
+    assert any(k.startswith("decision_tree__estimator__") for k in space)
+    # The un-nested form must NOT appear — it would hit the wrapper, not the model.
+    assert not any(
+        k.startswith("random_forest__") and "__estimator__" not in k for k in space
+    )
+
+
+def test_advanced_tuning_with_calibration_routes_nested_params():
+    """End-to-end: tuning a calibrated voting ensemble over a nested base param.
+
+    Regression test for the ``Invalid parameter 'n_estimators'`` crash: when base
+    classifiers are wrapped in ``CalibratedClassifierCV`` the search space must
+    address them as ``<name>__estimator__<param>`` so ``set_params`` resolves.
+    """
+    from skyulf.modeling._tuning.engine import TuningCalculator
+    from skyulf.modeling._tuning.schemas import TuningConfig
+    from sklearn.calibration import CalibratedClassifierCV
+
+    X, y = _clf_data(18)
+    base_calc = NodeRegistry.get_calculator("voting_classifier")()
+    base_calc.prepare_tuning_params(
+        {
+            "base_estimators": ["decision_tree", "gaussian_nb"],
+            "tune_base_models": True,
+            "calibrate_base_models": True,
+            "calibration_cv": 2,
+        }
+    )
+    tuner = TuningCalculator(base_calc)
+
+    config = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"decision_tree__estimator__max_depth": [2, 3]},
+        cv_folds=3,
+    )
+    model, result = tuner.fit(X, y, config=config.__dict__)
+
+    assert all(isinstance(est, CalibratedClassifierCV) for _, est in model.estimators)
+    assert model.get_params()["decision_tree__estimator__max_depth"] in (2, 3)
+    assert "decision_tree__estimator__max_depth" in result.best_params

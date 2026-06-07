@@ -20,6 +20,7 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from sklearn.base import BaseEstimator
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import (
     AdaBoostClassifier,
     AdaBoostRegressor,
@@ -187,6 +188,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             "passthrough",
             "weights",
             "n_jobs",
+            "calibrate_base_models",
+            "calibration_method",
+            "calibration_cv",
             "base_estimator_params",
             "final_estimator_params",
         )
@@ -214,6 +218,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             final_estimator=final_est if self.IS_STACKING else "",
             strategy=strategy,
             problem_type=self.problem_type,
+            calibrate_base_models=bool(src.get("calibrate_base_models")),
         )
 
     def _inject_tuning_base_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -238,13 +243,18 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     # --- structural helpers -------------------------------------------------
 
     def _build_estimators(
-        self, keys: Any, params_map: Optional[Dict[str, Any]] = None
+        self,
+        keys: Any,
+        params_map: Optional[Dict[str, Any]] = None,
+        calibration: Optional[Dict[str, Any]] = None,
     ) -> List[Tuple[str, BaseEstimator]]:
         """Translate a list of string keys into ``(name, instance)`` tuples.
 
         Unknown keys are skipped with a warning; an empty/invalid selection
         falls back to ``DEFAULT_KEYS`` so the node always has something to fit.
-        Per-key params (if any) are applied via ``set_params``.
+        Per-key params (if any) are applied via ``set_params``. When *calibration*
+        is enabled (classification only), each base classifier is wrapped in a
+        ``CalibratedClassifierCV`` so voting-soft averages calibrated proba.
         """
         if not isinstance(keys, (list, tuple)) or not keys:
             keys = self.DEFAULT_KEYS
@@ -258,11 +268,32 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             if factory is None:
                 logger.warning("Unknown base estimator '%s'; skipping.", key)
                 continue
-            estimators.append((key, self._apply_params(factory(), params_map.get(key), key)))
+            est = self._apply_params(factory(), params_map.get(key), key)
+            estimators.append((key, self._maybe_calibrate(est, calibration)))
             seen.add(key)
         if not estimators:
             estimators = [(k, self.BASE_ESTIMATORS[k]()) for k in self.DEFAULT_KEYS]
         return estimators
+
+    def _maybe_calibrate(
+        self, estimator: BaseEstimator, calibration: Optional[Dict[str, Any]]
+    ) -> BaseEstimator:
+        """Wrap a base classifier in ``CalibratedClassifierCV`` when requested.
+
+        Calibration only makes sense for classification, so it is a no-op for
+        regression ensembles. Fixed per-base params are applied before wrapping,
+        so they still reach the underlying estimator.
+        """
+        if not calibration or self.problem_type != "classification":
+            return estimator
+        method = calibration.get("method", "sigmoid")
+        if method not in ("sigmoid", "isotonic"):
+            method = "sigmoid"
+        try:
+            cv = int(calibration.get("cv", 3))
+        except (TypeError, ValueError):
+            cv = 3
+        return CalibratedClassifierCV(estimator, method=method, cv=max(cv, 2))
 
     @staticmethod
     def _apply_params(estimator: BaseEstimator, params: Any, name: str) -> BaseEstimator:
@@ -350,15 +381,33 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         bucket = dict(resolved["params"]) if nested else resolved
         base_params: Dict[str, Any] = dict(bucket.pop("base_estimator_params", None) or {})
         final_params: Dict[str, Any] = dict(bucket.pop("final_estimator_params", None) or {})
+        # Calibration is a structural choice (wrap base classifiers), not a sklearn
+        # meta-estimator param — pop it here so it never reaches the constructor.
+        calibration = self._extract_calibration(bucket)
         self._absorb_nested_keys(bucket, base_params, final_params)
         bucket["estimators"] = self._build_estimators(
-            bucket.pop("base_estimators", None), base_params
+            bucket.pop("base_estimators", None), base_params, calibration
         )
         self._clean_meta_keys(bucket, final_params or None)
         if nested:
             resolved["params"] = bucket
             return resolved
         return bucket
+
+    @staticmethod
+    def _extract_calibration(bucket: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Pop and normalise calibration settings from *bucket*.
+
+        Returns a ``{"method", "cv"}`` dict when ``calibrate_base_models`` is truthy,
+        else ``None``. The transport keys are always removed so they cannot leak
+        into the sklearn meta-estimator constructor.
+        """
+        enabled = bool(bucket.pop("calibrate_base_models", False))
+        method = bucket.pop("calibration_method", "sigmoid")
+        cv = bucket.pop("calibration_cv", 3)
+        if not enabled:
+            return None
+        return {"method": method, "cv": cv}
 
 
 # --- Voting Classifier ---

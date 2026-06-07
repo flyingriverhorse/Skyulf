@@ -95,6 +95,43 @@ _N_JOBS_FIELD = HyperparameterField(
     ),
 )
 
+_CALIBRATE_FIELD = HyperparameterField(
+    name="calibrate_base_models",
+    label="Calibrate base models (classification)",
+    type="boolean",
+    default=False,
+    description=(
+        "Wrap each base classifier in CalibratedClassifierCV so its predicted "
+        "probabilities are well-calibrated. Improves soft voting and stacking "
+        "when base models give over/under-confident probabilities."
+    ),
+)
+
+_CALIBRATION_METHOD_FIELD = HyperparameterField(
+    name="calibration_method",
+    label="Calibration Method",
+    type="select",
+    default="sigmoid",
+    options=[
+        {"label": "Sigmoid (Platt)", "value": "sigmoid"},
+        {"label": "Isotonic", "value": "isotonic"},
+    ],
+    description=(
+        "Sigmoid (Platt scaling) is robust on small data; isotonic is more "
+        "flexible but needs more samples to avoid overfitting."
+    ),
+)
+
+_CALIBRATION_CV_FIELD = HyperparameterField(
+    name="calibration_cv",
+    label="Calibration CV Folds",
+    type="number",
+    default=3,
+    min=2,
+    max=10,
+    description="Cross-validation folds used to fit each base model's calibrator.",
+)
+
 
 def _base_estimators_field(options, default):
     return HyperparameterField(
@@ -113,6 +150,9 @@ VOTING_CLASSIFIER_PARAMS = [
     ),
     _VOTING_FIELD,
     _N_JOBS_FIELD,
+    _CALIBRATE_FIELD,
+    _CALIBRATION_METHOD_FIELD,
+    _CALIBRATION_CV_FIELD,
 ]
 
 STACKING_CLASSIFIER_PARAMS = [
@@ -128,6 +168,9 @@ STACKING_CLASSIFIER_PARAMS = [
     _CV_FIELD,
     _PASSTHROUGH_FIELD,
     _N_JOBS_FIELD,
+    _CALIBRATE_FIELD,
+    _CALIBRATION_METHOD_FIELD,
+    _CALIBRATION_CV_FIELD,
 ]
 
 VOTING_REGRESSOR_PARAMS = [

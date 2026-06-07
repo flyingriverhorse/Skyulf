@@ -493,6 +493,7 @@ def build_ensemble_search_space(
     final_estimator: str = "",
     strategy: str = "random",
     problem_type: str = "classification",
+    calibrate_base_models: bool = False,
 ) -> Dict[str, Any]:
     """Expand an ensemble's base learners into a nested tuning search space.
 
@@ -501,17 +502,24 @@ def build_ensemble_search_space(
     sklearn's Voting/Stacking estimators route them to the right sub-model.
     The stacking ``final_estimator`` is prefixed as ``final_estimator__<param>``.
     Unknown keys are skipped.
+
+    When ``calibrate_base_models`` is set (classification only), each base learner
+    is wrapped in a ``CalibratedClassifierCV``, so its params live one level
+    deeper — keys become ``<name>__estimator__<param>``. The final estimator is
+    never calibrated, so its prefix is unchanged.
     """
     space: Dict[str, Any] = dict(get_default_search_space(ensemble_key, strategy))
     mapping = (
         _BASE_KEY_TO_REGISTRY_CLF if problem_type == "classification" else _BASE_KEY_TO_REGISTRY_REG
     )
+    calibrated = calibrate_base_models and problem_type == "classification"
+    base_infix = "estimator__" if calibrated else ""
     for key in base_estimators or []:
         reg_key = mapping.get(key)
         if not reg_key:
             continue
         for param, values in get_default_search_space(reg_key, strategy).items():
-            space[f"{key}__{param}"] = values
+            space[f"{key}__{base_infix}{param}"] = values
     if final_estimator:
         reg_key = mapping.get(final_estimator)
         if reg_key:

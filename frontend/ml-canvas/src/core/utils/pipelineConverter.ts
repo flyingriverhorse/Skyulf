@@ -355,6 +355,12 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   votingWeights = baseList.map((k) => (typeof weightMap[k] === 'number' ? weightMap[k] : 1));
               }
           }
+          // Classification only: wrap base classifiers in CalibratedClassifierCV.
+          // Sent only when enabled so regression/uncalibrated runs stay clean.
+          const calibrateBaseModels =
+              node.data.task === 'classification' && node.data.calibrate_base_models === true;
+          const calibrationMethod = calibrateBaseModels ? node.data.calibration_method : undefined;
+          const calibrationCv = calibrateBaseModels ? node.data.calibration_cv : undefined;
           // Drop model-spec sources from the data inputs so the backend only
           // receives the dataset edge (a model node is not a loadable Dataset).
           if (wired.modelSourceIds.size > 0) {
@@ -401,6 +407,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       passthrough: node.data.passthrough,
                       weights: votingWeights,
                       n_jobs: ensembleNJobs,
+                      calibrate_base_models: calibrateBaseModels || undefined,
+                      calibration_method: calibrationMethod,
+                      calibration_cv: calibrationCv,
                       tune_base_models: node.data.tune_base_models,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params,
@@ -426,6 +435,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       passthrough: node.data.passthrough,
                       weights: votingWeights,
                       n_jobs: ensembleNJobs,
+                      calibrate_base_models: calibrateBaseModels || undefined,
+                      calibration_method: calibrationMethod,
+                      calibration_cv: calibrationCv,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params
                   },
