@@ -155,7 +155,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         params = dict(self._default_params)
         if self._tuning_base_config:
             resolved = self._resolve_estimators(dict(self._tuning_base_config))
-            for key in ("estimators", "final_estimator", "voting", "cv"):
+            for key in ("estimators", "final_estimator", "voting", "cv", "passthrough"):
                 if key in resolved:
                     params[key] = resolved[key]
         return params
@@ -184,6 +184,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             "final_estimator",
             "voting",
             "cv",
+            "passthrough",
             "base_estimator_params",
             "final_estimator_params",
         )
@@ -289,9 +290,16 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             )
             bucket.pop("voting", None)
             bucket.pop("weights", None)
+            # ``passthrough`` (let the meta-learner also see the raw features) is
+            # a valid Stacking-only param; coerce to bool and keep it.
+            if "passthrough" in bucket:
+                bucket["passthrough"] = bool(bucket["passthrough"])
         else:
             bucket.pop("final_estimator", None)
             bucket.pop("cv", None)
+            # ``passthrough`` is meaningless for Voting — drop it so the sklearn
+            # constructor does not reject an unexpected keyword.
+            bucket.pop("passthrough", None)
             if not self.HAS_VOTING:
                 bucket.pop("voting", None)
 

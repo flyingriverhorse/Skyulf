@@ -386,6 +386,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       final_estimator: node.data.final_estimator,
                       voting: node.data.voting,
                       cv: node.data.cv,
+                      passthrough: node.data.passthrough,
                       tune_base_models: node.data.tune_base_models,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params,
@@ -408,6 +409,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       voting: node.data.voting,
                       final_estimator: node.data.final_estimator,
                       cv: node.data.cv,
+                      passthrough: node.data.passthrough,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params
                   },

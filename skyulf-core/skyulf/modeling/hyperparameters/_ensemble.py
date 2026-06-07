@@ -69,6 +69,18 @@ _CV_FIELD = HyperparameterField(
     ),
 )
 
+_PASSTHROUGH_FIELD = HyperparameterField(
+    name="passthrough",
+    label="Passthrough features (stacking)",
+    type="boolean",
+    default=False,
+    description=(
+        "When on, the final estimator sees the original input features "
+        "alongside the base models' predictions instead of the predictions "
+        "alone. Can help when the base learners miss signal in the raw data."
+    ),
+)
+
 
 def _base_estimators_field(options, default):
     return HyperparameterField(
@@ -99,6 +111,7 @@ STACKING_CLASSIFIER_PARAMS = [
         description="Meta-learner trained on the base models' out-of-fold predictions.",
     ),
     _CV_FIELD,
+    _PASSTHROUGH_FIELD,
 ]
 
 VOTING_REGRESSOR_PARAMS = [
@@ -118,4 +131,5 @@ STACKING_REGRESSOR_PARAMS = [
         description="Meta-learner trained on the base models' out-of-fold predictions.",
     ),
     _CV_FIELD,
+    _PASSTHROUGH_FIELD,
 ]

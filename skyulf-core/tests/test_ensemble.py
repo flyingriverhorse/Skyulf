@@ -86,6 +86,50 @@ def test_stacking_classifier_fits_with_cv_and_predicts():
     assert len(preds) == len(X)
 
 
+def test_stacking_classifier_passthrough_enabled():
+    X, y = _clf_data(8)
+    calc = NodeRegistry.get_calculator("stacking_classifier")()
+    applier = NodeRegistry.get_applier("stacking_classifier")()
+    model = calc.fit(
+        X,
+        y,
+        {
+            "base_estimators": ["random_forest", "decision_tree"],
+            "final_estimator": "logistic_regression",
+            "cv": 3,
+            "passthrough": True,
+        },
+    )
+
+    assert model.passthrough is True
+    preds = applier.predict(X, model)
+    assert len(preds) == len(X)
+
+
+def test_stacking_classifier_passthrough_defaults_off():
+    X, y = _clf_data(9)
+    calc = NodeRegistry.get_calculator("stacking_classifier")()
+    model = calc.fit(X, y, {"base_estimators": ["random_forest", "decision_tree"]})
+
+    # Not provided → sklearn StackingClassifier default (False).
+    assert model.passthrough is False
+
+
+def test_voting_classifier_ignores_passthrough():
+    X, y = _clf_data(10)
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    applier = NodeRegistry.get_applier("voting_classifier")()
+    # ``passthrough`` is Stacking-only; the Voting node must drop it silently
+    # rather than forward an unexpected keyword to the sklearn constructor.
+    model = calc.fit(
+        X, y, {"base_estimators": ["random_forest", "decision_tree"], "passthrough": True}
+    )
+
+    assert not hasattr(model, "passthrough")
+    preds = applier.predict(X, model)
+    assert len(preds) == len(X)
+
+
 def test_voting_regressor_predicts_finite():
     X, y = _reg_data()
     calc = NodeRegistry.get_calculator("voting_regressor")()
