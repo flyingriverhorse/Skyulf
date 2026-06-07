@@ -7,7 +7,7 @@
 #
 # NOTE: Requires Python >= 3.10
 
-geopandas>=0.14.0,<1.2.0   # Geospatial dataframe operations
+geopandas>=1.1.2,<1.2.0   # Geospatial dataframe operations
 shapely>=2.0.2,<2.2.0       # Geometry operations (GEOS bindings)
 pyproj>=3.6.0,<3.8.0        # Coordinate reference system transforms (PROJ bindings)
 rtree>=1.3.0,<2.0.0         # Spatial indexes for faster spatial joins

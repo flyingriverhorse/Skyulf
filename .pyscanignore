@@ -1,0 +1,9 @@
+# pyscan ignore list — vulnerability IDs intentionally suppressed.
+# Each entry MUST carry a justification. Review periodically.
+
+# GHSA-3936-cmfr-pm3m — black 24.10.0 ReDoS in cache-file naming via the
+# `--python-cell-magics` option. Black is a dev/CI-only formatter; the flag is
+# never set from untrusted input in our pipeline, so this is not exploitable.
+# Bumping to the fixed 26.x line would re-flow the entire codebase (a separate,
+# deliberate change). Tracked for a future formatter upgrade.
+GHSA-3936-cmfr-pm3m
