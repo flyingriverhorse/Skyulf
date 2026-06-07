@@ -36,7 +36,7 @@ try:
         def warning(self, msg: str) -> None:  # noqa: D401
             pass
 
-    _lgb.register_logger(_SilentLgbmLogger())
+    _lgb.register_logger(_SilentLgbmLogger())  # ty: ignore[unresolved-attribute]
 except ImportError:
     LIGHTGBM_AVAILABLE = False
 

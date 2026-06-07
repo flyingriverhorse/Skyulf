@@ -706,7 +706,7 @@ class EDAVisualizer:
 
         plt.figure(figsize=(12, 6))
         for col, values in values_map.items():
-            plt.plot(dates, values, label=col)
+            plt.plot(dates, values, label=col)  # ty: ignore[invalid-argument-type]
 
         plt.title("Time Series Trend (Daily Aggregation)")
         plt.xlabel(f"Date ({self.profile.timeseries.date_col})")
