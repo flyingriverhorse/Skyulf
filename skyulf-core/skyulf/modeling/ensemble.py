@@ -156,7 +156,15 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         params = dict(self._default_params)
         if self._tuning_base_config:
             resolved = self._resolve_estimators(dict(self._tuning_base_config))
-            for key in ("estimators", "final_estimator", "voting", "cv", "passthrough", "weights", "n_jobs"):
+            for key in (
+                "estimators",
+                "final_estimator",
+                "voting",
+                "cv",
+                "passthrough",
+                "weights",
+                "n_jobs",
+            ):
                 if key in resolved:
                     params[key] = resolved[key]
         return params
