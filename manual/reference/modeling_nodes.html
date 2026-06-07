@@ -1919,6 +1919,78 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#ensemble-meta-models-v060" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ensemble Meta-Models (v0.6.0)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Ensemble Meta-Models (v0.6.0)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#registered-ensemble-families" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registered Ensemble Families
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#core-configuration-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Core Configuration Parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-example-programmatic-usage-in-skyulf-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python Example — Programmatic Usage in skyulf-core
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#advanced-hyperparameter-tuning-nested-parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Advanced Hyperparameter Tuning (Nested Parameters)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#merge-strategy-canvas-wiring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Merge Strategy &amp; Canvas Wiring
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#hyperparameter-tuning" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3186,6 +3258,190 @@
 - <code>n_estimators=100</code>, <code>max_depth=6</code>
 - <code>learning_rate=0.3</code>, <code>n_jobs=-1</code>
 - <code>random_state=42</code></p>
+<h2 id="ensemble-meta-models-v060">Ensemble Meta-Models (v0.6.0)</h2>
+<p>Ensemble meta-models combine multiple base estimators to construct stronger predictive models under a unified interface. You can use them either programmatically in <code>skyulf-core</code> or directly on the canvas through the <strong>Ensemble Node</strong>.</p>
+<h3 id="registered-ensemble-families">Registered Ensemble Families</h3>
+<table>
+<thead>
+<tr>
+<th>Step Registry ID</th>
+<th>scikit-learn Class</th>
+<th>Task</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>voting_classifier</code></td>
+<td><code>sklearn.ensemble.VotingClassifier</code></td>
+<td>Classification</td>
+</tr>
+<tr>
+<td><code>stacking_classifier</code></td>
+<td><code>sklearn.ensemble.StackingClassifier</code></td>
+<td>Classification</td>
+</tr>
+<tr>
+<td><code>voting_regressor</code></td>
+<td><code>sklearn.ensemble.VotingRegressor</code></td>
+<td>Regression</td>
+</tr>
+<tr>
+<td><code>stacking_regressor</code></td>
+<td><code>sklearn.ensemble.StackingRegressor</code></td>
+<td>Regression</td>
+</tr>
+</tbody>
+</table>
+<h3 id="core-configuration-parameters">Core Configuration Parameters</h3>
+<p>Configuration is structured within the nested <code>params</code> dictionary of the modeling config (or <code>tuning_config</code> when running an advanced search):</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Applies To</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>base_estimators</code></td>
+<td><code>List[str]</code></td>
+<td>All</td>
+<td>Identifiers of base learners to combine (see lists below).</td>
+</tr>
+<tr>
+<td><code>voting</code></td>
+<td><code>str</code></td>
+<td>Voting Classifier</td>
+<td><code>"soft"</code> (mean of predicted probabilities — default) or <code>"hard"</code> (majority label vote).</td>
+</tr>
+<tr>
+<td><code>final_estimator</code></td>
+<td><code>str</code></td>
+<td>Stacking</td>
+<td>The meta-learner trained on out-of-fold base predictions. Defaults to <code>logistic_regression</code> (clf) / <code>ridge</code> (reg).</td>
+</tr>
+<tr>
+<td><code>cv</code></td>
+<td><code>int</code></td>
+<td>Stacking</td>
+<td>Internal CV folds used to generate the out-of-fold base predictions. Default <code>5</code>.</td>
+</tr>
+<tr>
+<td><code>base_estimator_params</code></td>
+<td><code>Dict[str, Dict]</code></td>
+<td>All</td>
+<td>Fixed per-base-model hyperparameters (basic mode).</td>
+</tr>
+<tr>
+<td><code>final_estimator_params</code></td>
+<td><code>Dict</code></td>
+<td>Stacking</td>
+<td>Fixed hyperparameters for the meta-learner.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Supported base models — Classification:</strong>
+<code>logistic_regression</code>, <code>random_forest</code>, <code>extra_trees</code>, <code>gradient_boosting</code>, <code>hist_gradient_boosting</code>, <code>adaboost</code>, <code>decision_tree</code>, <code>gaussian_nb</code>, <code>svc</code> (probability-enabled), <code>knn</code> — plus <code>xgboost</code> / <code>lightgbm</code> when those optional wheels are installed.</p>
+<p><strong>Supported base models — Regression:</strong>
+<code>linear_regression</code>, <code>ridge</code>, <code>lasso</code>, <code>elasticnet</code>, <code>random_forest</code>, <code>extra_trees</code>, <code>gradient_boosting</code>, <code>hist_gradient_boosting</code>, <code>adaboost</code>, <code>decision_tree</code>, <code>svr</code>, <code>knn</code> — plus <code>xgboost</code> / <code>lightgbm</code> when installed.</p>
+<blockquote>
+<p><strong>Cross-validation semantics:</strong> Voting does <em>no</em> internal CV (each base model is fit once, then predictions are averaged/voted). Stacking <em>requires</em> an internal <code>cv</code> so the meta-learner trains on out-of-fold predictions — otherwise it over-fits on in-sample predictions.</p>
+</blockquote>
+<h3 id="python-example-programmatic-usage-in-skyulf-core">Python Example — Programmatic Usage in <code>skyulf-core</code></h3>
+<p>Ensemble nodes are registered like any other modeling step, so they slot into the <code>modeling</code> block of a <code>SkyulfPipeline</code> config:</p>
+<pre><code class="language-python">import pandas as pd
+from skyulf.pipeline import SkyulfPipeline
+
+config = {
+    &quot;preprocessing&quot;: [
+        {
+            &quot;name&quot;: &quot;split&quot;,
+            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
+            &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;random_state&quot;: 42, &quot;target_column&quot;: &quot;target&quot;},
+        },
+    ],
+    &quot;modeling&quot;: {
+        &quot;type&quot;: &quot;stacking_classifier&quot;,
+        &quot;params&quot;: {
+            &quot;base_estimators&quot;: [&quot;random_forest&quot;, &quot;logistic_regression&quot;, &quot;gradient_boosting&quot;],
+            &quot;final_estimator&quot;: &quot;logistic_regression&quot;,
+            &quot;cv&quot;: 5,
+            # Fixed per-base-model hyperparameters (basic mode)
+            &quot;base_estimator_params&quot;: {
+                &quot;random_forest&quot;: {&quot;n_estimators&quot;: 100, &quot;max_depth&quot;: 12},
+                &quot;logistic_regression&quot;: {&quot;C&quot;: 0.5},
+            },
+        },
+    },
+}
+
+pipeline = SkyulfPipeline(config)
+metrics = pipeline.fit(df, target_column=&quot;target&quot;)   # learns on the train split
+predictions = pipeline.predict(new_df)               # feature-only dataframe
+</code></pre>
+<p>A <strong>VotingClassifier</strong> is configured the same way — swap the <code>type</code> for <code>voting_classifier</code> and add <code>"voting": "soft"</code> (or <code>"hard"</code>):</p>
+<pre><code class="language-python">&quot;modeling&quot;: {
+    &quot;type&quot;: &quot;voting_classifier&quot;,
+    &quot;params&quot;: {
+        &quot;base_estimators&quot;: [&quot;random_forest&quot;, &quot;svc&quot;, &quot;knn&quot;],
+        &quot;voting&quot;: &quot;soft&quot;,
+    },
+}
+</code></pre>
+<p>You can also drive the underlying calculator/applier directly for low-level usage via the <code>NodeRegistry</code>:</p>
+<pre><code class="language-python">from skyulf.registry import NodeRegistry
+
+calc = NodeRegistry.get_calculator(&quot;stacking_classifier&quot;)()
+applier = NodeRegistry.get_applier(&quot;stacking_classifier&quot;)()
+
+# `fit(X, y, config)` returns the fitted sklearn meta-estimator
+model = calc.fit(
+    X_train,
+    y_train,
+    {
+        &quot;base_estimators&quot;: [&quot;random_forest&quot;, &quot;decision_tree&quot;],
+        &quot;final_estimator&quot;: &quot;logistic_regression&quot;,
+        &quot;cv&quot;: 3,
+    },
+)
+
+# `predict(X, model)` / `predict_proba(X, model)` generate predictions
+preds = applier.predict(X_test, model)
+</code></pre>
+<h3 id="advanced-hyperparameter-tuning-nested-parameters">Advanced Hyperparameter Tuning (Nested Parameters)</h3>
+<p>When an ensemble runs in <strong>Advanced/Tuning mode</strong> (<code>run_mode: "advanced"</code>), it is routed through the same hyperparameter search engine as a normal model. Set <code>tune_base_models: true</code> to auto-expand the search space into per-base-model dimensions using sklearn's double-underscore syntax (e.g. <code>random_forest__n_estimators</code>, <code>logistic_regression__C</code>). The search then optimizes the meta-estimator's own params (voting type, stacking <code>cv</code>) <em>and</em> each base learner simultaneously.</p>
+<ul>
+<li>Recommended outer search strategies: <code>optuna</code> or <code>halving_random</code>.</li>
+<li><strong>Cost warning:</strong> Stacking <code>cv</code> × outer search = nested cross-validation (outer folds × stacking <code>cv</code> × trials × base models). Keep stacking <code>cv</code> small (e.g. <code>3</code>) or reduce trials when also running an outer search.</li>
+</ul>
+<h3 id="merge-strategy-canvas-wiring">Merge Strategy &amp; Canvas Wiring</h3>
+<p>The <strong>Ensemble Node</strong> behaves differently from ordinary fan-in on the canvas:</p>
+<p><strong>1. Merge strategy — are same-branch models taken as ensemble members?</strong></p>
+<p>Yes. Unlike normal nodes (where multiple inputs trigger a column merge or a parallel-experiment split), the Ensemble Node classifies its incoming edges by source type:</p>
+<ul>
+<li><strong>One dataset edge</strong> (e.g. a <code>train_test_split</code> output) supplies the rows/columns the ensemble trains on.</li>
+<li><strong>N model-spec edges</strong> — any <code>Basic Training</code> / <code>Advanced Training</code> nodes wired in are treated as <em>base-learner specifications</em>, not data. Only their recipe (<code>model_type</code> + hyperparameters) is read; their fitted weights are discarded because sklearn's Voting/Stacking always refit base learners on the composite dataset anyway.</li>
+</ul>
+<p>So <strong>models from the same branch are automatically adopted as ensemble members</strong>. If no direct dataset edge exists (the common <code>split → model → ensemble</code> flow), the ensemble <em>inherits</em> the dataset its wired models consume and refits everything on that single dataset.</p>
+<p>If you wire in a model trained on a <strong>different dataset lineage</strong>, the canvas raises a cross-dataset warning before committing the edge — mixing unrelated branches is almost always a wiring mistake.</p>
+<p><strong>2. Manual dropdowns to choose models / strategy</strong></p>
+<p>The settings panel exposes manual pickers so you don't have to wire nodes physically:</p>
+<ul>
+<li><strong>Base Models</strong> — a multi-select chip list to add/remove each base learner.</li>
+<li><strong>Final Estimator</strong> — a dropdown (Stacking only) to pick the meta-learner.</li>
+<li><strong>Voting type</strong> — soft/hard toggle (Voting classifier).</li>
+<li><strong>Search Strategy</strong> — a dropdown (<code>random</code>, <code>grid</code>, <code>optuna</code>, <code>halving_random</code>, <code>halving_grid</code>) with a gear button opening the per-strategy settings modal.</li>
+</ul>
+<p>Wired model nodes <em>override</em> the chip selection; if no models are wired, the manual chips are used.</p>
+<p><strong>3. How do wired models' search spaces work — automatically?</strong></p>
+<p>Automatic. When an <code>Advanced Training</code> node is wired in, the converter (<code>pipelineConverter.ts</code>):</p>
+<ul>
+<li>reads its <code>model_type</code> and adds the resolved base key to <code>base_estimators</code>,</li>
+<li>extracts its active <code>search_space</code> / <code>hyperparameters</code> and nests them under <code>base_estimator_params</code> (namespaced as <code>&lt;base_key&gt;__&lt;param&gt;</code>),</li>
+<li>forwards that nested space to the backend, where the Optuna/halving engine expands and optimizes all wired estimators together — no manual search-space entry required.</li>
+</ul>
 <h2 id="hyperparameter-tuning">Hyperparameter tuning</h2>
 <h3 id="hyperparameter_tuner">hyperparameter_tuner</h3>
 <p>This mode wraps a base model and performs search.</p>
