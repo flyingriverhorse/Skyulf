@@ -92,6 +92,32 @@ class TuningCalculator(BaseModelCalculator):
                 cleaned[k] = None if v == "none" else v
         return cleaned
 
+    @staticmethod
+    def _instantiate_model(model_class: Any, params: Dict[str, Any]) -> Any:
+        """Build an estimator, routing nested ``a__b`` keys through ``set_params``.
+
+        Constructor args (no ``__``) are filtered to the model's signature
+        (unless it accepts ``**kwargs``); nested keys — e.g. an ensemble's
+        ``random_forest__n_estimators`` — are applied afterwards via
+        ``set_params`` because sklearn estimators only accept them that way.
+        """
+        import inspect
+
+        flat = {k: v for k, v in params.items() if "__" not in str(k)}
+        nested = {k: v for k, v in params.items() if "__" in str(k)}
+
+        sig = inspect.signature(model_class)
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if not accepts_kwargs:
+            flat = {k: v for k, v in flat.items() if k in sig.parameters}
+
+        model = model_class(**flat)
+        if nested:
+            model.set_params(**nested)
+        return model
+
     def fit(
         self,
         X: Union[pd.DataFrame, SkyulfDataFrame],
@@ -175,22 +201,11 @@ class TuningCalculator(BaseModelCalculator):
         if not model_cls:
             raise ValueError("Model calculator does not have a model_class attribute")
 
-        # Filter params to only include those accepted by the model_class constructor.
-        # When the constructor accepts **kwargs (e.g. LightGBM, XGBoost), pass everything —
-        # the simple `k in sig.parameters` check would otherwise silently strip params like
-        # verbose=-1 / verbosity=-1 that are forwarded through **kwargs.
-        import inspect
-
-        sig = inspect.signature(model_cls)
-        accepts_kwargs = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-        )
-        if accepts_kwargs:
-            valid_final_params = final_params
-        else:
-            valid_final_params = {k: v for k, v in final_params.items() if k in sig.parameters}
-
-        model = model_cls(**valid_final_params)
+        # Build the final model. ``_instantiate_model`` filters constructor args
+        # to the signature (when there is no **kwargs) and routes nested
+        # ``a__b`` keys — e.g. an ensemble's tuned base-model params — through
+        # ``set_params`` so they are not silently dropped.
+        model = self._instantiate_model(model_cls, final_params)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*valid feature names.*")
             model.fit(X_np, y_np)
@@ -221,7 +236,9 @@ class TuningCalculator(BaseModelCalculator):
         # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
         model_class: Any = getattr(self.model_calculator, "model_class")
 
-        base_estimator = model_class(**self.model_calculator.default_params)
+        # ``default_params`` may carry structural args (e.g. an ensemble's
+        # resolved ``estimators``); the instantiator filters/routes them safely.
+        base_estimator = self._instantiate_model(model_class, self.model_calculator.default_params)
 
         # 2. Prepare Splitter
         # If validation data is provided, use PredefinedSplit to train on X and validate on validation_data
@@ -433,7 +450,10 @@ class TuningCalculator(BaseModelCalculator):
                     # Instantiate and Fit
                     # Note: We must handle potential errors (e.g. incompatible params)
                     try:
-                        model = model_class(**{**self.model_calculator.default_params, **params})
+                        model = self._instantiate_model(
+                            model_class,
+                            {**self.model_calculator.default_params, **params},
+                        )
                         model.fit(X_train_fold, y_train_fold)
 
                         # Score

@@ -1,0 +1,45 @@
+# © 2025 Murat Unsal — Skyulf Project
+
+name: Security
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Weekly Monday 06:00 UTC — surfaces newly-published CVEs against pinned
+    # dependencies even when no code changes land.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pyscan:
+    name: Dependency vulnerability scan (pyscan)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install pyscan
+        run: uv pip install --system "pyscan-rs>=2.1.3"
+
+      # pyscan reads uv.lock at the repo root and honours .pyscanignore.
+      # It exits non-zero when an un-ignored vulnerability is found, failing the gate.
+      - name: Scan dependencies (uv.lock vs OSV)
+        run: pyscan

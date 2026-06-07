@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.5.15"
+version = "0.6.0"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -18,7 +18,7 @@ classifiers = [
 ]
 dependencies = [
     "aiofiles>=24.1.0",
-    "aiohttp>=3.9.0,<4.0.0",
+    "aiohttp>=3.13.4,<4.0.0",
     "aiosqlite>=0.19.0,<1.0.0",
     "asyncpg>=0.29.0,<1.0.0",
     "celery[redis]>=5.4.0,<6.0.0",
@@ -26,16 +26,16 @@ dependencies = [
     "httpx>=0.25.0,<1.0.0",
     "numpy>=1.24.0",
     "orjson>=3.9.0",
-    "pandas>=2.0.0",
+    "pandas>=2.0.0,<3.0.0",
     "polars>=1.36.0",
-    "pyarrow>=21.0.0",
+    "pyarrow>=23.0.1",
     "pydantic>=2.4.0,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
-    "python-dotenv>=1.0.0",
-    "python-multipart>=0.0.6",
+    "python-dotenv>=1.2.2,<2.0.0",
+    "python-multipart>=0.0.27",
     "redis>=5.0.0,<6.0.0",
-    "scikit-learn>=1.8.0",
-    "imbalanced-learn>=0.14.1",
+    "scikit-learn>=1.8.0,<2.0.0",
+    "imbalanced-learn>=0.14.1,<1.0.0",
     "scipy>=1.10.0,<2.0.0",
     "statsmodels>=0.14.0,<1.0.0",
     "sqlalchemy[asyncio]>=2.0.0,<3.0.0",
@@ -48,12 +48,21 @@ dependencies = [
     "rich>=13.0.0",
     "tqdm>=4.67.1",
     "cmaes>=0.10",
-    "causal-learn>=0.1.4.5",
+    "causal-learn>=0.1.3.0",
+    "boto3>=1.34.0",
+    "s3fs>=2023.12.0",
+    "patsy>=0.5.0,<1.0.0",
+    "slowapi>=0.1.9",
+    "sentry-sdk[fastapi]>=2.0.0",
+    "xlsx2csv>=0.8.0",
+    "openpyxl>=3.1.0",
+    "rapidfuzz>=3.6.1,<4.0.0",
+    "vadersentiment>=3.3.2,<4.0.0",
 ]
 
 [project.optional-dependencies]
 geo = [
-    "geopandas>=0.14.0,<1.2.0",
+    "geopandas>=1.1.2,<1.2.0",
     "shapely>=2.0.2,<2.2.0",
     "pyproj>=3.6.0,<3.8.0",
     "rtree>=1.3.0,<2.0.0",
@@ -112,6 +121,9 @@ dev = [
     "pre-commit>=3.4.0",
     "ipython>=8.18.1",
     "jupyter>=1.1.1",
+
+    # Security scanners
+    "pyscan-rs>=2.1.3",  # Rust-based dependency vulnerability scanner (OSV)
 ]
 
 [tool.pytest.ini_options]
@@ -178,7 +190,9 @@ exclude = [
 required-version = ">=0.6,<1.0"
 
 [tool.uv.sources]
-# Always use the local monorepo copy, never PyPI — prevents uv from
-# resolving skyulf-core>=0.1.2 to the stale PyPI release (0.1.2) and
-# overwriting the local editable install when `uv add` re-resolves.
-skyulf-core = { path = "./skyulf-core", editable = true }
+skyulf-core = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "skyulf-core",
+]

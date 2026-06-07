@@ -7,7 +7,7 @@ import {
 import { JobInfo } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
-import { formatMetricName, getMetricDescription } from '../../../core/utils/format';
+import { formatMetricName, getMetricDescription, extractEnsembleSummary, formatBaseEstimator } from '../../../core/utils/format';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { useConfirm } from '../../shared';
 import { toast } from '../../../core/toast';
@@ -480,8 +480,68 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                                             ? 'factor: 3 · resource: n_samples · min_resources: exhaust (defaults)'
                                                             : '-';
 
+                                                        // For ensemble nodes the structural selection (which base learners
+                                                        // were combined) lives alongside the tuning config and is more
+                                                        // informative than the bare strategy, so surface it up top.
+                                                        const ensemble = extractEnsembleSummary(
+                                                            job.model_type,
+                                                            config as unknown as Record<string, unknown>,
+                                                        );
+
                                                         return (
                                                             <>
+                                                                {ensemble && (
+                                                                    <>
+                                                                        <div className="col-span-2">
+                                                                            <span className="text-gray-500">Base Models:</span>
+                                                                            <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                                                                {ensemble.baseEstimators.length > 0
+                                                                                    ? ensemble.baseEstimators.map(formatBaseEstimator).join(', ')
+                                                                                    : '-'}
+                                                                            </span>
+                                                                        </div>
+                                                                        {ensemble.isStacking && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Final Estimator:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                                                                    {ensemble.finalEstimator ? formatBaseEstimator(ensemble.finalEstimator) : '-'}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                        {ensemble.isStacking && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Passthrough:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{ensemble.passthrough ? 'Yes' : 'No'}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {!ensemble.isStacking && ensemble.voting && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Voting:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{ensemble.voting}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {!ensemble.isStacking && ensemble.weights && ensemble.weights.length === ensemble.baseEstimators.length && (
+                                                                            <div className="col-span-2">
+                                                                                <span className="text-gray-500">Model Weights:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                                                                    {ensemble.baseEstimators.map((m, i) => `${formatBaseEstimator(m)}: ${ensemble.weights?.[i]}`).join(', ')}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                        {typeof ensemble.nJobs === 'number' && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Parallel Jobs:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{ensemble.nJobs === -1 ? 'All cores' : ensemble.nJobs}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {ensemble.calibrateBaseModels && (
+                                                                            <div>
+                                                                                <span className="text-gray-500">Calibration:</span>
+                                                                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">{ensemble.calibrationMethod === 'isotonic' ? 'Isotonic' : 'Sigmoid'}</span>
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                )}
                                                                 <div>
                                                                     <span className="text-gray-500">Strategy:</span>
                                                                     <span className="ml-2 font-mono text-gray-700 dark:text-gray-300 capitalize">{activeStrategy || '-'}</span>
