@@ -1,5 +1,5 @@
-from .base import BaseApplier, BaseCalculator, StatefulTransformer
 from ._schema import SchemaMismatchError, SkyulfSchema, validate_schema
+from .base import BaseApplier, BaseCalculator, StatefulTransformer
 from .bucketing import (
     CustomBinningApplier,
     CustomBinningCalculator,

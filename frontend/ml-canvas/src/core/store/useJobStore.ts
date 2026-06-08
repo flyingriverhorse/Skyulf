@@ -16,7 +16,7 @@ interface JobState {
   hasMore: boolean;
   skip: number;
   activeParallelRun: ActiveParallelRun | null;
-  
+
   // Actions
   fetchJobs: () => Promise<void>;
   loadMoreJobs: () => Promise<void>;
@@ -27,7 +27,7 @@ interface JobState {
   setActiveParallelRun: (run: ActiveParallelRun | null) => void;
   promoteJob: (jobId: string) => Promise<void>;
   unpromoteJob: (jobId: string) => Promise<void>;
-  
+
   // Polling
   startPolling: () => void;
   stopPolling: () => void;
@@ -147,14 +147,14 @@ export const useJobStore = create<JobState>((set, get) => {
     loadMoreJobs: async () => {
         const { skip, jobs, isLoading, hasMore } = get();
         if (isLoading || !hasMore) return;
-        
+
         const nextSkip = skip + PAGE_SIZE;
         set({ isLoading: true });
         try {
             const newJobs = await jobsApi.getJobs(PAGE_SIZE, nextSkip);
-            set({ 
-                jobs: [...jobs, ...newJobs], 
-                isLoading: false, 
+            set({
+                jobs: [...jobs, ...newJobs],
+                isLoading: false,
                 skip: nextSkip,
                 hasMore: newJobs.length === PAGE_SIZE
             });
@@ -191,9 +191,9 @@ export const useJobStore = create<JobState>((set, get) => {
     toggleDrawer: (isOpen) => {
       const currentOpen = get().isDrawerOpen;
       const nextOpen = isOpen !== undefined ? isOpen : !currentOpen;
-      
+
       set({ isDrawerOpen: nextOpen });
-      
+
       // Opening: one-time fetch to populate the list. Do NOT start
       // sustained polling here — that only happens when a job is submitted.
       // Closing: nothing to do, polling auto-stops via the hasActive check.

@@ -1,27 +1,29 @@
 import unittest
+
 import polars as pl
-from skyulf.preprocessing.scaling import StandardScalerCalculator, StandardScalerApplier
-from skyulf.preprocessing.outliers import IQRCalculator, IQRApplier
-from skyulf.preprocessing.imputation import SimpleImputerCalculator, SimpleImputerApplier
-from skyulf.preprocessing.encoding import (
-    OneHotEncoderCalculator,
-    OneHotEncoderApplier,
-    OrdinalEncoderCalculator,
-    OrdinalEncoderApplier,
-    LabelEncoderCalculator,
-    LabelEncoderApplier,
-)
+
 from skyulf.preprocessing.drop_and_missing import (
-    DropMissingRowsCalculator,
-    DropMissingRowsApplier,
-    DeduplicateCalculator,
     DeduplicateApplier,
+    DeduplicateCalculator,
+    DropMissingRowsApplier,
+    DropMissingRowsCalculator,
 )
+from skyulf.preprocessing.encoding import (
+    LabelEncoderApplier,
+    LabelEncoderCalculator,
+    OneHotEncoderApplier,
+    OneHotEncoderCalculator,
+    OrdinalEncoderApplier,
+    OrdinalEncoderCalculator,
+)
+from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
+from skyulf.preprocessing.outliers import IQRApplier, IQRCalculator
+from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator
 from skyulf.preprocessing.split import (
-    SplitCalculator,
-    SplitApplier,
-    FeatureTargetSplitCalculator,
     FeatureTargetSplitApplier,
+    FeatureTargetSplitCalculator,
+    SplitApplier,
+    SplitCalculator,
 )
 
 
@@ -368,7 +370,8 @@ class TestPreprocessingNodes(unittest.TestCase):
     def test_bucketing_polars(self):
         """Test binning in Polars."""
         import polars as pl
-        from skyulf.preprocessing.bucketing import GeneralBinningCalculator, GeneralBinningApplier
+
+        from skyulf.preprocessing.bucketing import GeneralBinningApplier, GeneralBinningCalculator
 
         df_pl = pl.DataFrame({"A": [1.0, 2.0, 3.0, 4.0, 5.0, 10.0], "B": [10, 20, 30, 40, 50, 100]})
 
@@ -417,11 +420,12 @@ class TestPreprocessingNodes(unittest.TestCase):
     def test_feature_generation_polars(self):
         """Test Feature Generation (Math) and PolynomialFeatures in Polars."""
         import polars as pl
+
         from skyulf.preprocessing.feature_generation import (
-            FeatureGenerationCalculator,
             FeatureGenerationApplier,
-            PolynomialFeaturesCalculator,
+            FeatureGenerationCalculator,
             PolynomialFeaturesApplier,
+            PolynomialFeaturesCalculator,
         )
 
         df = pl.DataFrame(
@@ -498,12 +502,13 @@ class TestPreprocessingNodes(unittest.TestCase):
     def test_feature_selection_polars(self):
         """Test Feature Selection (Variance, Corr, Univariate) in Polars"""
         import polars as pl
+
         from skyulf.preprocessing.feature_selection import (
-            VarianceThresholdCalculator,
-            VarianceThresholdApplier,
-            CorrelationThresholdCalculator,
             CorrelationThresholdApplier,
+            CorrelationThresholdCalculator,
             UnivariateSelectionCalculator,
+            VarianceThresholdApplier,
+            VarianceThresholdCalculator,
         )
 
         # 1. Variance Threshold
@@ -565,11 +570,12 @@ class TestPreprocessingNodes(unittest.TestCase):
     def test_resampling_polars(self):
         """Test Oversampling/Undersampling in Polars"""
         import polars as pl
+
         from skyulf.preprocessing.resampling import (
-            OversamplingCalculator,
             OversamplingApplier,
-            UndersamplingCalculator,
+            OversamplingCalculator,
             UndersamplingApplier,
+            UndersamplingCalculator,
         )
 
         # Class 1 is minority (2 instances), Class 0 is majority (4 instances)

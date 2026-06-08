@@ -31,7 +31,6 @@ import pytest
 import skyulf  # noqa: F401  (side-effect: populate the registry)
 from skyulf.registry import NodeRegistry
 
-
 # ---------------------------------------------------------------------------
 # Synthetic dataset — wide enough that every node finds at least one valid
 # column to operate on. Has numeric (with outliers + missing), categorical
@@ -197,6 +196,6 @@ def test_registry_minimum_population() -> None:
     minimum size so CI catches it."""
     meta = NodeRegistry.get_all_metadata()
     preprocessing = [k for k, m in meta.items() if m.get("category") == "Preprocessing"]
-    assert (
-        len(preprocessing) >= 25
-    ), f"Preprocessing registry shrunk: only {len(preprocessing)} nodes registered"
+    assert len(preprocessing) >= 25, (
+        f"Preprocessing registry shrunk: only {len(preprocessing)} nodes registered"
+    )

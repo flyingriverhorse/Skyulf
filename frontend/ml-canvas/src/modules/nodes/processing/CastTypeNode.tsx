@@ -92,7 +92,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
           Connect a dataset node to see available columns.
         </div>
       )}
-      
+
       {isLoading && !!datasetId && (
         <div className="text-xs text-muted-foreground animate-pulse">
           Loading schema...
@@ -146,7 +146,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
               </button>
             </div>
           ))}
-          
+
           {Object.keys(config.column_types).length === 0 && (
             <div className={`text-xs text-muted-foreground italic border border-dashed rounded p-8 text-center ${isWide ? 'col-span-2' : ''}`}>
               No casting rules defined. Click + to add one.

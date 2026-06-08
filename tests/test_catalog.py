@@ -1,7 +1,9 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
 import pandas as pd
-from backend.data.catalog import FileSystemCatalog, SmartCatalog, S3Catalog
+import pytest
+
+from backend.data.catalog import FileSystemCatalog, S3Catalog, SmartCatalog
 
 # Mock data
 MOCK_DF = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})

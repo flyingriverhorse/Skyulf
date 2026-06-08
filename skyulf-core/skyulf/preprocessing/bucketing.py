@@ -14,18 +14,17 @@ import pandas as pd
 from sklearn.preprocessing import KBinsDiscretizer
 
 from ..core.meta.decorators import node_meta
+from ..engines import SkyulfDataFrame
+from ..registry import NodeRegistry
 from ..utils import (
     detect_numeric_columns,
     resolve_columns,
     user_picked_no_columns,
 )
-from .base import BaseApplier, BaseCalculator, apply_method, fit_method
-from .dispatcher import apply_dual_engine
 from ._artifacts import GeneralBinningArtifact
 from ._helpers import to_pandas
-from ..registry import NodeRegistry
-from ..engines import SkyulfDataFrame
-
+from .base import BaseApplier, BaseCalculator, apply_method, fit_method
+from .dispatcher import apply_dual_engine
 
 # -----------------------------------------------------------------------------
 # Polars apply

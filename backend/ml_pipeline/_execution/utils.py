@@ -1,7 +1,9 @@
 import re
-from typing import Optional, Dict, Tuple
+from typing import Dict, Optional, Tuple
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from backend.database.models import DataSource
 
 _BRANCH_RE = re.compile(r"^(.+?)__branch_(\d+)(?:_(\d+))?$")

@@ -1,6 +1,11 @@
 name: Release Drafter
 
 on:
+  push:
+    branches: [main, master]
+    paths:
+      - "pyproject.toml"
+      - "changelog/**"
   workflow_dispatch:
 
 permissions:
@@ -13,11 +18,35 @@ concurrency:
 
 jobs:
   update_release_draft:
+    name: Sync Release Draft with Changelog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: release-drafter/release-drafter@v6
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          config-name: release-drafter.yml
+          python-version: "3.12"
+
+      - name: Extract Release Notes
+        id: changelog
+        run: python .github/scripts/draft_release_from_changelog.py
+
+      - name: Create or Update GitHub Release Draft
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.changelog.outputs.version }}
+          TITLE: ${{ steps.changelog.outputs.title }}
+          NOTES_FILE: ${{ steps.changelog.outputs.notes_file }}
+        run: |
+          echo "Updating release draft for tag: $TAG"
+          # Attempt to edit the existing release draft; fall back to creating a new one if it doesn't exist.
+          gh release edit "$TAG" \
+            --title "$TITLE" \
+            --notes-file "$NOTES_FILE" \
+            --draft || \
+          gh release create "$TAG" \
+            --title "$TITLE" \
+            --notes-file "$NOTES_FILE" \
+            --draft

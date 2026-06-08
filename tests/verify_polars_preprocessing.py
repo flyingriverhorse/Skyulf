@@ -1,26 +1,27 @@
-import unittest
-import polars as pl
 import logging
+import unittest
+
+import polars as pl
 
 # Configure logging to capture output
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Import nodes
-from skyulf.preprocessing.bucketing import KBinsDiscretizerCalculator, KBinsDiscretizerApplier
+from skyulf.preprocessing.bucketing import KBinsDiscretizerApplier, KBinsDiscretizerCalculator
 from skyulf.preprocessing.cleaning import (
-    TextCleaningCalculator,
-    TextCleaningApplier,
-    InvalidValueReplacementCalculator,
-    InvalidValueReplacementApplier,
-    AliasReplacementCalculator,
     AliasReplacementApplier,
+    AliasReplacementCalculator,
+    InvalidValueReplacementApplier,
+    InvalidValueReplacementCalculator,
+    TextCleaningApplier,
+    TextCleaningCalculator,
 )
 from skyulf.preprocessing.feature_generation import (
-    FeatureGenerationCalculator,
     FeatureGenerationApplier,
-    PolynomialFeaturesCalculator,
+    FeatureGenerationCalculator,
     PolynomialFeaturesApplier,
+    PolynomialFeaturesCalculator,
 )
 from skyulf.preprocessing.inspection import DatasetProfileCalculator
 

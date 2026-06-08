@@ -36,8 +36,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     const handleAdd = () => {
         if (newFilterCol && newFilterVal) {
             onAddFilter(
-                newFilterCol, 
-                isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal), 
+                newFilterCol,
+                isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal),
                 newFilterOp
             );
             setShowFilterForm(false);
@@ -56,13 +56,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                         <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Active Filters</span>
                         <InfoTooltip text="Filters are applied to the raw dataset before profiling. You can add filters manually or by clicking on distribution bars to filter on specific range." />
                     </div>
-                    
+
                     {filters.map((filter, idx) => (
                         <div key={idx} className="flex items-center bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-full px-3 py-1 text-sm shadow-sm animate-in fade-in zoom-in duration-200">
                             <span className="font-medium text-gray-700 dark:text-gray-300 mr-1">{filter.column}</span>
                             <span className="text-gray-500 mx-1">{filter.operator}</span>
                             <span className="font-mono text-blue-600 dark:text-blue-400">{String(filter.value)}</span>
-                            <button 
+                            <button
                                 onClick={() => onRemoveFilter(idx)}
                                 className="ml-2 text-gray-400 hover:text-red-500"
                             >
@@ -72,7 +72,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     ))}
 
                     {!showFilterForm ? (
-                        <button 
+                        <button
                             onClick={() => setShowFilterForm(true)}
                             className="flex items-center px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-full hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
                         >
@@ -81,7 +81,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                         </button>
                     ) : (
                         <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-1 rounded-md border border-blue-200 dark:border-blue-700 animate-in slide-in-from-left-2 duration-200">
-                            <select 
+                            <select
                                 value={newFilterCol}
                                 onChange={(e) => setNewFilterCol(e.target.value)}
                                 className="text-xs border-none bg-transparent focus:ring-0 py-1 pl-2 pr-6"
@@ -91,7 +91,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                                     <option key={col} value={col}>{col}</option>
                                 ))}
                             </select>
-                            <select 
+                            <select
                                 value={newFilterOp}
                                 onChange={(e) => setNewFilterOp(e.target.value)}
                                 className="text-xs border-none bg-gray-50 dark:bg-gray-900 rounded focus:ring-0 py-1 px-2"
@@ -103,21 +103,21 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                                 <option value=">=">&gt;=</option>
                                 <option value="<=">&lt;=</option>
                             </select>
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 value={newFilterVal}
                                 onChange={(e) => setNewFilterVal(e.target.value)}
                                 placeholder="Value"
                                 className="text-xs border-none bg-gray-50 dark:bg-gray-900 rounded focus:ring-0 py-1 px-2 w-20"
                                 onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
                             />
-                            <button 
+                            <button
                                 onClick={handleAdd}
                                 className="p-1 text-green-600 hover:bg-green-50 rounded"
                             >
                                 <Plus className="w-3 h-3" />
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setShowFilterForm(false)}
                                 className="p-1 text-gray-400 hover:text-gray-600"
                             >
@@ -127,7 +127,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     )}
 
                     {filters.length > 0 && (
-                        <button 
+                        <button
                             onClick={onClearFilters}
                             className="ml-auto text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline"
                         >
@@ -149,7 +149,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     {excludedCols.map((col, idx) => (
                         <div key={idx} className="flex items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full px-3 py-1 text-sm shadow-sm opacity-75 hover:opacity-100 transition-opacity">
                             <span className="font-medium text-gray-500 dark:text-gray-400 mr-1 line-through decoration-gray-400">{col}</span>
-                            <button 
+                            <button
                                 onClick={() => onToggleExclude(col, false)}
                                 className="ml-2 text-gray-400 hover:text-green-500"
                                 title="Include back in analysis"
@@ -160,14 +160,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     ))}
 
                     <div className="relative">
-                        <button 
+                        <button
                             onClick={() => setShowExcludeDropdown(!showExcludeDropdown)}
                             className="flex items-center px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
                             <EyeOff className="w-3 h-3 mr-1" />
                             Exclude Column
                         </button>
-                        
+
                         {showExcludeDropdown && (
                             <div className="absolute top-full left-0 mt-1 w-48 max-h-60 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-50">
                                 {columns.filter(c => !excludedCols.includes(c)).map(col => (

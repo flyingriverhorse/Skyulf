@@ -1,4 +1,5 @@
 from typing import Any, List, Sequence, Tuple
+
 import numpy as np
 
 try:
@@ -8,8 +9,8 @@ try:
 except ImportError:
     HAS_POLARS = False
 
-from .registry import BaseEngine, EngineRegistry, EngineName
 from .protocol import SkyulfDataFrame
+from .registry import BaseEngine, EngineName, EngineRegistry
 
 
 class SkyulfPolarsWrapper:

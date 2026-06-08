@@ -152,11 +152,11 @@ Uses **Isolation Forest** to identify anomalous rows in your dataset. This is us
 if profile.outliers:
     print(f"Total Outliers: {profile.outliers.total_outliers}")
     print(f"Outlier Percentage: {profile.outliers.outlier_percentage}%")
-    
+
     # Inspect the top most anomalous rows
     for outlier in profile.outliers.top_outliers[:5]:
         print(f"Row Index: {outlier.index}, Score: {outlier.score}")
-        
+
         # See why it was flagged (feature contribution)
         if outlier.explanation:
             print("  Reason:", outlier.explanation)
@@ -180,7 +180,7 @@ Skyulf integrates `causal-learn` to perform causal discovery using the PC Algori
 ```python
 if profile.causal_graph:
     print(f"Graph has {len(profile.causal_graph.nodes)} nodes and {len(profile.causal_graph.edges)} edges.")
-    
+
     for edge in profile.causal_graph.edges:
         # Types: "directed" (->), "undirected" (--), "bidirected" (<->)
         print(f"{edge.source} {edge.type} {edge.target}")
@@ -201,7 +201,7 @@ Detects datetime columns and analyzes trends and seasonality. It automatically a
 ```python
 if profile.timeseries:
     print(f"Time Column: {profile.timeseries.date_col}")
-    
+
     # Access trend data
     for point in profile.timeseries.trend[:5]:
         print(f"Date: {point.date}, Value: {point.values}")
@@ -366,8 +366,7 @@ for col_name, drift_info in report.column_drifts.items():
         for metric in drift_info.metrics:
             status = "FAIL" if metric.has_drift else "PASS"
             print(f"  - {metric.metric}: {metric.value:.4f} [{status}]")
-        
+
         if drift_info.suggestions:
             print(f"  💡 Suggestion: {drift_info.suggestions[0]}")
 ```
-

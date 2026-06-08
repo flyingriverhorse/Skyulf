@@ -9,7 +9,7 @@ import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppe
 interface ScalingConfig {
   columns: string[];
   method: 'standard' | 'minmax' | 'maxabs' | 'robust';
-  
+
   // Standard Scaler
   with_mean?: boolean;
   with_std?: boolean;
@@ -34,10 +34,10 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  
+
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  
+
   // Responsive Layout
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
@@ -55,7 +55,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
   }, []);
 
   // Filter for numeric columns only, as scaling only applies to them
-  const numericColumns = schema 
+  const numericColumns = schema
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .filter(c => !droppedUpstream.has(c.name))
@@ -77,7 +77,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
     if (!nodeResult || !nodeResult.metrics) return null;
     const m = nodeResult.metrics;
     const cols = m.columns as string[] | undefined;
-    
+
     if (!cols) return null;
 
     const getTargetExplanation = () => {
@@ -140,10 +140,10 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           </div>
         )}
       </div>
-      
+
       {/* Main Content */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div>
@@ -257,11 +257,11 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
               </div>
             </div>
           )}
-          
+
           {/* Feedback Section (Wide) */}
           {isWide && renderFeedback()}
         </div>
-        
+
         {/* Right Column: Columns */}
         <div className={`flex flex-col h-full min-h-[200px] border rounded-md overflow-hidden ${isWide ? '' : 'shrink-0'}`}>
            <div className="p-2 border-b bg-muted/30 flex flex-col gap-2">
@@ -329,7 +329,7 @@ export const ScalingNode: NodeDefinition<ScalingConfig> = {
     if (cols === 0) return method;
     return `${method} · ${cols} ${cols === 1 ? 'col' : 'cols'}`;
   },
-  validate: (config) => ({ 
+  validate: (config) => ({
     isValid: config.columns.length > 0,
     message: config.columns.length === 0 ? 'Select at least one column' : undefined
   }),

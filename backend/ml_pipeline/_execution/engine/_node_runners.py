@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, cast
 
 import numpy as np
 import pandas as pd
 
+from backend.config import get_settings
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
@@ -29,7 +30,6 @@ from skyulf.modeling.base import StatefulEstimator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
-from backend.config import get_settings
 from ..schemas import NodeConfig
 
 if TYPE_CHECKING:

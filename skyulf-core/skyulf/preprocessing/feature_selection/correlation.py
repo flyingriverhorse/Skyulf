@@ -7,10 +7,10 @@ import numpy as np
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, resolve_columns
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine
 from .._artifacts import CorrelationThresholdArtifact
 from .._helpers import to_pandas
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
 
 
 def _corr_drop_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:

@@ -20,7 +20,7 @@ export const downloadChart = async (elementId: string, filename: string, title?:
             ctx.fillText(title, width / 2, 30);
             offset = 40;
         }
-        
+
         if (subtitle) {
             ctx.fillStyle = subTextColor;
             ctx.font = '12px sans-serif';
@@ -48,11 +48,11 @@ export const downloadChart = async (elementId: string, filename: string, title?:
         try {
             // Use Plotly.toImage to get a high-res PNG
             const dataUrl = await Plotly.toImage(plotlyDiv as any, { format: 'png', width: 1200, height: 800 });
-            
+
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
-            
+
             const width = 1200;
             const height = 800;
             const headerHeight = title ? (subtitle ? 80 : 50) : 0;
@@ -60,18 +60,18 @@ export const downloadChart = async (elementId: string, filename: string, title?:
             img.onload = () => {
                 canvas.width = width;
                 canvas.height = height + headerHeight;
-                
+
                 if (ctx) {
                     ctx.fillStyle = bgColor;
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    
+
                     // Draw Title
                     if (title) {
                         ctx.fillStyle = textColor;
                         ctx.font = 'bold 24px sans-serif';
                         ctx.textAlign = 'center';
                         ctx.fillText(title, width / 2, 40);
-                        
+
                         if (subtitle) {
                             ctx.fillStyle = subTextColor;
                             ctx.font = '16px sans-serif';
@@ -91,7 +91,7 @@ export const downloadChart = async (elementId: string, filename: string, title?:
                     }
 
                     ctx.drawImage(img, 0, headerHeight);
-                    
+
                     const a = document.createElement('a');
                     a.download = `${filename}.png`;
                     a.href = canvas.toDataURL('image/png');

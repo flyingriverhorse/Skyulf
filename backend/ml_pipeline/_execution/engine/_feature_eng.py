@@ -12,7 +12,7 @@ Relies on ``self.artifact_store``, ``self._node_configs``, ``self._get_input``,
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
@@ -238,7 +238,7 @@ class FeatureEngMixin:
             test_part = processed_df[1] if len(processed_df) > 1 else None
             train_shape = getattr(train_part, "shape", None)
             test_shape = getattr(test_part, "shape", None) if test_part is not None else None
-            self.log(f"Split details - Train: {train_shape}, " f"Test: {test_shape or 'None'}")
+            self.log(f"Split details - Train: {train_shape}, Test: {test_shape or 'None'}")
 
         self.artifact_store.save(node.node_id, processed_df)
 

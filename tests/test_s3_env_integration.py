@@ -1,6 +1,7 @@
 import os
 from unittest.mock import MagicMock, patch
-from backend.data.catalog import create_catalog_from_options, S3Catalog, FileSystemCatalog
+
+from backend.data.catalog import FileSystemCatalog, S3Catalog, create_catalog_from_options
 
 
 # Mock Node structure

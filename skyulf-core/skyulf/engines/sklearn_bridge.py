@@ -1,5 +1,7 @@
 from typing import Any, Optional, Tuple
+
 import numpy as np
+
 from .registry import get_engine
 
 
@@ -33,7 +35,8 @@ class SklearnBridge:
             X = X_data
 
         X_numpy = SklearnBridge._convert_single(X)
-        assert X_numpy is not None  # X is not None at this point
+        if X_numpy is None:
+            raise ValueError("Input X could not be converted to a numpy array (got None).")
         return X_numpy, y
 
     @staticmethod

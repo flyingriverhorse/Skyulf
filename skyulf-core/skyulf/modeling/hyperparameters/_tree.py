@@ -24,8 +24,7 @@ RANDOM_FOREST_PARAMS = [
         min=1,
         max=100,
         description=(
-            "The maximum depth of the tree. If None, nodes are expanded until "
-            "all leaves are pure."
+            "The maximum depth of the tree. If None, nodes are expanded until all leaves are pure."
         ),
     ),
     HyperparameterField(
@@ -436,7 +435,7 @@ HIST_GRADIENT_BOOSTING_PARAMS = [
         min=1,
         max=20,
         description=(
-            "Maximum depth per tree. None = unlimited " "(max_leaf_nodes is the effective limit)."
+            "Maximum depth per tree. None = unlimited (max_leaf_nodes is the effective limit)."
         ),
     ),
     HyperparameterField(
@@ -467,8 +466,7 @@ HIST_GRADIENT_BOOSTING_PARAMS = [
         max=255,
         step=5,
         description=(
-            "Maximum number of bins for feature discretisation. "
-            "Higher = more precise but slower."
+            "Maximum number of bins for feature discretisation. Higher = more precise but slower."
         ),
     ),
 ]

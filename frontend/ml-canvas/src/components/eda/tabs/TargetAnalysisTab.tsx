@@ -1,23 +1,23 @@
 import React, { useCallback, useState } from 'react';
-import { 
-    BarChart2, 
-    Download, 
-    ScatterChart as ScatterIcon, 
-    Clock, 
+import {
+    BarChart2,
+    Download,
+    ScatterChart as ScatterIcon,
+    Clock,
     Loader2,
     Check
 } from 'lucide-react';
-import { 
-    ResponsiveContainer, 
-    BarChart, 
-    CartesianGrid, 
-    XAxis, 
-    YAxis, 
-    Tooltip, 
-    ReferenceLine, 
-    Bar, 
-    ComposedChart, 
-    Scatter 
+import {
+    ResponsiveContainer,
+    BarChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    ReferenceLine,
+    Bar,
+    ComposedChart,
+    Scatter
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { StatusBadge } from '../../shared/StatusBadge';
@@ -58,14 +58,14 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
         const chartHeight = 400; // Height per chart
         const chartWidth = 800;
         const padding = 40;
-        
+
         // 2 Columns Layout
         const cols = 2;
         const rows = Math.ceil(interactions.length / cols);
-        
+
         const totalWidth = (cols * chartWidth) + ((cols + 1) * padding);
         const totalHeight = (rows * (chartHeight + padding)) + 100; // +100 for main title
-        
+
         const canvas = document.createElement('canvas');
         canvas.width = totalWidth;
         canvas.height = totalHeight;
@@ -89,10 +89,10 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
 
             const svg = element.querySelector('svg');
             if (!svg) continue;
-            
+
             const row = Math.floor(i / cols);
             const col = i % cols;
-            
+
             const x = padding + (col * (chartWidth + padding));
             const y = 100 + (row * (chartHeight + padding));
 
@@ -101,7 +101,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
             ctx.font = 'bold 16px sans-serif';
             ctx.textAlign = 'left';
             ctx.fillText(`${interaction.feature} vs ${profile.target_col}`, x + 40, y);
-            
+
             if (interaction.p_value !== undefined) {
                 ctx.font = '14px sans-serif';
                 ctx.fillStyle = interaction.p_value < 0.05 ? '#059669' : theme.subTextColor;
@@ -154,24 +154,24 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             <Download className="w-4 h-4" />
                         </button>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2">
                             <h3 className="text-sm font-medium text-gray-500 mb-4">Top Associated Features</h3>
                             <div className="h-64 w-full" id="target-analysis-chart">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart 
+                                    <BarChart
                                         data={Object.entries(profile.target_correlations)
                                             .slice(0, 10)
                                             .map(([k, v]) => ({ name: k, value: v as number }))
-                                        } 
+                                        }
                                         layout="vertical"
                                         margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                                     >
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                         <XAxis type="number" domain={[0, 1]} />
                                         <YAxis type="category" dataKey="name" width={120} tick={{fontSize: 12}} />
-                                        <Tooltip 
+                                        <Tooltip
                                             contentStyle={getTooltipContentStyle()}
                                             formatter={(value: number) => [value.toFixed(3), 'Association']}
                                         />
@@ -191,7 +191,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                 <li className="flex items-start">
                                     <span className="mr-2 text-blue-500">•</span>
                                     <span>
-                                        Strongest predictor: <strong>{Object.keys(profile.target_correlations)[0] || 'None'}</strong> 
+                                        Strongest predictor: <strong>{Object.keys(profile.target_correlations)[0] || 'None'}</strong>
                                         {Object.values(profile.target_correlations)[0] !== undefined && (
                                             <> ({(Object.values(profile.target_correlations)[0] as number).toFixed(2)})</>
                                         )}
@@ -229,7 +229,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                     <div className="absolute top-2 right-2 opacity-100">
                                         <button
                                             onClick={() => downloadChart(
-                                                `interaction-chart-${idx}`, 
+                                                `interaction-chart-${idx}`,
                                                 `interaction-${interaction.feature}`,
                                                 `${interaction.feature} vs ${profile.target_col}`,
                                                 interaction.p_value !== undefined ? `ANOVA p: ${Number(interaction.p_value).toExponential(2)}` : undefined
@@ -246,8 +246,8 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                         </h4>
                                         {interaction.p_value !== undefined && interaction.p_value !== null && (
                                             <span className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
-                                                interaction.p_value < 0.05 
-                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                                                interaction.p_value < 0.05
+                                                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                                                     : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
                                             }`}>
                                                 ANOVA p: {Number(interaction.p_value).toExponential(2)}
@@ -256,18 +256,18 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                     </div>
                                     <div className="h-64 w-full" id={`interaction-chart-${idx}`}>
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart 
+                                            <ComposedChart
                                                 data={interaction.data.map((d) => ({
                                                     ...d,
                                                     boxBottom: d.stats.q1,
                                                     boxHeight: d.stats.q3 - d.stats.q1
-                                                }))} 
+                                                }))}
                                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                                             >
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                                 <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                                                 <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
-                                                <Tooltip 
+                                                <Tooltip
                                                     cursor={{ fill: 'transparent' }}
                                                     content={({ active, payload }) => {
                                                         if (active && payload && payload.length) {
@@ -290,7 +290,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                 <Bar dataKey="boxBottom" stackId="a" fill="transparent" legendType="none" />
                                                 {/* The Box (Q1 to Q3) */}
                                                 <Bar dataKey="boxHeight" stackId="a" fill="#8884d8" fillOpacity={0.6} name="IQR (Q1-Q3)" />
-                                                
+
                                                 {/* Median, Min, Max Points */}
                                                 <Scatter name="Median" dataKey="stats.median" fill="#ff7300" shape="square" />
                                                 <Scatter name="Max" dataKey="stats.max" fill="#82ca9d" shape="cross" />

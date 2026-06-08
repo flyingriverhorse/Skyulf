@@ -349,8 +349,7 @@ def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[st
         # back to BFS discovery order so the caller gets *something*; the
         # engine will surface a clearer error when execution actually fails.
         logger.warning(
-            "Cycle detected while collecting ancestors of %s; "
-            "falling back to BFS-reverse order.",
+            "Cycle detected while collecting ancestors of %s; falling back to BFS-reverse order.",
             node_id,
         )
         return list(reversed(list(discovered)))

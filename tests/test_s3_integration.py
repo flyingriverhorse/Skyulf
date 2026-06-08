@@ -1,7 +1,9 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from backend.ml_pipeline.deployment.service import DeploymentService
+
 from backend.ml_pipeline.api import get_job_evaluation
+from backend.ml_pipeline.deployment.service import DeploymentService
 
 
 @pytest.mark.asyncio

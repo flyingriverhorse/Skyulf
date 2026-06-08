@@ -1,7 +1,5 @@
 from .analyzer import EDAAnalyzer
-from .visualizer import EDAVisualizer
-from .schemas import DatasetProfile, ColumnProfile, Alert
-from .drift import DriftCalculator, DriftReport, ColumnDrift, DriftMetric
+from .drift import ColumnDrift, DriftCalculator, DriftMetric, DriftReport
 from .expect import (
     ExpectationError,
     expect_columns_exist,
@@ -9,6 +7,8 @@ from .expect import (
     expect_unique,
     expect_value_range,
 )
+from .schemas import Alert, ColumnProfile, DatasetProfile
+from .visualizer import EDAVisualizer
 
 __all__ = [
     "EDAAnalyzer",

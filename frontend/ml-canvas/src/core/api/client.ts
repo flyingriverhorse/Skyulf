@@ -176,4 +176,3 @@ export const submitTrainingJob = async (payload: PipelineConfigModel): Promise<{
   const response = await apiClient.post<{ job_id: string }>('/pipeline/run', payload);
   return response.data;
 };
-

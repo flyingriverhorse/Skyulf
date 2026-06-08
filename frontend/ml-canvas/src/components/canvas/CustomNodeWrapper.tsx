@@ -104,7 +104,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
       : '';
   const perfTelemetry = (() => {
     if (perfDurationMs === null) return null;
-    
+
     // Core wall-clock duration message:
     const durStr =
       perfDurationMs >= 1000
@@ -119,8 +119,8 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
     const m = nodeResult?.metrics;
     if (m) {
       if (typeof m.fit_time === 'number') {
-        fitStr = m.fit_time >= 1 
-          ? `${m.fit_time.toFixed(2)}s` 
+        fitStr = m.fit_time >= 1
+          ? `${m.fit_time.toFixed(2)}s`
           : `${Math.round(m.fit_time * 1000)}ms`;
       }
       if (typeof m.peak_memory_bytes === 'number') {
@@ -130,7 +130,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
         rowsStr = `${m.rows_in} \u2192 ${m.rows_out}`;
       }
     }
-    
+
     let tooltip = `Last run: ${durStr}`;
     if (fitStr) tooltip += `\nFit time: ${fitStr}`;
     if (memMB !== null) tooltip += `\nPeak mem: ${memMB.toFixed(1)} MB`;
@@ -228,7 +228,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
 
   // Determine handle positions based on port definitions
   // This is a simplified version. In a real app, we might want more control over handle placement.
-  
+
   return (
     <div
       data-testid={`canvas-node-${definitionType}`}

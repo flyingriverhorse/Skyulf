@@ -1,10 +1,11 @@
-import polars as pl
+from typing import Dict, List, Optional
+
 import numpy as np
-from typing import Dict, Optional, List
+import polars as pl
 from pydantic import BaseModel
 
 try:
-    from scipy.stats import ks_2samp, wasserstein_distance, entropy
+    from scipy.stats import entropy, ks_2samp, wasserstein_distance
 
     SCIPY_AVAILABLE = True
 except ImportError:

@@ -16,10 +16,10 @@ import pandas as pd
 import pytest
 
 from backend.data.catalog import FileSystemCatalog
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.constants import StepType
 from skyulf.data.dataset import SplitDataset
 
 # --- Fixtures -------------------------------------------------------------
@@ -91,9 +91,9 @@ class TestSplitDatasetMerge:
 
         result = engine._merge_inputs(node, target_col="target")
 
-        assert isinstance(
-            result, SplitDataset
-        ), "Merging two SplitDatasets must return a SplitDataset, not a flat frame."
+        assert isinstance(result, SplitDataset), (
+            "Merging two SplitDatasets must return a SplitDataset, not a flat frame."
+        )
         assert set(result.train.columns) == {"f1", "f2", "target"}
         assert set(result.test.columns) == {"f1", "f2", "target"}
         assert len(result.train) == 3
@@ -157,9 +157,9 @@ class TestSplitDatasetMerge:
         result = engine._merge_inputs(node)
 
         assert isinstance(result, SplitDataset)
-        assert (
-            isinstance(result.train, tuple) and len(result.train) == 2
-        ), "Merging tuple-shaped SplitDatasets must keep the (X, y) tuple."
+        assert isinstance(result.train, tuple) and len(result.train) == 2, (
+            "Merging tuple-shaped SplitDatasets must keep the (X, y) tuple."
+        )
         assert isinstance(result.test, tuple) and len(result.test) == 2
         x_train, y_train_out = result.train
         x_test, y_test_out = result.test
@@ -279,9 +279,9 @@ class TestPreviewMerge:
         # With ``target_column`` configured on the splitter, train/test are
         # ``(X, y)`` tuples; the preview surfaces X-only column lists.
         summary = preview_info["data_summary"]
-        assert (
-            "train" in summary and "test" in summary
-        ), "Test split was dropped during merge; preview only sees train."
+        assert "train" in summary and "test" in summary, (
+            "Test split was dropped during merge; preview only sees train."
+        )
         # X frames carry the feature columns from both branches; the target
         # lives on the y side of the tuple, not in X.
         assert {"f1", "f2"}.issubset(set(summary["train"]["columns"]))

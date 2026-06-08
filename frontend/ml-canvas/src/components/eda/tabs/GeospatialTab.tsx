@@ -55,11 +55,11 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                             [profile.geospatial.min_lat, profile.geospatial.min_lon],
                             [profile.geospatial.max_lat, profile.geospatial.max_lon]
                         ];
-                        
+
                         // Helper to get color
                         const uniqueLabels = Array.from(new Set((profile.geospatial!.sample_points ?? []).map((p) => p.label))).filter(Boolean);
                         const isChaotic = uniqueLabels.length > 20;
-                        
+
                         const getColor = (label: string | null) => {
                             if (!label) return '#3b82f6'; // Default blue
                             if (isChaotic) return '#3b82f6'; // Single color for chaotic
@@ -68,8 +68,8 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                         };
 
                         return (
-                            <MapContainer 
-                                bounds={bounds} 
+                            <MapContainer
+                                bounds={bounds}
                                 style={{ height: '100%', width: '100%' }}
                                 scrollWheelZoom={true}
                             >
@@ -78,13 +78,13 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                                 />
                                 {(profile.geospatial!.sample_points ?? []).map((point, idx: number) => (
-                                    <CircleMarker 
-                                        key={idx} 
-                                        center={[point.lat, point.lon]} 
+                                    <CircleMarker
+                                        key={idx}
+                                        center={[point.lat, point.lon]}
                                         radius={5}
-                                        pathOptions={{ 
-                                            color: getColor(point.label ?? null), 
-                                            fillColor: getColor(point.label ?? null), 
+                                        pathOptions={{
+                                            color: getColor(point.label ?? null),
+                                            fillColor: getColor(point.label ?? null),
                                             fillOpacity: 0.7,
                                             weight: 1
                                         }}
@@ -127,7 +127,7 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
                             </span>
                         </div>
                     </div>
-                    
+
                     <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800">
                         <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
                         <div className="text-sm text-blue-700 dark:text-blue-300">

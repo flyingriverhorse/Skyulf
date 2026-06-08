@@ -7,11 +7,12 @@ import pytest
 
 from skyulf.preprocessing import SkyulfSchema
 from skyulf.preprocessing.base import BaseCalculator
-from skyulf.preprocessing.scaling import (
-    MaxAbsScalerCalculator,
-    MinMaxScalerCalculator,
-    RobustScalerCalculator,
-    StandardScalerCalculator,
+from skyulf.preprocessing.casting import CastingCalculator
+from skyulf.preprocessing.cleaning import (
+    AliasReplacementCalculator,
+    InvalidValueReplacementCalculator,
+    TextCleaningCalculator,
+    ValueReplacementCalculator,
 )
 from skyulf.preprocessing.drop_and_missing import (
     DeduplicateCalculator,
@@ -19,10 +20,20 @@ from skyulf.preprocessing.drop_and_missing import (
     DropMissingRowsCalculator,
     MissingIndicatorCalculator,
 )
+from skyulf.preprocessing.encoding.hash import HashEncoderCalculator
+from skyulf.preprocessing.encoding.label import LabelEncoderCalculator
+from skyulf.preprocessing.encoding.one_hot import OneHotEncoderCalculator
+from skyulf.preprocessing.encoding.ordinal import OrdinalEncoderCalculator
+from skyulf.preprocessing.encoding.target import TargetEncoderCalculator
+from skyulf.preprocessing.feature_selection import VarianceThresholdCalculator
 from skyulf.preprocessing.imputation import (
     IterativeImputerCalculator,
     KNNImputerCalculator,
     SimpleImputerCalculator,
+)
+from skyulf.preprocessing.inspection import (
+    DatasetProfileCalculator,
+    DataSnapshotCalculator,
 )
 from skyulf.preprocessing.outliers import (
     EllipticEnvelopeCalculator,
@@ -31,37 +42,25 @@ from skyulf.preprocessing.outliers import (
     WinsorizeCalculator,
     ZScoreCalculator,
 )
+from skyulf.preprocessing.resampling import (
+    OversamplingCalculator,
+    UndersamplingCalculator,
+)
+from skyulf.preprocessing.scaling import (
+    MaxAbsScalerCalculator,
+    MinMaxScalerCalculator,
+    RobustScalerCalculator,
+    StandardScalerCalculator,
+)
+from skyulf.preprocessing.split import (
+    FeatureTargetSplitCalculator,
+    SplitCalculator,
+)
 from skyulf.preprocessing.transformations import (
     GeneralTransformationCalculator,
     PowerTransformerCalculator,
     SimpleTransformationCalculator,
 )
-from skyulf.preprocessing.cleaning import (
-    AliasReplacementCalculator,
-    InvalidValueReplacementCalculator,
-    TextCleaningCalculator,
-    ValueReplacementCalculator,
-)
-from skyulf.preprocessing.casting import CastingCalculator
-from skyulf.preprocessing.inspection import (
-    DataSnapshotCalculator,
-    DatasetProfileCalculator,
-)
-from skyulf.preprocessing.resampling import (
-    OversamplingCalculator,
-    UndersamplingCalculator,
-)
-from skyulf.preprocessing.encoding.label import LabelEncoderCalculator
-from skyulf.preprocessing.encoding.ordinal import OrdinalEncoderCalculator
-from skyulf.preprocessing.encoding.one_hot import OneHotEncoderCalculator
-from skyulf.preprocessing.encoding.hash import HashEncoderCalculator
-from skyulf.preprocessing.encoding.target import TargetEncoderCalculator
-from skyulf.preprocessing.split import (
-    FeatureTargetSplitCalculator,
-    SplitCalculator,
-)
-from skyulf.preprocessing.feature_selection import VarianceThresholdCalculator
-
 
 # ---------- SkyulfSchema dataclass ----------
 
@@ -289,7 +288,6 @@ from skyulf.preprocessing.feature_selection import (  # noqa: E402
     UnivariateSelectionCalculator,
 )
 
-
 DATA_DEPENDENT_CALCULATORS = [
     # Encoders whose output column count depends on cardinality.
     OneHotEncoderCalculator,
@@ -350,5 +348,5 @@ def test_infer_output_schema_contract(calc_cls: type) -> None:
     except Exception as e:  # noqa: BLE001
         pytest.fail(f"{calc_cls.__name__}.infer_output_schema raised {type(e).__name__}: {e}")
     assert out is None or isinstance(out, SkyulfSchema), (
-        f"{calc_cls.__name__} returned {type(out).__name__}, " f"expected SkyulfSchema or None"
+        f"{calc_cls.__name__} returned {type(out).__name__}, expected SkyulfSchema or None"
     )

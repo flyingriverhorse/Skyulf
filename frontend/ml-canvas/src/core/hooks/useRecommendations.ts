@@ -46,7 +46,7 @@ export const useRecommendations = (nodeId: string, options: UseRecommendationsOp
       if (options.types || options.suggestedNodeTypes) {
         const typeMatch = options.types?.includes(r.type);
         const nodeTypeMatch = options.suggestedNodeTypes?.includes(r.suggested_node_type);
-        
+
         if (!typeMatch && !nodeTypeMatch) {
           return false;
         }

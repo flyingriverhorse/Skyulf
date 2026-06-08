@@ -2,7 +2,9 @@
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import Annotated, List
+
+from pydantic_settings import NoDecode
 
 
 class FilesMixin:
@@ -14,7 +16,8 @@ class FilesMixin:
     # protecting against runaway uploads on under-resourced deployments.
     # Docker Compose users can override with: MAX_UPLOAD_SIZE=5368709120
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024 * 1024  # 10 GB
-    ALLOWED_EXTENSIONS: List[str] = [
+    # NoDecode: pydantic-settings must not JSON-decode this before field_validator runs.
+    ALLOWED_EXTENSIONS: Annotated[List[str], NoDecode] = [
         ".csv",
         ".xlsx",
         ".xls",

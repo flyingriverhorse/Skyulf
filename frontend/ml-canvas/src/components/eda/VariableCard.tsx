@@ -37,10 +37,10 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
   }
 
   return (
-    <div 
+    <div
       className={`rounded-lg border p-4 transition-all cursor-pointer flex flex-col h-full ${
-        isExcluded 
-          ? 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-800 opacity-75' 
+        isExcluded
+          ? 'bg-gray-50 border-gray-200 dark:bg-gray-900 dark:border-gray-800 opacity-75'
           : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md'
       }`}
       {...clickableProps(onClick)}
@@ -61,14 +61,14 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
                 </span>
             )}
             {onToggleExclude && (
-                <button 
+                <button
                     onClick={(e) => {
                         e.stopPropagation();
                         onToggleExclude(profile.name, !isExcluded);
                     }}
                     className={`p-1 rounded transition-colors ml-auto ${
-                        isExcluded 
-                            ? 'hover:bg-green-100 text-gray-400 hover:text-green-600 dark:hover:bg-green-900/30' 
+                        isExcluded
+                            ? 'hover:bg-green-100 text-gray-400 hover:text-green-600 dark:hover:bg-green-900/30'
                             : 'hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30'
                     }`}
                     title={isExcluded ? "Include in analysis" : "Exclude from analysis"}
@@ -105,10 +105,10 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
           <div className="h-12 w-24">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={miniChartData}>
-                <Bar 
-                    dataKey="count" 
-                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'} 
-                    radius={[2, 2, 0, 0]} 
+                <Bar
+                    dataKey="count"
+                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'}
+                    radius={[2, 2, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>

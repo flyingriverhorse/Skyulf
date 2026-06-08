@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { 
-  Activity, Database, Play, Server, 
+import {
+  Activity, Database, Play, Server,
   Plus, ExternalLink,
   CheckCircle, XCircle, Clock, Settings
 } from 'lucide-react';
@@ -50,9 +50,9 @@ export const Dashboard: React.FC = () => {
         // Fetch more jobs for charts (50), but we'll only show 5 in the table
         const [statsRes, recentJobs] = await Promise.all([
           apiClient.get<SystemStats>('/pipeline/stats'),
-          jobsApi.getJobs(50, 0) 
+          jobsApi.getJobs(50, 0)
         ]);
-        
+
         setStats(statsRes.data);
 
         const formattedJobs = recentJobs.map(job => ({
@@ -109,8 +109,8 @@ export const Dashboard: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 mt-1">Overview of your ML pipeline activities</p>
         </div>
         <div className="flex gap-3">
-          <Link 
-            to="/canvas" 
+          <Link
+            to="/canvas"
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow-sm transition-all"
           >
             <Plus size={18} />
@@ -121,26 +121,26 @@ export const Dashboard: React.FC = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Jobs" 
-          value={stats?.total_jobs ?? '-'} 
+        <StatCard
+          title="Total Jobs"
+          value={stats?.total_jobs ?? '-'}
           icon={<Activity className="text-indigo-500" />}
           subtext={`${stats?.training_jobs ?? 0} Training, ${stats?.tuning_jobs ?? 0} Tuning`}
         />
-        <StatCard 
-          title="Active Deployments" 
-          value={stats?.active_deployments ?? '-'} 
+        <StatCard
+          title="Active Deployments"
+          value={stats?.active_deployments ?? '-'}
           icon={<Server className="text-green-500" />}
           color="text-green-600 dark:text-green-400"
         />
-        <StatCard 
-          title="Data Sources" 
-          value={stats?.data_sources ?? '-'} 
+        <StatCard
+          title="Data Sources"
+          value={stats?.data_sources ?? '-'}
           icon={<Database className="text-blue-500" />}
         />
-        <StatCard 
-          title="Success Rate" 
-          value={jobs.length > 0 ? `${Math.round((jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length / jobs.length) * 100)}%` : '-'} 
+        <StatCard
+          title="Success Rate"
+          value={jobs.length > 0 ? `${Math.round((jobs.filter(j => j.status === 'succeeded' || j.status === 'completed').length / jobs.length) * 100)}%` : '-'}
           icon={<CheckCircle className="text-emerald-500" />}
           subtext="Last 50 jobs"
         />
@@ -155,21 +155,21 @@ export const Dashboard: React.FC = () => {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData.dailyActivity}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#64748b" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
+                <XAxis
+                  dataKey="date"
+                  stroke="#64748b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
                 />
-                <YAxis 
-                  stroke="#64748b" 
-                  fontSize={12} 
-                  tickLine={false} 
-                  axisLine={false} 
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
                   allowDecimals={false}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
                   cursor={{ fill: '#f1f5f9' }}
                 />
@@ -219,7 +219,7 @@ export const Dashboard: React.FC = () => {
               View All <ExternalLink size={14} />
             </Link>
           </div>
-          
+
           {loading ? (
              <LoadingState message="Loading recent jobs..." />
           ) : jobs.length === 0 ? (
@@ -264,28 +264,28 @@ export const Dashboard: React.FC = () => {
         <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-6">
           <h2 className="text-lg font-semibold mb-4 text-slate-900 dark:text-slate-100">Quick Actions</h2>
           <div className="space-y-3">
-            <QuickActionButton 
-              to="/data" 
-              icon={<Database size={18} className="text-blue-500" />} 
-              title="Manage Data Sources" 
+            <QuickActionButton
+              to="/data"
+              icon={<Database size={18} className="text-blue-500" />}
+              title="Manage Data Sources"
               desc="Upload or connect new data"
             />
-            <QuickActionButton 
-              to="/canvas" 
-              icon={<Play size={18} className="text-indigo-500" />} 
-              title="Run Pipeline" 
+            <QuickActionButton
+              to="/canvas"
+              icon={<Play size={18} className="text-indigo-500" />}
+              title="Run Pipeline"
               desc="Create and execute ML workflows"
             />
-            <QuickActionButton 
-              to="/deployments" 
-              icon={<Server size={18} className="text-green-500" />} 
-              title="View Deployments" 
+            <QuickActionButton
+              to="/deployments"
+              icon={<Server size={18} className="text-green-500" />}
+              title="View Deployments"
               desc="Monitor active model endpoints"
             />
-            <QuickActionButton 
-              to="/settings" 
-              icon={<Settings size={18} className="text-slate-500" />} 
-              title="Settings" 
+            <QuickActionButton
+              to="/settings"
+              icon={<Settings size={18} className="text-slate-500" />}
+              title="Settings"
               desc="Configure system preferences"
             />
           </div>
@@ -320,7 +320,7 @@ const StatusBadge = ({ status }: { status: string }) => {
     running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   };
-  
+
   const icons = {
     succeeded: <CheckCircle size={14} />,
     completed: <CheckCircle size={14} />,

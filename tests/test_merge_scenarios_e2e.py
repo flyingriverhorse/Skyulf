@@ -24,10 +24,10 @@ from typing import Any, Dict
 import pandas as pd
 
 from backend.data.catalog import FileSystemCatalog
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.constants import StepType
 from skyulf.data.dataset import SplitDataset
 
 ARTIFACT_DIR = Path(__file__).parent / "artifacts" / "merge_scenarios"
@@ -239,9 +239,9 @@ def test_scenario_02_fan_in_to_transformer_lastwins(tmp_path: Path) -> None:
     # because the descendant (scaler) supersedes the ancestor (split) under
     # last-wins, so the merge is effectively just "use scaler's output".
     kinds = {w["kind"] for w in payload["merge_warnings"]}
-    assert (
-        "sibling_fan_in" not in kinds
-    ), f"Redundant ancestor edge should not raise sibling_fan_in; got {payload['merge_warnings']}"
+    assert "sibling_fan_in" not in kinds, (
+        f"Redundant ancestor edge should not raise sibling_fan_in; got {payload['merge_warnings']}"
+    )
     # Downstream still produced data (last-wins preserved scaler output)
     ds = payload["node_outputs"]["downstream"]
     assert ds["kind"] == "SplitDataset"
@@ -464,7 +464,7 @@ def test_scenario_06_training_with_multiple_preprocessor_branches(tmp_path: Path
     # Held-out test split survived merge (Bug 4a regression)
     has_test_metric = any("test" in k.lower() for k in train_metrics)
     assert has_test_metric, (
-        f"Expected at least one test_* metric, got keys: " f"{sorted(train_metrics.keys())}"
+        f"Expected at least one test_* metric, got keys: {sorted(train_metrics.keys())}"
     )
 
 

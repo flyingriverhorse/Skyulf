@@ -7,7 +7,7 @@ from sklearn.ensemble import (
     HistGradientBoostingRegressor,
     RandomForestRegressor,
 )
-from sklearn.linear_model import ElasticNet, Lasso, Ridge, LinearRegression
+from sklearn.linear_model import ElasticNet, Lasso, LinearRegression, Ridge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
@@ -36,7 +36,7 @@ try:
         def warning(self, msg: str) -> None:  # noqa: D401
             pass
 
-    _lgb.register_logger(_SilentLgbmLogger())
+    _lgb.register_logger(_SilentLgbmLogger())  # ty: ignore[unresolved-attribute]
 except ImportError:
     LIGHTGBM_AVAILABLE = False
 

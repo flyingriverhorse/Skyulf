@@ -38,19 +38,19 @@ interface ChartDataset {
   pointHoverRadius: number;
 }
 
-export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({ 
-  data, 
-  xKey, 
-  yKey, 
+export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
+  data,
+  xKey,
+  yKey,
   labelKey,
   xLabel,
   yLabel,
-  height = 500 
+  height = 500
 }) => {
-  
+
   // Prepare datasets
   const datasets: ChartDataset[] = [];
-  
+
   if (labelKey) {
     // Group by label
     const groups: { [key: string]: ChartPoint[] } = {};
@@ -59,7 +59,7 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
       if (!groups[label]) groups[label] = [];
       groups[label].push({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d });
     });
-    
+
     Object.keys(groups).forEach((label, idx) => {
       datasets.push({
         label: label,

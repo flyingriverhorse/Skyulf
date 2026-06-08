@@ -61,7 +61,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
 
   return (
     <div className="p-4 border rounded-lg bg-slate-50 dark:bg-slate-900 dark:border-slate-700 relative">
-      <button 
+      <button
         onClick={onCancel}
         className="absolute top-2 right-2 p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400"
       >
@@ -75,8 +75,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
 
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-          isDragging 
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400' 
+          isDragging
+            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
             : 'border-slate-300 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-600'
         }`}
         onDragEnter={handleDrag}
@@ -87,8 +87,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
         {uploading ? (
           <div className="space-y-3">
             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
-              <div 
-                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+              <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               ></div>
             </div>

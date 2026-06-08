@@ -189,5 +189,5 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
                                     )}
                                 </div>
                             );
-                        
+
 };

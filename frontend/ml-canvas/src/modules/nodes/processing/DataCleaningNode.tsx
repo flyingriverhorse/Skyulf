@@ -16,11 +16,11 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
   nodeId,
 }) => {
   const upstreamData = useUpstreamData(nodeId || '');
-  
+
   // Find a datasetId in upstream nodes
   // We look for any upstream node that has a datasetId property
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
-  
+
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
@@ -32,13 +32,13 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
           Connect a dataset node to see available columns.
         </div>
       )}
-      
+
       {isLoading && !!datasetId && (
         <div className="text-xs text-muted-foreground animate-pulse">
           Loading schema...
         </div>
       )}
-      
+
       <div>
         <span className="block text-sm font-medium mb-1">Fill Strategy</span>
         <select
@@ -52,7 +52,7 @@ const DataCleaningSettings: React.FC<{ config: DataCleaningConfig; onChange: (c:
           <option value="drop">Drop Rows</option>
         </select>
       </div>
-      
+
       <div>
         <span className="block text-sm font-medium mb-1">Drop Columns</span>
         {columns.length > 0 ? (

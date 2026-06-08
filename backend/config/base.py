@@ -7,11 +7,11 @@ Combines all domain mixins into one flat ``Settings`` class.
 Each mixin lives in ``backend/config/mixins/`` and owns one domain's fields.
 """
 
-from typing import Any, List, cast
-
+import json
 import logging
 import os
 import urllib.parse
+from typing import Any, List, cast
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -67,21 +67,39 @@ class Settings(
     @classmethod
     def parse_cors_origins(cls, v: Any) -> List[str]:
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            v = v.strip()
+            if v.startswith("["):
+                try:
+                    return cast(List[str], json.loads(v))
+                except json.JSONDecodeError:
+                    v = v[1:-1]  # strip brackets, fall through to split
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
         return cast(List[str], v)
 
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
     def parse_allowed_hosts(cls, v: Any) -> List[str]:
         if isinstance(v, str):
-            return [host.strip() for host in v.split(",")]
+            v = v.strip()
+            if v.startswith("["):
+                try:
+                    return cast(List[str], json.loads(v))
+                except json.JSONDecodeError:
+                    v = v[1:-1]  # strip brackets, fall through to split
+            return [host.strip() for host in v.split(",") if host.strip()]
         return cast(List[str], v)
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
     def parse_allowed_extensions(cls, v: Any) -> List[str]:
         if isinstance(v, str):
-            return [ext.strip() for ext in v.split(",")]
+            v = v.strip()
+            if v.startswith("["):
+                try:
+                    return cast(List[str], json.loads(v))
+                except json.JSONDecodeError:
+                    v = v[1:-1]  # strip brackets, fall through to split
+            return [ext.strip() for ext in v.split(",") if ext.strip()]
         return cast(List[str], v)
 
     @field_validator("API_DOCS_SERVERS", mode="before")

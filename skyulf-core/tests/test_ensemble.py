@@ -9,7 +9,8 @@ from skyulf.registry import NodeRegistry
 def _clf_data(seed: int = 0):
     rng = np.random.default_rng(seed)
     X = pd.DataFrame(
-        rng.normal(size=(60, 3)), columns=["a", "b", "c"]  # ty: ignore[invalid-argument-type]
+        rng.normal(size=(60, 3)),
+        columns=["a", "b", "c"],  # ty: ignore[invalid-argument-type]
     )
     y = pd.Series((X["a"] + X["b"] > 0).astype(int))
     return X, y
@@ -18,7 +19,8 @@ def _clf_data(seed: int = 0):
 def _reg_data(seed: int = 0):
     rng = np.random.default_rng(seed)
     X = pd.DataFrame(
-        rng.normal(size=(60, 3)), columns=["a", "b", "c"]  # ty: ignore[invalid-argument-type]
+        rng.normal(size=(60, 3)),
+        columns=["a", "b", "c"],  # ty: ignore[invalid-argument-type]
     )
     y = pd.Series(X["a"] * 2.0 + X["c"])
     return X, y
@@ -440,9 +442,10 @@ def test_advanced_tuning_with_calibration_routes_nested_params():
     classifiers are wrapped in ``CalibratedClassifierCV`` the search space must
     address them as ``<name>__estimator__<param>`` so ``set_params`` resolves.
     """
+    from sklearn.calibration import CalibratedClassifierCV
+
     from skyulf.modeling._tuning.engine import TuningCalculator
     from skyulf.modeling._tuning.schemas import TuningConfig
-    from sklearn.calibration import CalibratedClassifierCV
 
     X, y = _clf_data(18)
     base_calc = NodeRegistry.get_calculator("voting_classifier")()

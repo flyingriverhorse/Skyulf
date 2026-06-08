@@ -133,7 +133,7 @@ class AdvisorEngine:
                     rule_id="one_hot_encoding",
                     target_columns=cat_cols,
                     message=(
-                        f"Found {len(cat_cols)} categorical columns suitable for " "OneHotEncoding."
+                        f"Found {len(cat_cols)} categorical columns suitable for OneHotEncoding."
                     ),
                     suggestion="Consider OneHotEncoder.",
                 )
@@ -194,8 +194,7 @@ class AdvisorEngine:
                     rule_id="power_transform_yeo_johnson",
                     target_columns=neg_skewed_cols,
                     message=(
-                        f"Found {len(neg_skewed_cols)} skewed columns (with non-positive "
-                        "values)."
+                        f"Found {len(neg_skewed_cols)} skewed columns (with non-positive values)."
                     ),
                     suggestion="Consider Yeo-Johnson transformation.",
                 )
