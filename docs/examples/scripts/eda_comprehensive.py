@@ -120,7 +120,7 @@ def visualize_correlations(profile):
     # Add text annotations
     for i in range(len(cols)):
         for j in range(len(cols)):
-            text = plt.text(
+            plt.text(
                 j, i, f"{matrix[i][j]:.2f}", ha="center", va="center", color="black", fontsize=8
             )
 
