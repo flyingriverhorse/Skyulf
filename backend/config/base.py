@@ -69,8 +69,11 @@ class Settings(
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
-                return cast(List[str], json.loads(v))
-            return [origin.strip() for origin in v.split(",")]
+                try:
+                    return cast(List[str], json.loads(v))
+                except json.JSONDecodeError:
+                    v = v[1:-1]  # strip brackets, fall through to split
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
         return cast(List[str], v)
 
     @field_validator("ALLOWED_HOSTS", mode="before")
@@ -79,8 +82,11 @@ class Settings(
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
-                return cast(List[str], json.loads(v))
-            return [host.strip() for host in v.split(",")]
+                try:
+                    return cast(List[str], json.loads(v))
+                except json.JSONDecodeError:
+                    v = v[1:-1]  # strip brackets, fall through to split
+            return [host.strip() for host in v.split(",") if host.strip()]
         return cast(List[str], v)
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
@@ -89,8 +95,11 @@ class Settings(
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
-                return cast(List[str], json.loads(v))
-            return [ext.strip() for ext in v.split(",")]
+                try:
+                    return cast(List[str], json.loads(v))
+                except json.JSONDecodeError:
+                    v = v[1:-1]  # strip brackets, fall through to split
+            return [ext.strip() for ext in v.split(",") if ext.strip()]
         return cast(List[str], v)
 
     @field_validator("API_DOCS_SERVERS", mode="before")
