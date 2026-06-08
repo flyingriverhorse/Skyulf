@@ -87,7 +87,7 @@ jobs:
           pytest skyulf-core/tests -q --cov=skyulf --cov-branch --cov-fail-under=45 --disable-warnings
 
       - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
