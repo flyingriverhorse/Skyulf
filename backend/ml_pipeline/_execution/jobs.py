@@ -3,17 +3,17 @@ Job Management for V2 Pipeline.
 Handles persistence of Training and Tuning jobs to the database.
 """
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
-from backend.database.models import BasicTrainingJob, AdvancedTuningJob
-from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
-from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob
 from backend.ml_pipeline._execution.advanced_tuning_manager import AdvancedTuningManager
+from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
+from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
 
 # Jobs submitted within this window for the same pipeline+node are considered duplicates.
 _IDEMPOTENCY_WINDOW = timedelta(seconds=30)

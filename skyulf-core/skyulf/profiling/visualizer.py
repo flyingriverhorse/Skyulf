@@ -1,5 +1,7 @@
-﻿from typing import Optional
+from typing import Optional
+
 import polars as pl
+
 from .schemas import DatasetProfile
 
 
@@ -16,8 +18,8 @@ class EDAVisualizer:
         """Prints a rich terminal dashboard summary."""
         try:
             from rich.console import Console  # ty: ignore[unresolved-import]
-            from rich.table import Table  # ty: ignore[unresolved-import]
             from rich.panel import Panel  # ty: ignore[unresolved-import]
+            from rich.table import Table  # ty: ignore[unresolved-import]
         except ImportError:
             print("Please install 'rich' to use the terminal summary: pip install rich")
             return
@@ -675,8 +677,9 @@ class EDAVisualizer:
         if not self.profile.timeseries or not self.profile.timeseries.trend:
             return
 
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
         from datetime import datetime
+
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
 
         dates = []
         values_map = {}  # col -> list of values
@@ -703,7 +706,7 @@ class EDAVisualizer:
 
         plt.figure(figsize=(12, 6))
         for col, values in values_map.items():
-            plt.plot(dates, values, label=col)
+            plt.plot(dates, values, label=col)  # ty: ignore[invalid-argument-type]
 
         plt.title("Time Series Trend (Daily Aggregation)")
         plt.xlabel(f"Date ({self.profile.timeseries.date_col})")

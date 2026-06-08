@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type NodeCategory = 
+export type NodeCategory =
   | 'Data Source'
   | 'Preprocessing'
   | 'Modeling'
@@ -30,15 +30,15 @@ export interface NodeDefinition<TConfig = any> {
   label: string;             // Display Name, e.g., "Simple Imputer"
   category: NodeCategory;
   description: string;
-  
+
   // Visual Configuration
   icon?: React.ElementType;      // Lucide Icon / React component
   color?: string;            // Tailwind class or hex
-  
+
   // Logic Configuration
   inputs: PortDefinition[];
   outputs: PortDefinition[];
-  
+
   // Components
   component?: React.JSXElementConstructor<any>; // Custom Node View (optional)
   settings: React.JSXElementConstructor<NodeSettingsProps<TConfig>>; // The Form in the Sidebar

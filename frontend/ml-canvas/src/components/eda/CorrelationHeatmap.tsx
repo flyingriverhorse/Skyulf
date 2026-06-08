@@ -14,20 +14,20 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
   const MAX_COLS = 20;
   const displayColumns = data.columns.slice(0, MAX_COLS);
   const displayValues = data.values.slice(0, MAX_COLS).map(row => row.slice(0, MAX_COLS));
-  
+
   const isTruncated = data.columns.length > MAX_COLS;
 
   const getColor = (value: number) => {
     // -1 (blue) -> 0 (white) -> 1 (red)
     if (value === null) return 'rgba(243, 244, 246, 1)'; // gray-100
-    
+
     // Use opacity for intensity, but ensure minimum visibility
     // Scale opacity: 0.1 -> 0.4, 1.0 -> 1.0
     const opacity = Math.max(0.4, Math.abs(value));
-    
+
     if (value > 0) {
       // Red
-      return `rgba(239, 68, 68, ${opacity})`; 
+      return `rgba(239, 68, 68, ${opacity})`;
     } else {
       // Blue
       return `rgba(59, 130, 246, ${opacity})`;
@@ -42,10 +42,10 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
         </div>
       )}
       <div className="inline-block min-w-full">
-        <div 
-            className="grid gap-1" 
-            style={{ 
-                gridTemplateColumns: `100px repeat(${displayColumns.length}, minmax(50px, 1fr))` 
+        <div
+            className="grid gap-1"
+            style={{
+                gridTemplateColumns: `100px repeat(${displayColumns.length}, minmax(50px, 1fr))`
             }}
         >
           {/* Header Row */}
@@ -65,8 +65,8 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
               </div>
               {/* Cells */}
               {(displayValues[i] ?? []).map((val, j) => (
-                <div 
-                  key={j} 
+                <div
+                  key={j}
                   className="h-10 w-full flex items-center justify-center text-[10px] text-gray-900 dark:text-gray-100 rounded-sm cursor-help transition-opacity hover:opacity-80"
                   style={{ backgroundColor: getColor(val) }}
                   title={`${rowCol} vs ${displayColumns[j]}: ${val !== null ? val.toFixed(3) : 'N/A'}`}

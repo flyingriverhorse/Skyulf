@@ -61,8 +61,8 @@ except ImportError:
 
 try:
     from lightgbm import (  # ty: ignore[unresolved-import]
-        LGBMClassifier,
-        LGBMRegressor,
+        LGBMClassifier,  # ty: ignore[unresolved-import]
+        LGBMRegressor,  # ty: ignore[unresolved-import]
     )
 
     LIGHTGBM_AVAILABLE = True

@@ -9,15 +9,14 @@ from typing import Any, Dict, Tuple, Union, cast
 
 import pandas as pd
 
-from ..registry import NodeRegistry
 from ..core.meta.decorators import node_meta
+from ..engines import SkyulfDataFrame
+from ..registry import NodeRegistry
 from ..utils import detect_numeric_columns
-from .base import BaseApplier, BaseCalculator, fit_method
-from .dispatcher import fit_dual_engine
 from ._artifacts import DatasetProfileArtifact, DataSnapshotArtifact
 from ._schema import SkyulfSchema
-from ..engines import SkyulfDataFrame
-
+from .base import BaseApplier, BaseCalculator, fit_method
+from .dispatcher import fit_dual_engine
 
 # -----------------------------------------------------------------------------
 # DatasetProfile

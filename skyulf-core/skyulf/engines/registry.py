@@ -5,9 +5,9 @@ This module handles the auto-detection of the appropriate compute engine
 (Pandas, Polars, etc.) based on the input data type.
 """
 
-from typing import Any, Dict, Type
-from enum import Enum
 import logging
+from enum import Enum
+from typing import Any, Dict, Type
 
 # We import the protocol for type checking, but we don't strictly need it at runtime here
 # to avoid circular imports if engines import protocol.

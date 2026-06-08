@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+
 from skyulf.preprocessing.encoding import OneHotEncoderApplier, OneHotEncoderCalculator
 from skyulf.preprocessing.imputation import (
     SimpleImputerApplier,

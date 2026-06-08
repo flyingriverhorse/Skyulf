@@ -23,7 +23,7 @@ const ColumnSelector: React.FC<{
   onChange: (selected: string[]) => void;
 }> = ({ columns, selected, onChange }) => {
   const [search, setSearch] = useState('');
-  
+
   const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
 
   const toggle = (col: string) => {
@@ -89,9 +89,9 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   const datasetId = upstreamData.find((d: unknown) => (d as Record<string, unknown>).datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  
+
   // Filter for numeric columns only
-  const numericColumns: string[] = schema 
+  const numericColumns: string[] = schema
     ? Object.values(schema.columns)
         .filter((c: unknown) => ['int', 'float', 'number'].some(t => ((c as Record<string, unknown>).dtype as string).toLowerCase().includes(t)))
         .filter((c: unknown) => !droppedUpstream.has(String((c as Record<string, unknown>).name)))
@@ -112,17 +112,17 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-white dark:bg-gray-900 ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column: Column Selection */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Target Columns ({config.columns.length})
             </label>
-            <ColumnSelector 
-              columns={numericColumns} 
-              selected={config.columns} 
-              onChange={(cols) => onChange({ ...config, columns: cols })} 
+            <ColumnSelector
+              columns={numericColumns}
+              selected={config.columns}
+              onChange={(cols) => onChange({ ...config, columns: cols })}
             />
             <p className="text-xs text-gray-500 mt-1">Only numeric columns are shown.</p>
           </div>
@@ -131,7 +131,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
         {/* Right Column: Settings */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l border-gray-100 dark:border-gray-700' : 'shrink-0 pt-4 border-t border-gray-100 dark:border-gray-700'}`}>
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-100 dark:border-blue-800 overflow-hidden">
-            <button 
+            <button
               onClick={() => { setShowInfo(!showInfo); }}
               className="w-full flex items-center gap-2 p-3 text-left hover:bg-blue-100/50 dark:hover:bg-blue-900/30 transition-colors"
             >
@@ -145,7 +145,7 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
                 <ChevronDown size={14} className="text-blue-600 dark:text-blue-400" />
               )}
             </button>
-            
+
             {showInfo && (
               <div className="px-3 pb-3 text-xs text-blue-800 dark:text-blue-200 pl-9">
                 <p>Use this node to handle data quality issues by replacing invalid numeric values (like negative ages or out-of-bounds sensor readings) with NaN (Missing).</p>

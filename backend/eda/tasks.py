@@ -4,7 +4,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.database.models import EDAReport, DataSource, get_database_session
+from backend.database.models import DataSource, EDAReport, get_database_session
 from backend.services.data_service import DataService
 from backend.utils.file_utils import extract_file_path_from_source
 from skyulf.profiling.analyzer import EDAAnalyzer

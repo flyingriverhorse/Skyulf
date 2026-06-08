@@ -18,7 +18,7 @@ jobs:
           verbose: true
           output: codacy_results.json
           format: json
-          # tool: flake8 
+          # tool: flake8
 
       - name: Upload Analysis Results
         uses: actions/upload-artifact@v7

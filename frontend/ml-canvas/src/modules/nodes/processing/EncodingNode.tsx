@@ -61,8 +61,8 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       : null;
   const recommendations = executionResult?.recommendations || [];
 
-  const filteredRecommendations = recommendations.filter(rec => 
-    rec.suggested_node_type === 'encoding' || 
+  const filteredRecommendations = recommendations.filter(rec =>
+    rec.suggested_node_type === 'encoding' ||
     rec.type.includes('encoding') ||
     rec.type.includes('cardinality')
   );
@@ -83,7 +83,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
     ? Object.values(schema.columns).map(c => c.name).filter(name => !droppedUpstream.has(name))
     : [];
 
-  const filteredColumns = categoricalColumns.filter(c => 
+  const filteredColumns = categoricalColumns.filter(c =>
     c.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -102,7 +102,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
           Connect a dataset node to see available columns.
         </div>
       )}
-      
+
       {isLoading && !!datasetId && (
         <div className="text-xs text-muted-foreground animate-pulse">
           Loading schema...
@@ -168,7 +168,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
               <span>Needs a <strong>binary target</strong> (exactly 2 classes). The target is auto-excluded — use Label Encoder for the target itself. Non-binary targets are <strong>skipped</strong> (columns pass through unchanged), not an error. Records Information Value (IV) per column.</span>
             </div>
           )}
-          
+
           {/* drop_original only applies to OHE (the only encoder that expands to new columns) */}
           {config.method === 'onehot' && (
           <div className="pt-2">
@@ -428,9 +428,9 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
         </div>
 
         <div className="space-y-2 mb-2">
-          <input 
-            type="text" 
-            placeholder="Search columns..." 
+          <input
+            type="text"
+            placeholder="Search columns..."
             className="block w-full px-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary outline-none"
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); }}
@@ -498,7 +498,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                 <span className="font-medium text-primary">{String(metrics.new_features_count)}</span>
               </div>
             )}
-            
+
             {/* Detailed Counts */}
             {categoriesCount && (
               <div className="mt-2 border-t pt-2">

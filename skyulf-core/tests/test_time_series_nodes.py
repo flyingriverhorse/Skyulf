@@ -7,6 +7,7 @@ plus the ``infer_output_schema`` predictions and registry wiring.
 import pandas as pd
 import polars as pl
 
+from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing import (
     DateFeaturesApplier,
     DateFeaturesCalculator,
@@ -15,7 +16,6 @@ from skyulf.preprocessing import (
     RollingAggregateApplier,
     RollingAggregateCalculator,
 )
-from skyulf.core.schema import SkyulfSchema
 from skyulf.registry import NodeRegistry
 
 

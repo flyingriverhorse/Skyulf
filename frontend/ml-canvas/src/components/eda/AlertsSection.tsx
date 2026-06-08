@@ -14,7 +14,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ alerts }) => {
 
     return (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-            <div 
+            <div
                 className="flex justify-between items-center cursor-pointer"
                 {...clickableProps(() => setIsExpanded(!isExpanded))}
             >
@@ -28,7 +28,7 @@ export const AlertsSection: React.FC<AlertsSectionProps> = ({ alerts }) => {
                     <ChevronDown className="w-4 h-4 text-amber-800 dark:text-amber-200" />
                 )}
             </div>
-            
+
             {isExpanded && (
                 <div className="max-h-40 overflow-y-auto pr-2 mt-2 animate-in slide-in-from-top-2 duration-200">
                     <ul className="space-y-1">

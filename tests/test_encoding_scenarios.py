@@ -1,7 +1,8 @@
 import pandas as pd
-from skyulf.preprocessing.encoding import LabelEncoderCalculator, LabelEncoderApplier
-from skyulf.preprocessing.split import FeatureTargetSplitApplier, SplitApplier
+
 from skyulf.data.dataset import SplitDataset
+from skyulf.preprocessing.encoding import LabelEncoderApplier, LabelEncoderCalculator
+from skyulf.preprocessing.split import FeatureTargetSplitApplier, SplitApplier
 
 
 def create_sample_data():
@@ -137,9 +138,9 @@ def test_feature_encoding():
 
     # Check if 'cat_feature' is numeric
     print(f"Step 2 (Apply): cat_feature sample: {df_transformed['cat_feature'].tolist()}")
-    assert pd.api.types.is_numeric_dtype(
-        df_transformed["cat_feature"]
-    ), "cat_feature should be numeric"
+    assert pd.api.types.is_numeric_dtype(df_transformed["cat_feature"]), (
+        "cat_feature should be numeric"
+    )
 
 
 def test_serialization():

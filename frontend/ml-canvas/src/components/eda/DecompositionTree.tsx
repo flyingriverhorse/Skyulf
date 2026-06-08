@@ -38,7 +38,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     const [levels, setLevels] = useState<TreeLevel[]>([]);
     const [loading, setLoading] = useState(false);
     const [splitMenuOpen, setSplitMenuOpen] = useState<{ levelIndex: number, item: TreeItem, x: number, y: number } | null>(null);
-    
+
     // We need to store the "structure" of the tree (the sequence of split columns)
     // so we can automatically refresh subsequent levels when a parent selection changes.
     const [splitPath, setSplitPath] = useState<(string | null)[]>([null]); // Root is null
@@ -62,7 +62,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
         levels.forEach((level, index) => {
             if (index >= levels.length - 1) return;
-            
+
             const selectedItemName = level.selectedItemName;
             if (!selectedItemName) return;
 
@@ -71,21 +71,21 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
             if (startEl) {
                 const startRect = startEl.getBoundingClientRect();
-                
+
                 // Calculate start point (right side of selected item)
                 const x1 = startRect.right - innerRect.left;
                 const y1 = startRect.top + (startRect.height / 2) - innerRect.top;
-                
+
                 // Determine end point
                 let x2, y2;
-                
+
                 const nextLevel = levels[index + 1];
                 if (!nextLevel) return;
                 if (nextLevel.selectedItemName) {
                     // If next level has a selection, connect to that item
                     const endId = `node-${index + 1}-${nextLevel.selectedItemName}`;
                     const endEl = document.getElementById(endId);
-                    
+
                     if (endEl) {
                         const endRect = endEl.getBoundingClientRect();
                         x2 = endRect.left - innerRect.left;
@@ -99,7 +99,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     // We need an ID for the list container
                     const listId = `list-${index + 1}`;
                     const listEl = document.getElementById(listId);
-                    
+
                     if (listEl) {
                         const listRect = listEl.getBoundingClientRect();
                         x2 = listRect.left - innerRect.left;
@@ -160,7 +160,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 '',
                 initialFilters
             );
-            
+
             const rootLevel: TreeLevel = {
                 id: 'root',
                 splitColumn: null,
@@ -168,7 +168,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 selectedItemName: null,
                 filters: initialFilters
             };
-            
+
             setLevels([rootLevel]);
             setSplitPath([null]);
         } catch (err) {
@@ -192,14 +192,14 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         // Open Split Menu
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
         const containerRect = containerRef.current?.getBoundingClientRect();
-        
+
         if (containerRect) {
             let x = rect.right - containerRect.left + 10;
             let y = rect.top - containerRect.top;
 
             const wrapperWidth = containerRef.current?.parentElement?.clientWidth || window.innerWidth;
             if (x + 260 > wrapperWidth) {
-                x = rect.left - containerRect.left - 270; 
+                x = rect.left - containerRect.left - 270;
             }
 
             const wrapperHeight = containerRef.current?.parentElement?.clientHeight || window.innerHeight;
@@ -222,10 +222,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
         const currentLevel = newLevels[levelIndex];
         if (!currentLevel) return;
         currentLevel.selectedItemName = item.name;
-        
+
         // Check if we have a next level defined in our split path
         const nextSplitCol = splitPath[levelIndex + 1];
-        
+
         if (nextSplitCol) {
             // AUTOMATIC UPDATE: If next level exists, refresh it instead of opening menu
             setLoading(true);
@@ -259,11 +259,11 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     selectedItemName: null, // Reset selection in next level
                     filters: newFilters
                 };
-                
+
                 // Replace next level and remove any levels AFTER it (because selection in next level is reset)
                 const finalLevels = [...newLevels.slice(0, levelIndex + 1), nextLevel];
                 setLevels(finalLevels);
-                
+
                 // Update split path to match (remove anything after next level)
                 // Actually, if we reset selection in next level, we lose the path after it.
                 // So we should truncate splitPath too?
@@ -284,7 +284,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
     const handleSplit = async (column: string) => {
         if (!splitMenuOpen) return;
-        
+
         const { levelIndex, item } = splitMenuOpen;
         setSplitMenuOpen(null);
         setLoading(true);
@@ -319,7 +319,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
             const newLevels = [...levels.slice(0, levelIndex + 1), newLevel];
             setLevels(newLevels);
-            
+
             // Update Split Path
             const newSplitPath = [...splitPath.slice(0, levelIndex + 1), column];
             setSplitPath(newSplitPath);
@@ -333,7 +333,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
     const closeSplit = (levelIndex: number) => {
         setLevels(levels.slice(0, levelIndex));
-        setSplitPath(splitPath.slice(0, levelIndex)); 
+        setSplitPath(splitPath.slice(0, levelIndex));
     };
 
     return (
@@ -348,7 +348,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     {levels.map((level, index) => (
                         <div key={index} className="flex flex-col w-[200px] h-full relative z-10">
                             {/* Header */}
-                            <div 
+                            <div
                                 id={`header-${index}`}
                                 className="flex items-center justify-between mb-4 bg-white dark:bg-slate-800 p-2 rounded shadow-sm border border-slate-200 dark:border-slate-700"
                             >
@@ -358,7 +358,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                 <div className="flex items-center gap-1">
                                     {/* Add Split Button (Only on last level) */}
                                     {index === levels.length - 1 && (
-                                        <button 
+                                        <button
                                             onClick={(e) => handleHeaderSplitClick(index, e)}
                                             className={`
                                                 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors
@@ -370,7 +370,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                             <Plus className="w-4 h-4" />
                                         </button>
                                     )}
-                                    
+
                                     {index > 0 && (
                                         <button onClick={() => closeSplit(index)} className="text-slate-400 hover:text-red-500">
                                             <X className="w-4 h-4" />
@@ -380,7 +380,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                             </div>
 
                             {/* List */}
-                            <div 
+                            <div
                                 id={`list-${index}`}
                                 className="flex-1 overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600"
                                 onScroll={updatePaths}
@@ -391,14 +391,14 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                     const barWidth = (item.value / isMax) * 100;
 
                                     return (
-                                        <div 
+                                        <div
                                             key={item.name}
                                             id={`node-${index}-${item.name}`}
                                             {...clickableProps(() => handleItemClick(index, item))}
                                             className={`
                                                 relative p-3 rounded-md border cursor-pointer transition-all group
-                                                ${isSelected 
-                                                    ? 'bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-500 shadow-md' 
+                                                ${isSelected
+                                                    ? 'bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-500 shadow-md'
                                                     : 'bg-white border-slate-200 dark:bg-slate-800 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700'
                                                 }
                                             `}
@@ -411,7 +411,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                                                     {item.value.toLocaleString()} ({Math.round(item.ratio * 100)}%)
                                                 </span>
                                             </div>
-                                            
+
                                             {/* Bar Background */}
                                             <div className="absolute bottom-0 left-0 h-1 bg-blue-500/20 transition-all duration-500" style={{ width: `${barWidth}%` }} />
                                         </div>
@@ -420,7 +420,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                             </div>
                         </div>
                     ))}
-                
+
                 {/* SVG Connections Layer */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
                     {paths.map((path, i) => (
@@ -439,7 +439,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
             {/* Split Menu */}
             {splitMenuOpen && (
-                <div 
+                <div
                     className="absolute z-50 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-64 max-h-80 overflow-y-auto flex flex-col"
                     style={{ left: splitMenuOpen.x, top: splitMenuOpen.y }}
                 >
@@ -459,7 +459,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     </div>
                 </div>
             )}
-            
+
             {/* Backdrop for menu */}
             {splitMenuOpen && (
                 // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone

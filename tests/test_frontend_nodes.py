@@ -2,11 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.api import RegistryItem, _build_node_registry
-from backend.data.catalog import FileSystemCatalog
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 # Get all node IDs to ensure we cover them
 ALL_NODES = {node.id: node for node in _build_node_registry()}

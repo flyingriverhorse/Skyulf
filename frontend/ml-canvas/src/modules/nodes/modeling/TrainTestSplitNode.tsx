@@ -20,21 +20,21 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   nodeId,
 }) => {
   const upstreamData = useUpstreamData(nodeId || '');
-  
+
   // Find datasetId from upstream data (injected by useUpstreamData hook)
   const upstreamDatasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
-  
+
   // Check if an upstream node (like FeatureTargetSplitter) has already defined a target column
   const upstreamTargetColumn = upstreamData.find((d: Record<string, unknown>) => d.target_column)?.target_column as string | undefined;
 
   React.useEffect(() => {
     const updates: Partial<TrainTestSplitConfig> = {};
-    
+
     // Propagate datasetId
     if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {
       updates.datasetId = upstreamDatasetId;
     }
-    
+
     // Propagate target_column if upstream has it and we don't (or if we want to enforce it)
     if (upstreamTargetColumn && config.target_column !== upstreamTargetColumn) {
       updates.target_column = upstreamTargetColumn;
@@ -76,7 +76,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
             Connect a dataset node to see available columns.
           </div>
         )}
-        
+
         {isLoading && (
           <div className="text-xs text-muted-foreground animate-pulse">
             Loading schema...
@@ -86,7 +86,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
 
       {/* Main Content Area - Responsive Grid/Flex */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column: Split Ratios & Random State */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div className="space-y-2">

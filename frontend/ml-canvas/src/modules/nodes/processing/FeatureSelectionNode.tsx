@@ -8,18 +8,18 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
 
 interface FeatureSelectionConfig {
-  method: 
-    | 'variance_threshold' 
+  method:
+    | 'variance_threshold'
     | 'correlation_threshold'
-    | 'select_k_best' 
-    | 'select_percentile' 
-    | 'select_fpr' 
-    | 'select_fdr' 
-    | 'select_fwe' 
+    | 'select_k_best'
+    | 'select_percentile'
+    | 'select_fpr'
+    | 'select_fdr'
+    | 'select_fwe'
     | 'generic_univariate_select'
-    | 'select_from_model' 
+    | 'select_from_model'
     | 'rfe';
-  
+
   // Common
   target_column?: string | undefined;
   datasetId?: string | undefined;
@@ -45,7 +45,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   nodeId,
 }) => {
   const upstreamData = useUpstreamData(nodeId || '');
-  
+
   // Recursive search for datasetId
   const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
@@ -54,21 +54,21 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   const findUpstreamDatasetId = (currentNodeId: string): string | undefined => {
     const visited = new Set<string>();
     const queue = [currentNodeId];
-    
+
     while (queue.length > 0) {
       const id = queue.shift();
       if (!id) continue;
       if (visited.has(id)) continue;
       visited.add(id);
-      
+
       const node = nodes.find(n => n.id === id);
       if (!node) continue;
-      
+
       // If this is NOT the current node, check if it has datasetId
       if (id !== currentNodeId && node.data?.datasetId) {
         return node.data.datasetId as string;
       }
-      
+
       const incomers = getIncomers(node, nodes, edges);
       for (const incomer of incomers) {
         queue.push(incomer.id);
@@ -147,7 +147,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   const renderFeedback = () => {
     const result = executionResult?.node_results[nodeId || ''];
     if (!result) return null;
-    
+
     const metrics = result.metrics || {};
     const dropped = metrics.dropped_columns as string[] | undefined;
     const scores = metrics.feature_scores as Record<string, number> | undefined;
@@ -155,11 +155,11 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
     const importances = metrics.feature_importances as Record<string, number> | undefined;
     const variances = metrics.variances as Record<string, number> | undefined;
     const ranking = metrics.ranking as Record<string, number> | undefined;
-    
+
     return (
       <div className="mt-4 p-3 bg-muted/50 rounded border text-xs space-y-3">
         <div className="font-medium text-muted-foreground">Execution Feedback</div>
-        
+
         {result.error && (
           <div className="p-2 bg-destructive/10 text-destructive rounded border border-destructive/20">
             {result.error}
@@ -179,7 +179,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 const imp = importances?.[col];
                 const variance = variances?.[col];
                 const rank = ranking?.[col];
-                
+
                 return (
                   <div key={col} className="flex justify-between items-center border-b border-border/50 last:border-0 pb-1 last:pb-0">
                     <span className="truncate max-w-[120px] font-medium text-destructive" title={col}>{col}</span>
@@ -256,7 +256,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
 
       {/* Main Content */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column: Method & Target */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           <div className="space-y-2">
@@ -322,7 +322,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                </select>
              </div>
           )}
-          
+
           {/* Feedback Section - Show here if wide (Left Column) */}
           {isWide && renderFeedback()}
         </div>
@@ -330,7 +330,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
         {/* Right Column: Parameters */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pl-2 border-l' : 'shrink-0 border-t pt-4'}`}>
           <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Parameters</h4>
-          
+
           {/* Variance Threshold */}
           {config.method === 'variance_threshold' && (
             <div className="space-y-2">

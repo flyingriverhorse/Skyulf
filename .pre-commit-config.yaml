@@ -6,17 +6,31 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
-  - repo: https://github.com/psf/black
-    rev: 24.8.0
+        # tsconfig*.json files are JSONC (allow comments / trailing commas),
+        # which the strict JSON parser can't read. The frontend lint/build
+        # validates them instead.
+        exclude: (^|/)tsconfig.*\.json$
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.16
     hooks:
-      - id: black
-        language_version: python3
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+      - id: ruff          # Lint (replaces flake8 + isort)
+        args: [--fix]
+      - id: ruff-format    # Format (replaces black)
+  - repo: local
     hooks:
-      - id: isort
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-      - id: flake8
-        additional_dependencies: ["flake8-bugbear==24.8.19"]
+      - id: ty
+        name: ty (type check)
+        # Mirrors the CI "Type check (ty)" step so type errors are caught on
+        # commit, before CI. `uv tool run` fetches/runs ty without needing it
+        # installed in the venv or on PATH.
+        entry: uv tool run ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: frontend-lint
+        name: frontend lint (eslint)
+        # Runs the frontend linter. Filters to run only when frontend TS/JSX source files change.
+        entry: npm --prefix frontend/ml-canvas run lint
+        language: system
+        files: ^frontend/ml-canvas/src/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false

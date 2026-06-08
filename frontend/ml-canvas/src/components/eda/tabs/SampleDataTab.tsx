@@ -20,7 +20,7 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
 
     // Filter out excluded columns from display
     // Also filter out columns ending in '_encoded' (e.g. target_encoded)
-    const visibleColumns = Object.keys(profile.sample_data[0] || {}).filter(col => 
+    const visibleColumns = Object.keys(profile.sample_data[0] || {}).filter(col =>
         !excludedCols.includes(col) && !col.endsWith('_encoded')
     );
 
@@ -33,7 +33,7 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
                             <th key={col} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider group">
                                 <div className="flex items-center gap-2">
                                     {col}
-                                    <button 
+                                    <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             handleToggleExclude(col, true);

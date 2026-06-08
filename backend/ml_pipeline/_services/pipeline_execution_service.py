@@ -23,9 +23,7 @@ from backend.realtime.events import JobEvent, publish_job_event
 logger = logging.getLogger(__name__)
 
 
-def execute_pipeline(
-    job_id: str, pipeline_config_dict: dict, session: Session
-) -> None:  # noqa: C901
+def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) -> None:  # noqa: C901
     """Run a full ML pipeline for *job_id* using the supplied sync *session*.
 
     Raises nothing — all exceptions are caught, written to the job row, and
@@ -109,7 +107,8 @@ def execute_pipeline(
             # Throttle DB writes to avoid row-level locking churn.
             if (datetime.now() - last_log_update).total_seconds() > 2:
                 try:
-                    assert job is not None
+                    if job is None:
+                        raise RuntimeError(f"Job {job_id} is no longer available for log update.")
                     job.logs = list(job_logs)
                     session.commit()
                     last_log_update = datetime.now()

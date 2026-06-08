@@ -2,8 +2,9 @@
 
 import os
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Force Celery to use in-memory broker/backend for tests to avoid Redis connection issues
 # and the lingering _connection_worker_thread.
@@ -46,8 +47,8 @@ def cleanup_resources():
     """
     yield
 
-    import threading
     import asyncio
+    import threading
 
     # --- Celery Cleanup ---
     try:

@@ -1,6 +1,7 @@
-import pytest
-import polars as pl
 import numpy as np
+import polars as pl
+import pytest
+
 from skyulf.profiling.analyzer import EDAAnalyzer
 from skyulf.profiling.schemas import DatasetProfile
 

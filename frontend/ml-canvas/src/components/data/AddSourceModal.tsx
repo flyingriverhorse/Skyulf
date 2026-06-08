@@ -29,13 +29,13 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
       const config: Record<string, unknown> = {};
       if (type === 's3') {
         config.path = s3Path;
-        
+
         // Extract credentials from form
         const form = e.target as HTMLFormElement;
         const accessKey = (form.elements.namedItem('aws_access_key_id') as HTMLInputElement)?.value;
         const secretKey = (form.elements.namedItem('aws_secret_access_key') as HTMLInputElement)?.value;
         const region = (form.elements.namedItem('region_name') as HTMLInputElement)?.value;
-        
+
         if (accessKey && secretKey) {
           config.storage_options = {
             aws_access_key_id: accessKey,
@@ -102,7 +102,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                     placeholder="s3://my-bucket/path/to/data.parquet"
                   />
                 </div>
-                
+
                 <div className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
                   <button
                     type="button"
@@ -114,14 +114,14 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                     </div>
                     {showCredentials ? <ChevronDown size={16} className="text-slate-500" /> : <ChevronRight size={16} className="text-slate-500" />}
                   </button>
-                  
+
                   {showCredentials && (
                     <div className="p-3 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700">
                       <p className="text-xs text-slate-500 mb-3">
                         If your bucket is private, provide credentials here. They will be stored securely.
                         Leave blank if using backend&apos;s IAM role.
                       </p>
-                      
+
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Access Key ID</span>
@@ -184,8 +184,3 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
     </ModalShell>
   );
 };
-
-
-
-
-

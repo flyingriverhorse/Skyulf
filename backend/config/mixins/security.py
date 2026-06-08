@@ -1,7 +1,9 @@
 """Security, authentication, session, and CORS settings."""
 
 import secrets
-from typing import List
+from typing import Annotated, List
+
+from pydantic_settings import NoDecode
 
 
 class SecurityMixin:
@@ -38,8 +40,14 @@ class SecurityMixin:
     ALLOW_USER_REGISTRATION: bool = True
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
-    ALLOWED_HOSTS: List[str] = ["localhost", "127.0.0.1"]
+    # NoDecode: pydantic-settings must not JSON-decode these before the field_validator
+    # runs in base.py. Without it, comma-separated env values (e.g. localhost,127.0.0.1)
+    # raise a JSONDecodeError before our split() validator ever fires.
+    CORS_ORIGINS: Annotated[List[str], NoDecode] = [
+        "http://localhost:3000",
+        "http://localhost:8080",
+    ]
+    ALLOWED_HOSTS: Annotated[List[str], NoDecode] = ["localhost", "127.0.0.1"]
 
     # API Docs
     API_DOCS_ENABLED: bool | None = None

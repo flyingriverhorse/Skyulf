@@ -18,7 +18,7 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { isLoading } = useDatasetSchema(datasetId);
-  
+
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
   const metrics: Record<string, unknown> | null =
@@ -33,7 +33,7 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
           Connect a dataset node to see available columns.
         </div>
       )}
-      
+
       {isLoading && !!datasetId && (
         <div className="text-xs text-muted-foreground animate-pulse">
           Loading schema...

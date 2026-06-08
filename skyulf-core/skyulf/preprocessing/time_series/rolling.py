@@ -5,12 +5,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 
 from ...core.meta.decorators import node_meta
-from ...registry import NodeRegistry
 from ...engines import SkyulfDataFrame
-from ..base import BaseApplier, BaseCalculator, apply_method
-from ..dispatcher import apply_dual_engine
+from ...registry import NodeRegistry
 from .._artifacts import RollingAggregateArtifact
 from .._schema import SkyulfSchema
+from ..base import BaseApplier, BaseCalculator, apply_method
+from ..dispatcher import apply_dual_engine
 from ._common import coerce_aggregations, resolve_columns, sort_pandas
 
 

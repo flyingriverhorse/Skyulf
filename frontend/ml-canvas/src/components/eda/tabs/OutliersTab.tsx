@@ -20,7 +20,7 @@ export const OutliersTab: React.FC<OutliersTabProps> = ({ profile }) => {
                 Outlier Analysis ({profile.outliers.method})
                 <InfoTooltip text="Detects anomalous rows using Isolation Forest. Lower scores indicate higher anomaly." />
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-800">
                     <span className="text-sm text-red-600 dark:text-red-400 block mb-1">Total Outliers</span>

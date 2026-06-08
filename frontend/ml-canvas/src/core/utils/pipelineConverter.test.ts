@@ -435,4 +435,3 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     expect(ens?.inputs).toEqual(['ds']);
   });
 });
-

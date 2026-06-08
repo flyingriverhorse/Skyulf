@@ -5,11 +5,11 @@ from typing import Any, Dict, List, Sequence, Union
 
 import pandas as pd
 
-from ..types import PreprocessingStepConfig
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
-from ..utils import get_data_stats
 from ..registry import NodeRegistry
+from ..types import PreprocessingStepConfig
+from ..utils import get_data_stats
 from .base import StatefulTransformer
 
 # Import modules to ensure nodes are registered

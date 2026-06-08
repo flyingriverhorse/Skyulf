@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Type
 from datetime import datetime
+from typing import Dict, Optional, Type
+
 from sqlalchemy.orm import Session
 
-from backend.database.models import MLJob, BasicTrainingJob, AdvancedTuningJob
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob, MLJob
 from backend.ml_pipeline._execution.schemas import PipelineExecutionResult
 from backend.ml_pipeline._execution.summary import build_summary
 from backend.ml_pipeline.constants import StepType

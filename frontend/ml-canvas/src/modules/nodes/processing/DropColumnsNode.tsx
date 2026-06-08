@@ -27,14 +27,14 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
     () => schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [],
     [schema, droppedUpstream]
   );
-  
+
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
   const metrics: Record<string, unknown> | null =
     nodeResult?.metrics && typeof nodeResult.metrics === 'object'
       ? (nodeResult.metrics as Record<string, unknown>)
       : null;
-  
+
   // Responsive Layout Logic
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
@@ -49,7 +49,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
     observer.observe(containerRef.current);
     return () => { observer.disconnect(); };
   }, []);
-  
+
   const recommendations = useRecommendations(nodeId || '', {
     types: ['cleaning', 'feature_selection'],
     suggestedNodeTypes: ['DropMissingColumns'],
@@ -62,7 +62,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
       onChange({ ...config, columns: newCols });
     }
   };
-  
+
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredColumns = useMemo(() => {
@@ -87,7 +87,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
             Connect a dataset node to see available columns.
           </div>
         )}
-        
+
         {isLoading && !!datasetId && (
           <div className="text-xs text-muted-foreground animate-pulse">
             Loading schema...
@@ -97,14 +97,14 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
 
       {/* Main Content Area - Responsive Grid/Flex */}
       <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
-        
+
         {/* Left Column (Settings) */}
         <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
           {/* Recommendations */}
           {recommendations.length > 0 && (
             <div className="shrink-0">
-              <RecommendationsPanel 
-                recommendations={recommendations} 
+              <RecommendationsPanel
+                recommendations={recommendations}
                 onApply={handleApplyRecommendation}
               />
             </div>
@@ -175,18 +175,18 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
                   {config.columns.length} selected
                 </span>
             </div>
-            
+
             {/* Search */}
             <div className="relative group">
-              <input 
-                type="text" 
-                placeholder="Search columns..." 
+              <input
+                type="text"
+                placeholder="Search columns..."
                 className="block w-full pl-9 pr-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); }}
               />
             </div>
-            
+
             <div className="flex gap-2 text-xs justify-end">
                 <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
                 <span className="text-border">|</span>
@@ -250,10 +250,10 @@ export const DropColumnsNode: NodeDefinition<DropColumnsConfig> = {
     if (thr > 0) return `Drop missing > ${thr}%`;
     return null;
   },
-  validate: (config) => ({ 
+  validate: (config) => ({
     isValid: config.columns.length > 0 || (config.missing_threshold !== undefined && config.missing_threshold > 0),
-    message: (config.columns.length === 0 && (!config.missing_threshold || config.missing_threshold === 0)) 
-      ? 'Select columns or set a threshold' 
+    message: (config.columns.length === 0 && (!config.missing_threshold || config.missing_threshold === 0))
+      ? 'Select columns or set a threshold'
       : undefined
   }),
   getDefaultConfig: () => ({

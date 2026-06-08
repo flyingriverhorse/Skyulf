@@ -6,12 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from skyulf.preprocessing.pipeline import FeatureEngineer
-
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
-from backend.data.catalog import FileSystemCatalog
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

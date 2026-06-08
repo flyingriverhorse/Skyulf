@@ -15,7 +15,7 @@ import { Node } from '@xyflow/react';
 export const PropertiesPanel: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
   const { isSidebarOpen, isPropertiesPanelExpanded, setPropertiesPanelExpanded } = useViewStore();
-  
+
   // Find the currently selected node
   const selectedNode = nodes.find((n) => n.selected);
 
@@ -29,26 +29,26 @@ export const PropertiesPanel: React.FC = () => {
   const expandedWidth = isSidebarOpen ? 'w-[calc(100vw-300px)]' : 'w-[calc(100vw-50px)]';
 
   return (
-    <aside 
+    <aside
       className={`border-l bg-background shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${
         selectedNode ? (isPropertiesPanelExpanded ? `${expandedWidth} opacity-100` : 'w-80 opacity-100') : 'w-0 opacity-0'
       }`}
     >
       {selectedNode && (
-        <PropertiesContent 
-          selectedNode={selectedNode} 
-          isExpanded={isPropertiesPanelExpanded} 
-          toggleExpand={() => setPropertiesPanelExpanded(!isPropertiesPanelExpanded)} 
+        <PropertiesContent
+          selectedNode={selectedNode}
+          isExpanded={isPropertiesPanelExpanded}
+          toggleExpand={() => setPropertiesPanelExpanded(!isPropertiesPanelExpanded)}
         />
       )}
     </aside>
   );
 };
 
-const PropertiesContent: React.FC<{ 
-  selectedNode: Node; 
-  isExpanded: boolean; 
-  toggleExpand: () => void; 
+const PropertiesContent: React.FC<{
+  selectedNode: Node;
+  isExpanded: boolean;
+  toggleExpand: () => void;
 }> = ({ selectedNode, isExpanded, toggleExpand }) => {
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
   const onNodesChange = useGraphStore((state) => state.onNodesChange);
@@ -86,13 +86,13 @@ const PropertiesContent: React.FC<{
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button 
+          <button
             onClick={toggleExpand}
             className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >
             {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
-          <button 
+          <button
             onClick={handleClose}
             className="p-1.5 hover:bg-accent rounded-md text-muted-foreground hover:text-foreground transition-colors"
           >

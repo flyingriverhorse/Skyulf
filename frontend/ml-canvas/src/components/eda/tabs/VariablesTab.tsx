@@ -41,7 +41,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
         setExpandedVars(new Set());
     };
 
-    const filteredColumns = (Object.values(profile.columns) as ColumnProfile[]).filter((col) => 
+    const filteredColumns = (Object.values(profile.columns) as ColumnProfile[]).filter((col) =>
         col.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -51,9 +51,9 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
              <div className="flex items-center gap-4 bg-card p-2 rounded-lg border">
                 <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
-                    <Input 
-                        placeholder="Search variables..." 
-                        className="pl-8 h-9" 
+                    <Input
+                        placeholder="Search variables..."
+                        className="pl-8 h-9"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -75,9 +75,9 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
             <div className="space-y-2">
                 {/* Active Columns */}
                 {filteredColumns.map((col) => (
-                    <VariableRow 
-                        key={col.name} 
-                        profile={col} 
+                    <VariableRow
+                        key={col.name}
+                        profile={col}
                         isExpanded={expandedVars.has(col.name)}
                         onToggleExpand={() => toggleExpand(col.name)}
                         onToggleExclude={handleToggleExclude}
@@ -85,7 +85,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                         handleAddFilter={handleAddFilter}
                     />
                 ))}
-                
+
                 {/* Excluded Section if any */}
                 {profile.excluded_columns && profile.excluded_columns.length > 0 && (
                     <div className="mt-8">
@@ -93,7 +93,7 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                             Excluded Variables <Badge variant="secondary">{profile.excluded_columns.length}</Badge>
                         </h3>
                         {profile.excluded_columns.map((colName: string) => (
-                            <VariableRow 
+                            <VariableRow
                                 key={colName}
                                 profile={{ name: colName, dtype: 'Excluded', missing_count: 0, missing_percentage: 0 }}
                                 isExpanded={expandedVars.has(colName)}

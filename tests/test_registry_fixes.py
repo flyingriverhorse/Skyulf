@@ -1,8 +1,10 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from backend.ml_pipeline.model_registry.service import ModelRegistryService
-from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
+
 from backend.data.catalog import SmartCatalog
+from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
+from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
 @pytest.mark.asyncio

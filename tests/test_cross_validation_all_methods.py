@@ -16,7 +16,9 @@ Advanced Tuning flow tests each CV method inside hyperparameter search.
 import numpy as np
 import pandas as pd
 import pytest
+
 from skyulf.data.dataset import SplitDataset
+from skyulf.modeling._tuning import TuningCalculator, TuningConfig
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.classification import (
     LogisticRegressionApplier,
@@ -26,7 +28,6 @@ from skyulf.modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from skyulf.modeling._tuning import TuningCalculator, TuningConfig
 
 # ---------------------------------------------------------------------------
 # Fixtures — larger datasets so multi-fold CV doesn't starve
@@ -200,9 +201,9 @@ class TestSimpleCVClassification:
         _assert_cv_result(result, n_folds=3, problem_type="classification")
         assert result["cv_config"]["cv_type"] == "time_series_split"
         # Should have auto-detected and sorted
-        assert any(
-            "auto-detected" in log or "sorted" in log for log in logs
-        ), f"Expected auto-detect log, got: {logs}"
+        assert any("auto-detected" in log or "sorted" in log for log in logs), (
+            f"Expected auto-detect log, got: {logs}"
+        )
 
     def test_time_series_split_explicit_column(
         self, timeseries_classification_dataset: SplitDataset
@@ -220,9 +221,9 @@ class TestSimpleCVClassification:
             log_callback=logs.append,
         )
         _assert_cv_result(result, n_folds=3, problem_type="classification")
-        assert any(
-            "sorted by 'date'" in log for log in logs
-        ), f"Expected sort-by-date log, got: {logs}"
+        assert any("sorted by 'date'" in log for log in logs), (
+            f"Expected sort-by-date log, got: {logs}"
+        )
 
     def test_nested_cv(self, classification_dataset: SplitDataset) -> None:
         est = _make_classification_estimator()

@@ -7,12 +7,12 @@ import sklearn
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.database.models import Deployment
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
-from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 from backend.ml_pipeline._services.job_service import JobService
 from backend.ml_pipeline._services.prediction_utils import extract_target_label_encoder
-from backend.config import get_settings
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 
 logger = logging.getLogger(__name__)
 

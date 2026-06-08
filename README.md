@@ -12,13 +12,14 @@
 [![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml)
 [![Docs](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/format.json)](https://github.com/astral-sh/ruff)
+[![Type check: Ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/check.json)](https://github.com/astral-sh/ty)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![Skyulf](https://img.shields.io/badge/Skyulf-Privacy--First_MLOps_Hub-blueviolet)](#key-features)
 [![codecov](https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC)](https://codecov.io/github/flyingriverhorse/Skyulf)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99)](https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Downloads](https://img.shields.io/pypi/dm/skyulf-core.svg)](https://pypi.org/project/skyulf-core)
-[![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues) 
+[![issues](https://img.shields.io/github/issues/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/issues)
 [![contributors](https://img.shields.io/github/contributors/flyingriverhorse/Skyulf.svg)](https://github.com/flyingriverhorse/Skyulf/graphs/contributors)
 
 > **Skyulf:** The Visual MLOps Builder
@@ -46,7 +47,7 @@ Prerequisites: **Python 3.12**
 
 ### Fastest Path (One Command)
 
-**Windows:** Double-click `start.bat`  
+**Windows:** Double-click `start.bat`
 **macOS/Linux:** Run `./start.sh`
 
 These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open w when ready.
@@ -246,6 +247,5 @@ Let's build the simplest, most powerful MLOps hub together.
 
 ---
 
-© 2025–2026 Murat Unsal — Skyulf Project  
+© 2025–2026 Murat Unsal — Skyulf Project
 SPDX-License-Identifier: AGPL-3.0-or-later (backend/frontend) AND Apache-2.0 (skyulf-core)
-

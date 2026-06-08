@@ -8,9 +8,9 @@ from typing import Any, Dict, Optional, Union, cast
 
 import pandas as pd
 
-from .types import PipelineConfig
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
+from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .modeling.classification import (
     LogisticRegressionApplier,
@@ -24,9 +24,9 @@ from .modeling.regression import (
     RidgeRegressionApplier,
     RidgeRegressionCalculator,
 )
-from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .preprocessing.pipeline import FeatureEngineer
 from .registry import NodeRegistry
+from .types import PipelineConfig
 
 logger = logging.getLogger(__name__)
 

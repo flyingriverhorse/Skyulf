@@ -1,4 +1,5 @@
 import polars as pl
+
 from skyulf.profiling.analyzer import EDAAnalyzer
 
 

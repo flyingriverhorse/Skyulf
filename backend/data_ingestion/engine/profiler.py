@@ -1,9 +1,7 @@
+import logging
 from typing import Any, Dict
 
 import polars as pl
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 

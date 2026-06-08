@@ -13,13 +13,13 @@ from celery.signals import setup_logging, worker_process_init
 
 from backend.celery_app import celery_app
 from backend.config import get_settings
-from backend.utils.logging_utils import setup_universal_logging
 
 # Ensure tasks register with the shared Celery app
 from backend.data_ingestion import tasks as _ingestion_tasks  # noqa: F401
 from backend.database.engine import init_db
 from backend.ml_pipeline import tasks as _ml_pipeline_tasks  # noqa: F401
 from backend.monitoring import tasks as _monitoring_tasks  # noqa: F401
+from backend.utils.logging_utils import setup_universal_logging
 
 __all__ = ["celery_app"]
 

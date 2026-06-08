@@ -28,12 +28,12 @@ import { toast } from '../toast';
 interface GraphState {
   nodes: Node[];
   edges: Edge[];
-  
+
   // React Flow Actions
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
-  
+
   // Custom Actions
   addNode: (type: string, position: { x: number, y: number }, initialData?: unknown) => string;
   updateNodeData: (id: string, data: unknown) => void;
@@ -229,7 +229,7 @@ export const useGraphStore = create<GraphState>()(
       // Warn: X/Y Split without prior Train-Test Split
       if (sourceType === 'feature_target_split') {
         let hasTrainTestSplit = targetNode.data.definitionType === 'TrainTestSplitter';
-        
+
         if (!hasTrainTestSplit) {
           const queue = [sourceNode.id];
           const visited = new Set<string>();
@@ -331,7 +331,7 @@ export const useGraphStore = create<GraphState>()(
       id,
       type: 'custom', // We'll use a generic wrapper component
       position,
-      data: { 
+      data: {
         // Store the definition type so we can look it up later
         definitionType: type,
         catalogType: type, // For backend execution compatibility
@@ -443,7 +443,7 @@ export const useGraphStore = create<GraphState>()(
 
   validateGraph: async () => {
     const { nodes, edges } = get();
-    
+
     // 1. Check if graph is empty
     if (nodes.length === 0) {
       return false;

@@ -1,7 +1,9 @@
-import polars as pl
-import numpy as np
-from skyulf.profiling.analyzer import EDAAnalyzer
 import sys
+
+import numpy as np
+import polars as pl
+
+from skyulf.profiling.analyzer import EDAAnalyzer
 
 
 def test_eda_features():

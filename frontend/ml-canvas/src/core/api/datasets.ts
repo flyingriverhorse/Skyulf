@@ -25,17 +25,17 @@ export const DatasetService = {
   upload: async (file: File): Promise<IngestionJobResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await fetch(`${INGESTION_BASE}/upload`, {
       method: 'POST',
       body: formData,
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to upload file');
     }
-    
+
     return await response.json();
   },
 
@@ -47,22 +47,22 @@ export const DatasetService = {
       },
       body: JSON.stringify(data),
     });
-    
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Failed to create data source');
     }
-    
+
     return await response.json();
   },
 
   getIngestionStatus: async (sourceId: string): Promise<IngestionStatus> => {
     const response = await fetch(`${INGESTION_BASE}/${encodeURIComponent(sourceId)}/status`);
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch ingestion status');
     }
-    
+
     return await response.json();
   },
 
@@ -102,7 +102,7 @@ export const DatasetService = {
       throw new Error('Failed to fetch dataset profile');
     }
     const data = await response.json();
-    
+
     // Transform backend response to match frontend expectation
     const columns = Object.values(data.columns).map((col: unknown) => {
       const c = col as Record<string, unknown>;

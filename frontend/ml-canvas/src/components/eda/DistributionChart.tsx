@@ -97,15 +97,15 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
           }}
         >
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={theme.gridColor} />
-          <XAxis 
-            dataKey="name" 
-            tick={{ fontSize: 11, fill: theme.axisColor }} 
+          <XAxis
+            dataKey="name"
+            tick={{ fontSize: 11, fill: theme.axisColor }}
             interval="preserveStartEnd"
             angle={-45}
             textAnchor="end"
           />
           <YAxis tick={{ fontSize: 11, fill: theme.axisColor }} />
-          <Tooltip 
+          <Tooltip
             content={({ active, payload }) => {
                 if (active && payload && payload.length) {
                 const item = payload[0].payload;
@@ -120,9 +120,9 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
                 return null;
             }}
           />
-          <Bar 
-            dataKey="count" 
-            radius={[4, 4, 0, 0]} 
+          <Bar
+            dataKey="count"
+            radius={[4, 4, 0, 0]}
             onClick={(d) => onBarClick && onBarClick(d as unknown as DistributionDatum)}
             className={onBarClick ? "cursor-pointer hover:opacity-80" : ""}
           >

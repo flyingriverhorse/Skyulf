@@ -2,3 +2,6 @@
 exclude_paths:
   - "static/ml_canvas/assets/**"
   - "site/**"
+  - "tests/**"
+  - "skyulf-core/tests/**"
+  - "temp/**"

@@ -1,6 +1,6 @@
-import sys
-import os
 import io
+import os
+import sys
 
 # Force UTF-8 output to handle emoji on Windows
 if sys.stdout.encoding != "utf-8":
@@ -12,11 +12,11 @@ sys.path.append(os.getcwd())
 # Also add skyulf-core specifically if it's not installed in the env
 sys.path.append(os.path.join(os.getcwd(), "skyulf-core"))
 
-from skyulf.registry import NodeRegistry as SkyulfRegistry
 from skyulf.modeling.classification import (
     LogisticRegressionCalculator,
     RandomForestClassifierCalculator,
 )
+from skyulf.registry import NodeRegistry as SkyulfRegistry
 
 
 def test_registry():

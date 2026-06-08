@@ -6,7 +6,7 @@ const findDatasetId = (node: Node, nodes: Node[], edges: Edge[], visited = new S
   visited.add(node.id);
 
   if (node.data?.datasetId) return node.data.datasetId as string;
-  
+
   const incomers = getIncomers(node, nodes, edges);
   for (const incomer of incomers) {
     const id = findDatasetId(incomer, nodes, edges, visited);

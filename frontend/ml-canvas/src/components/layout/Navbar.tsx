@@ -32,8 +32,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => setView('canvas')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-            activeView === 'canvas' 
-              ? 'bg-background shadow-sm text-foreground' 
+            activeView === 'canvas'
+              ? 'bg-background shadow-sm text-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
           }`}
         >
@@ -43,8 +43,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => setView('experiments')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-            activeView === 'experiments' 
-              ? 'bg-background shadow-sm text-foreground' 
+            activeView === 'experiments'
+              ? 'bg-background shadow-sm text-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
           }`}
         >
@@ -54,8 +54,8 @@ export const Navbar: React.FC = () => {
         <button
           onClick={() => setView('inference')}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-            activeView === 'inference' 
-              ? 'bg-background shadow-sm text-foreground' 
+            activeView === 'inference'
+              ? 'bg-background shadow-sm text-foreground'
               : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
           }`}
         >

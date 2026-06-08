@@ -64,7 +64,7 @@ const ColumnSelector: React.FC<{
   single?: boolean;
 }> = ({ columns, selected, onChange, label, single }) => {
   const [search, setSearch] = useState('');
-  
+
   const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
 
   const toggle = (col: string) => {
@@ -133,7 +133,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema } = useDatasetSchema(datasetId);
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
-  
+
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
   const metrics: Record<string, unknown> | null =
@@ -162,7 +162,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
 
   const allColumns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
-  const numericColumns = schema 
+  const numericColumns = schema
     ? Object.values(schema.columns)
         .filter(c => ['int', 'float', 'number'].some(t => c.dtype.toLowerCase().includes(t)))
         .filter(c => !droppedUpstream.has(c.name))
@@ -195,8 +195,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
   const addOperation = (type: MathOperation['operation_type']) => {
     const newOp: MathOperation = {
       operation_type: type,
-      method: type === 'arithmetic' ? 'add' : 
-              type === 'similarity' ? 'ratio' : 
+      method: type === 'arithmetic' ? 'add' :
+              type === 'similarity' ? 'ratio' :
               type === 'group_agg' ? 'mean' : 'year',
       input_columns: [],
       output_column: '',
@@ -275,7 +275,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       {/* Recommendations Toggle */}
       {recommendations.length > 0 && (
         <div className="border-b bg-muted/10">
-          <button 
+          <button
             onClick={() => { setShowRecommendations(!showRecommendations); }}
             className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/20 transition-colors"
           >
@@ -285,7 +285,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             </div>
             {showRecommendations ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
-          
+
           {showRecommendations && (
             <div className="p-4 bg-muted/5 border-t">
               <RecommendationsPanel
@@ -305,7 +305,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
         {(config.operations || []).map((op, idx) => (
           <div key={idx} className="border rounded-lg bg-card shadow-sm overflow-hidden">
             {/* Header */}
-            <div 
+            <div
               className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b cursor-pointer hover:bg-muted/50 transition-colors"
               {...clickableProps(() => { toggleExpand(idx); })}
             >
@@ -321,7 +321,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     onClick={(e) => { e.stopPropagation(); }}
                     onChange={(e) => { updateOperation(idx, { method: e.target.value }); }}
                   >
-                    {(op.operation_type === 'arithmetic' ? ARITHMETIC_METHODS : 
+                    {(op.operation_type === 'arithmetic' ? ARITHMETIC_METHODS :
                       op.operation_type === 'similarity' ? SIMILARITY_METHODS :
                       op.operation_type === 'group_agg' ? GROUP_AGG_METHODS :
                       []).map(m => (
@@ -341,15 +341,15 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             {/* Body */}
             {op.isExpanded && (
             <div className="p-3 space-y-4">
-              
+
 
 
               {/* ARITHMETIC */}
               {op.operation_type === 'arithmetic' && (
                 <div className="flex flex-col gap-3">
                   <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
-                    {op.method === 'divide' 
-                      ? 'Performs row-by-row division (Col A / Col B) for each record.' 
+                    {op.method === 'divide'
+                      ? 'Performs row-by-row division (Col A / Col B) for each record.'
                       : 'Performs row-by-row arithmetic between two columns.'}
                   </div>
                   <ColumnSelector
@@ -359,7 +359,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
                     single
                   />
-                  
+
                   <div className="flex items-center gap-2">
                      <div className="h-px bg-border flex-1"></div>
                      <span className="text-lg font-bold text-muted-foreground bg-muted/20 w-8 h-8 rounded flex items-center justify-center">
@@ -390,7 +390,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     selected={op.input_columns}
                     onChange={(cols) => { updateOperation(idx, { input_columns: cols }); }}
                   />
-                  
+
                   <div className="relative flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed"></div></div>
                     <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">Divided By</span>
@@ -423,7 +423,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     onChange={(cols) => updateOperation(idx, { input_columns: cols })}
                     single
                   />
-                  
+
                   <div className="flex items-center gap-2">
                      <div className="h-px bg-border flex-1"></div>
                      <span className="text-xs font-bold text-muted-foreground bg-muted/20 px-2 py-1 rounded">vs</span>
@@ -453,7 +453,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     onChange={(cols) => updateOperation(idx, { input_columns: cols })}
                     single
                   />
-                  
+
                   <div className="relative flex items-center justify-center">
                     <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dashed"></div></div>
                     <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">Target Column</span>
@@ -479,7 +479,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     onChange={(cols) => updateOperation(idx, { input_columns: cols })}
                     single
                   />
-                  
+
                   <div className="space-y-1.5">
                     <span className="text-xs font-medium text-muted-foreground">Features to Extract</span>
                     <div className="grid grid-cols-2 gap-2">
@@ -555,7 +555,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
               <Activity size={14} />
               <span>Last Run Results</span>
             </div>
-            
+
             <div className="space-y-2 text-xs">
               {generatedFeatures.length > 0 ? (
                 <>
@@ -565,7 +565,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                       {generatedFeatures.length}
                     </span>
                   </div>
-                  
+
                   <div className="pt-2">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1.5 block">Generated Columns</span>
                     <div className="flex flex-wrap gap-1.5">

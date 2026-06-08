@@ -95,7 +95,6 @@ from skyulf.preprocessing.transformations import (
     SimpleTransformationCalculator,
 )
 
-
 # ---------- Synthetic data factories ----------
 
 
@@ -440,7 +439,7 @@ CASES: list[
 
 
 def _ids(
-    case: Tuple[Type[BaseCalculator], Type[Any], Optional[str], Callable[[], Any], Dict[str, Any]]
+    case: Tuple[Type[BaseCalculator], Type[Any], Optional[str], Callable[[], Any], Dict[str, Any]],
 ) -> str:
     return case[0].__name__
 
@@ -460,9 +459,9 @@ def test_artifact_shape(
     result = calc_cls().fit(df, config)
 
     # 1) Always a dict.
-    assert isinstance(
-        result, dict
-    ), f"{calc_cls.__name__}.fit returned {type(result).__name__}, not dict"
+    assert isinstance(result, dict), (
+        f"{calc_cls.__name__}.fit returned {type(result).__name__}, not dict"
+    )
 
     # 2) Empty-result early-exits are allowed (e.g. user picked no columns).
     if not result:
@@ -526,6 +525,6 @@ def test_every_artifact_typeddict_declares_type_field() -> None:
             and hasattr(obj, "__annotations__")
         ):
             continue
-        assert (
-            "type" in obj.__annotations__
-        ), f"{name} TypedDict is missing the 'type' discriminator field"
+        assert "type" in obj.__annotations__, (
+            f"{name} TypedDict is missing the 'type' discriminator field"
+        )

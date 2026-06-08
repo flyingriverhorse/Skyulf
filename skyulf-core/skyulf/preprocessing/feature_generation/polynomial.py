@@ -8,10 +8,10 @@ from sklearn.preprocessing import PolynomialFeatures
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns
-from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine
 from .._artifacts import PolynomialFeaturesArtifact
 from .._helpers import to_pandas
+from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
+from ..dispatcher import apply_dual_engine
 
 
 def _polynomial_compute(

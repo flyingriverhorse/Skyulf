@@ -3,7 +3,7 @@ contact_links:
   - name: 💬 Ask a Question
     url: https://github.com/flyingriverhorse/Skyulf/discussions
     about: Please use GitHub Discussions for general questions, ideas, and community support.
-  
+
   - name: 📚 Documentation
     url: https://flyingriverhorse.github.io/Skyulf/
     about: Check the official documentation before opening an issue.
