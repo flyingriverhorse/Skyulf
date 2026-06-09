@@ -211,6 +211,7 @@ The high-level flow from dataset to model training inside Skyulf:
 - Tests under `tests/` cover core feature engineering and training helpers
 - `docker-compose.yml` to run API + Redis (+ Celery worker)
 - **Command cheatsheet:** [`skyulf-commands.md`](skyulf-commands.md) collects the common local dev, quality-check, test, build, and release commands (Ruff + `ty` toolchain).
+- **Release guide:** [`RELEASING.md`](RELEASING.md) — how to cut an app release (GitHub Release draft) and a `skyulf-core` library release (PyPI).
 
 ## Contributing
 
