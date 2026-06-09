@@ -111,8 +111,10 @@ export function useRunControls(): RunControls {
       }
       toast.success(`${count} experiment${count > 1 ? 's' : ''} queued`);
       toggleDrawer();
-      // Keep standard nodes populated with data while experiments run.
-      void handleRun();
+      // Note: we intentionally do NOT trigger an inline preview here. The
+      // experiments run as background jobs; firing a synchronous preview on
+      // top would double the work and slow the queue. Users who want live
+      // canvas data can click Run Preview separately.
     } catch {
       toast.error('Failed to run experiments');
     } finally {

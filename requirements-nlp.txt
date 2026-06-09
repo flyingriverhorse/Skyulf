@@ -1,0 +1,16 @@
+# NLP / Text Stack (Optional)
+# Install with: pip install -r requirements-nlp.txt
+#   (or, from the core package:  pip install skyulf[nlp])
+#
+# These are NOT required for core Skyulf functionality.
+# The Count / TF-IDF / Hashing vectorizers, Tokenizer, and the
+# Multinomial / Bernoulli Naive Bayes nodes all work with the base
+# install (scikit-learn) and need NOTHING from this file.
+#
+# Only install this if you want dense semantic sentence embeddings
+# via the SentenceEmbedder node (`sentence_embedder`).
+#
+# NOTE: sentence-transformers pulls in PyTorch, which is a large
+# download (hundreds of MB). Install only when you need embeddings.
+
+sentence-transformers>=2.2.0   # Dense sentence/document embeddings (SentenceEmbedder node)

@@ -181,6 +181,7 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or S3. Backend storage starts with SQLite (zero-config) and scales to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
+*   **📝 Text & NLP:** Turn raw text into model-ready features with Count / TF-IDF / Hashing vectorizers, a configurable Tokenizer, and text-friendly Multinomial / Bernoulli Naive Bayes nodes. Optional dense **Sentence Embeddings** via `skyulf[nlp]`. See the [Text & NLP guide](https://flyingriverhorse.github.io/Skyulf/user_guide/text_nlp.html) and the runnable `skyulf-core/examples/07_text_nlp_real_data.ipynb` tutorial.
 *   **🤝 Ensemble Models:** Combine several base learners into one estimator with dedicated **Voting** and **Stacking** nodes (classification & regression). Supports per-model fixed hyperparameters, nested tuning, optional base-model calibration, and parallel fitting.
 *   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
 *   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
