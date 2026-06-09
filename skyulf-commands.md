@@ -187,7 +187,86 @@ Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 
 ---
 
-## 7. Git & GitHub CLI
+## 7. Release Drafter (GitHub Release Draft)
+
+The release drafter reads the version from `pyproject.toml`, finds the matching
+`## vX.Y.Z` block in `changelog/X.Y.x.md`, and publishes/updates a GitHub Release
+draft automatically. It fires on every push to `master` that touches `pyproject.toml`
+or `changelog/**`, or on manual `workflow_dispatch`.
+
+### Step-by-step: cut a new app release
+
+```
+1. Write the changelog entry
+2. Bump the version in pyproject.toml
+3. Commit & push → release draft is auto-created on GitHub
+4. Review the draft on GitHub, then "Publish release"
+```
+
+#### 1. Write the changelog entry
+
+Add (or finish) the `## vX.Y.Z` section at the top of the matching series file:
+
+```
+changelog/
+  0.6.x.md   ← edit this for a v0.6.x release
+  0.7.x.md   ← create this file for a v0.7.0 release
+```
+
+The header must be **exactly** `## vX.Y.Z` or `## vX.Y.Z — Short title`.
+Everything between that header and the next `## v` block becomes the release body.
+
+```markdown
+## v0.6.2 — Short release title
+
+### 🔧 Backend
+- **Thing:** what changed and why it matters.
+
+### 🐛 Bug Fixes
+- **Fix:** description.
+```
+
+#### 2. Bump the version in `pyproject.toml`
+
+```toml
+# pyproject.toml  ← the script reads [project].version
+[project]
+version = "0.6.2"   # ← change this
+```
+
+The script (`draft_release_from_changelog.py`) derives the series file from
+the version — e.g. `0.6.2` → `changelog/0.6.x.md`. If the series file doesn't
+exist yet, create it (see §7 below for a new minor series).
+
+#### 3. Commit & push
+
+```powershell
+git add pyproject.toml changelog/0.6.x.md
+git commit -m "chore: release v0.6.2"
+git push
+```
+
+The `release-drafter.yml` workflow fires because `pyproject.toml` was touched.
+It creates or updates the draft at
+`https://github.com/flyingriverhorse/Skyulf/releases`.
+
+#### Trigger manually (without a push)
+
+```powershell
+gh workflow run release-drafter.yml --ref master
+```
+
+---
+
+### Starting a new minor series (e.g. v0.7.0)
+
+1. Create `changelog/0.7.x.md` with a `## v0.7.0 — Title` header.
+2. Bump `pyproject.toml` → `version = "0.7.0"`.
+3. Commit & push — the drafter picks up the new file automatically.
+
+---
+
+## 8. Git & GitHub CLI
 
 ```powershell
 # Install gh
@@ -227,7 +306,7 @@ git push
 
 ---
 
-## 8. DCO Sign-off
+## 9. DCO Sign-off
 
 In VS Code: Settings (`Ctrl + ,`) → search `signoff` → enable **Git: Always Signoff**.
 
@@ -241,7 +320,7 @@ chmod +x .git/hooks/prepare-commit-msg
 
 ---
 
-## 9. Docs / GitHub Pages
+## 10. Docs / GitHub Pages
 
 ```powershell
 git commit --allow-empty -m "ci: trigger docs redeploy after gh-pages branch switch"
@@ -252,7 +331,7 @@ gh api repos/flyingriverhorse/Skyulf/pages --jq '{status: .status, url: .html_ur
 
 ---
 
-## 10. WSL / Ubuntu
+## 11. WSL / Ubuntu
 
 ```powershell
 wsl.exe --install Ubuntu
