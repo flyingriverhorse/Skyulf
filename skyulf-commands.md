@@ -157,40 +157,7 @@ system PATH) locates the project venv automatically — no PATH or activation ne
 
 ---
 
-## 6. Releasing
-
-See **[RELEASING.md](RELEASING.md)** for the full guide. Quick reference:
-
-### App release (`vX.Y.Z` → GitHub Release draft)
-
-```powershell
-# 1. Add ## vX.Y.Z block to changelog/X.Y.x.md
-# 2. Bump version in pyproject.toml → version = "X.Y.Z"
-git add pyproject.toml changelog/0.6.x.md
-git commit -m "chore: release vX.Y.Z"
-git push
-# Release Drafter workflow fires automatically and creates/updates the draft.
-
-# Or trigger manually:
-gh workflow run release-drafter.yml --ref master
-```
-
-### `skyulf-core` library release (PyPI)
-
-```powershell
-# 1. Bump version in skyulf-core/setup.py
-git add skyulf-core/setup.py
-git commit -m "chore: bump skyulf-core to 0.3.1"
-git push
-
-# 2. Tag → triggers release.yml which builds + publishes to PyPI
-git tag core-v0.3.1
-git push origin core-v0.3.1
-```
-
----
-
-## 7. Git & GitHub CLI
+## 6. Git & GitHub CLI
 
 ```powershell
 # Install gh
@@ -230,7 +197,7 @@ git push
 
 ---
 
-## 8. DCO Sign-off
+## 7. DCO Sign-off
 
 In VS Code: Settings (`Ctrl + ,`) → search `signoff` → enable **Git: Always Signoff**.
 
@@ -244,7 +211,7 @@ chmod +x .git/hooks/prepare-commit-msg
 
 ---
 
-## 9. Docs / GitHub Pages
+## 8. Docs / GitHub Pages
 
 ```powershell
 git commit --allow-empty -m "ci: trigger docs redeploy after gh-pages branch switch"
@@ -255,7 +222,7 @@ gh api repos/flyingriverhorse/Skyulf/pages --jq '{status: .status, url: .html_ur
 
 ---
 
-## 10. WSL / Ubuntu
+## 9. WSL / Ubuntu
 
 ```powershell
 wsl.exe --install Ubuntu
