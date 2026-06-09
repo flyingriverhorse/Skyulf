@@ -24,7 +24,7 @@
 
 > **Skyulf:** The Visual MLOps Builder
 
-Skyulf is a self-hosted, privacy-first. It is designed to be the "glue" that holds your data science workflow together (soon with export project option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
+Skyulf is a self-hosted, privacy-first MLOps platform. It is designed to be the "glue" that holds your data science workflow together (with export notebook option). Bring your data, clean it visually, engineer features with a node-based canvas, and train models, all in one place.
 
 ## What is the meaning of Skyulf?
 
@@ -50,7 +50,7 @@ Prerequisites: **Python 3.12**
 **Windows:** Double-click `start.bat`
 **macOS/Linux:** Run `./start.sh`
 
-These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open w when ready.
+These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open http://127.0.0.1:8000 when ready.
 
 ### On Windows PowerShell (Manual)
 
@@ -181,6 +181,7 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **💾 Flexible Data:** Ingest CSV, Excel, JSON, Parquet, or S3. Backend storage starts with SQLite (zero-config) and scales to PostgreSQL.
 *   **☁️ S3 Integration:** Full support for S3-compatible storage (AWS, MinIO) for data ingestion, artifact storage, and model registry.
 *   **🧠 Model Training:** Built-in support for Scikit-Learn models with hyperparameter search (Grid/Random/Halving) and optional Optuna integration.
+*   **🤝 Ensemble Models:** Combine several base learners into one estimator with dedicated **Voting** and **Stacking** nodes (classification & regression). Supports per-model fixed hyperparameters, nested tuning, optional base-model calibration, and parallel fitting.
 *   **📦 Model Registry & Deployment:** Version control your models, track metrics, and deploy them to a live inference API with a single click.
 *   **📊 Experiment Tracking:** Compare multiple runs side-by-side with interactive charts, confusion matrices, and ROC curves.
 *   **📓 Notebook Export:** Export any canvas pipeline to a fully self-contained Jupyter notebook with one click — two modes available:
@@ -209,6 +210,7 @@ The high-level flow from dataset to model training inside Skyulf:
 - Lifespan hooks initialize the async DB engine automatically
 - Tests under `tests/` cover core feature engineering and training helpers
 - `docker-compose.yml` to run API + Redis (+ Celery worker)
+- **Command cheatsheet:** [`skyulf-commands.md`](skyulf-commands.md) collects the common local dev, quality-check, test, build, and release commands (Ruff + `ty` toolchain).
 
 ## Contributing
 

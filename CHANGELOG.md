@@ -10,7 +10,7 @@ Each major/minor series has its own file in the [`changelog/`](changelog/) folde
 
 | Series | File | Status | Description |
 |--------|------|--------|-------------|
-| **0.6.x** | [changelog/0.6.x.md](changelog/0.6.x.md) | Active | Ensemble models — Voting / Stacking (v0.6.0) |
+| **0.6.x** | [changelog/0.6.x.md](changelog/0.6.x.md) | Active | Ensemble models — Voting / Stacking (v0.6.0); Ruff migration & config-parsing fixes (v0.6.1) |
 | **0.5.x** | [changelog/0.5.x.md](changelog/0.5.x.md) | Stable | Promote Winner, Branch-Aware Preview & Architecture Improvements |
 | **0.4.x** | [changelog/0.4.x.md](changelog/0.4.x.md) | Stable | Parallel Experiment Execution (v0.4.0+) |
 | **0.3.x** | [changelog/0.3.x.md](changelog/0.3.x.md) | Stable | Multi-Path Canvas Execution (v0.3.0 — v0.3.1) |
