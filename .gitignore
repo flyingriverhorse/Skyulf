@@ -42,6 +42,10 @@ mlops_database.db
 *.db
 *.sqlite
 *.sqlite3
+# SQLite WAL-mode sidecar files (the *.db glob does NOT match these suffixes)
+*.db-shm
+*.db-wal
+*.db-journal
 
 # === Environment Variables (CRITICAL - keep secrets out!) ===
 .env

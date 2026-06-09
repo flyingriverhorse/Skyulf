@@ -25,6 +25,12 @@ from .hyperparameters import (
     get_default_search_space,
     get_hyperparameters,
 )
+from .naive_bayes import (
+    BernoulliNBApplier,
+    BernoulliNBCalculator,
+    MultinomialNBApplier,
+    MultinomialNBCalculator,
+)
 from .regression import (
     RandomForestRegressorApplier,
     RandomForestRegressorCalculator,
@@ -61,6 +67,10 @@ __all__ = [
     "HyperparameterField",
     "get_hyperparameters",
     "get_default_search_space",
+    "MultinomialNBCalculator",
+    "MultinomialNBApplier",
+    "BernoulliNBCalculator",
+    "BernoulliNBApplier",
 ]
 
 # NOTE: Imports above are intentionally explicit. Every node module is imported

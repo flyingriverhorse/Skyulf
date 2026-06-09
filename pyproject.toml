@@ -59,6 +59,7 @@ dependencies = [
     "rapidfuzz>=3.6.1,<4.0.0",
     "vadersentiment>=3.3.2,<4.0.0",
     "ty>=0.0.44",
+    "sentence-transformers>=2.2.0",
 ]
 
 [project.optional-dependencies]

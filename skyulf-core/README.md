@@ -3,6 +3,7 @@
 **Skyulf Core** (`skyulf-core`) is the standalone machine learning library that powers the Skyulf MLOps platform. It provides a robust, type-safe, and modular set of tools for:
 
 - **Data Preprocessing**: A comprehensive suite of transformers for cleaning, scaling, encoding, and feature engineering.
+- **Text & NLP**: Count / TF-IDF / Hashing vectorizers, a configurable Tokenizer, Multinomial & Bernoulli Naive Bayes, and optional dense Sentence Embeddings (`skyulf-core[nlp]`).
 - **Modeling**: Unified interfaces for classification and regression models, wrapping Scikit-Learn and other libraries.
 - **Pipeline Management**: Tools to build, serialize, and execute complex ML pipelines.
 - **Tuning**: Advanced hyperparameter tuning capabilities with support for Grid Search, Random Search, and Optuna.

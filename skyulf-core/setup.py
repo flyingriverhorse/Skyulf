@@ -38,6 +38,7 @@ setup(
             "causal-learn>=0.1.3.0",
         ],
         "text": ["vaderSentiment>=3.3.2"],
+        "nlp": ["sentence-transformers>=2.2.0"],
         "geo": [
             "geopandas>=0.14.0,<1.2.0",
             "shapely>=2.0.2,<2.2.0",
@@ -65,6 +66,7 @@ setup(
             "imbalanced-learn>=0.13.0",
             "xgboost>=2.1.4",
             "lightgbm>=4.0.0",
+            "sentence-transformers>=2.2.0",
         ],
     },
     python_requires=">=3.12",

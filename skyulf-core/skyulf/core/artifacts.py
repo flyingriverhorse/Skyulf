@@ -324,6 +324,62 @@ class ValueReplacementArtifact(TypedDict, total=False):
     value: Any
 
 
+# ── Text / Vectorization ──────────────────────────────────────────────────────
+
+
+class CountVectorizerArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]  # source text column(s) fed to the vectorizer
+    output_columns: List[str]  # one name per vocabulary term
+    vocabulary: Dict[str, int]  # token → column-index mapping
+    max_features: Optional[int]
+    vectorizer_object: Any  # fitted sklearn object (not JSON-serialisable)
+    drop_original: bool
+
+
+class TfidfVectorizerArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]
+    output_columns: List[str]
+    vocabulary: Dict[str, int]
+    idf: List[float]  # one value per vocabulary term
+    max_features: Optional[int]
+    vectorizer_object: Any  # fitted sklearn object (not JSON-serialisable)
+    drop_original: bool
+
+
+class HashingVectorizerArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]
+    output_columns: List[str]  # indexed: ``{src}__hash__{i}``
+    n_features: int
+    norm: Optional[str]
+    vectorizer_object: Any  # configured (but stateless) sklearn object
+    drop_original: bool
+
+
+class TokenizerArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]  # source text column(s)
+    analyzer: str  # word | char | char_wb
+    lowercase: bool
+    stop_words: Optional[str]  # e.g. "english" or None
+    ngram_range: List[int]
+    output_columns: List[str]  # tokenized-text column name(s)
+    add_token_count: bool
+    drop_original: bool
+
+
+class SentenceEmbedderArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]  # source text column(s)
+    model_name: str  # sentence-transformers model id
+    embedding_dim: int
+    normalize: bool
+    output_columns: List[str]  # indexed: ``{src}__emb__{i}``
+    drop_original: bool
+
+
 class AliasReplacementArtifact(TypedDict, total=False):
     type: str
     columns: List[str]

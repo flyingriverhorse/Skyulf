@@ -2,7 +2,7 @@
 
 from typing import Any, Dict, List
 
-from ._bayes import GAUSSIAN_NB_PARAMS
+from ._bayes import BERNOULLI_NB_PARAMS, GAUSSIAN_NB_PARAMS, MULTINOMIAL_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
 from ._ensemble import (
     STACKING_CLASSIFIER_PARAMS,
@@ -60,6 +60,8 @@ MODEL_HYPERPARAMETERS = {
     "lgbm_classifier": LGBM_PARAMS,
     "lgbm_regressor": LGBM_PARAMS,
     "gaussian_nb": GAUSSIAN_NB_PARAMS,
+    "multinomial_nb": MULTINOMIAL_NB_PARAMS,
+    "bernoulli_nb": BERNOULLI_NB_PARAMS,
     "calibrated_classifier": CALIBRATED_CLASSIFIER_PARAMS,
     "voting_classifier": VOTING_CLASSIFIER_PARAMS,
     "stacking_classifier": STACKING_CLASSIFIER_PARAMS,
@@ -192,6 +194,15 @@ DEFAULT_SEARCH_SPACES: Dict[str, Any] = {
     },
     "gaussian_nb": {
         "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
+    },
+    "multinomial_nb": {
+        "alpha": [0.01, 0.1, 0.5, 1.0, 2.0, 5.0],
+        "fit_prior": [True, False],
+    },
+    "bernoulli_nb": {
+        "alpha": [0.01, 0.1, 0.5, 1.0, 2.0, 5.0],
+        "binarize": [0.0, 0.5, 1.0],
+        "fit_prior": [True, False],
     },
     "calibrated_classifier": {
         "method": ["sigmoid", "isotonic"],
@@ -378,6 +389,14 @@ GRID_SEARCH_SPACES: Dict[str, Any] = {
     },
     "gaussian_nb": {
         "var_smoothing": [1e-9, 1e-8, 1e-7, 1e-6],
+    },
+    "multinomial_nb": {
+        "alpha": [0.1, 0.5, 1.0, 2.0],
+        "fit_prior": [True, False],
+    },
+    "bernoulli_nb": {
+        "alpha": [0.1, 0.5, 1.0, 2.0],
+        "binarize": [0.0, 0.5],
     },
     "calibrated_classifier": {
         "method": ["sigmoid", "isotonic"],

@@ -308,6 +308,16 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'TextCleaning') {
           stepType = 'TextCleaning';
           params = node.data;
+      } else if (
+          node.data.definitionType === 'count_vectorizer' ||
+          node.data.definitionType === 'tfidf_vectorizer' ||
+          node.data.definitionType === 'hashing_vectorizer' ||
+          node.data.definitionType === 'tokenizer' ||
+          node.data.definitionType === 'sentence_embedder'
+      ) {
+          // Text node ids map 1:1 to the skyulf-core NodeRegistry ids.
+          stepType = node.data.definitionType;
+          params = node.data;
       } else if (node.data.definitionType === 'ValueReplacement' || node.data.definitionType === 'value_replacement') {
           stepType = 'ValueReplacement';
           params = node.data;
