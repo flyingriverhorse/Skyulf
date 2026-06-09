@@ -22,6 +22,8 @@ Alternatively, without uv:
 - Lint (with import sort + autofix): `uv run ruff check --fix .`
 - Ty (instead of MyPy): `uv run ty`
 
+See [`skyulf-commands.md`](skyulf-commands.md) for a fuller cheatsheet of dev, test, build, and release commands.
+
 ## Commit style
 - Keep diffs focused.
 - Add/adjust tests when changing behavior.
