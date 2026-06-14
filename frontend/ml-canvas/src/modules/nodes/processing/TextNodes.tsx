@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NodeDefinition, NodeSettingsProps } from '../../../core/types/nodes';
-import { Scissors, Brain, Info } from 'lucide-react';
+import { Scissors, Brain, Info, AlertTriangle } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
@@ -132,8 +132,17 @@ const TokenizerSettings: React.FC<NodeSettingsProps<TokenizerConfig>> = ({
         >
           <InfoBox
             defaultOpen={isExpanded ?? false}
-            text="Splits text into tokens. Outputs a space-joined token string column per source column. Stateless — no vocabulary is fitted, so it pairs well before a vectorizer."
+            text="Inspection / intermediate tool. Splits text into tokens and outputs a space-joined token string column per source column (optionally a token-count column). Stateless — no vocabulary is fitted."
           />
+
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-3">
+            <AlertTriangle className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" size={16} />
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              Don&apos;t feed this into a vectorizer. The Count / TF-IDF / Hashing vectorizers already
+              tokenize internally — chaining them leaves a stray text column that breaks training. Use a
+              vectorizer directly; reach for this node only to inspect tokens or add a token-count feature.
+            </p>
+          </div>
 
           <div>
             <label className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1 block">

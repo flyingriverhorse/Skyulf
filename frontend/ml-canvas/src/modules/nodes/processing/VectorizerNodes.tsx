@@ -11,6 +11,8 @@ import { clickableProps } from '../../../core/utils/a11y';
 interface BaseVectorizerConfig {
   columns: string[];
   drop_original: boolean;
+  lowercase: boolean;
+  stop_words: 'english' | null;
 }
 
 interface CountVectorizerConfig extends BaseVectorizerConfig {
@@ -18,6 +20,7 @@ interface CountVectorizerConfig extends BaseVectorizerConfig {
   min_df: number;
   max_df: number;
   ngram_range: [number, number];
+  binary?: boolean;
 }
 
 interface TfidfVectorizerConfig extends CountVectorizerConfig {
@@ -254,6 +257,19 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
             )}
           </div>
 
+          <Checkbox
+            label="Lowercase"
+            checked={config.lowercase ?? true}
+            onChange={(v) => patch({ lowercase: v })}
+            hint="Lowercase text before tokenizing."
+          />
+          <Checkbox
+            label="Remove English stop words"
+            checked={config.stop_words === 'english'}
+            onChange={(v) => patch({ stop_words: v ? 'english' : null })}
+            hint="Drop common words like 'the', 'and' (word analyzer only)."
+          />
+
           {variant === 'hashing' ? (
             <>
               <NumberField
@@ -342,6 +358,14 @@ const VectorizerSettings: React.FC<NodeSettingsProps<AnyVectorizerConfig> & { va
                   }
                 />
               </div>
+              {variant === 'count' && (
+                <Checkbox
+                  label="Binary counts"
+                  checked={countCfg.binary ?? false}
+                  onChange={(v) => patch({ binary: v } as Partial<CountVectorizerConfig>)}
+                  hint="Use 1/0 presence instead of raw token counts."
+                />
+              )}
               {variant === 'tfidf' && (
                 <Checkbox
                   label="Sublinear TF scaling"
@@ -395,6 +419,9 @@ export const CountVectorizerNode: NodeDefinition<CountVectorizerConfig> = {
     min_df: 1,
     max_df: 1.0,
     ngram_range: [1, 1],
+    lowercase: true,
+    stop_words: null,
+    binary: false,
     drop_original: false,
   }),
 };
@@ -419,6 +446,8 @@ export const TfidfVectorizerNode: NodeDefinition<TfidfVectorizerConfig> = {
     max_df: 1.0,
     ngram_range: [1, 1],
     sublinear_tf: false,
+    lowercase: true,
+    stop_words: null,
     drop_original: false,
   }),
 };
@@ -445,6 +474,8 @@ export const HashingVectorizerNode: NodeDefinition<HashingVectorizerConfig> = {
     n_features: 1024,
     norm: 'l2',
     alternate_sign: true,
+    lowercase: true,
+    stop_words: null,
     drop_original: false,
   }),
 };

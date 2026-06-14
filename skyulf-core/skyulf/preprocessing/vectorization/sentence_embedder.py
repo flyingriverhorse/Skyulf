@@ -44,6 +44,18 @@ def _load_model(model_name: str) -> Any:
     return model
 
 
+def _embedding_dimension(model: Any) -> int:
+    """Return the model's embedding dimension across sentence-transformers versions.
+
+    ``get_sentence_embedding_dimension`` was renamed to ``get_embedding_dimension``
+    in newer releases; prefer the new name and fall back to the old one.
+    """
+    getter = (
+        getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
+    )
+    return int(getter())
+
+
 # ── Apply ─────────────────────────────────────────────────────────────────────
 
 
@@ -122,7 +134,7 @@ class SentenceEmbedderCalculator(BaseCalculator):
 
         model_name: str = config.get("model_name") or "all-MiniLM-L6-v2"
         model = _load_model(model_name)
-        embedding_dim = int(model.get_sentence_embedding_dimension())
+        embedding_dim = int(_embedding_dimension(model))
 
         prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
         output_columns = [f"{prefix}__emb__{i}" for i in range(embedding_dim)]
