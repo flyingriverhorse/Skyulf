@@ -123,6 +123,7 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
               setAvailableModels([
                   { id: 'random_forest_classifier', name: 'Random Forest Classifier', category: 'Modeling', description: '', params: {} },
                   { id: 'logistic_regression', name: 'Logistic Regression', category: 'Modeling', description: '', params: {} },
+                  { id: 'sgd_classifier', name: 'SGD Classifier', category: 'Modeling', description: '', params: {} },
                   { id: 'ridge_regression', name: 'Ridge Regression', category: 'Modeling', description: '', params: {} },
                   { id: 'random_forest_regressor', name: 'Random Forest Regressor', category: 'Modeling', description: '', params: {} },
               ]);

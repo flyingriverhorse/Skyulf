@@ -16,6 +16,7 @@ from ._linear import (
     LINEAR_REGRESSION_PARAMS,
     LOGISTIC_REGRESSION_PARAMS,
     RIDGE_REGRESSION_PARAMS,
+    SGD_CLASSIFIER_PARAMS,
 )
 from ._neighbors import KNN_PARAMS
 from ._svm import SVM_PARAMS
@@ -35,6 +36,7 @@ from ._tree import (
 
 MODEL_HYPERPARAMETERS = {
     "logistic_regression": LOGISTIC_REGRESSION_PARAMS,
+    "sgd_classifier": SGD_CLASSIFIER_PARAMS,
     "random_forest_classifier": RANDOM_FOREST_CLASSIFIER_PARAMS,
     "random_forest_regressor": RANDOM_FOREST_PARAMS,
     "ridge_regression": RIDGE_REGRESSION_PARAMS,
@@ -86,6 +88,13 @@ DEFAULT_SEARCH_SPACES: Dict[str, Any] = {
         "solver": ["saga"],
         "max_iter": [100, 200, 500, 1000],
         "l1_ratio": [0.1, 0.5, 0.7, 0.9],  # Only used for elasticnet
+    },
+    "sgd_classifier": {
+        "loss": ["log_loss", "hinge", "modified_huber"],
+        "penalty": ["l1", "l2", "elasticnet"],
+        "alpha": [1e-5, 1e-4, 1e-3, 1e-2],
+        "l1_ratio": [0.05, 0.15, 0.3],
+        "max_iter": [500, 1000, 2000],
     },
     "random_forest_classifier": {
         "n_estimators": [50, 100, 200, 500],
@@ -289,6 +298,12 @@ GRID_SEARCH_SPACES: Dict[str, Any] = {
         "penalty": ["l1", "l2"],
         "solver": ["saga"],
         "max_iter": [200, 500],
+    },
+    "sgd_classifier": {
+        "loss": ["log_loss", "hinge"],
+        "penalty": ["l2", "elasticnet"],
+        "alpha": [1e-4, 1e-3],
+        "max_iter": [1000],
     },
     "random_forest_classifier": {
         "n_estimators": [100, 200, 500],

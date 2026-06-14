@@ -8,6 +8,8 @@ from .classification import (
     LogisticRegressionCalculator,
     RandomForestClassifierApplier,
     RandomForestClassifierCalculator,
+    SGDClassifierApplier,
+    SGDClassifierCalculator,
 )
 from .cross_validation import perform_cross_validation
 from .ensemble import (
@@ -49,6 +51,8 @@ __all__ = [
     "LogisticRegressionApplier",
     "CalibratedClassifierCalculator",
     "CalibratedClassifierApplier",
+    "SGDClassifierCalculator",
+    "SGDClassifierApplier",
     "RandomForestClassifierCalculator",
     "RandomForestClassifierApplier",
     "RidgeRegressionCalculator",
