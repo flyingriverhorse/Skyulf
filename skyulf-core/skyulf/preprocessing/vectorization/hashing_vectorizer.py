@@ -82,6 +82,8 @@ class HashingVectorizerApplier(BaseApplier):
         "n_features": _DEFAULT_N_FEATURES,
         "norm": "l2",
         "alternate_sign": True,
+        "lowercase": True,
+        "stop_words": None,
         "drop_original": False,
     },
     tags=["text", "nlp", "hashing", "vectorizer", "stateless"],
@@ -108,11 +110,15 @@ class HashingVectorizerCalculator(BaseCalculator):
         n_features: int = int(config.get("n_features", _DEFAULT_N_FEATURES))
         norm: Optional[str] = config.get("norm", "l2") or None
         alternate_sign: bool = bool(config.get("alternate_sign", True))
+        lowercase: bool = bool(config.get("lowercase", True))
+        stop_words: Optional[str] = config.get("stop_words") or None
 
         vectorizer = HashingVectorizer(
             n_features=n_features,
             norm=norm,
             alternate_sign=alternate_sign,
+            lowercase=lowercase,
+            stop_words=stop_words,
         )
 
         prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
@@ -128,6 +134,8 @@ class HashingVectorizerCalculator(BaseCalculator):
             "output_columns": output_columns,
             "n_features": n_features,
             "norm": norm,
+            "lowercase": lowercase,
+            "stop_words": stop_words,
             "vectorizer_object": vectorizer,
             "drop_original": bool(config.get("drop_original", False)),
         }

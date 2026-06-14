@@ -333,6 +333,9 @@ class CountVectorizerArtifact(TypedDict, total=False):
     output_columns: List[str]  # one name per vocabulary term
     vocabulary: Dict[str, int]  # token → column-index mapping
     max_features: Optional[int]
+    lowercase: bool
+    stop_words: Optional[str]  # e.g. "english" or None
+    binary: bool  # presence/absence (1/0) instead of counts
     vectorizer_object: Any  # fitted sklearn object (not JSON-serialisable)
     drop_original: bool
 
@@ -344,6 +347,8 @@ class TfidfVectorizerArtifact(TypedDict, total=False):
     vocabulary: Dict[str, int]
     idf: List[float]  # one value per vocabulary term
     max_features: Optional[int]
+    lowercase: bool
+    stop_words: Optional[str]  # e.g. "english" or None
     vectorizer_object: Any  # fitted sklearn object (not JSON-serialisable)
     drop_original: bool
 
@@ -354,6 +359,8 @@ class HashingVectorizerArtifact(TypedDict, total=False):
     output_columns: List[str]  # indexed: ``{src}__hash__{i}``
     n_features: int
     norm: Optional[str]
+    lowercase: bool
+    stop_words: Optional[str]  # e.g. "english" or None
     vectorizer_object: Any  # configured (but stateless) sklearn object
     drop_original: bool
 

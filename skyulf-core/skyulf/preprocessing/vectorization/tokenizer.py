@@ -85,7 +85,9 @@ class TokenizerApplier(BaseApplier):
     description=(
         "Split text columns into tokens (word, char, or char_wb). "
         "Outputs a space-joined token string column per source column, "
-        "optionally with a token-count column. Stateless — no vocabulary fitted."
+        "optionally with a token-count column. Stateless — no vocabulary fitted. "
+        "Inspection / intermediate tool only: do NOT chain before a vectorizer "
+        "(Count / TF-IDF / Hashing already tokenize internally)."
     ),
     params={
         "columns": [],

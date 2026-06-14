@@ -85,6 +85,9 @@ class CountVectorizerApplier(BaseApplier):
         "min_df": 1,
         "max_df": 1.0,
         "ngram_range": [1, 1],
+        "lowercase": True,
+        "stop_words": None,
+        "binary": False,
         "drop_original": False,
     },
     tags=["text", "nlp", "vectorizer", "bag-of-words"],
@@ -112,12 +115,18 @@ class CountVectorizerCalculator(BaseCalculator):
         min_df: Any = config.get("min_df", 1)
         max_df: Any = config.get("max_df", 1.0)
         ngram_min, ngram_max = config.get("ngram_range", [1, 1])
+        lowercase: bool = bool(config.get("lowercase", True))
+        stop_words: Optional[str] = config.get("stop_words") or None
+        binary: bool = bool(config.get("binary", False))
 
         vectorizer = CountVectorizer(
             max_features=max_features,
             min_df=min_df,
             max_df=max_df,
             ngram_range=(ngram_min, ngram_max),
+            lowercase=lowercase,
+            stop_words=stop_words,
+            binary=binary,
         )
 
         text = _join_text_columns(X, valid_cols)
@@ -137,6 +146,9 @@ class CountVectorizerCalculator(BaseCalculator):
             "output_columns": output_columns,
             "vocabulary": vectorizer.vocabulary_,
             "max_features": max_features,
+            "lowercase": lowercase,
+            "stop_words": stop_words,
+            "binary": binary,
             "vectorizer_object": vectorizer,
             "drop_original": bool(config.get("drop_original", False)),
         }

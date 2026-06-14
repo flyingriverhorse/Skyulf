@@ -79,6 +79,8 @@ class TfidfVectorizerApplier(BaseApplier):
         "max_df": 1.0,
         "ngram_range": [1, 1],
         "sublinear_tf": False,
+        "lowercase": True,
+        "stop_words": None,
         "drop_original": False,
     },
     tags=["text", "nlp", "tfidf", "vectorizer"],
@@ -105,6 +107,8 @@ class TfidfVectorizerCalculator(BaseCalculator):
         max_df: Any = config.get("max_df", 1.0)
         ngram_min, ngram_max = config.get("ngram_range", [1, 1])
         sublinear_tf: bool = bool(config.get("sublinear_tf", False))
+        lowercase: bool = bool(config.get("lowercase", True))
+        stop_words: Optional[str] = config.get("stop_words") or None
 
         vectorizer = TfidfVectorizer(
             max_features=max_features,
@@ -112,6 +116,8 @@ class TfidfVectorizerCalculator(BaseCalculator):
             max_df=max_df,
             ngram_range=(ngram_min, ngram_max),
             sublinear_tf=sublinear_tf,
+            lowercase=lowercase,
+            stop_words=stop_words,
         )
 
         text = _join_text_columns(X, valid_cols)
@@ -132,6 +138,8 @@ class TfidfVectorizerCalculator(BaseCalculator):
             "vocabulary": vectorizer.vocabulary_,
             "idf": vectorizer.idf_.tolist(),
             "max_features": max_features,
+            "lowercase": lowercase,
+            "stop_words": stop_words,
             "vectorizer_object": vectorizer,
             "drop_original": bool(config.get("drop_original", False)),
         }
