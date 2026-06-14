@@ -8,31 +8,31 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/imputation.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/text_nlp.html">
       
       
-        <link rel="prev" href="drop_and_missing.html">
+        <link rel="prev" href="eda_profiling.html">
       
       
-        <link rel="next" href="encoding.html">
+        <link rel="next" href="validation_vs_sklearn.html">
       
       
         
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
-        <title>imputation - Skyulf</title>
+        <title>Text & NLP - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#api-preprocessingimputation" class="md-skip">
+        <a href="#text-nlp" class="md-skip">
           Skip to content
         </a>
       
@@ -92,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              imputation
+              Text & NLP
             
           </span>
         </div>
@@ -223,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../../index.html" class="md-tabs__link">
+      <a href="../index.html" class="md-tabs__link">
         
   
   
@@ -244,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../guides/getting_started.html" class="md-tabs__link">
+        <a href="../guides/getting_started.html" class="md-tabs__link">
           
   
   
@@ -264,7 +264,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../examples/quickstart.html" class="md-tabs__link">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
           
   
   
@@ -284,31 +284,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../contributing/writing_docs.html" class="md-tabs__link">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
           
   
   
   Contributing
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../../../user_guide/overview.html" class="md-tabs__link">
-          
-  
-  
-  User Guide
 
         </a>
       </li>
@@ -326,7 +306,27 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../../preprocessing_nodes.html" class="md-tabs__link">
+        <a href="overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
           
   
   
@@ -362,7 +362,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -392,7 +392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../index.html" class="md-nav__link">
+      <a href="../index.html" class="md-nav__link">
         
   
   
@@ -473,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/getting_started.html" class="md-nav__link">
+      <a href="../guides/getting_started.html" class="md-nav__link">
         
   
   
@@ -501,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/platform_setup.html" class="md-nav__link">
+      <a href="../guides/platform_setup.html" class="md-nav__link">
         
   
   
@@ -529,7 +529,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/platform_walkthrough.html" class="md-nav__link">
+      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -557,7 +557,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/multi_path_pipelines.html" class="md-nav__link">
+      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
   
@@ -585,7 +585,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/faq.html" class="md-nav__link">
+      <a href="../guides/faq.html" class="md-nav__link">
         
   
   
@@ -613,7 +613,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/recipes.html" class="md-nav__link">
+      <a href="../guides/recipes.html" class="md-nav__link">
         
   
   
@@ -641,7 +641,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/profiling_comparison.html" class="md-nav__link">
+      <a href="../guides/profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -669,7 +669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../architecture.html" class="md-nav__link">
+      <a href="../architecture.html" class="md-nav__link">
         
   
   
@@ -697,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../data_architecture.html" class="md-nav__link">
+      <a href="../data_architecture.html" class="md-nav__link">
         
   
   
@@ -725,7 +725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../performance.html" class="md-nav__link">
+      <a href="../performance.html" class="md-nav__link">
         
   
   
@@ -753,7 +753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="../guides/adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -781,7 +781,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/engine_mechanics.html" class="md-nav__link">
+      <a href="../guides/engine_mechanics.html" class="md-nav__link">
         
   
   
@@ -809,7 +809,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../guides/job_idempotency.html" class="md-nav__link">
+      <a href="../guides/job_idempotency.html" class="md-nav__link">
         
   
   
@@ -898,7 +898,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/quickstart.html" class="md-nav__link">
+      <a href="../examples/quickstart.html" class="md-nav__link">
         
   
   
@@ -926,7 +926,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../examples/leakage_proof.html" class="md-nav__link">
+      <a href="../examples/leakage_proof.html" class="md-nav__link">
         
   
   
@@ -1015,7 +1015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../contributing/writing_docs.html" class="md-nav__link">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
         
   
   
@@ -1023,6 +1023,681 @@
     
   
     Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="text_nlp.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-text-toolbox-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The text toolbox at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#count-vectorizer-bag-of-words" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Count Vectorizer — bag of words
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tf-idf-vectorizer-counts-but-smarter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TF-IDF Vectorizer — counts, but smarter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hashing-vectorizer-no-vocabulary-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hashing Vectorizer — no vocabulary needed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tokenizer-clean-the-text-before-vectorizing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tokenizer — clean the text before vectorizing
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Tokenizer — clean the text before vectorizing">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chaining-tokenizer-tf-idf" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chaining: Tokenizer → TF-IDF
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sentence-embedder-modern-dense-embeddings-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sentence Embedder — modern dense embeddings (optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#which-model-can-i-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which model can I use?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Which model can I use?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multinomial-bernoulli-naive-bayes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Multinomial &amp; Bernoulli Naive Bayes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-universal-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The universal recipe
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#in-the-visual-canvas" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        In the visual canvas
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
   
 
     
@@ -1065,494 +1740,10 @@
         
           
         
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    User Guide
-  
-
-    
-  </span>
-  
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    User Guide
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/overview.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Overview
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/installation.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/pipeline_quickstart.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Pipeline Quickstart
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/step_by_step_no_config.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Step-by-Step (No Config)
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/eda_profiling.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Automated EDA
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/text_nlp.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Text & NLP
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/validation_vs_sklearn.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Validation vs scikit-learn
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/configuration.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/hyperparameter_tuning.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hyperparameter Tuning
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/cross_validation.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Cross-Validation
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    SplitDataset & Leakage
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/drift_monitoring.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Drift Monitoring
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/serialization.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Serialization
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/extending_custom_nodes.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Extending Skyulf-Core
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../user_guide/troubleshooting.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-    
-  
-  
-  
-    
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
-        
-          
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1570,7 +1761,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1588,7 +1779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../preprocessing_nodes.html" class="md-nav__link">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
         
   
   
@@ -1616,7 +1807,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../modeling_nodes.html" class="md-nav__link">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
         
   
   
@@ -1644,7 +1835,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../data_validation.html" class="md-nav__link">
+      <a href="../reference/data_validation.html" class="md-nav__link">
         
   
   
@@ -1672,7 +1863,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../deprecation.html" class="md-nav__link">
+      <a href="../reference/deprecation.html" class="md-nav__link">
         
   
   
@@ -1697,31 +1888,28 @@
                 
   
   
-    
   
   
-  
     
     
     
     
       
       
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
         
           
-          
         
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5" checked>
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5" >
         
           
-          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_6_5" id="__nav_6_5_label" tabindex="0">
             
   
   
@@ -1739,7 +1927,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1757,7 +1945,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../pipeline.html" class="md-nav__link">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
         
   
   
@@ -1839,7 +2027,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../data/dataset.html" class="md-nav__link">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
         
   
   
@@ -1872,8 +2060,6 @@
                 
   
   
-    
-  
   
   
     
@@ -1886,11 +2072,13 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_5_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6_5_3" >
         
           
           <label class="md-nav__link" for="__nav_6_5_3" id="__nav_6_5_3_label" tabindex="0">
@@ -1911,7 +2099,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_5_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_5_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6_5_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1929,7 +2117,7 @@
   
   
     <li class="md-nav__item">
-      <a href="index.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
         
   
   
@@ -1957,7 +2145,7 @@
   
   
     <li class="md-nav__item">
-      <a href="base.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
         
   
   
@@ -1985,7 +2173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="pipeline.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
         
   
   
@@ -2013,7 +2201,7 @@
   
   
     <li class="md-nav__item">
-      <a href="split.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
         
   
   
@@ -2041,7 +2229,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cleaning.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
         
   
   
@@ -2069,7 +2257,7 @@
   
   
     <li class="md-nav__item">
-      <a href="drop_and_missing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
         
   
   
@@ -2094,37 +2282,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    imputation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="imputation.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
         
   
   
@@ -2140,37 +2301,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#skyulf.preprocessing.imputation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        imputation
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2183,7 +2313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="encoding.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
         
   
   
@@ -2211,7 +2341,7 @@
   
   
     <li class="md-nav__item">
-      <a href="scaling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
         
   
   
@@ -2239,7 +2369,7 @@
   
   
     <li class="md-nav__item">
-      <a href="outliers.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
         
   
   
@@ -2267,7 +2397,7 @@
   
   
     <li class="md-nav__item">
-      <a href="transformations.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
         
   
   
@@ -2295,7 +2425,7 @@
   
   
     <li class="md-nav__item">
-      <a href="bucketing.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
         
   
   
@@ -2323,7 +2453,7 @@
   
   
     <li class="md-nav__item">
-      <a href="casting.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
         
   
   
@@ -2351,7 +2481,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_generation.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
         
   
   
@@ -2379,7 +2509,7 @@
   
   
     <li class="md-nav__item">
-      <a href="feature_selection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
         
   
   
@@ -2407,7 +2537,7 @@
   
   
     <li class="md-nav__item">
-      <a href="resampling.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
         
   
   
@@ -2435,7 +2565,7 @@
   
   
     <li class="md-nav__item">
-      <a href="inspection.html" class="md-nav__link">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
         
   
   
@@ -2525,7 +2655,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/index.html" class="md-nav__link">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
         
   
   
@@ -2553,7 +2683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/base.html" class="md-nav__link">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
         
   
   
@@ -2581,7 +2711,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/sklearn_wrapper.html" class="md-nav__link">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
         
   
   
@@ -2609,7 +2739,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/classification.html" class="md-nav__link">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
         
   
   
@@ -2637,7 +2767,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/regression.html" class="md-nav__link">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
         
   
   
@@ -2665,7 +2795,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/cross_validation.html" class="md-nav__link">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
         
   
   
@@ -2693,7 +2823,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../modeling/tuning_engine.html" class="md-nav__link">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
         
   
   
@@ -2757,61 +2887,297 @@
   
 
 
-<h1 id="api-preprocessingimputation">API: preprocessing.imputation</h1>
+<h1 id="text-nlp">Text &amp; NLP</h1>
+<p>Machine-learning models only understand <strong>numbers</strong>. A column of raw text
+(<code>"the pitcher threw a curveball"</code>) has to be turned into numeric features before any
+model can learn from it. Skyulf ships a small, composable set of <strong>text nodes</strong> that do
+exactly that, plus two text-friendly classifiers.</p>
+<p>This page explains each node, when to reach for it, and how they combine. For a runnable,
+end-to-end tour on real data see the notebook
+<a href="https://github.com/flyingriverhorse/Skyulf/blob/main/skyulf-core/examples/07_text_nlp_real_data.ipynb"><code>examples/07_text_nlp_real_data.ipynb</code></a>
+and the script <code>examples/06_text_nlp_vectorization.py</code>.</p>
+<hr />
+<h2 id="the-text-toolbox-at-a-glance">The text toolbox at a glance</h2>
+<table>
+<thead>
+<tr>
+<th>Node</th>
+<th>id</th>
+<th>What it does</th>
+<th>Needs a fit?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Count Vectorizer</td>
+<td><code>count_vectorizer</code></td>
+<td>Counts how often each word appears ("bag of words")</td>
+<td>Yes (learns a vocabulary)</td>
+</tr>
+<tr>
+<td>TF-IDF Vectorizer</td>
+<td><code>tfidf_vectorizer</code></td>
+<td>Like counts, but down-weights words common to every document</td>
+<td>Yes (vocabulary + IDF weights)</td>
+</tr>
+<tr>
+<td>Hashing Vectorizer</td>
+<td><code>hashing_vectorizer</code></td>
+<td>Hashes words into a fixed number of columns — no vocabulary</td>
+<td>No (stateless)</td>
+</tr>
+<tr>
+<td>Tokenizer</td>
+<td><code>tokenizer</code></td>
+<td>Splits / cleans text into tokens (lowercase, stop-words, n-grams)</td>
+<td>No (stateless)</td>
+</tr>
+<tr>
+<td>Sentence Embedder</td>
+<td><code>sentence_embedder</code></td>
+<td>Encodes text into dense semantic vectors (needs <code>skyulf[nlp]</code>)</td>
+<td>Yes (loads a model)</td>
+</tr>
+<tr>
+<td>Multinomial NB</td>
+<td><code>multinomial_nb</code></td>
+<td>Fast, strong classifier for word-count / TF-IDF features</td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>Bernoulli NB</td>
+<td><code>bernoulli_nb</code></td>
+<td>Classifier for "word present / absent" features</td>
+<td>Yes</td>
+</tr>
+</tbody>
+</table>
+<p>All vectorizers live in <code>skyulf.preprocessing.vectorization</code>; the Naive Bayes models live in
+<code>skyulf.modeling.naive_bayes</code>. Every node follows the standard Skyulf
+<strong>Calculator → Applier</strong> contract (see <a href="overview.html">Overview</a>): the Calculator <em>learns</em> from
+the training data and returns an artifact; the Applier <em>uses</em> that artifact to transform any
+DataFrame. Vectorizers keep the original columns and <strong>add</strong> new feature columns whose names
+are listed in <code>artifact['output_columns']</code>.</p>
+<p>!!! tip "Fit on train only"
+    Vectorizers learn a vocabulary, so they are subject to data leakage just like scalers and
+    encoders. Always <code>fit()</code> on the <strong>training</strong> split and reuse the same artifact to <code>apply()</code>
+    on test / inference data.</p>
+<hr />
+<h2 id="count-vectorizer-bag-of-words">Count Vectorizer — bag of words</h2>
+<p>The simplest representation: build a vocabulary of every word seen in training, then count how
+many times each word appears in each document.</p>
+<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
+    CountVectorizerCalculator,
+    CountVectorizerApplier,
+)
 
+cfg = {
+    &quot;columns&quot;: [&quot;text&quot;],     # one or more text columns (joined with a space)
+    &quot;max_features&quot;: 5000,    # keep the 5000 most frequent words
+    &quot;min_df&quot;: 2,             # ignore words appearing in &lt; 2 documents
+    &quot;ngram_range&quot;: [1, 1],   # unigrams only
+}
 
-<div class="doc doc-object doc-module">
+art = CountVectorizerCalculator().fit(train_df, cfg)   # learn vocabulary on TRAIN
+train_X = CountVectorizerApplier().apply(train_df, art)
+test_X = CountVectorizerApplier().apply(test_df, art)  # same vocabulary
 
+feature_cols = art[&quot;output_columns&quot;]   # e.g. ['text__count__game', ...]
+vocab = art[&quot;vocabulary&quot;]              # {word: column index}
+</code></pre>
+<p><strong>Reach for it when</strong> you want a dead-simple, interpretable baseline.</p>
+<hr />
+<h2 id="tf-idf-vectorizer-counts-but-smarter">TF-IDF Vectorizer — counts, but smarter</h2>
+<p>Plain counts over-reward words that appear everywhere ("the", "and"). <strong>TF-IDF</strong>
+(Term Frequency × Inverse Document Frequency) multiplies each count by how <em>rare</em> the word is
+across the corpus, so distinctive words score higher. This is the <strong>best default</strong> for most
+text-classification tasks.</p>
+<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
+    TfidfVectorizerCalculator,
+    TfidfVectorizerApplier,
+)
 
+cfg = {
+    &quot;columns&quot;: [&quot;text&quot;],
+    &quot;max_features&quot;: 20000,
+    &quot;min_df&quot;: 2,
+    &quot;ngram_range&quot;: [1, 2],   # unigrams + bigrams capture short phrases
+    &quot;sublinear_tf&quot;: True,    # dampen very frequent words (log scaling)
+}
 
-<h2 id="skyulf.preprocessing.imputation" class="doc doc-heading">
-            <code>skyulf.preprocessing.imputation</code>
+art = TfidfVectorizerCalculator().fit(train_df, cfg)
+app = TfidfVectorizerApplier()
+train_X = app.apply(train_df, art)
+test_X = app.apply(test_df, art)
+</code></pre>
+<p>The artifact stores both the vocabulary and the learned IDF weights, so test data is
+transformed with exactly the weights learned on train.</p>
+<hr />
+<h2 id="hashing-vectorizer-no-vocabulary-needed">Hashing Vectorizer — no vocabulary needed</h2>
+<p>Both vectorizers above must <strong>store</strong> a vocabulary, which can be large and must be learned up
+front. The Hashing Vectorizer instead pushes every word through a hash function into a fixed
+number of columns (<code>n_features</code>). It is <strong>stateless</strong> — there is nothing to learn — so it is
+ideal for streaming data or vocabularies too big to keep in memory.</p>
+<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
+    HashingVectorizerCalculator,
+    HashingVectorizerApplier,
+)
 
+cfg = {&quot;columns&quot;: [&quot;text&quot;], &quot;n_features&quot;: 4096, &quot;norm&quot;: &quot;l2&quot;}
 
-</h2>
+art = HashingVectorizerCalculator().fit(train_df, cfg)   # no vocabulary learned
+train_X = HashingVectorizerApplier().apply(train_df, art)
+</code></pre>
+<p>The trade-off: output columns are anonymous hash buckets (<code>text__hash__0 …</code>), so you lose the
+word ↔ column mapping, and different words can occasionally collide into the same bucket.</p>
+<p>!!! warning "Hashing + Multinomial Naive Bayes"
+    Multinomial Naive Bayes needs <strong>non-negative</strong> features. The Hashing Vectorizer uses a
+    signed hash by default (<code>alternate_sign=True</code>), producing negatives. Set
+    <code>alternate_sign=False</code> if you intend to feed it to Multinomial NB.</p>
+<hr />
+<h2 id="tokenizer-clean-the-text-before-vectorizing">Tokenizer — clean the text <em>before</em> vectorizing</h2>
+<p>Sometimes you want to pre-process text once — lowercase it, drop common filler ("stop") words,
+split on characters instead of words — and then feed the cleaned result into a vectorizer. The
+Tokenizer emits a space-joined token string column <code>{col}__tokens</code> (and optionally
+<code>{col}__token_count</code>) that any vectorizer can consume.</p>
+<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
+    TokenizerCalculator,
+    TokenizerApplier,
+)
 
-    <div class="doc doc-contents first">
+cfg = {
+    &quot;columns&quot;: [&quot;text&quot;],
+    &quot;analyzer&quot;: &quot;word&quot;,        # 'word' | 'char' | 'char_wb'
+    &quot;stop_words&quot;: &quot;english&quot;,   # drop common filler words ('the', 'is', ...)
+    &quot;add_token_count&quot;: True,   # also emit text__token_count
+}
 
-        <p>Imputation nodes package.</p>
+art = TokenizerCalculator().fit(train_df, cfg)
+train_tok = TokenizerApplier().apply(train_df, art)
+# -&gt; new columns: ['text__tokens', 'text__token_count']
+</code></pre>
+<h3 id="chaining-tokenizer-tf-idf">Chaining: Tokenizer → TF-IDF</h3>
+<p>Because every node speaks the same DataFrame-in / DataFrame-out language, you can simply point
+the next vectorizer at the Tokenizer's output column:</p>
+<pre><code class="language-python">chain_cfg = {
+    &quot;columns&quot;: [&quot;text__tokens&quot;],   # the Tokenizer's output column
+    &quot;max_features&quot;: 20000,
+    &quot;ngram_range&quot;: [1, 2],
+    &quot;sublinear_tf&quot;: True,
+}
+chain_art = TfidfVectorizerCalculator().fit(train_tok, chain_cfg)
+train_X = TfidfVectorizerApplier().apply(train_tok, chain_art)
+</code></pre>
+<p>In practice this <code>text → Tokenizer → TF-IDF → model</code> chain often beats vectorizing raw text,
+because stop-word removal focuses the vocabulary on meaningful words.</p>
+<hr />
+<h2 id="sentence-embedder-modern-dense-embeddings-optional">Sentence Embedder — modern dense embeddings (optional)</h2>
+<p>Bag-of-words and TF-IDF treat "great" and "excellent" as completely unrelated. <strong>Sentence
+embeddings</strong> map text into a dense vector space where similar <em>meanings</em> land close together,
+which can help on short text. This node is powered by
+<a href="https://www.sbert.net/"><code>sentence-transformers</code></a> and is an <strong>optional</strong> dependency.</p>
+<pre><code class="language-bash">pip install skyulf[nlp]          # or: pip install -r requirements-nlp.txt
+</code></pre>
+<pre><code class="language-python">from skyulf.preprocessing.vectorization import (
+    SentenceEmbedderCalculator,
+    SentenceEmbedderApplier,
+)
 
+cfg = {&quot;columns&quot;: [&quot;text&quot;], &quot;model_name&quot;: &quot;all-MiniLM-L6-v2&quot;, &quot;normalize&quot;: True}
 
-<details class="split-from-a-single-416-loc-module-into-per-imputer-files" open>
-  <summary>Split from a single 416-LOC module into per-imputer files</summary>
-  <p>_common.py    — shared helpers (column resolution, polars fill values, sklearn transform)
-simple.py     — SimpleImputer
-knn.py        — KNNImputer
-iterative.py  — IterativeImputer (MICE)</p>
-</details>        <p>All public names are re-exported here so existing imports such as
-<code>from skyulf.preprocessing.imputation import SimpleImputerCalculator</code>
-continue to work unchanged.</p>
+art = SentenceEmbedderCalculator().fit(train_df, cfg)
+train_X = SentenceEmbedderApplier().apply(train_df, art)
+# output columns: text__emb__0 … text__emb__{embedding_dim-1}
+</code></pre>
+<p>The node imports <code>sentence-transformers</code> lazily and raises a clear install hint if the extra is
+missing, so pipelines that don't use it never pay the (large, PyTorch-based) dependency cost.</p>
+<p>!!! warning "Embeddings are dense and can be negative"
+    Embedding values can be negative, so they <strong>cannot</strong> be fed to Multinomial / Bernoulli
+    Naive Bayes. Pair embeddings with Logistic Regression, SVC, Random Forest, or boosting.</p>
+<hr />
+<h2 id="which-model-can-i-use">Which model can I use?</h2>
+<p><strong>Any of them.</strong> Once text is vectorized it is just numeric columns, so the output feeds any
+Skyulf classifier or regressor exactly like ordinary tabular data — <code>logistic_regression</code>,
+<code>random_forest_classifier</code>, <code>svc</code>, <code>gradient_boosting_classifier</code>,
+<code>hist_gradient_boosting_classifier</code>, <code>extra_trees_classifier</code>, <code>xgboost_classifier</code>,
+<code>lgbm_classifier</code>, the ensemble nodes (<code>voting_classifier</code>, <code>stacking_classifier</code>), and so on.</p>
+<p>There is only <strong>one real constraint</strong>, and it comes from the <em>model</em>, not from Skyulf:</p>
+<table>
+<thead>
+<tr>
+<th>Features</th>
+<th>Good models</th>
+<th>Avoid</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Counts / TF-IDF (non-negative)</td>
+<td><strong>Multinomial NB</strong>, Logistic Regression, linear SVC, trees, boosting</td>
+<td>—</td>
+<td>NB is the fast, strong text baseline; linear models thrive on high-dimensional sparse text</td>
+</tr>
+<tr>
+<td>Binary word presence</td>
+<td><strong>Bernoulli NB</strong>, plus any of the above</td>
+<td>—</td>
+<td>Bernoulli models "word present / absent"</td>
+</tr>
+<tr>
+<td>Dense embeddings (can be negative)</td>
+<td>Logistic Regression, SVC, Random Forest, boosting</td>
+<td><strong>Multinomial / Bernoulli NB</strong></td>
+<td>Naive Bayes requires non-negative inputs</td>
+</tr>
+</tbody>
+</table>
+<h3 id="multinomial-bernoulli-naive-bayes">Multinomial &amp; Bernoulli Naive Bayes</h3>
+<p>These two text-friendly classifiers live in <code>skyulf.modeling.naive_bayes</code>:</p>
+<pre><code class="language-python">from skyulf.modeling.naive_bayes import (
+    MultinomialNBCalculator, MultinomialNBApplier,
+    BernoulliNBCalculator, BernoulliNBApplier,
+)
+from sklearn.metrics import accuracy_score
 
+# TF-IDF (or counts) -&gt; Multinomial NB: the classic strong baseline
+model = MultinomialNBCalculator().fit(
+    train_X[feature_cols], train_df[&quot;label&quot;], config={&quot;alpha&quot;: 0.1}
+)
+preds = MultinomialNBApplier().predict(test_X[feature_cols], model)
+print(accuracy_score(test_df[&quot;label&quot;], preds))
+</code></pre>
+<p>Bernoulli NB binarizes its inputs internally at the <code>binarize</code> threshold, so it pairs naturally
+with raw counts: <code>BernoulliNBCalculator().fit(X, y, config={"binarize": 0.0})</code>.</p>
+<hr />
+<h2 id="the-universal-recipe">The universal recipe</h2>
+<p>Every text pipeline follows the same shape:</p>
+<pre><code class="language-python"># 1. LEARN the transform on TRAIN only
+art = SomeVectorizerCalculator().fit(train_df, config)
 
+# 2. APPLY the same transform to train and test
+train_X = SomeVectorizerApplier().apply(train_df, art)
+test_X = SomeVectorizerApplier().apply(test_df, art)
+cols = art[&quot;output_columns&quot;]
 
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
-
-    </div>
-
-</div>
+# 3. Train a model on the new numeric columns
+model = SomeModelCalculator().fit(train_X[cols], train_df[&quot;label&quot;])
+preds = SomeModelApplier().predict(test_X[cols], model)
+</code></pre>
+<hr />
+<h2 id="in-the-visual-canvas">In the visual canvas</h2>
+<p>All of these nodes appear in the <strong>Preprocessing</strong> section of the node sidebar in the ML Canvas.
+The built-in <strong>"Text Classification"</strong> starter template wires the standard strong baseline for
+you — <code>dataset → Text Cleaning → TF-IDF → Train/Test Split → Logistic Regression</code>. Load it, point
+the Text Cleaning and TF-IDF nodes at your raw-text column, pick the label column on the split,
+and <strong>Run All</strong>.</p>
+<h2 id="see-also">See also</h2>
+<ul>
+<li><a href="overview.html">Overview</a> — the Calculator → Applier pattern.</li>
+<li><a href="splitdataset_and_leakage.html">SplitDataset &amp; Leakage</a> — why vectorizers must fit on train only.</li>
+<li><a href="../reference/preprocessing_nodes.html">Preprocessing Nodes</a> — full node reference.</li>
+<li><a href="../reference/modeling_nodes.html">Modeling Nodes</a> — every available classifier and regressor.</li>
+</ul>
 
 
 
@@ -2863,10 +3229,10 @@ continue to work unchanged.</p>
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
       
     
   </body>
