@@ -22,6 +22,13 @@ export interface NodeSettingsProps<TConfig> {
   config: TConfig;
   onChange: (newConfig: TConfig) => void;
   nodeId?: string;
+  /**
+   * Whether the Properties panel is maximised. Settings forms can use this
+   * to switch between a compact single-column layout (narrow `w-80` panel)
+   * and a roomier multi-column layout (full-width expanded panel). Optional —
+   * most settings ignore it and render the same in both states.
+   */
+  isExpanded?: boolean;
 }
 
 export interface NodeDefinition<TConfig = any> {

@@ -1,11 +1,37 @@
+# Generated/minified build outputs must never be touched by the auto-fix
+# hooks (trailing-whitespace, end-of-file-fixer, ruff-format). Rewriting their
+# whitespace is pointless and, when a file is partially staged, triggers
+# pre-commit's stash/un-stash conflict → "Rolling back fixes" → aborted commit.
+exclude: |
+  (?x)^(
+    static/ml_canvas/assets/.*|
+    frontend/ml-canvas/dist/.*|
+    .*\.min\.(js|css)
+  )$
+
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+  - repo: local
     hooks:
       - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: uv run --no-sync python -m pre_commit_hooks.trailing_whitespace_fixer
+        language: system
+        types: [text]
       - id: end-of-file-fixer
+        name: fix end of files
+        entry: uv run --no-sync python -m pre_commit_hooks.end_of_file_fixer
+        language: system
+        types: [text]
       - id: check-yaml
+        name: check yaml
+        entry: uv run --no-sync python -m pre_commit_hooks.check_yaml
+        language: system
+        types: [yaml]
       - id: check-json
+        name: check json
+        entry: uv run --no-sync python -m pre_commit_hooks.check_json
+        language: system
+        types: [json]
         # tsconfig*.json files are JSONC (allow comments / trailing commas),
         # which the strict JSON parser can't read. The frontend lint/build
         # validates them instead.

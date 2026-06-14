@@ -74,6 +74,7 @@ const CLF_OPTIONS: Option[] = [
   { label: 'AdaBoost', value: 'adaboost' },
   { label: 'Decision Tree', value: 'decision_tree' },
   { label: 'Gaussian Naive Bayes', value: 'gaussian_nb' },
+  { label: 'SGD Classifier', value: 'sgd_classifier' },
   { label: 'Support Vector Classifier', value: 'svc' },
   { label: 'K-Nearest Neighbors', value: 'knn' },
 ];
@@ -187,6 +188,7 @@ const LOOKUP_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', Rec
     adaboost_classifier: 'adaboost',
     decision_tree_classifier: 'decision_tree',
     gaussian_nb: 'gaussian_nb',
+    sgd_classifier: 'sgd_classifier',
     svc: 'svc',
     k_neighbors_classifier: 'knn',
     xgboost_classifier: 'xgboost',
@@ -213,7 +215,7 @@ const LOOKUP_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', Rec
 function lookupTaskFromModelType(modelType: string): 'classification' | 'regression' | null {
   if (modelType in LOOKUP_BASE_KEY_BY_MODEL_TYPE.classification) return 'classification';
   if (modelType in LOOKUP_BASE_KEY_BY_MODEL_TYPE.regression) return 'regression';
-  if (modelType.endsWith('_classifier') || modelType === 'logistic_regression' || modelType === 'gaussian_nb' || modelType === 'svc') {
+  if (modelType.endsWith('_classifier') || modelType === 'logistic_regression' || modelType === 'gaussian_nb' || modelType === 'sgd_classifier' || modelType === 'svc') {
     return 'classification';
   }
   if (modelType.endsWith('_regressor') || modelType === 'linear_regression' || modelType.includes('regression') || modelType === 'svr') {

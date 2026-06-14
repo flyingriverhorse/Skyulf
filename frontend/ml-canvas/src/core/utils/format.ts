@@ -105,6 +105,7 @@ const HYPERPARAM_DESCRIPTIONS: Record<string, string> = {
   solver: 'Optimisation algorithm. Choice depends on dataset size and regularisation type.',
   max_iter: 'Maximum number of iterations for the solver to converge. Increase if training shows convergence warnings.',
   selection: 'Coefficient update order for coordinate descent (Lasso/ElasticNet): cyclic (stable) or random (faster).',
+  loss: 'Loss function for SGD: log_loss = logistic regression (probabilistic), hinge = linear SVM, modified_huber = smooth SVM with outlier tolerance.',
   // Naive Bayes
   var_smoothing: 'Portion of the largest variance added to all variances for numerical stability (Gaussian NB).',
 };
@@ -194,6 +195,7 @@ const BASE_ESTIMATOR_LABELS: Record<string, string> = {
   adaboost: 'AdaBoost',
   decision_tree: 'Decision Tree',
   gaussian_nb: 'Gaussian NB',
+  sgd_classifier: 'SGD Classifier',
   svc: 'SVC',
   svr: 'SVR',
   knn: 'KNN',

@@ -8,6 +8,8 @@ from .classification import (
     LogisticRegressionCalculator,
     RandomForestClassifierApplier,
     RandomForestClassifierCalculator,
+    SGDClassifierApplier,
+    SGDClassifierCalculator,
 )
 from .cross_validation import perform_cross_validation
 from .ensemble import (
@@ -24,6 +26,12 @@ from .hyperparameters import (
     HyperparameterField,
     get_default_search_space,
     get_hyperparameters,
+)
+from .naive_bayes import (
+    BernoulliNBApplier,
+    BernoulliNBCalculator,
+    MultinomialNBApplier,
+    MultinomialNBCalculator,
 )
 from .regression import (
     RandomForestRegressorApplier,
@@ -43,6 +51,8 @@ __all__ = [
     "LogisticRegressionApplier",
     "CalibratedClassifierCalculator",
     "CalibratedClassifierApplier",
+    "SGDClassifierCalculator",
+    "SGDClassifierApplier",
     "RandomForestClassifierCalculator",
     "RandomForestClassifierApplier",
     "RidgeRegressionCalculator",
@@ -61,6 +71,10 @@ __all__ = [
     "HyperparameterField",
     "get_hyperparameters",
     "get_default_search_space",
+    "MultinomialNBCalculator",
+    "MultinomialNBApplier",
+    "BernoulliNBCalculator",
+    "BernoulliNBApplier",
 ]
 
 # NOTE: Imports above are intentionally explicit. Every node module is imported
