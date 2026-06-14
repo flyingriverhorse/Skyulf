@@ -12,7 +12,7 @@ from sklearn.ensemble import (
     HistGradientBoostingClassifier,
     RandomForestClassifier,
 )
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -545,5 +545,48 @@ class GaussianNBCalculator(SklearnCalculator):
         super().__init__(
             model_class=GaussianNB,
             default_params={"var_smoothing": 1e-9},
+            problem_type="classification",
+        )
+
+
+# --- SGD Classifier ---
+class SGDClassifierApplier(SklearnApplier):
+    """Stochastic Gradient Descent Classifier Applier."""
+
+
+@NodeRegistry.register("sgd_classifier", SGDClassifierApplier)
+@node_meta(
+    id="sgd_classifier",
+    name="SGD Classifier (text / linear)",
+    category="Modeling",
+    description=(
+        "Linear classifiers (SVM, logistic regression, etc.) with SGD training. "
+        "Highly efficient for high-dimensional sparse/dense text representations "
+        "and large datasets."
+    ),
+    params={
+        "loss": "log_loss",
+        "penalty": "l2",
+        "alpha": 0.0001,
+        "l1_ratio": 0.15,
+        "max_iter": 1000,
+        "random_state": 42,
+    },
+    tags=["text", "nlp", "classification", "linear", "requires_scaling"],
+)
+class SGDClassifierCalculator(SklearnCalculator):
+    """SGD Classifier Calculator."""
+
+    def __init__(self):
+        super().__init__(
+            model_class=SGDClassifier,
+            default_params={
+                "loss": "log_loss",
+                "penalty": "l2",
+                "alpha": 0.0001,
+                "l1_ratio": 0.15,
+                "max_iter": 1000,
+                "random_state": 42,
+            },
             problem_type="classification",
         )

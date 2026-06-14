@@ -171,3 +171,61 @@ ELASTICNET_REGRESSION_PARAMS = [
         description="If set to 'random', a random coefficient is updated every iteration.",
     ),
 ]
+
+
+# --- SGD Classifier ---
+SGD_CLASSIFIER_PARAMS = [
+    HyperparameterField(
+        name="loss",
+        label="Loss",
+        type="select",
+        default="log_loss",
+        options=[
+            {"label": "Log Loss (logistic regression)", "value": "log_loss"},
+            {"label": "Hinge (linear SVM)", "value": "hinge"},
+            {"label": "Modified Huber (smooth SVM)", "value": "modified_huber"},
+        ],
+        description="The loss function to be used.",
+    ),
+    HyperparameterField(
+        name="penalty",
+        label="Penalty",
+        type="select",
+        default="l2",
+        options=[
+            {"label": "L2", "value": "l2"},
+            {"label": "L1", "value": "l1"},
+            {"label": "ElasticNet", "value": "elasticnet"},
+        ],
+        description="The regularization term to use.",
+    ),
+    HyperparameterField(
+        name="alpha",
+        label="Alpha (Regularization Strength)",
+        type="number",
+        default=0.0001,
+        min=1e-7,
+        max=1.0,
+        description="Constant that multiplies the regularization term. Smaller means weaker regularization.",
+    ),
+    HyperparameterField(
+        name="l1_ratio",
+        label="L1 Ratio",
+        type="number",
+        default=0.15,
+        min=0.0,
+        max=1.0,
+        step=0.05,
+        description="The ElasticNet mixing parameter, with 0 <= l1_ratio <= 1. Only used if penalty='elasticnet'.",
+    ),
+    HyperparameterField(
+        name="max_iter",
+        label="Max Iterations",
+        type="number",
+        default=1000,
+        min=10,
+        max=10000,
+        step=100,
+        description="The maximum number of passes over the training data (epochs).",
+    ),
+]

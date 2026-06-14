@@ -32,6 +32,7 @@ const ENSEMBLE_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', R
     adaboost_classifier: 'adaboost',
     decision_tree_classifier: 'decision_tree',
     gaussian_nb: 'gaussian_nb',
+    sgd_classifier: 'sgd_classifier',
     svc: 'svc',
     k_neighbors_classifier: 'knn',
     xgboost_classifier: 'xgboost',
