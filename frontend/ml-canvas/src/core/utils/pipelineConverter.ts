@@ -32,6 +32,7 @@ const ENSEMBLE_BASE_KEY_BY_MODEL_TYPE: Record<'classification' | 'regression', R
     adaboost_classifier: 'adaboost',
     decision_tree_classifier: 'decision_tree',
     gaussian_nb: 'gaussian_nb',
+    sgd_classifier: 'sgd_classifier',
     svc: 'svc',
     k_neighbors_classifier: 'knn',
     xgboost_classifier: 'xgboost',
@@ -307,6 +308,16 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           params = node.data;
       } else if (node.data.definitionType === 'TextCleaning') {
           stepType = 'TextCleaning';
+          params = node.data;
+      } else if (
+          node.data.definitionType === 'count_vectorizer' ||
+          node.data.definitionType === 'tfidf_vectorizer' ||
+          node.data.definitionType === 'hashing_vectorizer' ||
+          node.data.definitionType === 'tokenizer' ||
+          node.data.definitionType === 'sentence_embedder'
+      ) {
+          // Text node ids map 1:1 to the skyulf-core NodeRegistry ids.
+          stepType = node.data.definitionType;
           params = node.data;
       } else if (node.data.definitionType === 'ValueReplacement' || node.data.definitionType === 'value_replacement') {
           stepType = 'ValueReplacement';

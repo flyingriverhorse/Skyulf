@@ -7,6 +7,8 @@ from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
+    SGDClassifierApplier,
+    SGDClassifierCalculator,
 )
 from skyulf.modeling.regression import (
     RandomForestRegressorApplier,
@@ -86,3 +88,27 @@ def test_cross_validation(sample_classification_data):
     assert "aggregated_metrics" in cv_results
     assert "accuracy" in cv_results["aggregated_metrics"]
     assert len(cv_results["folds"]) == 3
+
+
+def test_sgd_classifier(sample_classification_data):
+    """Test SGD Classifier training and prediction with different hyperparams."""
+    data = sample_classification_data.fillna(0).drop(columns=["category"])
+    dataset = SplitDataset(train=data.iloc[:80], test=data.iloc[80:], validation=None)
+
+    estimator = StatefulEstimator(
+        node_id="test_sgd",
+        calculator=SGDClassifierCalculator(),
+        applier=SGDClassifierApplier(),
+    )
+
+    # Test with default logs_loss loss
+    config = {"params": {"loss": "log_loss", "penalty": "elasticnet", "alpha": 0.001}}
+    predictions = estimator.fit_predict(dataset, target_column="target", config=config)
+
+    assert "train" in predictions
+    assert "test" in predictions
+    assert len(predictions["train"]) == 80
+
+    report = estimator.evaluate(dataset, target_column="target")
+    assert report["problem_type"] == "classification"
+    assert "accuracy" in report["splits"]["test"].metrics

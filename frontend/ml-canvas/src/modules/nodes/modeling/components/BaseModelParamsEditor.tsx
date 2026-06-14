@@ -18,6 +18,7 @@ const REGISTRY_KEY: Record<'classification' | 'regression', Record<string, strin
     adaboost: 'adaboost_classifier',
     decision_tree: 'decision_tree_classifier',
     gaussian_nb: 'gaussian_nb',
+    sgd_classifier: 'sgd_classifier',
     svc: 'svc',
     knn: 'k_neighbors_classifier',
     xgboost: 'xgboost_classifier',

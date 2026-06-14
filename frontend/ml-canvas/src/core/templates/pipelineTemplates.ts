@@ -160,20 +160,25 @@ const TEXT_CLASSIFICATION: PipelineTemplate = {
   id: 'text_classification',
   name: 'Text Classification',
   description:
-    'Text starter: dataset → text cleaning → encoding → split → train. Wire the Text Cleaning node at the column with your raw text, and pick the label column on the split.',
+    'Text → numbers → model: dataset → text cleaning → TF-IDF vectorizer → split → Logistic Regression. Point the Text Cleaning and TF-IDF nodes at your raw-text column, pick the label column on the split, then Run All. (TF-IDF + Logistic Regression is the standard strong baseline for text.)',
   category: 'text',
   icon: FileText,
   nodes: [
     { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
     { localId: 'clean', type: 'TextCleaning', position: { x: col(1), y: row(0) } },
-    { localId: 'enc', type: 'encoding', position: { x: col(2), y: row(0) } },
+    { localId: 'vec', type: 'tfidf_vectorizer', position: { x: col(2), y: row(0) } },
     { localId: 'split', type: 'TrainTestSplitter', position: { x: col(3), y: row(0) } },
-    { localId: 'train', type: 'basic_training', position: { x: col(4), y: row(0) } },
+    {
+      localId: 'train',
+      type: 'basic_training',
+      position: { x: col(4), y: row(0) },
+      data: { model_type: 'logistic_regression' },
+    },
   ],
   edges: [
     { source: 'ds', target: 'clean' },
-    { source: 'clean', target: 'enc' },
-    { source: 'enc', target: 'split' },
+    { source: 'clean', target: 'vec' },
+    { source: 'vec', target: 'split' },
     { source: 'split', target: 'train' },
   ],
 };

@@ -16,7 +16,7 @@ Per-family ``*_PARAMS`` constants are also re-exported so existing imports
 keep working.
 """
 
-from ._bayes import GAUSSIAN_NB_PARAMS
+from ._bayes import BERNOULLI_NB_PARAMS, GAUSSIAN_NB_PARAMS, MULTINOMIAL_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
 from ._ensemble import (
     STACKING_CLASSIFIER_PARAMS,

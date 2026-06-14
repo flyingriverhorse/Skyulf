@@ -107,6 +107,7 @@ const PropertiesContent: React.FC<{
             config={selectedNode.data}
             onChange={(data: unknown) => updateNodeData(selectedNode.id, data)}
             nodeId={selectedNode.id}
+            isExpanded={isExpanded}
           />
           <MultiInputModeSection selectedNode={selectedNode} />
           <MergeStrategySection selectedNode={selectedNode} />

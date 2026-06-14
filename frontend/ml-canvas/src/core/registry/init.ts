@@ -23,6 +23,12 @@ import { ResamplingNode } from '../../modules/nodes/processing/ResamplingNode';
 import { FeatureGenerationNode } from '../../modules/nodes/processing/FeatureGenerationNode';
 import { PolynomialFeaturesNode } from '../../modules/nodes/processing/PolynomialFeaturesNode';
 import { TextCleaningNode } from '../../modules/nodes/processing/TextCleaningNode';
+import {
+  CountVectorizerNode,
+  TfidfVectorizerNode,
+  HashingVectorizerNode,
+} from '../../modules/nodes/processing/VectorizerNodes';
+import { TokenizerNode, SentenceEmbedderNode } from '../../modules/nodes/processing/TextNodes';
 import { ValueReplacementNode } from '../../modules/nodes/processing/ValueReplacementNode';
 import { AliasReplacementNode } from '../../modules/nodes/processing/AliasReplacementNode';
 import { InvalidValueReplacementNode } from '../../modules/nodes/processing/InvalidValueReplacementNode';
@@ -40,6 +46,11 @@ export const initializeRegistry = () => {
   registry.register(FeatureGenerationNode);
   registry.register(PolynomialFeaturesNode);
   registry.register(TextCleaningNode);
+  registry.register(CountVectorizerNode);
+  registry.register(TfidfVectorizerNode);
+  registry.register(HashingVectorizerNode);
+  registry.register(TokenizerNode);
+  registry.register(SentenceEmbedderNode);
   registry.register(ValueReplacementNode);
   registry.register(AliasReplacementNode);
   registry.register(InvalidValueReplacementNode);

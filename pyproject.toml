@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.6.0"
+version = "0.6.2"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -59,6 +59,7 @@ dependencies = [
     "rapidfuzz>=3.6.1,<4.0.0",
     "vadersentiment>=3.3.2,<4.0.0",
     "ty>=0.0.44",
+    "sentence-transformers>=2.2.0",
 ]
 
 [project.optional-dependencies]
@@ -118,6 +119,7 @@ dev = [
     "factory-boy>=3.3.0,<4.0.0",
     "faker>=19.0.0,<20.0.0",
     "pre-commit>=3.4.0",
+    "pre-commit-hooks>=4.6.0",  # Hygiene hooks run via python -m (avoids AppLocker-blocked .exe wrappers)
     "ipython>=8.18.1",
     "jupyter>=1.1.1",
 

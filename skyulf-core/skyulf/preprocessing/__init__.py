@@ -107,6 +107,18 @@ from .transformations import (
     SimpleTransformationApplier,
     SimpleTransformationCalculator,
 )
+from .vectorization import (
+    CountVectorizerApplier,
+    CountVectorizerCalculator,
+    HashingVectorizerApplier,
+    HashingVectorizerCalculator,
+    SentenceEmbedderApplier,
+    SentenceEmbedderCalculator,
+    TfidfVectorizerApplier,
+    TfidfVectorizerCalculator,
+    TokenizerApplier,
+    TokenizerCalculator,
+)
 
 __all__ = [
     "BaseCalculator",
@@ -198,6 +210,16 @@ __all__ = [
     "RollingAggregateApplier",
     "DateFeaturesCalculator",
     "DateFeaturesApplier",
+    "CountVectorizerCalculator",
+    "CountVectorizerApplier",
+    "TfidfVectorizerCalculator",
+    "TfidfVectorizerApplier",
+    "HashingVectorizerCalculator",
+    "HashingVectorizerApplier",
+    "TokenizerCalculator",
+    "TokenizerApplier",
+    "SentenceEmbedderCalculator",
+    "SentenceEmbedderApplier",
 ]
 
 # NOTE: Imports above are intentionally explicit. Every node module is imported
