@@ -117,7 +117,7 @@ dev = [
 
     # Dev helpers
     "factory-boy>=3.3.0,<4.0.0",
-    "faker>=19.0.0,<20.0.0",
+    "faker>=19.0.0,<41.0.0",
     "pre-commit>=3.4.0",
     "pre-commit-hooks>=4.6.0",  # Hygiene hooks run via python -m (avoids AppLocker-blocked .exe wrappers)
     "ipython>=8.18.1",
