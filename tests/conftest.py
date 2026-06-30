@@ -14,6 +14,7 @@ import pytest
 os.environ["CELERY_BROKER_URL"] = "memory://"
 os.environ["CELERY_RESULT_BACKEND"] = "rpc://"
 os.environ["USE_CELERY"] = "False"
+os.environ["TESTING"] = "True"
 
 # During tests we want the FastAPI TestClient which uses the host
 # "testserver" to be accepted by TrustedHostMiddleware. Add it to
