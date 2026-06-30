@@ -85,14 +85,37 @@ async def _try_init_mongodb(settings: Settings):
     return False
 
 
-async def initialize(settings: Optional[Settings] = None):
+async def initialize(settings: Optional[Settings] = None) -> bool:
     """
     Initialize the database backend based on configuration.
+
+    Returns True on success, False on failure.
     """
     if settings is None:
         from backend.config import Settings
 
         settings = Settings()
+
+    # Determine which backend to initialise from DATABASE_URL or DB_PRIMARY.
+    try:
+        from .adapter import DatabaseType, get_db_type
+
+        db_type = get_db_type(settings)
+    except Exception:
+        logger.exception("Could not determine database type; defaulting to postgres")
+        db_type = DatabaseType.POSTGRES
+
+    if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL):
+        return await _try_init_postgres(settings)
+    elif db_type == DatabaseType.SQLITE:
+        return await _try_init_sqlite(settings)
+    elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB):
+        return await _try_init_mysql(settings)
+    elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
+        return await _try_init_mongodb(settings)
+    else:
+        logger.warning("Unknown database type '%s'; attempting postgres init", db_type)
+        return await _try_init_postgres(settings)
 
 
 # For standalone testing

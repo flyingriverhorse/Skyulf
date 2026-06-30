@@ -69,9 +69,14 @@ async def resolve_pipeline_nodes(
                         )
                 else:
                     raise HTTPException(status_code=404, detail=f"Dataset {raw_id} not found")
+            except HTTPException:
+                # Re-raise known HTTP errors (404 dataset not found, 400 bad path)
+                # so the API surface returns the correct status instead of silently
+                # allowing execution to proceed with an unresolved dataset.
+                raise
             except Exception as e:
-                # Log error but don't crash if resolution fails (might be already a path)
-                # But if it was an ID that needed resolution, this will likely fail later
+                # Non-HTTP errors (e.g. DB connection failure) — log and continue;
+                # the engine will surface a clearer error if `path` remains unset.
                 import logging
 
                 logging.getLogger(__name__).warning(

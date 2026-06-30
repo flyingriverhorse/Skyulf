@@ -71,6 +71,7 @@ async def preview_pipeline(  # noqa: C901
     ingestion_service = DataIngestionService(session)
     resolved_s3_options = await resolve_pipeline_nodes(config.nodes, ingestion_service)
 
+    sync_session = None
     try:
         logger.debug(f"Preview request received with {len(config.nodes)} nodes")
         for n in config.nodes:
@@ -178,25 +179,23 @@ async def preview_pipeline(  # noqa: C901
             # No training → no separate label source; reuse the runnable sub.
             paired_subs = [(sub, sub) for sub in preview_subs if not _is_data_preview_sub(sub)]
 
-        try:
-            catalog = create_catalog_from_options(
-                resolved_s3_options, config.nodes, session=sync_session
+
+        catalog = create_catalog_from_options(
+            resolved_s3_options, config.nodes, session=sync_session
+        )
+        engine = PipelineEngine(artifact_store, catalog=catalog)
+        # Sort paired_subs by BFS position of their terminal node so branch
+        # letters (A, B, C, …) match the canvas edge colors from useBranchColors.
+        node_bfs_pos = {n.node_id: i for i, n in enumerate(pipeline_config.nodes)}
+        paired_subs.sort(
+            key=lambda pair: node_bfs_pos.get(
+                pair[0].nodes[-1].node_id if pair[0].nodes else "",
+                len(pipeline_config.nodes),
             )
-            engine = PipelineEngine(artifact_store, catalog=catalog)
-            # Sort paired_subs by BFS position of their terminal node so branch
-            # letters (A, B, C, …) match the canvas edge colors from useBranchColors.
-            node_bfs_pos = {n.node_id: i for i, n in enumerate(pipeline_config.nodes)}
-            paired_subs.sort(
-                key=lambda pair: node_bfs_pos.get(
-                    pair[0].nodes[-1].node_id if pair[0].nodes else "",
-                    len(pipeline_config.nodes),
-                )
-            )
-            # Single shared artifact store across branches deduplicates work
-            # for ancestor nodes that appear in multiple sub-pipelines.
-            sub_results = [(orig, runnable, engine.run(runnable)) for orig, runnable in paired_subs]
-        finally:
-            sync_session.close()
+        )
+        # Single shared artifact store across branches deduplicates work
+        # for ancestor nodes that appear in multiple sub-pipelines.
+        sub_results = [(orig, runnable, engine.run(runnable)) for orig, runnable in paired_subs]
 
         # ---- Preview extraction helpers ----
 
@@ -510,7 +509,9 @@ async def preview_pipeline(  # noqa: C901
         logger.exception("Pipeline preview failed")
         raise SkyulfException(message="Pipeline preview failed")
     finally:
-        # 5. Cleanup
+        # 5. Cleanup — close sync session before removing temp artefacts.
+        if sync_session is not None:
+            sync_session.close()
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 

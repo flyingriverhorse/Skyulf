@@ -9,7 +9,7 @@ call ``execute_pipeline`` directly with a real or mocked session.
 import logging
 import re
 import traceback
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
             return
 
         job.status = "running"
-        job.started_at = datetime.now()
+        job.started_at = datetime.now(timezone.utc)
         job.progress = 0
         session.commit()
         publish_job_event(JobEvent(event="status", job_id=job_id, status="running", progress=0))
@@ -140,7 +140,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
         if result.status == "success":
             job.status = "completed"
             job.progress = 100
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now(timezone.utc)
             job.artifact_uri = base_artifact_uri
             strategy.handle_success(job, result)
         else:
@@ -161,12 +161,16 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
         logger.error(f"Job {job_id} failed with exception: {exc}")
         logger.error(traceback.format_exc())
 
-        job, strategy = JobStrategyFactory.find_job(session, job_id)
-        if job and strategy:
-            if job.status != "cancelled":
-                strategy.handle_failure(job, str(exc))
-            session.commit()
-            publish_job_event(JobEvent(event="status", job_id=job_id, status=job.status))
+        try:
+            session.rollback()
+            job, strategy = JobStrategyFactory.find_job(session, job_id)
+            if job and strategy:
+                if job.status != "cancelled":
+                    strategy.handle_failure(job, str(exc))
+                session.commit()
+                publish_job_event(JobEvent(event="status", job_id=job_id, status=job.status))
+        except Exception:
+            logger.exception("Failed to record failure state for job %s", job_id)
 
 
 def _resolve_dataset_name(session: Session, job: object) -> str:

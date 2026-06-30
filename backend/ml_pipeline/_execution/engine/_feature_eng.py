@@ -206,8 +206,9 @@ class FeatureEngMixin:
                 self.log(f"Saving bundled artifact to {uri}")
                 self.artifact_store.save(job_id, full_artifact)
 
-        except Exception as e:
-            logger.error(f"Failed to bundle transformers with model: {e}")
+        except Exception:
+            logger.exception("Failed to bundle transformers with model")
+            raise
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).

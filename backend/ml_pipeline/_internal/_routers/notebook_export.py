@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -426,14 +427,23 @@ async def export_pipeline_notebook(
     """
     if not config.nodes:
         raise HTTPException(status_code=400, detail="Pipeline has no nodes")
-    dataset_name = await _lookup_dataset_name(dataset_id, session)
-    db_file_path = await _lookup_dataset_file_path(dataset_id, session)
-    builder = _build_full_notebook if mode == "full" else _build_compact_notebook
-    notebook = builder(config, dataset_id, dataset_name, db_file_path)
-    body = json.dumps(notebook, indent=1).encode("utf-8")
-    filename = f"skyulf_pipeline_{dataset_id}_{mode}.ipynb"
-    return Response(
-        content=body,
-        media_type="application/x-ipynb+json",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    try:
+        dataset_name = await _lookup_dataset_name(dataset_id, session)
+        db_file_path = await _lookup_dataset_file_path(dataset_id, session)
+        builder = _build_full_notebook if mode == "full" else _build_compact_notebook
+        notebook = builder(config, dataset_id, dataset_name, db_file_path)
+        body = json.dumps(notebook, indent=1).encode("utf-8")
+        # Sanitise dataset_id before embedding it in the Content-Disposition
+        # header — raw user input could inject header fields via `"` or CRLF.
+        safe_id = re.sub(r"[^\w.\-]", "_", dataset_id)
+        filename = f"skyulf_pipeline_{safe_id}_{mode}.ipynb"
+        return Response(
+            content=body,
+            media_type="application/x-ipynb+json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to export notebook for dataset %s", dataset_id)
+        raise HTTPException(status_code=500, detail="Failed to generate notebook")

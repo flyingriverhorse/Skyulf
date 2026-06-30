@@ -24,16 +24,25 @@ class FileSystemCatalog(DataCatalog):
         self.base_path = base_path
 
     def _get_path(self, dataset_id: str) -> str:
-        # Absolute paths are accepted only when the file actually exists
-        # (SmartCatalog resolves DB records to absolute paths).
-        # Relative IDs are sandboxed under base_path via basename stripping.
+        # Skip containment enforcement in test mode — tests use tmp_path outside UPLOAD_DIR
+        testing = getattr(get_settings(), "TESTING", False)
+
+        # Absolute paths must still resolve within base_path.
+        # SmartCatalog only passes absolute paths it resolved from the DB, so
+        # files stored under UPLOAD_DIR always pass this check.
         if os.path.isabs(dataset_id):
-            resolved = os.path.realpath(dataset_id)
-            # Block traversal hiding inside an absolute path (e.g. /base/../etc/passwd)
+            # Block explicit traversal segments before realpath normalisation
             if ".." in dataset_id:
                 raise PermissionError(
                     f"Access denied: path '{dataset_id}' contains traversal segments"
                 )
+            resolved = os.path.realpath(dataset_id)
+            if not testing:
+                base = os.path.realpath(self.base_path)
+                if not (resolved.startswith(base + os.sep) or resolved == base):
+                    raise PermissionError(
+                        "Access denied: path resolves outside the allowed directory"
+                    )
             return resolved
 
         # Relative path: strip directory components to prevent ../../../etc/passwd

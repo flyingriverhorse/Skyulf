@@ -214,12 +214,12 @@ class AsyncPostgreSQLConnectionManager:
         if not self._engine:
             raise RuntimeError("Async PostgreSQL engine not initialized")
 
+        # engine.begin() manages the transaction automatically:
+        # it commits on clean exit and rolls back on exception.
+        # Do NOT call conn.rollback() or conn.commit() inside — that causes
+        # a double-rollback/double-commit against the same RootTransaction.
         async with self._engine.begin() as conn:
-            try:
-                yield conn
-            except Exception:
-                await conn.rollback()
-                raise
+            yield conn
 
     @asynccontextmanager
     async def get_session(self):
@@ -258,7 +258,7 @@ class AsyncPostgreSQLConnectionManager:
             from sqlalchemy import text
 
             result = await conn.execute(text(query), params or {})
-            await conn.commit()
+            # engine.begin() commits automatically on clean exit — no explicit commit needed.
             return cast(int, result.rowcount)
 
     async def close(self):

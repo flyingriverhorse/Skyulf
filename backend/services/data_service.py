@@ -200,7 +200,7 @@ class DataService:
         elif path.endswith(".csv"):
             df.to_csv(path, index=False)
         else:
-            # Default to parquet if extension unknown/other
+            # Unknown extension — default to Parquet
             if not path.endswith(".parquet"):
                 path += ".parquet"
             df.to_parquet(path)
