@@ -24,7 +24,9 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 @router.post("/deploy/{job_id}", response_model=DeploymentInfo)
 @limiter.limit("10/minute")
-async def deploy_model(request: Request, job_id: str, session: AsyncSession = Depends(get_async_session)):
+async def deploy_model(
+    request: Request, job_id: str, session: AsyncSession = Depends(get_async_session)
+):
     """
     Deploys a model from a completed job.
     """
@@ -74,7 +76,11 @@ async def deactivate_deployment(session: AsyncSession = Depends(get_async_sessio
 
 @router.post("/predict", response_model=PredictionResponse)
 @limiter.limit("60/minute")
-async def predict(request: Request, prediction_request: PredictionRequest, session: AsyncSession = Depends(get_async_session)):
+async def predict(
+    request: Request,
+    prediction_request: PredictionRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
     """
     Makes predictions using the active model.
     """
