@@ -171,7 +171,7 @@ class Settings(
                 "SECRET_KEY must be explicitly set in production environments. "
                 "Add SECRET_KEY=<value> to your .env file or environment. "
                 "Generate a strong key with: "
-                "python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                'python -c "import secrets; print(secrets.token_urlsafe(64))"'
             )
         return self
 

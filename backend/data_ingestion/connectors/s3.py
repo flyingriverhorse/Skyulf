@@ -53,7 +53,9 @@ class S3Connector(BaseConnector):
             await self.get_schema()
             return True
         except Exception as e:
-            logger.error("S3 connection check failed for %s: %s", self.path, self._sanitize_error(e))
+            logger.error(
+                "S3 connection check failed for %s: %s", self.path, self._sanitize_error(e)
+            )
             raise ConnectionError(f"Failed to connect to S3 path {self.path}") from e
 
     async def get_schema(self) -> Dict[str, str]:

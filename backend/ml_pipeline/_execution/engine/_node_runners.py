@@ -290,7 +290,9 @@ class NodeRunnersMixin:
         try:
             self._record_data_shape_metrics(metrics, data, target_col)
         except Exception:
-            logger.debug("Failed to record data shape metrics for node %s", node.node_id, exc_info=True)
+            logger.debug(
+                "Failed to record data shape metrics for node %s", node.node_id, exc_info=True
+            )
 
         return node.node_id, metrics
 
@@ -488,7 +490,9 @@ class NodeRunnersMixin:
         try:
             self._record_data_shape_metrics(metrics, data, target_col)
         except Exception:
-            logger.debug("Failed to record data shape metrics for node %s", node.node_id, exc_info=True)
+            logger.debug(
+                "Failed to record data shape metrics for node %s", node.node_id, exc_info=True
+            )
 
         return node.node_id, metrics
 
