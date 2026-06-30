@@ -194,7 +194,7 @@ class JobManager:
 
             all_jobs = train_jobs + tune_jobs
             # Sort by start_time desc
-            all_jobs.sort(key=lambda x: x.start_time or datetime.min, reverse=True)
+            all_jobs.sort(key=lambda x: x.start_time or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
 
             # Apply skip and limit
             jobs = all_jobs[skip : skip + limit]
@@ -244,7 +244,7 @@ class JobManager:
         # "latest run group" key.
         all_jobs = sorted(
             train_jobs + tune_jobs,
-            key=lambda j: j.start_time or datetime.min,
+            key=lambda j: j.start_time or datetime.min.replace(tzinfo=timezone.utc),
             reverse=True,
         )
         # Phase 1: pick the parent_pipeline_id of the most recent
@@ -326,7 +326,7 @@ class JobManager:
             if job:
                 if job.status != "completed":
                     return False
-                job.promoted_at = datetime.now()  # type: ignore[assignment]
+                job.promoted_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                 await session.commit()
                 return True
         return False

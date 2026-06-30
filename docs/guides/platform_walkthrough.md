@@ -55,7 +55,7 @@ curl http://127.0.0.1:8000/data/api/sources/{source_id}/sample
 
 1. Select a dataset from the dropdown.
 2. Click **Analyze** to trigger a full automated EDA (`POST /api/eda/{dataset_id}/analyze`).
-3. The EDA runs as a background Celery task — poll status until complete.
+3. The backend runs the analysis asynchronously — using Celery if `USE_CELERY=true`, or FastAPI BackgroundTasks otherwise.
 4. View the report: data quality summary, column statistics, distributions, correlations, outlier detection, and smart alerts.
 
 **What the EDA covers:**
@@ -134,7 +134,7 @@ The frontend converts your visual graph into a pipeline config and sends it to t
 POST /api/pipeline/run
 ```
 
-The backend validates the config, queues the job in Celery, and returns a `job_id`.
+The backend validates the config, queues the job (Celery if `USE_CELERY=true`, otherwise FastAPI BackgroundTasks), and returns a `job_id`.
 
 ### Multiple training nodes *(v0.4.0+)*
 

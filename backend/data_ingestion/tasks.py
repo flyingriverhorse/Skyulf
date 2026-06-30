@@ -98,8 +98,10 @@ def ingest_data_task(source_id: int):
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        profile = loop.run_until_complete(run_ingestion())
-        loop.close()
+        try:
+            profile = loop.run_until_complete(run_ingestion())
+        finally:
+            loop.close()
 
         # 4. Update Metadata with Success
         metadata["ingestion_status"] = {

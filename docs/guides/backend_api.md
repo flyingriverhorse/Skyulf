@@ -25,6 +25,9 @@ and [`/redoc`](http://127.0.0.1:8000/redoc) (ReDoc) when `DEBUG=true`.
 
 ## Health
 
+### `GET /health/ping`
+Minimal liveness probe — returns `{ "message": "pong" }`. Fastest possible health check with no database involvement.
+
 ### `GET /health`
 Basic health probe for load balancers. Returns HTTP 200 when the server is running.
 
@@ -92,7 +95,7 @@ Upload a dataset file. Starts an asynchronous ingestion job.
 { "job_id": "...", "status": "pending", "message": "File upload started", "file_id": "..." }
 ```
 
-**Allowed extensions:** `.csv`, `.xlsx`, `.xls`, `.parquet`, `.json`, `.txt`, `.pkl`, `.feather`, `.h5`, `.hdf5`
+**Allowed extensions:** `.csv`, `.xlsx`, `.xls`, `.parquet`, `.json`, `.txt`, `.pkl`, `.pickle`, `.feather`, `.h5`, `.hdf5`
 
 **Size limit:** `MAX_UPLOAD_SIZE` (default 10 GB).
 
@@ -316,7 +319,7 @@ Query params: `days` (1–90, default 7), `limit` (1–50, default 10).
 The backend automatically records unhandled 5xx errors to the `error_events` database table.
 
 #### `GET /api/monitoring/errors`
-List recorded error events. Supports `since`, `limit`, `include_resolved` query params.
+List recorded error events. Supports `since`, `limit`, `show_resolved` (default `false`) query params.
 
 #### `GET /api/monitoring/errors/count`
 Count of unresolved errors.
@@ -345,7 +348,10 @@ Delete all error events. ⚠️ Irreversible.
 Ingest pipeline execution log entries.
 
 #### `GET /api/monitoring/pipeline-logs`
-List pipeline run logs. Supports `job_id`, `since`, `limit` query params.
+List pipeline run logs. Supports `pipeline_id`, `since`, `limit` (max 500) query params.
+
+#### `PATCH /api/monitoring/jobs/{job_id}/description`
+Update the description/notes for a monitored job.
 
 #### `DELETE /api/monitoring/pipeline-logs`
 Delete all pipeline run logs. ⚠️ Irreversible.
@@ -360,22 +366,34 @@ A WebSocket stream that pushes real-time job status events to connected clients.
 
 **Connection:** `ws://127.0.0.1:8000/ws/jobs`
 
-**Event shape:**
+**Message envelope:**
 ```json
-{ "event": "progress", "job_id": "abc123", "status": "running", "progress": 42 }
+{ "channel": "jobs", "data": { "event": "progress", "job_id": "abc123", "status": "running", "progress": 42 } }
 ```
 
-**Event types:**
+Messages are wrapped in a `channel`/`data` envelope. The `data` object is a `JobEvent`.
+
+**Event types (`data.event`):**
 
 | `event` | When |
 |---|---|
 | `created` | A new job was submitted |
-| `progress` | Job progress updated (0–100) |
-| `completed` | Job finished successfully |
-| `failed` | Job finished with an error |
-| `cancelled` | Job was cancelled |
+| `progress` | Job progress updated (0–100, in `data.progress`) |
+| `status` | Job status changed (running → completed, etc.) |
+| `deleted` | Job was deleted |
 
-> **Important:** The WebSocket stream is a best-effort hint. Clients should maintain a polling fallback (e.g. `GET /api/pipeline/jobs/{job_id}`) in case WebSocket messages are missed or the connection drops.
+**JavaScript example:**
+```js
+const ws = new WebSocket("ws://127.0.0.1:8000/ws/jobs");
+ws.onmessage = (msg) => {
+  const { channel, data } = JSON.parse(msg.data);
+  if (channel === "jobs") {
+    console.log(`Job ${data.job_id}: ${data.event} (${data.status})`);
+  }
+};
+```
+
+> **Important:** WebSocket events are best-effort hints. Maintain a polling fallback (`GET /api/pipeline/jobs/{job_id}`) for critical status checks.
 
 ---
 
@@ -386,6 +404,7 @@ The following endpoints are rate-limited by client IP address:
 | Endpoint | Limit |
 |---|---|
 | `POST /api/pipeline/run` | 20/minute |
+| `POST /api/eda/{dataset_id}/analyze` | 20/minute |
 | `POST /api/ingestion/upload` | 10/minute |
 | `POST /api/monitoring/drift/calculate` | 20/minute |
 | `POST /api/deployment/deploy/{job_id}` | 10/minute |
@@ -397,7 +416,7 @@ Requests over the limit receive **HTTP 429 Too Many Requests**.
 
 ## Error Responses
 
-All error responses follow this shape:
+Error responses share a common shape, though some fields may be absent depending on the handler:
 
 ```json
 {
