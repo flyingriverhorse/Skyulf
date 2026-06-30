@@ -61,7 +61,7 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
             return {"success": True}
 
         except Exception as e:
-            logger.error(f"Failed to insert data source: {e}")
+            logger.exception(f"Failed to insert data source: {e}")
             await session.rollback()
             raise
 
@@ -95,7 +95,7 @@ async def select_data_sources(
             return data
 
         except Exception as e:
-            logger.error(f"Failed to select data sources: {e}")
+            logger.exception(f"Failed to select data sources: {e}")
             raise
 
 
@@ -122,7 +122,7 @@ async def update_data_source(
             return {"affected_rows": result.rowcount}
 
         except Exception as e:
-            logger.error(f"Failed to update data source: {e}")
+            logger.exception(f"Failed to update data source: {e}")
             await session.rollback()
             raise
 
@@ -144,7 +144,7 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
             return {"affected_rows": result.rowcount}
 
         except Exception as e:
-            logger.error(f"Failed to delete data source: {e}")
+            logger.exception(f"Failed to delete data source: {e}")
             await session.rollback()
             raise
 
@@ -166,7 +166,7 @@ async def count_data_sources(
             return result.scalar() or 0
 
         except Exception as e:
-            logger.error(f"Failed to count data sources: {e}")
+            logger.exception(f"Failed to count data sources: {e}")
             raise
 
 
@@ -192,5 +192,5 @@ async def select_data_source_by_file_hash(
             row = result.fetchone()
             return dict(row._mapping) if row else None
         except Exception as e:
-            logger.error(f"Failed to select data source by file hash: {e}")
+            logger.exception(f"Failed to select data source by file hash: {e}")
             raise

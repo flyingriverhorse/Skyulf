@@ -157,7 +157,6 @@ def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
     # Each component gets its own pipeline_id
     results: List[PipelineConfig] = []
     for component_ids in components:
-        set(component_ids)
         comp_nodes = [node_map[nid] for nid in component_ids]
         # Preserve original ID for first component, generate new for rest
         comp_pipeline_id = config.pipeline_id if not results else f"preview_{uuid.uuid4().hex[:12]}"
