@@ -96,11 +96,13 @@ cp .env.example .env
 |---|---|---|
 | `UPLOAD_DIR` | `uploads/data` | Directory for uploaded dataset files |
 | `MAX_UPLOAD_SIZE` | `10737418240` (10 GB) | Maximum upload file size in bytes |
-| `ALLOWED_EXTENSIONS` | `.csv,.xlsx,.xls,.parquet,.json,.txt,.pkl,.feather,.h5,.hdf5` | Comma-separated list of allowed file extensions |
+| `ALLOWED_EXTENSIONS` | `.csv,.xlsx,.xls,.parquet,.json,.txt,.pkl,.pickle,.feather,.h5,.hdf5` | Comma-separated list of allowed file extensions |
 | `TRAINING_ARTIFACT_DIR` | `uploads/models` | Directory for trained model artifacts |
 | `TEMP_DIR` | `temp/processing` | Temporary processing directory |
 | `EXPORT_DIR` | `exports/data` | Data export directory |
 | `MODELS_DIR` | `uploads/models` | Model storage directory |
+| `PIPELINE_STORAGE_TYPE` | `database` | Pipeline save/load backend: `database` or `json` (file-based) |
+| `PIPELINE_STORAGE_PATH` | `exports/pipelines` | Directory for JSON pipeline files (only used when `PIPELINE_STORAGE_TYPE=json`) |
 
 ---
 

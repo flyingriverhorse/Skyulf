@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from typing import cast as t_cast
 from typing import cast as type_cast
@@ -57,7 +57,7 @@ class BasicTrainingManager:
             model_type=model_type_val,
             graph=graph,
             job_metadata={"branch_index": branch_index},
-            started_at=datetime.now(),
+            started_at=datetime.now(timezone.utc),
         )
 
         session.add(job)
@@ -131,7 +131,7 @@ class BasicTrainingManager:
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
             job.status = JobStatus.CANCELLED.value
             job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now(timezone.utc)
             # Revoke the Celery task if we recorded its id at submission time.
             meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
             task_id = meta.get("celery_task_id")
@@ -201,7 +201,7 @@ class BasicTrainingManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now(timezone.utc)
 
         session.commit()
         return True
