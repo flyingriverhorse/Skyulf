@@ -1,25 +1,56 @@
-# © 2025 Murat Unsal — Skyulf Project
+# © 2025-2026 Murat Unsal — Skyulf Project
 #
-# Publishes skyulf-core to PyPI when a tag matching `core-vX.Y.Z` is pushed.
+# Auto-publishes skyulf-core to PyPI on merge to master IF the version in
+# skyulf-core/setup.py has changed.
 # Uses PyPI Trusted Publishing (OIDC) — no API token stored in the repo.
-#
-# Release flow:
-#   1. Bump the version in skyulf-core/setup.py.
-#   2. git tag core-v0.1.17 && git push origin core-v0.1.17
 
 name: Release skyulf-core
 
 on:
   push:
-    tags:
-      - "core-v*.*.*"
+    branches:
+      - master
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # Upgraded to write so the bot can create and push the new version tag
 
 jobs:
+  # 1. GATEKEEPER: Check if the version is new
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      should_release: ${{ steps.check.outputs.should_release }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to fetch existing git tags for comparison
+
+      - name: Detect version changes
+        id: check
+        run: |
+          # Safely extract the version from setup.py using Python regex (supporting optional spaces around '=')
+          VERSION=$(python -c "import re; print(re.search(r'version\s*=\s*[\"\'']([^\"\'']+)[\"\']', open('skyulf-core/setup.py').read()).group(1))")
+          echo "Found version in setup.py: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          TAG_NAME="core-v$VERSION"
+
+          # Check if this tag already exists in the repository
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME"; then
+            echo "Tag $TAG_NAME already exists. No new release needed."
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected! Will proceed with release for $TAG_NAME."
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+  # 2. BUILD: Only runs if check-version says "true"
   build:
+    needs: check-version
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -48,18 +79,35 @@ jobs:
           name: skyulf-core-dist
           path: skyulf-core/dist/*
 
+  # 3. PUBLISH: Only runs if check-version says "true" AND build succeeds
   publish:
-    needs: build
+    needs: [check-version, build]
+    if: needs.check-version.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      id-token: write # Required for PyPI Trusted Publishing (OIDC).
+      contents: write # Needed to push the tag
+      id-token: write # Required for PyPI Trusted Publishing (OIDC)
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4 # Note: Updated from v8 (which doesn't exist) to v4
         with:
           name: skyulf-core-dist
           path: dist
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create and push Git tag
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+          TAG_NAME="core-v${{ needs.check-version.outputs.version }}"
+          echo "Tagging repository with $TAG_NAME"
+
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
