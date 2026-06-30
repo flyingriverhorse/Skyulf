@@ -88,6 +88,10 @@ class JobManager:
         that share the same terminal node are never confused with each other.
         Scoped to jobs created within the last 30 seconds.  Returns None if no
         active duplicate exists.
+
+        The query runs inside the *caller's* transaction so that, on databases
+        that support it (PostgreSQL), the session lock serialises concurrent
+        workers at the DB level — not just within a single process.
         """
         cutoff = datetime.now(timezone.utc) - _IDEMPOTENCY_WINDOW
         active = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
@@ -102,6 +106,7 @@ class JobManager:
                     model.status.in_(active),
                     model.created_at >= cutoff,
                 )
+                .with_for_update(skip_locked=True)
                 .limit(20)
             )
             rows = (await session.execute(stmt)).all()

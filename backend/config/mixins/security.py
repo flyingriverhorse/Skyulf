@@ -21,18 +21,19 @@ class SecurityMixin:
     MAX_LOGIN_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_DURATION_MINUTES: int = 30
 
-    # Developer fallback auth — off by default; set AUTH_FALLBACK_ENABLED=true in .env to enable
+    # Developer fallback auth — off by default; set AUTH_FALLBACK_ENABLED=true in .env to enable.
+    # AUTH_FALLBACK_USERNAME and AUTH_FALLBACK_PASSWORD must be explicitly set when enabled.
     AUTH_FALLBACK_ENABLED: bool = False
     AUTH_FALLBACK_USERNAME: str = "admin"
-    AUTH_FALLBACK_PASSWORD: str = "admin123"
+    AUTH_FALLBACK_PASSWORD: str = ""
     AUTH_FALLBACK_DISPLAY_NAME: str = "Fallback Admin"
     AUTH_FALLBACK_IS_ADMIN: bool = True
 
     # Session
+    # NOTE: These are reserved for future SessionMiddleware integration.
+    # Starlette's SessionMiddleware is not currently wired — do not rely on
+    # these values for security decisions.
     PERMANENT_SESSION_LIFETIME: int = 28800  # 8 hours
-    SESSION_COOKIE_SECURE: bool = False
-    SESSION_COOKIE_HTTPONLY: bool = True
-    SESSION_COOKIE_SAMESITE: str = "Lax"
 
     # Page-level auth redirects
     LOGIN_REDIRECT_URL: str = "/login"

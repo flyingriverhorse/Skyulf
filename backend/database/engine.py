@@ -210,14 +210,17 @@ async def _run_migrations() -> None:
     ]
 
     applied = 0
-    async with async_engine.begin() as conn:
-        for version, ddl in _MIGRATIONS:
-            try:
+    for version, ddl in _MIGRATIONS:
+        try:
+            # Each migration runs in its own transaction so that a "column
+            # already exists" error on PostgreSQL does not abort the whole
+            # batch and crash startup.
+            async with async_engine.begin() as conn:
                 await conn.execute(text(ddl))
-                applied += 1
-                logger.info("Migration [%s] applied: %s", version, ddl)
-            except Exception:
-                pass  # Column already exists
+            applied += 1
+            logger.info("Migration [%s] applied: %s", version, ddl)
+        except Exception:
+            pass  # Column already exists — idempotent
 
     if applied:
         logger.info("✅ %d migration(s) applied", applied)
