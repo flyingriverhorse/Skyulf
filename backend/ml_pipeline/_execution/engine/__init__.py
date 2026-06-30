@@ -19,7 +19,7 @@ upstream-input resolution helpers, and the ``log`` shim.
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -100,7 +100,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
         self.dataset_name = dataset_name
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         self.executed_transformers = []  # Reset for new run
         self._node_configs = {n.node_id: n for n in config.nodes}
         self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
@@ -158,7 +158,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             pipeline_result.node_warnings = warn_handler.drain()
             warn_handler.detach()
 
-        pipeline_result.end_time = datetime.now()
+        pipeline_result.end_time = datetime.now(timezone.utc)
         # Dedup advisories: a merge node executed in multiple branches/parts
         # (e.g. FeatureTargetSplit hit once per parallel branch) re-appends
         # the same advisory each pass. Collapse on (node_id, kind, inputs,

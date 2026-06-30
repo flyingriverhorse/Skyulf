@@ -3,6 +3,8 @@ Job Management for V2 Pipeline.
 Handles persistence of Training and Tuning jobs to the database.
 """
 
+import logging
+
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 
@@ -17,6 +19,11 @@ from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
 
 # Jobs submitted within this window for the same pipeline+node are considered duplicates.
 _IDEMPOTENCY_WINDOW = timedelta(seconds=30)
+# Cross-table pagination merges Python objects from two ORM queries because a
+# portable UNION over heterogeneous job tables would require dropping to raw SQL.
+_MAX_SKIP = 500
+
+logger = logging.getLogger(__name__)
 
 
 class JobManager:
@@ -180,7 +187,14 @@ class JobManager:
         skip: int = 0,
         job_type: Optional[str] = None,
     ) -> List[JobInfo]:
-        """Lists recent jobs (Async)."""
+        """Lists recent jobs (Async).
+
+        When listing all job types, results are merge-sorted in Python because a
+        cross-table UNION across the training and tuning ORM models would require
+        raw SQL. To keep memory bounded, large offsets are clamped; callers that
+        need deep pagination should prefer cursor-based pagination or date-range
+        filtering.
+        """
         jobs = []
 
         if job_type in ["basic_training", "training"]:
@@ -188,13 +202,24 @@ class JobManager:
         elif job_type in ["advanced_tuning", "tuning"]:
             jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
+            if skip > _MAX_SKIP:
+                logger.warning(
+                    "list_jobs: skip=%d exceeds cap %d; clamping to avoid OOM",
+                    skip,
+                    _MAX_SKIP,
+                )
+                skip = _MAX_SKIP
+
             # Combine both
             train_jobs = await BasicTrainingManager.list_training_jobs(session, limit + skip, 0)
             tune_jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit + skip, 0)
 
             all_jobs = train_jobs + tune_jobs
             # Sort by start_time desc
-            all_jobs.sort(key=lambda x: x.start_time or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+            all_jobs.sort(
+                key=lambda x: x.start_time or datetime.min.replace(tzinfo=timezone.utc),
+                reverse=True,
+            )
 
             # Apply skip and limit
             jobs = all_jobs[skip : skip + limit]

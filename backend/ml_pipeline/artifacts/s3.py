@@ -11,9 +11,11 @@ logger = logging.getLogger(__name__)
 
 class S3ArtifactStore(ArtifactStore):
     def __init__(self, bucket_name: str, prefix: str = "", storage_options: Optional[dict] = None):
-        self.bucket_name = bucket_name
-        self.prefix = prefix.strip("/")
+        self.bucket_name = bucket_name.strip()
+        self.prefix = self._normalize_prefix(prefix)
         self.storage_options = storage_options or {}
+        if not self.bucket_name:
+            raise ValueError("S3 bucket name cannot be empty")
 
         # Map standard AWS keys to s3fs keys if needed
         if "aws_access_key_id" in self.storage_options and "key" not in self.storage_options:
@@ -48,14 +50,49 @@ class S3ArtifactStore(ArtifactStore):
         except ImportError:
             raise ImportError("s3fs is required for S3ArtifactStore")
         except Exception as e:
-            logger.error(f"Failed to initialize S3FileSystem: {e}")
-            raise e
+            logger.error("Failed to initialize S3 filesystem client: %s", self._sanitize_error(e))
+            raise RuntimeError("Failed to initialize S3 artifact storage") from e
+
+    @staticmethod
+    def _sanitize_error(error: Exception) -> str:
+        message = str(error)
+        for secret in ("aws_secret_access_key", "aws_access_key_id", "secret=", "key="):
+            if secret in message:
+                return "redacted sensitive S3 error"
+        return message
+
+    @staticmethod
+    def _normalize_prefix(prefix: str) -> str:
+        normalized = str(prefix or "").replace("\\", "/").strip("/")
+        if not normalized:
+            return ""
+        parts = [part for part in normalized.split("/") if part]
+        if any(part in {".", ".."} for part in parts):
+            raise PermissionError("S3 prefix contains invalid path segments")
+        return "/".join(parts)
+
+    @staticmethod
+    def _sanitize_key(key: str) -> str:
+        candidate = str(key).strip()
+        if not candidate:
+            raise ValueError("Artifact key cannot be empty")
+
+        normalized = candidate.replace("\\", "/").strip("/")
+        parts = [part for part in normalized.split("/") if part]
+        if not parts or any(part in {".", ".."} for part in parts):
+            raise PermissionError("Artifact key contains invalid path segments")
+        if len(parts) != 1:
+            raise PermissionError("Artifact keys must not contain nested paths")
+
+        filename = parts[0]
+        if filename.endswith(".joblib"):
+            filename = filename[:-7]
+        if not filename:
+            raise ValueError("Artifact key cannot be empty")
+        return f"{filename}.joblib"
 
     def _get_s3_path(self, key: str) -> str:
-        # Ensure key is safe
-        safe_key = key.replace("\\", "/")
-        if not safe_key.endswith(".joblib"):
-            safe_key += ".joblib"
+        safe_key = self._sanitize_key(key)
 
         if self.prefix:
             return f"s3://{self.bucket_name}/{self.prefix}/{safe_key}"
@@ -70,8 +107,8 @@ class S3ArtifactStore(ArtifactStore):
             with self.fs.open(path, "wb") as f:
                 joblib.dump(data, f)
         except Exception as e:
-            logger.error(f"Failed to save artifact to S3 {path}: {e}")
-            raise e
+            logger.error("Failed to save artifact to S3 %s: %s", path, self._sanitize_error(e))
+            raise RuntimeError(f"Failed to save artifact to S3: {path}") from e
 
     def load(self, key: str) -> Any:
         """Load a joblib artifact from S3.
@@ -83,19 +120,26 @@ class S3ArtifactStore(ArtifactStore):
         path = self._get_s3_path(key)
         logger.info(f"Loading artifact from S3: {path}")
 
-        if not self.fs.exists(path):
-            raise FileNotFoundError(f"Artifact not found: {path}")
-
         try:
+            if not self.fs.exists(path):
+                raise FileNotFoundError(f"Artifact not found: {path}")
             with self.fs.open(path, "rb") as f:
                 return joblib.load(f)
         except Exception as e:
-            logger.error(f"Failed to load artifact from S3 {path}: {e}")
-            raise e
+            logger.error("Failed to load artifact from S3 %s: %s", path, self._sanitize_error(e))
+            if isinstance(e, FileNotFoundError):
+                raise
+            raise RuntimeError(f"Failed to load artifact from S3: {path}") from e
 
     def exists(self, key: str) -> bool:
         path = self._get_s3_path(key)
-        return bool(self.fs.exists(path))
+        try:
+            return bool(self.fs.exists(path))
+        except Exception as e:
+            logger.error(
+                "Failed to check artifact existence in S3 %s: %s", path, self._sanitize_error(e)
+            )
+            raise RuntimeError(f"Failed to check artifact existence in S3: {path}") from e
 
     def list_artifacts(self) -> list[str]:
         """List all artifacts in the store."""
@@ -111,18 +155,38 @@ class S3ArtifactStore(ArtifactStore):
             files = self.fs.ls(base_path)
             keys = []
             for f in files:
-                # s3fs ls returns full paths usually without protocol? or with?
-                # usually 'bucket/prefix/file.joblib'
-                filename = os.path.basename(f)
+                normalized = str(f).replace("s3://", "")
+                bucket_prefix = f"{self.bucket_name}/"
+                if normalized.startswith(bucket_prefix):
+                    normalized = normalized[len(bucket_prefix) :]
+                if self.prefix:
+                    prefix = f"{self.prefix}/"
+                    if not normalized.startswith(prefix):
+                        continue
+                    normalized = normalized[len(prefix) :]
+                if "/" in normalized.strip("/"):
+                    continue
+                filename = os.path.basename(normalized)
                 if filename.endswith(".joblib"):
                     keys.append(filename[:-7])
                 else:
                     keys.append(filename)
             return keys
         except Exception as e:
-            logger.error(f"Failed to list artifacts in {base_path}: {e}")
+            logger.error("Failed to list artifacts in %s: %s", base_path, self._sanitize_error(e))
             return []
 
     def get_artifact_uri(self, key: str) -> str:
         """Get the full URI/Path for a given artifact key."""
         return self._get_s3_path(key)
+
+    def close(self) -> None:
+        close = getattr(self.fs, "close", None)
+        if callable(close):
+            close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
