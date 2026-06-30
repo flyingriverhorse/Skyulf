@@ -39,13 +39,13 @@ Key variables in `.env`:
 | Variable | Default | Description |
 |---|---|---|
 | `DB_TYPE` | `sqlite` | Database backend (`sqlite` or `postgres`) |
-| `USE_CELERY` | `true` | Set `false` to run background tasks in-process (no Redis needed) |
-| `CELERY_BROKER_URL` | `redis://localhost:6379/1` | Redis URL for Celery message broker |
-| `REDIS_URL` | `redis://localhost:6379/0` | Redis URL for caching |
-| `SECRET_KEY` | *(placeholder)* | **Change this** in production |
+| `USE_CELERY` | `false` | Set `true` to enable Redis-backed background jobs (requires Redis) |
+| `CELERY_BROKER_URL` | `redis://127.0.0.1:6379/0` | Redis URL for Celery message broker |
+| `REDIS_URL` | `redis://127.0.0.1:6379/0` | Redis URL for caching |
+| `SECRET_KEY` | *(random, regenerated each restart)* | **Required in production** — set a stable value or JWT tokens will break on restart |
 | `DEBUG` | `true` | Set `false` in production |
 
-> **Minimal setup:** For local development with SQLite and no Celery, the only change needed is `USE_CELERY=false`. No Redis required.
+> **Minimal setup:** For local development with SQLite and no Celery (the default), no changes are needed — just `cp .env.example .env` and start the server.
 
 ---
 
@@ -155,28 +155,21 @@ Once the server is running, check these URLs:
 | [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | **Swagger UI** — interactive API explorer |
 | [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc) | **ReDoc** — API reference documentation |
 | [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health) | Health check endpoint |
-| [http://127.0.0.1:8000/health/detailed](http://127.0.0.1:8000/health/detailed) | Detailed diagnostics (DB, Redis, Celery status) |
+| [http://127.0.0.1:8000/health/detailed](http://127.0.0.1:8000/health/detailed) | Detailed diagnostics (DB connectivity, Redis/Celery availability, Snowflake status) |
 
 ---
 
-## 5. Default Credentials
+## 5. First Login
 
-Skyulf ships with fallback admin credentials for local development:
+Authentication is **not yet enabled** in this release — the platform is accessible without credentials. When auth is implemented, credentials will be configured via environment variables (`AUTH_FALLBACK_*` settings in `.env`).
 
-| Field | Value |
-|---|---|
-| **Username** | `admin` |
-| **Password** | `admin123` |
-
-These are defined in `backend/config.py` (`AUTH_FALLBACK_*` settings) and are **enabled by default in development mode**.
-
-> **Security:** Change `AUTH_FALLBACK_ENABLED` to `false` and `SECRET_KEY` to a strong random value before deploying to any network-accessible environment.
+> **Heads-up:** Do not expose the API on a public network until authentication is implemented.
 
 ---
 
 ## 6. First Steps After Setup
 
-1. **Sign in** at [http://127.0.0.1:8000](http://127.0.0.1:8000) using the default credentials above.
+1. **Open the dashboard** at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 2. **Upload data:** Navigate to **Data Sources** and upload a CSV file.
 3. **Explore your data:** Open **EDA** to see automated profiling, distributions, and outlier alerts.
 4. **Build a pipeline:** Open the **ML Canvas**, drag nodes, connect them, and hit **Execute**.

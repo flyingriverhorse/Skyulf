@@ -6,12 +6,13 @@ from typing import Any, Dict, List, Optional, cast
 
 import pandas as pd
 import polars as pl
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.exceptions.core import SkyulfException
+from backend.middleware.rate_limiter import limiter
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 
 logger = logging.getLogger(__name__)
@@ -169,7 +170,9 @@ class EnrichedDriftReport(BaseModel):
 
 
 @router.post("/drift/calculate", response_model=EnrichedDriftReport)
+@limiter.limit("20/minute")
 async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load ref → load curr → compute → persist
+    request: Request,
     job_id: str = Form(...),
     file: UploadFile = File(...),
     dataset_name: Optional[str] = Form(None),
@@ -219,7 +222,16 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
 
     # 3. Load Current Data
     try:
-        content = await file.read()
+        from backend.config import get_settings as _get_settings
+
+        _settings = _get_settings()
+        _max_size = _settings.MAX_UPLOAD_SIZE
+        content = await file.read(_max_size + 1)
+        if len(content) > _max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum allowed size is {_max_size // (1024 * 1024)} MB.",
+            )
         filename = (file.filename or "").lower()
         if filename.endswith(".csv"):
             curr_df = pl.read_csv(io.BytesIO(content))
@@ -669,7 +681,7 @@ async def list_slow_nodes(
     days = max(1, min(days, 90))
     limit = max(1, min(limit, 50))
 
-    cutoff = datetime.now() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
 
     by_step: Dict[str, List[float]] = {}
     sample_node: Dict[str, str] = {}

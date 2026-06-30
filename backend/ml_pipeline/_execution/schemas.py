@@ -1,7 +1,7 @@
 """Execution schemas for the ML Pipeline."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
@@ -111,7 +111,7 @@ class PipelineExecutionResult:
     pipeline_id: str
     status: Literal["success", "failed", "partial"]
     node_results: Dict[str, NodeExecutionResult] = field(default_factory=dict)
-    start_time: datetime = field(default_factory=datetime.now)
+    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     end_time: Optional[datetime] = None
     merge_warnings: List[Dict[str, Any]] = field(default_factory=list)
     # Soft, advisory warnings emitted by individual nodes during their

@@ -8,15 +8,27 @@ plus file cleanup and maintenance utilities.
 import logging
 import os
 import shutil
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
 
+def _is_within_base(path: Path, base: Path) -> bool:
+    """Return True iff *path* is located inside *base* (symlinks resolved)."""
+    try:
+        path.resolve().relative_to(base.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def safe_delete_path(
-    path: Union[str, Path], force_delete: bool = True, files_only: bool = True
+    path: Union[str, Path],
+    force_delete: bool = True,
+    files_only: bool = True,
+    allowed_base: Optional[Union[str, Path]] = None,
 ) -> bool:
     """
     Safely delete a file or directory.
@@ -25,11 +37,24 @@ def safe_delete_path(
         path: Path to the file or directory to delete
         force_delete: If True, delete immediately (default True, backup removed)
         files_only: If True, only delete files, not directories
+        allowed_base: When provided, the path must resolve inside this directory.
+            Requests that escape the base directory are rejected to prevent
+            path-traversal deletions.
 
     Returns:
         bool: True if deletion was successful, False otherwise
     """
     path = Path(path)
+
+    # Guard against path-traversal when a base directory is enforced.
+    if allowed_base is not None:
+        if not _is_within_base(path, Path(allowed_base)):
+            logger.error(
+                "safe_delete_path: refusing to delete %s — path escapes allowed base %s",
+                path,
+                allowed_base,
+            )
+            return False
 
     if not path.exists():
         logger.warning(f"Path does not exist: {path}")
@@ -173,12 +198,10 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
                 logger.debug(f"Found file path: {path}")
                 return path
 
-    # Also check if source_name contains a path
-    source_name = source_data.get("source_name", "")
-    if source_name and ("/" in source_name or "\\" in source_name):
-        path = Path(source_name)
-        if path.exists():
-            return path
+    # Deliberately do NOT fall back to source_name as a filesystem path.
+    # source_name is a user-supplied label, not a trusted file location; treating
+    # it as a path would enable path-traversal reads/deletes via crafted names
+    # such as "../../etc/passwd".
 
     return None
 
@@ -219,14 +242,14 @@ def cleanup_old_files(
 
         removed_count = 0
         removed_files = []
-        cutoff_date = datetime.now() - timedelta(days=max_age_days)
+        cutoff_date = datetime.now(UTC) - timedelta(days=max_age_days)
 
         # Sort files by modification time (newest first)
         files_by_mtime = sorted(files_only, key=lambda f: f.stat().st_mtime, reverse=True)
 
         # Remove files older than max_age_days
         for file_path in files_only:
-            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime, UTC)
             if file_mtime < cutoff_date:
                 try:
                     file_path.unlink()

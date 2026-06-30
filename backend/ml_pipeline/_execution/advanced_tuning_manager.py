@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from typing import cast as type_cast
 
@@ -56,7 +56,7 @@ class AdvancedTuningManager:
             search_strategy=search_strategy,
             graph=graph,
             job_metadata={"branch_index": branch_index},
-            started_at=datetime.now(),
+            started_at=datetime.now(timezone.utc),
         )
 
         session.add(job)
@@ -136,7 +136,7 @@ class AdvancedTuningManager:
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
             job.status = JobStatus.CANCELLED.value
             job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now(timezone.utc)
             meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
             task_id = meta.get("celery_task_id")
             if task_id:
@@ -204,7 +204,7 @@ class AdvancedTuningManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now()
+            job.finished_at = datetime.now(timezone.utc)
 
         session.commit()
         return True

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Type
 
 from sqlalchemy.orm import Session
@@ -102,7 +102,7 @@ class JobStrategy(ABC):
         """Updates the job with failure information."""
         job.status = "failed"
         job.error_message = error_msg
-        job.finished_at = datetime.now()
+        job.finished_at = datetime.now(timezone.utc)
 
 
 class BasicTrainingStrategy(JobStrategy):

@@ -16,7 +16,7 @@ sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable, Dict, cast
 
 import numpy as np
@@ -55,6 +55,36 @@ class NodeRunnersMixin:
     _bundle_transformers_with_model: Any
     _extract_feature_importances: Any
     _pipeline_has_training_node: Any
+
+    def _record_data_shape_metrics(
+        self, metrics: Dict[str, Any], data: Any, target_col: str
+    ) -> None:
+        if isinstance(data, pd.DataFrame):
+            metrics["n_rows"] = len(data)
+            metrics["n_features"] = len(data.columns) - int(target_col in data.columns)
+            return
+
+        if isinstance(data, SplitDataset):
+            train_data = data.train
+            if isinstance(train_data, tuple) and len(train_data) >= 1:
+                train_x = cast(Any, train_data[0])
+                if hasattr(train_x, "shape"):
+                    metrics["n_rows"] = train_x.shape[0]
+                    metrics["n_features"] = train_x.shape[1]
+                    return
+            if hasattr(train_data, "shape"):
+                train_frame = cast(Any, train_data)
+                metrics["n_rows"] = train_frame.shape[0]
+                metrics["n_features"] = train_frame.shape[1] - int(
+                    target_col in getattr(train_frame, "columns", ())
+                )
+                return
+
+        if isinstance(data, tuple) and len(data) >= 1:
+            first = cast(Any, data[0])
+            if hasattr(first, "shape"):
+                metrics["n_rows"] = first.shape[0]
+                metrics["n_features"] = first.shape[1]
 
     def _run_data_loader(self, node: NodeConfig, job_id: str = "unknown") -> str:
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
@@ -258,19 +288,9 @@ class NodeRunnersMixin:
 
         # Persist data shape for monitoring
         try:
-            if isinstance(data, pd.DataFrame):
-                metrics["n_rows"] = len(data)
-                metrics["n_features"] = len(data.columns) - 1  # minus target
-            elif hasattr(data, "train") and hasattr(data.train, "shape"):
-                metrics["n_rows"] = data.train.shape[0]
-                metrics["n_features"] = data.train.shape[1] - 1
-            elif isinstance(data, tuple) and len(data) >= 1:
-                first = data[0]
-                if hasattr(first, "shape"):
-                    metrics["n_rows"] = first.shape[0]
-                    metrics["n_features"] = first.shape[1] - 1
+            self._record_data_shape_metrics(metrics, data, target_col)
         except Exception:
-            pass
+            logger.debug("Failed to record data shape metrics for node %s", node.node_id, exc_info=True)
 
         return node.node_id, metrics
 
@@ -426,8 +446,8 @@ class NodeRunnersMixin:
                     if isinstance(stats, dict) and "mean" in stats:
                         cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
                         cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
-            except Exception as e:
-                logger.warning(f"Cross-validation failed for tuned model: {e}")
+            except Exception:
+                logger.exception("Cross-validation failed for tuned model")
 
         # Evaluate the tuned model
         try:
@@ -453,8 +473,8 @@ class NodeRunnersMixin:
             if "validation" in splits and splits["validation"]:
                 for k, v in splits["validation"].metrics.items():
                     metrics[f"val_{k}"] = v
-        except Exception as e:
-            logger.warning(f"Failed to evaluate tuned model: {e}")
+        except Exception:
+            logger.exception("Failed to evaluate tuned model")
 
         # Merge CV metrics
         metrics.update(cv_metrics)
@@ -466,20 +486,9 @@ class NodeRunnersMixin:
 
         # Persist data shape for monitoring
         try:
-            if isinstance(data, pd.DataFrame):
-                metrics["n_rows"] = len(data)
-                metrics["n_features"] = len(data.columns) - 1
-            elif hasattr(data, "train") and hasattr(data.train, "shape"):
-                train_frame = cast(Any, data.train)
-                metrics["n_rows"] = train_frame.shape[0]
-                metrics["n_features"] = train_frame.shape[1] - 1
-            elif isinstance(data, tuple) and len(data) >= 1:
-                first = cast(Any, data[0])
-                if hasattr(first, "shape"):
-                    metrics["n_rows"] = first.shape[0]
-                    metrics["n_features"] = first.shape[1] - 1
+            self._record_data_shape_metrics(metrics, data, target_col)
         except Exception:
-            pass
+            logger.debug("Failed to record data shape metrics for node %s", node.node_id, exc_info=True)
 
         return node.node_id, metrics
 
@@ -568,7 +577,7 @@ class NodeRunnersMixin:
         data = self._get_input(node)
 
         preview_info: Dict[str, Any] = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "data_summary": {},
             "applied_transformations": [],
             "operation_mode": "unknown",

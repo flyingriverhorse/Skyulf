@@ -31,7 +31,9 @@ class DataProfiler:
 
             col_stats["type"] = dtype
             col_stats["null_count"] = series.null_count()
-            col_stats["null_percentage"] = (series.null_count() / len(df)) * 100
+            col_stats["null_percentage"] = (
+                (series.null_count() / len(df)) * 100 if len(df) > 0 else 0.0
+            )
             col_stats["unique_count"] = series.n_unique()
 
             if dtype in ["Int64", "Float64", "Int32", "Float32"]:

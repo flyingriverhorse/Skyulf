@@ -19,7 +19,6 @@ _DEV_DEFAULTS: Dict[str, Any] = {
     "DB_ECHO": False,
     "HOST": "0.0.0.0",
     "CORS_ORIGINS": ["*"],
-    "SESSION_COOKIE_SECURE": False,
 }
 
 _PROD_DEFAULTS: Dict[str, Any] = {
@@ -28,9 +27,6 @@ _PROD_DEFAULTS: Dict[str, Any] = {
     "DB_ECHO": False,
     "CORS_ORIGINS": ["https://www.skyulf.com", "https://app.yourdomain.com"],
     "ALLOWED_HOSTS": ["skyulf.com", "app.yourdomain.com"],
-    "SESSION_COOKIE_SECURE": True,
-    "SESSION_COOKIE_HTTPONLY": True,
-    "SESSION_COOKIE_SAMESITE": "Lax",
 }
 
 _TEST_DEFAULTS: Dict[str, Any] = {

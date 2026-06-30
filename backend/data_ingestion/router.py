@@ -1,5 +1,16 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from fastapi.responses import Response
+
+from backend.middleware.rate_limiter import limiter
 
 from .dependencies import get_data_service
 from .schemas.ingestion import (
@@ -120,7 +131,9 @@ async def export_source_data(
 
 
 @router.post("/upload", response_model=IngestionJobResponse)
+@limiter.limit("10/minute")
 async def upload_file(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     service: DataIngestionService = Depends(get_data_service),
