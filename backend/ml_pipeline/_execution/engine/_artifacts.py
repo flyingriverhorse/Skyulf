@@ -73,7 +73,11 @@ class ArtifactsMixin:
             if importances is not None and len(importances) == len(feature_names):
                 return {name: round(float(val), 6) for name, val in zip(feature_names, importances)}
         except Exception:
-            pass
+            logger.debug(
+                "Failed to extract feature importances for step_type=%s",
+                type(model).__name__,
+                exc_info=True,
+            )
         return None
 
     def _finalize_training_artifacts(

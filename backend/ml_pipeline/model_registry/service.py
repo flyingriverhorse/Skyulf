@@ -14,6 +14,8 @@ from backend.ml_pipeline._services.job_service import JobService
 
 from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, RegistryStats
 
+_MIN_DATETIME = datetime.min
+
 
 class ModelRegistryService:
     @staticmethod
@@ -148,8 +150,8 @@ class ModelRegistryService:
 
             # For tuning jobs, we use run_number as version
             # And best_params as hyperparameters
-            metrics: Dict[str, Any] = cast(Dict[str, Any], job.metrics) or {}
-            if job.best_score:
+            metrics = dict(cast(Optional[Dict[str, Any]], job.metrics) or {})
+            if job.best_score is not None:
                 metrics["best_score"] = job.best_score
 
             grouped[key].append(
@@ -174,7 +176,7 @@ class ModelRegistryService:
         results = []
         for (m_type, ds_id), versions in grouped.items():
             # Sort versions by created_at desc
-            versions.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+            versions.sort(key=lambda x: x.created_at or _MIN_DATETIME, reverse=True)
 
             latest = versions[0] if versions else None
             deploy_count = sum(1 for v in versions if v.is_deployed)
@@ -211,7 +213,7 @@ class ModelRegistryService:
             key=lambda x: (
                 x.latest_version.created_at
                 if x.latest_version and x.latest_version.created_at
-                else datetime.min
+                else _MIN_DATETIME
             ),
             reverse=True,
         )
@@ -266,8 +268,8 @@ class ModelRegistryService:
             .order_by(AdvancedTuningJob.created_at.desc())
         )
         for job in tune_jobs.scalars().all():
-            metrics: Dict[str, Any] = cast(Dict[str, Any], job.metrics) or {}
-            if job.best_score:
+            metrics = dict(cast(Optional[Dict[str, Any]], job.metrics) or {})
+            if job.best_score is not None:
                 metrics["best_score"] = job.best_score
 
             versions.append(
@@ -288,7 +290,7 @@ class ModelRegistryService:
                 )
             )
 
-        versions.sort(key=lambda x: x.created_at or datetime.min, reverse=True)
+        versions.sort(key=lambda x: x.created_at or _MIN_DATETIME, reverse=True)
         return versions
 
     @staticmethod
@@ -307,9 +309,9 @@ class ModelRegistryService:
         if not job:
             raise ValueError(f"Job {job_id} not found")
 
-        artifact_uri = str(job.artifact_uri)
-        if not artifact_uri:
+        if not job.artifact_uri:
             return ArtifactListResponse(storage_type="unknown", base_uri="", files=[])
+        artifact_uri = str(job.artifact_uri)
 
         store: Union[S3ArtifactStore, LocalArtifactStore]
 
@@ -332,4 +334,4 @@ class ModelRegistryService:
 
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to list artifacts: {e}")
-            raise e
+            raise

@@ -333,10 +333,21 @@ class DataIngestionService:
             elif background_tasks:
                 background_tasks.add_task(ingest_data_task, new_source.id)
             else:
-                # Fallback: Run in thread
+                # Fallback: Run in thread — retain a strong reference so the
+                # task is not garbage-collected before it finishes.
                 import asyncio
 
-                asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
+                _task = asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
+                _source_id = new_source.id
+
+                def _on_done(t: asyncio.Task) -> None:
+                    exc = t.exception() if not t.cancelled() else None
+                    if exc:
+                        logger.error(
+                            "Ingestion task failed for source %s: %s", _source_id, exc
+                        )
+
+                _task.add_done_callback(_on_done)
 
             return IngestionJobResponse(
                 job_id=str(new_source.id),  # Using source ID as job ID for now

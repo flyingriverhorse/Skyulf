@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional
 # preprocessing / modeling node logs; ``backend.ml_pipeline`` covers
 # engine-level advisories that aren't already routed via merge_warnings.
 _CAPTURED_LOGGERS = ("skyulf", "backend.ml_pipeline")
+logger = logging.getLogger(__name__)
 
 
 class WarningCaptureHandler(logging.Handler):
@@ -64,6 +65,7 @@ class WarningCaptureHandler(logging.Handler):
         try:
             msg = record.getMessage()
         except Exception:
+            self.handleError(record)
             return
         self._buffer.append(
             {
@@ -93,7 +95,11 @@ class WarningCaptureHandler(logging.Handler):
             try:
                 lg.removeHandler(self)
             except Exception:
-                pass
+                logger.debug(
+                    "Failed to detach warning capture handler from logger %s",
+                    lg.name,
+                    exc_info=True,
+                )
         self._attached.clear()
 
     # Context-manager sugar so engine code can do ``with handler.attach():``.

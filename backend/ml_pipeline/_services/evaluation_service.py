@@ -59,10 +59,7 @@ class EvaluationService:
             # Fallback: Check if the job failed or is still running
             if job.status not in ["completed", "succeeded"]:
                 raise ValueError(f"Job is {job.status}, evaluation data not available yet.")
-
-            # `_get_path` is only on concrete stores; fall back to the key.
-            path = getattr(artifact_store, "_get_path", lambda k: k)(key)
-            raise FileNotFoundError(f"Evaluation data artifact not found. Key: {key}, Path: {path}")
+            raise FileNotFoundError(f"Evaluation data not found for job {job_id}")
 
         try:
             data = artifact_store.load(key)

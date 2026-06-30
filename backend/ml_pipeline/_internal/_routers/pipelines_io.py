@@ -49,7 +49,11 @@ async def save_pipeline(
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
         os.makedirs(storage_dir, exist_ok=True)
-        file_path = os.path.join(storage_dir, f"{dataset_id}.json")
+        # Guard against path traversal in dataset_id (e.g. "../../etc/passwd")
+        safe_id = os.path.basename(dataset_id)
+        if not safe_id or safe_id != dataset_id:
+            raise HTTPException(status_code=400, detail="Invalid dataset_id")
+        file_path = os.path.join(storage_dir, f"{safe_id}.json")
         try:
             with open(file_path, "w") as f:
                 json.dump(payload.model_dump(), f, indent=2)
@@ -118,7 +122,11 @@ async def load_pipeline(
 
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
-        file_path = os.path.join(storage_dir, f"{dataset_id}.json")
+        # Guard against path traversal in dataset_id
+        safe_id = os.path.basename(dataset_id)
+        if not safe_id or safe_id != dataset_id:
+            return None
+        file_path = os.path.join(storage_dir, f"{safe_id}.json")
         if not os.path.exists(file_path):
             return None
         try:

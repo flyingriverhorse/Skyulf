@@ -16,6 +16,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
     """
     Core logic to run EDA analysis.
     """
+    report = None
     try:
         logger.info(f"Starting EDA analysis for report {report_id}")
 
@@ -157,6 +158,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
         logger.error(f"EDA Analysis failed for report {report_id}: {e}")
         # Try to update status if possible
         try:
+            await session.rollback()
             if report:
                 report.status = "FAILED"
                 report.error_message = str(e)
@@ -184,8 +186,13 @@ try:
         """
         Entry point for Celery.
         """
-        # Run async code in sync context
-        asyncio.run(run_eda_background(report_id))
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(run_eda_background(report_id))
+        finally:
+            asyncio.set_event_loop(None)
+            loop.close()
 
 except ImportError:
     pass

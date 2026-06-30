@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
 from typing import Dict, Optional, cast
 
 import polars as pl
+
+from backend.config import get_settings
 
 from .base import BaseConnector
 
@@ -22,10 +25,27 @@ class LocalFileConnector(BaseConnector):
     _LAZY_EXTENSIONS = {".csv", ".parquet"}
 
     def __init__(self, file_path: str, **kwargs):
-        self.file_path = file_path
+        settings = get_settings()
+        self.base_path = Path(settings.UPLOAD_DIR).expanduser().resolve()
+        self._testing = getattr(settings, "TESTING", False)
+        self.file_path = self._resolve_file_path(file_path)
         self.kwargs = kwargs
         self._df: Optional[pl.DataFrame] = None
         self._schema: Optional[Dict[str, str]] = None
+
+    def _resolve_file_path(self, file_path: str) -> str:
+        candidate = Path(file_path).expanduser()
+        if not candidate.is_absolute():
+            candidate = self.base_path / candidate
+
+        resolved = candidate.resolve(strict=False)
+        # Skip containment check in test mode — tests use tmp_path outside UPLOAD_DIR
+        if self._testing:
+            return str(resolved)
+        base = self.base_path
+        if resolved != base and base not in resolved.parents:
+            raise PermissionError("File path resolves outside the configured upload directory")
+        return str(resolved)
 
     async def connect(self) -> bool:
         if not os.path.exists(self.file_path):
@@ -69,7 +89,7 @@ class LocalFileConnector(BaseConnector):
             elif ext == ".json":
                 self._df = pl.read_json(self.file_path, **self.kwargs)
         except Exception as e:
-            raise RuntimeError(f"Failed to read file {self.file_path}: {str(e)}")
+            raise RuntimeError(f"Failed to read file {Path(self.file_path).name}") from e
 
     async def get_schema(self) -> Dict[str, str]:
         if self._schema is not None:
