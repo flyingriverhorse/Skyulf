@@ -31,7 +31,11 @@ class ArtifactFactory:
         if str(artifact_uri).startswith("s3://"):
             return ArtifactFactory._create_s3_store_from_uri(artifact_uri)
         else:
-            return LocalArtifactStore(base_path=artifact_uri)
+            settings = get_settings()
+            base_path = ArtifactFactory._resolve_local_artifact_path(
+                artifact_uri, settings.TRAINING_ARTIFACT_DIR
+            )
+            return LocalArtifactStore(base_path=base_path)
 
     @staticmethod
     def get_discovery() -> "ArtifactDiscovery":
@@ -48,7 +52,9 @@ class ArtifactFactory:
         )
 
         settings = get_settings()
-        discovery: ArtifactDiscovery = LocalArtifactDiscovery(settings.TRAINING_ARTIFACT_DIR)
+        discovery: ArtifactDiscovery = LocalArtifactDiscovery(
+            ArtifactFactory._resolve_artifact_root(settings.TRAINING_ARTIFACT_DIR)
+        )
         return discovery
 
     @staticmethod
@@ -73,7 +79,7 @@ class ArtifactFactory:
         s3_bucket = settings.S3_ARTIFACT_BUCKET
 
         use_s3 = False
-        folder_name = artifact_path_name or job_id
+        folder_name = ArtifactFactory._sanitize_artifact_name(artifact_path_name or job_id)
 
         if s3_bucket:
             if is_s3_source:
@@ -94,7 +100,8 @@ class ArtifactFactory:
             return store, base_uri
         else:
             # Create Local Store
-            base_path = os.path.join(settings.TRAINING_ARTIFACT_DIR, folder_name)
+            artifact_root = ArtifactFactory._resolve_artifact_root(settings.TRAINING_ARTIFACT_DIR)
+            base_path = os.path.join(artifact_root, folder_name)
             os.makedirs(base_path, exist_ok=True)
             store = LocalArtifactStore(base_path)
             return store, base_path
@@ -111,6 +118,31 @@ class ArtifactFactory:
         storage_options = ArtifactFactory._get_s3_options(settings)
 
         return S3ArtifactStore(bucket_name=bucket, prefix=prefix, storage_options=storage_options)
+
+    @staticmethod
+    def _resolve_artifact_root(root_path: str) -> str:
+        return os.path.realpath(os.path.abspath(root_path))
+
+    @staticmethod
+    def _resolve_local_artifact_path(path: str, artifact_root: str) -> str:
+        root = ArtifactFactory._resolve_artifact_root(artifact_root)
+        candidate = path if os.path.isabs(path) else os.path.join(root, path)
+        resolved = os.path.realpath(os.path.abspath(candidate))
+        if not resolved.startswith(root + os.sep) and resolved != root:
+            raise PermissionError("Artifact path resolves outside the configured artifact directory")
+        return resolved
+
+    @staticmethod
+    def _sanitize_artifact_name(name: str) -> str:
+        candidate = str(name).strip()
+        if not candidate:
+            raise ValueError("Artifact path name cannot be empty")
+
+        normalized = candidate.replace("\\", "/").strip("/")
+        parts = [part for part in normalized.split("/") if part]
+        if not parts or any(part in {".", ".."} for part in parts):
+            raise PermissionError("Artifact path name contains invalid path segments")
+        return "_".join(parts)
 
     @staticmethod
     def _get_s3_options(settings) -> dict:
