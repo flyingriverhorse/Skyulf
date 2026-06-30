@@ -1,6 +1,8 @@
 ﻿# Configuration
 
-This page documents the configuration schema consumed by `SkyulfPipeline` and `FeatureEngineer`.
+This page documents the configuration schema consumed by `SkyulfPipeline` and `FeatureEngineer` (the **skyulf-core** library).
+
+> **Running the full platform?** See the [Backend Configuration Reference](../guides/backend_configuration.md) for all `.env` / environment variable settings (database, security, Celery, uploads, etc.).
 
 ## Pipeline config
 

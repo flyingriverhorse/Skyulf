@@ -212,13 +212,13 @@ async def async_session_or_connection(  # noqa: C901
                 warehouse=cfg.get("snowflake_warehouse"),
             )
 
-        conn = await asyncio.get_event_loop().run_in_executor(executor, create_snowflake_connection)
+        conn = await asyncio.get_running_loop().run_in_executor(executor, create_snowflake_connection)
 
         try:
             # Wrap connection with async interface
             yield AsyncSnowflakeConnection(conn, executor)
         finally:
-            await asyncio.get_event_loop().run_in_executor(executor, conn.close)
+            await asyncio.get_running_loop().run_in_executor(executor, conn.close)
             executor.shutdown(wait=True)
 
     else:
@@ -250,13 +250,13 @@ class AsyncSnowflakeConnection:
             finally:
                 cursor.close()
 
-        return await asyncio.get_event_loop().run_in_executor(self._executor, _execute)
+        return await asyncio.get_running_loop().run_in_executor(self._executor, _execute)
 
     async def commit(self):
         """Commit transaction asynchronously."""
         import asyncio
 
-        return await asyncio.get_event_loop().run_in_executor(
+        return await asyncio.get_running_loop().run_in_executor(
             self._executor, self._connection.commit
         )
 
@@ -264,7 +264,7 @@ class AsyncSnowflakeConnection:
         """Rollback transaction asynchronously."""
         import asyncio
 
-        return await asyncio.get_event_loop().run_in_executor(
+        return await asyncio.get_running_loop().run_in_executor(
             self._executor, self._connection.rollback
         )
 

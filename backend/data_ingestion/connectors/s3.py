@@ -1,20 +1,30 @@
+import logging
 from typing import Dict, Optional, cast
 
 import polars as pl
 
 from backend.data_ingestion.connectors.base import BaseConnector
 
+logger = logging.getLogger(__name__)
+
 
 class S3Connector(BaseConnector):
     def __init__(self, path: str, storage_options: Optional[Dict] = None):
         self.path = path
         self.storage_options = storage_options or {}
-        # Debug log to confirm code reload
-        import logging
-
-        logging.getLogger(__name__).info(
-            f"Initialized S3Connector for {path} with options keys: {list(self.storage_options.keys())}"
+        logger.info(
+            "Initialized S3Connector for %s with option keys: %s",
+            path,
+            list(self.storage_options.keys()),
         )
+
+    @staticmethod
+    def _sanitize_error(error: Exception) -> str:
+        message = str(error)
+        for secret in ("aws_secret_access_key", "aws_access_key_id", "secret=", "key="):
+            if secret in message:
+                return "redacted sensitive S3 error"
+        return message
 
     def _get_storage_options(self) -> Dict[str, str]:
         """
@@ -43,15 +53,8 @@ class S3Connector(BaseConnector):
             await self.get_schema()
             return True
         except Exception as e:
-            # Log the error but don't raise immediately if it's just a connection check
-            # Wait, validate() calls connect(), so we should raise or return False.
-            # But get_sample calls connect() then fetch_data().
-            # If connect fails, fetch_data will likely fail too.
-            # Let's raise a clearer error.
-            import logging
-
-            logging.getLogger(__name__).error(f"S3 Connect failed for {self.path}: {e}")
-            raise ConnectionError(f"Failed to connect to S3 path {self.path}: {e}")
+            logger.error("S3 connection check failed for %s: %s", self.path, self._sanitize_error(e))
+            raise ConnectionError(f"Failed to connect to S3 path {self.path}") from e
 
     async def get_schema(self) -> Dict[str, str]:
         options = self._get_storage_options()
@@ -80,12 +83,12 @@ class S3Connector(BaseConnector):
                     raise ValueError(
                         "S3 Connection Error: Could not find AWS credentials. "
                         "If running locally, ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
-                        "are set or passed in storage_options. "
-                        f"Original error: {e}"
+                        "are set or passed in storage_options."
                     )
                 raise ValueError(
-                    f"Could not infer schema for {self.path}. Ensure it is a valid Parquet or CSV file. Error: {e}"
-                )
+                    f"Could not infer schema for {self.path}. Ensure it is a valid Parquet or CSV file "
+                    "and that the configured S3 credentials have access."
+                ) from e
 
     async def fetch_data(
         self, query: Optional[str] = None, limit: Optional[int] = None
@@ -98,25 +101,26 @@ class S3Connector(BaseConnector):
 
         lf = None
 
-        if is_csv:
-            lf = pl.scan_csv(self.path, storage_options=options)
-        elif is_parquet:
-            lf = pl.scan_parquet(self.path, storage_options=options)
-        else:
-            # Fallback: Try Parquet, verify schema, else CSV
-            try:
-                temp_lf = pl.scan_parquet(self.path, storage_options=options)
-                # Force schema check to ensure it's actually Parquet
-                temp_lf.collect_schema()
-                lf = temp_lf
-            except Exception:
-                # Not a valid Parquet file — fall back to CSV
+        try:
+            if is_csv:
                 lf = pl.scan_csv(self.path, storage_options=options)
+            elif is_parquet:
+                lf = pl.scan_parquet(self.path, storage_options=options)
+            else:
+                try:
+                    temp_lf = pl.scan_parquet(self.path, storage_options=options)
+                    temp_lf.collect_schema()
+                    lf = temp_lf
+                except Exception:
+                    lf = pl.scan_csv(self.path, storage_options=options)
 
-        if limit:
-            lf = lf.limit(limit)
+            if limit:
+                lf = lf.limit(limit)
 
-        return cast(pl.DataFrame, lf.collect())
+            return cast(pl.DataFrame, lf.collect())
+        except Exception as e:
+            logger.error("Failed to fetch data from %s: %s", self.path, self._sanitize_error(e))
+            raise RuntimeError(f"Failed to fetch data from S3 path {self.path}") from e
 
     async def validate(self) -> bool:
         return await self.connect()

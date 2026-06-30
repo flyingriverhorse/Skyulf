@@ -48,7 +48,7 @@ Prerequisites: **Python 3.12**
 ### Fastest Path (One Command)
 
 **Windows:** Double-click `start.bat`
-**macOS/Linux:** Run `./start.sh`
+**macOS/Linux:** Run `./start.sh`or bash `start.sh`
 
 These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open http://127.0.0.1:8000 when ready.
 

@@ -97,5 +97,13 @@ def run_pipeline_batch_task(branches: List[Tuple[str, dict]]) -> None:
     else:
         with ThreadPoolExecutor(max_workers=len(branches)) as pool:
             futures = [pool.submit(_run_one, jid, pl) for jid, pl in branches]
+            errors = []
             for f in futures:
-                f.result()  # re-raises per-branch exceptions so Celery marks the task failed
+                try:
+                    f.result()
+                except Exception as exc:
+                    errors.append(exc)
+            if errors:
+                # Re-raise the first error; all failures are already logged
+                # inside _run_one so Celery receives a meaningful traceback.
+                raise errors[0]

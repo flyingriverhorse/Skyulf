@@ -60,20 +60,23 @@ def record_pipeline_error(job_id: str, message: str, traceback: str) -> None:
             db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
         engine = create_engine(db_url)
-        session = sessionmaker(bind=engine)()
         try:
-            event = ErrorEvent(
-                route="celery/pipeline",
-                error_type="PipelineExecutionException",
-                message=message[:2000],
-                traceback=traceback[:8000],
-                job_id=job_id or None,
-                status_code=500,
-            )
-            session.add(event)
-            session.commit()
+            session = sessionmaker(bind=engine)()
+            try:
+                event = ErrorEvent(
+                    route="celery/pipeline",
+                    error_type="PipelineExecutionException",
+                    message=message[:2000],
+                    traceback=traceback[:8000],
+                    job_id=job_id or None,
+                    status_code=500,
+                )
+                session.add(event)
+                session.commit()
+            finally:
+                session.close()
         finally:
-            session.close()
+            engine.dispose()
     except Exception as persist_err:
         logger.debug("ErrorEvent (sync) persist failed: %s", persist_err)
 
@@ -156,7 +159,7 @@ async def method_not_allowed_exception_handler(request: Request, exc: Exception)
             "success": False,
             "error": "Method Not Allowed",
             "message": f"Method {request.method} not allowed",
-            "status_code": 405,
+            "request_id": getattr(request.state, "request_id", None),
         },
     )
 

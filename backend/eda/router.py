@@ -1,12 +1,12 @@
 import logging
-from typing import Any, List, Optional, cast
+from typing import Any, List, Literal, Optional, cast
 
 import orjson
 import pandas as pd
 import polars as pl
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,16 +31,37 @@ class FilterRequest(BaseModel):
     operator: str
     value: Any
 
+    @field_validator("column")
+    @classmethod
+    def validate_column(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("column name cannot be empty")
+        if len(v) > 255:
+            raise ValueError("column name too long")
+        return v
+
+    @field_validator("operator")
+    @classmethod
+    def validate_operator(cls, v: str) -> str:
+        allowed = {"==", "!=", ">", ">=", "<", "<=", "in", "not_in", "contains", "not_contains"}
+        if v not in allowed:
+            raise ValueError(f"operator must be one of {sorted(allowed)}")
+        return v
+
 
 class AnalyzeRequest(BaseModel):
     target_col: Optional[str] = None
     exclude_cols: Optional[List[str]] = None
     filters: Optional[List[FilterRequest]] = None
-    task_type: Optional[str] = None  # "Classification" or "Regression"
+    task_type: Optional[Literal["Classification", "Regression"]] = None
 
 
 @router.get("/jobs/all")
-async def list_all_jobs(limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_db)):
+async def list_all_jobs(
+    limit: int = Query(default=50, ge=1, le=200),
+    skip: int = Query(default=0, ge=0),
+    session: AsyncSession = Depends(get_db),
+):
     """
     Returns a list of all EDA jobs across all datasets.
     """
@@ -219,7 +240,7 @@ async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
 
 class DecompositionRequest(BaseModel):
     measure_col: Optional[str] = None
-    measure_agg: str = "count"
+    measure_agg: Literal["count", "sum", "mean", "min", "max", "median"] = "count"
     split_col: Optional[str] = None
     filters: Optional[List[FilterRequest]] = None
 

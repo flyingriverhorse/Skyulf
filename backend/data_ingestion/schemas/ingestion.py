@@ -1,7 +1,27 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+# Keys inside `config` that should never be sent to clients.
+_SENSITIVE_CONFIG_KEYS = frozenset(
+    {
+        "storage_options",
+        "aws_access_key_id",
+        "aws_secret_access_key",
+        "aws_session_token",
+        "password",
+        "secret",
+        "private_key",
+        "token",
+        "api_key",
+    }
+)
+
+
+def _redact_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of *config* with sensitive keys removed."""
+    return {k: v for k, v in config.items() if k not in _SENSITIVE_CONFIG_KEYS}
 
 
 class DataSourceCreate(BaseModel):
@@ -41,6 +61,13 @@ class DataSourceRead(BaseModel):
     rows: Optional[int] = None
     columns: Optional[int] = None
     size_bytes: Optional[int] = None
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def redact_sensitive_config(cls, v: Any) -> Any:
+        if isinstance(v, dict):
+            return _redact_config(v)
+        return v
 
     @model_validator(mode="after")
     def extract_metadata_fields(self):

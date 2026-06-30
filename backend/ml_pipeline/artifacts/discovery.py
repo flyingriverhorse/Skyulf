@@ -60,7 +60,7 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
     """Filesystem implementation rooted at ``TRAINING_ARTIFACT_DIR``."""
 
     def __init__(self, root_path: str):
-        self.root_path = Path(root_path)
+        self.root_path = Path(root_path).expanduser().resolve()
 
     @staticmethod
     def _parse_created_at(folder_name: str) -> Optional[str]:
@@ -80,7 +80,13 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
             return []
 
         artifacts: List[ReferenceArtifact] = []
-        for item_path in self.root_path.iterdir():
+        try:
+            root_items = list(self.root_path.iterdir())
+        except OSError:
+            logger.warning("Could not scan artifact root %s", self.root_path, exc_info=True)
+            return []
+
+        for item_path in root_items:
             if not item_path.is_dir():
                 continue
             created_at = self._parse_created_at(item_path.name)
@@ -108,8 +114,13 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
     def get_store_for_job(self, job_id: str) -> ArtifactStore:
         job_folder = str(self.root_path)
         if self.root_path.exists():
-            for item_path in self.root_path.iterdir():
-                if item_path.is_dir() and item_path.name.endswith(f"_{job_id}"):
-                    job_folder = str(item_path)
-                    break
+            try:
+                for item_path in self.root_path.iterdir():
+                    if item_path.is_dir() and (
+                        item_path.name == job_id or item_path.name.endswith(f"_{job_id}")
+                    ):
+                        job_folder = str(item_path)
+                        break
+            except OSError:
+                logger.warning("Could not inspect artifact root %s", self.root_path, exc_info=True)
         return LocalArtifactStore(base_path=job_folder)

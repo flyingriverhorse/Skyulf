@@ -93,7 +93,7 @@ This starts three containers:
 - Dashboard: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 - Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
-- Default login: **admin** / **admin123** (change in production)
+- Authentication is not yet enabled — the platform is open by default in this release.
 
 For the full manual setup (without Docker), see the [Platform Setup guide](../guides/platform_setup.md).
 
