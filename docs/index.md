@@ -66,6 +66,20 @@ See [Architecture](architecture.md) and [Data Architecture](data_architecture.md
 2. See the [Platform Walkthrough](guides/platform_walkthrough.md) for an 8-step end-to-end guide through the UI.
 3. Explore the interactive API docs at [/docs](http://127.0.0.1:8000/docs) (Swagger UI) or [/redoc](http://127.0.0.1:8000/redoc) (ReDoc).
 
+**Backend reference:**
+- [Backend API Reference](guides/backend_api.md) — All REST endpoints, request/response shapes, rate limits, WebSocket events.
+- [Backend Configuration Reference](guides/backend_configuration.md) — Every `.env` variable grouped by category.
+
+**Frontend development:**
+```bash
+# Terminal 1 — backend
+cd /path/to/Skyulf && .venv/bin/python3 run_fastapi.py
+
+# Terminal 2 — frontend dev server (proxies /api/* to localhost:8000)
+cd frontend/ml-canvas && npm run dev
+# Opens at http://localhost:5173
+```
+
 ### Using skyulf-core as a Library
 
 1. [Installation](user_guide/installation.md) — Install from PyPI or editable mode.

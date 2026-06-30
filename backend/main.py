@@ -163,8 +163,13 @@ def _reset_stale_jobs() -> None:
     These are orphans from a previous server process that was killed while
     BackgroundTasks (or a Celery worker) were mid-execution.  Without this
     reset the frontend polls forever because the status never changes.
+
+    A 2-hour staleness cutoff is applied so that jobs recently started by
+    Celery workers (which survive API restarts) are not incorrectly failed.
     """
     try:
+        from datetime import datetime, timedelta, timezone
+
         from sqlalchemy import create_engine, text
 
         db_url = settings.DATABASE_URL
@@ -175,14 +180,20 @@ def _reset_stale_jobs() -> None:
 
         engine = create_engine(sync_url, pool_pre_ping=True)
         msg = "Server restarted while job was running — marked failed on startup."
+        # Only treat jobs as orphaned if they have been stuck for > 2 hours.
+        # This protects Celery-managed jobs that may still be running after
+        # the API process restarts.
+        stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2)
         with engine.begin() as conn:
             for table in ("basic_training_jobs", "advanced_tuning_jobs"):
                 result = conn.execute(
                     text(
                         f"UPDATE {table} SET status='failed', finished_at=CURRENT_TIMESTAMP,"
-                        f" error_message=:msg WHERE status IN ('running','queued')"
+                        f" error_message=:msg"
+                        f" WHERE status IN ('running','queued')"
+                        f" AND (started_at IS NULL OR started_at < :cutoff)"
                     ),
-                    {"msg": msg},
+                    {"msg": msg, "cutoff": stale_cutoff},
                 )
                 if result.rowcount:
                     logger.warning(
@@ -353,16 +364,8 @@ def _include_routers(app: FastAPI) -> None:
     # Health check (no prefix, available at /health)
     app.include_router(health_router, tags=["health"])
 
-    # ML Pipeline
-    # Note: ml_pipeline_router prefix was removed from its file to allow flexible mounting.
-    # We mount it at /api/pipeline for standard access
+    # ML Pipeline — canonical path is /api/pipeline.
     app.include_router(ml_pipeline_router, prefix="/api/pipeline")
-
-    # And at /ml-workflow/api/pipelines for frontend compatibility
-    app.include_router(ml_pipeline_router, prefix="/ml-workflow/api/pipelines")
-
-    # Mount at /api/ml for frontend compatibility (fixes 404s)
-    app.include_router(ml_pipeline_router, prefix="/api/ml")
     app.include_router(model_registry_router, prefix="/api/ml", tags=["Model Registry"])
 
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
@@ -383,7 +386,6 @@ def _include_routers(app: FastAPI) -> None:
     _API_PREFIXES = (
         "/api/",
         "/data/",
-        "/ml-workflow/",
         "/health",
         "/docs",
         "/redoc",
@@ -444,12 +446,14 @@ def _add_exception_handlers(app: FastAPI) -> None:
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle unexpected Python exceptions and convert them to 500 errors."""
         import traceback as _tb
+        from fastapi.responses import JSONResponse as _JSONResponse
 
         real_type = type(exc).__name__
         real_message = str(exc)
         real_traceback = _tb.format_exc()
         logger.error(f"Unexpected error ({real_type}): {real_message}", exc_info=True)
-        # Record with the real exception metadata before wrapping
+        # Record with full real exception metadata. Return a sanitised response
+        # directly to avoid double-recording through generic_http_exception_handler.
         await _record_error(
             route=str(request.url.path),
             error_type=real_type,
@@ -457,8 +461,15 @@ def _add_exception_handlers(app: FastAPI) -> None:
             traceback=real_traceback,
             status_code=500,
         )
-        http_exc = HTTPException(status_code=500, detail=f"Internal server error: {real_message}")
-        return await generic_http_exception_handler(request, http_exc)
+        return _JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": "HTTP 500",
+                "message": "Internal server error",
+                "status_code": 500,
+            },
+        )
 
 
 # Create the application instance

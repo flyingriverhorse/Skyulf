@@ -51,7 +51,7 @@ class Settings(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="allow",
+        extra="ignore",
     )
 
     # ── Validators ────────────────────────────────────────────────────
@@ -62,6 +62,16 @@ class Settings(
         if len(v) < 32:
             raise ValueError("SECRET_KEY must be at least 32 characters long")
         return v
+
+    @model_validator(mode="after")
+    def validate_fallback_auth(self) -> "Settings":
+        """Reject a blank fallback password when fallback auth is enabled."""
+        if self.AUTH_FALLBACK_ENABLED and not self.AUTH_FALLBACK_PASSWORD:
+            raise ValueError(
+                "AUTH_FALLBACK_PASSWORD must be explicitly set when AUTH_FALLBACK_ENABLED=true. "
+                "Set a strong password in your .env file."
+            )
+        return self
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -145,6 +155,24 @@ class Settings(
                     self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
                 else:
                     self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
+        return self
+
+    @model_validator(mode="after")
+    def validate_production_secret_key(self) -> "Settings":
+        """Fail fast if SECRET_KEY was not explicitly set in production.
+
+        The default value is a randomly generated token — different per process
+        and per restart — which breaks JWT validation across workers and makes
+        all existing tokens invalid after a restart.
+        """
+        env = os.getenv("FASTAPI_ENV", "development").lower()
+        if env == "production" and not self.is_field_set("SECRET_KEY"):
+            raise ValueError(
+                "SECRET_KEY must be explicitly set in production environments. "
+                "Add SECRET_KEY=<value> to your .env file or environment. "
+                "Generate a strong key with: "
+                "python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+            )
         return self
 
     # ── Utility ───────────────────────────────────────────────────────

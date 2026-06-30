@@ -50,6 +50,16 @@ async def _get_submit_lock(key: str) -> asyncio.Lock:
         return _submit_locks[key]
 
 
+async def _release_submit_lock(key: str) -> None:
+    """Evict the lock entry once no submission is actively holding it.
+
+    Any waiter that already has a reference to the lock object will acquire
+    it normally; the eviction only prevents the dict from growing unbounded.
+    """
+    async with _submit_locks_guard:
+        _submit_locks.pop(key, None)
+
+
 @router.post("/run", response_model=RunPipelineResponse)
 @limiter.limit("20/minute")
 async def run_pipeline(  # noqa: C901
@@ -187,6 +197,7 @@ async def run_pipeline(  # noqa: C901
             if existing_job_id:
                 logger.info("Deduplicating submission: returning existing job %s", existing_job_id)
                 all_job_ids.append(existing_job_id)
+                await _release_submit_lock(_submit_key)
                 continue
 
             # Create Job in DB (commits immediately, visible to next waiter)
@@ -200,6 +211,7 @@ async def run_pipeline(  # noqa: C901
                 graph=branch_graph,
                 branch_index=branch_index,
             )
+        await _release_submit_lock(_submit_key)
 
         all_job_ids.append(job_id)
         publish_job_event(JobEvent(event="created", job_id=job_id, status="queued", progress=0))

@@ -1,10 +1,11 @@
 import logging
 from typing import AsyncGenerator, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.exceptions.core import SkyulfException
+from backend.middleware.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,8 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @router.post("/deploy/{job_id}", response_model=DeploymentInfo)
-async def deploy_model(job_id: str, session: AsyncSession = Depends(get_async_session)):
+@limiter.limit("10/minute")
+async def deploy_model(request: Request, job_id: str, session: AsyncSession = Depends(get_async_session)):
     """
     Deploys a model from a completed job.
     """
@@ -71,7 +73,8 @@ async def deactivate_deployment(session: AsyncSession = Depends(get_async_sessio
 
 
 @router.post("/predict", response_model=PredictionResponse)
-async def predict(request: PredictionRequest, session: AsyncSession = Depends(get_async_session)):
+@limiter.limit("60/minute")
+async def predict(request: Request, prediction_request: PredictionRequest, session: AsyncSession = Depends(get_async_session)):
     """
     Makes predictions using the active model.
     """
@@ -80,10 +83,13 @@ async def predict(request: PredictionRequest, session: AsyncSession = Depends(ge
         if not deployment:
             raise HTTPException(status_code=404, detail="No active deployment found")
 
-        predictions = await DeploymentService.predict(session, request.data)
+        predictions = await DeploymentService.predict(session, prediction_request.data)
 
         return PredictionResponse(predictions=predictions, model_version=deployment.job_id)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Prediction failed")
+        raise HTTPException(status_code=500, detail="Prediction failed")

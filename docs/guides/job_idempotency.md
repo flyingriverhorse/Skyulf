@@ -50,9 +50,19 @@ Click 2  →  acquires lock  →  J1 found (queued)  →  returns J1  →  relea
 Without the lock, both clicks could see an empty table simultaneously
 before either one committed its new row (a classic read-modify-write race).
 
-## Known Limitation
+## Cross-Worker Protection
 
-The lock lives in-process.  If you run multiple uvicorn workers
-(`--workers N`) each worker has its own lock dictionary and
-cross-process races are not prevented.  The current default
-single-worker configuration is fully protected.
+The in-process `asyncio.Lock` prevents races within a single uvicorn worker.
+For deployments with **multiple workers** (`--workers N`), the idempotency
+check additionally uses a **database-level row lock** (`SELECT … FOR UPDATE SKIP LOCKED`):
+
+```
+Worker A  →  acquires DB row lock  →  no job found  →  creates job J1  →  commits
+Worker B  →  waits for lock  →  J1 now found  →  returns J1
+```
+
+This provides strong protection on **PostgreSQL**.
+
+> **Note (SQLite):** SQLite does not support `SELECT FOR UPDATE`. Under SQLite with multiple
+> workers, a race is still theoretically possible. The default single-worker configuration
+> is fully protected on both databases.
