@@ -99,7 +99,9 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
                         logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
                         return existing
                 except Exception:
-                    pass
+                    logger.debug(
+                        "Failed to check for existing data source in PostgreSQL", exc_info=True
+                    )
 
             logger.exception("PostgreSQL insert failed for data_sources")
             raise RuntimeError(
