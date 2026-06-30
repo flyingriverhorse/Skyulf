@@ -343,9 +343,7 @@ class DataIngestionService:
                 def _on_done(t: asyncio.Task) -> None:
                     exc = t.exception() if not t.cancelled() else None
                     if exc:
-                        logger.error(
-                            "Ingestion task failed for source %s: %s", _source_id, exc
-                        )
+                        logger.error("Ingestion task failed for source %s: %s", _source_id, exc)
 
                 _task.add_done_callback(_on_done)
 

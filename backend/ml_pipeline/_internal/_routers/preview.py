@@ -179,7 +179,6 @@ async def preview_pipeline(  # noqa: C901
             # No training → no separate label source; reuse the runnable sub.
             paired_subs = [(sub, sub) for sub in preview_subs if not _is_data_preview_sub(sub)]
 
-
         catalog = create_catalog_from_options(
             resolved_s3_options, config.nodes, session=sync_session
         )
