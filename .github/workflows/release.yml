@@ -31,8 +31,14 @@ jobs:
       - name: Detect version changes
         id: check
         run: |
-          # Safely extract the version from setup.py using Python regex (supporting optional spaces around '=')
-          VERSION=$(python -c "import re; print(re.search(r'version\s*=\s*[\"\'']([^\"\'']+)[\"\']', open('skyulf-core/setup.py').read()).group(1))")
+          VERSION=$(python - <<'PYEOF'
+import re, sys
+m = re.search(r"""version\s*=\s*['"]([^'"]+)['"]""", open('skyulf-core/setup.py').read())
+if not m:
+    print("ERROR: could not find version in setup.py", file=sys.stderr); sys.exit(1)
+print(m.group(1))
+PYEOF
+)
           echo "Found version in setup.py: $VERSION"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
