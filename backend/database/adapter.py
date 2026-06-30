@@ -212,7 +212,9 @@ async def async_session_or_connection(  # noqa: C901
                 warehouse=cfg.get("snowflake_warehouse"),
             )
 
-        conn = await asyncio.get_running_loop().run_in_executor(executor, create_snowflake_connection)
+        conn = await asyncio.get_running_loop().run_in_executor(
+            executor, create_snowflake_connection
+        )
 
         try:
             # Wrap connection with async interface
