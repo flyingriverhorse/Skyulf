@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/validation_vs_sklearn.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/backend_configuration.html">
       
       
-        <link rel="prev" href="text_nlp.html">
+        <link rel="prev" href="backend_api.html">
       
       
-        <link rel="next" href="configuration.html">
+        <link rel="next" href="job_idempotency.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Validation vs scikit-learn - Skyulf</title>
+        <title>Configuration Reference - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#validation-vs-scikit-learn-proof" class="md-skip">
+        <a href="#backend-configuration-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Validation vs scikit-learn
+              Configuration Reference
             
           </span>
         </div>
@@ -240,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../guides/platform_setup.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="platform_setup.html" class="md-tabs__link">
           
   
   
@@ -264,7 +266,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../guides/getting_started.html" class="md-tabs__link">
+        <a href="getting_started.html" class="md-tabs__link">
           
   
   
@@ -320,13 +322,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="overview.html" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
           
   
   
@@ -436,28 +436,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -475,7 +478,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -493,7 +496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/platform_setup.html" class="md-nav__link">
+      <a href="platform_setup.html" class="md-nav__link">
         
   
   
@@ -521,7 +524,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+      <a href="platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -549,7 +552,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/backend_api.html" class="md-nav__link">
+      <a href="backend_api.html" class="md-nav__link">
         
   
   
@@ -574,10 +577,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../guides/backend_configuration.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="backend_configuration.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -593,6 +623,158 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#application-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application (Core)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#security-auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security &amp; Auth
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#database" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Database
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#background-jobs-celery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Background Jobs (Celery)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-uploads" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Uploads
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cache-redis" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cache / Redis
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#logging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Logging
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aws-s3-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AWS / S3 (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#snowflake-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Snowflake (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#llm-integrations-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LLM Integrations (Optional)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#api-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        API Documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-ingestion-feature-flags" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Ingestion Feature Flags
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -605,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/job_idempotency.html" class="md-nav__link">
+      <a href="job_idempotency.html" class="md-nav__link">
         
   
   
@@ -694,7 +876,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/getting_started.html" class="md-nav__link">
+      <a href="getting_started.html" class="md-nav__link">
         
   
   
@@ -722,7 +904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+      <a href="multi_path_pipelines.html" class="md-nav__link">
         
   
   
@@ -750,7 +932,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/faq.html" class="md-nav__link">
+      <a href="faq.html" class="md-nav__link">
         
   
   
@@ -778,7 +960,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/recipes.html" class="md-nav__link">
+      <a href="recipes.html" class="md-nav__link">
         
   
   
@@ -806,7 +988,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+      <a href="profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -918,7 +1100,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -946,7 +1128,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+      <a href="engine_mechanics.html" class="md-nav__link">
         
   
   
@@ -974,7 +1156,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+      <a href="data_drift_roadmap.html" class="md-nav__link">
         
   
   
@@ -1212,31 +1394,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1254,7 +1433,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1272,7 +1451,7 @@
   
   
     <li class="md-nav__item">
-      <a href="overview.html" class="md-nav__link">
+      <a href="../user_guide/overview.html" class="md-nav__link">
         
   
   
@@ -1300,7 +1479,7 @@
   
   
     <li class="md-nav__item">
-      <a href="installation.html" class="md-nav__link">
+      <a href="../user_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1328,7 +1507,7 @@
   
   
     <li class="md-nav__item">
-      <a href="pipeline_quickstart.html" class="md-nav__link">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
   
@@ -1356,7 +1535,7 @@
   
   
     <li class="md-nav__item">
-      <a href="step_by_step_no_config.html" class="md-nav__link">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
         
   
   
@@ -1384,7 +1563,7 @@
   
   
     <li class="md-nav__item">
-      <a href="eda_profiling.html" class="md-nav__link">
+      <a href="../user_guide/eda_profiling.html" class="md-nav__link">
         
   
   
@@ -1412,7 +1591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="text_nlp.html" class="md-nav__link">
+      <a href="../user_guide/text_nlp.html" class="md-nav__link">
         
   
   
@@ -1437,37 +1616,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Validation vs scikit-learn
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="validation_vs_sklearn.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
         
   
   
@@ -1483,87 +1635,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#1-scikit-learn-style-workflow-xy-train_test_split" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1) scikit-learn-style workflow (X/y + train_test_split)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#1b-side-by-side-run-sklearn-pipeline-vs-skyulfpipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#example-output-from-the-notebook" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Example output (from the notebook)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-proof-of-leakage-prevention-train-only-learned-params" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2) Proof of leakage prevention (train-only learned params)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-what-this-proves-and-what-it-doesnt" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3) What this proves (and what it doesn't)
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1576,7 +1647,7 @@
   
   
     <li class="md-nav__item">
-      <a href="configuration.html" class="md-nav__link">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
   
@@ -1604,7 +1675,7 @@
   
   
     <li class="md-nav__item">
-      <a href="hyperparameter_tuning.html" class="md-nav__link">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
   
@@ -1632,7 +1703,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cross_validation.html" class="md-nav__link">
+      <a href="../user_guide/cross_validation.html" class="md-nav__link">
         
   
   
@@ -1660,7 +1731,7 @@
   
   
     <li class="md-nav__item">
-      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
   
@@ -1688,7 +1759,7 @@
   
   
     <li class="md-nav__item">
-      <a href="drift_monitoring.html" class="md-nav__link">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
   
@@ -1716,7 +1787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="serialization.html" class="md-nav__link">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
         
   
   
@@ -1744,7 +1815,7 @@
   
   
     <li class="md-nav__item">
-      <a href="extending_custom_nodes.html" class="md-nav__link">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
         
   
   
@@ -1772,7 +1843,7 @@
   
   
     <li class="md-nav__item">
-      <a href="troubleshooting.html" class="md-nav__link">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
         
   
   
@@ -2969,428 +3040,629 @@
   
 
 
-<h1 id="validation-vs-scikit-learn-proof">Validation vs scikit-learn (Proof)</h1>
-<p>This page gives <strong>reproducible, runnable checks</strong> that:</p>
-<ul>
-<li>Skyulf supports the familiar scikit-learn workflow (build <code>X</code>/<code>y</code>, run <code>train_test_split</code>, fit on train, transform/predict on test).</li>
-<li>Skyulf avoids common forms of data leakage by learning preprocessing parameters from <strong>train only</strong>.</li>
-</ul>
+<h1 id="backend-configuration-reference">Backend Configuration Reference</h1>
+<p>All settings are loaded from the <code>.env</code> file in the project root (or environment variables).
+They are case-sensitive. Start by copying the example:</p>
+<pre><code class="language-bash">cp .env.example .env
+</code></pre>
+<hr />
+<h2 id="application-core">Application (Core)</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FASTAPI_ENV</code></td>
+<td><code>development</code></td>
+<td>Environment mode: <code>development</code>, <code>production</code>, or <code>testing</code></td>
+</tr>
+<tr>
+<td><code>APP_NAME</code></td>
+<td><code>Skyulf</code></td>
+<td>Application name shown in API docs</td>
+</tr>
+<tr>
+<td><code>APP_VERSION</code></td>
+<td><em>(set by code)</em></td>
+<td>Application version — do not override</td>
+</tr>
+<tr>
+<td><code>DEBUG</code></td>
+<td><code>false</code></td>
+<td>Enable debug mode (enables API docs, verbose logging, auto-reload)</td>
+</tr>
+<tr>
+<td><code>HOST</code></td>
+<td><code>127.0.0.1</code></td>
+<td>Bind address (<code>0.0.0.0</code> to expose on all interfaces)</td>
+</tr>
+<tr>
+<td><code>PORT</code></td>
+<td><code>8000</code></td>
+<td>Bind port</td>
+</tr>
+<tr>
+<td><code>WORKERS</code></td>
+<td><code>1</code></td>
+<td>Number of uvicorn worker processes (production only)</td>
+</tr>
+<tr>
+<td><code>SENTRY_DSN</code></td>
+<td><em>(unset)</em></td>
+<td>Sentry error tracking DSN — leave unset to disable</td>
+</tr>
+</tbody>
+</table>
 <blockquote>
-<p>Goal: show <em>verifiable behavior</em>, not claim bit-for-bit identical models.</p>
+<p><strong>Note:</strong> <code>FASTAPI_ENV=development</code> is the default. Production mode is enabled with <code>FASTAPI_ENV=production</code>.</p>
 </blockquote>
-<h2 id="1-scikit-learn-style-workflow-xy-train_test_split">1) scikit-learn-style workflow (X/y + train_test_split)</h2>
-<p>This mirrors the sklearn pattern:</p>
-<ul>
-<li>sklearn: <code>fit(X_train, y_train)</code> then <code>predict(X_test)</code></li>
-<li>Skyulf: pass <code>SplitDataset(train=(X_train, y_train), test=(X_test, y_test))</code></li>
-</ul>
-<pre><code class="language-python">from __future__ import annotations
-
-import pandas as pd
-from sklearn.model_selection import train_test_split
-
-from skyulf.data.dataset import SplitDataset
-from skyulf.pipeline import SkyulfPipeline
-
-# Synthetic classification data
-raw = pd.DataFrame(
-    {
-        &quot;age&quot;: [10, 20, None, 40, 50, 60, None, 80],
-        &quot;city&quot;: [&quot;A&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;, &quot;A&quot;, &quot;C&quot;, &quot;B&quot;],
-        &quot;target&quot;: [0, 1, 0, 1, 1, 0, 1, 0],
-    }
-)
-
-X = raw.drop(columns=[&quot;target&quot;])
-y = raw[&quot;target&quot;]
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
-)
-
-dataset = SplitDataset(train=(X_train, y_train), test=(X_test, y_test), validation=None)
-
-# IMPORTANT: because we already split, we do not add TrainTestSplitter here.
-config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]},
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;], &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
-        },
-    ],
-    &quot;modeling&quot;: {&quot;type&quot;: &quot;random_forest_classifier&quot;, &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;random_state&quot;: 42}},
-}
-
-pipeline = SkyulfPipeline(config)
-metrics = pipeline.fit(dataset, target_column=&quot;target&quot;)  # target_column ignored for (X, y) tuples
-
-preds = pipeline.predict(X_test)
-
-# Proof-like checks
-assert len(preds) == len(X_test)
-assert preds.index.equals(X_test.index)
-print(&quot;OK: Skyulf fit/predict with sklearn-style train/test split&quot;)
-print(&quot;Metrics keys:&quot;, list(metrics.keys()))
-</code></pre>
-<h2 id="1b-side-by-side-run-sklearn-pipeline-vs-skyulfpipeline">1b) Side-by-side run: sklearn Pipeline vs SkyulfPipeline</h2>
-<p>This comparison proves both stacks can run the same <em>shape</em> of workflow on the same split.
-We do <strong>not</strong> assert equality of predictions (different defaults / encodings can legitimately differ).</p>
-<p>For a stronger numeric sanity check, we also compute and print test accuracy for both pipelines and the absolute difference.</p>
-<pre><code class="language-python">from __future__ import annotations
-
-import numpy as np
-import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.datasets import load_breast_cancer
-from sklearn.impute import SimpleImputer as SkSimpleImputer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import classification_report
-from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline as SkPipeline
-from sklearn.preprocessing import OneHotEncoder as SkOneHotEncoder
-from sklearn.preprocessing import StandardScaler
-
-from skyulf import SkyulfPipeline
-from skyulf.data.dataset import SplitDataset
-
-np.random.seed(42)
-
-# Real dataset + extra categorical feature + missingness
-raw = load_breast_cancer(as_frame=True)
-df = raw.frame.copy().rename(columns={&quot;target&quot;: &quot;label&quot;})
-
-df[&quot;radius_band&quot;] = pd.cut(
-    df[&quot;mean radius&quot;],
-    bins=[0, 12, 15, 100],
-    labels=[&quot;small&quot;, &quot;medium&quot;, &quot;large&quot;],
-    include_lowest=True,
-)
-
-missing_idx = np.random.choice(df.index, size=25, replace=False)
-df.loc[missing_idx, &quot;mean texture&quot;] = np.nan
-
-target_col = &quot;label&quot;
-cat_cols = [&quot;radius_band&quot;]
-num_cols = [c for c in df.columns if c not in [target_col, *cat_cols]]
-
-X = df[num_cols + cat_cols]
-y = df[target_col]
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
-)
-
-# --- scikit-learn pipeline ---
-numeric_features = num_cols
-categorical_features = cat_cols
-
-numeric_pipe = SkPipeline(
-    steps=[
-        (&quot;imputer&quot;, SkSimpleImputer(strategy=&quot;mean&quot;)),
-        (&quot;scaler&quot;, StandardScaler()),
-    ]
-)
-
-categorical_pipe = SkPipeline(
-    steps=[
-        (&quot;imputer&quot;, SkSimpleImputer(strategy=&quot;most_frequent&quot;)),
-        (&quot;onehot&quot;, SkOneHotEncoder(handle_unknown=&quot;ignore&quot;, sparse_output=False)),
-    ]
-)
-
-preprocess = ColumnTransformer(
-    transformers=[
-        (&quot;num&quot;, numeric_pipe, numeric_features),
-        (&quot;cat&quot;, categorical_pipe, categorical_features),
-    ],
-    remainder=&quot;drop&quot;,
-)
-
-sk_model = LogisticRegression(max_iter=1000, random_state=42)
-sk = SkPipeline(steps=[(&quot;preprocess&quot;, preprocess), (&quot;model&quot;, sk_model)])
-sk.fit(X_train, y_train)
-sk_preds = pd.Series(sk.predict(X_test), index=X_test.index)
-sk_acc = accuracy_score(y_test, sk_preds)
-
-# --- Skyulf pipeline ---
-train_df = X_train.copy()
-train_df[target_col] = y_train
-test_df = X_test.copy()
-test_df[target_col] = y_test
-
-dataset = SplitDataset(train=train_df, test=test_df, validation=None)
-skyulf_config = {
-    &quot;preprocessing&quot;: [
-        {
-            &quot;name&quot;: &quot;impute&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: num_cols},
-        },
-        {
-            &quot;name&quot;: &quot;impute_cat&quot;,
-            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
-            &quot;params&quot;: {&quot;strategy&quot;: &quot;most_frequent&quot;, &quot;columns&quot;: cat_cols},
-        },
-        {
-            &quot;name&quot;: &quot;encode&quot;,
-            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: cat_cols, &quot;drop_original&quot;: True, &quot;handle_unknown&quot;: &quot;ignore&quot;},
-        },
-        {
-            &quot;name&quot;: &quot;scale&quot;,
-            &quot;transformer&quot;: &quot;StandardScaler&quot;,
-            &quot;params&quot;: {&quot;columns&quot;: num_cols},
-        },
-    ],
-    &quot;modeling&quot;: {&quot;type&quot;: &quot;logistic_regression&quot;, &quot;params&quot;: {&quot;max_iter&quot;: 1000, &quot;random_state&quot;: 42}},
-}
-
-sky = SkyulfPipeline(skyulf_config)
-_ = sky.fit(dataset, target_column=target_col)
-sky_preds = sky.predict(X_test)
-sky_acc = accuracy_score(y_test, sky_preds)
-delta = abs(sk_acc - sky_acc)
-
-assert sk_preds.index.equals(X_test.index)
-assert sky_preds.index.equals(X_test.index)
-
-# Proof-like checks
-assert len(sk_preds) == len(X_test)
-assert sk_preds.index.equals(X_test.index)
-assert len(sky_preds) == len(X_test)
-assert sky_preds.index.equals(X_test.index)
-
-print(&quot;OK: sklearn Pipeline and SkyulfPipeline both run&quot;)
-print(f&quot;sklearn test accuracy: {sk_acc:.4f}&quot;)
-print(f&quot;skyulf  test accuracy: {sky_acc:.4f}&quot;)
-print(f&quot;delta accuracy: {delta:.4f}&quot;)
-
-# --- Classification metrics (side-by-side) ---
-sk_report = classification_report(y_test, sk_preds, output_dict=True, zero_division=0)
-sky_report = classification_report(y_test, sky_preds, output_dict=True, zero_division=0)
-
-sk_df = pd.DataFrame(sk_report).T
-sky_df = pd.DataFrame(sky_report).T
-
-# Keep a consistent row order: class labels first, then summary rows (if present)
-label_rows = [str(v) for v in sorted(pd.unique(y_test))]
-summary_rows = [r for r in [&quot;accuracy&quot;, &quot;macro avg&quot;, &quot;weighted avg&quot;] if r in sk_df.index]
-row_order = [r for r in label_rows if r in sk_df.index] + summary_rows
-
-sk_df = sk_df.loc[row_order]
-sky_df = sky_df.loc[row_order]
-
-side_by_side = pd.concat(
-    {
-        &quot;sklearn&quot;: sk_df[[&quot;precision&quot;, &quot;recall&quot;, &quot;f1-score&quot;, &quot;support&quot;]],
-        &quot;skyulf&quot;: sky_df[[&quot;precision&quot;, &quot;recall&quot;, &quot;f1-score&quot;, &quot;support&quot;]],
-    },
-    axis=1,
-)
-
-print(&quot;\nClassification report (side-by-side):&quot;)
-print(side_by_side.to_string())
-
-labels = sorted(pd.unique(y_test))
-cm_sk = confusion_matrix(y_test, sk_preds, labels=labels)
-cm_sky = confusion_matrix(y_test, sky_preds, labels=labels)
-
-cm_index = [f&quot;true_{l}&quot; for l in labels]
-cm_cols = [f&quot;pred_{l}&quot; for l in labels]
-
-cm_sk_df = pd.DataFrame(cm_sk, index=cm_index, columns=cm_cols)
-cm_sky_df = pd.DataFrame(cm_sky, index=cm_index, columns=cm_cols)
-
-print(&quot;\nConfusion matrix (sklearn):&quot;)
-print(cm_sk_df.to_string())
-print(&quot;\nConfusion matrix (skyulf):&quot;)
-print(cm_sky_df.to_string())
-
-print(&quot;sklearn preds head:&quot;)
-print(sk_preds.head())
-print(&quot;skyulf preds head:&quot;)
-print(sky_preds.head())
-
-assert (sk_pred.values == sky_pred.values).all()
-print(&quot;Predictions match exactly.&quot;)
-</code></pre>
-<h3 id="example-output-from-the-notebook">Example output (from the notebook)</h3>
-<p>This is the exact output from one notebook run (same dataset, same random seed/split):</p>
-<p>Classification report (side-by-side):</p>
+<hr />
+<h2 id="security-auth">Security &amp; Auth</h2>
 <table>
 <thead>
 <tr>
-<th>class/avg</th>
-<th style="text-align: right;">sklearn precision</th>
-<th style="text-align: right;">sklearn recall</th>
-<th style="text-align: right;">sklearn f1-score</th>
-<th style="text-align: right;">sklearn support</th>
-<th style="text-align: right;">skyulf precision</th>
-<th style="text-align: right;">skyulf recall</th>
-<th style="text-align: right;">skyulf f1-score</th>
-<th style="text-align: right;">skyulf support</th>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>0</td>
-<td style="text-align: right;">0.962963</td>
-<td style="text-align: right;">0.981132</td>
-<td style="text-align: right;">0.971963</td>
-<td style="text-align: right;">53.000000</td>
-<td style="text-align: right;">0.962963</td>
-<td style="text-align: right;">0.981132</td>
-<td style="text-align: right;">0.971963</td>
-<td style="text-align: right;">53.000000</td>
+<td><code>SECRET_KEY</code></td>
+<td><em>(random per restart)</em></td>
+<td><strong>Required in production.</strong> Used for JWT signing. Set a stable value or tokens break on restart and across workers. Generate: <code>python -c "import secrets; print(secrets.token_urlsafe(64))"</code></td>
 </tr>
 <tr>
-<td>1</td>
-<td style="text-align: right;">0.988764</td>
-<td style="text-align: right;">0.977778</td>
-<td style="text-align: right;">0.983240</td>
-<td style="text-align: right;">90.000000</td>
-<td style="text-align: right;">0.988764</td>
-<td style="text-align: right;">0.977778</td>
-<td style="text-align: right;">0.983240</td>
-<td style="text-align: right;">90.000000</td>
+<td><code>ALGORITHM</code></td>
+<td><code>HS256</code></td>
+<td>JWT signing algorithm</td>
 </tr>
 <tr>
-<td>accuracy</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979021</td>
+<td><code>ACCESS_TOKEN_EXPIRE_MINUTES</code></td>
+<td><code>480</code></td>
+<td>JWT access token lifetime (8 hours)</td>
 </tr>
 <tr>
-<td>macro avg</td>
-<td style="text-align: right;">0.975864</td>
-<td style="text-align: right;">0.979455</td>
-<td style="text-align: right;">0.977601</td>
-<td style="text-align: right;">143.000000</td>
-<td style="text-align: right;">0.975864</td>
-<td style="text-align: right;">0.979455</td>
-<td style="text-align: right;">0.977601</td>
-<td style="text-align: right;">143.000000</td>
+<td><code>REFRESH_TOKEN_EXPIRE_DAYS</code></td>
+<td><code>7</code></td>
+<td>JWT refresh token lifetime</td>
 </tr>
 <tr>
-<td>weighted avg</td>
-<td style="text-align: right;">0.979201</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979060</td>
-<td style="text-align: right;">143.000000</td>
-<td style="text-align: right;">0.979201</td>
-<td style="text-align: right;">0.979021</td>
-<td style="text-align: right;">0.979060</td>
-<td style="text-align: right;">143.000000</td>
+<td><code>MAX_LOGIN_ATTEMPTS</code></td>
+<td><code>5</code></td>
+<td>Failed login attempts before lockout</td>
+</tr>
+<tr>
+<td><code>ACCOUNT_LOCKOUT_DURATION_MINUTES</code></td>
+<td><code>30</code></td>
+<td>Account lockout duration</td>
+</tr>
+<tr>
+<td><code>AUTH_FALLBACK_ENABLED</code></td>
+<td><code>false</code></td>
+<td>Enable simple username/password fallback auth (dev only)</td>
+</tr>
+<tr>
+<td><code>AUTH_FALLBACK_USERNAME</code></td>
+<td><code>admin</code></td>
+<td>Fallback auth username (only used when <code>AUTH_FALLBACK_ENABLED=true</code>)</td>
+</tr>
+<tr>
+<td><code>AUTH_FALLBACK_PASSWORD</code></td>
+<td><em>(unset)</em></td>
+<td><strong>Required if fallback auth is enabled.</strong> Must be set explicitly — no default.</td>
+</tr>
+<tr>
+<td><code>ALLOW_USER_REGISTRATION</code></td>
+<td><code>true</code></td>
+<td>Allow new user registration via API</td>
+</tr>
+<tr>
+<td><code>CORS_ORIGINS</code></td>
+<td><code>http://localhost:3000,http://localhost:8080</code></td>
+<td>Comma-separated list of allowed CORS origins</td>
+</tr>
+<tr>
+<td><code>ALLOWED_HOSTS</code></td>
+<td><code>localhost,127.0.0.1</code></td>
+<td>Comma-separated list of trusted host headers</td>
 </tr>
 </tbody>
 </table>
-<p>Confusion matrix (sklearn):</p>
+<blockquote>
+<p><strong>Production checklist:</strong>
+- Set <code>SECRET_KEY</code> to a strong random value
+- Set <code>FASTAPI_ENV=production</code>
+- Set <code>CORS_ORIGINS</code> to your actual frontend domain
+- Set <code>AUTH_FALLBACK_ENABLED=false</code> (or omit — it defaults to false)</p>
+</blockquote>
+<hr />
+<h2 id="database">Database</h2>
 <table>
 <thead>
 <tr>
-<th></th>
-<th style="text-align: right;">pred_0</th>
-<th style="text-align: right;">pred_1</th>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>true_0</td>
-<td style="text-align: right;">52</td>
-<td style="text-align: right;">1</td>
+<td><code>DB_TYPE</code></td>
+<td><code>sqlite</code></td>
+<td>Database backend: <code>sqlite</code> or <code>postgres</code></td>
 </tr>
 <tr>
-<td>true_1</td>
-<td style="text-align: right;">2</td>
-<td style="text-align: right;">88</td>
+<td><code>DATABASE_URL</code></td>
+<td><em>(auto-constructed)</em></td>
+<td>Full SQLAlchemy async URL — set directly to override component fields</td>
+</tr>
+<tr>
+<td><code>DB_PATH</code></td>
+<td><code>mlops_database.db</code></td>
+<td>SQLite database file path (relative to project root)</td>
+</tr>
+<tr>
+<td><code>DB_ECHO</code></td>
+<td><code>false</code></td>
+<td>Log all SQL statements to console (verbose, use for debugging only)</td>
+</tr>
+<tr>
+<td><code>DB_POOL_SIZE</code></td>
+<td><code>10</code></td>
+<td>PostgreSQL connection pool size</td>
+</tr>
+<tr>
+<td><code>DB_MAX_OVERFLOW</code></td>
+<td><code>20</code></td>
+<td>Maximum PostgreSQL overflow connections</td>
 </tr>
 </tbody>
 </table>
-<p>Confusion matrix (skyulf):</p>
+<p><strong>PostgreSQL component fields</strong> (used when <code>DB_TYPE=postgres</code> and <code>DATABASE_URL</code> is not set):</p>
 <table>
 <thead>
 <tr>
-<th></th>
-<th style="text-align: right;">pred_0</th>
-<th style="text-align: right;">pred_1</th>
+<th>Variable</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>true_0</td>
-<td style="text-align: right;">52</td>
-<td style="text-align: right;">1</td>
+<td><code>DB_USER</code></td>
+<td>Database username</td>
 </tr>
 <tr>
-<td>true_1</td>
-<td style="text-align: right;">2</td>
-<td style="text-align: right;">88</td>
+<td><code>DB_PASSWORD</code></td>
+<td>Database password</td>
+</tr>
+<tr>
+<td><code>DB_HOST</code></td>
+<td>Database host</td>
+</tr>
+<tr>
+<td><code>DB_PORT</code></td>
+<td>Database port (default: 5432)</td>
+</tr>
+<tr>
+<td><code>DB_NAME</code></td>
+<td>Database name</td>
+</tr>
+<tr>
+<td><code>DB_SSLMODE</code></td>
+<td>SSL mode (<code>require</code>, <code>disable</code>, etc.)</td>
+</tr>
+<tr>
+<td><code>DB_SSLROOTCERT</code></td>
+<td>Path to SSL root certificate</td>
 </tr>
 </tbody>
 </table>
-<h2 id="2-proof-of-leakage-prevention-train-only-learned-params">2) Proof of leakage prevention (train-only learned params)</h2>
-<p>A common leakage bug is fitting preprocessing on the full dataset.</p>
-<p>Here we construct a dataset where <strong>train and test have very different distributions</strong>.
-If an imputer learns the mean from the full dataset, it will be pulled toward the test distribution.</p>
-<p>Skyulf's pattern learns from train only (Calculator) and applies to test (Applier).</p>
-<pre><code class="language-python">from __future__ import annotations
-
-import pandas as pd
-
-from skyulf.preprocessing.imputation import SimpleImputerCalculator
-
-# Train has small ages; test has huge ages.
-X_train = pd.DataFrame({&quot;age&quot;: [1.0, 2.0, None, 2.0]})
-y_train = pd.Series([0, 1, 0, 1])
-
-X_test = pd.DataFrame({&quot;age&quot;: [1000.0, None, 1200.0]})
-y_test = pd.Series([0, 1, 1])
-
-cfg = {&quot;strategy&quot;: &quot;mean&quot;, &quot;columns&quot;: [&quot;age&quot;]}
-
-# What train-only mean should be (ignoring NaNs)
-expected_train_mean = float(pd.Series([1.0, 2.0, 2.0]).mean())
-
-params = SimpleImputerCalculator().fit((X_train, y_train), cfg)
-learned_mean = float(params[&quot;fill_values&quot;][&quot;age&quot;])
-
-# Proof: learned mean equals train mean (not influenced by test)
-assert abs(learned_mean - expected_train_mean) &lt; 1e-12
-
-# For comparison only: full-data mean would be very different
-full_mean = float(pd.concat([X_train[&quot;age&quot;], X_test[&quot;age&quot;]]).mean())
-assert abs(full_mean - expected_train_mean) &gt; 1.0
-
-print(&quot;OK: SimpleImputer learns from train only&quot;)
-print(&quot;train_mean:&quot;, expected_train_mean)
-print(&quot;full_mean:&quot;, full_mean)
-print(&quot;learned_mean:&quot;, learned_mean)
-</code></pre>
-<h2 id="3-what-this-proves-and-what-it-doesnt">3) What this proves (and what it doesn't)</h2>
-<ul>
-<li>Proves the API supports sklearn-style <code>X/y</code> workflows and produces aligned predictions.</li>
-<li>Proves at least one common leakage-sensitive node (<code>SimpleImputer</code>) learns its statistics from the provided training data.</li>
-</ul>
-<p>It does <strong>not</strong> claim Skyulf will produce identical predictions to an arbitrary sklearn pipeline, because:</p>
-<ul>
-<li>different defaults/hyperparameters,</li>
-<li>different encoding conventions,</li>
-<li>and different ordering of operations</li>
-</ul>
-<p>can all change results while still being correct.</p>
+<hr />
+<h2 id="background-jobs-celery">Background Jobs (Celery)</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>USE_CELERY</code></td>
+<td><code>false</code></td>
+<td>Enable Celery for background training jobs. When <code>false</code>, jobs run in FastAPI BackgroundTasks (no Redis needed — recommended for local dev)</td>
+</tr>
+<tr>
+<td><code>CELERY_BROKER_URL</code></td>
+<td><code>redis://127.0.0.1:6379/0</code></td>
+<td>Redis URL for the Celery message broker</td>
+</tr>
+<tr>
+<td><code>CELERY_RESULT_BACKEND</code></td>
+<td><code>redis://127.0.0.1:6379/0</code></td>
+<td>Redis URL for storing Celery task results</td>
+</tr>
+<tr>
+<td><code>CELERY_TASK_DEFAULT_QUEUE</code></td>
+<td><code>mlops-training</code></td>
+<td>Default Celery queue name</td>
+</tr>
+<tr>
+<td><code>TUNING_N_JOBS</code></td>
+<td><code>1</code></td>
+<td>Parallelism for hyperparameter search (1 = sequential, safe in FastAPI; -1 = all CPUs, safe in Celery workers only)</td>
+</tr>
+<tr>
+<td><code>TUNING_PARALLEL_BACKEND</code></td>
+<td><em>(unset)</em></td>
+<td>joblib backend override: <code>threading</code> (safe in FastAPI), <code>loky</code> (safe in Celery only)</td>
+</tr>
+<tr>
+<td><code>ERROR_LOG_RETENTION_DAYS</code></td>
+<td><code>30</code></td>
+<td>Days to retain error events in the DB before auto-deletion</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="file-uploads">File Uploads</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>UPLOAD_DIR</code></td>
+<td><code>uploads/data</code></td>
+<td>Directory for uploaded dataset files</td>
+</tr>
+<tr>
+<td><code>MAX_UPLOAD_SIZE</code></td>
+<td><code>10737418240</code> (10 GB)</td>
+<td>Maximum upload file size in bytes</td>
+</tr>
+<tr>
+<td><code>ALLOWED_EXTENSIONS</code></td>
+<td><code>.csv,.xlsx,.xls,.parquet,.json,.txt,.pkl,.pickle,.feather,.h5,.hdf5</code></td>
+<td>Comma-separated list of allowed file extensions</td>
+</tr>
+<tr>
+<td><code>TRAINING_ARTIFACT_DIR</code></td>
+<td><code>uploads/models</code></td>
+<td>Directory for trained model artifacts</td>
+</tr>
+<tr>
+<td><code>TEMP_DIR</code></td>
+<td><code>temp/processing</code></td>
+<td>Temporary processing directory</td>
+</tr>
+<tr>
+<td><code>EXPORT_DIR</code></td>
+<td><code>exports/data</code></td>
+<td>Data export directory</td>
+</tr>
+<tr>
+<td><code>MODELS_DIR</code></td>
+<td><code>uploads/models</code></td>
+<td>Model storage directory</td>
+</tr>
+<tr>
+<td><code>PIPELINE_STORAGE_TYPE</code></td>
+<td><code>database</code></td>
+<td>Pipeline save/load backend: <code>database</code> or <code>json</code> (file-based)</td>
+</tr>
+<tr>
+<td><code>PIPELINE_STORAGE_PATH</code></td>
+<td><code>exports/pipelines</code></td>
+<td>Directory for JSON pipeline files (only used when <code>PIPELINE_STORAGE_TYPE=json</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="cache-redis">Cache / Redis</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CACHE_TYPE</code></td>
+<td><code>filesystem</code></td>
+<td>Cache backend: <code>filesystem</code> or <code>redis</code></td>
+</tr>
+<tr>
+<td><code>CACHE_DEFAULT_TIMEOUT</code></td>
+<td><code>3600</code></td>
+<td>Default cache TTL in seconds (1 hour)</td>
+</tr>
+<tr>
+<td><code>CACHE_TTL</code></td>
+<td><code>300</code></td>
+<td>Short-lived cache TTL (5 minutes)</td>
+</tr>
+<tr>
+<td><code>REDIS_URL</code></td>
+<td><em>(unset)</em></td>
+<td>Redis URL for cache backend (e.g. <code>redis://127.0.0.1:6379/0</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="logging">Logging</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LOG_LEVEL</code></td>
+<td><code>INFO</code></td>
+<td>Log level: <code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code>, <code>ERROR</code></td>
+</tr>
+<tr>
+<td><code>LOG_FILE</code></td>
+<td><code>logs/fastapi_app.log</code></td>
+<td>Log file path</td>
+</tr>
+<tr>
+<td><code>LOG_MAX_SIZE</code></td>
+<td><code>52428800</code> (50 MB)</td>
+<td>Maximum log file size before rotation</td>
+</tr>
+<tr>
+<td><code>LOG_BACKUP_COUNT</code></td>
+<td><code>5</code></td>
+<td>Number of rotated log files to retain</td>
+</tr>
+<tr>
+<td><code>LOG_ROTATION_TYPE</code></td>
+<td><code>size</code></td>
+<td>Log rotation strategy: <code>size</code> or <code>time</code></td>
+</tr>
+<tr>
+<td><code>LOG_ROTATION_WHEN</code></td>
+<td><code>midnight</code></td>
+<td>When to rotate (used with <code>LOG_ROTATION_TYPE=time</code>)</td>
+</tr>
+<tr>
+<td><code>LOG_ROTATION_INTERVAL</code></td>
+<td><code>1</code></td>
+<td>Rotation interval (used with <code>LOG_ROTATION_TYPE=time</code>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="aws-s3-optional">AWS / S3 (Optional)</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AWS_ACCESS_KEY_ID</code></td>
+<td><em>(unset)</em></td>
+<td>AWS access key</td>
+</tr>
+<tr>
+<td><code>AWS_SECRET_ACCESS_KEY</code></td>
+<td><em>(unset)</em></td>
+<td>AWS secret key</td>
+</tr>
+<tr>
+<td><code>AWS_SESSION_TOKEN</code></td>
+<td><em>(unset)</em></td>
+<td>AWS session token (for temporary credentials)</td>
+</tr>
+<tr>
+<td><code>AWS_DEFAULT_REGION</code></td>
+<td><code>us-east-1</code></td>
+<td>AWS region</td>
+</tr>
+<tr>
+<td><code>AWS_ENDPOINT_URL</code></td>
+<td><em>(unset)</em></td>
+<td>Custom S3 endpoint (e.g. MinIO)</td>
+</tr>
+<tr>
+<td><code>AWS_BUCKET_NAME</code></td>
+<td><em>(unset)</em></td>
+<td>S3 bucket for uploads</td>
+</tr>
+<tr>
+<td><code>S3_ARTIFACT_BUCKET</code></td>
+<td><em>(unset)</em></td>
+<td>S3 bucket for ML artifacts</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="snowflake-optional">Snowflake (Optional)</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FEATURE_SNOWFLAKE</code></td>
+<td><code>false</code></td>
+<td>Enable Snowflake data source integration</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_ACCOUNT</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake account identifier</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_USER</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake username</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_PASSWORD</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake password</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_WAREHOUSE</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake warehouse</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_DATABASE</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake database</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_SCHEMA</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake schema</td>
+</tr>
+<tr>
+<td><code>SNOWFLAKE_ROLE</code></td>
+<td><em>(unset)</em></td>
+<td>Snowflake role</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="llm-integrations-optional">LLM Integrations (Optional)</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DEFAULT_LLM_PROVIDER</code></td>
+<td><code>openai</code></td>
+<td>Default provider: <code>openai</code>, <code>deepseek</code>, <code>anthropic</code>, or <code>local</code></td>
+</tr>
+<tr>
+<td><code>OPENAI_API_KEY</code></td>
+<td><em>(unset)</em></td>
+<td>OpenAI API key</td>
+</tr>
+<tr>
+<td><code>OPENAI_DEFAULT_MODEL</code></td>
+<td><code>gpt-4</code></td>
+<td>Default OpenAI model</td>
+</tr>
+<tr>
+<td><code>DEEPSEEK_API_KEY</code></td>
+<td><em>(unset)</em></td>
+<td>DeepSeek API key</td>
+</tr>
+<tr>
+<td><code>ANTHROPIC_API_KEY</code></td>
+<td><em>(unset)</em></td>
+<td>Anthropic (Claude) API key</td>
+</tr>
+<tr>
+<td><code>LOCAL_LLM_URL</code></td>
+<td><code>http://localhost:11434</code></td>
+<td>Local LLM server URL (e.g. Ollama)</td>
+</tr>
+<tr>
+<td><code>LOCAL_LLM_MODEL</code></td>
+<td><code>llama3</code></td>
+<td>Local model name</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="api-documentation">API Documentation</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>API_DOCS_ENABLED</code></td>
+<td><em>(follows DEBUG)</em></td>
+<td><code>true</code> to always show docs, <code>false</code> to always hide</td>
+</tr>
+<tr>
+<td><code>API_DOCS_URL</code></td>
+<td><code>/docs</code></td>
+<td>Swagger UI path</td>
+</tr>
+<tr>
+<td><code>API_REDOC_URL</code></td>
+<td><code>/redoc</code></td>
+<td>ReDoc path</td>
+</tr>
+<tr>
+<td><code>API_OPENAPI_URL</code></td>
+<td><code>/openapi.json</code></td>
+<td>OpenAPI schema path</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>In production (<code>FASTAPI_ENV=production</code>), API docs are hidden by default (<code>DEBUG=false</code>). Set <code>API_DOCS_ENABLED=true</code> to override.</p>
+</blockquote>
+<hr />
+<h2 id="data-ingestion-feature-flags">Data Ingestion Feature Flags</h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ENABLE_LINEAGE</code></td>
+<td><code>true</code></td>
+<td>Track data lineage for ingested datasets</td>
+</tr>
+<tr>
+<td><code>ENABLE_SCHEMA_DRIFT</code></td>
+<td><code>true</code></td>
+<td>Detect schema changes on re-upload</td>
+</tr>
+<tr>
+<td><code>ENABLE_RETENTION</code></td>
+<td><code>true</code></td>
+<td>Enable data retention policies</td>
+</tr>
+</tbody>
+</table>
 
 
 

@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/platform_setup.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/backend_api.html">
       
       
-        <link rel="prev" href="../index.html">
+        <link rel="prev" href="platform_walkthrough.html">
       
       
-        <link rel="next" href="platform_walkthrough.html">
+        <link rel="next" href="backend_configuration.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Platform Setup - Skyulf</title>
+        <title>API Reference - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#full-platform-setup" class="md-skip">
+        <a href="#backend-api-reference" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Platform Setup
+              API Reference
             
           </span>
         </div>
@@ -493,37 +493,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Platform Setup
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="platform_setup.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="platform_setup.html" class="md-nav__link">
         
   
   
@@ -539,186 +512,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Prerequisites
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#1-clone-the-repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        1. Clone the Repository
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#2-configure-environment-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        2. Configure Environment Variables
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3a-docker-compose-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3A. Docker Compose (Recommended)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3b-manual-setup-no-docker" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3B. Manual Setup (No Docker)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="3B. Manual Setup (No Docker)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#create-a-virtual-environment" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Create a virtual environment
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-dependencies" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install dependencies
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#start-redis-if-use_celerytrue" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start Redis (if USE_CELERY=true)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#launch-the-api-server" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Launch the API server
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#start-the-celery-worker-optional" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Start the Celery worker (optional)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-verify-the-stack" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4. Verify the Stack
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#5-first-login" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. First Login
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#6-first-steps-after-setup" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        6. First Steps After Setup
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Troubleshooting
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -756,10 +549,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="backend_api.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="backend_api.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -775,6 +595,1034 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#route-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Route Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-healthping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/ping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-healthdetailed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/detailed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-healthready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/ready
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcesusable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/usable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcessource_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/{source_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcessource_idsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/{source_id}/sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-dataapisourcessource_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /data/api/sources/{source_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcessource_idexport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/{source_id}/export
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Ingestion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Ingestion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiingestionupload-rate-limited-10min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/ingestion/upload — Rate limited: 10/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiingestionsource_idstatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/ingestion/{source_id}/status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiingestionsource_idcancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/ingestion/{source_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ML Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinerun-rate-limited-20min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/run — Rate limited: 20/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinepreview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelineschema-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/schema-preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobsjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinejobsjob_idcancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/jobs/{job_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinejobsjob_idpromote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/jobs/{job_id}/promote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apipipelinejobsjob_idpromote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/pipeline/jobs/{job_id}/promote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobsjob_idevaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/{job_id}/evaluation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobsnode-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/node-summaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tuning-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning Jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelineregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinestats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinedatasetslist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/datasets/list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinedatasetsdataset_idschema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/datasets/{dataset_id}/schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinehyperparametersmodel_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/hyperparameters/{model_type}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinehyperparametersmodel_typedefaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/hyperparameters/{model_type}/defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-save-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Save / Load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notebook-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notebook Export
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notebook Export">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinepipelinedataset_idexport-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/pipeline/{dataset_id}/export-notebook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment &amp; Inference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment &amp; Inference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apideploymentdeployjob_id-rate-limited-10min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/deployment/deploy/{job_id} — Rate limited: 10/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apideploymentactive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/deployment/active
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apideploymenthistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/deployment/history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apideploymentdeactivate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/deployment/deactivate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apideploymentpredict-rate-limited-60min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/deployment/predict — Rate limited: 60/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Registry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model Registry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistrystats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistrymodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistrymodelsmodel_typeversions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/models/{model_type}/versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistryartifactsjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/artifacts/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eda-profiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EDA &amp; Profiling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EDA &amp; Profiling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiedadataset_idanalyze-rate-limited-20min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/eda/{dataset_id}/analyze — Rate limited: 20/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedadataset_idlatest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/{dataset_id}/latest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedadataset_idhistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/{dataset_id}/history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedareportsreport_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/reports/{report_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiedareportsreport_idcancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/eda/reports/{report_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiedadataset_iddecomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/eda/{dataset_id}/decomposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedajobsall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/jobs/all
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#drift-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Drift Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringjobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apimonitoringdriftcalculate-rate-limited-20min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/monitoring/drift/calculate — Rate limited: 20/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringdrifthistoryjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/drift/history/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringdriftstatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/drift/status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringslow-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/slow-nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Tracking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Error Tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorscount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorsgrouped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/grouped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorstimeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/timeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorserror_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/{error_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apimonitoringerrorserror_idresolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/monitoring/errors/{error_id}/resolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apimonitoringerrorserror_idunresolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/monitoring/errors/{error_id}/unresolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apimonitoringerrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/monitoring/errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-run-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Run Logs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pipeline Run Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apimonitoringpipeline-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/monitoring/pipeline-logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringpipeline-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/pipeline-logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apimonitoringjobsjob_iddescription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/monitoring/jobs/{job_id}/description
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apimonitoringpipeline-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/monitoring/pipeline-logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websocket-job-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSocket — Job Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WebSocket — Job Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ws-wsjobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WS /ws/jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-responses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Responses
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3068,260 +3916,486 @@
   
 
 
-<h1 id="full-platform-setup">Full Platform Setup</h1>
-<p>This guide walks you through deploying the complete Skyulf platform — backend API, Celery workers, Redis, and the web UI.</p>
-<blockquote>
-<p><strong>Just want the Python library?</strong> See <a href="../user_guide/installation.html">Installation</a> to <code>pip install skyulf-core</code> and skip this page.</p>
-</blockquote>
+<h1 id="backend-api-reference">Backend API Reference</h1>
+<p>The Skyulf backend exposes a REST API on port <code>8000</code> by default.
+Interactive docs are available at <a href="http://127.0.0.1:8000/docs"><code>/docs</code></a> (Swagger UI)
+and <a href="http://127.0.0.1:8000/redoc"><code>/redoc</code></a> (ReDoc) when <code>DEBUG=true</code>.</p>
 <hr />
-<h2 id="prerequisites">Prerequisites</h2>
+<h2 id="route-map">Route Map</h2>
 <table>
 <thead>
 <tr>
-<th>Requirement</th>
-<th>Notes</th>
+<th>Prefix</th>
+<th>Area</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><strong>Docker Desktop</strong> (recommended)</td>
-<td>Docker Compose launches everything in containers — no host Python or Redis needed.</td>
+<td><code>/health*</code></td>
+<td>Health &amp; readiness probes</td>
 </tr>
 <tr>
-<td><strong>Python 3.12</strong> (manual path)</td>
-<td>Only if you prefer running services directly on your machine.</td>
+<td><code>/data/api/*</code></td>
+<td>Data source management</td>
 </tr>
 <tr>
-<td><strong>Redis</strong> (manual path)</td>
-<td>Required for Celery background tasks. Install natively, via WSL, or run <code>docker run -d -p 6379:6379 redis:7</code>.</td>
+<td><code>/api/ingestion/*</code></td>
+<td>File upload &amp; ingestion jobs</td>
 </tr>
 <tr>
-<td><strong>Git</strong></td>
-<td>To clone the repository.</td>
+<td><code>/api/pipeline/*</code></td>
+<td>ML pipeline execution, preview, jobs, versions</td>
+</tr>
+<tr>
+<td><code>/api/eda/*</code></td>
+<td>Automated EDA &amp; profiling</td>
+</tr>
+<tr>
+<td><code>/api/deployment/*</code></td>
+<td>Model deployment &amp; inference</td>
+</tr>
+<tr>
+<td><code>/api/ml/registry/*</code></td>
+<td>Model registry (alternate mount)</td>
+</tr>
+<tr>
+<td><code>/api/registry/*</code></td>
+<td>Model registry (canonical mount)</td>
+</tr>
+<tr>
+<td><code>/api/monitoring/*</code></td>
+<td>Drift monitoring, error tracking, pipeline logs</td>
+</tr>
+<tr>
+<td><code>/ws/jobs</code></td>
+<td>WebSocket job event stream</td>
 </tr>
 </tbody>
 </table>
 <hr />
-<h2 id="1-clone-the-repository">1. Clone the Repository</h2>
-<pre><code class="language-bash">git clone https://github.com/flyingriverhorse/Skyulf.git
-cd Skyulf
+<h2 id="health">Health</h2>
+<h3 id="get-healthping"><code>GET /health/ping</code></h3>
+<p>Minimal liveness probe — returns <code>{ "message": "pong" }</code>. Fastest possible health check with no database involvement.</p>
+<h3 id="get-health"><code>GET /health</code></h3>
+<p>Basic health probe for load balancers. Returns HTTP 200 when the server is running.</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;timestamp&quot;: &quot;2025-06-30T12:00:00Z&quot;,
+  &quot;version&quot;: &quot;0.6.3&quot;,
+  &quot;environment&quot;: &quot;development&quot;,
+  &quot;uptime_seconds&quot;: 3600.0
+}
 </code></pre>
+<h3 id="get-healthdetailed"><code>GET /health/detailed</code></h3>
+<p>Detailed diagnostics. Checks database connectivity and Redis (if <code>USE_CELERY=true</code>).</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;database_status&quot;: &quot;healthy&quot;,
+  &quot;cache_status&quot;: &quot;healthy&quot;,
+  &quot;external_services&quot;: { &quot;snowflake&quot;: &quot;not_configured&quot; }
+}
+</code></pre>
+<h3 id="get-healthready"><code>GET /health/ready</code></h3>
+<p>Readiness probe — fits a tiny sklearn pipeline to verify the ML stack is functional.
+Returns <code>503</code> if the ML dependencies are broken.</p>
 <hr />
-<h2 id="2-configure-environment-variables">2. Configure Environment Variables</h2>
-<p>Copy the example environment file and review the settings:</p>
-<pre><code class="language-bash">cp .env.example .env
+<h2 id="data-sources">Data Sources</h2>
+<h3 id="get-dataapisources"><code>GET /data/api/sources</code></h3>
+<p>List all data sources. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
+<h3 id="get-dataapisourcesusable"><code>GET /data/api/sources/usable</code></h3>
+<p>List data sources that have completed ingestion and are ready for pipeline use.</p>
+<h3 id="get-dataapisourcessource_id"><code>GET /data/api/sources/{source_id}</code></h3>
+<p>Get a single data source by ID.</p>
+<blockquote>
+<p><strong>Note:</strong> The <code>config</code> field in all data source responses has sensitive keys (<code>storage_options</code>, AWS credentials, passwords) automatically redacted.</p>
+</blockquote>
+<h3 id="get-dataapisourcessource_idsample"><code>GET /data/api/sources/{source_id}/sample</code></h3>
+<p>Get a sample of rows from the data source.</p>
+<h3 id="delete-dataapisourcessource_id"><code>DELETE /data/api/sources/{source_id}</code></h3>
+<p>Delete a data source and its associated files.</p>
+<h3 id="get-dataapisourcessource_idexport"><code>GET /data/api/sources/{source_id}/export</code></h3>
+<p>Export the full dataset as a downloadable file.</p>
+<hr />
+<h2 id="file-ingestion">File Ingestion</h2>
+<h3 id="post-apiingestionupload-rate-limited-10min"><code>POST /api/ingestion/upload</code> — Rate limited: 10/min</h3>
+<p>Upload a dataset file. Starts an asynchronous ingestion job.</p>
+<p><strong>Request:</strong> <code>multipart/form-data</code> with a <code>file</code> field.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{ &quot;job_id&quot;: &quot;...&quot;, &quot;status&quot;: &quot;pending&quot;, &quot;message&quot;: &quot;File upload started&quot;, &quot;file_id&quot;: &quot;...&quot; }
 </code></pre>
-<p>Key variables in <code>.env</code>:</p>
+<p><strong>Allowed extensions:</strong> <code>.csv</code>, <code>.xlsx</code>, <code>.xls</code>, <code>.parquet</code>, <code>.json</code>, <code>.txt</code>, <code>.pkl</code>, <code>.pickle</code>, <code>.feather</code>, <code>.h5</code>, <code>.hdf5</code></p>
+<p><strong>Size limit:</strong> <code>MAX_UPLOAD_SIZE</code> (default 10 GB).</p>
+<h3 id="get-apiingestionsource_idstatus"><code>GET /api/ingestion/{source_id}/status</code></h3>
+<p>Poll the status of an ingestion job. Returns <code>pending</code>, <code>processing</code>, <code>completed</code>, or <code>failed</code>.</p>
+<h3 id="post-apiingestionsource_idcancel"><code>POST /api/ingestion/{source_id}/cancel</code></h3>
+<p>Cancel an in-progress ingestion job.</p>
+<hr />
+<h2 id="ml-pipeline">ML Pipeline</h2>
+<p>All pipeline endpoints are under <code>/api/pipeline/*</code>.</p>
+<h3 id="post-apipipelinerun-rate-limited-20min"><code>POST /api/pipeline/run</code> — Rate limited: 20/min</h3>
+<p>Submit a pipeline for asynchronous execution. Accepts a <code>PipelineConfigModel</code> JSON body describing the node graph.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;message&quot;: &quot;Pipeline execution started&quot;,
+  &quot;pipeline_id&quot;: &quot;...&quot;,
+  &quot;job_id&quot;: &quot;...&quot;,
+  &quot;job_ids&quot;: [&quot;...&quot;]
+}
+</code></pre>
+<p>Multiple <code>job_ids</code> are returned when the pipeline is split into parallel branches.</p>
+<h3 id="post-apipipelinepreview"><code>POST /api/pipeline/preview</code></h3>
+<p>Run the pipeline in preview mode (synchronous, limited to 1000 rows). Returns per-node output samples.</p>
+<h3 id="post-apipipelineschema-preview"><code>POST /api/pipeline/schema-preview</code></h3>
+<p>Returns predicted output column schema for a node without executing the pipeline.</p>
+<h3 id="get-apipipelinejobs"><code>GET /api/pipeline/jobs</code></h3>
+<p>List all training jobs with status and metrics.</p>
+<h3 id="get-apipipelinejobsjob_id"><code>GET /api/pipeline/jobs/{job_id}</code></h3>
+<p>Get detailed status, metrics, and logs for a specific job.</p>
+<h3 id="post-apipipelinejobsjob_idcancel"><code>POST /api/pipeline/jobs/{job_id}/cancel</code></h3>
+<p>Cancel a running or queued job.</p>
+<h3 id="post-apipipelinejobsjob_idpromote"><code>POST /api/pipeline/jobs/{job_id}/promote</code></h3>
+<p>Mark a completed job as the "promoted winner" — sets the <code>promoted_at</code> timestamp.</p>
+<h3 id="delete-apipipelinejobsjob_idpromote"><code>DELETE /api/pipeline/jobs/{job_id}/promote</code></h3>
+<p>Remove the promoted status from a job (unpromote).</p>
+<h3 id="get-apipipelinejobsjob_idevaluation"><code>GET /api/pipeline/jobs/{job_id}/evaluation</code></h3>
+<p>Get full evaluation results for a completed job — model metrics, preprocessing artifacts, and tuning trial history (if applicable).</p>
+<h3 id="get-apipipelinejobsnode-summaries"><code>GET /api/pipeline/jobs/node-summaries</code></h3>
+<p>Returns per-node aggregated metrics across all jobs. Useful for comparing model types. Query param: <code>limit</code> (default 200).</p>
+<h3 id="tuning-jobs">Tuning Jobs</h3>
 <table>
 <thead>
 <tr>
-<th>Variable</th>
-<th>Default</th>
+<th>Method</th>
+<th>Path</th>
 <th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>DB_TYPE</code></td>
-<td><code>sqlite</code></td>
-<td>Database backend (<code>sqlite</code> or <code>postgres</code>)</td>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/jobs/tuning/latest/{node_id}</code></td>
+<td>Most recent tuning job for a canvas node</td>
 </tr>
 <tr>
-<td><code>USE_CELERY</code></td>
-<td><code>false</code></td>
-<td>Set <code>true</code> to enable Redis-backed background jobs (requires Redis)</td>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/jobs/tuning/best/{model_type}</code></td>
+<td>Best-scoring tuning job for a model type</td>
 </tr>
 <tr>
-<td><code>CELERY_BROKER_URL</code></td>
-<td><code>redis://127.0.0.1:6379/0</code></td>
-<td>Redis URL for Celery message broker</td>
-</tr>
-<tr>
-<td><code>REDIS_URL</code></td>
-<td><code>redis://127.0.0.1:6379/0</code></td>
-<td>Redis URL for caching</td>
-</tr>
-<tr>
-<td><code>SECRET_KEY</code></td>
-<td><em>(random, regenerated each restart)</em></td>
-<td><strong>Required in production</strong> — set a stable value or JWT tokens will break on restart</td>
-</tr>
-<tr>
-<td><code>DEBUG</code></td>
-<td><code>true</code></td>
-<td>Set <code>false</code> in production</td>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/jobs/tuning/history/{model_type}</code></td>
+<td>Full tuning history for a model type</td>
 </tr>
 </tbody>
 </table>
-<blockquote>
-<p><strong>Minimal setup:</strong> For local development with SQLite and no Celery (the default), no changes are needed — just <code>cp .env.example .env</code> and start the server.</p>
-</blockquote>
-<hr />
-<h2 id="3a-docker-compose-recommended">3A. Docker Compose (Recommended)</h2>
-<p>From the repository root:</p>
-<pre><code class="language-bash">docker compose up --build
-</code></pre>
-<p>This starts three containers:</p>
+<h3 id="get-apipipelineregistry"><code>GET /api/pipeline/registry</code></h3>
+<p>Returns the full node registry — all available step types with their parameter schemas.</p>
+<h3 id="get-apipipelinestats"><code>GET /api/pipeline/stats</code></h3>
+<p>Aggregate statistics across all jobs (counts by status, model type, etc.).</p>
+<h3 id="get-apipipelinedatasetslist"><code>GET /api/pipeline/datasets/list</code></h3>
+<p>List datasets available for pipeline use.</p>
+<h3 id="get-apipipelinedatasetsdataset_idschema"><code>GET /api/pipeline/datasets/{dataset_id}/schema</code></h3>
+<p>Get the column schema of a dataset.</p>
+<h3 id="get-apipipelinehyperparametersmodel_type"><code>GET /api/pipeline/hyperparameters/{model_type}</code></h3>
+<p>Get hyperparameter definitions for a model type.</p>
+<h3 id="get-apipipelinehyperparametersmodel_typedefaults"><code>GET /api/pipeline/hyperparameters/{model_type}/defaults</code></h3>
+<p>Get default hyperparameter values for a model type.</p>
+<h3 id="pipeline-save-load">Pipeline Save / Load</h3>
 <table>
 <thead>
 <tr>
-<th>Service</th>
-<th>Port</th>
-<th>Purpose</th>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>api</code></td>
-<td><code>8000</code></td>
-<td>FastAPI backend + static frontend</td>
+<td><code>POST</code></td>
+<td><code>/api/pipeline/save/{dataset_id}</code></td>
+<td>Save a pipeline configuration for a dataset</td>
 </tr>
 <tr>
-<td><code>redis</code></td>
-<td><code>6379</code></td>
-<td>Message broker for Celery</td>
-</tr>
-<tr>
-<td><code>worker</code></td>
-<td>—</td>
-<td>Celery worker for background training jobs</td>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/load/{dataset_id}</code></td>
+<td>Load the current pipeline configuration for a dataset</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Verify it's running:</strong></p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/health
-# Expected: {&quot;status&quot;: &quot;healthy&quot;, ...}
-</code></pre>
-<p><strong>Useful commands:</strong></p>
-<pre><code class="language-bash"># Run in background
-docker compose up --build -d
-
-# Follow API logs
-docker compose logs -f api
-
-# Stop everything
-docker compose down
-</code></pre>
-<blockquote>
-<p><strong>Tip:</strong> Docker Compose mounts your working tree, so local code edits are picked up on reload.</p>
-</blockquote>
-<hr />
-<h2 id="3b-manual-setup-no-docker">3B. Manual Setup (No Docker)</h2>
-<h3 id="create-a-virtual-environment">Create a virtual environment</h3>
-<pre><code class="language-bash">python -m venv .venv
-
-# Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-
-# macOS / Linux
-source .venv/bin/activate
-</code></pre>
-<h3 id="install-dependencies">Install dependencies</h3>
-<pre><code class="language-bash">pip install --upgrade pip
-pip install -r requirements-fastapi.txt
-</code></pre>
-<h3 id="start-redis-if-use_celerytrue">Start Redis (if <code>USE_CELERY=true</code>)</h3>
-<pre><code class="language-bash"># Option 1: Docker (simplest)
-docker run --name skyulf-redis -p 6379:6379 -d redis:7
-
-# Option 2: Native install (Linux)
-sudo apt install redis-server &amp;&amp; sudo systemctl start redis
-
-# Option 3: Skip Redis entirely
-# Set USE_CELERY=false in your .env file
-</code></pre>
-<h3 id="launch-the-api-server">Launch the API server</h3>
-<pre><code class="language-bash">python run_skyulf.py
-</code></pre>
-<p>Or with uvicorn directly:</p>
-<pre><code class="language-bash">python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
-</code></pre>
-<h3 id="start-the-celery-worker-optional">Start the Celery worker (optional)</h3>
-<p>In a second terminal with the virtualenv activated:</p>
-<pre><code class="language-bash">python -m celery -A celery_worker.celery_app worker --pool=solo --loglevel=info --queues mlops-training
-</code></pre>
-<hr />
-<h2 id="4-verify-the-stack">4. Verify the Stack</h2>
-<p>Once the server is running, check these URLs:</p>
+<h3 id="pipeline-versions">Pipeline Versions</h3>
 <table>
 <thead>
 <tr>
-<th>URL</th>
-<th>What it is</th>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a></td>
-<td>Web dashboard (main UI)</td>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}</code></td>
+<td>List all saved versions for a dataset</td>
 </tr>
 <tr>
-<td><a href="http://127.0.0.1:8000/docs">http://127.0.0.1:8000/docs</a></td>
-<td><strong>Swagger UI</strong> — interactive API explorer</td>
+<td><code>POST</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}</code></td>
+<td>Save a new named version</td>
 </tr>
 <tr>
-<td><a href="http://127.0.0.1:8000/redoc">http://127.0.0.1:8000/redoc</a></td>
-<td><strong>ReDoc</strong> — API reference documentation</td>
+<td><code>PATCH</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}/{version_id}</code></td>
+<td>Update version metadata</td>
 </tr>
 <tr>
-<td><a href="http://127.0.0.1:8000/health">http://127.0.0.1:8000/health</a></td>
-<td>Health check endpoint</td>
+<td><code>DELETE</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}/{version_id}</code></td>
+<td>Delete a version</td>
 </tr>
 <tr>
-<td><a href="http://127.0.0.1:8000/health/detailed">http://127.0.0.1:8000/health/detailed</a></td>
-<td>Detailed diagnostics (DB connectivity, Redis/Celery availability, Snowflake status)</td>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}/audit</code></td>
+<td>Version change audit log</td>
 </tr>
 </tbody>
 </table>
+<h3 id="notebook-export">Notebook Export</h3>
+<h4 id="post-apipipelinepipelinedataset_idexport-notebook"><code>POST /api/pipeline/pipeline/{dataset_id}/export-notebook</code></h4>
+<p>Generate and download a Jupyter notebook (<code>.ipynb</code>) for a pipeline. Supports <code>full</code> and <code>compact</code> export modes. See <a href="platform_walkthrough.html#step-5b-export-to-jupyter-notebook">Platform Walkthrough</a> for details.</p>
 <hr />
-<h2 id="5-first-login">5. First Login</h2>
-<p>Authentication is <strong>not yet enabled</strong> in this release — the platform is accessible without credentials. When auth is implemented, credentials will be configured via environment variables (<code>AUTH_FALLBACK_*</code> settings in <code>.env</code>).</p>
-<blockquote>
-<p><strong>Heads-up:</strong> Do not expose the API on a public network until authentication is implemented.</p>
-</blockquote>
+<h2 id="deployment-inference">Deployment &amp; Inference</h2>
+<h3 id="post-apideploymentdeployjob_id-rate-limited-10min"><code>POST /api/deployment/deploy/{job_id}</code> — Rate limited: 10/min</h3>
+<p>Deploy a trained model from a completed job. Sets it as the active deployment.</p>
+<h3 id="get-apideploymentactive"><code>GET /api/deployment/active</code></h3>
+<p>Get the currently active deployment.</p>
+<h3 id="get-apideploymenthistory"><code>GET /api/deployment/history</code></h3>
+<p>List deployment history. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
+<h3 id="post-apideploymentdeactivate"><code>POST /api/deployment/deactivate</code></h3>
+<p>Deactivate the current active deployment.</p>
+<h3 id="post-apideploymentpredict-rate-limited-60min"><code>POST /api/deployment/predict</code> — Rate limited: 60/min</h3>
+<p>Run inference using the active model.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{ &quot;data&quot;: [{ &quot;feature1&quot;: 1.5, &quot;feature2&quot;: &quot;value&quot; }] }
+</code></pre>
+<p><code>data</code> is an <strong>array</strong> of records — even for a single prediction, wrap it in a list.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{ &quot;predictions&quot;: [...], &quot;model_version&quot;: &quot;job-id-here&quot; }
+</code></pre>
+<p>Returns <code>404</code> if no deployment is active.</p>
 <hr />
-<h2 id="6-first-steps-after-setup">6. First Steps After Setup</h2>
-<ol>
-<li><strong>Open the dashboard</strong> at <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a>.</li>
-<li><strong>Upload data:</strong> Navigate to <strong>Data Sources</strong> and upload a CSV file.</li>
-<li><strong>Explore your data:</strong> Open <strong>EDA</strong> to see automated profiling, distributions, and outlier alerts.</li>
-<li><strong>Build a pipeline:</strong> Open the <strong>ML Canvas</strong>, drag nodes, connect them, and hit <strong>Execute</strong>.</li>
-<li><strong>Deploy a model:</strong> Register a trained model and test it from the <strong>Deployments</strong> page.</li>
-</ol>
-<p>For a detailed step-by-step walkthrough, see <a href="platform_walkthrough.html">Platform Walkthrough</a>.</p>
+<h2 id="model-registry">Model Registry</h2>
+<p>The model registry is <strong>read-only</strong> — models are auto-registered when jobs complete and promoted via the jobs API. Both <code>/api/registry/*</code> (canonical) and <code>/api/ml/registry/*</code> (compatibility alias) are supported.</p>
+<h3 id="get-apiregistrystats"><code>GET /api/registry/stats</code></h3>
+<p>Aggregate registry statistics (model counts by type, total versions, etc.).</p>
+<h3 id="get-apiregistrymodels"><code>GET /api/registry/models</code></h3>
+<p>List all registered models.</p>
+<h3 id="get-apiregistrymodelsmodel_typeversions"><code>GET /api/registry/models/{model_type}/versions</code></h3>
+<p>List all versions for a specific model type (e.g., <code>random_forest_classifier</code>).</p>
+<h3 id="get-apiregistryartifactsjob_id"><code>GET /api/registry/artifacts/{job_id}</code></h3>
+<p>List all stored artifacts (model files, preprocessing pickles) for a job.</p>
 <hr />
-<h2 id="troubleshooting">Troubleshooting</h2>
+<h2 id="eda-profiling">EDA &amp; Profiling</h2>
+<h3 id="post-apiedadataset_idanalyze-rate-limited-20min"><code>POST /api/eda/{dataset_id}/analyze</code> — Rate limited: 20/min</h3>
+<p>Trigger a full automated EDA analysis for a dataset. Returns a <code>report_id</code> immediately; the analysis runs asynchronously.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{ &quot;report_id&quot;: 42, &quot;status&quot;: &quot;pending&quot;, &quot;dataset_id&quot;: 7 }
+</code></pre>
+<h3 id="get-apiedadataset_idlatest"><code>GET /api/eda/{dataset_id}/latest</code></h3>
+<p>Get the most recently completed EDA report for a dataset (distributions, correlations, outliers, smart alerts).</p>
+<h3 id="get-apiedadataset_idhistory"><code>GET /api/eda/{dataset_id}/history</code></h3>
+<p>List all past EDA reports for a dataset.</p>
+<h3 id="get-apiedareportsreport_id"><code>GET /api/eda/reports/{report_id}</code></h3>
+<p>Get a specific EDA report by ID.</p>
+<h3 id="post-apiedareportsreport_idcancel"><code>POST /api/eda/reports/{report_id}/cancel</code></h3>
+<p>Cancel a running EDA analysis.</p>
+<h3 id="post-apiedadataset_iddecomposition"><code>POST /api/eda/{dataset_id}/decomposition</code></h3>
+<p>Run time-series decomposition on a dataset column.</p>
+<h3 id="get-apiedajobsall"><code>GET /api/eda/jobs/all</code></h3>
+<p>List all EDA jobs with status. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
+<hr />
+<h2 id="monitoring">Monitoring</h2>
+<h3 id="drift-detection">Drift Detection</h3>
+<h4 id="get-apimonitoringjobs"><code>GET /api/monitoring/jobs</code></h4>
+<p>List jobs that have reference data available for drift comparison.</p>
+<h4 id="post-apimonitoringdriftcalculate-rate-limited-20min"><code>POST /api/monitoring/drift/calculate</code> — Rate limited: 20/min</h4>
+<p>Calculate data drift between a job's reference data and a new uploaded file.</p>
+<p><strong>Request:</strong> <code>multipart/form-data</code>
+- <code>job_id</code> — the training job whose reference data to compare against
+- <code>file</code> — current data file (CSV or Parquet)
+- <code>dataset_name</code> <em>(optional)</em> — dataset name to match reference data
+- <code>threshold_psi</code>, <code>threshold_ks</code>, <code>threshold_wasserstein</code>, <code>threshold_kl</code> <em>(optional)</em> — custom thresholds</p>
+<p><strong>Size limit:</strong> <code>MAX_UPLOAD_SIZE</code> (default 10 GB).</p>
+<h4 id="get-apimonitoringdrifthistoryjob_id"><code>GET /api/monitoring/drift/history/{job_id}</code></h4>
+<p>List past drift check results for a job.</p>
+<h4 id="get-apimonitoringdriftstatus"><code>GET /api/monitoring/drift/status</code></h4>
+<p>Drift health summary across all monitored jobs.</p>
+<h3 id="performance">Performance</h3>
+<h4 id="get-apimonitoringslow-nodes"><code>GET /api/monitoring/slow-nodes</code></h4>
+<p>Returns the top N step types by cumulative execution time over the last N days.
+Query params: <code>days</code> (1–90, default 7), <code>limit</code> (1–50, default 10).</p>
+<h3 id="error-tracking">Error Tracking</h3>
+<p>The backend automatically records unhandled 5xx errors to the <code>error_events</code> database table.</p>
+<h4 id="get-apimonitoringerrors"><code>GET /api/monitoring/errors</code></h4>
+<p>List recorded error events. Supports <code>since</code>, <code>limit</code>, <code>show_resolved</code> (default <code>false</code>) query params.</p>
+<h4 id="get-apimonitoringerrorscount"><code>GET /api/monitoring/errors/count</code></h4>
+<p>Count of unresolved errors.</p>
+<h4 id="get-apimonitoringerrorsgrouped"><code>GET /api/monitoring/errors/grouped</code></h4>
+<p>Errors grouped by <code>error_type</code>.</p>
+<h4 id="get-apimonitoringerrorstimeline"><code>GET /api/monitoring/errors/timeline</code></h4>
+<p>Error counts over time (for trend charts).</p>
+<h4 id="get-apimonitoringerrorserror_id"><code>GET /api/monitoring/errors/{error_id}</code></h4>
+<p>Get a specific error event (includes full traceback — <strong>admin-only in production</strong>).</p>
+<h4 id="patch-apimonitoringerrorserror_idresolve"><code>PATCH /api/monitoring/errors/{error_id}/resolve</code></h4>
+<p>Mark an error as resolved.</p>
+<h4 id="patch-apimonitoringerrorserror_idunresolve"><code>PATCH /api/monitoring/errors/{error_id}/unresolve</code></h4>
+<p>Reopen a resolved error.</p>
+<h4 id="delete-apimonitoringerrors"><code>DELETE /api/monitoring/errors</code></h4>
+<p>Delete all error events. ⚠️ Irreversible.</p>
+<h3 id="pipeline-run-logs">Pipeline Run Logs</h3>
+<h4 id="post-apimonitoringpipeline-logs"><code>POST /api/monitoring/pipeline-logs</code></h4>
+<p>Ingest pipeline execution log entries.</p>
+<h4 id="get-apimonitoringpipeline-logs"><code>GET /api/monitoring/pipeline-logs</code></h4>
+<p>List pipeline run logs. Supports <code>pipeline_id</code>, <code>since</code>, <code>limit</code> (max 500) query params.</p>
+<h4 id="patch-apimonitoringjobsjob_iddescription"><code>PATCH /api/monitoring/jobs/{job_id}/description</code></h4>
+<p>Update the description/notes for a monitored job.</p>
+<h4 id="delete-apimonitoringpipeline-logs"><code>DELETE /api/monitoring/pipeline-logs</code></h4>
+<p>Delete all pipeline run logs. ⚠️ Irreversible.</p>
+<hr />
+<h2 id="websocket-job-events">WebSocket — Job Events</h2>
+<h3 id="ws-wsjobs"><code>WS /ws/jobs</code></h3>
+<p>A WebSocket stream that pushes real-time job status events to connected clients.</p>
+<p><strong>Connection:</strong> <code>ws://127.0.0.1:8000/ws/jobs</code></p>
+<p><strong>Message envelope:</strong></p>
+<pre><code class="language-json">{ &quot;channel&quot;: &quot;jobs&quot;, &quot;data&quot;: { &quot;event&quot;: &quot;progress&quot;, &quot;job_id&quot;: &quot;abc123&quot;, &quot;status&quot;: &quot;running&quot;, &quot;progress&quot;: 42 } }
+</code></pre>
+<p>Messages are wrapped in a <code>channel</code>/<code>data</code> envelope. The <code>data</code> object is a <code>JobEvent</code>.</p>
+<p><strong>Event types (<code>data.event</code>):</strong></p>
 <table>
 <thead>
 <tr>
-<th>Problem</th>
-<th>Fix</th>
+<th><code>event</code></th>
+<th>When</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>Connection refused</code> on port 8000</td>
-<td>Is the API running? Check <code>docker compose logs api</code> or your terminal.</td>
+<td><code>created</code></td>
+<td>A new job was submitted</td>
 </tr>
 <tr>
-<td>Celery tasks stuck in "pending"</td>
-<td>Verify Redis is running: <code>redis-cli ping</code> should return <code>PONG</code>.</td>
+<td><code>progress</code></td>
+<td>Job progress updated (0–100, in <code>data.progress</code>)</td>
 </tr>
 <tr>
-<td><code>ModuleNotFoundError</code> on startup</td>
-<td>Activate your virtualenv and run <code>pip install -r requirements-fastapi.txt</code>.</td>
+<td><code>status</code></td>
+<td>Job status changed (running → completed, etc.)</td>
 </tr>
 <tr>
-<td>Database errors after update</td>
-<td>Delete <code>mlops_database.db</code> (SQLite) to start fresh — it auto-recreates on boot.</td>
-</tr>
-<tr>
-<td>CORS errors in browser</td>
-<td>Add your frontend URL to <code>CORS_ORIGINS</code> in <code>.env</code>. Default allows <code>localhost:3000</code> and <code>localhost:8080</code>.</td>
+<td><code>deleted</code></td>
+<td>Job was deleted</td>
 </tr>
 </tbody>
 </table>
-<p>For more issues, see <a href="../user_guide/troubleshooting.html">Troubleshooting</a>.</p>
+<p><strong>JavaScript example:</strong></p>
+<pre><code class="language-js">const ws = new WebSocket(&quot;ws://127.0.0.1:8000/ws/jobs&quot;);
+ws.onmessage = (msg) =&gt; {
+  const { channel, data } = JSON.parse(msg.data);
+  if (channel === &quot;jobs&quot;) {
+    console.log(`Job ${data.job_id}: ${data.event} (${data.status})`);
+  }
+};
+</code></pre>
+<blockquote>
+<p><strong>Important:</strong> WebSocket events are best-effort hints. Maintain a polling fallback (<code>GET /api/pipeline/jobs/{job_id}</code>) for critical status checks.</p>
+</blockquote>
+<hr />
+<h2 id="rate-limiting">Rate Limiting</h2>
+<p>The following endpoints are rate-limited by client IP address:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/pipeline/run</code></td>
+<td>20/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/eda/{dataset_id}/analyze</code></td>
+<td>20/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/ingestion/upload</code></td>
+<td>10/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/monitoring/drift/calculate</code></td>
+<td>20/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/deployment/deploy/{job_id}</code></td>
+<td>10/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/deployment/predict</code></td>
+<td>60/minute</td>
+</tr>
+</tbody>
+</table>
+<p>Requests over the limit receive <strong>HTTP 429 Too Many Requests</strong>.</p>
+<hr />
+<h2 id="error-responses">Error Responses</h2>
+<p>Error responses share a common shape, though some fields may be absent depending on the handler:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: false,
+  &quot;error&quot;: &quot;HTTP 404&quot;,
+  &quot;message&quot;: &quot;The requested resource was not found&quot;,
+  &quot;request_id&quot;: &quot;550e8400-e29b-41d4-a716-446655440000&quot;
+}
+</code></pre>
+<p>The <code>request_id</code> is also returned in the <code>X-Request-ID</code> response header for log correlation.</p>
+<p>Common status codes:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>400</code></td>
+<td>Bad request (invalid parameters or business logic error)</td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td>Resource not found</td>
+</tr>
+<tr>
+<td><code>405</code></td>
+<td>Method not allowed</td>
+</tr>
+<tr>
+<td><code>413</code></td>
+<td>File too large</td>
+</tr>
+<tr>
+<td><code>422</code></td>
+<td>Validation error (malformed request body)</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>Rate limit exceeded</td>
+</tr>
+<tr>
+<td><code>500</code></td>
+<td>Internal server error</td>
+</tr>
+</tbody>
+</table>
 
 
 
