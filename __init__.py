@@ -7,7 +7,8 @@ This package contains the FastAPI implementation of the MLops platform,
 designed to replace the Flask application with better concurrency support.
 """
 
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 try:
     __version__ = _pkg_version("skyulf")

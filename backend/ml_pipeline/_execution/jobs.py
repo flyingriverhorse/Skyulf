@@ -4,7 +4,6 @@ Handles persistence of Training and Tuning jobs to the database.
 """
 
 import logging
-
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional
 

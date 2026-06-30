@@ -446,6 +446,7 @@ def _add_exception_handlers(app: FastAPI) -> None:
     async def general_exception_handler(request: Request, exc: Exception):
         """Handle unexpected Python exceptions and convert them to 500 errors."""
         import traceback as _tb
+
         from fastapi.responses import JSONResponse as _JSONResponse
 
         real_type = type(exc).__name__
