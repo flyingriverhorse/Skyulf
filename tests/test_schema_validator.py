@@ -1,7 +1,5 @@
 """Tests for the static column-reference validator (C7 Phase D)."""
 
-from __future__ import annotations
-
 import pandas as pd
 
 from backend.ml_pipeline._execution._schema_graph import predict_schemas

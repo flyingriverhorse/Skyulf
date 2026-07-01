@@ -7,8 +7,6 @@ shared `_advisor.Recommendation` re-export so legacy
 imports continue to work via `api.py`'s re-export shim.
 """
 
-from __future__ import annotations
-
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel

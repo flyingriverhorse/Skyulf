@@ -10,8 +10,6 @@ All fields are optional (``total=False``) so that the early-return
 call sites that collect params.
 """
 
-from __future__ import annotations
-
 from typing import Any, Dict, List, Optional
 
 from typing_extensions import TypedDict

@@ -10,8 +10,6 @@ This keeps ``monitoring`` free of direct ``Path.iterdir()`` calls so a future
 Local behaviour is identical to the previous inline filesystem scan.
 """
 
-from __future__ import annotations
-
 import logging
 import re
 from abc import ABC, abstractmethod

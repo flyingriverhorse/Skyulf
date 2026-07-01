@@ -13,8 +13,6 @@ metadata to seed loader schemas from the catalog without loading the
 underlying data.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Dict, List, Optional
 

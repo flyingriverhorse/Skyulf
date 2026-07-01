@@ -1,7 +1,5 @@
 """Tests for the C7 lineage primitive (`SkyulfSchema` + `infer_output_schema`)."""
 
-from __future__ import annotations
-
 import pandas as pd
 import pytest
 

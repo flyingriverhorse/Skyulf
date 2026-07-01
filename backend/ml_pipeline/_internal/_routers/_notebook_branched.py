@@ -6,8 +6,6 @@ rather than a single ambiguous block. Imported by ``notebook_export`` when
 ``_terminal_models()`` detects more than one model at the graph leaves.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 

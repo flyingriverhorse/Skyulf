@@ -6,8 +6,6 @@ cloud-object serializer can later implement the same interface without changing
 call sites.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Union

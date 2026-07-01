@@ -19,8 +19,6 @@ external callers (Pydantic models, helper functions, the legacy
 `get_job_evaluation` handler, `_build_node_registry`, etc.).
 """
 
-from __future__ import annotations
-
 from fastapi import APIRouter
 
 # Schema / helper / advisor re-exports — used by tests and callers that

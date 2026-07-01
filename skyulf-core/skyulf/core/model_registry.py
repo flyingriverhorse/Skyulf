@@ -6,8 +6,6 @@ Additive, non-breaking seam ahead of the Databricks/MLflow phases. The default
 can later subclass :class:`ModelRegistry` without changing call sites.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
