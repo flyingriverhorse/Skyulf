@@ -16,8 +16,6 @@ the only thing that catches a calculator silently emitting an unknown
 key (which Appliers would then ignore at runtime).
 """
 
-from __future__ import annotations
-
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 import numpy as np

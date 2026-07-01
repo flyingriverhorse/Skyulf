@@ -4,8 +4,6 @@ Celery worker bootstrap.
 © 2025 Murat Unsal — Skyulf Project
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 

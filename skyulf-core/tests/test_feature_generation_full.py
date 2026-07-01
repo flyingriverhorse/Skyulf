@@ -6,8 +6,6 @@ Run with:
     pytest skyulf-core/tests/test_feature_generation_full.py -v
 """
 
-from __future__ import annotations
-
 import math
 
 import pandas as pd

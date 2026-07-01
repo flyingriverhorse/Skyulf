@@ -10,8 +10,6 @@ Versions are keyed by `dataset_source_id` (not `pipelines.id`) because
 pipeline per dataset means dataset_source_id is the natural identity.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, List, Optional
 

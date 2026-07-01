@@ -6,8 +6,6 @@ just translates HTTP requests into `PipelineVersionsService` calls
 plus a small JSON-on-disk fallback for the "json" storage backend.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os

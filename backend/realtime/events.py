@@ -6,8 +6,6 @@ This keeps the WS payload schema stable across job-type changes and
 sidesteps the partial-update problem.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Literal, Optional
 

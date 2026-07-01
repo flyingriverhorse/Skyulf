@@ -9,8 +9,6 @@ Relies on ``self.artifact_store``, ``self._node_configs``, ``self._get_input``,
 ``self.executed_transformers``, and ``self.log`` from :class:`PipelineEngine`.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Dict, List
 

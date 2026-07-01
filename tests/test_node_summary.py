@@ -4,8 +4,6 @@ Each family lives in its own focused test so a phrasing change is
 quickly traceable.
 """
 
-from __future__ import annotations
-
 import pandas as pd
 
 from backend.ml_pipeline._execution.summary import build_summary

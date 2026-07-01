@@ -25,8 +25,6 @@ Cell builders live in `_notebook_builders` to keep this module focused on
 graph classification and the HTTP endpoint.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import re

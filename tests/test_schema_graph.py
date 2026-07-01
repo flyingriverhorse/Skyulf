@@ -1,7 +1,5 @@
 """Tests for the pre-execution schema graph (C7 Phase B)."""
 
-from __future__ import annotations
-
 import pandas as pd
 
 from backend.ml_pipeline._execution._schema_graph import (

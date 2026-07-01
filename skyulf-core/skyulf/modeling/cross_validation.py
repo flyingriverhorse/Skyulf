@@ -1,7 +1,5 @@
 """Cross-validation logic for V2 modeling."""
 
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
 
 import numpy as np
@@ -53,8 +51,8 @@ def _aggregate_metrics(
 
 
 def perform_cross_validation(
-    calculator: BaseModelCalculator,
-    applier: BaseModelApplier,
+    calculator: "BaseModelCalculator",
+    applier: "BaseModelApplier",
     X: Union[pd.DataFrame, SkyulfDataFrame],
     y: Union[pd.Series, Any],
     config: Dict[str, Any],
@@ -287,8 +285,8 @@ def _build_splitter(
 
 
 def _perform_nested_cv(
-    calculator: BaseModelCalculator,
-    applier: BaseModelApplier,
+    calculator: "BaseModelCalculator",
+    applier: "BaseModelApplier",
     X: Union[pd.DataFrame, SkyulfDataFrame],
     y: Union[pd.Series, Any],
     config: Dict[str, Any],

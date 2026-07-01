@@ -15,8 +15,6 @@ Scenarios cover the bug categories in ``temp/merge_system_audit.md``:
 * training metrics computed when held-out test is non-empty (Bug 4a regression)
 """
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
 from typing import Any, Dict

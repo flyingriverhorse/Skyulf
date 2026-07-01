@@ -1,7 +1,5 @@
 """Tests for the in-process LocalBus fallback used when USE_CELERY=False."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 import threading

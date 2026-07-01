@@ -17,8 +17,6 @@ Design constraints
   per-split detail (test/train) for trained models.
 """
 
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple
