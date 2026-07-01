@@ -23,8 +23,8 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
 
-    /* Paths */
-    "baseUrl": ".",
+    /* Paths (resolved relative to this file — baseUrl no longer needed
+       since TS 5.0, and it's removed entirely in TS 7.0) */
     "paths": {
       "@/*": ["./src/*"]
     }
