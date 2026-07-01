@@ -11,6 +11,12 @@ import { useViewStore } from '../store/useViewStore';
 
 describe('useKeyboardShortcuts', () => {
   beforeEach(() => {
+    // Restore any vi.spyOn wrappers from the previous test first. The
+    // store's action functions are shared singletons, so re-spying on an
+    // already-spied method reuses the same mock and its stale call count —
+    // without this, later "not.toHaveBeenCalled()" assertions can see
+    // leftover calls recorded by earlier tests.
+    vi.restoreAllMocks();
     // Reset stores between cases — the duplicate-action / panel-expanded
     // assertions otherwise leak across tests.
     useGraphStore.setState({ nodes: [], edges: [] });
