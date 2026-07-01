@@ -88,18 +88,7 @@ nlp = [
 ]
 all = [
     "skyulf[geo,auth,viz,nlp]",
-    "beautifulsoup4>=4.13.5",
-    "dask[complete]>=2024.8.0",
-    "flower>=2.0.0,<3.0.0",
-    "jinja2>=3.1.0,<4.0.0",
-    "kaggle>=1.7.4.5",
-    "numba>=0.60.0",
-    "openml>=0.15.1",
-    "psutil>=5.9.0,<6.0.0",
     "psycopg2-binary>=2.9.10",
-    "networkx>=3.4.2",
-    "cookiecutter>=2.6.0",
-    "email-validator>=2.3.0",
 ]
 
 [dependency-groups]
