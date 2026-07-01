@@ -30,6 +30,16 @@ Skyulf is a self-hosted, privacy-first MLOps platform. It is designed to be the 
 
 I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and helpful to community.
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=flyingriverhorse%2FSkyulf&type=timeline&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=flyingriverhorse/Skyulf&type=timeline&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=flyingriverhorse/Skyulf&type=timeline&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=flyingriverhorse/Skyulf&type=timeline&legend=bottom-right" />
+ </picture>
+</a>
+
 ## Table of Contents
 
 - [Quick Start](#quick-start)
