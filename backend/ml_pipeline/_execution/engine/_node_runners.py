@@ -13,8 +13,6 @@ sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
 ``self._bundle_transformers_with_model``, ``self._extract_feature_importances``.
 """
 
-from __future__ import annotations
-
 import logging
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable, Dict, cast

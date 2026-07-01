@@ -13,8 +13,6 @@ The default returns `None`, meaning "I can't predict my output schema
 from config alone" — callers fall back to runtime introspection.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 

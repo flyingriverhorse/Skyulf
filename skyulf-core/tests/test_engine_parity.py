@@ -7,8 +7,6 @@ Backlog item E4 — second slice: imputation + outlier calculators added
 alongside the first-slice scalers.
 """
 
-from __future__ import annotations
-
 from typing import Any, Dict
 
 import numpy as np

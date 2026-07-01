@@ -1,7 +1,5 @@
 """Datetime helpers used across the application."""
 
-from __future__ import annotations
-
 from datetime import UTC, datetime
 
 

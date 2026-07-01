@@ -5,8 +5,6 @@ form `{"channel": "jobs", "data": {...JobEvent...}}`, and reply with
 nothing. The endpoint blocks on `receive_text` purely to detect close.
 """
 
-from __future__ import annotations
-
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect

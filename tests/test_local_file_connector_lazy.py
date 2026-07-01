@@ -1,7 +1,5 @@
 """Tests for `LocalFileConnector` lazy schema / sample fast paths (A6)."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pandas as pd

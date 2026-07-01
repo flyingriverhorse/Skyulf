@@ -5,8 +5,6 @@ file-NLOC complexity budget. Pure functions only — they consume already-
 classified `_NodeIn` lists and emit raw nbformat 4.5 cell dicts.
 """
 
-from __future__ import annotations
-
 import hashlib
 import json
 import re

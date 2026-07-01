@@ -20,8 +20,6 @@ will never work (e.g. `Oversampling` requires imblearn + numeric-only
 features + a binary `y`). Those are covered by their own targeted tests.
 """
 
-from __future__ import annotations
-
 from typing import Any, Dict, Set, Tuple
 
 import numpy as np

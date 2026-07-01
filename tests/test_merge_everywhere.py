@@ -10,8 +10,6 @@ training/tuning. Covers:
   evaluation (this used to be silently dropped).
 """
 
-from __future__ import annotations
-
 import pandas as pd
 import pytest
 

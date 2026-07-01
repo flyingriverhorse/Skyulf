@@ -8,8 +8,6 @@ Relies on ``self._node_configs``, ``self._resolve_all_inputs``,
 :class:`PipelineEngine`.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Callable, Dict, List, Optional, cast
 
