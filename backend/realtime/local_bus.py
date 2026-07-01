@@ -12,8 +12,6 @@ sync ``publish`` from any thread; the asyncio listener installed by
 running loop.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import Optional

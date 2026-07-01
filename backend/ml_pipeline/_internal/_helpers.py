@@ -5,8 +5,6 @@ together so naming changes (e.g. branch label format) only touch one
 file.
 """
 
-from __future__ import annotations
-
 import re
 
 from backend.ml_pipeline._execution.schemas import PipelineConfig

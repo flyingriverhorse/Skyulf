@@ -5,8 +5,6 @@ the set of live WebSocket clients and a single asyncio task that
 subscribes to the Redis pub/sub channel and broadcasts every message.
 """
 
-from __future__ import annotations
-
 import asyncio
 import logging
 from typing import Any, Optional, Set

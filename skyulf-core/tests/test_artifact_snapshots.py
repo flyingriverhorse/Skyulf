@@ -6,8 +6,6 @@ snapshots stay stable across platforms — we are guarding structure, not the
 last ULP (engine parity already guards numeric equality).
 """
 
-from __future__ import annotations
-
 from typing import Any
 
 import pandas as pd

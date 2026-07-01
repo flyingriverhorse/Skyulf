@@ -16,8 +16,6 @@ catalog) are passed in by the caller. When a loader's schema is not seeded,
 the loader's prediction is ``None`` and downstream predictions follow.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Dict, List, Optional
 

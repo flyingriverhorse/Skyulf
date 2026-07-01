@@ -15,8 +15,6 @@ simply don't know enough to validate. False positives on save would be
 worse than missed detections.
 """
 
-from __future__ import annotations
-
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 from skyulf.preprocessing import SkyulfSchema

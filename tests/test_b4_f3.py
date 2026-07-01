@@ -4,8 +4,6 @@ Tests for:
   F3 — Sentry span no-op when sentry-sdk is absent
 """
 
-from __future__ import annotations
-
 import sys
 from contextlib import contextmanager
 from unittest.mock import MagicMock, call, patch

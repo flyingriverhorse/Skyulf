@@ -10,8 +10,6 @@ with the currently-executing node id, so the engine can return them on
 toasts / a notification panel.
 """
 
-from __future__ import annotations
-
 import logging
 from typing import Any, Dict, List, Optional
 

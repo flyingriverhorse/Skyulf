@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "types": ["vitest/globals", "@testing-library/jest-dom"],
@@ -23,8 +23,8 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
 
-    /* Paths */
-    "baseUrl": ".",
+    /* Paths (resolved relative to this file — baseUrl no longer needed
+       since TS 5.0, and it's removed entirely in TS 7.0) */
     "paths": {
       "@/*": ["./src/*"]
     }

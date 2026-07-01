@@ -1,7 +1,5 @@
 """Shared helpers for model evaluation modules."""
 
-from __future__ import annotations
-
 import math
 from typing import Any, Dict, List
 

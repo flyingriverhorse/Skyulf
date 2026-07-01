@@ -7,8 +7,6 @@ without touching node logic. Nothing in the library wires this in by default,
 so behaviour is unchanged until a backend is explicitly installed.
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from typing import Any, Callable, TypeVar
 

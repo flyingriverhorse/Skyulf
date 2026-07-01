@@ -1,7 +1,5 @@
 """Integration test for `POST /api/pipeline/schema-preview` (C7 Phase C)."""
 
-from __future__ import annotations
-
 import pytest
 from fastapi.testclient import TestClient
 
