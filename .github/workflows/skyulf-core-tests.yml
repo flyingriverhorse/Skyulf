@@ -55,26 +55,35 @@ jobs:
 
       - name: Install dependencies (uv)
         run: |
-          uv pip install --system -r requirements-ci.txt
+          echo "::group::Installing dependencies (uv pip install -r requirements-ci.txt)"
+          uv pip install --system -q -r requirements-ci.txt
+          echo "::endgroup::"
+          echo "## 🧪 skyulf-core test suite" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Complexity gate (lizard, CCN 8)
         run: |
           # Hard gate on green-field / known-clean packages so new code stays simple.
-          lizard skyulf-core/skyulf/core skyulf-core/skyulf/engines \
-                 skyulf-core/skyulf/preprocessing/scaling \
-                 skyulf-core/skyulf/preprocessing/transformations --CCN 8 -w
+          bash .github/scripts/run_check.sh "Lizard complexity gate (core/engines/scaling/transformations)" \
+            lizard skyulf-core/skyulf/core skyulf-core/skyulf/engines \
+                   skyulf-core/skyulf/preprocessing/scaling \
+                   skyulf-core/skyulf/preprocessing/transformations --CCN 8 -w
           # Full-tree report (non-blocking) — surfaces legacy hotspots without failing CI.
+          echo "::group::Full-tree lizard report (informational only, non-blocking)"
           lizard skyulf-core/skyulf --CCN 8 -w || true
+          echo "::endgroup::"
 
       - name: Run skyulf-core tests
         # --cov=skyulf-core/skyulf scopes coverage to the package itself, so
         # the ratchet floor can be enforced directly here without a separate
         # "re-run and clobber coverage.xml" step (see git history for the CI
         # bug that pattern used to cause when both suites shared one job).
+        # No -s: keeps captured stdout/print output out of the log for
+        # passing tests (still shown automatically for any failure).
         run: |
-          pytest skyulf-core/tests -q -s --maxfail=1 --disable-warnings \
-            --cov=skyulf-core/skyulf --cov-branch --cov-report=term-missing \
-            --cov-report=xml --cov-fail-under=45
+          bash .github/scripts/run_check.sh "pytest skyulf-core/tests (coverage ≥ 45%)" \
+            pytest skyulf-core/tests -q --maxfail=1 --disable-warnings \
+              --cov=skyulf-core/skyulf --cov-branch --cov-report=term-missing \
+              --cov-report=xml --cov-fail-under=45
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
@@ -99,4 +108,8 @@ jobs:
 
       - name: Build and run skyulf-core unit-test image
         run: |
-          docker compose -f docker-compose.test.yml run --rm --build unit-tests
+          echo "## 🐳 Docker smoke test (skyulf-core standalone)" >> "$GITHUB_STEP_SUMMARY"
+          echo "::group::docker compose build + run (unit-tests)"
+          bash ../.github/scripts/run_check.sh "docker compose unit-tests (skyulf-core)" \
+            docker compose -f docker-compose.test.yml run --rm --build unit-tests
+          echo "::endgroup::"
