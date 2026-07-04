@@ -251,7 +251,7 @@ class TestApplyPowerTransforms:
         """yeo-johnson is not a no-op — it must alter the column values."""
         art = calc.fit(pos_df, {"transformations": [{"column": "a", "method": "yeo-johnson"}]})
         result = appl.apply(pos_df, art)
-        assert not np.allclose(result["a"].values, pos_df["a"].values)
+        assert not np.allclose(result["a"].to_numpy(), pos_df["a"].to_numpy())
 
     def test_box_cox_positive_data_full_flow(self, calc: Any, appl: Any) -> None:
         """box-cox on strictly positive data returns finite values."""

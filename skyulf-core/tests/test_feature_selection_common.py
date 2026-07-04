@@ -251,6 +251,7 @@ class TestExtractTarget:
         df = pd.DataFrame({"a": [1, 2], "target": [0, 1]})
         y = pd.Series([9, 8])
         result = _extract_target(df, y, "target")
+        assert result is not None
         pd.testing.assert_series_equal(result, y)
 
     def test_target_col_extracted_from_df(self) -> None:

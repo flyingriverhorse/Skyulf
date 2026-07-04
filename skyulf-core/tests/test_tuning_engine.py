@@ -470,6 +470,7 @@ def test_optuna_integration_import_all_fallbacks_fail():
 def test_optuna_integration_second_fallback_path_succeeds():
     """If `optuna.integration` fails but `optuna.integration.sklearn` succeeds,
     OptunaSearchCV should be sourced from the second fallback path."""
+    pytest.importorskip("optuna")
     import types
 
     fake_module = types.ModuleType("optuna.integration.sklearn")
@@ -485,6 +486,7 @@ def test_optuna_integration_third_fallback_path_succeeds():
     """If both `optuna.integration` and `optuna.integration.sklearn` fail but
     `optuna_integration.sklearn` succeeds, OptunaSearchCV should come from the
     third fallback path."""
+    pytest.importorskip("optuna")
     import types
 
     fake_module = types.ModuleType("optuna_integration.sklearn")
@@ -732,6 +734,7 @@ def test_fit_halving_random_with_log_callback_and_string_min_resources():
 
 def test_fit_optuna_strategy_basic():
     """optuna strategy (default TPE sampler / median pruner) should tune successfully."""
+    pytest.importorskip("optuna")
     X, y = _clf_xy(n=150)
     tuner = _tuner_clf()
     cfg = TuningConfig(
@@ -760,6 +763,9 @@ def test_fit_optuna_strategy_basic():
 @pytest.mark.parametrize("sampler_name", ["tpe", "random", "cmaes"])
 def test_fit_optuna_strategy_samplers(sampler_name):
     """optuna strategy should support tpe/random/cmaes samplers."""
+    pytest.importorskip("optuna")
+    if sampler_name == "cmaes":
+        pytest.importorskip("cmaes")
     X, y = _clf_xy(n=150)
     tuner = _tuner_clf()
     cfg = TuningConfig(
@@ -778,6 +784,8 @@ def test_fit_optuna_strategy_samplers(sampler_name):
 
 def test_fit_optuna_cmaes_with_integer_search_space():
     """cmaes sampler with an all-integer numeric list should use IntDistribution."""
+    pytest.importorskip("optuna")
+    pytest.importorskip("cmaes")
     X, y = _clf_xy(n=150)
     tuner = TuningCalculator(RandomForestRegressorCalculator())
     tuner_clf = _tuner_clf()
@@ -798,7 +806,7 @@ def test_fit_optuna_cmaes_with_integer_search_space():
 def test_fit_optuna_with_non_list_search_space_value():
     """A non-list search_space value (a pre-built Optuna distribution) should
     be passed through to Optuna unchanged rather than converted."""
-    import optuna
+    optuna = pytest.importorskip("optuna")
 
     X, y = _clf_xy(n=150)
     tuner = _tuner_clf()
@@ -828,6 +836,7 @@ def test_fit_optuna_with_non_list_search_space_value():
 @pytest.mark.parametrize("pruner_name", ["median", "hyperband", "none"])
 def test_fit_optuna_strategy_pruners(pruner_name):
     """optuna strategy should support median/hyperband/none pruners."""
+    pytest.importorskip("optuna")
     X, y = _clf_xy(n=150)
     tuner = _tuner_clf()
     cfg = TuningConfig(

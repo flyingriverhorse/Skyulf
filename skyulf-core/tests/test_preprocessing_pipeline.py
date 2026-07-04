@@ -4,7 +4,7 @@ Covers fit_transform roundtrips, transform-after-fit, edge cases, and metrics
 collection.  Every pipeline step uses real DataFrames — no mocking of pandas.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 import numpy as np
 import pandas as pd
@@ -116,7 +116,7 @@ def test_fit_transform_then_transform_gives_same_result(numeric_df: pd.DataFrame
     out_fit, _ = fe.fit_transform(numeric_df)
     # transform re-applies stored fitted_steps — must match
     out_transform = fe.transform(numeric_df)
-    pd.testing.assert_frame_equal(out_fit, out_transform)
+    pd.testing.assert_frame_equal(out_fit, cast(pd.DataFrame, out_transform))
 
 
 def test_fitted_steps_populated_after_fit_transform(numeric_df: pd.DataFrame) -> None:
@@ -162,7 +162,7 @@ def test_transform_skips_splitter_types(numeric_df: pd.DataFrame) -> None:
     # With only a splitter in fitted_steps, transform should return data unchanged.
     clean = numeric_df.dropna()
     result = fe.transform(clean)
-    pd.testing.assert_frame_equal(result, clean)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, result), clean)
 
 
 def test_transform_applies_scaler_artifact(numeric_df: pd.DataFrame) -> None:

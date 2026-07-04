@@ -4,6 +4,7 @@ import builtins
 import importlib
 
 import polars as pl
+import pytest
 
 import skyulf.profiling._analyzer._utils as utils_mod
 
@@ -18,6 +19,7 @@ def test_collect_narrows_lazyframe_to_dataframe() -> None:
 
 def test_optional_dependency_flags_are_true_when_packages_installed() -> None:
     """In this environment all optional deps (sklearn/scipy/statsmodels/vader) are installed."""
+    pytest.importorskip("vaderSentiment")
     assert utils_mod.SKLEARN_AVAILABLE is True
     assert utils_mod.SCIPY_AVAILABLE is True
     assert utils_mod.STATSMODELS_AVAILABLE is True

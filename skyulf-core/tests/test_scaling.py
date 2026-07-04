@@ -8,7 +8,7 @@ range) columns, out-of-range values seen only at apply time, and the full
 fit -> apply round trip via the public Calculator/Applier API.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 import numpy as np
 import pandas as pd
@@ -171,7 +171,7 @@ def test_standard_scaler_fit_transform_round_trip() -> None:
     )
     piped_out = transformer.fit_transform(df, config)
 
-    pd.testing.assert_frame_equal(piped_out, direct_out)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, piped_out), direct_out)
     assert transformer.params == direct_params
 
 
@@ -272,7 +272,7 @@ def test_minmax_scaler_fit_transform_round_trip() -> None:
     )
     piped_out = transformer.fit_transform(df, config)
 
-    pd.testing.assert_frame_equal(piped_out, direct_out)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, piped_out), direct_out)
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ def test_maxabs_scaler_fit_transform_round_trip() -> None:
     )
     piped_out = transformer.fit_transform(df, config)
 
-    pd.testing.assert_frame_equal(piped_out, direct_out)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, piped_out), direct_out)
 
 
 # ---------------------------------------------------------------------------
@@ -505,7 +505,7 @@ def test_robust_scaler_fit_transform_round_trip() -> None:
     )
     piped_out = transformer.fit_transform(df, config)
 
-    pd.testing.assert_frame_equal(piped_out, direct_out)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, piped_out), direct_out)
     assert transformer.params == direct_params
 
 
