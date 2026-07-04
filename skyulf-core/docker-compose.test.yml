@@ -1,0 +1,15 @@
+# © 2025 Murat Unsal — Skyulf Project
+# Docker Compose configuration for testing skyulf-core in complete isolation
+# from the rest of the monorepo (no backend/ dependencies at all). Run this
+# from inside skyulf-core/:
+#
+#   cd skyulf-core
+#   docker compose -f docker-compose.test.yml run --rm --build unit-tests
+
+name: skyulf-core-tests
+
+services:
+  unit-tests:
+    build:
+      context: .
+      dockerfile: tests/docker/Dockerfile.unittests

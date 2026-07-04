@@ -1,0 +1,119 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Backend test suite: runs the root `tests/` directory (backend API, Celery
+# tasks, DB models, node wiring, etc.) plus the full-monorepo Docker smoke
+# test. This is intentionally separate from skyulf-core-tests.yml — the two
+# suites exercise different layers of the architecture (see
+# .github/instructions/project_architecture.instructions.md) and should be
+# re-runnable/required independently.
+#
+# Static analysis (lint/format/type checks) is NOT duplicated here — that's
+# pr_check.yml's job. This workflow assumes pr_check.yml already gates PRs.
+
+name: Backend Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Backend test suite
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Cache uv
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+
+      - name: Install dependencies (uv)
+        run: |
+          echo "::group::Installing dependencies (uv pip install -r requirements-ci.txt)"
+          uv pip install --system -q -r requirements-ci.txt
+          echo "::endgroup::"
+          echo "## 🧪 Backend test suite" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Complexity gate (lizard, CCN 8)
+        run: |
+          # Non-blocking full-tree report for now — no "known-clean" backend/
+          # subpackage has been designated as a hard gate yet (unlike
+          # skyulf-core-tests.yml's core/engines/scaling/transformations).
+          # Promote specific backend/ paths to a hard `-w` gate once they're
+          # verified clean.
+          echo "::group::Full-tree lizard report (informational only, non-blocking)"
+          lizard backend --CCN 8 -w || true
+          echo "::endgroup::"
+
+      - name: Run backend tests
+        # Scoped to the root tests/ dir (backend API, Celery, DB, node
+        # wiring) — skyulf-core's own test suite lives in skyulf-core/tests
+        # and runs in skyulf-core-tests.yml instead.
+        # No -s: keeps captured stdout/print output out of the log for
+        # passing tests (still shown automatically for any failure).
+        run: |
+          bash .github/scripts/run_check.sh "pytest tests (backend)" \
+            pytest tests -q --maxfail=1 --disable-warnings \
+              --cov=backend --cov-branch --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: backend
+
+  docker-test-smoke:
+    name: Docker test image smoke test (full monorepo)
+    runs-on: ubuntu-latest
+    # Validates that tests/docker/Dockerfile.unittests actually builds and its
+    # pytest suite passes in a clean container — catches Docker-specific
+    # breakage (missing files in build context, dependency drift) that the
+    # native `test` job above can't detect, without duplicating it as a
+    # required gate. See tests/docker/run_unit_tests.ps1|sh for local usage.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build and run unit-test image
+        run: |
+          echo "## 🐳 Docker smoke test (full monorepo)" >> "$GITHUB_STEP_SUMMARY"
+          echo "::group::docker compose build + run (unit-tests)"
+          bash .github/scripts/run_check.sh "docker compose unit-tests (monorepo)" \
+            docker compose -f docker-compose.test.yml run --rm --build unit-tests
+          echo "::endgroup::"

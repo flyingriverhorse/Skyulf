@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.6.5"
+version = "0.6.6"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -124,6 +124,7 @@ pythonpath = ["skyulf-core"] # Allow test imports from skyulf-core without needi
 addopts = "--benchmark-skip"
 markers = [
     "benchmark: performance benchmarks (opt-in; run with --benchmark-only)",
+    "integration: requires a live backing service (e.g. Redis) — run via tests/docker/run_integration_tests.ps1|sh",
 ]
 
 [tool.ruff]

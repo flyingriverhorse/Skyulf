@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.3.4",
+    version="0.3.5",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -21,7 +21,7 @@ setup(
     packages=find_packages(),
     package_data={"skyulf": ["py.typed"]},
     install_requires=[
-        "pandas>=2.0.0",
+        "pandas>=2.0.0,<3.0.0",
         "numpy>=1.24.0",
         "scikit-learn>=1.4.0,<2.0.0",
         "polars>=1.36.0",
@@ -31,7 +31,16 @@ setup(
         "statsmodels>=0.14.0",
     ],
     extras_require={
-        "dev": ["pytest", "twine", "build", "lizard>=1.17.0", "hypothesis>=6.100", "syrupy>=4.0.0"],
+        "dev": [
+            "pytest",
+            "pytest-cov>=4.1.0,<5.0.0",
+            "twine",
+            "build",
+            "lizard>=1.17.0",
+            "hypothesis>=6.100",
+            "syrupy>=4.0.0",
+            "pytest-benchmark>=5.0.0,<6.0.0",
+        ],
         "viz": ["matplotlib>=3.7.0", "rich>=13.0.0"],
         "eda": [
             "vaderSentiment>=3.3.2",
@@ -50,6 +59,7 @@ setup(
         "tuning": [
             "optuna>=3.0.0",
             "optuna-integration>=3.0.0",
+            "cmaes>=0.10.0",  # Required by optuna's CmaEsSampler (not bundled with optuna itself)
         ],
         "preprocessing-imbalanced": ["imbalanced-learn>=0.13.0"],
         "modeling-xgboost": ["xgboost>=2.1.4"],
@@ -63,6 +73,7 @@ setup(
             "causal-learn>=0.1.3.0",
             "optuna>=3.0.0",
             "optuna-integration>=3.0.0",
+            "cmaes>=0.10.0",
             "imbalanced-learn>=0.13.0",
             "xgboost>=2.1.4",
             "lightgbm>=4.0.0",
