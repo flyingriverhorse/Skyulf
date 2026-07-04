@@ -72,7 +72,7 @@ def _dummy_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
 
 class DummyEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -132,7 +132,7 @@ def _dummy_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, An
 )
 class DummyEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> DummyEncoderArtifact:
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> DummyEncoderArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         return cast(

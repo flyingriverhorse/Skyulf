@@ -17,7 +17,7 @@ from ._polars_ops import _featgen_apply_polars
 
 class FeatureGenerationApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _featgen_apply_polars, _featgen_apply_pandas)
 
 

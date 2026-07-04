@@ -40,7 +40,9 @@ class RulesMixin(_AnalyzerState):
                 elif task_type.lower() == "classification":
                     is_regression = False
             else:
-                target_type = self._get_semantic_type(df_sample[target_col])  # type: ignore[attr-defined]
+                target_type = self._get_semantic_type(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
+                    df_sample[target_col]
+                )
                 is_regression = target_type == "Numeric"
 
             cat_cols = [

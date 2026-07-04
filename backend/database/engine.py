@@ -220,7 +220,7 @@ async def _run_migrations() -> None:
             applied += 1
             logger.info("Migration [%s] applied: %s", version, ddl)
         except Exception:
-            pass  # Column already exists — idempotent
+            pass  # nosec B110 - Column already exists — idempotent migration, safe to skip
 
     if applied:
         logger.info("✅ %d migration(s) applied", applied)

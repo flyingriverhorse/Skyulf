@@ -41,7 +41,7 @@ def _manual_bounds_col_mask_pandas(series: pd.Series, bound: Dict[str, Any]) -> 
 
 class ManualBoundsApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -93,6 +93,6 @@ class ManualBoundsCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> ManualBoundsArtifact:
+    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> ManualBoundsArtifact:  # pylint: disable=arguments-differ
         # Config: {'bounds': {'col1': {'lower': 0, 'upper': 100}, ...}}
         return {"type": "manual_bounds", "bounds": config.get("bounds", {})}

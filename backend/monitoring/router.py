@@ -89,7 +89,7 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
                 _, target_col, _ = extract_job_details(graph, node_id)
                 job.target_column = target_col
             except Exception:
-                pass
+                pass  # nosec B110 - target column is optional metadata; job listing still succeeds
 
             # Description from job_metadata
             meta: Dict[str, Any] = cast(Dict[str, Any], db_row.job_metadata or {})

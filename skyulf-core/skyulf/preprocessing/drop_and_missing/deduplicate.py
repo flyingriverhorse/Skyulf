@@ -44,7 +44,7 @@ def _dedup_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
 
 class DeduplicateApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         # Note: dedup must propagate row drops to y, so we route X+y as a tuple
         # through apply_dual_engine which handles unpack/pack.
         return apply_dual_engine(

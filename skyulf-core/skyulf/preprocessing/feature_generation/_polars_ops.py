@@ -257,5 +257,5 @@ def _featgen_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
                 expr = expr.round(round_digits)
             X_out = X_out.with_columns(expr.alias(output_col))
         except Exception:
-            pass
+            pass  # nosec B110 - skip a malformed op; other feature-generation ops still apply
     return X_out, y

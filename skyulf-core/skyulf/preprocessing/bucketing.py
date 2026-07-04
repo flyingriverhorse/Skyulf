@@ -214,7 +214,7 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any
             df_out[f"{col}{output_suffix}"] = binned_series
         except Exception:
             # Skip columns that fail (e.g. degenerate edges, dtype mismatch).
-            continue
+            continue  # nosec B112
 
     if drop_original and processed_cols:
         df_out = df_out.drop(columns=processed_cols)
@@ -232,7 +232,7 @@ class BaseBinningApplier(BaseApplier):
     """
 
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _bucketing_apply_polars, _bucketing_apply_pandas)
 
 
@@ -390,7 +390,7 @@ class GeneralBinningCalculator(BaseCalculator):
     """Master calculator that handles mixed strategies and per-column overrides."""
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
@@ -474,7 +474,7 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """Thin wrapper around :class:`GeneralBinningCalculator` with ``kbins`` strategy."""
 
-    def fit(
+    def fit(  # pylint: disable=arguments-differ
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],
@@ -485,4 +485,4 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
             new_config["kbins_n_bins"] = config["n_bins"]
         if "strategy" in config and config["strategy"] != "kbins":
             new_config["kbins_strategy"] = config["strategy"]
-        return super().fit(df, new_config)
+        return super().fit(df, new_config)  # pylint: disable=no-value-for-parameter

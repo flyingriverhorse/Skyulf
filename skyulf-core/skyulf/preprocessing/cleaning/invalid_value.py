@@ -84,7 +84,7 @@ def _resolve_invalid_replacement(params: Dict[str, Any]) -> Any:
 
 class InvalidValueReplacementApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -157,7 +157,7 @@ class InvalidValueReplacementCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> InvalidValueReplacementArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> InvalidValueReplacementArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         cols = resolve_columns(X, config, _auto_detect_numeric_columns)

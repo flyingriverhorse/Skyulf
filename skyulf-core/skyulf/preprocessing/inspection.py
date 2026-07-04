@@ -98,7 +98,7 @@ class DatasetProfileCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DatasetProfileArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DatasetProfileArtifact:  # pylint: disable=arguments-differ
         return cast(
             DatasetProfileArtifact,
             fit_dual_engine(X, config, _profile_fit_polars, _profile_fit_pandas),
@@ -145,7 +145,7 @@ class DataSnapshotCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:  # pylint: disable=arguments-differ
         return cast(
             DataSnapshotArtifact,
             fit_dual_engine(X, config, _snapshot_fit_polars, _snapshot_fit_pandas),

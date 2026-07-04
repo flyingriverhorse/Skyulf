@@ -145,7 +145,8 @@ class AdvancedTuningManager:
 
                     celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
                 except Exception:
-                    pass
+                    # Best-effort: never let revoke errors block the user-visible cancel.
+                    pass  # nosec B110
             await session.commit()
             return True
         return False

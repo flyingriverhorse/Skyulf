@@ -91,7 +91,7 @@ def _target_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, A
 
 class TargetEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -213,7 +213,7 @@ def _target_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, A
 )
 class TargetEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> TargetEncoderArtifact:
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> TargetEncoderArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         return cast(

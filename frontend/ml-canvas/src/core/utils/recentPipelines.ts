@@ -103,6 +103,8 @@ export function pushRecentPipeline(
   const remaining = all.filter((e) => e !== sameName);
   const inheritedPin = entry.pinned ?? sameName?.pinned ?? false;
   const next: RecentPipelineEntry = {
+    // nosemgrep: insecure-random-generator -- non-cryptographic local UI id suffix,
+    // not used for security tokens/secrets.
     id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     name: entry.name,
     savedAt: entry.savedAt ?? new Date().toISOString(),

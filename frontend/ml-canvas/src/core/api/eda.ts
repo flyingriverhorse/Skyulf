@@ -34,6 +34,8 @@ export interface EDAHistoryEntry {
 
 export const EDAService = {
   analyze: async (datasetId: number, targetCol?: string, excludeCols?: string[], filters?: Filter[], taskType?: string) => {
+    // nosemgrep: node-ssrf -- browser axios call to our own fixed API_BASE; `datasetId`
+    // is a numeric identifier, never an attacker-supplied host/URL.
     const response = await axios.post(`${API_BASE}/${datasetId}/analyze`, {
         target_col: targetCol,
         exclude_cols: excludeCols,
@@ -64,6 +66,8 @@ export const EDAService = {
   },
 
   getDecomposition: async (datasetId: number, measureCol: string | null, measureAgg: string, splitCol: string, filters: Filter[]) => {
+    // nosemgrep: node-ssrf -- browser axios call to our own fixed API_BASE; `datasetId`
+    // is a numeric identifier, never an attacker-supplied host/URL.
     const response = await axios.post(`${API_BASE}/${datasetId}/decomposition`, {
         measure_col: measureCol,
         measure_agg: measureAgg,

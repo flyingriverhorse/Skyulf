@@ -9,7 +9,7 @@ It replaces the Flask run.py with modern async server capabilities.
 
 import logging
 import os
-import subprocess
+import subprocess  # nosec B404 - used only to spawn the local Celery worker (see below)
 import sys
 
 from backend.config import get_settings
@@ -58,7 +58,7 @@ def start_celery_worker():
     ]
 
     print(f"👷 Starting Celery worker: {' '.join(cmd)}")
-    return subprocess.Popen(cmd, cwd=os.getcwd())  # nosec B603
+    return subprocess.Popen(cmd, cwd=os.getcwd())  # nosec B603 nosemgrep: dangerous-subprocess-use-audit -- cmd is a static list of literals, no shell, no untrusted input
 
 
 def check_redis_availability():

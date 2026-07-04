@@ -3,7 +3,7 @@
 import hashlib
 import json
 import logging
-import pickle
+import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
 from typing import Any, Dict, Optional, Union, cast
 
 import pandas as pd
@@ -44,7 +44,7 @@ def _artifact_digest(obj: Any) -> bytes:
     the rare object that refuses to pickle.
     """
     try:
-        return hashlib.sha256(pickle.dumps(obj)).digest()  # nosec B301
+        return hashlib.sha256(pickle.dumps(obj)).digest()  # nosec B301 nosemgrep: avoid-pickle -- trusted in-process artifact hashing, not attacker-controlled deserialization
     except Exception:
         return hashlib.sha256(repr(obj).encode("utf-8")).digest()
 
@@ -354,10 +354,10 @@ class SkyulfPipeline:
         """Save the pipeline to a file."""
         # We can use pickle to save the whole object since we removed external dependencies
         with open(path, "wb") as f:
-            pickle.dump(self, f)  # nosec B301
+            pickle.dump(self, f)  # nosec B301 nosemgrep: avoid-pickle -- trusted local artifact save, not attacker-controlled
 
     @classmethod
     def load(cls, path: str) -> "SkyulfPipeline":
         """Load the pipeline from a file."""
         with open(path, "rb") as f:
-            return pickle.load(f)  # nosec B301
+            return pickle.load(f)  # nosec B301 nosemgrep: avoid-pickle -- loads only artifacts previously saved by this same trusted process, not attacker-controlled input

@@ -35,7 +35,7 @@ def _missing_indicator_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> T
 
 class MissingIndicatorApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             X, params, _missing_indicator_apply_polars, _missing_indicator_apply_pandas
         )
