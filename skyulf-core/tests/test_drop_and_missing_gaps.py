@@ -8,6 +8,10 @@ import pandas as pd
 import polars as pl
 
 from skyulf.preprocessing._schema import SkyulfSchema
+from skyulf.preprocessing.drop_and_missing._common import (
+    _normalize_subset,
+    _polars_filter_y_by_kept_indices,
+)
 from skyulf.preprocessing.drop_and_missing.deduplicate import (
     DeduplicateApplier,
     DeduplicateCalculator,
@@ -78,6 +82,13 @@ def test_missing_indicator_apply_creates_binary_flags_polars() -> None:
 def test_missing_indicator_apply_noop_without_columns() -> None:
     """An empty ``columns`` list leaves the frame unchanged."""
     df = _missing_df()
+    out = MissingIndicatorApplier().apply(df, {"columns": []})
+    assert "a_missing" not in out.columns
+
+
+def test_missing_indicator_apply_noop_without_columns_polars() -> None:
+    """Polars apply with an empty ``columns`` list must leave the frame unchanged."""
+    df = pl.from_pandas(_missing_df())
     out = MissingIndicatorApplier().apply(df, {"columns": []})
     assert "a_missing" not in out.columns
 
@@ -235,3 +246,62 @@ def test_drop_missing_columns_infer_output_schema_none_with_threshold() -> None:
     schema = SkyulfSchema.from_columns(["a"], {"a": "float64"})
     out = DropMissingColumnsCalculator().infer_output_schema(schema, {"missing_threshold": 30})
     assert out is None
+
+
+# ---------------------------------------------------------------------------
+# _common._polars_filter_y_by_kept_indices — direct unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_polars_filter_y_by_kept_indices_none_y_passthrough() -> None:
+    """A None ``y`` must pass through unchanged."""
+    kept = pl.Series([0, 2])
+    assert _polars_filter_y_by_kept_indices(None, kept) is None
+
+
+def test_polars_filter_y_by_kept_indices_dataframe_y_filters_rows() -> None:
+    """A Polars DataFrame ``y`` must be filtered to the rows in ``kept_indices``."""
+    y = pl.DataFrame({"label": [10, 20, 30, 40]})
+    kept = pl.Series([0, 2])
+    out = _polars_filter_y_by_kept_indices(y, kept)
+    assert isinstance(out, pl.DataFrame)
+    assert out["label"].to_list() == [10, 30]
+    assert "__idx__" not in out.columns
+
+
+def test_polars_filter_y_by_kept_indices_series_y_gathers_rows() -> None:
+    """A Polars Series ``y`` must be gathered at the kept row positions."""
+    y = pl.Series("label", [10, 20, 30, 40])
+    kept = pl.Series([1, 3])
+    out = _polars_filter_y_by_kept_indices(y, kept)
+    assert isinstance(out, pl.Series)
+    assert out.to_list() == [20, 40]
+
+
+def test_polars_filter_y_by_kept_indices_non_polars_y_passthrough() -> None:
+    """A non-Polars, non-None ``y`` (e.g. a pandas Series) must pass through unchanged."""
+    y = pd.Series([10, 20, 30])
+    kept = pl.Series([0, 1])
+    out = _polars_filter_y_by_kept_indices(y, kept)
+    assert out is y
+
+
+# ---------------------------------------------------------------------------
+# _common._normalize_subset — direct unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_normalize_subset_empty_input_returns_none() -> None:
+    """An empty/falsy subset must resolve to None (no restriction)."""
+    assert _normalize_subset(None, ["a", "b"]) is None
+    assert _normalize_subset([], ["a", "b"]) is None
+
+
+def test_normalize_subset_filters_to_existing_columns() -> None:
+    """Subset entries absent from existing_cols must be dropped, keeping the rest."""
+    assert _normalize_subset(["a", "nonexistent"], ["a", "b"]) == ["a"]
+
+
+def test_normalize_subset_all_missing_returns_none() -> None:
+    """A subset where none of the entries exist must resolve to None."""
+    assert _normalize_subset(["nonexistent"], ["a", "b"]) is None

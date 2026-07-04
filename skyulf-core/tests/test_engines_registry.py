@@ -155,6 +155,25 @@ def test_resolve_pyspark_like_module_uses_registered_spark_engine():
         del EngineRegistry._engines["spark"]
 
 
+def test_resolve_dask_like_module_uses_registered_dask_engine():
+    """When a 'dask' engine is registered, a dask-namespaced type should resolve to it."""
+
+    class DummyDaskEngine(BaseEngine):
+        name = EngineName.BASE
+
+    EngineRegistry.register("dask", DummyDaskEngine)
+    try:
+
+        class _FakeDaskFrame:
+            pass
+
+        _FakeDaskFrame.__module__ = "dask.dataframe.core"
+        resolved = EngineRegistry.resolve(_FakeDaskFrame())
+        assert resolved is DummyDaskEngine
+    finally:
+        del EngineRegistry._engines["dask"]
+
+
 def test_register_logs_debug_message(caplog):
     """register() should emit a debug log entry naming the registered engine."""
 

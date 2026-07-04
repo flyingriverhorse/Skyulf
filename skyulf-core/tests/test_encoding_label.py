@@ -195,3 +195,52 @@ def test_label_apply_engine_parity_on_unseen_category() -> None:
         out_pd["category"].to_numpy().astype(float),
         out_pl["category"].to_numpy().astype(float),
     )
+
+
+def test_polars_apply_target_column_is_encoded() -> None:
+    """The polars apply path encodes y via `__target__` when configured."""
+    X = pd.DataFrame({"category": ["a", "b", "a"]})
+    y = pd.Series(["yes", "no", "yes"], name="target")
+    params = dict(LabelEncoderCalculator().fit((X, y), {"columns": ["category", "target"]}))
+
+    X_pl = pl.from_pandas(X)
+    y_pl = pl.Series("target", y)
+    X_out, y_out = LabelEncoderApplier().apply((X_pl, y_pl), dict(params))
+
+    # "no" < "yes" alphabetically -> no=0, yes=1
+    assert list(y_out) == [1, 0, 1]
+    assert list(X_out["category"]) == [0, 1, 0]
+
+
+def test_y_to_str_array_without_to_numpy_uses_np_array_fallback() -> None:
+    """_y_to_str_array falls back to np.array(y) for plain Python sequences (no `.to_numpy`)."""
+    from skyulf.preprocessing.encoding.label import _y_to_str_array
+
+    result = _y_to_str_array([1, 2, 3])
+    np.testing.assert_array_equal(result, np.array(["1", "2", "3"]))
+
+
+def test_maybe_pull_y_pandas_extracts_column_from_x() -> None:
+    """_maybe_pull_y_pandas pulls the target column out of X when y is missing."""
+    X = pd.DataFrame({"category": ["a", "b"], "target": ["yes", "no"]})
+    params = LabelEncoderCalculator().fit(
+        X, {"columns": ["category", "target"], "target_column": "target"}
+    )
+    assert "__target__" in params["encoders"]
+
+
+def test_maybe_pull_y_polars_extracts_column_from_x() -> None:
+    """_maybe_pull_y_polars pulls the target column out of X when y is missing (polars)."""
+    X = pl.DataFrame({"category": ["a", "b"], "target": ["yes", "no"]})
+    params = LabelEncoderCalculator().fit(
+        X, {"columns": ["category", "target"], "target_column": "target"}
+    )
+    assert "__target__" in params["encoders"]
+
+
+def test_maybe_fit_target_skips_when_y_name_not_in_columns() -> None:
+    """_maybe_fit_target does nothing when `cols` is set but y's name isn't among them."""
+    X = pd.DataFrame({"category": ["a", "b"]})
+    y = pd.Series(["p", "q"], name="unrelated")
+    params = LabelEncoderCalculator().fit((X, y), {"columns": ["category"]})
+    assert "__target__" not in params["encoders"]

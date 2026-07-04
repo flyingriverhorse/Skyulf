@@ -31,7 +31,15 @@ setup(
         "statsmodels>=0.14.0",
     ],
     extras_require={
-        "dev": ["pytest", "twine", "build", "lizard>=1.17.0", "hypothesis>=6.100", "syrupy>=4.0.0"],
+        "dev": [
+            "pytest",
+            "pytest-cov>=4.1.0,<5.0.0",
+            "twine",
+            "build",
+            "lizard>=1.17.0",
+            "hypothesis>=6.100",
+            "syrupy>=4.0.0",
+        ],
         "viz": ["matplotlib>=3.7.0", "rich>=13.0.0"],
         "eda": [
             "vaderSentiment>=3.3.2",

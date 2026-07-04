@@ -64,6 +64,12 @@ def test_calculate_correlations_caps_at_twenty_columns() -> None:
     assert len(matrix.columns) <= 20
 
 
+def test_calculate_correlations_returns_none_on_unexpected_error() -> None:
+    """An internal error (e.g. a column that doesn't exist) should be caught and return None."""
+    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]}).lazy()
+    assert calculate_correlations(df, ["a", "does_not_exist"]) is None
+
+
 def test_calculate_histogram_basic_bins() -> None:
     """Histogram bins should cover the min/max range and sum counts to row count."""
     df = pl.DataFrame({"x": list(range(100))}).lazy()
@@ -86,3 +92,19 @@ def test_calculate_histogram_none_for_all_null_column() -> None:
     """An all-null column also has no min/max, so histogram should be None."""
     df = pl.DataFrame({"x": pl.Series([None, None], dtype=pl.Float64)}).lazy()
     assert calculate_histogram(df, "x") is None
+
+
+def test_calculate_histogram_returns_none_on_unexpected_error() -> None:
+    """An internal error (e.g. a column that doesn't exist) should be caught and return None."""
+    df = pl.DataFrame({"x": [1.0, 2.0, 3.0]}).lazy()
+    assert calculate_histogram(df, "does_not_exist") is None
+
+
+def test_calculate_histogram_skips_unparseable_null_bin_group() -> None:
+    """Null values form a 'None' bin group that can't be parsed as an int; it should be skipped."""
+    df = pl.DataFrame({"x": [1.0, 2.0, 3.0, None, 5.0]}).lazy()
+    hist = calculate_histogram(df, "x", bins=5)
+
+    assert hist is not None
+    # The single null value is excluded from every bin's count.
+    assert sum(b.count for b in hist) == 4

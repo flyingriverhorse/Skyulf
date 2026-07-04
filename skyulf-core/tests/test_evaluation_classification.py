@@ -117,6 +117,51 @@ def test_evaluate_model_without_predict_proba_has_no_curves():
     assert report.classification.pr_curves == []
 
 
+def test_evaluate_predict_proba_exception_is_swallowed():
+    """If predict_proba raises, evaluation must proceed without probability curves."""
+    rng = np.random.RandomState(2)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 40), "f2": rng.normal(0, 1, 40)})
+    y = pd.Series((X["f1"] > 0).astype(int))
+    base_model = LogisticRegression().fit(X, y)
+
+    class _BrokenProbaModel:
+        def __init__(self, inner):
+            self._inner = inner
+            self.classes_ = inner.classes_
+
+        def predict(self, X):
+            return self._inner.predict(X)
+
+        def predict_proba(self, X):
+            raise RuntimeError("boom")
+
+    report = evaluate_classification_model(_BrokenProbaModel(base_model), X, y)
+    assert report.classification is not None
+    assert report.classification.roc_curves == []
+    assert report.classification.pr_curves == []
+
+
+def test_evaluate_classes_fallback_to_np_unique_when_model_has_no_classes_attr():
+    """When the model exposes no classes_, classes must be derived from np.unique(y_test)."""
+    rng = np.random.RandomState(2)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 40), "f2": rng.normal(0, 1, 40)})
+    y = pd.Series((X["f1"] > 0).astype(int))
+    base_model = LogisticRegression().fit(X, y)
+
+    class _NoClassesModel:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def predict(self, X):
+            return self._inner.predict(X)
+
+    report = evaluate_classification_model(_NoClassesModel(base_model), X, y)
+    assert report.classification is not None
+    cm = report.classification.confusion_matrix
+    assert cm is not None
+    assert len(cm.labels) == 2
+
+
 def test_evaluate_sanitizes_nan_metrics():
     """Any NaN/inf scalar metrics should be dropped from the final report."""
     rng = np.random.RandomState(3)

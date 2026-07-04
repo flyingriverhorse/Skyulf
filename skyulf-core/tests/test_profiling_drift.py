@@ -2,6 +2,7 @@
 
 import numpy as np
 import polars as pl
+import pytest
 
 from skyulf.profiling.drift import DriftCalculator, DriftReport
 
@@ -104,3 +105,124 @@ def test_calculate_drift_custom_thresholds_override_defaults() -> None:
         thresholds={"ks": 0.0, "psi": 100.0, "wasserstein": 100.0, "kl_divergence": 100.0}
     )
     assert lenient_report.column_drifts["feature"].drift_detected is False
+
+
+def test_scipy_missing_disables_flag_and_blocks_drift_calculation() -> None:
+    """If scipy cannot be imported, SCIPY_AVAILABLE is False and calculate_drift raises."""
+    import importlib
+    import sys
+
+    import skyulf.profiling.drift as drift_module
+
+    original_scipy_stats = sys.modules.get("scipy.stats")
+    sys.modules["scipy.stats"] = None  # ty: ignore[invalid-assignment]
+    try:
+        reloaded = importlib.reload(drift_module)
+        assert reloaded.SCIPY_AVAILABLE is False
+        calc = reloaded.DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+        with pytest.raises(ImportError, match="scipy is required"):
+            calc.calculate_drift()
+    finally:
+        # Restore real scipy.stats and reload the module so later tests see a working scipy.
+        if original_scipy_stats is not None:
+            sys.modules["scipy.stats"] = original_scipy_stats
+        else:
+            del sys.modules["scipy.stats"]
+        importlib.reload(drift_module)
+
+
+def test_calculate_drift_skips_column_when_cast_fails() -> None:
+    """A current column that cannot be cast to the reference dtype should be skipped."""
+    reference = pl.DataFrame({"a": [1, 2, 3]})
+    current = pl.DataFrame({"a": [[1], [2], [3]]})  # List(Int64) can't cast to Int64.
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "a" not in report.column_drifts
+
+
+def test_calculate_drift_moderate_psi_shift_suggestion() -> None:
+    """A moderate (but not critical) PSI shift should add the 'monitor closely' suggestion."""
+    rng = np.random.default_rng(42)
+    reference = pl.DataFrame({"feature": rng.normal(0, 1, 1000)})
+    current = pl.DataFrame({"feature": rng.normal(0.4, 1, 1000)})
+
+    report = DriftCalculator(reference, current).calculate_drift(
+        thresholds={"psi": 0.01, "ks": 0.05, "wasserstein": 100.0, "kl_divergence": 100.0}
+    )
+    drift = report.column_drifts["feature"]
+    metrics = {m.metric: m.value for m in drift.metrics}
+    assert 0.1 < metrics["psi"] <= 0.25
+    assert any("Monitor model performance" in s for s in drift.suggestions)
+
+
+def test_calculate_drift_ks_drift_without_psi_drift_suggestion() -> None:
+    """When KS flags drift but PSI does not, the 'check for outliers' suggestion should appear."""
+    rng = np.random.default_rng(7)
+    reference = pl.DataFrame({"feature": rng.normal(0, 1, 2000)})
+    current = pl.DataFrame({"feature": rng.normal(0.08, 1, 2000)})
+
+    report = DriftCalculator(reference, current).calculate_drift(
+        thresholds={"ks": 0.9, "psi": 100.0, "wasserstein": 100.0, "kl_divergence": 100.0}
+    )
+    drift = report.column_drifts["feature"]
+    assert drift.drift_detected is True
+    assert any("population stability" in s for s in drift.suggestions)
+
+
+def test_calculate_psi_returns_zero_for_empty_arrays() -> None:
+    """PSI should short-circuit to 0.0 when either input array is empty."""
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+    assert calc._calculate_psi(np.array([]), np.array([1.0, 2.0])) == 0.0
+    assert calc._calculate_psi(np.array([1.0, 2.0]), np.array([])) == 0.0
+
+
+def test_calculate_kl_returns_zero_for_empty_arrays() -> None:
+    """KL divergence should short-circuit to 0.0 when either input array is empty."""
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+    assert calc._calculate_kl(np.array([]), np.array([1.0, 2.0])) == 0.0
+    assert calc._calculate_kl(np.array([1.0, 2.0]), np.array([])) == 0.0
+
+
+def test_calculate_distribution_handles_unexpected_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_calculate_distribution should fall back to empty bins if histogram computation errors."""
+    import skyulf.profiling.drift as drift_module
+
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(drift_module.np, "histogram", boom)
+    dist = calc._calculate_distribution(np.array([1.0, 2.0]), np.array([1.0, 2.0]))
+    assert dist.bins == []
+
+
+def test_calculate_psi_handles_unexpected_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_calculate_psi should fall back to 0.0 if the percentile computation errors."""
+    import skyulf.profiling.drift as drift_module
+
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(drift_module.np, "percentile", boom)
+    psi = calc._calculate_psi(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+    assert psi == 0.0
+
+
+def test_calculate_kl_handles_unexpected_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    """_calculate_kl should fall back to 0.0 if the percentile computation errors."""
+    import skyulf.profiling.drift as drift_module
+
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+
+    def boom(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(drift_module.np, "percentile", boom)
+    kl = calc._calculate_kl(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+    assert kl == 0.0

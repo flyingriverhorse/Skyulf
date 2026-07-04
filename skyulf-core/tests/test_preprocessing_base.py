@@ -41,6 +41,23 @@ class _SplitReturningApplier(BaseApplier):
         return SplitDataset(train=df, test=df)
 
 
+class _CountingSplitReturningApplier(BaseApplier):
+    """Returns the input frame unchanged for the first `trigger_after` calls, then
+    illegally returns a SplitDataset — used to selectively trigger the test/validation
+    guard (as opposed to the train guard, which fires on the very first call)."""
+
+    def __init__(self, trigger_after: int):
+        self.calls = 0
+        self.trigger_after = trigger_after
+
+    def apply(self, df, params):
+        """Pass df through until `trigger_after` calls, then return an illegal SplitDataset."""
+        self.calls += 1
+        if self.calls > self.trigger_after:
+            return SplitDataset(train=df, test=df)
+        return df
+
+
 def _transformer():
     """Build a StatefulTransformer using the AddOne calculator/applier pair."""
     return StatefulTransformer(_AddOneCalculator(), _AddOneApplier(), node_id="add_one")
@@ -195,3 +212,55 @@ def test_base_calculator_infer_output_schema_defaults_to_none():
     """The default infer_output_schema on BaseCalculator should return None."""
     calc = _AddOneCalculator()
     assert calc.infer_output_schema(typing.cast(SkyulfSchema, None), {}) is None
+
+
+def test_fit_transform_raises_when_applier_returns_split_dataset_on_test():
+    """If the Applier illegally returns a SplitDataset for test, a TypeError should be raised."""
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [10, 20]})
+    dataset = SplitDataset(train=train, test=test, validation=None)
+    # trigger_after=1: 1st call (train) passes through fine, 2nd call (test) triggers.
+    transformer = StatefulTransformer(
+        _AddOneCalculator(), _CountingSplitReturningApplier(trigger_after=1), node_id="bad"
+    )
+    with pytest.raises(TypeError, match="not supported"):
+        transformer.fit_transform(dataset, {})
+
+
+def test_fit_transform_raises_when_applier_returns_split_dataset_on_validation():
+    """If the Applier illegally returns a SplitDataset for validation, a TypeError is raised."""
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [10, 20]})
+    val = pd.DataFrame({"a": [100, 200]})
+    dataset = SplitDataset(train=train, test=test, validation=val)
+    # trigger_after=2: train + test pass through fine, 3rd call (validation) triggers.
+    transformer = StatefulTransformer(
+        _AddOneCalculator(), _CountingSplitReturningApplier(trigger_after=2), node_id="bad"
+    )
+    with pytest.raises(TypeError, match="not supported"):
+        transformer.fit_transform(dataset, {})
+
+
+def test_transform_raises_when_applier_returns_split_dataset_on_test():
+    """transform() must guard against an Applier illegally returning SplitDataset for test."""
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [10, 20]})
+    dataset = SplitDataset(train=train, test=test, validation=None)
+    applier = _CountingSplitReturningApplier(trigger_after=1)
+    transformer = StatefulTransformer(_AddOneCalculator(), applier, node_id="bad")
+    transformer.params = {}
+    with pytest.raises(TypeError, match="not supported"):
+        transformer.transform(dataset)
+
+
+def test_transform_raises_when_applier_returns_split_dataset_on_validation():
+    """transform() must guard against an Applier illegally returning SplitDataset for validation."""
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [10, 20]})
+    val = pd.DataFrame({"a": [100, 200]})
+    dataset = SplitDataset(train=train, test=test, validation=val)
+    applier = _CountingSplitReturningApplier(trigger_after=2)
+    transformer = StatefulTransformer(_AddOneCalculator(), applier, node_id="bad")
+    transformer.params = {}
+    with pytest.raises(TypeError, match="not supported"):
+        transformer.transform(dataset)

@@ -151,6 +151,49 @@ def test_pandas_group_agg_std_computation() -> None:
     assert result.iloc[2] == 0.0  # group "b" has zero variance
 
 
+def test_pandas_group_agg_unresolvable_cols_returns_none() -> None:
+    """When group/target columns can't be resolved, the function returns None (line 173)."""
+    df = pd.DataFrame({"g": ["a", "b"]})
+    op = {"input_columns": ["g"], "secondary_columns": ["missing_target"]}
+    assert _pandas_group_agg(op, df, 1e-9) is None
+
+
+def test_pandas_divide_no_series_no_constants_returns_none() -> None:
+    """_pandas_divide must return None directly when given no series and no constants."""
+    from skyulf.preprocessing.feature_generation._pandas_ops import _pandas_divide
+
+    result = _pandas_divide([], [], pd.RangeIndex(3), 1e-9)
+    assert result is None
+
+
+def test_pandas_datetime_apply_skips_unknown_feature() -> None:
+    """An unknown datetime feature name must be skipped, not raise (line 160)."""
+    from skyulf.preprocessing.feature_generation._pandas_ops import _pandas_datetime_apply
+
+    df = pd.DataFrame({"d": pd.to_datetime(["2024-01-01", "2024-06-15"])})
+    op = {"input_columns": ["d"], "datetime_features": ["totally_unknown_feature"]}
+    _pandas_datetime_apply(op, df)
+    # No new column should have been added for the unknown feature.
+    assert "d_totally_unknown_feature" not in df.columns
+
+
+def test_pandas_datetime_apply_swallows_exception_on_bad_column(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A conversion error inside the datetime block must be swallowed (lines 162-163)."""
+    import skyulf.preprocessing.feature_generation._pandas_ops as pandas_ops_mod
+
+    def _boom(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("simulated to_datetime failure")
+
+    monkeypatch.setattr(pandas_ops_mod.pd, "to_datetime", _boom)
+    df = pd.DataFrame({"d": ["2024-01-01", "2024-06-15"]})
+    op = {"input_columns": ["d"], "datetime_features": ["year"]}
+    # Should not raise despite to_datetime blowing up internally.
+    pandas_ops_mod._pandas_datetime_apply(op, df)
+    assert "d_year" not in df.columns
+
+
 # ---------------------------------------------------------------------------
 # Similarity fallback (SequenceMatcher, when rapidfuzz absent)
 # ---------------------------------------------------------------------------
@@ -272,6 +315,94 @@ def test_polynomial_features_include_input_features() -> None:
     out = PolynomialFeaturesApplier().apply(df, art)
     assert "poly_a" in out.columns
     assert "poly_b" in out.columns
+
+
+def test_polynomial_features_degree_one_without_input_features_skips_pandas() -> None:
+    """Degree=1 with include_input_features=False leaves nothing to keep -> no-op (line 35, 68)."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    art = PolynomialFeaturesCalculator().fit(
+        df, {"columns": ["a", "b"], "degree": 1, "include_input_features": False}
+    )
+    out = PolynomialFeaturesApplier().apply(df, art)
+    # No new poly_* columns should have been added.
+    assert list(out.columns) == list(df.columns)
+
+
+def test_polynomial_features_degree_one_without_input_features_skips_polars() -> None:
+    """Same no-op case through the polars apply path (lines 51/55)."""
+    import polars as pl
+
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    art = PolynomialFeaturesCalculator().fit(
+        df, {"columns": ["a", "b"], "degree": 1, "include_input_features": False}
+    )
+    df_pl = pl.from_pandas(df)
+    out = PolynomialFeaturesApplier().apply(df_pl, art)
+    assert list(out.columns) == list(df.columns)
+
+
+def test_polynomial_features_apply_polars_no_valid_columns_is_noop() -> None:
+    """Polars apply must no-op when none of the configured columns exist (line 51)."""
+    import polars as pl
+
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    art = {"columns": ["missing_col"], "degree": 2}
+    df_pl = pl.from_pandas(df)
+    out = PolynomialFeaturesApplier().apply(df_pl, art)
+    assert list(out.columns) == ["a"]
+
+
+def test_polynomial_features_apply_with_sklearn_pandas_output_config() -> None:
+    """When sklearn's global transform_output is "pandas", transform() returns a
+    DataFrame exposing `.values`, exercising the `.values` extraction branch (line 29).
+    """
+    import sklearn
+
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    art = PolynomialFeaturesCalculator().fit(df, {"columns": ["a", "b"], "degree": 2})
+    with sklearn.config_context(transform_output="pandas"):
+        out = PolynomialFeaturesApplier().apply(df, art)
+    assert "poly_a_b" in out.columns
+
+
+# ---------------------------------------------------------------------------
+# _common.py: rapidfuzz-absent fallback + ImportError branch
+# ---------------------------------------------------------------------------
+
+
+def test_compute_similarity_score_uses_difflib_when_rapidfuzz_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When rapidfuzz is unavailable, similarity must fall back to difflib (line 84)."""
+    import skyulf.preprocessing.feature_generation._common as common_mod
+
+    monkeypatch.setattr(common_mod, "_HAS_RAPIDFUZZ", False)
+    score = common_mod._compute_similarity_score("hello world", "hello world", "ratio")
+    assert score == 100.0
+
+
+def test_rapidfuzz_import_error_sets_has_rapidfuzz_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Simulate rapidfuzz being uninstalled: the except-ImportError branch must run (lines 18-19)."""
+    import builtins
+    import importlib
+
+    import skyulf.preprocessing.feature_generation._common as common_mod
+
+    real_import = builtins.__import__
+
+    def _fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "rapidfuzz" or name.startswith("rapidfuzz."):
+            raise ImportError("simulated missing rapidfuzz")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fake_import)
+    try:
+        importlib.reload(common_mod)
+        assert common_mod._HAS_RAPIDFUZZ is False
+        assert common_mod.fuzz is None
+    finally:
+        # Restore the module to its normal (rapidfuzz-available) state for other tests.
+        importlib.reload(common_mod)
 
 
 # ---------------------------------------------------------------------------
@@ -423,6 +554,55 @@ def test_polynomial_features_empty_columns_returns_empty_artifact() -> None:
     df = pd.DataFrame({"a": [1.0, 2.0]})
     art = PolynomialFeaturesCalculator().fit(df, {"columns": []})
     assert art == {}
+
+
+# ---------------------------------------------------------------------------
+# _polars_ops.py: handler-returns-None continue (line 253) and
+# exception-swallow (lines 259-260) via the full polars apply pipeline.
+# ---------------------------------------------------------------------------
+
+
+def test_polars_ratio_missing_denominator_columns_skips() -> None:
+    """A ratio op with unresolvable denominator columns must be skipped (line 253)."""
+    import polars as pl
+
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    params = _CALC.fit(
+        df,
+        {
+            "operations": [
+                {
+                    "operation_type": "ratio",
+                    "input_columns": ["a"],
+                    "secondary_columns": ["missing"],
+                }
+            ]
+        },
+    )
+    out = _APPLIER.apply(pl.from_pandas(df), params)
+    assert "ratio_0" not in out.columns
+
+
+def test_polars_malformed_operation_is_swallowed_without_raising() -> None:
+    """A malformed op (bad round_digits) must be caught, not raised (lines 259-260)."""
+    import polars as pl
+
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    params = _CALC.fit(
+        df,
+        {
+            "operations": [
+                {
+                    "operation_type": "arithmetic",
+                    "method": "add",
+                    "input_columns": ["a", "b"],
+                    "round_digits": "not-a-number",
+                }
+            ]
+        },
+    )
+    out = _APPLIER.apply(pl.from_pandas(df), params)
+    assert "arithmetic_0" not in out.columns
 
 
 def test_polynomial_features_auto_detect_columns() -> None:

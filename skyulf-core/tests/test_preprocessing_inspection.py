@@ -88,6 +88,26 @@ def test_extract_polars_numeric_stats_contains_mean(polars_df):
     assert len(stats["num"]) > 0
 
 
+def test_extract_polars_numeric_stats_skips_row_without_metric_key():
+    """A describe() row lacking both 'describe' and 'statistic' keys is skipped (line 36)."""
+
+    class _FakeDescribeDf:
+        def to_dicts(self):
+            # Simulates a malformed/unexpected describe() row shape.
+            return [{"num": 1.0}, {"describe": "mean", "num": 2.5}]
+
+    class _FakeSelected:
+        def describe(self):
+            return _FakeDescribeDf()
+
+    class _FakeX:
+        def select(self, cols):
+            return _FakeSelected()
+
+    stats = _extract_polars_numeric_stats(_FakeX(), ["num"])
+    assert stats == {"num": {"mean": 2.5}}
+
+
 def test_dataset_profile_applier_is_passthrough(pandas_df):
     """DatasetProfileApplier.apply should return the input frame unchanged."""
     result = DatasetProfileApplier().apply(pandas_df, {})

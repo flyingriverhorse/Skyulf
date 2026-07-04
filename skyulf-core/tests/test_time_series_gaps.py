@@ -128,6 +128,31 @@ def test_lag_features_infer_output_schema_skips_unresolved_columns() -> None:
     assert "missing_lag_1" not in out
 
 
+def test_lag_features_polars_apply_noop_without_columns_or_lags() -> None:
+    """Missing columns/lags must no-op on the polars apply path (line 43)."""
+    df = pd.DataFrame({"v": [1.0, 2.0]})
+    pl_df = pl.from_pandas(df)
+    out = LagFeaturesApplier().apply(pl_df, {"columns": [], "lags": [1]})
+    assert list(out.columns) == ["v"]
+
+
+def test_lag_features_polars_skips_missing_column() -> None:
+    """A configured column absent from the polars frame must be skipped (line 29)."""
+    df = pd.DataFrame({"v": [1.0, 2.0, 3.0]})
+    art = LagFeaturesCalculator().fit(df, {"columns": ["v", "missing"], "lags": [1]})
+    out = LagFeaturesApplier().apply(pl.from_pandas(df), art)
+    assert "v_lag_1" in out.columns
+    assert "missing_lag_1" not in out.columns
+
+
+def test_lag_features_polars_drop_na_removes_incomplete_rows() -> None:
+    """``drop_na=True`` must drop null rows on the polars apply path (line 50)."""
+    df = pd.DataFrame({"v": [1.0, 2.0, 3.0]})
+    art = LagFeaturesCalculator().fit(df, {"columns": ["v"], "lags": [1], "drop_na": True})
+    out = LagFeaturesApplier().apply(pl.from_pandas(df), art)
+    assert out.shape[0] == 2
+
+
 # ---------------------------------------------------------------------------
 # RollingAggregate edge cases
 # ---------------------------------------------------------------------------
@@ -175,6 +200,42 @@ def test_rolling_aggregate_apply_noop_without_columns_or_aggs() -> None:
     df = pd.DataFrame({"v": [1.0, 2.0]})
     out = RollingAggregateApplier().apply(df, {"columns": [], "aggregations": ["mean"]})
     assert list(out.columns) == ["v"]
+
+
+def test_rolling_aggregate_polars_apply_noop_without_columns_or_aggs() -> None:
+    """Missing columns/aggregations must no-op on the polars apply path (line 61)."""
+    df = pd.DataFrame({"v": [1.0, 2.0]})
+    pl_df = pl.from_pandas(df)
+    out = RollingAggregateApplier().apply(pl_df, {"columns": [], "aggregations": ["mean"]})
+    assert list(out.columns) == ["v"]
+
+
+def test_rolling_aggregate_polars_skips_missing_column() -> None:
+    """A configured column absent from the polars frame must be skipped (line 47)."""
+    df = pd.DataFrame({"v": [1.0, 2.0, 3.0]})
+    art = RollingAggregateCalculator().fit(
+        df, {"columns": ["v", "missing"], "window": 2, "aggregations": ["mean"]}
+    )
+    out = RollingAggregateApplier().apply(pl.from_pandas(df), art)
+    assert "v_roll_mean_2" in out.columns
+    assert "missing_roll_mean_2" not in out.columns
+
+
+def test_rolling_aggregate_polars_group_by_computed_within_groups() -> None:
+    """``group_by`` on the polars path must apply the `.over()` group scoping (line 51)."""
+    df = pd.DataFrame({"g": ["a", "a", "b", "b"], "v": [1.0, 3.0, 100.0, 200.0]})
+    art = RollingAggregateCalculator().fit(
+        df,
+        {
+            "columns": ["v"],
+            "window": 2,
+            "aggregations": ["sum"],
+            "min_periods": 1,
+            "group_by": ["g"],
+        },
+    )
+    out = RollingAggregateApplier().apply(pl.from_pandas(df), art)
+    assert out["v_roll_sum_2"].to_list() == [1.0, 4.0, 100.0, 300.0]
 
 
 # ---------------------------------------------------------------------------
@@ -229,3 +290,40 @@ def test_date_features_infer_output_schema_skips_unresolved_columns() -> None:
     assert out is not None
     assert "d_year" in out
     assert "missing_year" not in out
+
+
+def test_date_features_pandas_skips_missing_column() -> None:
+    """A configured column absent from the pandas frame must be skipped (line 49)."""
+    df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])})
+    art = DateFeaturesCalculator().fit(df, {"columns": ["d", "missing"], "features": ["year"]})
+    out = DateFeaturesApplier().apply(df, art)
+    assert "d_year" in out.columns
+    assert "missing_year" not in out.columns
+
+
+def test_date_features_polars_skips_missing_column() -> None:
+    """A configured column absent from the polars frame must be skipped (line 83)."""
+    df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])})
+    art = DateFeaturesCalculator().fit(df, {"columns": ["d", "missing"], "features": ["year"]})
+    out = DateFeaturesApplier().apply(pl.from_pandas(df), art)
+    assert "d_year" in out.columns
+    assert "missing_year" not in out.columns
+
+
+def test_date_features_polars_apply_noop_without_columns_or_features() -> None:
+    """Missing columns/features must no-op on the polars apply path (line 94)."""
+    df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])})
+    pl_df = pl.from_pandas(df)
+    out = DateFeaturesApplier().apply(pl_df, {"columns": [], "features": ["year"]})
+    assert list(out.columns) == ["d"]
+
+
+def test_date_features_polars_drop_original_removes_source_column() -> None:
+    """``drop_original=True`` must drop the source column on the polars path (lines 101-103)."""
+    df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01", "2021-06-15"])})
+    art = DateFeaturesCalculator().fit(
+        df, {"columns": ["d"], "features": ["year"], "drop_original": True}
+    )
+    out = DateFeaturesApplier().apply(pl.from_pandas(df), art)
+    assert "d" not in out.columns
+    assert "d_year" in out.columns

@@ -493,3 +493,125 @@ class TestAdditionalOversamplers:
         )
         X_res, y_res = OversamplingApplier().apply((X, y), art)
         assert y_res.value_counts()[1] >= 20
+
+    def test_svm_smote_balances_classes(self, imbalanced_pandas: Any) -> None:
+        """SVMSMOTE must balance classes on overlapping/imbalanced data."""
+        X, y = imbalanced_pandas
+        art = OversamplingCalculator().fit(
+            (X, y),
+            {"method": "svm_smote", "k_neighbors": 3, "m_neighbors": 5, "out_step": 0.3},
+        )
+        X_res, y_res = OversamplingApplier().apply((X, y), art)
+        assert y_res.value_counts()[1] >= 20
+
+    def test_kmeans_smote_balances_classes(self) -> None:
+        """KMeansSMOTE must balance classes when class overlap exists."""
+        rng = np.random.default_rng(11)
+        n_maj, n_min = 60, 20
+        X = pd.DataFrame(
+            {
+                "f1": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
+                "f2": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
+            }
+        )
+        y = pd.Series([0] * n_maj + [1] * n_min, name="target")
+        art = OversamplingCalculator().fit(
+            (X, y), {"method": "kmeans_smote", "k_neighbors": 3, "cluster_balance_threshold": 0.01}
+        )
+        X_res, y_res = OversamplingApplier().apply((X, y), art)
+        assert y_res.value_counts()[1] > n_min
+
+    def test_smote_tomek_balances_classes(self, imbalanced_pandas: Any) -> None:
+        """SMOTETomek (combined over/under sampler) must balance classes."""
+        X, y = imbalanced_pandas
+        art = OversamplingCalculator().fit((X, y), {"method": "smote_tomek", "k_neighbors": 3})
+        X_res, y_res = OversamplingApplier().apply((X, y), art)
+        counts = y_res.value_counts()
+        assert counts[0] == counts[1]
+
+
+# ---------------------------------------------------------------------------
+# Polars-path edge cases: missing target and unknown method (_resample_polars)
+# ---------------------------------------------------------------------------
+
+
+class TestResamplePolarsEdgeCases:
+    def test_oversampling_polars_missing_target_returns_unchanged(
+        self, imbalanced_pandas: Any
+    ) -> None:
+        """Polars input without y/target_column must short-circuit and return unchanged."""
+        X, _ = imbalanced_pandas
+        pl_X = pl.from_pandas(X)
+        art = OversamplingCalculator().fit(X, {"method": "smote"})
+        result = OversamplingApplier().apply(pl_X, art)
+        assert isinstance(result, pl.DataFrame)
+        assert result.shape == pl_X.shape
+
+    def test_oversampling_polars_unknown_method_returns_unchanged(
+        self, imbalanced_pandas: Any
+    ) -> None:
+        """Polars input with an unknown sampler method must return the data unchanged."""
+        X, y = imbalanced_pandas
+        art = OversamplingCalculator().fit((X, y), {"method": "smote"})
+        art["method"] = "totally_unknown_method"
+        pl_X = pl.from_pandas(X)
+        pl_y = pl.from_pandas(y.to_frame()).to_series()
+        X_res, y_res = OversamplingApplier().apply((pl_X, pl_y), art)
+        assert isinstance(X_res, pl.DataFrame)
+        assert X_res.shape[0] == pl_X.shape[0]
+
+    def test_undersampling_polars_missing_target_returns_unchanged(
+        self, imbalanced_pandas: Any
+    ) -> None:
+        """Polars input without y/target_column must short-circuit for undersampling too."""
+        X, _ = imbalanced_pandas
+        pl_X = pl.from_pandas(X)
+        art = UndersamplingCalculator().fit(X, {"method": "random_under_sampling"})
+        result = UndersamplingApplier().apply(pl_X, art)
+        assert isinstance(result, pl.DataFrame)
+        assert result.shape == pl_X.shape
+
+
+# ---------------------------------------------------------------------------
+# ImportError branches when imblearn submodules are unavailable
+# ---------------------------------------------------------------------------
+
+
+class TestImblearnImportErrors:
+    def test_import_over_samplers_raises_import_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_import_over_samplers must re-raise ImportError with a clear message."""
+        import builtins
+
+        from skyulf.preprocessing.resampling import _import_over_samplers
+
+        real_import = builtins.__import__
+
+        def _fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
+            if name == "imblearn.over_sampling" or name.startswith("imblearn.over_sampling"):
+                raise ImportError("simulated missing imblearn")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _fake_import)
+        with pytest.raises(ImportError, match="imblearn is required for oversampling"):
+            _import_over_samplers()
+
+    def test_import_under_samplers_raises_import_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """_import_under_samplers must re-raise ImportError with a clear message."""
+        import builtins
+
+        from skyulf.preprocessing.resampling import _import_under_samplers
+
+        real_import = builtins.__import__
+
+        def _fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
+            if name == "imblearn.under_sampling" or name.startswith("imblearn.under_sampling"):
+                raise ImportError("simulated missing imblearn")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", _fake_import)
+        with pytest.raises(ImportError, match="imblearn is required for undersampling"):
+            _import_under_samplers()

@@ -189,6 +189,16 @@ def test_apply_polars_to_replace_scalar_with_value() -> None:
     assert result["a"].tolist() == [-9, 2, -9]
 
 
+def test_apply_polars_to_replace_mapping_like() -> None:
+    """Polars path: a dict-shaped to_replace must be applied like pandas .replace(dict)."""
+    df = pl.DataFrame({"a": [1, 2, 3]})
+    params: Dict[str, Any] = {"columns": ["a"], "to_replace": {1: 10, 3: 30}}
+    result = ValueReplacementApplier().apply(df, params)
+    if hasattr(result, "to_pandas"):
+        result = result.to_pandas()
+    assert result["a"].tolist() == [10, 2, 30]
+
+
 def test_apply_polars_no_valid_columns_is_noop() -> None:
     """Polars path: no valid columns must leave the frame unchanged."""
     df = pl.DataFrame({"a": [1, 2]})

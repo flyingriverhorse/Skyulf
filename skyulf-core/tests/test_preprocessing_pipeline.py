@@ -12,6 +12,7 @@ import pytest
 
 # Trigger node registration by importing the package.
 import skyulf.preprocessing  # noqa: F401
+from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 # ---------------------------------------------------------------------------
@@ -348,3 +349,456 @@ def test_pipeline_with_split_dataset_applies_to_train_and_test() -> None:
     assert isinstance(result, SD)
     # Train scaled to ~zero mean; test should also be transformed.
     assert abs(result.train["a"].mean()) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# TrainTestSplitter skip-on-already-split path (_run_step lines 154-155)
+# ---------------------------------------------------------------------------
+
+
+def test_run_step_train_test_splitter_skips_already_split_data() -> None:
+    """TrainTestSplitter must skip (with a warning) when data isn't a frame/tuple."""
+    fe = FeatureEngineer(steps_config=[])
+    calculator, applier = fe._get_transformer_components("TrainTestSplitter")
+
+    # A SplitDataset is neither a DataFrame, SkyulfDataFrame nor a tuple, so the
+    # splitter must bail out and return the data unchanged instead of re-splitting.
+    already_split = SplitDataset(
+        train=pd.DataFrame({"a": [1.0, 2.0]}), test=pd.DataFrame({"a": [3.0]})
+    )
+    result, fitted_params, transformer_inst = fe._run_step(
+        transformer_type="TrainTestSplitter",
+        name="split",
+        calculator=calculator,
+        applier=applier,
+        step_node_id="node_split",
+        current_data=already_split,
+        params={},
+    )
+    assert result is already_split
+    assert fitted_params == {}
+    assert transformer_inst is None
+
+
+# ---------------------------------------------------------------------------
+# _collect_step_metrics: exception path (lines 239-240)
+# ---------------------------------------------------------------------------
+
+
+def test_collect_step_metrics_swallows_exception_from_fitted_params(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An exception raised while deriving metrics must be logged, not propagated."""
+    fe = FeatureEngineer(steps_config=[])
+
+    def _boom(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(fe, "_metrics_from_fitted_params", _boom)
+    metrics: Dict[str, Any] = {}
+    # Should not raise despite _metrics_from_fitted_params blowing up.
+    fe._collect_step_metrics(
+        transformer_type="StandardScaler",
+        fitted_params={"mean": [0.0]},
+        data_before=pd.DataFrame({"a": [1.0]}),
+        current_data=pd.DataFrame({"a": [1.0]}),
+        params={},
+        rows_before=1,
+        cols_before={"a"},
+        rows_after=1,
+        cols_after={"a"},
+        name="scale",
+        metrics=metrics,
+    )
+    # metrics dict left untouched by the failed helper, but no crash.
+    assert "mean" not in metrics
+
+
+# ---------------------------------------------------------------------------
+# _collect_step_metrics: resampling dispatch (line 243)
+# ---------------------------------------------------------------------------
+
+
+def test_collect_step_metrics_dispatches_resampling_metrics() -> None:
+    """Oversampling/Undersampling step types must trigger resampling metrics."""
+    fe = FeatureEngineer(steps_config=[])
+    df = pd.DataFrame({"f": [1, 2, 3, 4], "label": [0, 0, 1, 1]})
+    metrics: Dict[str, Any] = {}
+    fe._collect_step_metrics(
+        transformer_type="Oversampling",
+        fitted_params={},
+        data_before=df,
+        current_data=df,
+        params={"target_column": "label"},
+        rows_before=4,
+        cols_before={"f", "label"},
+        rows_after=4,
+        cols_after={"f", "label"},
+        name="oversample",
+        metrics=metrics,
+    )
+    assert metrics["total_samples"] == 4
+    assert metrics["class_counts"] == {"0": 2, "1": 2}
+
+
+# ---------------------------------------------------------------------------
+# _metrics_from_fitted_params: feature selection keys (lines 272-281)
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_from_fitted_params_feature_selection_keys() -> None:
+    """All feature-selection metric keys must be copied when present."""
+    fe = FeatureEngineer(steps_config=[])
+    fitted_params = {
+        "feature_scores": {"a": 1.0},
+        "p_values": {"a": 0.01},
+        "feature_importances": {"a": 0.5},
+        "variances": {"a": 2.0},
+        "ranking": {"a": 1},
+        "selected_columns": ["a"],
+    }
+    metrics: Dict[str, Any] = {}
+    fe._metrics_from_fitted_params(
+        "UnivariateSelection", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics
+    )
+    for key in fitted_params:
+        assert metrics[key] == fitted_params[key]
+
+
+# ---------------------------------------------------------------------------
+# _metrics_from_fitted_params: outlier keys (lines 299-311)
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_from_fitted_params_outlier_warnings_and_bounds() -> None:
+    """IQR must copy warnings and bounds keys when present."""
+    fe = FeatureEngineer(steps_config=[])
+    fitted_params = {"warnings": ["clipped col a"], "bounds": {"a": (0.0, 10.0)}}
+    metrics: Dict[str, Any] = {}
+    fe._metrics_from_fitted_params("IQR", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics)
+    assert metrics["warnings"] == fitted_params["warnings"]
+    assert metrics["bounds"] == fitted_params["bounds"]
+
+
+def test_metrics_from_fitted_params_zscore_stats() -> None:
+    """ZScore must copy the stats key when present."""
+    fe = FeatureEngineer(steps_config=[])
+    fitted_params = {"stats": {"a": {"mean": 0.0, "std": 1.0}}}
+    metrics: Dict[str, Any] = {}
+    fe._metrics_from_fitted_params("ZScore", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics)
+    assert metrics["stats"] == fitted_params["stats"]
+
+
+def test_metrics_from_fitted_params_elliptic_contamination() -> None:
+    """EllipticEnvelope must copy the contamination key when present."""
+    fe = FeatureEngineer(steps_config=[])
+    fitted_params = {"contamination": 0.1}
+    metrics: Dict[str, Any] = {}
+    fe._metrics_from_fitted_params(
+        "EllipticEnvelope", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics
+    )
+    assert metrics["contamination"] == 0.1
+
+
+# ---------------------------------------------------------------------------
+# _metrics_from_fitted_params: feature generation keys (lines 314-319)
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_from_fitted_params_feature_generation() -> None:
+    """FeatureMath must record operations count + list, plus generated_features diff."""
+    fe = FeatureEngineer(steps_config=[])
+    fitted_params = {"operations": [{"op": "add", "columns": ["a", "b"]}]}
+    df_before = pd.DataFrame({"a": [1.0], "b": [2.0]})
+    df_after = pd.DataFrame({"a": [1.0], "b": [2.0], "a_plus_b": [3.0]})
+    metrics: Dict[str, Any] = {}
+    fe._metrics_from_fitted_params("FeatureMath", fitted_params, df_before, df_after, metrics)
+    assert metrics["operations_count"] == 1
+    assert metrics["operations"] == fitted_params["operations"]
+    assert metrics["generated_features"] == ["a_plus_b"]
+
+
+def test_metrics_from_fitted_params_bucketing_keys() -> None:
+    """Bucketing transformer types must copy bin_edges/n_bins keys when present."""
+    fe = FeatureEngineer(steps_config=[])
+    fitted_params = {"bin_edges": {"a": [0.0, 1.0, 2.0]}, "n_bins": 3}
+    metrics: Dict[str, Any] = {}
+    fe._metrics_from_fitted_params(
+        "KBinsDiscretizer", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics
+    )
+    assert metrics["bin_edges"] == fitted_params["bin_edges"]
+    assert metrics["n_bins"] == 3
+
+
+# ---------------------------------------------------------------------------
+# _diff_generated_columns: SplitDataset paths (lines 334-345)
+# ---------------------------------------------------------------------------
+
+
+def test_diff_generated_columns_split_dataset_dataframe_train() -> None:
+    """SplitDataset with DataFrame train members must diff on train columns."""
+    before = SplitDataset(train=pd.DataFrame({"a": [1.0]}), test=pd.DataFrame({"a": [1.0]}))
+    after = SplitDataset(
+        train=pd.DataFrame({"a": [1.0], "b": [2.0]}),
+        test=pd.DataFrame({"a": [1.0], "b": [2.0]}),
+    )
+    new_cols = FeatureEngineer._diff_generated_columns(before, after)
+    assert new_cols == ["b"]
+
+
+def test_diff_generated_columns_split_dataset_tuple_train() -> None:
+    """SplitDataset with (X, y) tuple train members must diff on X columns."""
+    before = SplitDataset(
+        train=(pd.DataFrame({"a": [1.0]}), pd.Series([0])),
+        test=(pd.DataFrame({"a": [1.0]}), pd.Series([0])),
+    )
+    after = SplitDataset(
+        train=(pd.DataFrame({"a": [1.0], "b": [2.0]}), pd.Series([0])),
+        test=(pd.DataFrame({"a": [1.0], "b": [2.0]}), pd.Series([0])),
+    )
+    new_cols = FeatureEngineer._diff_generated_columns(before, after)
+    assert new_cols == ["b"]
+
+
+# ---------------------------------------------------------------------------
+# _extract_y_for_resampling: SplitDataset paths (lines 352-358)
+# ---------------------------------------------------------------------------
+
+
+def test_extract_y_for_resampling_split_dataset_tuple_train() -> None:
+    """SplitDataset whose train is an (X, y) tuple must yield y from train."""
+    y = pd.Series([0, 1], name="label")
+    ds = SplitDataset(train=(pd.DataFrame({"f": [1, 2]}), y), test=(pd.DataFrame(), None))
+    fe = FeatureEngineer(steps_config=[])
+    result = fe._extract_y_for_resampling(ds, {})
+    assert result is y
+
+
+def test_extract_y_for_resampling_split_dataset_dataframe_train() -> None:
+    """SplitDataset whose train is a DataFrame must pull y via target_column."""
+    train = pd.DataFrame({"f": [1, 2], "label": [0, 1]})
+    ds = SplitDataset(train=train, test=pd.DataFrame({"f": [3], "label": [1]}))
+    fe = FeatureEngineer(steps_config=[])
+    result = fe._extract_y_for_resampling(ds, {"target_column": "label"})
+    pd.testing.assert_series_equal(result, train["label"])
+
+
+# ---------------------------------------------------------------------------
+# _metrics_resampling: exception path (lines 371-381)
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_resampling_success_populates_class_counts() -> None:
+    """Successful resampling metrics collection must set class_counts + total_samples."""
+    fe = FeatureEngineer(steps_config=[])
+    X = pd.DataFrame({"f": [1, 2, 3]})
+    y = pd.Series([0, 1, 1])
+    metrics: Dict[str, Any] = {}
+    fe._metrics_resampling((X, y), {}, metrics)
+    assert metrics["total_samples"] == 3
+    assert metrics["class_counts"] == {"0": 1, "1": 2}
+
+
+def test_metrics_resampling_returns_early_when_y_is_none() -> None:
+    """When y cannot be extracted, no metrics should be added and no error raised."""
+    fe = FeatureEngineer(steps_config=[])
+    metrics: Dict[str, Any] = {}
+    fe._metrics_resampling(pd.DataFrame({"f": [1, 2]}), {}, metrics)
+    assert metrics == {}
+
+
+def test_metrics_resampling_converts_polars_like_y_via_to_pandas() -> None:
+    """A y_res exposing to_pandas() must be converted before value_counts()."""
+
+    class _FakePolarsSeries:
+        """Minimal stand-in exposing to_pandas(), mimicking a polars Series."""
+
+        def to_pandas(self) -> pd.Series:
+            return pd.Series([0, 0, 1], name="label")
+
+    fe = FeatureEngineer(steps_config=[])
+    X = pd.DataFrame({"f": [1, 2, 3]})
+    metrics: Dict[str, Any] = {}
+    fe._metrics_resampling((X, _FakePolarsSeries()), {}, metrics)
+    assert metrics["total_samples"] == 3
+    assert metrics["class_counts"] == {"0": 2, "1": 1}
+
+
+def test_metrics_resampling_handles_extraction_failure_gracefully() -> None:
+    """If y extraction / value_counts blows up, the method must not raise."""
+    fe = FeatureEngineer(steps_config=[])
+    # y_res will be `5` (an int) -> .value_counts() raises AttributeError internally.
+    metrics: Dict[str, Any] = {}
+    fe._metrics_resampling((pd.DataFrame({"f": [1]}), 5), {}, metrics)
+    assert "class_counts" not in metrics
+
+
+# ---------------------------------------------------------------------------
+# _count_winsorize_diffs: tuple path (lines 394-413)
+# ---------------------------------------------------------------------------
+
+
+def test_count_winsorize_diffs_tuple_path_counts_x_and_y_changes() -> None:
+    """Tuple (X, y) diffs must sum differing cells across both X and y."""
+    x1 = pd.DataFrame({"a": [1.0, 2.0]})
+    x2 = pd.DataFrame({"a": [99.0, 2.0]})
+    y1 = pd.Series([0, 1])
+    y2 = pd.Series([0, 5])
+    diffs = FeatureEngineer._count_winsorize_diffs((x1, y1), (x2, y2))
+    assert diffs == 2
+
+
+def test_count_winsorize_diffs_tuple_path_no_changes() -> None:
+    """Identical tuple data must report zero diffs."""
+    x = pd.DataFrame({"a": [1.0, 2.0]})
+    y = pd.Series([0, 1])
+    diffs = FeatureEngineer._count_winsorize_diffs((x, y), (x.copy(), y.copy()))
+    assert diffs == 0
+
+
+def test_count_winsorize_diffs_non_tuple_non_dataframe_returns_zero() -> None:
+    """Unsupported types must fall through to the default 0."""
+    assert FeatureEngineer._count_winsorize_diffs("not_a_frame", 123) == 0
+
+
+# ---------------------------------------------------------------------------
+# _metrics_winsorize_clipped (lines 418-432)
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_winsorize_clipped_dataframe_path() -> None:
+    """Plain DataFrame before/after must populate values_clipped via cell diff."""
+    fe = FeatureEngineer(steps_config=[])
+    before = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    after = pd.DataFrame({"a": [1.0, 2.0, 99.0]})
+    metrics: Dict[str, Any] = {}
+    fe._metrics_winsorize_clipped(before, after, metrics)
+    assert metrics["values_clipped"] == 1
+
+
+def test_metrics_winsorize_clipped_split_dataset_path() -> None:
+    """SplitDataset before/after must sum diffs across train/test/validation."""
+    fe = FeatureEngineer(steps_config=[])
+    before = SplitDataset(
+        train=pd.DataFrame({"a": [1.0, 2.0]}),
+        test=pd.DataFrame({"a": [5.0]}),
+        validation=pd.DataFrame({"a": [7.0]}),
+    )
+    after = SplitDataset(
+        train=pd.DataFrame({"a": [1.0, 99.0]}),
+        test=pd.DataFrame({"a": [5.0]}),
+        validation=pd.DataFrame({"a": [70.0]}),
+    )
+    metrics: Dict[str, Any] = {}
+    fe._metrics_winsorize_clipped(before, after, metrics)
+    assert metrics["values_clipped"] == 2
+
+
+def test_metrics_winsorize_clipped_swallows_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any exception while computing clip diffs must be logged, not raised."""
+    fe = FeatureEngineer(steps_config=[])
+
+    def _boom(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(FeatureEngineer, "_count_winsorize_diffs", staticmethod(_boom))
+    metrics: Dict[str, Any] = {}
+    fe._metrics_winsorize_clipped(pd.DataFrame({"a": [1.0]}), pd.DataFrame({"a": [2.0]}), metrics)
+    assert "values_clipped" not in metrics
+
+
+# ---------------------------------------------------------------------------
+# _metrics_shape_change: row-drop / Winsorize / MissingIndicator / encoders
+# (lines 447-454, 457-459, 462-464, 471, 473)
+# ---------------------------------------------------------------------------
+
+
+def test_metrics_shape_change_row_drop_type() -> None:
+    """Deduplicate (a row-drop type) must record removed/remaining/total rows."""
+    fe = FeatureEngineer(steps_config=[])
+    metrics: Dict[str, Any] = {}
+    fe._metrics_shape_change(
+        "Deduplicate",
+        pd.DataFrame({"a": [1, 2, 3]}),
+        pd.DataFrame({"a": [1, 2]}),
+        {},
+        3,
+        {"a"},
+        2,
+        {"a"},
+        metrics,
+    )
+    assert metrics["Deduplicate_rows_removed"] == 1
+    assert metrics["Deduplicate_rows_remaining"] == 2
+    assert metrics["Deduplicate_rows_total"] == 3
+    assert metrics["rows_removed"] == 1
+    assert metrics["rows_total"] == 3
+
+
+def test_metrics_shape_change_winsorize_also_computes_clipped() -> None:
+    """Winsorize row-drop path must additionally compute values_clipped."""
+    fe = FeatureEngineer(steps_config=[])
+    before = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    after = pd.DataFrame({"a": [1.0, 2.0]})
+    metrics: Dict[str, Any] = {}
+    fe._metrics_shape_change("Winsorize", before, after, {}, 3, {"a"}, 2, {"a"}, metrics)
+    assert "values_clipped" in metrics
+
+
+def test_metrics_shape_change_missing_indicator() -> None:
+    """MissingIndicator must report the newly created indicator columns."""
+    fe = FeatureEngineer(steps_config=[])
+    metrics: Dict[str, Any] = {}
+    fe._metrics_shape_change(
+        "MissingIndicator",
+        pd.DataFrame({"a": [1]}),
+        pd.DataFrame({"a": [1], "a_missing": [0]}),
+        {},
+        1,
+        {"a"},
+        1,
+        {"a", "a_missing"},
+        metrics,
+    )
+    assert metrics["missing_indicators_created"] == 1
+    assert metrics["missing_indicators_columns"] == ["a_missing"]
+
+
+def test_metrics_shape_change_drop_missing_columns() -> None:
+    """DropMissingColumns must report dropped column names + count."""
+    fe = FeatureEngineer(steps_config=[])
+    metrics: Dict[str, Any] = {}
+    fe._metrics_shape_change(
+        "DropMissingColumns",
+        pd.DataFrame({"a": [1], "b": [None]}),
+        pd.DataFrame({"a": [1]}),
+        {},
+        1,
+        {"a", "b"},
+        1,
+        {"a"},
+        metrics,
+    )
+    assert metrics["dropped_columns"] == ["b"]
+    assert metrics["dropped_columns_count"] == 1
+
+
+def test_metrics_shape_change_encoder_with_categories_and_classes_count() -> None:
+    """Encoder types must report new feature count plus categories/classes counts."""
+    fe = FeatureEngineer(steps_config=[])
+    metrics: Dict[str, Any] = {}
+    fe._metrics_shape_change(
+        "OneHotEncoder",
+        pd.DataFrame({"grade": ["A"]}),
+        pd.DataFrame({"grade_A": [1], "grade_B": [0]}),
+        {"columns": ["grade"], "categories_count": 2, "classes_count": 3},
+        1,
+        {"grade"},
+        1,
+        {"grade_A", "grade_B"},
+        metrics,
+    )
+    assert metrics["new_features_count"] == 2
+    assert metrics["encoded_columns_count"] == 1
+    assert metrics["categories_count"] == 2
+    assert metrics["classes_count"] == 3

@@ -96,6 +96,46 @@ def test_wrapper_getattr_delegates_to_dataframe(pl_df):
     assert wrapper.height == 3
 
 
+def test_wrapper_setitem_mutates_underlying_frame(pl_df):
+    """__setitem__ should delegate to the underlying polars DataFrame's item assignment."""
+    wrapper = SkyulfPolarsWrapper(pl_df)
+    wrapper[0, "a"] = 99
+    assert wrapper._df[0, "a"] == 99
+
+
+# ---------------------------------------------------------------------------
+# HAS_POLARS=False guard branches (simulated via monkeypatch, since polars is
+# actually installed in this environment and the `except ImportError` branch
+# at module import time cannot be exercised without uninstalling polars).
+# ---------------------------------------------------------------------------
+
+
+def test_is_compatible_false_when_polars_not_installed(monkeypatch, pl_df):
+    """is_compatible must short-circuit to False when HAS_POLARS is False."""
+    import skyulf.engines.polars_engine as polars_engine_module
+
+    monkeypatch.setattr(polars_engine_module, "HAS_POLARS", False)
+    assert polars_engine_module.PolarsEngine.is_compatible(pl_df) is False
+
+
+def test_from_pandas_raises_when_polars_not_installed(monkeypatch, pl_df):
+    """from_pandas must raise ImportError when HAS_POLARS is False."""
+    import skyulf.engines.polars_engine as polars_engine_module
+
+    monkeypatch.setattr(polars_engine_module, "HAS_POLARS", False)
+    with pytest.raises(ImportError, match="Polars not installed"):
+        polars_engine_module.PolarsEngine.from_pandas(pl_df.to_pandas())
+
+
+def test_create_dataframe_raises_when_polars_not_installed(monkeypatch):
+    """create_dataframe must raise ImportError when HAS_POLARS is False."""
+    import skyulf.engines.polars_engine as polars_engine_module
+
+    monkeypatch.setattr(polars_engine_module, "HAS_POLARS", False)
+    with pytest.raises(ImportError, match="Polars not installed"):
+        polars_engine_module.PolarsEngine.create_dataframe({"x": [1, 2]})
+
+
 # ---------------------------------------------------------------------------
 # PolarsEngine
 # ---------------------------------------------------------------------------

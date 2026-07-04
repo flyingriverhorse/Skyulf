@@ -123,6 +123,34 @@ def test_polars_apply_path_matches_pandas_values() -> None:
         )
 
 
+def test_drop_first_not_applied_when_single_category() -> None:
+    """_drop_first_if_needed leaves a single-category list untouched even with drop_first=True."""
+    from skyulf.preprocessing.encoding.dummy import _drop_first_if_needed
+
+    assert _drop_first_if_needed(["only"], drop_first=True) == ["only"]
+
+
+def test_polars_apply_drop_first_removes_first_category_column() -> None:
+    """Polars apply path honors drop_first, matching the pandas-side behavior."""
+    df_pd = pd.DataFrame({"color": ["red", "blue", "green"]})
+    params = DummyEncoderCalculator().fit(df_pd, {"columns": ["color"], "drop_first": True})
+
+    df_pl = pl.from_pandas(df_pd)
+    out_pl = DummyEncoderApplier().apply(df_pl, dict(params))
+
+    assert "color_blue" not in out_pl.columns  # "blue" sorts first, dropped
+    assert "color_green" in out_pl.columns
+    assert "color_red" in out_pl.columns
+
+
+def test_polars_apply_no_valid_columns_is_noop() -> None:
+    """Polars apply returns X, y unchanged when configured columns aren't present in X."""
+    df_pl = pl.DataFrame({"other": [1, 2]})
+    params = {"columns": ["color"], "categories": {"color": ["blue", "red"]}, "drop_first": False}
+    out = DummyEncoderApplier().apply(df_pl, dict(params))
+    assert out.equals(df_pl)
+
+
 @given(
     cats=st.lists(st.sampled_from(["a", "b", "c"]), min_size=5, max_size=40),
 )

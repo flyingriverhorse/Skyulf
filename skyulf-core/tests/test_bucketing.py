@@ -20,6 +20,8 @@ from skyulf.preprocessing.bucketing import (
     GeneralBinningApplier,
     GeneralBinningCalculator,
     KBinsDiscretizerCalculator,
+    _fit_equal_frequency,
+    _fit_one_column_into_maps,
     _resolve_kbins_strategy,
 )
 
@@ -378,3 +380,226 @@ def test_fit_then_apply_round_trip_kbins_discretizer() -> None:
     params = calc.fit(df, {"columns": ["x"], "n_bins": 3, "strategy": "uniform"})
     result = applier.apply(df, params)
     assert result["x_binned"].nunique() == 3
+
+
+# ---------------------------------------------------------------------------
+# Polars — degenerate edges / missing columns / non-ordinal label format
+# ---------------------------------------------------------------------------
+
+
+def test_apply_polars_degenerate_edges_produce_no_expr() -> None:
+    """A column whose sorted-unique edges collapse to <2 must be skipped (no cut expr)."""
+    df_pl = pl.DataFrame({"x": [1, 2, 3]})
+    params: Dict[str, Any] = {
+        "bin_edges": {"x": [5.0, 5.0]},
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "ordinal",
+        "custom_labels": {},
+    }
+    result = GeneralBinningApplier().apply(df_pl, params)
+    if hasattr(result, "to_pandas"):
+        result = result.to_pandas()
+    # No cut expr was built, so no new column should appear.
+    assert "x_binned" not in result.columns
+
+
+def test_apply_polars_missing_column_is_skipped() -> None:
+    """A bin_edges entry for a column absent from the polars frame must be skipped."""
+    df_pl = pl.DataFrame({"y": [1, 2, 3]})
+    params: Dict[str, Any] = {
+        "bin_edges": {"x": [0.0, 5.0, 10.0]},
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "ordinal",
+        "custom_labels": {},
+    }
+    result = GeneralBinningApplier().apply(df_pl, params)
+    if hasattr(result, "to_pandas"):
+        result = result.to_pandas()
+    assert list(result.columns) == ["y"]
+
+
+def test_apply_polars_range_label_format_keeps_categorical_alias() -> None:
+    """label_format='range' on the polars path must not cast to UInt32 (keeps labels)."""
+    df_pl = pl.DataFrame({"x": list(range(10))})
+    config = {"columns": ["x"], "strategy": "equal_width", "n_bins": 5, "label_format": "range"}
+    params = GeneralBinningCalculator().fit(pd.DataFrame({"x": list(range(10))}), config)
+    result = GeneralBinningApplier().apply(df_pl, params)
+    if hasattr(result, "to_pandas"):
+        result = result.to_pandas()
+    assert "x_binned" in result.columns
+    # Should be categorical/string-like labels, not raw integer codes.
+    assert not pd.api.types.is_integer_dtype(result["x_binned"])
+
+
+# ---------------------------------------------------------------------------
+# Pandas — missing-label formatting on categorical (range) output
+# ---------------------------------------------------------------------------
+
+
+def test_apply_range_format_with_missing_label_tags_out_of_range_category() -> None:
+    """range format + missing_strategy='label' must format the added string category as-is."""
+    df = pd.DataFrame({"x": [-5.0, 2.0, 7.0]})
+    params: Dict[str, Any] = {
+        "bin_edges": {"x": [0.0, 5.0, 10.0]},
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "range",
+        "missing_strategy": "label",
+        "missing_label": "OOR",
+        "include_lowest": True,
+        "precision": 3,
+    }
+    result = GeneralBinningApplier().apply(df, params)
+    assert result["x_binned"].iloc[0] == "OOR"
+    assert result["x_binned"].iloc[1].startswith("[")
+
+
+# ---------------------------------------------------------------------------
+# Pandas — degenerate edges raise + are swallowed by the apply loop
+# ---------------------------------------------------------------------------
+
+
+def test_apply_pandas_degenerate_edges_column_is_skipped() -> None:
+    """A column with <2 unique edges must raise internally and be skipped, not crash apply."""
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
+    params: Dict[str, Any] = {
+        "bin_edges": {"x": [5.0, 5.0]},
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "ordinal",
+        "missing_strategy": "keep",
+        "missing_label": "Missing",
+        "include_lowest": True,
+        "precision": 3,
+        "custom_labels": {},
+    }
+    result = GeneralBinningApplier().apply(df, params)
+    assert "x_binned" not in result.columns
+    assert "x" in result.columns
+
+
+# ---------------------------------------------------------------------------
+# Fit — equal_frequency edge clamp (defensive: forces qcut to underflow the min)
+# ---------------------------------------------------------------------------
+
+
+def test_fit_equal_frequency_edge_clamped_to_series_min(monkeypatch) -> None:
+    """If qcut ever returns an edge below the true series min, it must be clamped."""
+    import skyulf.preprocessing.bucketing as bucketing_mod
+
+    original_qcut = bucketing_mod.pd.qcut
+
+    def fake_qcut(series, q, labels=None, retbins=True, duplicates="drop"):
+        binned, edges = original_qcut(
+            series, q=q, labels=labels, retbins=retbins, duplicates=duplicates
+        )
+        edges = edges.copy()
+        edges[0] = edges[0] - 1.0
+        return binned, edges
+
+    monkeypatch.setattr(bucketing_mod.pd, "qcut", fake_qcut)
+    series = pd.Series(range(10), dtype=float)
+    edges = _fit_equal_frequency(series, n_bins=4, duplicates="drop")
+    assert edges[0] == series.min()
+
+
+# ---------------------------------------------------------------------------
+# Fit — kbins quantile strategy (quantile_method kwarg)
+# ---------------------------------------------------------------------------
+
+
+def test_fit_kbins_default_quantile_strategy_uses_quantile_method_kwarg() -> None:
+    """KBinsDiscretizerCalculator's default 'quantile' strategy must fit without error."""
+    df = _series_0_to_9()
+    params = KBinsDiscretizerCalculator().fit(df, {"columns": ["x"], "n_bins": 3})
+    assert len(params["bin_edges"]["x"]) == 4
+
+
+# ---------------------------------------------------------------------------
+# Fit — custom strategy via column_strategies / global strategy
+# ---------------------------------------------------------------------------
+
+
+def test_fit_general_binning_custom_strategy_uses_custom_bins_and_labels() -> None:
+    """strategy='custom' must resolve edges/labels from custom_bins/custom_labels config."""
+    df = _series_0_to_9()
+    config = {
+        "columns": ["x"],
+        "strategy": "custom",
+        "custom_bins": {"x": [0, 5, 9]},
+        "custom_labels": {"x": ["low", "high"]},
+    }
+    params = GeneralBinningCalculator().fit(df, config)
+    assert params["bin_edges"]["x"] == [0, 5, 9]
+    assert params["custom_labels"]["x"] == ["low", "high"]
+
+
+def test_fit_general_binning_column_strategy_override_custom() -> None:
+    """Per-column strategy override to 'custom' must take precedence over the global strategy."""
+    df = _series_0_to_9()
+    config = {
+        "columns": ["x"],
+        "strategy": "equal_width",
+        "column_strategies": {
+            "x": {"strategy": "custom", "custom_bins": [0, 4, 9]},
+        },
+    }
+    params = GeneralBinningCalculator().fit(df, config)
+    assert params["bin_edges"]["x"] == [0, 4, 9]
+
+
+# ---------------------------------------------------------------------------
+# Fit — all-NaN column is skipped
+# ---------------------------------------------------------------------------
+
+
+def test_fit_general_binning_all_nan_column_is_skipped() -> None:
+    """A column that is entirely NaN must be skipped (empty series after dropna)."""
+    df = pd.DataFrame({"x": [np.nan, np.nan, np.nan]})
+    params = GeneralBinningCalculator().fit(
+        df, {"columns": ["x"], "strategy": "equal_width", "n_bins": 5}
+    )
+    assert "x" not in params["bin_edges"]
+
+
+# ---------------------------------------------------------------------------
+# Fit — errors inside a per-column fit are swallowed
+# ---------------------------------------------------------------------------
+
+
+def test_fit_one_column_into_maps_swallows_sklearn_errors() -> None:
+    """An invalid n_bins that makes sklearn raise must be caught, leaving the maps untouched."""
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
+    bin_edges_map: Dict[str, Any] = {}
+    custom_labels_map: Dict[str, Any] = {}
+    _fit_one_column_into_maps(
+        df,
+        "x",
+        {"strategy": "kmeans"},
+        {"default_n_bins": 1, "n_bins": 1, "q_bins": 1, "duplicates": "drop"},
+        bin_edges_map,
+        custom_labels_map,
+    )
+    assert "x" not in bin_edges_map
+
+
+# ---------------------------------------------------------------------------
+# Fit — CustomBinningCalculator no-columns short circuit
+# ---------------------------------------------------------------------------
+
+
+def test_fit_custom_binning_no_columns_returns_empty_artifact() -> None:
+    """An explicit empty `columns` list must short-circuit CustomBinningCalculator too."""
+    df = _series_0_to_9()
+    params = CustomBinningCalculator().fit(df, {"columns": []})
+    assert params == {}
+
+
+def test_fit_general_binning_unknown_strategy_yields_no_edges() -> None:
+    """An unrecognised strategy name must produce no edges/labels for that column."""
+    df = _series_0_to_9()
+    params = GeneralBinningCalculator().fit(df, {"columns": ["x"], "strategy": "not_a_strategy"})
+    assert "x" not in params["bin_edges"]
+    assert "x" not in params["custom_labels"]

@@ -15,6 +15,7 @@ from skyulf.preprocessing.feature_selection.correlation import (
     CorrelationThresholdApplier,
     CorrelationThresholdCalculator,
 )
+from skyulf.preprocessing.feature_selection.facade import FeatureSelectionApplier
 from skyulf.preprocessing.feature_selection.model_based import (
     ModelBasedSelectionApplier,
     ModelBasedSelectionCalculator,
@@ -89,6 +90,27 @@ def test_correlation_threshold_polars_engine_parity() -> None:
     pd_art = CorrelationThresholdCalculator().fit(df, {"threshold": 0.9})
     pl_art = CorrelationThresholdCalculator().fit(pl.from_pandas(df), {"threshold": 0.9})
     assert set(pd_art["columns_to_drop"]) == set(pl_art["columns_to_drop"])
+
+
+def test_correlation_threshold_apply_polars_drops_column() -> None:
+    """Applying a fitted artifact to a polars frame must drop the correlated column."""
+    import polars as pl
+
+    df = _correlated_df()
+    art = CorrelationThresholdCalculator().fit(df, {"threshold": 0.9})
+    out = CorrelationThresholdApplier().apply(pl.from_pandas(df), art)
+    assert "b" not in out.columns
+    assert "a" in out.columns
+
+
+def test_correlation_threshold_apply_polars_respects_drop_columns_false() -> None:
+    """Polars apply path must leave frame untouched when drop_columns=False."""
+    import polars as pl
+
+    df = _correlated_df()
+    art = CorrelationThresholdCalculator().fit(df, {"threshold": 0.9, "drop_columns": False})
+    out = CorrelationThresholdApplier().apply(pl.from_pandas(df), art)
+    assert "b" in out.columns
 
 
 # ---------------------------------------------------------------------------
@@ -242,3 +264,93 @@ def test_model_based_selection_no_candidate_columns_returns_empty() -> None:
     df = pd.DataFrame({"target": [0, 1, 0, 1]})
     art = ModelBasedSelectionCalculator().fit(df, {"target_column": "target"})
     assert art == {}
+
+
+def test_model_based_selection_linear_regression_estimator_for_classification() -> None:
+    """'linear_regression' key must resolve to LinearRegression even under classification.
+
+    Covers the (odd-but-allowed) classification branch of _resolve_estimator that
+    permits a LinearRegression estimator for a classification problem.
+    """
+    df = _classification_df()
+    art = ModelBasedSelectionCalculator().fit(
+        df,
+        {
+            "target_column": "target",
+            "estimator": "linear_regression",
+            "problem_type": "classification",
+        },
+    )
+    # LinearRegression exposes coef_, so importances should be computed.
+    assert "x1" in art["feature_importances"]
+
+
+def test_model_feature_importances_returns_empty_for_unsupported_estimator() -> None:
+    """_model_feature_importances must return {} when the estimator has neither attr."""
+    from skyulf.preprocessing.feature_selection._common import _model_feature_importances
+
+    class _NoImportanceEstimator:
+        """Stand-in estimator lacking both feature_importances_ and coef_."""
+
+    class _FakeSelector:
+        estimator_ = _NoImportanceEstimator()
+
+    result = _model_feature_importances(_FakeSelector(), ["a", "b"])
+    assert result == {}
+
+
+def test_model_based_selection_unknown_method_returns_empty() -> None:
+    """A resolvable estimator but unrecognized selector method yields empty artifact."""
+    df = _classification_df()
+    art = ModelBasedSelectionCalculator().fit(
+        df,
+        {
+            "target_column": "target",
+            "estimator": "random_forest",
+            "problem_type": "classification",
+            "method": "totally_unknown_selector_method",
+        },
+    )
+    assert art == {}
+
+
+# ---------------------------------------------------------------------------
+# Univariate: unknown selector method (line 69)
+# ---------------------------------------------------------------------------
+
+
+def test_univariate_selection_unknown_method_returns_empty() -> None:
+    """An unrecognized selector method yields an empty artifact."""
+    df = _classification_df()
+    art = UnivariateSelectionCalculator().fit(
+        df, {"target_column": "target", "method": "totally_unknown_selector_method"}
+    )
+    assert art == {}
+
+
+# ---------------------------------------------------------------------------
+# FeatureSelection facade dispatch (facade.py lines 33, 35)
+# ---------------------------------------------------------------------------
+
+
+def test_feature_selection_facade_dispatches_univariate_selection() -> None:
+    """The facade applier must route 'univariate_selection' type to UnivariateSelectionApplier."""
+    df = _classification_df()
+    art = UnivariateSelectionCalculator().fit(df, {"target_column": "target"})
+    out = FeatureSelectionApplier().apply(df, dict(art))
+    for col in art["candidate_columns"]:
+        if col not in art["selected_columns"]:
+            assert col not in out.columns
+
+
+def test_feature_selection_facade_dispatches_model_based_selection() -> None:
+    """The facade applier must route 'model_based_selection' type to ModelBasedSelectionApplier."""
+    df = _classification_df()
+    art = ModelBasedSelectionCalculator().fit(
+        df,
+        {"target_column": "target", "estimator": "random_forest", "problem_type": "classification"},
+    )
+    out = FeatureSelectionApplier().apply(df, dict(art))
+    for col in art["candidate_columns"]:
+        if col not in art["selected_columns"]:
+            assert col not in out.columns

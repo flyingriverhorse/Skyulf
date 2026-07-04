@@ -6,6 +6,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
@@ -193,3 +194,52 @@ def test_apply_engine_parity_pandas_vs_polars(df: pd.DataFrame) -> None:
     np.testing.assert_allclose(
         out_pd["city"].to_numpy(), out_pl_pd["city"].to_numpy(), rtol=1e-9, atol=1e-9
     )
+
+
+def test_polars_apply_no_valid_columns_is_noop() -> None:
+    """Polars apply returns X, y unchanged when configured columns/mappings aren't available."""
+    X = pd.DataFrame({"city": ["a", "b"]})
+    y = pd.Series([0, 1], name="target")
+    params = dict(WOEEncoderCalculator().fit((X, y), {"columns": ["city"]}))
+
+    X_pl = pl.DataFrame({"other": [1, 2]})
+    y_pl = pl.Series("target", [0, 1])
+    out_pl, y_out = WOEEncoderApplier().apply((X_pl, y_pl), dict(params))
+
+    assert out_pl.equals(X_pl)
+    assert list(y_out) == list(y_pl)
+
+
+def test_extract_y_returns_none_when_target_column_missing_from_x() -> None:
+    """_extract_y's final fallback: y stays None if target_col isn't found in X either."""
+    X = pd.DataFrame({"city": ["a", "b"]})
+    params = WOEEncoderCalculator().fit(X, {"columns": ["city"], "target_column": "nonexistent"})
+    assert params == {}
+
+
+def test_woe_fit_polars_no_target_returns_empty_and_warns(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Polars fit without a resolvable target logs a warning and returns {}."""
+    X_pl = pl.DataFrame({"city": ["a", "b"]})
+    with caplog.at_level("WARNING"):
+        params = WOEEncoderCalculator().fit(X_pl, {"columns": ["city"]})
+
+    assert params == {}
+    assert any("requires a target variable" in rec.message for rec in caplog.records)
+
+
+def test_woe_fit_polars_no_resolvable_columns_returns_empty() -> None:
+    """Polars fit with only numeric feature columns returns {} (nothing to encode)."""
+    X_pl = pl.DataFrame({"amount": [1, 2, 3, 4]})
+    y_pl = pl.Series("target", [0, 1, 0, 1])
+    params = WOEEncoderCalculator().fit((X_pl, y_pl), {})
+    assert params == {}
+
+
+def test_woe_fit_pandas_no_resolvable_columns_returns_empty() -> None:
+    """Pandas fit with only numeric feature columns returns {} (nothing to encode)."""
+    X = pd.DataFrame({"amount": [1, 2, 3, 4]})
+    y = pd.Series([0, 1, 0, 1], name="target")
+    params = WOEEncoderCalculator().fit((X, y), {})
+    assert params == {}

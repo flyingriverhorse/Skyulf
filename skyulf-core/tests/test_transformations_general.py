@@ -17,6 +17,7 @@ from skyulf.preprocessing.transformations.general import (
     GeneralTransformationApplier,
     GeneralTransformationCalculator,
     _apply_power_to_pandas_col,
+    _apply_power_to_polars_col,
     _fit_power_for_column,
 )
 
@@ -418,6 +419,50 @@ class TestInternalHelpers:
         item: dict = {"column": "a", "method": "yeo-johnson"}
         result = _apply_power_to_pandas_col(pos_df.copy(), item)
         pd.testing.assert_frame_equal(result, pos_df)
+
+    def test_apply_power_polars_missing_lambdas_is_noop(self, pos_df: pd.DataFrame) -> None:
+        """_apply_power_to_polars_col with lambdas=None returns the frame unchanged (line 32)."""
+        pl_df = pl.from_pandas(pos_df)
+        item: dict = {"column": "a", "method": "yeo-johnson"}
+        result = _apply_power_to_polars_col(pl_df, item)
+        assert result is pl_df
+
+    def test_apply_power_polars_malformed_lambdas_swallows_exception(
+        self, pos_df: pd.DataFrame
+    ) -> None:
+        """A malformed lambdas value must be caught and the frame returned unchanged (lines 52-54)."""
+        pl_df = pl.from_pandas(pos_df)
+        item: dict = {"column": "a", "method": "yeo-johnson", "lambdas": ["not_a_number"]}
+        result = _apply_power_to_polars_col(pl_df, item)
+        # Exception is swallowed; original frame returned untouched.
+        assert result.equals(pl_df)
+
+    def test_apply_power_pandas_malformed_lambdas_swallows_exception(
+        self, pos_df: pd.DataFrame
+    ) -> None:
+        """A malformed lambdas value must be caught and the column left unchanged (lines 82-83)."""
+        item: dict = {"column": "a", "method": "yeo-johnson", "lambdas": ["not_a_number"]}
+        original = pos_df.copy()
+        result = _apply_power_to_pandas_col(pos_df.copy(), item)
+        pd.testing.assert_series_equal(result["a"], original["a"])
+
+    def test_fit_power_for_column_swallows_exception(
+        self, calc: GeneralTransformationCalculator
+    ) -> None:
+        """fit() must catch exceptions from _fit_power_for_column and skip the item (lines 196-198)."""
+        # Non-numeric column values cause PowerTransformer.fit() to raise internally.
+        df = pd.DataFrame({"x": ["a", "b", "c", "d", "e"]})
+        art = calc.fit(df, {"transformations": [{"column": "x", "method": "yeo-johnson"}]})
+        assert art["transformations"] == []
+
+    def test_apply_polars_unknown_method_is_noop(
+        self, appl: GeneralTransformationApplier, pos_df: pd.DataFrame
+    ) -> None:
+        """An unknown method on the polars apply path must be skipped (line 109)."""
+        pl_df = pl.from_pandas(pos_df)
+        params = {"transformations": [{"column": "a", "method": "does_not_exist"}]}
+        result = appl.apply(pl_df, params)
+        assert result["a"].to_list() == pos_df["a"].to_list()
 
 
 # ---------------------------------------------------------------------------

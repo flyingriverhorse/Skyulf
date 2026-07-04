@@ -1,6 +1,6 @@
 """Tests for skyulf.modeling.base (BaseModelCalculator, BaseModelApplier, StatefulEstimator)."""
 
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional, Union, cast
 
 import numpy as np
 import pandas as pd
@@ -159,6 +159,82 @@ def test_extract_xy_from_tuple_xy():
     X_out, y_out = estimator._extract_xy((X, y), "target")
     assert len(X_out) == 2
     assert list(y_out) == [0, 1]
+
+
+def test_extract_xy_from_tuple_y_none_target_in_columns():
+    """_extract_xy with (X, None) where target is embedded in X should recurse and split it."""
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="n1"
+    )
+    df = pd.DataFrame({"a": [1, 2], "target": [0, 1]})
+    X_out, y_out = estimator._extract_xy((df, None), "target")
+    assert "target" not in X_out.columns
+    assert list(y_out) == [0, 1]
+
+
+def test_extract_xy_polars_dataframe():
+    """_extract_xy should support Polars DataFrames via the Polars engine branch."""
+    import polars as pl
+
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="n1"
+    )
+    df = pl.DataFrame({"a": [1, 2], "target": [0, 1]})
+    X_out, y_out = estimator._extract_xy(df, "target")
+    assert "target" not in X_out.columns
+    assert list(y_out) == [0, 1]
+
+
+def test_extract_xy_polars_missing_target_raises():
+    """_extract_xy on a Polars DataFrame without the target column should raise ValueError."""
+    import polars as pl
+
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="n1"
+    )
+    df = pl.DataFrame({"a": [1, 2]})
+    with pytest.raises(ValueError, match="not found in data"):
+        estimator._extract_xy(df, "target")
+
+
+class _DropKwargUnsupportedFrame:
+    """Fake frame exposing 'columns' + a non-pandas-style attribute fallback.
+
+    Its ``drop`` method rejects the ``columns=`` keyword (raising TypeError) but has
+    no positional fallback either, forcing _extract_xy into the attribute-access path.
+    """
+
+    def __init__(self, target_name: str, target_values: pd.Series):
+        self.columns = ["a", target_name]
+        setattr(self, target_name, target_values)
+
+    def drop(self, *args, **kwargs):
+        raise TypeError("columns kwarg not supported")
+
+
+def test_extract_xy_typeerror_falls_back_to_attribute_access():
+    """When drop(columns=...) raises TypeError, _extract_xy should fall back to getattr."""
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="n1"
+    )
+    target_values = pd.Series([0, 1])
+    fake = _DropKwargUnsupportedFrame("target", target_values)
+    X_out, y_out = estimator._extract_xy(fake, "target")
+    assert X_out is fake
+    assert y_out is target_values
+
+
+def test_extract_xy_unexpected_type_raises():
+    """_extract_xy should raise ValueError for a data type it cannot interpret."""
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="n1"
+    )
+
+    class _Unsupported:
+        pass
+
+    with pytest.raises(ValueError, match="Unexpected data type"):
+        estimator._extract_xy(_Unsupported(), "target")
 
 
 # ---------------------------------------------------------------------------
@@ -330,3 +406,320 @@ def test_cross_validate_via_stateful_estimator():
     result = estimator.cross_validate(dataset, "target", config={}, n_folds=3)
     assert "aggregated_metrics" in result
     assert len(result["folds"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# StatefulEstimator.fit_predict — raw tuple dataset handling
+# ---------------------------------------------------------------------------
+
+
+def test_fit_predict_tuple_train_test_dataframes():
+    """Passing (train_df, test_df) tuple should be treated as an explicit split."""
+    df = pd.DataFrame({"a": [1, 2, 3, 4, 5, 6], "target": [0, 1, 0, 1, 0, 1]})
+    train_df, test_df = df.iloc[:4], df.iloc[4:]
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t1"
+    )
+    preds = estimator.fit_predict((train_df, test_df), "target", config={})
+    assert len(preds["train"]) == 4
+    assert len(preds["test"]) == 2
+
+
+def test_fit_predict_tuple_xy_fallback_warns():
+    """Passing a plain (X, y) tuple (no target embedded) should log a leakage warning."""
+    X = pd.DataFrame({"a": [1, 2, 3, 4]})
+    y = pd.Series([0, 1, 0, 1])
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t2"
+    )
+    messages = []
+    preds = estimator.fit_predict((X, y), "target", config={}, log_callback=messages.append)
+    assert len(preds["train"]) == 4
+    assert any("No test set provided" in m for m in messages)
+
+
+def test_fit_predict_test_split_as_tuple_with_y():
+    """dataset.test provided as an (X, y) tuple with y present should be predicted directly."""
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    test_X = pd.DataFrame({"a": [5, 6]})
+    test_y = pd.Series([0, 1])
+    dataset = SplitDataset(train=train_df, test=(test_X, test_y), validation=None)
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t3"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["test"]) == 2
+
+
+def test_fit_predict_test_split_as_tuple_y_none_target_embedded():
+    """dataset.test as (X, None) where target is embedded in X should be dropped before predict."""
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    test_X = pd.DataFrame({"a": [5, 6], "target": [0, 1]})
+    dataset = SplitDataset(train=train_df, test=(test_X, None), validation=None)
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t4"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["test"]) == 2
+
+
+def test_fit_predict_test_split_as_polars_tuple_typeerror_fallback():
+    """A Polars (X, None) test tuple should use the drop([col]) TypeError fallback path."""
+    import polars as pl
+
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    test_pl = pl.DataFrame({"a": [5, 6], "target": [0, 1]})
+    dataset = SplitDataset(train=train_df, test=cast(Any, (test_pl, None)), validation=None)
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t5"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["test"]) == 2
+
+
+def test_fit_predict_test_split_polars_non_tuple_is_empty_and_drop():
+    """A Polars test split (non-tuple) should use is_empty() and drop() fallback."""
+    import polars as pl
+
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    test_pl = pl.DataFrame({"a": [5, 6], "target": [0, 1]})
+    dataset = SplitDataset(train=train_df, test=cast(Any, test_pl), validation=None)
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t6"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["test"]) == 2
+
+
+def test_fit_predict_validation_split_as_tuple_y_none_target_embedded():
+    """dataset.validation as (X, None) with the target embedded should be dropped before predict."""
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    val_X = pd.DataFrame({"a": [7, 8], "target": [0, 1]})
+    dataset = SplitDataset(train=train_df, test=pd.DataFrame(), validation=(val_X, None))
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t7"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["validation"]) == 2
+
+
+def test_fit_predict_validation_split_as_polars_tuple_typeerror_fallback():
+    """A Polars (X, None) validation tuple should use the drop([col]) TypeError fallback path."""
+    import polars as pl
+
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    val_pl = pl.DataFrame({"a": [7, 8], "target": [0, 1]})
+    dataset = SplitDataset(
+        train=train_df, test=pd.DataFrame(), validation=cast(Any, (val_pl, None))
+    )
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t8"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["validation"]) == 2
+
+
+def test_fit_predict_test_split_dataframe_no_target_column():
+    """A non-tuple dataset.test missing the target column should be used as-is."""
+    train_df = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    test_df = pd.DataFrame({"a": [5, 6]})
+    dataset = SplitDataset(train=train_df, test=test_df, validation=None)
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t10"
+    )
+    preds = estimator.fit_predict(dataset, "target", config={})
+    assert len(preds["test"]) == 2
+
+
+# NOTE: base.py line 287 (`X_val = dataset.validation` when the target column is
+# *not* present in a non-tuple validation split) is unreachable through the public
+# fit_predict() API: `_extract_xy(dataset.validation, target_column)` is called
+# unconditionally at the top of fit_predict() (base.py:210) for any non-tuple
+# validation split and raises ValueError there if the target column is missing,
+# before the code can ever reach the later re-check at line 287. This appears to
+# be defensive dead code kept for symmetry with the analogous `test` split branch.
+
+
+# ---------------------------------------------------------------------------
+# StatefulEstimator.evaluate — split-shape edge cases
+# ---------------------------------------------------------------------------
+
+
+class _UnknownProblemTypeCalculator(LogisticRegressionCalculator):
+    """Reuses real LogisticRegression fit/predict, but reports an unsupported problem type."""
+
+    @property
+    def problem_type(self) -> str:
+        """Return an unrecognized problem type to exercise the else/raise branch."""
+        return "clustering"
+
+
+def test_evaluate_unknown_problem_type_raises():
+    """evaluate() should raise ValueError when problem_type is neither classification nor regression."""
+    dataset, _ = _classification_dataset()
+    estimator = StatefulEstimator(
+        calculator=_UnknownProblemTypeCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u1",
+    )
+    estimator.fit_predict(dataset, "target", config={})
+    with pytest.raises(ValueError, match="Unknown problem type"):
+        estimator.evaluate(dataset, "target")
+
+
+def test_evaluate_train_split_as_tuple_y_none_target_embedded():
+    """evaluate() should extract y from an (X, None) train tuple when the target is embedded."""
+    dataset, df = _classification_dataset()
+    train_tuple_dataset = SplitDataset(
+        train=(df.iloc[:160], None), test=df.iloc[160:], validation=None
+    )
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u2",
+    )
+    estimator.fit_predict(train_tuple_dataset, "target", config={})
+    report = estimator.evaluate(train_tuple_dataset, "target")
+    assert report["splits"]["train"] is not None
+    assert "accuracy" in report["splits"]["train"].metrics
+
+
+def test_evaluate_train_split_tuple_missing_target_returns_none():
+    """evaluate_split should return None for a tuple split whose X has no target and y is None."""
+    dataset, df = _classification_dataset()
+    X_no_target = df.drop(columns=["target"]).iloc[:160]
+    train_tuple_dataset = SplitDataset(
+        train=(X_no_target, None), test=df.iloc[160:], validation=None
+    )
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u3",
+    )
+    # Fit directly on properly-shaped data so the model is trained, then evaluate the
+    # malformed tuple dataset to trigger the "cannot evaluate without target" branch.
+    good_dataset, _ = _classification_dataset()
+    estimator.fit_predict(good_dataset, "target", config={})
+    report = estimator.evaluate(train_tuple_dataset, "target")
+    assert report["splits"]["train"] is None
+
+
+def test_evaluate_train_split_dataframe_missing_target_returns_none():
+    """evaluate_split should return None for a plain DataFrame split missing the target column."""
+    dataset, df = _classification_dataset()
+    X_no_target = df.drop(columns=["target"]).iloc[:160]
+    train_dataset = SplitDataset(train=X_no_target, test=df.iloc[160:], validation=None)
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u4",
+    )
+    good_dataset, _ = _classification_dataset()
+    estimator.fit_predict(good_dataset, "target", config={})
+    report = estimator.evaluate(train_dataset, "target")
+    assert report["splits"]["train"] is None
+
+
+def test_evaluate_train_split_unsupported_type_returns_none():
+    """evaluate_split should return None for a train split of an unsupported type."""
+    dataset, _ = _classification_dataset()
+    unsupported_dataset = SplitDataset(
+        train=cast(Any, object()), test=dataset.test, validation=None
+    )
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u5",
+    )
+    good_dataset, _ = _classification_dataset()
+    estimator.fit_predict(good_dataset, "target", config={})
+    report = estimator.evaluate(unsupported_dataset, "target")
+    assert report["splits"]["train"] is None
+
+
+def test_evaluate_test_split_as_tuple_triggers_has_test_branch():
+    """evaluate() should recognize a non-empty (X, y) test tuple via the has_test tuple branch."""
+    dataset, df = _classification_dataset()
+    test_X = df.drop(columns=["target"]).iloc[160:]
+    test_y = df["target"].iloc[160:]
+    tuple_test_dataset = SplitDataset(train=df.iloc[:160], test=(test_X, test_y), validation=None)
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u6",
+    )
+    estimator.fit_predict(tuple_test_dataset, "target", config={})
+    report = estimator.evaluate(tuple_test_dataset, "target")
+    assert "test" in report["splits"]
+    assert report["splits"]["test"] is not None
+
+
+def test_evaluate_validation_split_as_tuple_triggers_has_val_branch():
+    """evaluate() should recognize a non-empty (X, y) validation tuple via the has_val tuple branch."""
+    dataset, df = _classification_dataset()
+    val_X = df.drop(columns=["target"]).iloc[160:180]
+    val_y = df["target"].iloc[160:180]
+    tuple_val_dataset = SplitDataset(
+        train=df.iloc[:160], test=df.iloc[180:], validation=(val_X, val_y)
+    )
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u7",
+    )
+    estimator.fit_predict(tuple_val_dataset, "target", config={})
+    report = estimator.evaluate(tuple_val_dataset, "target")
+    assert "validation" in report["splits"]
+    assert report["splits"]["validation"] is not None
+
+
+def test_evaluate_train_split_as_polars_tuple_typeerror_fallback():
+    """evaluate_split should use the drop([col]) TypeError fallback for a Polars (X, None) tuple."""
+    import polars as pl
+
+    dataset, df = _classification_dataset()
+    train_pl = pl.DataFrame(df.iloc[:160].reset_index(drop=True))
+    train_tuple_dataset = SplitDataset(
+        train=cast(Any, (train_pl, None)), test=df.iloc[160:], validation=None
+    )
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u9",
+    )
+    estimator.fit_predict(train_tuple_dataset, "target", config={})
+    report = estimator.evaluate(train_tuple_dataset, "target")
+    assert report["splits"]["train"] is not None
+    assert "accuracy" in report["splits"]["train"].metrics
+
+
+def test_evaluate_validation_dataframe_triggers_has_val_dataframe_branch():
+    """evaluate() should recognize a non-empty plain-DataFrame validation split."""
+    dataset, df = _classification_dataset()
+    val_df = df.iloc[160:180]
+    dataframe_val_dataset = SplitDataset(train=df.iloc[:160], test=df.iloc[180:], validation=val_df)
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="u10",
+    )
+    estimator.fit_predict(dataframe_val_dataset, "target", config={})
+    report = estimator.evaluate(dataframe_val_dataset, "target")
+    assert "validation" in report["splits"]
+    assert report["splits"]["validation"] is not None
+
+    """evaluate() should unpack a (model, meta) tuple stored on self.model before evaluating."""
+    from skyulf.modeling._tuning.engine import TuningApplier
+
+    dataset, _ = _classification_dataset()
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=TuningApplier(base_applier=LogisticRegressionApplier()),
+        node_id="u8",
+    )
+    estimator.fit_predict(dataset, "target", config={})
+    # Simulate a Tuner-style artifact: (model, extra_metadata) — TuningApplier.predict()
+    # unpacks this tuple itself, matching the real self.model shape produced by the tuner.
+    estimator.model = (estimator.model, {"best_params": {}})
+    report = estimator.evaluate(dataset, "target")
+    assert report["splits"]["train"] is not None
