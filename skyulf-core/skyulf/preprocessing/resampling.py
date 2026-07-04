@@ -214,7 +214,7 @@ def _build_oversampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
 
 class OversamplingApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -239,7 +239,7 @@ class OversamplingCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> OversamplingArtifact:
+    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> OversamplingArtifact:  # pylint: disable=arguments-differ
         return {
             "type": "oversampling",
             "method": config.get("method", "smote"),
@@ -347,7 +347,7 @@ class UndersamplingCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> UndersamplingArtifact:
+    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> UndersamplingArtifact:  # pylint: disable=arguments-differ
         return {
             "type": "undersampling",
             "method": config.get("method", "random_under_sampling"),

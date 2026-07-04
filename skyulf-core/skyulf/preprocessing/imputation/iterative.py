@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 class IterativeImputerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -67,7 +67,7 @@ class IterativeImputerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> IterativeImputerArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> IterativeImputerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

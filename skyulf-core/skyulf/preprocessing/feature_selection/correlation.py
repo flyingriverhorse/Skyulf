@@ -35,7 +35,7 @@ def _corr_drop_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]
 
 class CorrelationThresholdApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _corr_drop_polars, _corr_drop_pandas)
 
 
@@ -49,7 +49,7 @@ class CorrelationThresholdApplier(BaseApplier):
 )
 class CorrelationThresholdCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CorrelationThresholdArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CorrelationThresholdArtifact:  # pylint: disable=arguments-differ
         X_pd = to_pandas(X)
 
         threshold = config.get("threshold", 0.95)

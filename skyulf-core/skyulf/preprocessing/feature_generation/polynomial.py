@@ -73,7 +73,7 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[A
 
 class PolynomialFeaturesApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _polynomial_apply_polars, _polynomial_apply_pandas)
 
 
@@ -88,7 +88,7 @@ class PolynomialFeaturesApplier(BaseApplier):
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> PolynomialFeaturesArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> PolynomialFeaturesArtifact:  # pylint: disable=arguments-differ
         X_pd = to_pandas(X)
         cols = list(config.get("columns", []))
         if not cols and config.get("auto_detect", False):
