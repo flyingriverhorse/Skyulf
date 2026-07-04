@@ -120,7 +120,7 @@ def test_copy_with_numpy_array_payload() -> None:
     ds = SplitDataset(train=typing.cast(SplitPayload, arr), test=typing.cast(SplitPayload, arr))
     ds_copy = ds.copy()
     # Should return without raising; data must be equivalent.
-    np.testing.assert_array_equal(ds_copy.train, arr)
+    np.testing.assert_array_equal(typing.cast(np.ndarray, ds_copy.train), arr)
 
 
 class _CloneOnly:

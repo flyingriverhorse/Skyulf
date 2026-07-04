@@ -39,6 +39,7 @@ setup(
             "lizard>=1.17.0",
             "hypothesis>=6.100",
             "syrupy>=4.0.0",
+            "pytest-benchmark>=5.0.0,<6.0.0",
         ],
         "viz": ["matplotlib>=3.7.0", "rich>=13.0.0"],
         "eda": [
