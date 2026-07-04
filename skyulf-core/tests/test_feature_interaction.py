@@ -70,6 +70,23 @@ class TestThreeWayInteractions:
         np.testing.assert_allclose(result["x1_x_x2_x_x3"], df["x1"] * df["x2"] * df["x3"])
 
 
+class TestFourWayInteractions:
+    """4-way (degree=4) interaction generation."""
+
+    def test_generates_quadruple_product(self) -> None:
+        df = _sample_pandas_df()
+        df["x4"] = [5.0, 5.0, 5.0, 5.0]
+        calc = FeatureInteractionCalculator()
+        applier = FeatureInteractionApplier()
+        params = calc.fit(df, {"columns": ["x1", "x2", "x3", "x4"], "degree": 4})
+        result = applier.apply(df, params)
+
+        assert "x1_x_x2_x_x3_x_x4" in result.columns
+        np.testing.assert_allclose(
+            result["x1_x_x2_x_x3_x_x4"], df["x1"] * df["x2"] * df["x3"] * df["x4"]
+        )
+
+
 class TestInteractionOnly:
     """``interaction_only`` must skip self-products."""
 
@@ -115,7 +132,7 @@ class TestValidation:
         df = _sample_pandas_df()
         calc = FeatureInteractionCalculator()
         with pytest.raises(ValueError):
-            calc.fit(df, {"columns": ["x1", "x2"], "degree": 4})
+            calc.fit(df, {"columns": ["x1", "x2"], "degree": 5})
 
     def test_non_numeric_column_raises(self) -> None:
         df = _sample_pandas_df()
@@ -188,4 +205,21 @@ class TestEngineParity:
         np.testing.assert_allclose(
             result_pd["x1_x_x2_x_x3"].to_numpy(),
             result_pl["x1_x_x2_x_x3"].to_numpy(),
+        )
+
+    def test_four_way_parity(self) -> None:
+        df_pd = _sample_pandas_df()
+        df_pd["x4"] = [5.0, 5.0, 5.0, 5.0]
+        df_pl = pl.from_pandas(df_pd)
+
+        calc = FeatureInteractionCalculator()
+        applier = FeatureInteractionApplier()
+        params = calc.fit(df_pd, {"columns": ["x1", "x2", "x3", "x4"], "degree": 4})
+
+        result_pd = applier.apply(df_pd, params)
+        result_pl = applier.apply(df_pl, params)
+
+        np.testing.assert_allclose(
+            result_pd["x1_x_x2_x_x3_x_x4"].to_numpy(),
+            result_pl["x1_x_x2_x_x3_x_x4"].to_numpy(),
         )

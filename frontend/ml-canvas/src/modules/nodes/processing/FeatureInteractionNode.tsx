@@ -8,7 +8,7 @@ import { clickableProps } from '../../../core/utils/a11y';
 
 interface FeatureInteractionConfig {
   columns: string[];
-  degree: 2 | 3;
+  degree: 2 | 3 | 4;
   interaction_only: boolean;
   include_bias: boolean;
   isExpanded?: boolean;
@@ -155,17 +155,22 @@ export const FeatureInteractionNode: NodeDefinition = {
                     <div className="group relative">
                       <Info size={10} className="cursor-help" />
                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block w-52 p-2 bg-popover text-popover-foreground text-[10px] rounded border shadow-lg z-50">
-                        2 for pairwise interactions (e.g. a*b), 3 for three-way interactions (e.g. a*b*c).
+                        2 for pairwise interactions (e.g. a*b), 3 for three-way (a*b*c), 4 for four-way (a*b*c*d). Higher degrees grow combinatorially — use sparingly.
                       </div>
                     </div>
                   </span>
                   <select
                     className="w-full px-2 py-1.5 text-xs border rounded bg-background"
                     value={config.degree || 2}
-                    onChange={(e) => updateConfig({ degree: (parseInt(e.target.value) === 3 ? 3 : 2) })}
+                    onChange={(e) => {
+                      const parsed = parseInt(e.target.value);
+                      const degree: 2 | 3 | 4 = parsed === 4 ? 4 : parsed === 3 ? 3 : 2;
+                      updateConfig({ degree });
+                    }}
                   >
                     <option value={2}>2 (pairwise)</option>
                     <option value={3}>3 (three-way)</option>
+                    <option value={4}>4 (four-way)</option>
                   </select>
                 </div>
 
@@ -211,8 +216,8 @@ export const FeatureInteractionNode: NodeDefinition = {
     if (data.columns.length < (data.degree || 2)) {
       return { isValid: false, message: `Select at least ${data.degree || 2} columns for degree ${data.degree || 2} interactions.` };
     }
-    if (![2, 3].includes(data.degree)) {
-      return { isValid: false, message: 'Degree must be 2 or 3.' };
+    if (![2, 3, 4].includes(data.degree)) {
+      return { isValid: false, message: 'Degree must be 2, 3, or 4.' };
     }
     return { isValid: true };
   }

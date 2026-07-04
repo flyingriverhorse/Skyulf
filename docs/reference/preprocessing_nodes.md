@@ -567,16 +567,16 @@ Learned params:
 
 (Alias: `FeatureInteractionNode`)
 
-Generates 2-way/3-way multiplicative interaction columns between numeric
+Generates 2-way/3-way/4-way multiplicative interaction columns between numeric
 columns. Interaction column names are deterministic and regularization-friendly:
-sorted column names joined with `_x_` (e.g. `x1_x_x2`, `x1_x_x2_x_x3`), so the
+sorted column names joined with `_x_` (e.g. `x1_x_x2`, `x1_x_x2_x_x3`, `x1_x_x2_x_x3_x_x4`), so the
 same combination of inputs always produces the same output name regardless of
 input column order.
 
 Config:
 
 - `columns`: list[str]
-- `degree`: int (2 or 3, default 2)
+- `degree`: int (2, 3, or 4, default 2)
 - `interaction_only`: bool (default True; skips self-products like `x1 * x1`)
 - `include_bias`: bool (default False; adds a constant `interaction_bias` column of 1.0)
 
