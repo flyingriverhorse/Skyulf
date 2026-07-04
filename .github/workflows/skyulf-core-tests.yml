@@ -1,0 +1,102 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# skyulf-core test suite: runs skyulf-core/tests (the standalone ML-library
+# package) plus its own complexity gate and the standalone Docker smoke test.
+# Kept separate from backend-tests.yml so the two suites — which exercise
+# different layers of the architecture (see
+# .github/instructions/project_architecture.instructions.md) — can be
+# triaged, re-run, and required independently in branch protection.
+#
+# Static analysis (lint/format/type checks) is NOT duplicated here — that's
+# pr_check.yml's job. This workflow assumes pr_check.yml already gates PRs.
+
+name: Skyulf-Core Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skyulf-core-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: skyulf-core test suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Cache uv
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+
+      - name: Install dependencies (uv)
+        run: |
+          uv pip install --system -r requirements-ci.txt
+
+      - name: Complexity gate (lizard, CCN 8)
+        run: |
+          # Hard gate on green-field / known-clean packages so new code stays simple.
+          lizard skyulf-core/skyulf/core skyulf-core/skyulf/engines \
+                 skyulf-core/skyulf/preprocessing/scaling \
+                 skyulf-core/skyulf/preprocessing/transformations --CCN 8 -w
+          # Full-tree report (non-blocking) — surfaces legacy hotspots without failing CI.
+          lizard skyulf-core/skyulf --CCN 8 -w || true
+
+      - name: Run skyulf-core tests
+        # --cov=skyulf-core/skyulf scopes coverage to the package itself, so
+        # the ratchet floor can be enforced directly here without a separate
+        # "re-run and clobber coverage.xml" step (see git history for the CI
+        # bug that pattern used to cause when both suites shared one job).
+        run: |
+          pytest skyulf-core/tests -q -s --maxfail=1 --disable-warnings \
+            --cov=skyulf-core/skyulf --cov-branch --cov-report=term-missing \
+            --cov-report=xml --cov-fail-under=45
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: skyulf-core
+
+  skyulf-core-docker-smoke:
+    name: Docker test image smoke test (skyulf-core standalone)
+    runs-on: ubuntu-latest
+    # Builds skyulf-core in total isolation from backend/ — enforces the
+    # "independently distributable" architecture rule in
+    # project_architecture.instructions.md by construction: if skyulf-core
+    # ever grows an accidental import of fastapi/celery/backend, this build
+    # fails (those packages simply aren't installed in this image).
+    defaults:
+      run:
+        working-directory: skyulf-core
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build and run skyulf-core unit-test image
+        run: |
+          docker compose -f docker-compose.test.yml run --rm --build unit-tests

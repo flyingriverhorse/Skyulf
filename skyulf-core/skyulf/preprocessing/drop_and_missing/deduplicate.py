@@ -26,8 +26,13 @@ def _dedup_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
     if y is None:
         return X.unique(subset=subset, keep=pl_keep, maintain_order=True), None
 
+    # Resolve the dedup key columns before adding "__idx__" below: if left as
+    # None, Polars' unique(subset=None) dedups on *all* columns, which would
+    # include the always-unique "__idx__" column and defeat deduplication.
+    dedup_subset = subset if subset is not None else list(X.columns)
+
     X_with_idx = X.with_row_index("__idx__")
-    X_dedup = X_with_idx.unique(subset=subset, keep=pl_keep, maintain_order=True)
+    X_dedup = X_with_idx.unique(subset=dedup_subset, keep=pl_keep, maintain_order=True)
     kept = X_dedup["__idx__"]
     return X_dedup.drop("__idx__"), _polars_filter_y_by_kept_indices(y, kept)
 

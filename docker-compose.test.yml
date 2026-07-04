@@ -1,0 +1,49 @@
+# © 2025 Murat Unsal — Skyulf Project
+# Docker Compose configuration for running the full monorepo test suite
+# (backend + skyulf-core together) in isolated containers — mirrors
+# docker-compose.yml's redis service so tests exercise the same broker wiring
+# as local dev, without touching your host Python env.
+#
+# For skyulf-core-only testing (no backend deps at all), use
+# skyulf-core/docker-compose.test.yml instead.
+#
+# Unit tests (no external services):
+#   docker compose -f docker-compose.test.yml run --rm --build unit-tests
+#
+# Integration tests (against a live Redis):
+#   docker compose -f docker-compose.test.yml up --build --abort-on-container-exit integration-tests
+
+name: skyulf-tests
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  unit-tests:
+    build:
+      context: .
+      dockerfile: tests/docker/Dockerfile.unittests
+    profiles: ["unit"]
+
+  integration-tests:
+    build:
+      context: .
+      dockerfile: tests/docker/Dockerfile.integrationtests
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles: ["integration"]
+
+networks:
+  default:
+    name: skyulf-test-net

@@ -1,0 +1,67 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Fast static-analysis gate for every PR: lint, format, and type checks
+# across the whole repo (backend + skyulf-core + tests). This intentionally
+# does NOT run the test suites — those live in their own dedicated workflows
+# (backend-tests.yml, skyulf-core-tests.yml, frontend-tests.yml) so each
+# concern can be triaged, re-run, and required independently in branch
+# protection.
+
+name: PR Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-gate:
+    name: Python Static Checks
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Cache uv
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ matrix.python-version }}-${{ hashFiles('requirements-ci.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-uv-${{ matrix.python-version }}-
+
+      - name: Install dependencies (uv)
+        run: |
+          uv pip install --system -r requirements-ci.txt
+
+      - name: Lint check (Ruff)
+        run: |
+          ruff check .
+
+      - name: Format check (Ruff)
+        run: |
+          ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+
+      - name: Type check (Ty)
+        run: |
+          ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py

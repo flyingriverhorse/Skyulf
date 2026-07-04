@@ -42,7 +42,12 @@ def _manual_bounds_col_mask_pandas(series: pd.Series, bound: Dict[str, Any]) -> 
 class ManualBoundsApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+        # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
+        # own unpack_pipeline_input doesn't silently drop y (leaving it
+        # unfiltered when X rows are removed). Omit the wrap when y is None
+        # to avoid apply_dual_engine's tuple-with-no-y warning log.
+        input_data = (X, y) if y is not None else X
+        return apply_dual_engine(input_data, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:

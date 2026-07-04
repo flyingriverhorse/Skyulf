@@ -33,13 +33,18 @@ class StandardScalerApplier(BaseApplier):
         mean = params.get("mean")
         scale = params.get("scale")
         valid = resolve_valid_columns(X, cols)
-        if not valid or mean is None or scale is None:
-            return X, _y
-
         with_mean = params.get("with_mean", True)
         with_std = params.get("with_std", True)
-        mean_arr = np.array(mean)
-        scale_arr = np.array(scale)
+        # Only require the artifact a flag actually needs: sklearn's
+        # StandardScaler leaves `mean_`/`scale_` as None whenever the
+        # corresponding `with_mean`/`with_std` flag was False at fit time, so
+        # requiring *both* unconditionally would wrongly skip mean-centering
+        # for a valid with_mean=True, with_std=False configuration.
+        if not valid or (with_mean and mean is None) or (with_std and scale is None):
+            return X, _y
+
+        mean_arr = np.array(mean) if mean is not None else np.zeros(len(cols))
+        scale_arr = np.array(scale) if scale is not None else np.ones(len(cols))
 
         exprs = []
         for col_name in valid:
@@ -59,16 +64,18 @@ class StandardScalerApplier(BaseApplier):
         mean = params.get("mean")
         scale = params.get("scale")
         valid = resolve_valid_columns(X, cols)
-        if not valid or mean is None or scale is None:
+        with_mean = params.get("with_mean", True)
+        with_std = params.get("with_std", True)
+        if not valid or (with_mean and mean is None) or (with_std and scale is None):
             return X, _y
 
         X_out = X.copy()
         col_indices = [cols.index(c) for c in valid]
         vals = X_out[valid].values
 
-        if params.get("with_mean", True):
+        if with_mean:
             vals = vals - np.array(mean)[col_indices]
-        if params.get("with_std", True):
+        if with_std:
             vals = vals / safe_scale(np.array(scale)[col_indices].copy())
 
         X_out[valid] = vals
