@@ -300,6 +300,14 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               output_prefix: node.data.output_prefix,
               include_input_features: node.data.include_input_features
           };
+      } else if (node.data.definitionType === 'FeatureInteractionNode') {
+          stepType = 'FeatureInteraction';
+          params = {
+              columns: node.data.columns,
+              degree: node.data.degree,
+              interaction_only: node.data.interaction_only,
+              include_bias: node.data.include_bias
+          };
       } else if (node.data.definitionType === 'TimeSeriesNode') {
           const method = node.data.method;
           if (method === 'rolling') stepType = 'RollingAggregate';

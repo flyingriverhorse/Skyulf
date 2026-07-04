@@ -83,8 +83,13 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   // Auto-detect target and dataset
   useEffect(() => {
     const updates: Partial<FeatureSelectionConfig> = {};
+    // Propagate datasetId, and clear it if the upstream dataset connection is removed
+    // (otherwise a stale datasetId lingers on this node's data forever, making
+    // downstream nodes think a dataset is still connected when it isn't).
     if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {
       updates.datasetId = upstreamDatasetId;
+    } else if (!upstreamDatasetId && config.datasetId) {
+      updates.datasetId = undefined;
     }
     if (upstreamTargetColumn && config.target_column !== upstreamTargetColumn) {
       updates.target_column = upstreamTargetColumn;

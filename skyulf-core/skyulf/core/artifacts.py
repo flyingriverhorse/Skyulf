@@ -251,6 +251,16 @@ class FeatureGenerationArtifact(TypedDict, total=False):
     allow_overwrite: bool
 
 
+class FeatureInteractionArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]
+    degree: int
+    interaction_only: bool
+    include_bias: bool
+    combinations: List[List[str]]
+    feature_names: List[str]
+
+
 # ── Feature selection ────────────────────────────────────────────────────────
 
 

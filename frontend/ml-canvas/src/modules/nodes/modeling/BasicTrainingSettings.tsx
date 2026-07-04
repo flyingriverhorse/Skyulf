@@ -179,6 +179,10 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
 
   const handleTrain = async () => {
     if (!nodeId) return;
+    if (!datasetId) {
+        toast.error('No dataset connected', 'Connect a dataset node upstream before starting training.');
+        return;
+    }
     try {
         const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
         const response = await jobsApi.runPipeline({
@@ -599,7 +603,9 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
         <button
           onClick={() => { void handleTrain(); }}
-          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+          disabled={!datasetId}
+          title={!datasetId ? 'Connect a dataset node upstream to enable training' : undefined}
+          className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-lg disabled:hover:translate-y-0"
           style={{ background: 'var(--main-gradient)' }}
         >
           <Play className="w-4 h-4 fill-current" />
