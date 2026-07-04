@@ -1,0 +1,38 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Maps changed file paths to PR labels. Labels are created automatically by
+# the labeler action on first use; no manual label setup is required.
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: "backend/**"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: "frontend/ml-canvas/**"
+
+skyulf-core:
+  - changed-files:
+      - any-glob-to-any-file: "skyulf-core/**"
+
+docs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "docs/**"
+          - "**/*.md"
+          - "mkdocs.yml"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file:
+          - ".github/workflows/**"
+          - ".github/dependabot.yml"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/pyproject.toml"
+          - "**/requirements*.txt"
+          - "**/uv.lock"
+          - "frontend/ml-canvas/package.json"
+          - "frontend/ml-canvas/package-lock.json"

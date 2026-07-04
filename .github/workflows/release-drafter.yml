@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   update_release_draft:
-    name: Sync Release Draft with Changelog
+    name: Draft & Publish GitHub Release from Changelog
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,3 +50,11 @@ jobs:
             --title "$TITLE" \
             --notes-file "$NOTES_FILE" \
             --draft
+
+      - name: Publish Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.changelog.outputs.version }}
+        run: |
+          echo "Publishing release: $TAG"
+          gh release edit "$TAG" --draft=false

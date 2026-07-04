@@ -1,0 +1,35 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Blocks PRs that introduce dependencies with known vulnerabilities or
+# disallowed licenses, *before* merge. Complements Dependabot (which only
+# scans dependencies already merged into the default branch) and the
+# weekly OSV scan in security.yml.
+
+name: Dependency Review
+
+on:
+  pull_request:
+    paths:
+      - "**/pyproject.toml"
+      - "**/requirements*.txt"
+      - "**/uv.lock"
+      - "frontend/ml-canvas/package.json"
+      - "frontend/ml-canvas/package-lock.json"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: Scan changed dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always

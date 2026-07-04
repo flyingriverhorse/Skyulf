@@ -1,6 +1,14 @@
 name: CodeQL
 
 on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Weekly Monday 07:00 UTC — catches new CodeQL query packs / rule updates
+    # even when no code changes land.
+    - cron: "0 7 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -14,12 +22,12 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze (Python)
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python' ]
+        language: [ 'python', 'javascript-typescript' ]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -27,6 +35,7 @@ jobs:
           fetch-depth: 2
 
       - name: Set up Python
+        if: matrix.language == 'python'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -37,7 +46,8 @@ jobs:
           languages: ${{ matrix.language }}
           # queries: security-and-quality  # optional
 
-      - name: Install dependencies
+      - name: Install Python dependencies
+        if: matrix.language == 'python'
         run: |
           python -m pip install --upgrade pip
           if [ -f "requirements-fastapi.txt" ]; then python -m pip install -r requirements-fastapi.txt; fi
@@ -46,6 +56,7 @@ jobs:
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
-      # Python doesn't require an explicit build step for CodeQL
+      # Python doesn't require an explicit build step for CodeQL; the JS/TS
+      # analysis is source-only too (no bundler build needed for CodeQL).
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
