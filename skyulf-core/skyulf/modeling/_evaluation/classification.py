@@ -57,7 +57,7 @@ def evaluate_classification_model(
     n_classes = len(classes)
 
     # Confusion Matrix
-    cm_data = _compute_confusion_matrix(y_test_np, y_pred, class_names)
+    cm_data = _compute_confusion_matrix(y_test_np, y_pred, class_names, classes)
 
     # ROC and PR Curves
     roc_curves = []
@@ -126,9 +126,21 @@ def evaluate_classification_model(
     )
 
 
-def _compute_confusion_matrix(y_true: Any, y_pred: Any, labels: List[str]) -> ConfusionMatrixData:
-    """Compute confusion matrix data."""
-    cm = confusion_matrix(y_true, y_pred, labels=labels)
+def _compute_confusion_matrix(
+    y_true: Any, y_pred: Any, labels: List[str], label_values: Any = None
+) -> ConfusionMatrixData:
+    """Compute confusion matrix data.
+
+    ``labels`` are the human-readable display names (already stringified);
+    ``label_values`` are the actual class values used to match ``y_true``/
+    ``y_pred`` for sklearn's ``confusion_matrix``. Without this distinction,
+    passing stringified labels directly to ``confusion_matrix`` silently
+    produces an all-zero matrix whenever the underlying classes are not
+    already strings (e.g. int-encoded targets).
+    """
+    cm = confusion_matrix(
+        y_true, y_pred, labels=label_values if label_values is not None else labels
+    )
 
     # Convert to list of lists for JSON serialization
     matrix_data = cm.tolist()

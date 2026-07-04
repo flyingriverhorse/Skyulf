@@ -1,0 +1,38 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Standalone image for testing `skyulf-core` in complete isolation from the
+# rest of the monorepo — no backend/, no fastapi/celery/sqlalchemy, nothing
+# except skyulf-core's own package + its "dev"/"all" extras. This proves the
+# library actually is the independently-distributable package it claims to
+# be (see .github/instructions/project_architecture.instructions.md: "MUST
+# NOT depend on fastapi, celery, or any code in backend/").
+#
+# The "geo" extra (geopandas/shapely/pyproj/rtree/libpysal/esda) is
+# deliberately excluded — it carries heavy native deps and is opt-in even in
+# setup.py's own "all" extra. Tests that need it should skip gracefully when
+# geopandas is unavailable.
+#
+# Build (context must be skyulf-core/, not the repo root):
+#   cd skyulf-core && docker build -f tests/docker/Dockerfile.unittests -t skyulf-core-unit-tests .
+# Or via compose from skyulf-core/:
+#   docker compose -f docker-compose.test.yml run --rm --build unit-tests
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy just enough to resolve the package's own dependency graph first, so
+# this layer is cached across pure test-code changes.
+COPY pyproject.toml setup.py MANIFEST.in README.md ./
+COPY skyulf/ skyulf/
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir ".[dev,all]"
+
+COPY tests/ tests/
+
+CMD ["python", "-m", "pytest", "tests", "-q", "--disable-warnings", \
+     "--cov=skyulf", "--cov-branch", "--cov-report=term-missing", "--cov-report=html"]

@@ -1,0 +1,197 @@
+"""Tests for the LabelEncoder Calculator/Applier (skyulf.preprocessing.encoding.label)."""
+
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import polars as pl
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+
+from skyulf.preprocessing.encoding.label import (
+    LabelEncoderApplier,
+    LabelEncoderCalculator,
+)
+
+settings.register_profile(
+    "encoding_label",
+    max_examples=25,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
+)
+settings.load_profile("encoding_label")
+
+
+def test_fit_apply_roundtrip_sorts_classes_alphabetically() -> None:
+    """LabelEncoder assigns codes in sklearn's default alphabetical class order."""
+    df = pd.DataFrame({"category": ["b", "a", "c", "a", "b"]})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+
+    params = calc.fit(df, {"columns": ["category"]})
+    result = applier.apply(df, dict(params))
+
+    assert params["classes_count"] == {"category": 3}
+    expected = {"a": 0, "b": 1, "c": 2}
+    for raw, code in zip(df["category"], result["category"]):
+        assert code == expected[raw]
+
+
+def test_unseen_category_at_apply_maps_to_missing_code() -> None:
+    """A category unseen during fit maps to the configured missing_code (-1 by default)."""
+    train = pd.DataFrame({"category": ["a", "b", "a"]})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+    params = calc.fit(train, {"columns": ["category"]})
+
+    test_df = pd.DataFrame({"category": ["a", "unseen"]})
+    result = applier.apply(test_df, dict(params))
+
+    assert result["category"].iloc[0] == 0
+    assert result["category"].iloc[1] == -1
+
+
+def test_custom_missing_code_is_respected() -> None:
+    """A non-default missing_code configuration flows through fit and apply."""
+    train = pd.DataFrame({"category": ["a", "b"]})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+    params = calc.fit(train, {"columns": ["category"], "missing_code": -99})
+
+    assert params["missing_code"] == -99
+    result = applier.apply(pd.DataFrame({"category": ["unseen"]}), dict(params))
+    assert result["category"].iloc[0] == -99
+
+
+def test_target_column_named_in_columns_gets_encoded() -> None:
+    """When y's name is listed in `columns`, the target is also label-encoded."""
+    X = pd.DataFrame({"category": ["a", "b", "a"]})
+    y = pd.Series(["yes", "no", "yes"], name="target")
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+
+    params = calc.fit((X, y), {"columns": ["category", "target"]})
+    assert "__target__" in params["encoders"]
+
+    X_out, y_out = applier.apply((X, y), dict(params))
+    # "no" < "yes" alphabetically -> no=0, yes=1
+    assert list(y_out) == [1, 0, 1]
+    assert list(X_out["category"]) == [0, 1, 0]
+
+
+def test_target_encoded_when_no_feature_columns_configured() -> None:
+    """`_maybe_fit_target` fits y whenever `cols` is falsy, regardless of y.name."""
+    X = pd.DataFrame({"category": ["a", "b"]})
+    y = pd.Series(["p", "q"], name="anything")
+    calc = LabelEncoderCalculator()
+
+    params = calc.fit((X, y), {})
+    assert "__target__" in params["encoders"]
+    assert params["classes_count"]["__target__"] == 2
+
+
+def test_empty_dataframe_with_no_columns_returns_empty_artifact() -> None:
+    """Fitting with no configured columns and no rows still returns a valid (empty) artifact."""
+    df = pd.DataFrame({"category": pd.Series([], dtype=object)})
+    calc = LabelEncoderCalculator()
+
+    params = calc.fit(df, {"columns": None})
+    assert params["encoders"] == {}
+    assert params["classes_count"] == {}
+
+
+def test_single_row_dataframe() -> None:
+    """A single-row frame produces exactly one class."""
+    df = pd.DataFrame({"category": ["only"]})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+
+    params = calc.fit(df, {"columns": ["category"]})
+    result = applier.apply(df, dict(params))
+
+    assert params["classes_count"] == {"category": 1}
+    assert result["category"].iloc[0] == 0
+
+
+def test_all_nan_column_becomes_single_string_class() -> None:
+    """An all-NaN column stringifies to a constant "nan" class."""
+    df = pd.DataFrame({"category": [np.nan, np.nan, np.nan]})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+
+    params = calc.fit(df, {"columns": ["category"]})
+    result = applier.apply(df, dict(params))
+
+    assert params["classes_count"] == {"category": 1}
+    assert (result["category"] == 0).all()
+
+
+def test_constant_column_encodes_to_single_code() -> None:
+    """A constant categorical column collapses to exactly one class."""
+    df = pd.DataFrame({"category": ["same"] * 5})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+
+    params = calc.fit(df, {"columns": ["category"]})
+    result = applier.apply(df, dict(params))
+
+    assert params["classes_count"] == {"category": 1}
+    assert (result["category"] == 0).all()
+
+
+def test_unconfigured_column_is_left_untouched() -> None:
+    """Columns absent from `encoders` (e.g. filtered out) pass through unchanged."""
+    df = pd.DataFrame({"category": ["a", "b"], "other": [1, 2]})
+    calc = LabelEncoderCalculator()
+    applier = LabelEncoderApplier()
+
+    params = calc.fit(df, {"columns": ["category"]})
+    result = applier.apply(df, dict(params))
+
+    assert list(result["other"]) == [1, 2]
+
+
+# ---------------------------------------------------------------------------
+# Polars parity
+# ---------------------------------------------------------------------------
+
+
+@st.composite
+def _category_frame(draw: st.DrawFn) -> pd.DataFrame:
+    """Generate a small frame with a categorical column drawn from a fixed alphabet."""
+    n = draw(st.integers(min_value=3, max_value=30))
+    cats = draw(st.lists(st.sampled_from(["a", "b", "c", "d"]), min_size=n, max_size=n))
+    return pd.DataFrame({"category": cats})
+
+
+@given(df=_category_frame())
+def test_label_fit_engine_parity(df: pd.DataFrame) -> None:
+    """Pandas and polars fits must assign identical classes and codes."""
+    config: dict[str, Any] = {"columns": ["category"]}
+    pd_params = LabelEncoderCalculator().fit(df, dict(config))
+    pl_params = LabelEncoderCalculator().fit(pl.from_pandas(df), dict(config))
+
+    assert pd_params["classes_count"] == pl_params["classes_count"]
+    pd_le = pd_params["encoders"]["category"]
+    pl_le = pl_params["encoders"]["category"]
+    assert list(pd_le.classes_) == list(pl_le.classes_)
+
+
+def test_label_apply_engine_parity_on_unseen_category() -> None:
+    """Unknown-category fallback must match between pandas and polars apply paths."""
+    train = pd.DataFrame({"category": ["a", "b", "a"]})
+    config: dict[str, Any] = {"columns": ["category"], "missing_code": -1}
+
+    pd_params = dict(LabelEncoderCalculator().fit(train, dict(config)))
+    pl_params = dict(LabelEncoderCalculator().fit(pl.from_pandas(train), dict(config)))
+
+    test_pd = pd.DataFrame({"category": ["a", "unseen"]})
+    test_pl = pl.DataFrame({"category": ["a", "unseen"]})
+
+    out_pd = LabelEncoderApplier().apply(test_pd, pd_params)
+    out_pl = LabelEncoderApplier().apply(test_pl, pl_params)
+
+    np.testing.assert_allclose(
+        out_pd["category"].to_numpy().astype(float),
+        out_pl["category"].to_numpy().astype(float),
+    )

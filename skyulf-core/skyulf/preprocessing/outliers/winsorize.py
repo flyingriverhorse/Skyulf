@@ -17,7 +17,12 @@ from ..dispatcher import apply_dual_engine
 class WinsorizeApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
+        # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
+        # own unpack_pipeline_input doesn't silently drop y. Winsorize never
+        # filters rows, but the wrap keeps behavior consistent with the other
+        # outlier nodes and avoids losing y from the returned tuple.
+        input_data = (X, y) if y is not None else X
+        return apply_dual_engine(input_data, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
