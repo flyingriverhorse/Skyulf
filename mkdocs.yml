@@ -54,6 +54,7 @@ nav:
     - Multi-Path Pipelines: guides/multi_path_pipelines.md
     - FAQ & Comparison: guides/faq.md
     - Recipes: guides/recipes.md
+    - Migrating from scikit-learn: guides/sklearn_migration.md
     - Skyulf vs. YData vs. Sweetviz: guides/profiling_comparison.md
     - Architecture: architecture.md
     - Data Architecture: data_architecture.md

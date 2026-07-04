@@ -8,6 +8,7 @@ from .compute import (
 )
 from .deprecation import deprecated, warn_deprecated
 from .model_registry import InMemoryModelRegistry, ModelRegistry, ModelVersion
+from .protocols import ApplierProtocol, CalculatorProtocol, PipelineStep
 from .schema import SchemaMismatchError, SkyulfSchema, validate_schema
 from .serialization import (
     JoblibModelSerializer,
@@ -36,4 +37,7 @@ __all__ = [
     "SkyulfSchema",
     "SchemaMismatchError",
     "validate_schema",
+    "CalculatorProtocol",
+    "ApplierProtocol",
+    "PipelineStep",
 ]

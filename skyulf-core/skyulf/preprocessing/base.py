@@ -6,6 +6,7 @@ from typing import Any, Callable, Dict, Mapping, Optional, TypeVar, Union, cast
 
 import pandas as pd
 
+from ..core.protocols import ApplierProtocol, CalculatorProtocol
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..utils import get_data_stats, pack_pipeline_output, unpack_pipeline_input
@@ -118,10 +119,18 @@ class BaseApplier(ABC):
 
 
 class StatefulTransformer:
+    """Fits + applies one pipeline step.
+
+    Accepts anything satisfying :class:`~skyulf.core.protocols.CalculatorProtocol` /
+    :class:`~skyulf.core.protocols.ApplierProtocol` (structural typing) — a
+    ``BaseCalculator``/``BaseApplier`` subclass, or any duck-typed object
+    exposing matching ``fit``/``apply`` methods, works without subclassing.
+    """
+
     def __init__(
         self,
-        calculator: BaseCalculator,
-        applier: BaseApplier,
+        calculator: CalculatorProtocol,
+        applier: ApplierProtocol,
         node_id: str,
         apply_on_test: bool = True,
         apply_on_validation: bool = True,
