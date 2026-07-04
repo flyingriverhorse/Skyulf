@@ -86,7 +86,7 @@ def _apply_power_to_pandas_col(df_out: Any, item: Dict[str, Any]) -> Any:
 
 class GeneralTransformationApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -176,7 +176,7 @@ class GeneralTransformationCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralTransformationArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralTransformationArtifact:  # pylint: disable=arguments-differ
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
         is_polars = get_engine(X).name == EngineName.POLARS

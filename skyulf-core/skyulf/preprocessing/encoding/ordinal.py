@@ -122,7 +122,7 @@ def _ordinal_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
 
 class OrdinalEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -306,7 +306,7 @@ class OrdinalEncoderCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> OrdinalArtifact:
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> OrdinalArtifact:  # pylint: disable=arguments-differ
         return cast(
             OrdinalArtifact,
             fit_dual_engine(

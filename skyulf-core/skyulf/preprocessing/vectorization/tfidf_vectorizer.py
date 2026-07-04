@@ -56,7 +56,7 @@ def _tfidf_apply_pandas(
 
 class TfidfVectorizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _tfidf_apply_pandas)
 
 
@@ -90,7 +90,7 @@ class TfidfVectorizerCalculator(BaseCalculator):
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TfidfVectorizerArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TfidfVectorizerArtifact:  # pylint: disable=arguments-differ
         cols: List[str] = config.get("columns", [])
         if not cols:
             return {}

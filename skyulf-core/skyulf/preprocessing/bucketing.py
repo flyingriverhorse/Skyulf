@@ -232,7 +232,7 @@ class BaseBinningApplier(BaseApplier):
     """
 
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _bucketing_apply_polars, _bucketing_apply_pandas)
 
 
@@ -390,7 +390,7 @@ class GeneralBinningCalculator(BaseCalculator):
     """Master calculator that handles mixed strategies and per-column overrides."""
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
@@ -474,7 +474,7 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """Thin wrapper around :class:`GeneralBinningCalculator` with ``kbins`` strategy."""
 
-    def fit(
+    def fit(  # pylint: disable=arguments-differ
         self,
         df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
         config: Dict[str, Any],

@@ -99,7 +99,7 @@ def _apply_value_replacement_pandas(
 
 class ValueReplacementApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -147,7 +147,7 @@ class ValueReplacementCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> ValueReplacementArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> ValueReplacementArtifact:  # pylint: disable=arguments-differ
         cols = resolve_columns(X, config)
         mapping = config.get("mapping")
         replacements = config.get("replacements")

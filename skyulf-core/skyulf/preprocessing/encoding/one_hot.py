@@ -102,7 +102,7 @@ def _onehot_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, A
 
 class OneHotEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -224,7 +224,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, A
 )
 class OneHotEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> OneHotArtifact:
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> OneHotArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         return cast(

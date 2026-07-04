@@ -59,7 +59,7 @@ def _normalize_alias_pandas(val: Any, mapping: Dict[str, str]) -> Any:
 
 class AliasReplacementApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -131,7 +131,7 @@ class AliasReplacementCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> AliasReplacementArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> AliasReplacementArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

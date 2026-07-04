@@ -20,7 +20,7 @@ from ._common import (
 
 class SimpleImputerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -81,7 +81,7 @@ class SimpleImputerCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> SimpleImputerArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

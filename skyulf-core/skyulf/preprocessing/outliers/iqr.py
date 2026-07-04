@@ -17,7 +17,7 @@ from ._common import _apply_pandas_mask, _filter_y_polars
 
 class IQRApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
@@ -71,7 +71,7 @@ class IQRCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> IQRArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> IQRArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

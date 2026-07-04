@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class UnivariateSelectionApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
@@ -43,7 +43,7 @@ class UnivariateSelectionApplier(BaseApplier):
 )
 class UnivariateSelectionCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> UnivariateSelectionArtifact:
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> UnivariateSelectionArtifact:  # pylint: disable=arguments-differ
         target_col = config.get("target_column")
         X_pd = to_pandas(X)
 

@@ -95,7 +95,7 @@ def _label_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
 
 class LabelEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -229,7 +229,7 @@ class LabelEncoderCalculator(BaseCalculator):
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> LabelEncoderArtifact:
+    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> LabelEncoderArtifact:  # pylint: disable=arguments-differ
         return cast(
             LabelEncoderArtifact,
             fit_dual_engine(
