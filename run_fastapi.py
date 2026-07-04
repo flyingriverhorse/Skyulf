@@ -9,7 +9,7 @@ It replaces the Flask run.py with modern async server capabilities.
 
 import logging
 import os
-import subprocess
+import subprocess  # nosec B404 - used only to spawn the local Celery worker (see below)
 import sys
 
 from backend.config import get_settings

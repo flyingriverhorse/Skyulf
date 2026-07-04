@@ -52,16 +52,16 @@ def main():
         }
     )
 
-    print(f"\n📊 Drift Report Summary")
+    print("\n📊 Drift Report Summary")
     print(f"Drifted Columns: {report.drifted_columns_count}")
 
     # 1. Check Schema Drift
     if report.missing_columns:
-        print(f"\n⚠️  Missing Columns (Present in Ref, Missing in Curr):")
+        print("\n⚠️  Missing Columns (Present in Ref, Missing in Curr):")
         print(f"   {report.missing_columns}")
 
     if report.new_columns:
-        print(f"\nℹ️  New Columns (Present in Curr, Missing in Ref):")
+        print("\nℹ️  New Columns (Present in Curr, Missing in Ref):")
         print(f"   {report.new_columns}")
 
     # 2. Check Statistical Drift

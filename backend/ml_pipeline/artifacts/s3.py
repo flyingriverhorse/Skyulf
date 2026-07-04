@@ -189,4 +189,4 @@ class S3ArtifactStore(ArtifactStore):
         try:
             self.close()
         except Exception:
-            pass
+            pass  # nosec B110 - best-effort cleanup; logging is unsafe during interpreter shutdown

@@ -105,7 +105,7 @@ class AsyncSQLiteConnectionManager:
                     try:
                         await conn.rollback()
                     except Exception:
-                        pass
+                        pass  # nosec B110 - connection already broken; rollback best-effort only
                 raise
             finally:
                 if conn:

@@ -17,6 +17,13 @@ module.exports = {
   settings: {
     react: { version: 'detect' },
   },
+  overrides: [
+    {
+      // Node-only build/config scripts (not shipped to the browser).
+      files: ['scripts/**/*.mjs', 'tailwind.config.js', 'vite.config.*', 'postcss.config.*'],
+      env: { node: true, browser: false },
+    },
+  ],
   rules: {
     'react-refresh/only-export-components': 'off',
     '@typescript-eslint/no-explicit-any': 'off',

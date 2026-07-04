@@ -17,7 +17,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import unpack_pipeline_input
 from .._artifacts import CountVectorizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import _join_text_columns, _warn_large_output, apply_text_pandas_only

@@ -3,7 +3,7 @@
 import hashlib
 import json
 import logging
-import pickle
+import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
 from typing import Any, Dict, Optional, Union, cast
 
 import pandas as pd

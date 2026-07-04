@@ -97,7 +97,7 @@ class DriftCalculator:
                     curr_series = curr_series.cast(dtype, strict=False)
                 except Exception:
                     # If casting fails completely (unlikely with strict=False), skip
-                    continue
+                    continue  # nosec B112
 
             ref_data = self.reference_df[col].drop_nulls().to_numpy()
             curr_data = curr_series.drop_nulls().to_numpy()
@@ -254,12 +254,6 @@ class DriftCalculator:
         """
         Calculate Population Stability Index (PSI).
         """
-
-        def scale_range(input, min, max):  # noqa: A002
-            input += -(np.min(input))
-            input /= np.max(input) / (max - min)
-            input += min
-            return input
 
         breakpoints = np.arange(0, buckets + 1) / (buckets) * 100
 

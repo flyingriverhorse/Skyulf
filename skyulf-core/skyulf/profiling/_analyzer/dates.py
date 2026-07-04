@@ -53,7 +53,7 @@ class DatesMixin(_AnalyzerState):
                         best_parsed = (None, "datetime_generic")
                         best_method_name = "Generic Datetime"
             except Exception:
-                pass
+                pass  # nosec B110 - datetime-generic parse is a best-effort candidate, others still tried
 
             try:
                 parsed = sample.str.to_date(strict=False)
@@ -64,7 +64,7 @@ class DatesMixin(_AnalyzerState):
                         best_parsed = (None, "date_generic")
                         best_method_name = "Generic Date"
             except Exception:
-                pass
+                pass  # nosec B110 - date-generic parse is a best-effort candidate, others still tried
 
             common_formats = [
                 "%m/%d/%Y",
@@ -85,7 +85,7 @@ class DatesMixin(_AnalyzerState):
                             best_parsed = (fmt, "datetime_format")
                             best_method_name = f"Format {fmt}"
                 except Exception:
-                    continue
+                    continue  # nosec B112 - format candidate didn't match; next format is tried
 
             if best_parsed:
                 fmt, method = best_parsed
