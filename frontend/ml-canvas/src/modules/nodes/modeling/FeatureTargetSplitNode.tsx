@@ -7,7 +7,7 @@ import { getIncomers } from '@xyflow/react';
 
 interface FeatureTargetSplitConfig {
   target_column: string;
-  datasetId?: string;
+  datasetId?: string | undefined;
 }
 
 const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; onChange: (c: FeatureTargetSplitConfig) => void; nodeId?: string }> = ({
@@ -48,8 +48,13 @@ const FeatureTargetSplitSettings: React.FC<{ config: FeatureTargetSplitConfig; o
   const upstreamDatasetId = findUpstreamDatasetId(nodeId || '');
 
   React.useEffect(() => {
+    // Propagate datasetId, and clear it if the upstream dataset connection is removed
+    // (otherwise a stale datasetId lingers on this node's data forever, making
+    // downstream nodes think a dataset is still connected when it isn't).
     if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {
       onChange({ ...config, datasetId: upstreamDatasetId });
+    } else if (!upstreamDatasetId && config.datasetId) {
+      onChange({ ...config, datasetId: undefined });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upstreamDatasetId, config.datasetId, onChange]);

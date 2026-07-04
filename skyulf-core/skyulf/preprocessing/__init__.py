@@ -38,6 +38,8 @@ from .encoding import (
 from .feature_generation import (
     FeatureGenerationApplier,
     FeatureGenerationCalculator,
+    FeatureInteractionApplier,
+    FeatureInteractionCalculator,
     PolynomialFeaturesApplier,
     PolynomialFeaturesCalculator,
 )
@@ -186,6 +188,8 @@ __all__ = [
     "CastingApplier",
     "FeatureGenerationCalculator",
     "FeatureGenerationApplier",
+    "FeatureInteractionCalculator",
+    "FeatureInteractionApplier",
     "PolynomialFeaturesCalculator",
     "PolynomialFeaturesApplier",
     "VarianceThresholdCalculator",

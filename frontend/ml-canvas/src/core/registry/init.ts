@@ -22,6 +22,7 @@ import { BinningNode } from '../../modules/nodes/processing/BinningNode';
 import { ResamplingNode } from '../../modules/nodes/processing/ResamplingNode';
 import { FeatureGenerationNode } from '../../modules/nodes/processing/FeatureGenerationNode';
 import { PolynomialFeaturesNode } from '../../modules/nodes/processing/PolynomialFeaturesNode';
+import { FeatureInteractionNode } from '../../modules/nodes/processing/FeatureInteractionNode';
 import { TextCleaningNode } from '../../modules/nodes/processing/TextCleaningNode';
 import {
   CountVectorizerNode,
@@ -45,6 +46,7 @@ export const initializeRegistry = () => {
   registry.register(ResamplingNode);
   registry.register(FeatureGenerationNode);
   registry.register(PolynomialFeaturesNode);
+  registry.register(FeatureInteractionNode);
   registry.register(TextCleaningNode);
   registry.register(CountVectorizerNode);
   registry.register(TfidfVectorizerNode);
