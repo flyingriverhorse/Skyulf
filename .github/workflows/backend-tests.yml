@@ -65,7 +65,10 @@ jobs:
 
       - name: Install dependencies (uv)
         run: |
-          uv pip install --system -r requirements-ci.txt
+          echo "::group::Installing dependencies (uv pip install -r requirements-ci.txt)"
+          uv pip install --system -q -r requirements-ci.txt
+          echo "::endgroup::"
+          echo "## 🧪 Backend test suite" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Complexity gate (lizard, CCN 8)
         run: |
@@ -74,15 +77,20 @@ jobs:
           # skyulf-core-tests.yml's core/engines/scaling/transformations).
           # Promote specific backend/ paths to a hard `-w` gate once they're
           # verified clean.
+          echo "::group::Full-tree lizard report (informational only, non-blocking)"
           lizard backend --CCN 8 -w || true
+          echo "::endgroup::"
 
       - name: Run backend tests
         # Scoped to the root tests/ dir (backend API, Celery, DB, node
         # wiring) — skyulf-core's own test suite lives in skyulf-core/tests
         # and runs in skyulf-core-tests.yml instead.
+        # No -s: keeps captured stdout/print output out of the log for
+        # passing tests (still shown automatically for any failure).
         run: |
-          pytest tests -q -s --maxfail=1 --disable-warnings \
-            --cov=backend --cov-branch --cov-report=term-missing --cov-report=xml
+          bash .github/scripts/run_check.sh "pytest tests (backend)" \
+            pytest tests -q --maxfail=1 --disable-warnings \
+              --cov=backend --cov-branch --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
@@ -104,4 +112,8 @@ jobs:
 
       - name: Build and run unit-test image
         run: |
-          docker compose -f docker-compose.test.yml run --rm --build unit-tests
+          echo "## 🐳 Docker smoke test (full monorepo)" >> "$GITHUB_STEP_SUMMARY"
+          echo "::group::docker compose build + run (unit-tests)"
+          bash .github/scripts/run_check.sh "docker compose unit-tests (monorepo)" \
+            docker compose -f docker-compose.test.yml run --rm --build unit-tests
+          echo "::endgroup::"

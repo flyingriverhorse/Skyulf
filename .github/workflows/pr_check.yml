@@ -52,16 +52,16 @@ jobs:
 
       - name: Install dependencies (uv)
         run: |
-          uv pip install --system -r requirements-ci.txt
+          echo "::group::Installing dependencies (uv pip install -r requirements-ci.txt)"
+          uv pip install --system -q -r requirements-ci.txt
+          echo "::endgroup::"
+          echo "## 🔍 Python Static Checks" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Lint check (Ruff)
-        run: |
-          ruff check .
+        run: bash .github/scripts/run_check.sh "Ruff lint" ruff check .
 
       - name: Format check (Ruff)
-        run: |
-          ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+        run: bash .github/scripts/run_check.sh "Ruff format" ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
 
       - name: Type check (Ty)
-        run: |
-          ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+        run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py

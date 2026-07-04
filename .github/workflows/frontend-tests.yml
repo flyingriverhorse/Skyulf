@@ -38,19 +38,23 @@ jobs:
           cache-dependency-path: frontend/ml-canvas/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "::group::npm ci"
+          npm ci --silent --no-audit --no-fund
+          echo "::endgroup::"
+          echo "## 🎨 Frontend gate" >> "$GITHUB_STEP_SUMMARY"
         working-directory: frontend/ml-canvas
 
       - name: Lint (ESLint)
-        run: npm run lint
+        run: bash ../../.github/scripts/run_check.sh "ESLint" npm run lint
         working-directory: frontend/ml-canvas
 
       - name: Type check (tsc)
-        run: npx tsc --project tsconfig.json --noEmit
+        run: bash ../../.github/scripts/run_check.sh "tsc --noEmit" npx tsc --project tsconfig.json --noEmit
         working-directory: frontend/ml-canvas
 
       - name: Version sync check (pyproject.toml vs package.json)
-        run: npm run check-version
+        run: bash ../../.github/scripts/run_check.sh "Version sync check" npm run check-version
         working-directory: frontend/ml-canvas
 
   frontend-build:
@@ -68,21 +72,25 @@ jobs:
           cache-dependency-path: frontend/ml-canvas/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "::group::npm ci"
+          npm ci --silent --no-audit --no-fund
+          echo "::endgroup::"
+          echo "## 🏗️ Frontend build" >> "$GITHUB_STEP_SUMMARY"
         working-directory: frontend/ml-canvas
 
       - name: Test
-        run: npm test
+        run: bash ../../.github/scripts/run_check.sh "Unit tests (vitest)" npm test
         working-directory: frontend/ml-canvas
 
       - name: Build
         # Notice: building here compiles the code anyway, but doing it inside
         # frontend-build keeps the gate super fast!
-        run: npm run build
+        run: bash ../../.github/scripts/run_check.sh "Build" npm run build
         working-directory: frontend/ml-canvas
 
       - name: Bundle size budget
-        run: npm run size-check
+        run: bash ../../.github/scripts/run_check.sh "Bundle size budget" npm run size-check
         working-directory: frontend/ml-canvas
 
   frontend-e2e:
@@ -101,15 +109,22 @@ jobs:
           cache-dependency-path: frontend/ml-canvas/package-lock.json
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          echo "::group::npm ci"
+          npm ci --silent --no-audit --no-fund
+          echo "::endgroup::"
+          echo "## 🎭 Frontend e2e (Playwright)" >> "$GITHUB_STEP_SUMMARY"
         working-directory: frontend/ml-canvas
 
       - name: Install Playwright browsers
-        run: npm run test:e2e:install
+        run: |
+          echo "::group::npm run test:e2e:install"
+          npm run test:e2e:install
+          echo "::endgroup::"
         working-directory: frontend/ml-canvas
 
       - name: Run Playwright e2e tests
-        run: npm run test:e2e
+        run: bash ../../.github/scripts/run_check.sh "Playwright e2e" npm run test:e2e
         working-directory: frontend/ml-canvas
 
       - name: Upload Playwright report
