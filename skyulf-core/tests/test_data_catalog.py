@@ -1,5 +1,7 @@
 """Tests for the DataCatalog abstract interface."""
 
+from typing import cast
+
 import pandas as pd
 import pytest
 
@@ -39,7 +41,7 @@ def test_concrete_catalog_save_load_roundtrip() -> None:
     catalog.save("ds1", df)
 
     assert catalog.exists("ds1") is True
-    pd.testing.assert_frame_equal(catalog.load("ds1"), df)
+    pd.testing.assert_frame_equal(cast(pd.DataFrame, catalog.load("ds1")), df)
 
 
 def test_get_dataset_name_default_returns_none() -> None:

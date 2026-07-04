@@ -163,8 +163,8 @@ def test_split_xy_row_counts_and_shapes() -> None:
     y = pd.Series([i % 2 for i in range(100)])
     splitter = DataSplitter(test_size=0.2, random_state=42)
     result = splitter.split_xy(X, y)
-    X_train, y_train = result.train
-    X_test, y_test = result.test
+    X_train, y_train = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.train)
+    X_test, y_test = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.test)
     assert len(X_train) == len(y_train) == 80
     assert len(X_test) == len(y_test) == 20
 
@@ -176,7 +176,7 @@ def test_split_xy_with_validation() -> None:
     splitter = DataSplitter(test_size=0.2, validation_size=0.1, random_state=42)
     result = splitter.split_xy(X, y)
     assert result.validation is not None
-    X_val, y_val = result.validation
+    X_val, y_val = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.validation)
     assert len(X_val) == len(y_val) == 10
 
 
@@ -215,7 +215,7 @@ def test_split_applier_splits_target_column_when_configured() -> None:
     }
     result = SplitApplier().apply(df, params)
     assert isinstance(result.train, tuple)
-    X_train, y_train = result.train
+    X_train, y_train = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.train)
     assert "target" not in X_train.columns
     assert len(X_train) == len(y_train)
 
@@ -227,7 +227,7 @@ def test_split_applier_accepts_xy_tuple_input() -> None:
     params: Dict[str, Any] = {"test_size": 0.2, "random_state": 42}
     result = SplitApplier().apply((X, y), params)
     assert isinstance(result, SplitDataset)
-    X_train, y_train = result.train
+    X_train, y_train = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.train)
     assert len(X_train) == 40
 
 
@@ -280,7 +280,7 @@ def test_feature_target_split_applier_handles_split_dataset_input() -> None:
     split_result = SplitApplier().apply(df, {"test_size": 0.2, "random_state": 42})
     result = FeatureTargetSplitApplier().apply(split_result, {"target_column": "target"})
     assert isinstance(result, SplitDataset)
-    X_train, y_train = result.train
+    X_train, y_train = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.train)
     assert "target" not in X_train.columns
     assert len(X_train) == len(y_train)
 
@@ -362,7 +362,7 @@ def test_split_applier_stratify_true_without_target_column_uses_sentinel() -> No
     params: Dict[str, Any] = {"test_size": 0.2, "random_state": 42, "stratify": True}
     result = SplitApplier().apply((X, y), params)
     assert isinstance(result, SplitDataset)
-    _, y_test = result.test
+    _, y_test = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.test)
     assert y_test.mean() == pytest.approx(0.5, abs=0.05)
 
 
@@ -395,7 +395,7 @@ def test_feature_target_split_applier_handles_polars_split_dataset_input() -> No
     split_result = SplitApplier().apply(df, {"test_size": 0.2, "random_state": 42})
     result = FeatureTargetSplitApplier().apply(split_result, {"target_column": "target"})
     assert isinstance(result, SplitDataset)
-    X_train, y_train = result.train
+    X_train, y_train = typing.cast("tuple[pl.DataFrame, pl.Series]", result.train)
     assert "target" not in X_train.columns
     assert X_train.height == len(y_train)
 
@@ -418,7 +418,7 @@ def test_feature_target_split_applier_split_dataset_member_already_split() -> No
     assert result.train[0] is X_train
     assert result.train[1] is y_train
     # test member had no y but does have the target column -> gets split.
-    X_test_out, y_test_out = result.test
+    X_test_out, y_test_out = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], result.test)
     assert "target" not in X_test_out.columns
     assert list(y_test_out) == [1, 0]
 

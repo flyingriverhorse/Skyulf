@@ -85,6 +85,7 @@ def test_analyze_sentiment_returns_none_for_empty_texts() -> None:
 
 def test_analyze_sentiment_skips_non_string_items() -> None:
     """Non-string items in the texts list are skipped but strings are still scored (line 72)."""
+    pytest.importorskip("vaderSentiment")
     analyzer = _text_analyzer(["placeholder"])
     mixed_series = _FakeTextSeries(["I love this product", 12345, "This is terrible"])
 
@@ -106,6 +107,7 @@ def test_analyze_sentiment_returns_none_when_total_stays_zero() -> None:
 
 def test_analyze_sentiment_outer_exception_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     """A failure inside VADER's polarity_scores should be caught and return None (lines 92-93)."""
+    pytest.importorskip("vaderSentiment")
     import vaderSentiment.vaderSentiment as vader_mod
 
     class _BoomAnalyzer:

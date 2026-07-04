@@ -281,6 +281,7 @@ def test_discover_causal_graph_returns_none_for_small_sample() -> None:
 
 def test_discover_causal_graph_runs_on_correlated_data() -> None:
     """A larger correlated dataset should produce a causal graph with matching nodes."""
+    pytest.importorskip("causallearn")
     rng = np.random.default_rng(7)
     a = rng.normal(0, 1, 200)
     b = a * 1.5 + rng.normal(0, 0.2, 200)
@@ -295,6 +296,7 @@ def test_discover_causal_graph_runs_on_correlated_data() -> None:
 
 def test_discover_causal_graph_selects_top_correlated_with_target_hint() -> None:
     """With >15 numeric cols and a 'target'-like name, keep target + top-14 |corr| cols."""
+    pytest.importorskip("causallearn")
     rng = np.random.default_rng(11)
     n = 60
     data = {f"feature_{i}": rng.normal(0, 1, n) for i in range(15)}
@@ -313,6 +315,7 @@ def test_discover_causal_graph_selects_top_correlated_with_target_hint() -> None
 
 def test_discover_causal_graph_selects_highest_variance_without_target_hint() -> None:
     """With >15 numeric cols and no target-like name, keep the 15 highest-variance cols."""
+    pytest.importorskip("causallearn")
     rng = np.random.default_rng(12)
     n = 60
     data = {}
@@ -353,6 +356,7 @@ def test_discover_causal_graph_returns_none_when_causallearn_missing(monkeypatch
 
 def test_discover_causal_graph_maps_all_edge_endpoint_combinations(monkeypatch) -> None:
     """Directed/reversed/undirected/bidirected/no-edge endpoint codes should map correctly."""
+    pytest.importorskip("causallearn")
     from types import SimpleNamespace
 
     import skyulf.profiling._analyzer.causal as causal_module

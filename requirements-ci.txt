@@ -30,6 +30,7 @@ lightgbm>=4.0.0
 scipy>=1.13.1
 imbalanced-learn>=0.14.1,<1.0.0
 joblib>=1.3.0
+optuna>=3.0.0                        # Imported by skyulf-core/tests/test_tuning_engine.py — needed for ty type-resolution in CI
 
 # Test + tooling
 pytest>=7.4.0,<10.0.0
