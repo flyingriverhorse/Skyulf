@@ -1,4 +1,4 @@
-# Â© 2025 Murat Unsal â€” Skyulf Project
+# © 2025 Murat Unsal — Skyulf Project
 
 name: CI
 
@@ -107,7 +107,7 @@ jobs:
           lizard skyulf-core/skyulf/core skyulf-core/skyulf/engines \
                  skyulf-core/skyulf/preprocessing/scaling \
                  skyulf-core/skyulf/preprocessing/transformations --CCN 8 -w
-          # Full-tree report (non-blocking) â€” surfaces legacy hotspots without failing CI.
+          # Full-tree report (non-blocking) — surfaces legacy hotspots without failing CI.
           lizard skyulf-core/skyulf --CCN 8 -w || true
 
       - name: Run tests
@@ -149,6 +149,10 @@ jobs:
         run: npx tsc --project tsconfig.json --noEmit
         working-directory: frontend/ml-canvas
 
+      - name: Version sync check (pyproject.toml vs package.json)
+        run: npm run check-version
+        working-directory: frontend/ml-canvas
+
   frontend-build:
     needs: frontend-gate
     runs-on: ubuntu-latest
@@ -180,3 +184,38 @@ jobs:
       - name: Bundle size budget
         run: npm run size-check
         working-directory: frontend/ml-canvas
+
+  frontend-e2e:
+    name: Frontend e2e (Playwright)
+    needs: frontend-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/ml-canvas/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend/ml-canvas
+
+      - name: Install Playwright browsers
+        run: npm run test:e2e:install
+        working-directory: frontend/ml-canvas
+
+      - name: Run Playwright e2e tests
+        run: npm run test:e2e
+        working-directory: frontend/ml-canvas
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/ml-canvas/playwright-report/
+          retention-days: 7
