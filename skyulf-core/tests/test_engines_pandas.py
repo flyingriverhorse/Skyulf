@@ -140,6 +140,26 @@ def test_pandas_engine_to_numpy_from_wrapper(df):
     np.testing.assert_array_equal(result, df.to_numpy())
 
 
+class _NoToNumpyDelegationWrapper(SkyulfPandasWrapper):
+    """A wrapper variant whose __getattr__ hides `to_numpy` so that
+    `hasattr(wrapper, "to_numpy")` is False, forcing PandasEngine.to_numpy's
+    isinstance(SkyulfPandasWrapper) fallback branch to run."""
+
+    def __getattr__(self, name):
+        if name == "to_numpy":
+            raise AttributeError(name)
+        return super().__getattr__(name)
+
+
+def test_pandas_engine_to_numpy_wrapper_without_delegated_to_numpy(df):
+    """to_numpy must fall back to `.to_pandas().to_numpy()` for a wrapper whose
+    __getattr__ does not expose `to_numpy` directly (the isinstance branch)."""
+    wrapper = _NoToNumpyDelegationWrapper(df)
+    assert not hasattr(wrapper, "to_numpy")
+    result = PandasEngine.to_numpy(wrapper)
+    np.testing.assert_array_equal(result, df.to_numpy())
+
+
 def test_pandas_engine_to_numpy_from_plain_list():
     """to_numpy should fall back to np.array for objects without to_numpy."""
     result = PandasEngine.to_numpy([1, 2, 3])

@@ -293,6 +293,140 @@ def test_discover_causal_graph_runs_on_correlated_data() -> None:
     assert {n.id for n in graph.nodes} == {"a", "b", "c"}
 
 
+def test_discover_causal_graph_selects_top_correlated_with_target_hint() -> None:
+    """With >15 numeric cols and a 'target'-like name, keep target + top-14 |corr| cols."""
+    rng = np.random.default_rng(11)
+    n = 60
+    data = {f"feature_{i}": rng.normal(0, 1, n) for i in range(15)}
+    # target correlates strongly with feature_0 so it should survive the top-14 cut.
+    data["target"] = data["feature_0"] * 2.0 + rng.normal(0, 0.1, n)
+    df = pl.DataFrame(data)
+    analyzer = EDAAnalyzer(df)
+
+    graph = analyzer._discover_causal_graph(list(df.columns))
+
+    assert graph is not None
+    node_ids = {n.id for n in graph.nodes}
+    assert "target" in node_ids
+    assert len(node_ids) == 15
+
+
+def test_discover_causal_graph_selects_highest_variance_without_target_hint() -> None:
+    """With >15 numeric cols and no target-like name, keep the 15 highest-variance cols."""
+    rng = np.random.default_rng(12)
+    n = 60
+    data = {}
+    for i in range(16):
+        # Scale increases with i so higher-index columns have higher variance.
+        data[f"col_{i}"] = rng.normal(0, 1 + i, n)
+    df = pl.DataFrame(data)
+    analyzer = EDAAnalyzer(df)
+
+    graph = analyzer._discover_causal_graph(list(df.columns))
+
+    assert graph is not None
+    node_ids = {n.id for n in graph.nodes}
+    assert len(node_ids) == 15
+    # The lowest-variance column ("col_0") should have been dropped.
+    assert "col_0" not in node_ids
+
+
+def test_discover_causal_graph_returns_none_when_causallearn_missing(monkeypatch) -> None:
+    """If causal-learn isn't importable, the PC algorithm step should degrade to None."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name.startswith("causallearn"):
+            raise ImportError("mocked missing causallearn")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    rng = np.random.default_rng(13)
+    df = pl.DataFrame({"a": rng.normal(0, 1, 60), "b": rng.normal(0, 1, 60)})
+    analyzer = EDAAnalyzer(df)
+
+    assert analyzer._discover_causal_graph(["a", "b"]) is None
+
+
+def test_discover_causal_graph_maps_all_edge_endpoint_combinations(monkeypatch) -> None:
+    """Directed/reversed/undirected/bidirected/no-edge endpoint codes should map correctly."""
+    from types import SimpleNamespace
+
+    import skyulf.profiling._analyzer.causal as causal_module
+
+    # causal-learn endpoint encoding: -1 = tail, 1 = arrowhead. Build a 4x4 adjacency
+    # matrix exercising every branch of the endpoint-to-edge-type mapping.
+    adj = np.zeros((4, 4))
+    # (a, b): directed a -> b
+    adj[1, 0] = -1
+    adj[0, 1] = 1
+    # (a, c): reversed -> edge stored as c -> a
+    adj[2, 0] = 1
+    adj[0, 2] = -1
+    # (a, d): no edge at all (both endpoints 0) -> skipped
+    # (b, c): undirected
+    adj[2, 1] = -1
+    adj[1, 2] = -1
+    # (b, d): bidirected
+    adj[3, 1] = 1
+    adj[1, 3] = 1
+    # (c, d): left as no edge.
+
+    fake_cg = SimpleNamespace(G=SimpleNamespace(graph=adj))
+
+    def fake_pc(data, alpha, indep_test, show_progress):
+        return fake_cg
+
+    monkeypatch.setattr(
+        "causallearn.search.ConstraintBased.PC.pc",
+        fake_pc,
+    )
+
+    rng = np.random.default_rng(14)
+    n = 60
+    df = pl.DataFrame(
+        {
+            "a": rng.normal(0, 1, n),
+            "b": rng.normal(0, 1, n),
+            "c": rng.normal(0, 1, n),
+            "d": rng.normal(0, 1, n),
+        }
+    )
+    analyzer = causal_module.CausalMixin()
+    analyzer.df = df  # type: ignore[attr-defined]
+
+    graph = analyzer._discover_causal_graph(["a", "b", "c", "d"])
+
+    assert graph is not None
+    edges_by_type = {}
+    for edge in graph.edges:
+        edges_by_type.setdefault(edge.type, []).append((edge.source, edge.target))
+
+    assert ("a", "b") in edges_by_type["directed"]
+    assert ("c", "a") in edges_by_type["directed"]
+    assert ("b", "c") in edges_by_type["undirected"]
+    assert ("b", "d") in edges_by_type["bidirected"]
+    # No-edge pairs (a,d) and (c,d) should not have produced any edge entries.
+    all_pairs = {(e.source, e.target) for e in graph.edges} | {
+        (e.target, e.source) for e in graph.edges
+    }
+    assert ("a", "d") not in all_pairs
+    assert ("c", "d") not in all_pairs
+
+
+def test_discover_causal_graph_returns_none_on_internal_exception() -> None:
+    """Any unexpected internal error should be caught and degrade to None (not raise)."""
+    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+    analyzer = EDAAnalyzer(df)
+    # Passing a column name that isn't in the DataFrame triggers a polars error
+    # inside the try block, which should be caught by the outer except.
+    result = analyzer._discover_causal_graph(["a", "does_not_exist"])
+    assert result is None
+
+
 def test_calculate_vif_flags_collinear_columns() -> None:
     """VIF should be high for two nearly-collinear numeric columns."""
     rng = np.random.default_rng(3)
@@ -312,3 +446,48 @@ def test_calculate_vif_returns_none_for_single_column() -> None:
     df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
     analyzer = EDAAnalyzer(df)
     assert analyzer._calculate_vif(["a"]) is None
+
+
+def test_analyze_flags_moderate_vif_with_info_severity() -> None:
+    """A moderately (not severely) collinear feature set should raise an 'info' VIF alert."""
+    rng = np.random.default_rng(5)
+    n = 300
+    a = rng.normal(0, 1, n)
+    b = rng.normal(0, 1, n)
+    # c is a moderate (not near-perfect) linear combination of a and b to land VIF in (5, 10].
+    c = 0.75 * a + 0.75 * b + rng.normal(0, 0.3, n)
+    df = pl.DataFrame({"a": a, "b": b, "c": c})
+
+    profile = EDAAnalyzer(df).analyze()
+
+    assert profile.vif is not None
+    moderate_vif_cols = [col for col, val in profile.vif.items() if 5.0 < val <= 10.0]
+    assert moderate_vif_cols, f"expected a moderate VIF column, got {profile.vif}"
+    info_alerts = [
+        a for a in profile.alerts if a.type == "Multicollinearity" and a.severity == "info"
+    ]
+    assert info_alerts
+
+
+def test_analyze_flags_high_null_percentage() -> None:
+    """A dataset that is mostly null should raise a 'High Null' frame-level alert."""
+    df = pl.DataFrame(
+        {
+            "a": [None, None, None, None, 1.0],
+            "b": [None, None, None, None, 2.0],
+        }
+    )
+    profile = EDAAnalyzer(df).analyze()
+
+    assert profile.missing_cells_percentage > 50
+    dataset_level_alerts = [a for a in profile.alerts if "Dataset is" in a.message]
+    assert dataset_level_alerts
+    assert "empty" in dataset_level_alerts[0].message
+
+
+def test_analyze_infers_native_categorical_semantic_type() -> None:
+    """A native pl.Categorical column should map to the 'Categorical' semantic type."""
+    df = pl.DataFrame({"native_cat": pl.Series(["x", "y", "x", "z"], dtype=pl.Categorical)})
+    profile = EDAAnalyzer(df).analyze()
+
+    assert profile.columns["native_cat"].dtype == "Categorical"

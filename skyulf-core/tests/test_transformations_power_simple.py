@@ -14,6 +14,8 @@ from sklearn.preprocessing import PowerTransformer as SkPowerTransformer
 from skyulf.preprocessing.transformations.power import (
     PowerTransformerApplier,
     PowerTransformerCalculator,
+    _extract_scaler_params,
+    _filter_power_columns,
 )
 from skyulf.preprocessing.transformations.simple import (
     SimpleTransformationApplier,
@@ -95,6 +97,94 @@ def test_power_transformer_infer_output_schema_is_identity() -> None:
     schema = SkyulfSchema.from_columns(["a"], {"a": "float64"})
     out = PowerTransformerCalculator().infer_output_schema(schema, {"columns": ["a"]})
     assert out is schema
+
+
+def test_power_transformer_no_numeric_candidate_columns_returns_empty() -> None:
+    """No numeric candidate columns (e.g. all-string frame) yields an empty artifact.
+
+    Exercises _filter_power_columns's early-return for an empty `cols` list (line 72),
+    reached before the box-cox positivity filter even runs.
+    """
+    df = pd.DataFrame({"cat": ["a", "b", "c"]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson"})
+    assert art == {}
+
+
+def test_filter_power_columns_empty_input_returns_empty() -> None:
+    """_filter_power_columns must short-circuit on an empty `cols` list directly."""
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    assert _filter_power_columns(df, [], "yeo-johnson") == []
+
+
+def test_extract_scaler_params_returns_empty_when_no_scaler_present() -> None:
+    """_extract_scaler_params must return {} when the transformer lacks a `_scaler` (line 84)."""
+    transformer = SkPowerTransformer(method="yeo-johnson", standardize=True)
+    # Freshly constructed (unfitted) transformer has no `_scaler` attribute yet.
+    assert _extract_scaler_params(transformer, standardize=True) == {}
+
+
+def test_power_transformer_apply_polars_missing_lambdas_is_noop() -> None:
+    """Polars apply with no fitted `lambdas` must return the frame unchanged (line 102)."""
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    pl_df = pl.from_pandas(df)
+    out = PowerTransformerApplier().apply(pl_df, {"columns": ["a"]})
+    assert out.equals(pl_df)
+
+
+def test_power_transformer_apply_polars_no_valid_columns_is_noop() -> None:
+    """Polars apply where none of the fitted columns exist must no-op (line 105)."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
+    other_df = pd.DataFrame({"b": [1.0, 2.0, 3.0]})
+    pl_df = pl.from_pandas(other_df)
+    out = PowerTransformerApplier().apply(pl_df, art)
+    assert out.equals(pl_df)
+
+
+def test_power_transformer_apply_pandas_no_valid_columns_is_noop() -> None:
+    """Pandas apply where none of the fitted columns exist must no-op (line 123)."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
+    other_df = pd.DataFrame({"b": [1.0, 2.0, 3.0]})
+    out = PowerTransformerApplier().apply(other_df, art)
+    pd.testing.assert_frame_equal(out, other_df)
+
+
+def test_power_transformer_apply_polars_swallows_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transform failure on the polars path must be logged, not raised (lines 112-114)."""
+    import skyulf.preprocessing.transformations.power as power_mod
+
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated transform failure")
+
+    monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
+    pl_df = pl.from_pandas(df)
+    out = PowerTransformerApplier().apply(pl_df, art)
+    # Exception swallowed; original frame returned unchanged.
+    assert out.equals(pl_df)
+
+
+def test_power_transformer_apply_pandas_swallows_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transform failure on the pandas path must be logged, not raised (lines 130-131)."""
+    import skyulf.preprocessing.transformations.power as power_mod
+
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson", "columns": ["a"]})
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("simulated transform failure")
+
+    monkeypatch.setattr(power_mod, "_power_transform_array", _boom)
+    out = PowerTransformerApplier().apply(df, art)
+    # Exception swallowed; original values returned unchanged.
+    pd.testing.assert_frame_equal(out, df)
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +282,37 @@ def test_simple_transformation_no_transformations_returns_unchanged() -> None:
     art = SimpleTransformationCalculator().fit(df, {"transformations": []})
     out = SimpleTransformationApplier().apply(df, art)
     pd.testing.assert_frame_equal(out, df)
+
+
+def test_simple_transformation_polars_no_transformations_returns_unchanged() -> None:
+    """An empty ``transformations`` list must no-op on the polars apply path (line 26)."""
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    pl_df = pl.from_pandas(df)
+    art = SimpleTransformationCalculator().fit(df, {"transformations": []})
+    out = SimpleTransformationApplier().apply(pl_df, art)
+    assert out.equals(pl_df)
+
+
+def test_simple_transformation_polars_missing_column_skipped() -> None:
+    """A transformation targeting a nonexistent column must be skipped (line 33)."""
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    pl_df = pl.from_pandas(df)
+    art = SimpleTransformationCalculator().fit(
+        df, {"transformations": [{"column": "nonexistent", "method": "log"}]}
+    )
+    out = SimpleTransformationApplier().apply(pl_df, art)
+    assert list(out.columns) == ["a"]
+
+
+def test_simple_transformation_polars_unknown_method_skipped() -> None:
+    """An unrecognised method must be skipped on the polars apply path (line 36)."""
+    df = pd.DataFrame({"a": [1.0, 2.0]})
+    pl_df = pl.from_pandas(df)
+    art = SimpleTransformationCalculator().fit(
+        df, {"transformations": [{"column": "a", "method": "bogus_method"}]}
+    )
+    out = SimpleTransformationApplier().apply(pl_df, art)
+    assert out["a"].to_list() == [1.0, 2.0]
 
 
 def test_simple_transformation_polars_parity_log_and_square() -> None:

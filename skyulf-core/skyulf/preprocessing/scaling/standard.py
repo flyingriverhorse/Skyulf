@@ -20,6 +20,24 @@ from ._common import _select_subset_pandas, _select_subset_polars
 logger = logging.getLogger(__name__)
 
 
+def _needs_fitted_artifact(
+    valid: List[str], with_mean: bool, mean: Any, with_std: bool, scale: Any
+) -> bool:
+    """True when there's nothing to scale, or a flag's required artifact is missing.
+
+    sklearn's ``StandardScaler`` leaves ``mean_``/``scale_`` as ``None``
+    whenever the corresponding ``with_mean``/``with_std`` flag was ``False``
+    at fit time, so only the artifact a flag actually needs is required here
+    — requiring both unconditionally would wrongly skip mean-centering for a
+    valid ``with_mean=True, with_std=False`` configuration.
+    """
+    if not valid:
+        return True
+    if with_mean and mean is None:
+        return True
+    return with_std and scale is None
+
+
 class StandardScalerApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -35,19 +53,13 @@ class StandardScalerApplier(BaseApplier):
         valid = resolve_valid_columns(X, cols)
         with_mean = params.get("with_mean", True)
         with_std = params.get("with_std", True)
-        # Only require the artifact a flag actually needs: sklearn's
-        # StandardScaler leaves `mean_`/`scale_` as None whenever the
-        # corresponding `with_mean`/`with_std` flag was False at fit time, so
-        # requiring *both* unconditionally would wrongly skip mean-centering
-        # for a valid with_mean=True, with_std=False configuration.
-        if not valid or (with_mean and mean is None) or (with_std and scale is None):
+        if _needs_fitted_artifact(valid, with_mean, mean, with_std, scale):
             return X, _y
 
         mean_arr = np.array(mean) if mean is not None else np.zeros(len(cols))
         scale_arr = np.array(scale) if scale is not None else np.ones(len(cols))
 
-        exprs = []
-        for col_name in valid:
+        def _standardized_expr(col_name: str) -> Any:
             idx = cols.index(col_name)
             e = pl.col(col_name)
             if with_mean:
@@ -55,7 +67,9 @@ class StandardScalerApplier(BaseApplier):
             if with_std:
                 s = scale_arr[idx]
                 e = e / (s if s != 0 else 1.0)
-            exprs.append(e.alias(col_name))
+            return e.alias(col_name)
+
+        exprs = [_standardized_expr(col_name) for col_name in valid]
         return X.with_columns(exprs), _y
 
     @staticmethod
@@ -66,13 +80,12 @@ class StandardScalerApplier(BaseApplier):
         valid = resolve_valid_columns(X, cols)
         with_mean = params.get("with_mean", True)
         with_std = params.get("with_std", True)
-        if not valid or (with_mean and mean is None) or (with_std and scale is None):
+        if _needs_fitted_artifact(valid, with_mean, mean, with_std, scale):
             return X, _y
 
         X_out = X.copy()
         col_indices = [cols.index(c) for c in valid]
         vals = X_out[valid].values
-
         if with_mean:
             vals = vals - np.array(mean)[col_indices]
         if with_std:

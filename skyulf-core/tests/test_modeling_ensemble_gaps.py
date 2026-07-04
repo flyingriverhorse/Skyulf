@@ -1,8 +1,11 @@
 """Gap-closing tests for skyulf.modeling.ensemble (_BaseEnsembleCalculator internals)."""
 
+import typing
+
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.calibration import CalibratedClassifierCV
 
 from skyulf.modeling.ensemble import (
     StackingClassifierCalculator,
@@ -128,3 +131,91 @@ def test_voting_classifier_fits_with_defaults_end_to_end(clf_data):
     model = calc.fit(X, y, {})
     preds = VotingClassifierApplier().predict(X, model)
     assert len(preds) == len(y)
+
+
+def test_build_estimators_skips_non_string_and_duplicate_keys():
+    """Non-string keys and repeated keys must be skipped, not duplicated."""
+    calc = VotingClassifierCalculator()
+    estimators = calc._build_estimators(["random_forest", "random_forest", 123, "decision_tree"])
+    names = [name for name, _ in estimators]
+    assert names == ["random_forest", "decision_tree"]
+
+
+def test_build_estimators_all_unknown_keys_falls_back_to_defaults():
+    """When every key is unknown, estimators must fall back to DEFAULT_KEYS."""
+    calc = VotingClassifierCalculator()
+    estimators = calc._build_estimators(["totally_bogus_1", "totally_bogus_2"])
+    names = [name for name, _ in estimators]
+    assert names == list(calc.DEFAULT_KEYS)
+
+
+def test_maybe_calibrate_invalid_method_falls_back_to_sigmoid():
+    """An unrecognised calibration method must fall back to 'sigmoid'."""
+    from sklearn.linear_model import LogisticRegression
+
+    calc = VotingClassifierCalculator()
+    calibrated = typing.cast(
+        CalibratedClassifierCV,
+        calc._maybe_calibrate(LogisticRegression(), {"method": "not_a_real_method"}),
+    )
+    assert calibrated.method == "sigmoid"
+
+
+def test_maybe_calibrate_invalid_cv_falls_back_to_three():
+    """A non-numeric calibration cv must fall back to 3 (then clamped to >=2)."""
+    from sklearn.linear_model import LogisticRegression
+
+    calc = VotingClassifierCalculator()
+    calibrated = typing.cast(
+        CalibratedClassifierCV,
+        calc._maybe_calibrate(LogisticRegression(), {"cv": "not_a_number"}),
+    )
+    assert calibrated.cv == 3
+
+
+def test_absorb_nested_keys_routes_final_estimator_params():
+    """A `final_estimator__<param>` key must be routed into final_params, not base_params."""
+    calc = StackingClassifierCalculator()
+    bucket = {"final_estimator__C": 2.5, "estimators": []}
+    base_params: dict = {}
+    final_params: dict = {}
+    calc._absorb_nested_keys(bucket, base_params, final_params)
+    assert final_params == {"C": 2.5}
+    assert base_params == {}
+    assert "final_estimator__C" not in bucket
+
+
+def test_ensemble_xgboost_import_failure_sets_flag_false(monkeypatch):
+    """Simulating an unimportable xgboost must leave XGBOOST_AVAILABLE False after reload."""
+    import importlib
+    import sys
+
+    import skyulf.modeling.ensemble as ensemble_mod
+
+    monkeypatch.setitem(sys.modules, "xgboost", None)
+    try:
+        importlib.reload(ensemble_mod)
+        assert ensemble_mod.XGBOOST_AVAILABLE is False
+        assert "xgboost" not in ensemble_mod.BASE_ESTIMATORS_CLF
+    finally:
+        monkeypatch.delitem(sys.modules, "xgboost", raising=False)
+        importlib.reload(ensemble_mod)
+        assert ensemble_mod.XGBOOST_AVAILABLE is True
+
+
+def test_ensemble_lightgbm_import_failure_sets_flag_false(monkeypatch):
+    """Simulating an unimportable lightgbm must leave LIGHTGBM_AVAILABLE False after reload."""
+    import importlib
+    import sys
+
+    import skyulf.modeling.ensemble as ensemble_mod
+
+    monkeypatch.setitem(sys.modules, "lightgbm", None)
+    try:
+        importlib.reload(ensemble_mod)
+        assert ensemble_mod.LIGHTGBM_AVAILABLE is False
+        assert "lightgbm" not in ensemble_mod.BASE_ESTIMATORS_CLF
+    finally:
+        monkeypatch.delitem(sys.modules, "lightgbm", raising=False)
+        importlib.reload(ensemble_mod)
+        assert ensemble_mod.LIGHTGBM_AVAILABLE is True

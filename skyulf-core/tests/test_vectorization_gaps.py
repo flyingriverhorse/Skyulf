@@ -108,10 +108,39 @@ def test_hashing_vectorizer_short_strings_produce_dense_output() -> None:
 
 
 def test_hashing_vectorizer_polars_input_at_fit_time() -> None:
-    """Fitting directly on a polars frame converts internally to pandas."""
+    """Fitting directly on a polars frame converts internally to pandas (line 104)."""
     df = pl.DataFrame({"text": SHORT_CORPUS})
-    art = HashingVectorizerCalculator().fit(df.to_pandas(), {"columns": ["text"], "n_features": 8})
+    art = HashingVectorizerCalculator().fit(df, {"columns": ["text"], "n_features": 8})
     assert art["type"] == "hashing_vectorizer"
+
+
+def test_hashing_vectorizer_apply_all_columns_missing_is_noop() -> None:
+    """If none of the fitted columns are present at apply time, no-op (line 43)."""
+    fit_df = pd.DataFrame({"text": ["hello world"]})
+    art = HashingVectorizerCalculator().fit(fit_df, {"columns": ["text"], "n_features": 8})
+    apply_df = pd.DataFrame({"other": ["unrelated"]})
+    out = HashingVectorizerApplier().apply(apply_df, art)
+    assert list(out.columns) == ["other"]
+
+
+def test_hashing_vectorizer_drop_original_removes_source_column() -> None:
+    """``drop_original=True`` removes the source text column after vectorizing (line 57)."""
+    df = pd.DataFrame({"text": ["hello world", "foo bar baz"]})
+    art = HashingVectorizerCalculator().fit(
+        df, {"columns": ["text"], "n_features": 8, "drop_original": True}
+    )
+    out = HashingVectorizerApplier().apply(df, art)
+    assert "text" not in out.columns
+
+
+def test_hashing_vectorizer_large_n_features_logs_warning(caplog: Any) -> None:
+    """A very large ``n_features`` triggers the ``logger.warning`` branch (line 129)."""
+    import logging
+
+    df = pd.DataFrame({"text": ["hello world"]})
+    with caplog.at_level(logging.WARNING):
+        HashingVectorizerCalculator().fit(df, {"columns": ["text"], "n_features": 20_000})
+    assert "output columns" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -151,6 +180,45 @@ def test_tfidf_vectorizer_multi_column_join() -> None:
     assert all(c.startswith("title_body__tfidf__") for c in art["output_columns"])
 
 
+def test_tfidf_vectorizer_apply_all_columns_missing_is_noop() -> None:
+    """If none of the fitted columns are present at apply time, no-op (line 39)."""
+    fit_df = pd.DataFrame({"text": ["hello world"]})
+    art = TfidfVectorizerCalculator().fit(fit_df, {"columns": ["text"], "max_features": 10})
+    apply_df = pd.DataFrame({"other": ["unrelated"]})
+    out = TfidfVectorizerApplier().apply(apply_df, art)
+    assert list(out.columns) == ["other"]
+
+
+def test_tfidf_vectorizer_fit_accepts_polars_input() -> None:
+    """Fitting directly on a polars frame must route through ``to_pandas`` (line 99)."""
+    df = pl.DataFrame({"text": ["hello world", "world of tokens"]})
+    art = TfidfVectorizerCalculator().fit(df, {"columns": ["text"], "max_features": 10})
+    assert art["columns"] == ["text"]
+    assert len(art["output_columns"]) > 0
+
+
+def test_tfidf_vectorizer_missing_column_at_fit_returns_empty() -> None:
+    """A configured column absent from the frame yields an empty artifact (line 103)."""
+    df = pd.DataFrame({"text": ["hello world"]})
+    art = TfidfVectorizerCalculator().fit(df, {"columns": ["nonexistent"]})
+    assert art == {}
+
+
+def test_tfidf_vectorizer_large_vocabulary_logs_warning(caplog: Any, monkeypatch: Any) -> None:
+    """A very large vocabulary triggers the ``logger.warning`` branch (line 132)."""
+    import logging
+
+    from skyulf.preprocessing.vectorization import tfidf_vectorizer as tfidf_module
+
+    monkeypatch.setattr(
+        tfidf_module, "_warn_large_output", lambda output_cols: "forced warning for test"
+    )
+    with caplog.at_level(logging.WARNING):
+        df = pd.DataFrame({"text": ["hello world"]})
+        TfidfVectorizerCalculator().fit(df, {"columns": ["text"]})
+    assert "forced warning for test" in caplog.text
+
+
 # ---------------------------------------------------------------------------
 # CountVectorizer edge cases
 # ---------------------------------------------------------------------------
@@ -179,6 +247,38 @@ def test_count_vectorizer_missing_column_at_fit_returns_empty() -> None:
     df = pd.DataFrame({"text": SHORT_CORPUS})
     art = CountVectorizerCalculator().fit(df, {"columns": ["nonexistent"]})
     assert art == {}
+
+
+def test_count_vectorizer_apply_all_columns_missing_is_noop() -> None:
+    """If none of the fitted columns are present at apply time, no-op (line 45)."""
+    fit_df = pd.DataFrame({"text": ["hello world"]})
+    art = CountVectorizerCalculator().fit(fit_df, {"columns": ["text"]})
+    apply_df = pd.DataFrame({"other": ["unrelated"]})
+    out = CountVectorizerApplier().apply(apply_df, art)
+    assert list(out.columns) == ["other"]
+
+
+def test_count_vectorizer_fit_accepts_polars_input() -> None:
+    """Fitting directly on a polars frame must route through ``to_pandas`` (line 107)."""
+    df = pl.DataFrame({"text": ["hello world", "world of tokens"]})
+    art = CountVectorizerCalculator().fit(df, {"columns": ["text"], "max_features": 10})
+    assert art["columns"] == ["text"]
+    assert len(art["output_columns"]) > 0
+
+
+def test_count_vectorizer_large_vocabulary_logs_warning(caplog: Any, monkeypatch: Any) -> None:
+    """A very large vocabulary triggers the ``logger.warning`` branch (line 140)."""
+    import logging
+
+    from skyulf.preprocessing.vectorization import count_vectorizer as cv_module
+
+    monkeypatch.setattr(
+        cv_module, "_warn_large_output", lambda output_cols: "forced warning for test"
+    )
+    with caplog.at_level(logging.WARNING):
+        df = pd.DataFrame({"text": ["hello world"]})
+        CountVectorizerCalculator().fit(df, {"columns": ["text"]})
+    assert "forced warning for test" in caplog.text
 
 
 # ---------------------------------------------------------------------------

@@ -135,6 +135,21 @@ def test_polars_apply_path_produces_valid_bucket_range() -> None:
     assert out_dup.loc[0, "city"] == out_dup.loc[1, "city"]
 
 
+def test_polars_apply_no_valid_columns_is_noop() -> None:
+    """Polars apply returns X, y unchanged when configured columns aren't present in X."""
+    df_pl = pl.DataFrame({"other": [1, 2]})
+    params = {"columns": ["city"], "n_features": 5}
+    out = HashEncoderApplier().apply(df_pl, dict(params))
+    assert out.equals(df_pl)
+
+
+def test_fit_no_resolvable_columns_returns_empty() -> None:
+    """Fitting with only numeric columns and no explicit selection returns {}."""
+    df = pd.DataFrame({"amount": [1, 2, 3]})
+    params = HashEncoderCalculator().fit(df, {})
+    assert params == {}
+
+
 @given(
     cats=st.lists(st.sampled_from(["a", "b", "c"]), min_size=5, max_size=40),
 )

@@ -1,6 +1,6 @@
 """Unit tests for the OneHotEncoder Calculator/Applier (fit + apply, dual-engine)."""
 
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -162,3 +162,154 @@ def test_fit_engine_parity_pandas_vs_polars(cats: list[str]) -> None:
 
     assert pd_params["feature_names"] == pl_params["feature_names"]
     assert pd_params["columns"] == pl_params["columns"]
+
+
+# ---------------------------------------------------------------------------
+# Apply-time edge cases and error handling
+# ---------------------------------------------------------------------------
+
+
+def test_apply_missing_columns_key_is_noop() -> None:
+    """A params dict with no 'columns' key (falsy) short-circuits apply to a no-op."""
+    df = pd.DataFrame({"color": ["red", "blue"]})
+    out = OneHotEncoderApplier().apply(df, {})
+    pd.testing.assert_frame_equal(out, df)
+
+
+def test_apply_columns_present_but_no_encoder_is_noop() -> None:
+    """Columns exist but there's no fitted encoder_object: apply is a no-op."""
+    df = pd.DataFrame({"color": ["red", "blue"]})
+    params = {"columns": ["color"], "encoder_object": None}
+    out = OneHotEncoderApplier().apply(df, dict(params))
+    pd.testing.assert_frame_equal(out, df)
+
+
+def test_polars_apply_no_valid_columns_is_noop() -> None:
+    """Polars apply returns X, y unchanged when configured columns aren't in X."""
+    df_pl = pl.DataFrame({"other": [1, 2]})
+    params, _ = _fit_apply(pd.DataFrame({"color": ["red", "blue"]}), {"columns": ["color"]})
+    out = OneHotEncoderApplier().apply(df_pl, dict(params))
+    assert out.equals(df_pl)
+
+
+def test_polars_apply_include_missing_fills_null_token() -> None:
+    """Polars apply path fills nulls with the sentinel token when include_missing is set."""
+    df_pd = pd.DataFrame({"color": ["red", None, "blue"]})
+    params = OneHotEncoderCalculator().fit(df_pd, {"columns": ["color"], "include_missing": True})
+
+    df_pl = pl.DataFrame({"color": ["red", None, "blue"]})
+    out_pl = OneHotEncoderApplier().apply(df_pl, dict(params))
+    missing_cols = [c for c in params["feature_names"] if "__mlops_missing__" in c]
+    assert missing_cols
+    assert out_pl[missing_cols[0]][1] == 1
+
+
+def test_polars_apply_exception_is_caught_and_returns_input(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transform-time exception in the polars apply path is caught, logged, and X returned as-is."""
+    df_pl = pl.DataFrame({"color": ["red", "blue"]})
+
+    class _BrokenEncoder:
+        def transform(self, _x: Any) -> Any:
+            raise ValueError("boom")
+
+    params = {
+        "columns": ["color"],
+        "encoder_object": _BrokenEncoder(),
+        "feature_names": ["color_x"],
+    }
+    with caplog.at_level("ERROR"):
+        out = OneHotEncoderApplier().apply(df_pl, dict(params))
+
+    assert out.equals(df_pl)
+    assert any("OneHot Encoding failed" in rec.message for rec in caplog.records)
+
+
+def test_pandas_apply_exception_is_caught_and_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transform-time exception in the pandas apply path is caught and logged."""
+    df_pd = pd.DataFrame({"color": ["red", "blue"]})
+
+    class _BrokenEncoder:
+        def transform(self, _x: Any) -> Any:
+            raise ValueError("boom")
+
+    params = {
+        "columns": ["color"],
+        "encoder_object": _BrokenEncoder(),
+        "feature_names": ["color_x"],
+    }
+    with caplog.at_level("ERROR"):
+        out = OneHotEncoderApplier().apply(df_pd, dict(params))
+
+    pd.testing.assert_frame_equal(out, df_pd)
+    assert any("OneHot Encoding failed" in rec.message for rec in caplog.records)
+
+
+def test_to_dense_handles_pandas_wrapped_output() -> None:
+    """_to_dense unwraps a pandas-like `.values` output when there's no `.toarray`."""
+    from skyulf.preprocessing.encoding.one_hot import _to_dense
+
+    wrapped = pd.DataFrame({"a": [1, 2]})
+    result = _to_dense(wrapped)
+    np.testing.assert_array_equal(result, wrapped.values)
+
+
+def test_to_dense_handles_sparse_output_via_toarray() -> None:
+    """_to_dense densifies sparse-matrix-like output via `.toarray()`."""
+    from skyulf.preprocessing.encoding.one_hot import _to_dense
+
+    class _FakeSparse:
+        def toarray(self) -> np.ndarray:
+            return np.array([[1, 0], [0, 1]])
+
+    result = _to_dense(_FakeSparse())
+    np.testing.assert_array_equal(result, np.array([[1, 0], [0, 1]]))
+
+
+def test_polars_fit_include_missing_fills_null_before_fitting() -> None:
+    """Polars fit path fills nulls with the sentinel token before fitting sklearn's encoder."""
+    df_pl = pl.DataFrame({"color": ["red", None, "blue"]})
+    params = OneHotEncoderCalculator().fit(df_pl, {"columns": ["color"], "include_missing": True})
+    missing_names = [c for c in params["feature_names"] if "__mlops_missing__" in c]
+    assert missing_names
+
+
+def test_warn_degenerate_categories_returns_early_without_categories_attr() -> None:
+    """_warn_degenerate_categories is a no-op for objects lacking `categories_`."""
+    from skyulf.preprocessing.encoding.one_hot import _warn_degenerate_categories
+
+    class _NoCategories:
+        pass
+
+    # Should not raise even though `_NoCategories` has no `categories_` attribute.
+    _warn_degenerate_categories(cast(Any, _NoCategories()), ["color"], None)
+
+
+def test_zero_category_column_logs_warning(caplog: pytest.LogCaptureFixture) -> None:
+    """_warn_degenerate_categories logs a "will be dropped" warning for 0-category columns."""
+    from skyulf.preprocessing.encoding.one_hot import _warn_degenerate_categories
+
+    class _FakeEncoder:
+        categories_ = [np.array([], dtype=object)]
+
+    with caplog.at_level("WARNING"):
+        _warn_degenerate_categories(cast(Any, _FakeEncoder()), ["color"], None)
+
+    assert any("0 categories" in rec.message for rec in caplog.records)
+
+
+def test_polars_fit_no_resolvable_columns_returns_empty() -> None:
+    """Polars fit falls back to auto-detection; a purely-numeric frame yields no columns."""
+    df_pl = pl.DataFrame({"amount": [1, 2, 3]})
+    params = OneHotEncoderCalculator().fit(df_pl, {})
+    assert params == {}
+
+
+def test_pandas_fit_no_resolvable_columns_returns_empty() -> None:
+    """Pandas fit falls back to auto-detection; a purely-numeric frame yields no columns."""
+    df_pd = pd.DataFrame({"amount": [1, 2, 3]})
+    params = OneHotEncoderCalculator().fit(df_pd, {})
+    assert params == {}

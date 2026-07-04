@@ -218,3 +218,161 @@ def test_ordinal_apply_engine_parity_on_unseen_category() -> None:
     out_pl = OrdinalEncoderApplier().apply(test_pl, pl_params)
 
     np.testing.assert_allclose(out_pd["category"].to_numpy(), out_pl["category"].to_numpy())
+
+
+# ---------------------------------------------------------------------------
+# Apply-time error handling and target-column apply paths
+# ---------------------------------------------------------------------------
+
+
+def test_apply_features_polars_exception_is_caught_and_returns_input(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transform-time exception in the polars feature-apply path is caught and logged."""
+    X_pl = pl.DataFrame({"category": ["a", "b"]})
+
+    class _BrokenEncoder:
+        def transform(self, _x: Any) -> Any:
+            raise ValueError("boom")
+
+    params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
+    with caplog.at_level("ERROR"):
+        out_pl = OrdinalEncoderApplier().apply(X_pl, dict(params))
+
+    assert out_pl.equals(X_pl)
+    assert any("Ordinal Encoding failed" in rec.message for rec in caplog.records)
+
+
+def test_apply_features_pandas_exception_is_caught_and_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transform-time exception in the pandas feature-apply path is caught and logged."""
+    X_pd = pd.DataFrame({"category": ["a", "b"]})
+
+    class _BrokenEncoder:
+        def transform(self, _x: Any) -> Any:
+            raise ValueError("boom")
+
+    params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
+    with caplog.at_level("ERROR"):
+        out_pd = OrdinalEncoderApplier().apply(X_pd, dict(params))
+
+    pd.testing.assert_frame_equal(out_pd, X_pd)
+    assert any("Ordinal Encoding failed" in rec.message for rec in caplog.records)
+
+
+def test_apply_target_polars_encodes_y_correctly() -> None:
+    """The polars target-apply path encodes y using the fitted target encoder."""
+    X = pd.DataFrame({"category": ["a", "b"]})
+    y = pd.Series(["yes", "no"], name="target")
+    config = {"columns": ["category", "target"], "target_column": "target"}
+    params = dict(OrdinalEncoderCalculator().fit((X, y), config))
+
+    X_pl = pl.from_pandas(X)
+    y_pl = pl.Series("target", y)
+    X_out, y_out = OrdinalEncoderApplier().apply((X_pl, y_pl), dict(params))
+
+    # "no" < "yes" alphabetically -> no=0, yes=1
+    assert list(y_out) == [1.0, 0.0]
+    assert list(X_out["category"]) == [0.0, 1.0]
+
+
+def test_apply_target_polars_exception_is_caught_and_returns_y(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transform-time exception in the polars target-apply path is caught and logged."""
+    y_pl = pl.Series("target", ["yes", "no"])
+
+    class _BrokenEncoder:
+        def transform(self, _x: Any) -> Any:
+            raise ValueError("boom")
+
+    params = {"columns": [], "encoder_object": None, "encoders": {"__target__": _BrokenEncoder()}}
+    X_pl = pl.DataFrame({"other": [1, 2]})
+    with caplog.at_level("ERROR"):
+        _, y_out = OrdinalEncoderApplier().apply((X_pl, y_pl), dict(params))
+
+    assert list(y_out) == list(y_pl)
+    assert any("Ordinal Encoding target failed" in rec.message for rec in caplog.records)
+
+
+def test_apply_target_pandas_exception_is_caught_and_returns_y(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transform-time exception in the pandas target-apply path is caught and logged."""
+    y_pd = pd.Series(["yes", "no"], name="target")
+
+    class _BrokenEncoder:
+        def transform(self, _x: Any) -> Any:
+            raise ValueError("boom")
+
+    params = {"columns": [], "encoder_object": None, "encoders": {"__target__": _BrokenEncoder()}}
+    X_pd = pd.DataFrame({"other": [1, 2]})
+    with caplog.at_level("ERROR"):
+        _, y_out = OrdinalEncoderApplier().apply((X_pd, y_pd), dict(params))
+
+    assert list(y_out) == list(y_pd)
+    assert any("Ordinal Encoding target failed" in rec.message for rec in caplog.records)
+
+
+def test_polars_apply_returns_input_when_nothing_to_do() -> None:
+    """No valid feature columns and no target encoder: apply is a pure no-op."""
+    X_pl = pl.DataFrame({"other": [1, 2]})
+    params = {"columns": ["category"], "encoder_object": None, "encoders": {}}
+    out_pl = OrdinalEncoderApplier().apply(X_pl, dict(params))
+    assert out_pl.equals(X_pl)
+
+
+# ---------------------------------------------------------------------------
+# Fit-time edge cases (target categories resolution, empty selections)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_target_categories_uses_last_row_when_counts_match() -> None:
+    """categories_order with an extra trailing row supplies explicit target categories."""
+    X = pd.DataFrame({"category": ["a", "b", "a"]})
+    y = pd.Series(["yes", "no", "yes"], name="target")
+    config = {
+        "columns": ["category", "target"],
+        "target_column": "target",
+        "categories_order": "a,b\nno,yes",
+    }
+    params = OrdinalEncoderCalculator().fit((X, y), config)
+    target_enc = params["encoders"]["__target__"]
+    assert list(target_enc.categories_[0]) == ["no", "yes"]
+
+
+def test_no_feature_columns_and_no_target_encoding_returns_empty() -> None:
+    """When resolve_columns yields nothing and the target isn't configured, fit() returns {}."""
+    X = pd.DataFrame({"amount": [1, 2, 3]})
+    params = OrdinalEncoderCalculator().fit(X, {})
+    assert params == {}
+
+
+def test_should_encode_target_true_when_target_named_in_columns() -> None:
+    """_should_encode_target fires when target_column is listed in `columns` but absent from X."""
+    X = pd.DataFrame({"category": ["a", "b"]})
+    y = pd.Series(["yes", "no"], name="target")
+    config = {"columns": ["category", "target"], "target_column": "target"}
+    params = OrdinalEncoderCalculator().fit((X, y), config)
+    assert "__target__" in params["encoders"]
+
+
+def test_should_encode_target_false_when_no_target_name_resolvable() -> None:
+    """_should_encode_target returns False when neither target_column nor y.name is set."""
+    X = pd.DataFrame({"category": ["a", "b"]})
+    y = pd.Series(["yes", "no"])  # unnamed series
+    params = OrdinalEncoderCalculator().fit((X, y), {"columns": ["category"]})
+    assert "__target__" not in params["encoders"]
+
+
+def test_no_feature_columns_but_target_encoding_fits_target_only() -> None:
+    """When no feature columns resolve but the target is configured, only y gets encoded."""
+    X = pd.DataFrame({"amount": [1, 2, 3]})
+    y = pd.Series(["yes", "no", "yes"], name="target")
+    config = {"columns": ["target"], "target_column": "target"}
+    params = OrdinalEncoderCalculator().fit((X, y), config)
+
+    assert params["columns"] == []
+    assert params["encoder_object"] is None
+    assert "__target__" in params["encoders"]

@@ -12,6 +12,7 @@ from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from skyulf.preprocessing.scaling.maxabs import (
@@ -530,3 +531,142 @@ def test_standard_scaler_on_sample_regression_data_matches_manual(
         np.testing.assert_allclose(out[col].to_numpy(), expected, rtol=1e-9, atol=1e-9)
         assert params["mean"][i] == pytest.approx(mean)
         assert params["scale"][i] == pytest.approx(std)
+
+
+# ---------------------------------------------------------------------------
+# Polars engine — _apply_polars branches (fit stays on pandas, apply on polars)
+# ---------------------------------------------------------------------------
+
+
+def test_standard_scaler_polars_apply_matches_pandas() -> None:
+    """Polars apply must match the pandas-computed z-score for the same params."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, 5.0]})
+    params = StandardScalerCalculator().fit(df, {"columns": ["a"]})
+    pd_out = StandardScalerApplier().apply(df, params)
+
+    pl_df = pl.from_pandas(df)
+    pl_out = StandardScalerApplier().apply(pl_df, params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), pd_out["a"].to_numpy(), rtol=1e-9)
+
+
+def test_standard_scaler_polars_apply_with_mean_false() -> None:
+    """Polars apply with with_mean=False must only scale, not center."""
+    df = pd.DataFrame({"a": [2.0, 4.0, 6.0]})
+    config = {"columns": ["a"], "with_mean": False}
+    params = StandardScalerCalculator().fit(df, config)
+    pl_out = StandardScalerApplier().apply(pl.from_pandas(df), params)
+    assert params["scale"] is not None
+    expected = df["a"].to_numpy() / params["scale"][0]
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), expected, rtol=1e-9)
+
+
+def test_standard_scaler_polars_apply_constant_column_scale_guarded() -> None:
+    """Polars apply on a constant (zero-scale) column must not divide by zero."""
+    df = pd.DataFrame({"a": [5.0, 5.0, 5.0]})
+    params = StandardScalerCalculator().fit(df, {"columns": ["a"]})
+    pl_out = StandardScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), [0.0, 0.0, 0.0])
+
+
+def test_standard_scaler_polars_apply_noop_when_missing_artifact() -> None:
+    """Polars apply with no mean/scale in params must be a no-op passthrough."""
+    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+    out = StandardScalerApplier().apply(df, {"columns": ["a"]})
+    assert out["a"].to_list() == [1.0, 2.0, 3.0]
+
+
+def test_robust_scaler_polars_apply_matches_pandas() -> None:
+    """Polars RobustScaler apply must match the pandas median/IQR transform."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, 100.0]})
+    params = RobustScalerCalculator().fit(df, {"columns": ["a"]})
+    pd_out = RobustScalerApplier().apply(df, params)
+    pl_out = RobustScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), pd_out["a"].to_numpy(), rtol=1e-9)
+
+
+def test_robust_scaler_polars_apply_with_centering_false() -> None:
+    """Polars apply with with_centering=False must only scale."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, 100.0]})
+    config = {"columns": ["a"], "with_centering": False}
+    params = RobustScalerCalculator().fit(df, config)
+    pl_out = RobustScalerApplier().apply(pl.from_pandas(df), params)
+    assert params["scale"] is not None
+    expected = df["a"].to_numpy() / params["scale"][0]
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), expected, rtol=1e-9)
+
+
+def test_robust_scaler_polars_apply_with_scaling_false() -> None:
+    """Polars apply with with_scaling=False must only center."""
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0, 4.0, 100.0]})
+    config = {"columns": ["a"], "with_scaling": False}
+    params = RobustScalerCalculator().fit(df, config)
+    pl_out = RobustScalerApplier().apply(pl.from_pandas(df), params)
+    assert params["center"] is not None
+    expected = df["a"].to_numpy() - params["center"][0]
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), expected, rtol=1e-9)
+
+
+def test_robust_scaler_polars_apply_constant_column_scale_guarded() -> None:
+    """A constant column's Polars scale is guarded to 1.0 to avoid division by zero."""
+    df = pd.DataFrame({"a": [5.0, 5.0, 5.0]})
+    params = RobustScalerCalculator().fit(df, {"columns": ["a"]})
+    pl_out = RobustScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), [0.0, 0.0, 0.0])
+
+
+def test_robust_scaler_polars_apply_noop_without_valid_columns() -> None:
+    """Polars apply must no-op when the fitted columns aren't present in X."""
+    df = pl.DataFrame({"b": [1.0, 2.0, 3.0]})
+    params = {"columns": ["a"], "center": [1.0], "scale": [1.0]}
+    out = RobustScalerApplier().apply(df, params)
+    assert out["b"].to_list() == [1.0, 2.0, 3.0]
+
+
+def test_maxabs_scaler_polars_apply_matches_pandas() -> None:
+    """Polars MaxAbsScaler apply must match the pandas scale-by-max-abs transform."""
+    df = pd.DataFrame({"a": [-2.0, 4.0, -8.0]})
+    params = MaxAbsScalerCalculator().fit(df, {"columns": ["a"]})
+    pd_out = MaxAbsScalerApplier().apply(df, params)
+    pl_out = MaxAbsScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), pd_out["a"].to_numpy(), rtol=1e-9)
+
+
+def test_maxabs_scaler_polars_apply_all_zero_column_scale_guarded() -> None:
+    """An all-zero column's Polars scale is guarded to 1.0, leaving zeros unchanged."""
+    df = pd.DataFrame({"a": [0.0, 0.0, 0.0]})
+    params = MaxAbsScalerCalculator().fit(df, {"columns": ["a"]})
+    pl_out = MaxAbsScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), [0.0, 0.0, 0.0])
+
+
+def test_maxabs_scaler_polars_apply_noop_when_missing_artifact() -> None:
+    """Polars apply with no fitted scale must be a no-op passthrough."""
+    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+    out = MaxAbsScalerApplier().apply(df, {"columns": ["a"]})
+    assert out["a"].to_list() == [1.0, 2.0, 3.0]
+
+
+def test_minmax_scaler_polars_apply_matches_pandas() -> None:
+    """Polars MinMaxScaler apply must match the pandas (x-min)/(max-min) transform."""
+    df = pd.DataFrame({"a": [10.0, 20.0, 30.0, 40.0]})
+    params = MinMaxScalerCalculator().fit(df, {"columns": ["a"]})
+    pd_out = MinMaxScalerApplier().apply(df, params)
+    pl_out = MinMaxScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), pd_out["a"].to_numpy(), rtol=1e-9)
+
+
+def test_minmax_scaler_polars_apply_custom_feature_range() -> None:
+    """Polars apply with a custom feature_range must match the pandas result."""
+    df = pd.DataFrame({"a": [0.0, 5.0, 10.0]})
+    config = {"columns": ["a"], "feature_range": [-1, 1]}
+    params = MinMaxScalerCalculator().fit(df, config)
+    pd_out = MinMaxScalerApplier().apply(df, params)
+    pl_out = MinMaxScalerApplier().apply(pl.from_pandas(df), params)
+    np.testing.assert_allclose(pl_out["a"].to_numpy(), pd_out["a"].to_numpy(), rtol=1e-9)
+
+
+def test_minmax_scaler_polars_apply_noop_when_missing_artifact() -> None:
+    """Polars apply with no fitted min/scale must be a no-op passthrough."""
+    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+    out = MinMaxScalerApplier().apply(df, {"columns": ["a"]})
+    assert out["a"].to_list() == [1.0, 2.0, 3.0]

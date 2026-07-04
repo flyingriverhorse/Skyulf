@@ -259,6 +259,23 @@ def test_detect_numeric_columns_mixed_dtypes() -> None:
     assert "int_col" in result
 
 
+def test_detect_numeric_columns_pandas_like_wrapper_uses_to_pandas() -> None:
+    """A non-DataFrame frame exposing to_pandas() must be converted before analysis."""
+
+    class _PandasLikeWrapper:
+        def __init__(self, df: pd.DataFrame) -> None:
+            self._df = df
+            self.columns = df.columns
+            self.dtypes = df.dtypes
+
+        def to_pandas(self) -> pd.DataFrame:
+            return self._df
+
+    wrapper = _PandasLikeWrapper(pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]}))
+    result = detect_numeric_columns(typing.cast(pd.DataFrame, wrapper))
+    assert set(result) == {"a", "b"}
+
+
 # ---------------------------------------------------------------------------
 # resolve_columns
 # ---------------------------------------------------------------------------
@@ -392,4 +409,95 @@ def test_pack_pipeline_output_polars_with_y() -> None:
     # Result must be a polars DataFrame containing both x and target.
     assert not isinstance(result, tuple)
     assert "x" in result.columns
+    assert "target" in result.columns
+
+
+@pytest.mark.skipif(not _POLARS_AVAILABLE, reason="polars not installed")
+def test_pack_pipeline_output_polars_unnamed_series_gets_target_alias() -> None:
+    """An unnamed polars y Series must be aliased to 'target' before concatenation."""
+    import polars as pl
+
+    X = pl.DataFrame({"x": [1, 2]})
+    y = pl.Series([10, 20])  # No name -> defaults to "".
+    assert y.name == ""
+
+    result = pack_pipeline_output(X, y, False)
+    assert not isinstance(result, tuple)
+    assert "target" in result.columns
+
+
+@pytest.mark.skipif(not _POLARS_AVAILABLE, reason="polars not installed")
+def test_pack_pipeline_output_polars_dataframe_y_uses_hstack() -> None:
+    """A polars DataFrame y (multiple target columns) must be hstacked onto X."""
+    import polars as pl
+
+    X = pl.DataFrame({"x": [1, 2]})
+    y = pl.DataFrame({"t1": [10, 20], "t2": [30, 40]})
+    result = pack_pipeline_output(X, y, False)
+    assert not isinstance(result, tuple)
+    assert "t1" in result.columns
+    assert "t2" in result.columns
+
+
+@pytest.mark.skipif(not _POLARS_AVAILABLE, reason="polars not installed")
+def test_pack_pipeline_output_polars_wrapped_x_returns_wrapped_result() -> None:
+    """A SkyulfPolarsWrapper-wrapped X must be unwrapped, merged, and re-wrapped."""
+    import polars as pl
+
+    from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+
+    X = SkyulfPolarsWrapper(pl.DataFrame({"x": [1, 2]}))
+    y = pl.Series("target", [10, 20])
+    result = pack_pipeline_output(X, y, False)
+
+    assert isinstance(result, SkyulfPolarsWrapper)
+    assert "target" in result.columns
+    assert "x" in result.columns
+
+
+@pytest.mark.skipif(not _POLARS_AVAILABLE, reason="polars not installed")
+def test_pack_pipeline_output_polars_unconvertible_y_falls_back_to_raw_hstack() -> None:
+    """A y that can't be turned into a pl.Series should fall through to raw hstack (and fail)."""
+    import polars as pl
+
+    X = pl.DataFrame({"x": [1, 2]})
+    y = {1, 2, 3}  # A plain python set can't be converted via pl.Series(...).
+    with pytest.raises(AttributeError):
+        pack_pipeline_output(X, y, False)
+
+
+def test_pack_pipeline_output_pandas_wrapper_x_uses_to_pandas() -> None:
+    """An X exposing to_pandas() (e.g. a wrapper) must be converted before concatenation."""
+
+    class _PandasLikeWrapper:
+        def __init__(self, df: pd.DataFrame) -> None:
+            self._df = df
+
+        def to_pandas(self) -> pd.DataFrame:
+            return self._df
+
+    X = _PandasLikeWrapper(pd.DataFrame({"x": [1, 2]}))
+    y = pd.Series([10, 20], name="target")
+    result = pack_pipeline_output(X, y, False)
+
+    assert isinstance(result, pd.DataFrame)
+    assert "x" in result.columns
+    assert "target" in result.columns
+
+
+def test_pack_pipeline_output_pandas_y_wrapper_uses_to_pandas() -> None:
+    """A y exposing to_pandas() must be converted before concatenation."""
+
+    class _PandasLikeYWrapper:
+        def __init__(self, series: pd.Series) -> None:
+            self._series = series
+
+        def to_pandas(self) -> pd.Series:
+            return self._series
+
+    X = pd.DataFrame({"x": [1, 2]})
+    y = _PandasLikeYWrapper(pd.Series([10, 20], name="target"))
+    result = pack_pipeline_output(X, y, False)
+
+    assert isinstance(result, pd.DataFrame)
     assert "target" in result.columns

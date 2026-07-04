@@ -145,7 +145,9 @@ class TemporalMixin(_AnalyzerState):
             acf_stats: List[dict] = []
             if cols_to_track:
                 target_metric = cols_to_track[0]
-                series = trend_df[target_metric].to_numpy()
+                # .copy() avoids "assignment destination is read-only" — polars
+                # returns a zero-copy read-only view when the column has no nulls.
+                series = trend_df[target_metric].to_numpy().copy()
 
                 mask = np.isnan(series)
                 if mask.any():
@@ -167,7 +169,7 @@ class TemporalMixin(_AnalyzerState):
                     from statsmodels.tsa.stattools import adfuller
 
                     target_metric = cols_to_track[0]
-                    series = trend_df[target_metric].to_numpy()
+                    series = trend_df[target_metric].to_numpy().copy()
                     mask = np.isnan(series)
                     if mask.any():
                         series[mask] = np.nanmean(series)

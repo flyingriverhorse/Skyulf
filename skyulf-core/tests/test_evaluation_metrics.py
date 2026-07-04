@@ -14,6 +14,7 @@ from sklearn.metrics import (
 )
 from sklearn.tree import DecisionTreeClassifier
 
+from skyulf.modeling._evaluation import metrics as metrics_mod
 from skyulf.modeling._evaluation.metrics import (
     calculate_classification_metrics,
     calculate_regression_metrics,
@@ -157,6 +158,119 @@ def test_regression_metrics_mse_matches_sklearn():
     metrics = calculate_regression_metrics(model, X, y)
     expected = mean_squared_error(y, model.predict(X))
     assert metrics["mse"] == pytest.approx(expected)
+
+
+# ---------------------------------------------------------------------------
+# Exception-swallowing branches (all guarded blocks must not propagate errors)
+# ---------------------------------------------------------------------------
+
+
+def test_binary_unweighted_metrics_exception_is_swallowed(monkeypatch, binary_data):
+    """If precision_score raises for the binary block, precision/recall/f1 must be absent."""
+    model, X, y = binary_data
+    original = metrics_mod.precision_score
+
+    def flaky(y_true, y_pred, average="binary", **kwargs):
+        if average == "binary":
+            raise ValueError("boom")
+        return original(y_true, y_pred, average=average, **kwargs)
+
+    monkeypatch.setattr(metrics_mod, "precision_score", flaky)
+    result = calculate_classification_metrics(model, X, y)
+    assert "precision" not in result
+    assert "precision_weighted" in result
+
+
+def test_geometric_mean_score_exception_is_swallowed(monkeypatch, binary_data):
+    """If geometric_mean_score raises, g_score must simply be absent from the result."""
+    model, X, y = binary_data
+
+    def flaky(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(metrics_mod, "geometric_mean_score", flaky)
+    result = calculate_classification_metrics(model, X, y)
+    assert "g_score" not in result
+    assert "accuracy" in result
+
+
+def test_log_loss_exception_is_swallowed(monkeypatch, binary_data):
+    """If log_loss raises, log_loss must be absent but roc_auc/pr_auc still computed."""
+    model, X, y = binary_data
+
+    def flaky(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(metrics_mod, "log_loss", flaky)
+    result = calculate_classification_metrics(model, X, y)
+    assert "log_loss" not in result
+    assert "roc_auc" in result
+
+
+def test_multiclass_pr_auc_weighted_exception_is_swallowed(monkeypatch, multiclass_data):
+    """If roc_auc_score raises inside the multiclass block, roc_auc_ovo must be absent."""
+    model, X, y = multiclass_data
+
+    def flaky(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(metrics_mod, "roc_auc_score", flaky)
+    result = calculate_classification_metrics(model, X, y)
+    assert "roc_auc_ovo" not in result
+    assert "accuracy" in result
+
+
+def test_predict_proba_outer_exception_is_swallowed(monkeypatch, binary_data):
+    """If predict_proba itself raises, the whole probability block must be skipped safely."""
+    model, X, y = binary_data
+
+    class _BrokenProbaModel:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def predict(self, X):
+            return self._inner.predict(X)
+
+        def predict_proba(self, X):
+            raise RuntimeError("boom")
+
+    broken = _BrokenProbaModel(model)
+    result = calculate_classification_metrics(broken, X, y)
+    assert "roc_auc" not in result
+    assert "accuracy" in result
+
+
+def test_multiclass_classes_fallback_when_model_lacks_classes_attr(monkeypatch, multiclass_data):
+    """When model.classes_ is missing/mismatched, classes must fall back to np.arange."""
+    model, X, y = multiclass_data
+
+    class _NoClassesModel:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def predict(self, X):
+            return self._inner.predict(X)
+
+        def predict_proba(self, X):
+            return self._inner.predict_proba(X)
+
+    wrapped = _NoClassesModel(model)
+    result = calculate_classification_metrics(wrapped, X, y)
+    assert "pr_auc_weighted" in result
+
+
+def test_imblearn_import_failure_leaves_geometric_mean_score_none(monkeypatch):
+    """If imblearn.metrics is unimportable, geometric_mean_score must fall back to None."""
+    import importlib
+    import sys
+
+    monkeypatch.setitem(sys.modules, "imblearn.metrics", None)
+    try:
+        importlib.reload(metrics_mod)
+        assert metrics_mod.geometric_mean_score is None
+    finally:
+        monkeypatch.delitem(sys.modules, "imblearn.metrics", raising=False)
+        importlib.reload(metrics_mod)
 
 
 def test_regression_metrics_returns_all_expected_keys():

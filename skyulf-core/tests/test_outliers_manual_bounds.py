@@ -271,3 +271,36 @@ class TestManualBoundsApplierPolars:
         pd_out = ManualBoundsApplier().apply(df_pandas, params)
         pl_out = ManualBoundsApplier().apply(pl.from_pandas(df_pandas), params)
         assert list(pd_out["val"]) == pl_out["val"].to_list()
+
+    def test_unknown_column_ignored_polars(self, df_polars: pl.DataFrame) -> None:
+        """Bounds referencing a column absent from the Polars frame must not raise
+        (covers the ``continue`` branch in ``_apply_polars``)."""
+        out = self._run(df_polars, {"bounds": {"nonexistent": {"lower": 0.0}}})
+        assert out.shape[0] == df_polars.shape[0]
+
+    def test_polars_tuple_xy_with_polars_series_y(self, df_polars: pl.DataFrame) -> None:
+        """A Polars Series ``y`` paired with a Polars X must be filtered in sync."""
+        y = pl.Series("y", list(range(df_polars.shape[0])))
+        config = {"bounds": {"val": {"lower": 0.0, "upper": 50.0}}}
+        params = ManualBoundsCalculator().fit(df_polars.to_pandas(), config)
+        X_out, y_out = self._APPLIER.apply((df_polars, y), params)
+        assert isinstance(y_out, pl.Series)
+        assert X_out.height == len(y_out)
+
+    def test_polars_tuple_xy_with_polars_dataframe_y(self, df_polars: pl.DataFrame) -> None:
+        """A Polars DataFrame ``y`` paired with a Polars X must be filtered in sync."""
+        y = pl.DataFrame({"label": list(range(df_polars.shape[0]))})
+        config = {"bounds": {"val": {"lower": 0.0, "upper": 50.0}}}
+        params = ManualBoundsCalculator().fit(df_polars.to_pandas(), config)
+        X_out, y_out = self._APPLIER.apply((df_polars, y), params)
+        assert isinstance(y_out, pl.DataFrame)
+        assert X_out.height == y_out.height
+
+    def test_polars_tuple_xy_with_non_polars_y_passthrough(self, df_polars: pl.DataFrame) -> None:
+        """A non-Polars, non-None ``y`` alongside a Polars X must be returned
+        unchanged (the ``_filter_y_polars`` fallback branch)."""
+        y = [0, 1, 2, 3, 4, 5]
+        config = {"bounds": {"val": {"lower": 0.0, "upper": 50.0}}}
+        params = ManualBoundsCalculator().fit(df_polars.to_pandas(), config)
+        _, y_out = self._APPLIER.apply((df_polars, y), params)
+        assert y_out is y

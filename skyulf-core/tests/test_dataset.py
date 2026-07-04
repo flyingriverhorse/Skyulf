@@ -121,3 +121,41 @@ def test_copy_with_numpy_array_payload() -> None:
     ds_copy = ds.copy()
     # Should return without raising; data must be equivalent.
     np.testing.assert_array_equal(ds_copy.train, arr)
+
+
+class _CloneOnly:
+    """Stub payload exposing only `clone()` (e.g. a lazy-frame-like engine object)."""
+
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+    def clone(self) -> "_CloneOnly":
+        """Return a new instance with the same value."""
+        return _CloneOnly(self.value)
+
+
+class _NoCopyNoClone:
+    """Stub payload exposing neither `copy()` nor `clone()`."""
+
+    def __init__(self, value: int) -> None:
+        self.value = value
+
+
+def test_copy_uses_clone_when_copy_is_unavailable() -> None:
+    """copy() must fall back to .clone() for payloads without a .copy() method."""
+    train = _CloneOnly(1)
+    test = _CloneOnly(2)
+    ds = SplitDataset(train=typing.cast(SplitPayload, train), test=typing.cast(SplitPayload, test))
+    ds_copy = ds.copy()
+    assert ds_copy.train is not train
+    assert typing.cast(_CloneOnly, ds_copy.train).value == 1
+
+
+def test_copy_returns_same_object_when_neither_copy_nor_clone_available() -> None:
+    """copy() must return the payload unchanged when it has no .copy()/.clone() method."""
+    train = _NoCopyNoClone(1)
+    test = _NoCopyNoClone(2)
+    ds = SplitDataset(train=typing.cast(SplitPayload, train), test=typing.cast(SplitPayload, test))
+    ds_copy = ds.copy()
+    assert ds_copy.train is train
+    assert ds_copy.test is test

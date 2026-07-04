@@ -501,3 +501,31 @@ if _POLARS_AVAILABLE:
         params: Dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
         result = CastingApplier().apply(df_pl, params)
         assert result["flag"].dtype == pl.Boolean
+
+    # -----------------------------------------------------------------------
+    # _resolve_polars_dtype (datetime-prefix branch + unsupported-dtype None)
+    # -----------------------------------------------------------------------
+
+    from skyulf.preprocessing.casting import _resolve_polars_dtype
+
+    def test_resolve_polars_dtype_datetime_prefix_variant() -> None:
+        """A 'datetime...' string not in the alias table must map via the
+        startswith('datetime') fallback to pl.Datetime."""
+        assert _resolve_polars_dtype("datetime64[ns]") is pl.Datetime
+
+    def test_resolve_polars_dtype_unsupported_returns_none() -> None:
+        """An unrecognised dtype string must resolve to None (unsupported)."""
+        assert _resolve_polars_dtype("totally_unsupported_dtype") is None
+
+    def test_casting_apply_polars_skips_unsupported_dtype_column() -> None:
+        """Polars apply must silently skip a column whose target dtype is
+        unsupported (_resolve_polars_dtype returns None), leaving it untouched."""
+        df_pl = pl.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+        params: Dict[str, Any] = {
+            "type_map": {"a": "totally_unsupported_dtype", "b": "string"},
+            "coerce_on_error": True,
+        }
+        result = CastingApplier().apply(df_pl, params)
+        # 'a' must remain untouched (Int64), 'b' must be cast to String.
+        assert result["a"].dtype == df_pl["a"].dtype
+        assert result["b"].dtype == pl.String

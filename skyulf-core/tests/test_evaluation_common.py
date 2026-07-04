@@ -9,6 +9,7 @@ from skyulf.modeling._evaluation.common import (
     _align_thresholds,
     _downsample_indices,
     _is_finite_number,
+    _sanitize_structure,
     downsample_curve,
     sanitize_metrics,
 )
@@ -114,6 +115,37 @@ def test_sanitize_metrics_converts_numpy_float():
     result = sanitize_metrics(cast(Dict[str, float], metrics))
     assert isinstance(result["score"], float)
     assert result["score"] == pytest.approx(0.75)
+
+
+def test_sanitize_structure_handles_nested_list():
+    """A list value must be recursively sanitized and rebuilt as a list."""
+    warnings: list = []
+    result = _sanitize_structure([1, 2.5, float("nan")], warnings=warnings, context="ctx")
+    assert result == [1, 2.5, None]
+    assert isinstance(result, list)
+
+
+def test_sanitize_structure_handles_nested_tuple():
+    """A tuple value must be recursively sanitized and rebuilt as a tuple."""
+    warnings: list = []
+    result = _sanitize_structure((1, 2, 3), warnings=warnings, context="ctx")
+    assert result == (1, 2, 3)
+    assert isinstance(result, tuple)
+
+
+def test_sanitize_structure_int_returns_plain_int():
+    """A finite Python/numpy int must be cast to a plain int (not float)."""
+    warnings: list = []
+    result = _sanitize_structure(np.int64(7), warnings=warnings, context="ctx")
+    assert result == 7
+    assert isinstance(result, int)
+
+
+def test_sanitize_structure_non_numeric_passthrough():
+    """Non-numeric, non-container values (e.g. strings) must be returned unchanged."""
+    warnings: list = []
+    result = _sanitize_structure("hello", warnings=warnings, context="ctx")
+    assert result == "hello"
 
 
 # ---------------------------------------------------------------------------

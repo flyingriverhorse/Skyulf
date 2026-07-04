@@ -9,7 +9,7 @@ import pytest
 from sklearn.datasets import make_classification, make_regression
 
 from skyulf.modeling._tuning.schemas import TuningConfig
-from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling.base import BaseModelCalculator, StatefulEstimator
 from skyulf.modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
@@ -401,7 +401,151 @@ def test_sort_by_time_missing_specified_column():
 # ---------------------------------------------------------------------------
 
 
-def test_perform_cv_time_series_with_datetime_column():
+def _make_classification_xy_numpy(n: int = 120, seed: int = 0) -> tuple:
+    """Build classification data as raw numpy arrays (no .iloc) to exercise fallback branches."""
+    X_arr, y_arr = make_classification(
+        n_samples=n, n_features=4, n_informative=3, n_redundant=1, random_state=seed
+    )
+    return X_arr, y_arr
+
+
+def test_perform_cv_kfold_with_numpy_arrays_no_iloc():
+    """perform_cross_validation should fall back to plain indexing for numpy X/y (no .iloc)."""
+    X, y = _make_classification_xy_numpy()
+    calc = LogisticRegressionCalculator()
+    appl = LogisticRegressionApplier()
+
+    result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="k_fold")
+    assert len(result["folds"]) == 3
+    assert "accuracy" in result["aggregated_metrics"]
+
+
+class _FlakyInnerCalculator(BaseModelCalculator):
+    """Wraps LogisticRegressionCalculator but fails fit() on small (inner-fold-sized) splits."""
+
+    def __init__(self, size_threshold: int = 60):
+        self._real = LogisticRegressionCalculator()
+        self._threshold = size_threshold
+
+    @property
+    def problem_type(self) -> str:
+        """Report classification, matching the wrapped calculator."""
+        return "classification"
+
+    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+        """Raise for small (inner-fold) splits; delegate to the real calculator otherwise."""
+        if len(X) <= self._threshold:
+            raise RuntimeError("Simulated inner-fold failure")
+        return self._real.fit(X, y, config)
+
+
+def test_perform_nested_cv_inner_fold_failure_is_caught():
+    """A failing inner-fold fit should be caught and recorded as a 0.0 score, not raised."""
+    X, y = _make_classification_xy(n=150)
+    calc = _FlakyInnerCalculator()
+    appl = LogisticRegressionApplier()
+
+    result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="nested_cv")
+    assert len(result["folds"]) == 3
+    for fold in result["folds"]:
+        assert fold["inner_cv_mean"] == 0.0
+
+
+def test_perform_nested_cv_with_callbacks_and_numpy_arrays():
+    """nested_cv should invoke progress/log callbacks and support numpy X/y (no .iloc branches)."""
+    X, y = _make_classification_xy_numpy(n=150)
+    calc = LogisticRegressionCalculator()
+    appl = LogisticRegressionApplier()
+
+    progress_calls: List[tuple] = []
+    messages: List[str] = []
+    result = perform_cross_validation(
+        calc,
+        appl,
+        X,
+        y,
+        config={},
+        n_folds=3,
+        cv_type="nested_cv",
+        progress_callback=lambda cur, total: progress_calls.append((cur, total)),
+        log_callback=messages.append,
+    )
+    assert len(result["folds"]) == 3
+    assert len(progress_calls) == 3
+    assert any("Nested CV" in m for m in messages)
+    assert any("Outer Fold" in m for m in messages)
+    assert any("Completed" in m for m in messages)
+
+
+# ---------------------------------------------------------------------------
+# _sort_by_time — log_callback coverage
+# ---------------------------------------------------------------------------
+
+
+def test_sort_by_time_auto_detect_datetime_with_log_callback():
+    """Auto-detected datetime sorting should invoke log_callback for both messages."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    messages: List[str] = []
+
+    dates = pd.to_datetime(["2023-03-01", "2023-01-01", "2023-02-01"])
+    X = pd.DataFrame({"ts": dates, "val": [30, 10, 20]})
+    y = pd.Series([30, 10, 20])
+
+    X_out, y_out = _sort_by_time(X, y, None, messages.append, logger)
+
+    assert "ts" not in X_out.columns
+    assert list(X_out["val"]) == [10, 20, 30]
+    assert any("auto-detected datetime column" in m for m in messages)
+    assert any("data sorted by" in m for m in messages)
+
+
+def test_sort_by_time_explicit_column_with_numpy_y_no_iloc():
+    """Sorting with a plain numpy y (no .iloc) should use positional indexing."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    dates = pd.to_datetime(["2023-03-01", "2023-01-01", "2023-02-01"])
+    X = pd.DataFrame({"date": dates, "val": [3, 1, 2]})
+    y = np.array([3, 1, 2])
+
+    X_out, y_out = _sort_by_time(X, y, "date", None, logger)
+
+    assert list(X_out["val"]) == [1, 2, 3]
+    assert list(y_out) == [1, 2, 3]
+
+
+def test_sort_by_time_missing_specified_column_with_log_callback():
+    """A missing specified time column should invoke log_callback with a warning message."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    messages: List[str] = []
+
+    X = pd.DataFrame({"a": [3, 1, 2]})
+    y = pd.Series([3, 1, 2])
+
+    _sort_by_time(X, y, "nonexistent", messages.append, logger)
+
+    assert any("not found in data" in m for m in messages)
+
+
+def test_sort_by_time_no_datetime_column_with_log_callback():
+    """No datetime column found (and none specified) should invoke log_callback."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    messages: List[str] = []
+
+    X = pd.DataFrame({"a": [3, 1, 2], "b": [1, 2, 3]})
+    y = pd.Series([3, 1, 2])
+
+    _sort_by_time(X, y, None, messages.append, logger)
+
+    assert any("no datetime column found" in m for m in messages)
+
     """time_series_split should sort by datetime column when provided."""
     np.random.seed(1)
     dates = pd.date_range("2020-01-01", periods=90, freq="D")

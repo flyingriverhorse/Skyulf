@@ -11,6 +11,7 @@ import typing
 from typing import Any, Dict
 
 import pandas as pd
+import polars as pl
 import pytest
 
 from skyulf.data.dataset import SplitDataset
@@ -20,7 +21,9 @@ from skyulf.preprocessing.split import (
     FeatureTargetSplitCalculator,
     SplitApplier,
     SplitCalculator,
+    _back_to_engine,
     _safe_stratify,
+    _to_pandas_remember_engine,
 )
 
 
@@ -290,3 +293,189 @@ def test_feature_target_split_applier_passes_through_tuple_input() -> None:
     assert isinstance(result, tuple)
     assert result[0] is X
     assert result[1] is y
+
+
+# ---------------------------------------------------------------------------
+# Polars engine — _to_pandas_remember_engine / _back_to_engine round trip
+# ---------------------------------------------------------------------------
+
+
+def test_data_splitter_split_polars_round_trips_back_to_polars() -> None:
+    """split() on a Polars frame must convert to pandas internally and back to Polars."""
+    df = pl.DataFrame({"feature": range(20), "target": [i % 2 for i in range(20)]})
+    splitter = DataSplitter(test_size=0.2, random_state=42)
+    result = splitter.split(typing.cast(Any, df))
+    assert isinstance(result.train, pl.DataFrame)
+    assert isinstance(result.test, pl.DataFrame)
+    assert result.train.height == 16
+    assert result.test.height == 4
+
+
+def test_data_splitter_split_polars_with_validation_round_trips() -> None:
+    """split() with validation on Polars input must return Polars frames for all splits."""
+    df = pl.DataFrame({"feature": range(20), "target": [i % 2 for i in range(20)]})
+    splitter = DataSplitter(test_size=0.2, validation_size=0.2, random_state=42)
+    result = splitter.split(typing.cast(Any, df))
+    assert isinstance(result.validation, pl.DataFrame)
+    assert result.validation.height == 4
+
+
+def test_data_splitter_split_xy_polars_round_trips_back_to_polars() -> None:
+    """split_xy() on Polars X/y must return Polars frames/series in every split member."""
+    X = pl.DataFrame({"feature": range(20)})
+    y = pl.Series("target", [i % 2 for i in range(20)])
+    splitter = DataSplitter(test_size=0.2, random_state=42)
+    result = splitter.split_xy(typing.cast(Any, X), typing.cast(Any, y))
+    X_train, y_train = result.train
+    X_test, y_test = result.test
+    assert isinstance(X_train, pl.DataFrame)
+    assert isinstance(y_train, pl.Series)
+    assert isinstance(X_test, pl.DataFrame)
+    assert isinstance(y_test, pl.Series)
+    assert X_train.height == len(y_train) == 16
+    assert X_test.height == len(y_test) == 4
+
+
+def test_data_splitter_split_xy_polars_with_validation_round_trips() -> None:
+    """split_xy() with validation on Polars input must return Polars members throughout."""
+    X = pl.DataFrame({"feature": range(20)})
+    y = pl.Series("target", [i % 2 for i in range(20)])
+    splitter = DataSplitter(test_size=0.2, validation_size=0.2, random_state=42)
+    result = splitter.split_xy(typing.cast(Any, X), typing.cast(Any, y))
+    assert result.validation is not None
+    X_val, y_val = result.validation
+    assert isinstance(X_val, pl.DataFrame)
+    assert isinstance(y_val, pl.Series)
+    assert X_val.height == len(y_val) == 4
+
+
+# ---------------------------------------------------------------------------
+# _build_splitter — implicit stratify sentinel
+# ---------------------------------------------------------------------------
+
+
+def test_split_applier_stratify_true_without_target_column_uses_sentinel() -> None:
+    """stratify=True with no target_column must fall back to the implicit sentinel
+    and still stratify successfully on a supplied (X, y) tuple."""
+    X = pd.DataFrame({"feature": range(100)})
+    y = pd.Series([i % 2 for i in range(100)])
+    params: Dict[str, Any] = {"test_size": 0.2, "random_state": 42, "stratify": True}
+    result = SplitApplier().apply((X, y), params)
+    assert isinstance(result, SplitDataset)
+    _, y_test = result.test
+    assert y_test.mean() == pytest.approx(0.5, abs=0.05)
+
+
+# ---------------------------------------------------------------------------
+# FeatureTargetSplitApplier — polars single-frame split (_split_xy_one_polars)
+# ---------------------------------------------------------------------------
+
+
+def test_feature_target_split_applier_splits_single_polars_frame() -> None:
+    """FeatureTargetSplitApplier on a Polars frame must return (X, y) Polars members."""
+    df = pl.DataFrame({"feature": range(10), "target": [i % 2 for i in range(10)]})
+    result = FeatureTargetSplitApplier().apply(typing.cast(Any, df), {"target_column": "target"})
+    X, y = typing.cast("tuple[pl.DataFrame, pl.Series]", result)
+    assert isinstance(X, pl.DataFrame)
+    assert isinstance(y, pl.Series)
+    assert "target" not in X.columns
+    assert y.to_list() == [i % 2 for i in range(10)]
+
+
+def test_feature_target_split_applier_polars_raises_when_column_missing() -> None:
+    """A target_column absent from a Polars frame must raise a ValueError."""
+    df = pl.DataFrame({"feature": [1, 2, 3]})
+    with pytest.raises(ValueError):
+        FeatureTargetSplitApplier().apply(typing.cast(Any, df), {"target_column": "does_not_exist"})
+
+
+def test_feature_target_split_applier_handles_polars_split_dataset_input() -> None:
+    """FeatureTargetSplitApplier must split every Polars member of an input SplitDataset."""
+    df = pl.DataFrame({"feature": range(50), "target": [i % 2 for i in range(50)]})
+    split_result = SplitApplier().apply(df, {"test_size": 0.2, "random_state": 42})
+    result = FeatureTargetSplitApplier().apply(split_result, {"target_column": "target"})
+    assert isinstance(result, SplitDataset)
+    X_train, y_train = result.train
+    assert "target" not in X_train.columns
+    assert X_train.height == len(y_train)
+
+
+# ---------------------------------------------------------------------------
+# _maybe_split_xy_member — already-split tuple members and missing-target fallback
+# ---------------------------------------------------------------------------
+
+
+def test_feature_target_split_applier_split_dataset_member_already_split() -> None:
+    """A SplitDataset member that is already an (X, y) tuple with non-None y must
+    be returned unchanged instead of being re-split."""
+    X_train = pd.DataFrame({"feature": [1, 2]})
+    y_train = pd.Series([0, 1])
+    X_test = pd.DataFrame({"feature": [3, 4], "target": [1, 0]})
+    split_dataset = SplitDataset(train=(X_train, y_train), test=(X_test, None))
+    result = FeatureTargetSplitApplier().apply(split_dataset, {"target_column": "target"})
+    assert isinstance(result, SplitDataset)
+    # train member was already split -> passed through untouched.
+    assert result.train[0] is X_train
+    assert result.train[1] is y_train
+    # test member had no y but does have the target column -> gets split.
+    X_test_out, y_test_out = result.test
+    assert "target" not in X_test_out.columns
+    assert list(y_test_out) == [1, 0]
+
+
+def test_feature_target_split_applier_split_dataset_member_tuple_without_target_col() -> None:
+    """A SplitDataset (X, None) member whose X lacks the target column must pass through
+    unchanged rather than raising."""
+    X = pd.DataFrame({"feature": [1, 2, 3]})
+    split_dataset = SplitDataset(train=(X, None), test=(X.copy(), None))
+    result = FeatureTargetSplitApplier().apply(split_dataset, {"target_column": "target"})
+    assert isinstance(result, SplitDataset)
+    assert result.train[0] is X
+    assert result.train[1] is None
+
+
+def test_feature_target_split_calculator_infer_output_schema_passes_through() -> None:
+    """FeatureTargetSplitCalculator.infer_output_schema must return the input schema
+    unchanged (target column stays visible downstream in the y slot)."""
+    from skyulf.core.schema import SkyulfSchema
+
+    schema = SkyulfSchema.from_columns(
+        ["feature", "target"], {"feature": "int64", "target": "int64"}
+    )
+    result = FeatureTargetSplitCalculator().infer_output_schema(schema, {"target_column": "target"})
+    assert result is schema
+
+
+# ---------------------------------------------------------------------------
+# _to_pandas_remember_engine / _back_to_engine — private helper unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_to_pandas_remember_engine_none_passthrough() -> None:
+    """None input must pass through as (None, False) without conversion."""
+    assert _to_pandas_remember_engine(None) == (None, False)
+
+
+def test_to_pandas_remember_engine_pandas_passthrough() -> None:
+    """A pandas DataFrame must pass through unconverted with was_polars=False."""
+    df = pd.DataFrame({"a": [1, 2]})
+    data, was_polars = _to_pandas_remember_engine(df)
+    assert data is df
+    assert was_polars is False
+
+
+def test_back_to_engine_none_input_returns_none() -> None:
+    """None input must pass through _back_to_engine unchanged regardless of was_polars."""
+    assert _back_to_engine(None, True) is None
+    assert _back_to_engine(None, False) is None
+
+
+def test_back_to_engine_not_was_polars_returns_data_unchanged() -> None:
+    """When was_polars is False, data must be returned unchanged even if convertible."""
+    df = pd.DataFrame({"a": [1, 2]})
+    assert _back_to_engine(df, False) is df
+
+
+def test_back_to_engine_non_frame_data_with_was_polars_passthrough() -> None:
+    """A was_polars=True conversion must fall through unchanged for non pandas types."""
+    assert _back_to_engine(42, True) == 42
