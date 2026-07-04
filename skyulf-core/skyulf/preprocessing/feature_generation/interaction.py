@@ -1,4 +1,4 @@
-"""Feature-interaction node — automatic 2-way / 3-way multiplicative interactions.
+"""Feature-interaction node — automatic 2-way / 3-way / 4-way multiplicative interactions.
 
 Unlike :mod:`.polynomial` (which also generates squared/cubed terms), this
 node focuses purely on cross-products between distinct columns and names the
@@ -22,7 +22,7 @@ from ..dispatcher import apply_dual_engine
 # ``*``/spaces/other characters that break patsy/statsmodels formula parsing
 # or common ML naming conventions.
 _NAME_SEP = "_x_"
-_SUPPORTED_DEGREES = (2, 3)
+_SUPPORTED_DEGREES = (2, 3, 4)
 _BIAS_COLUMN = "interaction_bias"
 
 
@@ -37,7 +37,8 @@ def _interaction_name(columns: Tuple[str, ...]) -> str:
         columns: Column names participating in the interaction.
 
     Returns:
-        A name such as ``"x1_x_x2"`` (2-way) or ``"x1_x_x2_x_x3"`` (3-way).
+        A name such as ``"x1_x_x2"`` (2-way), ``"x1_x_x2_x_x3"`` (3-way), or
+        ``"x1_x_x2_x_x3_x_x4"`` (4-way).
     """
     return _NAME_SEP.join(sorted(columns))
 
@@ -49,7 +50,7 @@ def _resolve_combinations(
 
     Args:
         columns: Candidate numeric columns (already validated to exist).
-        degree: 2 for pairwise, 3 for three-way interactions.
+        degree: 2 for pairwise, 3 for three-way, or 4 for four-way interactions.
         interaction_only: If ``True``, skip self-products (e.g. ``x1 * x1``)
             by using combinations without replacement.
 
@@ -120,7 +121,7 @@ class FeatureInteractionApplier(BaseApplier):
     name="Feature Interaction",
     category="Feature Engineering",
     description=(
-        "Generate 2-way/3-way multiplicative interaction features between "
+        "Generate 2-way/3-way/4-way multiplicative interaction features between "
         "numeric columns, using deterministic regularization-friendly names."
     ),
     params={"columns": [], "degree": 2, "interaction_only": True, "include_bias": False},
@@ -143,7 +144,7 @@ class FeatureInteractionCalculator(BaseCalculator):
 
         degree = config.get("degree", 2)
         if degree not in _SUPPORTED_DEGREES:
-            raise ValueError(f"FeatureInteraction only supports degree 2 or 3, got {degree}")
+            raise ValueError(f"FeatureInteraction only supports degree 2, 3 or 4, got {degree}")
         interaction_only = config.get("interaction_only", True)
         include_bias = config.get("include_bias", False)
 
