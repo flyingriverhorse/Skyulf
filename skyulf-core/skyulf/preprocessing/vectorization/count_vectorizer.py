@@ -17,7 +17,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import unpack_pipeline_input
 from .._artifacts import CountVectorizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import _join_text_columns, _warn_large_output, apply_text_pandas_only
@@ -63,7 +62,7 @@ def _count_apply_pandas(
 
 class CountVectorizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _count_apply_pandas)
 
 
@@ -98,7 +97,7 @@ class CountVectorizerCalculator(BaseCalculator):
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CountVectorizerArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CountVectorizerArtifact:  # pylint: disable=arguments-differ
         cols: List[str] = config.get("columns", [])
         if not cols:
             return {}

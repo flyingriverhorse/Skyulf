@@ -203,7 +203,7 @@ def _casting_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Any:
 
 class CastingApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _casting_apply_polars, _casting_apply_pandas)
 
 
@@ -233,7 +233,7 @@ class CastingCalculator(BaseCalculator):
         return new_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CastingArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CastingArtifact:  # pylint: disable=arguments-differ
         # Config supports two shapes:
         #   {'columns': ['col1'], 'target_type': 'float'}
         #   {'column_types': {'col1': 'float', 'col2': 'int'}}

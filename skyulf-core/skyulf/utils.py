@@ -109,7 +109,7 @@ def pack_pipeline_output(
                 try:
                     y_series = pl.Series(y)
                 except Exception:
-                    pass  # Let it fail or handle otherwise
+                    pass  # nosec B110 - Let it fail or handle otherwise
 
             # Helper to get raw df
             raw_df = X

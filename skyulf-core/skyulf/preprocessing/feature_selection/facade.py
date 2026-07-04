@@ -35,7 +35,7 @@ class FeatureSelectionApplier(BaseApplier):
             applier = ModelBasedSelectionApplier()
 
         if applier:
-            return applier.apply(df, params)
+            return applier.apply(df, params)  # pylint: disable=no-value-for-parameter
         # Identity passthrough when no concrete applier matches.
         return df
 

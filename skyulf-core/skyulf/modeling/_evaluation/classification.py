@@ -47,7 +47,7 @@ def evaluate_classification_model(
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 y_prob = model.predict_proba(X_test_np)
         except Exception:
-            pass
+            pass  # nosec B110 - predict_proba is optional; classes/labels still work without it
 
     # Determine classes
     classes = getattr(model, "classes_", None)

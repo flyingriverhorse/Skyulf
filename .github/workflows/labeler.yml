@@ -1,0 +1,24 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Auto-labels PRs by changed path, using .github/labeler.yml as the mapping.
+
+name: PR Labeler
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Apply path-based labels
+    runs-on: ubuntu-latest
+    steps:
+      - name: Labeler
+        uses: actions/labeler@v6
+        with:
+          configuration-path: .github/labeler.yml
+          sync-labels: true

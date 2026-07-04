@@ -17,7 +17,7 @@ _DEV_DEFAULTS: Dict[str, Any] = {
     "DEBUG": True,
     "LOG_LEVEL": "DEBUG",
     "DB_ECHO": False,
-    "HOST": "0.0.0.0",
+    "HOST": "0.0.0.0",  # nosec B104 - dev-only default; intended to be reachable from containers/LAN
     "CORS_ORIGINS": ["*"],
 }
 

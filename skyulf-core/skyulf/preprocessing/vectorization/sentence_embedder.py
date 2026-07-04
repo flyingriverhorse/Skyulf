@@ -90,7 +90,7 @@ def _embed_apply_pandas(
 
 class SentenceEmbedderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _embed_apply_pandas)
 
 
@@ -120,7 +120,7 @@ class SentenceEmbedderCalculator(BaseCalculator):
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> SentenceEmbedderArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ
         cols: List[str] = config.get("columns", [])
         if not cols:
             return {}

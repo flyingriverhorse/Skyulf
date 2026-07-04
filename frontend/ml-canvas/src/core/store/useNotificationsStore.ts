@@ -53,6 +53,8 @@ export const useNotificationsStore = create<NotificationsState>()(
         existingKeys.add(key);
         fresh.push({
           ...w,
+          // nosemgrep: insecure-random-generator -- non-cryptographic local UI id
+          // suffix, not used for security tokens/secrets.
           id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           ts: Date.now(),
           read: false,

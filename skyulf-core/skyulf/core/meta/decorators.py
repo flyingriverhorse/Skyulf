@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 
 @dataclass
 class NodeMetadata:
-    id: str  # noqa: A002, A003
+    id: str  # noqa: A002, A003  # pylint: disable=redefined-builtin
     name: str
     category: str
     description: str
@@ -13,7 +13,7 @@ class NodeMetadata:
 
 
 def node_meta(
-    id: str,  # noqa: A002, A003
+    id: str,  # noqa: A002, A003  # pylint: disable=redefined-builtin
     name: str,
     category: str,
     description: str,

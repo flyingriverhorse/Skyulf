@@ -60,7 +60,7 @@ def _hash_apply_pandas(X: pd.DataFrame, y: Any, params: Dict[str, Any]) -> Tuple
 
 class HashingVectorizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _hash_apply_pandas)
 
 
@@ -95,7 +95,7 @@ class HashingVectorizerCalculator(BaseCalculator):
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> HashingVectorizerArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> HashingVectorizerArtifact:  # pylint: disable=arguments-differ
         cols: List[str] = config.get("columns", [])
         if not cols:
             return {}

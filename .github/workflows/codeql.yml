@@ -1,6 +1,14 @@
 name: CodeQL
 
 on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Weekly Monday 07:00 UTC — catches new CodeQL query packs / rule updates
+    # even when no code changes land.
+    - cron: "0 7 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -14,38 +22,41 @@ concurrency:
 
 jobs:
   analyze:
-    name: Analyze (Python)
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        language: [ 'python' ]
+        language: [ 'python', 'javascript-typescript' ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           # queries: security-and-quality  # optional
 
-      - name: Install dependencies
+      - name: Install Python dependencies
+        if: matrix.language == 'python'
         run: |
           python -m pip install --upgrade pip
           if [ -f "requirements-fastapi.txt" ]; then python -m pip install -r requirements-fastapi.txt; fi
           if [ -f "requirements.txt" ]; then python -m pip install -r requirements.txt; fi
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
-      # Python doesn't require an explicit build step for CodeQL
+      # Python doesn't require an explicit build step for CodeQL; the JS/TS
+      # analysis is source-only too (no bundler build needed for CodeQL).
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4

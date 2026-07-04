@@ -130,9 +130,9 @@ def calculate_classification_metrics(
                             average_precision_score(y_indicator, proba, average="weighted")
                         )
                 except Exception:
-                    pass
+                    pass  # nosec B110 - weighted PR-AUC is an optional extra metric
     except Exception:
-        pass
+        pass  # nosec B110 - multiclass PR-AUC block is optional; other metrics still returned
 
     return metrics
 

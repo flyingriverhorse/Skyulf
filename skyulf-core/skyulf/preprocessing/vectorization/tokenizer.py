@@ -70,7 +70,7 @@ def _tokenizer_apply_pandas(
 
 class TokenizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _tokenizer_apply_pandas)
 
 
@@ -105,7 +105,7 @@ class TokenizerCalculator(BaseCalculator):
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TokenizerArtifact:
+    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TokenizerArtifact:  # pylint: disable=arguments-differ
         cols: List[str] = config.get("columns", [])
         if not cols:
             return {}

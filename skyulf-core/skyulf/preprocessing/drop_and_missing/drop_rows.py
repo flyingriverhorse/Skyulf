@@ -56,7 +56,7 @@ def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> T
 
 class DropMissingRowsApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,

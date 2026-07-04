@@ -22,7 +22,7 @@ def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> T
 
 class DropMissingColumnsApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             X, params, _drop_missing_cols_apply_polars, _drop_missing_cols_apply_pandas
         )
