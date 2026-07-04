@@ -30,18 +30,18 @@ jobs:
         language: [ 'python', 'javascript-typescript' ]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2
 
       - name: Set up Python
         if: matrix.language == 'python'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           # queries: security-and-quality  # optional
@@ -54,9 +54,9 @@ jobs:
           if [ -f "requirements.txt" ]; then python -m pip install -r requirements.txt; fi
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       # Python doesn't require an explicit build step for CodeQL; the JS/TS
       # analysis is source-only too (no bundler build needed for CodeQL).
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
