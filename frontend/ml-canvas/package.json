@@ -78,7 +78,7 @@
     "@types/react-plotly.js": "^2.6.4",
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
+    "@typescript-eslint/parser": "^8.62.1",
     "@vitejs/plugin-react": "^4.2.1",
     "@vitest/ui": "^4.1.0",
     "autoprefixer": "^10.4.19",
