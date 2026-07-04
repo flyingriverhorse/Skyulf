@@ -1,0 +1,38 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Integration-test image: same suite as Dockerfile.unittests, but intended to
+# run against *live* backing services (Redis today; add Postgres/etc. here if
+# the project grows a real DB dependency) via docker-compose.test.yml, instead
+# of whatever mocks/sqlite defaults the unit-test image uses. This exercises
+# real Celery broker/result-backend wiring end-to-end.
+#
+# Build+run via compose (recommended): docker compose -f docker-compose.test.yml up --build --abort-on-container-exit
+# Build directly:  docker build -f tests/docker/Dockerfile.integrationtests -t skyulf-integration-tests .
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the whole repo in one shot (requirements-ci.txt installs skyulf-core
+# via `-e ./skyulf-core`, so there's no separate skyulf-core-only copy step
+# here — that isolated setup lives in skyulf-core/tests/docker/ instead).
+COPY . .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-ci.txt
+
+# Overridden by docker-compose.test.yml to point at the compose network's
+# redis service; these are just sane standalone defaults.
+ENV DATABASE_URL=sqlite+aiosqlite:///./mlops_database.db
+ENV REDIS_URL=redis://redis:6379/0
+ENV CELERY_BROKER_URL=redis://redis:6379/0
+ENV CELERY_RESULT_BACKEND=redis://redis:6379/0
+
+# NOTE: no tests are marked `integration` yet — this currently runs the full
+# suite against a live Redis instead of running unmarked. Once specific tests
+# are tagged `@pytest.mark.integration` (marker registered in pyproject.toml),
+# narrow this to `-m integration` so it stays fast and focused.
+CMD ["python", "-m", "pytest", "-q", "--disable-warnings"]

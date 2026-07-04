@@ -168,7 +168,12 @@ class StatefulEstimator:
 
     def fit_predict(
         self,
-        dataset: Union[SplitDataset, pd.DataFrame, Tuple[pd.DataFrame, pd.Series]],
+        dataset: Union[
+            SplitDataset,
+            pd.DataFrame,
+            Tuple[pd.DataFrame, pd.Series],
+            Tuple[pd.DataFrame, pd.DataFrame],
+        ],
         target_column: str,
         config: Dict[str, Any],
         progress_callback: Optional[Callable[[int, int], None]] = None,

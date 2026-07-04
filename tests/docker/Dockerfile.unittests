@@ -1,0 +1,44 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Full-monorepo test image: runs the whole pytest suite (backend/ + tests/ +
+# skyulf-core/tests, via requirements-ci.txt) in isolation from the host
+# machine. Mirrors the "test" job in .github/workflows/ci.yml — useful
+# locally when you don't want a Python venv, or want to reproduce a CI
+# failure in a clean container.
+#
+# NOTE: this intentionally installs the full backend stack (fastapi, celery,
+# sqlalchemy, ...). If you only want to test skyulf-core in isolation — e.g.
+# to verify it has no hidden dependency on backend/ — use
+# skyulf-core/tests/docker/Dockerfile.unittests instead, which installs only
+# skyulf-core's own package extras.
+#
+# Build:  docker build -f tests/docker/Dockerfile.unittests -t skyulf-full-tests .
+# Run:    docker run --rm skyulf-full-tests
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Build tools needed by a couple of compiled wheels (e.g. lightgbm/xgboost
+# sdists on some platforms); git is needed for pip's VCS-style installs.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy the whole repo in one shot (requirements-ci.txt installs skyulf-core
+# via `-e ./skyulf-core`, so there's no separate skyulf-core-only copy step
+# here — that isolated setup lives in skyulf-core/tests/docker/ instead).
+COPY . .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-ci.txt
+
+# Runs against sqlite by default — no external services required. Override
+# DATABASE_URL/REDIS_URL with `docker run -e ...` if you need to point at
+# something else.
+ENV DATABASE_URL=sqlite+aiosqlite:///./mlops_database.db
+
+# --import-mode=importlib avoids pytest's default rootdir-relative module
+# naming, which collides here: tests/ and skyulf-core/tests/ both contain
+# same-named files (e.g. test_split.py) with no __init__.py packages.
+CMD ["python", "-m", "pytest", "-q", "--disable-warnings", "--import-mode=importlib", \
+     "--cov", "--cov-branch", "--cov-report=term-missing", "--cov-report=html"]
