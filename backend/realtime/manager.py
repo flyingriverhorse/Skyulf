@@ -82,7 +82,7 @@ class ConnectionManager:
             try:
                 await self._subscriber_task
             except (asyncio.CancelledError, Exception):
-                pass
+                pass  # nosec B110 - best-effort task teardown during shutdown
             self._subscriber_task = None
         async with self._lock:
             clients = list(self._clients)
@@ -91,7 +91,7 @@ class ConnectionManager:
             try:
                 await ws.close()
             except Exception:
-                pass
+                pass  # nosec B110 - best-effort socket close during shutdown
 
     async def _drain_pubsub(self, pubsub: Any) -> None:
         """Forward messages from a Redis pubsub stream until stop is set."""

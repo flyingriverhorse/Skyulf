@@ -77,6 +77,8 @@ export const DatasetService = {
   },
 
   getById: async (id: string): Promise<Dataset> => {
+    // nosemgrep: node-ssrf -- browser fetch to our own fixed API_BASE; `id` is
+    // an encoded path segment (dataset id), never an attacker-supplied host/URL.
     const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}`);
     if (!response.ok) {
       throw new Error('Failed to fetch dataset');
@@ -146,6 +148,8 @@ export const DatasetService = {
 
   exportData: async (id: string, format: 'csv' | 'parquet' = 'csv', limit: number = 10000): Promise<void> => {
     const params = new URLSearchParams({ format, limit: limit.toString() });
+    // nosemgrep: node-ssrf -- browser fetch to our own fixed API_BASE; `id` is
+    // an encoded path segment (dataset id), never an attacker-supplied host/URL.
     const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}/export?${params.toString()}`);
     if (!response.ok) {
       throw new Error('Failed to export dataset');

@@ -341,7 +341,9 @@ class EDAAnalyzer(
         target_correlations: Dict[str, float] = {}
         target_interactions = None
         if target_col and target_col in self.columns:
-            target_semantic_type = self._get_semantic_type(self.df[target_col])
+            target_semantic_type = self._get_semantic_type(  # pylint: disable=assignment-from-no-return
+                self.df[target_col]
+            )
 
             if target_semantic_type == "Numeric":
                 if target_col in numeric_cols:
@@ -428,7 +430,9 @@ class EDAAnalyzer(
         rule_tree = None
         final_task_type = task_type
         if SKLEARN_AVAILABLE and target_col and len(feature_cols) >= 1:
-            target_type = self._get_semantic_type(self.df[target_col])
+            target_type = self._get_semantic_type(  # pylint: disable=assignment-from-no-return
+                self.df[target_col]
+            )
             if target_type in ["Categorical", "Boolean", "Numeric"]:
                 rule_tree = self._discover_rules(feature_cols, target_col, task_type)
                 if not final_task_type:

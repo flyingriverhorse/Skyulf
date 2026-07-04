@@ -144,7 +144,7 @@ class BasicTrainingManager:
                     # Best-effort: never let revoke errors block the user-visible
                     # cancel. The status guard in update_status_sync still keeps
                     # the row at CANCELLED even if the worker writes back.
-                    pass
+                    pass  # nosec B110
             await session.commit()
             return True
         return False

@@ -214,7 +214,7 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any
             df_out[f"{col}{output_suffix}"] = binned_series
         except Exception:
             # Skip columns that fail (e.g. degenerate edges, dtype mismatch).
-            continue
+            continue  # nosec B112
 
     if drop_original and processed_cols:
         df_out = df_out.drop(columns=processed_cols)
@@ -485,4 +485,4 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
             new_config["kbins_n_bins"] = config["n_bins"]
         if "strategy" in config and config["strategy"] != "kbins":
             new_config["kbins_strategy"] = config["strategy"]
-        return super().fit(df, new_config)
+        return super().fit(df, new_config)  # pylint: disable=no-value-for-parameter

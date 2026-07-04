@@ -21,6 +21,12 @@ Sections
 9. SentenceEmbedder  — dense semantic embeddings (optional dependency)
 """
 
+# pylint: disable=no-value-for-parameter
+# The calculator/applier `fit`/`apply` calls below use the public 2-arg
+# wrapper signature (see `fit_method`/`apply_method` in `preprocessing/base.py`).
+# Pylint statically inspects the pre-decoration signature and misreports a
+# missing argument; the decorator supplies it at runtime.
+
 import pandas as pd
 import polars as pl
 

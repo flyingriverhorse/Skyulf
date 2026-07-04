@@ -20,6 +20,8 @@ from typing import Optional
 
 from backend.config import Settings
 
+from .adapter import DatabaseType, get_db_type
+
 logger = logging.getLogger(__name__)
 
 
@@ -98,8 +100,6 @@ async def initialize(settings: Optional[Settings] = None) -> bool:
 
     # Determine which backend to initialise from DATABASE_URL or DB_PRIMARY.
     try:
-        from .adapter import DatabaseType, get_db_type
-
         db_type = get_db_type(settings)
     except Exception:
         logger.exception("Could not determine database type; defaulting to postgres")

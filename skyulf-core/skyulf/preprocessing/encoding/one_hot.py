@@ -18,7 +18,7 @@ from ._common import _exclude_target_column, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
 
-_MISSING_TOKEN = "__mlops_missing__"
+_MISSING_TOKEN = "__mlops_missing__"  # nosec B105 - sentinel value, not a credential
 
 
 # -----------------------------------------------------------------------------

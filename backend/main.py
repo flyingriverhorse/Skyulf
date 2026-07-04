@@ -186,9 +186,11 @@ def _reset_stale_jobs() -> None:
         stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2)
         with engine.begin() as conn:
             for table in ("basic_training_jobs", "advanced_tuning_jobs"):
+                # `table` is drawn only from the fixed tuple above (never user input),
+                # so the identifier interpolation below is not injectable.
                 result = conn.execute(
                     text(
-                        f"UPDATE {table} SET status='failed', finished_at=CURRENT_TIMESTAMP,"
+                        f"UPDATE {table} SET status='failed', finished_at=CURRENT_TIMESTAMP,"  # nosec B608
                         f" error_message=:msg"
                         f" WHERE status IN ('running','queued')"
                         f" AND (started_at IS NULL OR started_at < :cutoff)"

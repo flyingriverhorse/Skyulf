@@ -88,7 +88,9 @@ class ColumnMixin(_AnalyzerState):
         )
 
         if semantic_type == "Numeric":
-            profile.numeric_stats = self._analyze_numeric(col, advanced_stats)  # type: ignore[attr-defined]
+            profile.numeric_stats = self._analyze_numeric(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
+                col, advanced_stats
+            )
             profile.histogram = calculate_histogram(self.lazy_df, col)  # type: ignore[attr-defined]
 
             # Normality test — Shapiro for small samples (more powerful), KS for large.
@@ -161,7 +163,7 @@ class ColumnMixin(_AnalyzerState):
                 )
 
         elif semantic_type in ("Categorical", "Boolean"):
-            profile.categorical_stats = self._analyze_categorical(  # type: ignore[attr-defined]
+            profile.categorical_stats = self._analyze_categorical(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
                 col, advanced_stats, basic_stats
             )
 
@@ -201,7 +203,9 @@ class ColumnMixin(_AnalyzerState):
                 )
 
         elif semantic_type == "DateTime":
-            profile.date_stats = self._analyze_date(col, advanced_stats)  # type: ignore[attr-defined]
+            profile.date_stats = self._analyze_date(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
+                col, advanced_stats
+            )
 
             try:
                 ts = self.df[col].dt.timestamp("ms").drop_nulls().to_numpy()  # type: ignore[attr-defined]
@@ -219,9 +223,11 @@ class ColumnMixin(_AnalyzerState):
                 print(f"Failed to calculate date histogram for {col}: {e}")
 
         elif semantic_type == "Text":
-            profile.text_stats = self._analyze_text(col, advanced_stats)  # type: ignore[attr-defined]
+            profile.text_stats = self._analyze_text(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
+                col, advanced_stats
+            )
             if profile.text_stats:
-                profile.text_stats.sentiment_distribution = self._analyze_sentiment(  # type: ignore[attr-defined]
+                profile.text_stats.sentiment_distribution = self._analyze_sentiment(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
                     self.df[col]  # type: ignore[attr-defined]
                 )
 

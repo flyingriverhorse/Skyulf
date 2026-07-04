@@ -160,7 +160,7 @@ def _pandas_datetime_apply(op: Dict[str, Any], df_out: Any) -> None:
                     continue
                 df_out[f"{col}_{feat}"] = builder(dt)
         except Exception:
-            pass
+            pass  # nosec B110 - skip a column that fails datetime feature extraction
 
 
 _PANDAS_AGG_METHODS = {"mean", "sum", "count", "min", "max", "std", "median"}
@@ -214,5 +214,5 @@ def _featgen_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
                 result = result.round(round_digits)
             df_out[output_col] = result
         except Exception:
-            pass
+            pass  # nosec B110 - skip a malformed op; other feature-generation ops still apply
     return df_out, y

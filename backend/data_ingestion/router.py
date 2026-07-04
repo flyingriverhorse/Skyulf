@@ -91,7 +91,7 @@ async def delete_source(source_id: str, service: DataIngestionService = Depends(
 @sources_router.get("/sources/{source_id}/export")
 async def export_source_data(
     source_id: str,
-    format: str = Query("csv", pattern="^(csv|parquet)$"),  # noqa: A002
+    format: str = Query("csv", pattern="^(csv|parquet)$"),  # noqa: A002  # pylint: disable=redefined-builtin
     limit: int = Query(1000, ge=1, le=50_000),
     service: DataIngestionService = Depends(get_data_service),
 ) -> Response:

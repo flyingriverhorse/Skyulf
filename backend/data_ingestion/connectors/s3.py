@@ -67,7 +67,7 @@ class S3Connector(BaseConnector):
                 lf = pl.scan_csv(self.path, storage_options=options)
                 return {name: str(dtype) for name, dtype in lf.collect_schema().items()}
             except Exception:
-                pass  # Expected fallback: CSV extension but try standard flow next
+                pass  # nosec B110 - Expected fallback: CSV extension but try standard flow next
 
         # Try Parquet first, then CSV
         try:

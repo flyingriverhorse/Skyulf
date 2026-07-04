@@ -72,6 +72,8 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
                 const nodeWithPosition = dagreGraph.node(node.id);
                 // Fallback if dagre fails to position a node
                 if (!nodeWithPosition) {
+                    // nosemgrep: insecure-random-generator -- cosmetic fallback layout
+                    // position only, not security-sensitive.
                     return {
                         ...node,
                         position: { x: Math.random() * 500, y: Math.random() * 500 }
