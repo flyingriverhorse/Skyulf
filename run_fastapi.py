@@ -58,7 +58,7 @@ def start_celery_worker():
     ]
 
     print(f"👷 Starting Celery worker: {' '.join(cmd)}")
-    return subprocess.Popen(cmd, cwd=os.getcwd())  # nosec B603
+    return subprocess.Popen(cmd, cwd=os.getcwd())  # nosec B603 nosemgrep: dangerous-subprocess-use-audit -- cmd is a static list of literals, no shell, no untrusted input
 
 
 def check_redis_availability():
