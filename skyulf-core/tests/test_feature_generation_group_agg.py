@@ -11,7 +11,7 @@ from skyulf.preprocessing.feature_generation import (
     _featgen_apply_polars,
 )
 
-_pandas_agg_cases = TestCaseLoader("preprocessing/feature_generation_group_agg_pandas").load()
+_pandas_agg_cases = TestCaseLoader("preprocessing/feature_generation_group_agg").load()
 
 
 def _build_data():

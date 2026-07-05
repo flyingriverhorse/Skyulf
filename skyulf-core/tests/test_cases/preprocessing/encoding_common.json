@@ -1,0 +1,72 @@
+{
+  "groups": {
+    "parse_categories_order": {
+      "params": "raw, n_cols, expected",
+      "test_cases": {
+        "none_raw_returns_auto": {"raw": null, "n_cols": 2, "expected": "auto"},
+        "empty_string_raw_returns_auto": {"raw": "", "n_cols": 2, "expected": "auto"},
+        "string_input_matching_n_cols": {
+          "raw": "a,b,c\nx,y",
+          "n_cols": 2,
+          "expected": [["a", "b", "c"], ["x", "y"]]
+        },
+        "list_input_matching_n_cols": {
+          "raw": ["a,b", "x,y,z"],
+          "n_cols": 2,
+          "expected": [["a", "b"], ["x", "y", "z"]]
+        },
+        "non_str_non_list_returns_auto": {"raw": 123, "n_cols": 2, "expected": "auto"},
+        "mismatched_line_count_returns_auto": {"raw": "a,b\nc,d\ne,f", "n_cols": 2, "expected": "auto"},
+        "blank_lines_are_ignored": {
+          "raw": "a,b\n\nx,y\n",
+          "n_cols": 2,
+          "expected": [["a", "b"], ["x", "y"]]
+        }
+      }
+    },
+    "exclude_target_column": {
+      "params": "columns, target_column, y_name, encoder_name, expected, expect_warning",
+      "test_cases": {
+        "removes_and_warns": {
+          "columns": ["city", "target"],
+          "target_column": "target",
+          "y_name": null,
+          "encoder_name": "OneHotEncoder",
+          "expected": ["city"],
+          "expect_warning": true
+        },
+        "uses_y_name_when_config_missing": {
+          "columns": ["city", "target"],
+          "target_column": null,
+          "y_name": "target",
+          "encoder_name": "DummyEncoder",
+          "expected": ["city"],
+          "expect_warning": false
+        },
+        "noop_for_safe_encoders": {
+          "columns": ["city", "target"],
+          "target_column": "target",
+          "y_name": null,
+          "encoder_name": "LabelEncoder",
+          "expected": ["city", "target"],
+          "expect_warning": false
+        },
+        "noop_when_target_not_in_columns": {
+          "columns": ["city"],
+          "target_column": "target",
+          "y_name": null,
+          "encoder_name": "OneHotEncoder",
+          "expected": ["city"],
+          "expect_warning": false
+        }
+      }
+    },
+    "detect_categorical_columns": {
+      "params": "engine",
+      "test_cases": {
+        "pandas": {"engine": "pandas"},
+        "polars": {"engine": "polars"}
+      }
+    }
+  }
+}

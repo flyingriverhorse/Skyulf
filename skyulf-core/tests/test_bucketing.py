@@ -27,18 +27,18 @@ from skyulf.preprocessing.bucketing import (
     _resolve_kbins_strategy,
 )
 
-_fit_edges_cases = TestCaseLoader("preprocessing/bucketing_fit_edges").load()
+_fit_edges_cases = TestCaseLoader("preprocessing/bucketing", group="fit_edges").load()
 _resolve_kbins_strategy_cases = TestCaseLoader(
-    "preprocessing/bucketing_resolve_kbins_strategy_aliases"
+    "preprocessing/bucketing", group="resolve_kbins_strategy_aliases"
 ).load()
 _custom_binning_bin_edges_cases = TestCaseLoader(
-    "preprocessing/bucketing_custom_binning_bin_edges"
+    "preprocessing/bucketing", group="custom_binning_bin_edges"
 ).load()
 _out_of_range_missing_strategy_cases = TestCaseLoader(
-    "preprocessing/bucketing_apply_out_of_range_missing_strategy"
+    "preprocessing/bucketing", group="apply_out_of_range_missing_strategy"
 ).load()
 _no_columns_cases = TestCaseLoader(
-    "preprocessing/bucketing_no_columns_returns_empty_artifact"
+    "preprocessing/bucketing", group="no_columns_returns_empty_artifact"
 ).load()
 
 _NO_COLUMNS_CALCULATORS = {"general": GeneralBinningCalculator, "custom": CustomBinningCalculator}
@@ -56,7 +56,7 @@ def _series_0_to_9() -> pd.DataFrame:
 
 class TestFitBinEdgesByStrategy:
     """Fit-time bin-edge computation across binning strategies — scenarios loaded
-    from ``tests/test_cases/preprocessing/bucketing_fit_edges.json``.
+    from ``tests/test_cases/preprocessing/bucketing.json`` (group ``fit_edges``).
     """
 
     @pytest.mark.parametrize(*_fit_edges_cases)
@@ -114,7 +114,7 @@ def test_fit_kbins_via_wrapper_uses_uniform_edges() -> None:
 
 class TestResolveKBinsStrategyAliases:
     """UI-friendly strategy alias mapping — scenarios loaded from
-    ``tests/test_cases/preprocessing/bucketing_resolve_kbins_strategy_aliases.json``.
+    ``tests/test_cases/preprocessing/bucketing.json`` (group ``resolve_kbins_strategy_aliases``).
     """
 
     @pytest.mark.parametrize(*_resolve_kbins_strategy_cases)
@@ -129,7 +129,7 @@ class TestResolveKBinsStrategyAliases:
 
 class TestFitCustomBinningBinEdges:
     """CustomBinningCalculator bin-edge resolution — scenarios loaded from
-    ``tests/test_cases/preprocessing/bucketing_custom_binning_bin_edges.json``.
+    ``tests/test_cases/preprocessing/bucketing.json`` (group ``custom_binning_bin_edges``).
     """
 
     @pytest.mark.parametrize(*_custom_binning_bin_edges_cases)
@@ -149,7 +149,7 @@ class TestFitCustomBinningBinEdges:
 class TestFitNoColumnsReturnsEmptyArtifact:
     """An explicit empty ``columns`` list must short-circuit to an empty artifact,
     for both GeneralBinningCalculator and CustomBinningCalculator — scenarios
-    loaded from ``tests/test_cases/preprocessing/bucketing_no_columns_returns_empty_artifact.json``.
+    loaded from ``tests/test_cases/preprocessing/bucketing.json`` (group ``no_columns_returns_empty_artifact``).
     """
 
     @pytest.mark.parametrize(*_no_columns_cases)
@@ -247,7 +247,7 @@ def test_apply_output_suffix_is_configurable() -> None:
 
 class TestApplyOutOfRangeMissingStrategy:
     """Out-of-range value handling by ``missing_strategy`` — scenarios loaded
-    from ``tests/test_cases/preprocessing/bucketing_apply_out_of_range_missing_strategy.json``.
+    from ``tests/test_cases/preprocessing/bucketing.json`` (group ``apply_out_of_range_missing_strategy``).
     """
 
     @pytest.mark.parametrize(*_out_of_range_missing_strategy_cases)

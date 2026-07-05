@@ -24,17 +24,19 @@ from skyulf.preprocessing._helpers import (
     to_pandas,
 )
 
-_resolve_valid_columns_cases = TestCaseLoader("preprocessing/helpers_resolve_valid_columns").load()
-_safe_scale_cases = TestCaseLoader("preprocessing/helpers_safe_scale").load()
-_is_polars_cases = TestCaseLoader("preprocessing/helpers_is_polars").load()
+_resolve_valid_columns_cases = TestCaseLoader(
+    "preprocessing/preprocessing_helpers", group="resolve_valid_columns"
+).load()
+_safe_scale_cases = TestCaseLoader("preprocessing/preprocessing_helpers", group="safe_scale").load()
+_is_polars_cases = TestCaseLoader("preprocessing/preprocessing_helpers", group="is_polars").load()
 _auto_detect_text_columns_cases = TestCaseLoader(
-    "preprocessing/helpers_auto_detect_text_columns"
+    "preprocessing/preprocessing_helpers", group="auto_detect_text_columns"
 ).load()
 _auto_detect_numeric_columns_cases = TestCaseLoader(
-    "preprocessing/helpers_auto_detect_numeric_columns"
+    "preprocessing/preprocessing_helpers", group="auto_detect_numeric_columns"
 ).load()
 _auto_detect_datetime_columns_cases = TestCaseLoader(
-    "preprocessing/helpers_auto_detect_datetime_columns"
+    "preprocessing/preprocessing_helpers", group="auto_detect_datetime_columns"
 ).load()
 
 
@@ -69,7 +71,7 @@ def _build_datetime_frame(
 
 class TestResolveValidColumns:
     """resolve_valid_columns — scenarios loaded from
-    ``tests/test_cases/preprocessing/helpers_resolve_valid_columns.json``.
+    ``tests/test_cases/preprocessing/preprocessing_helpers.json`` (group ``resolve_valid_columns``).
     """
 
     @pytest.mark.parametrize(*_resolve_valid_columns_cases)
@@ -88,7 +90,7 @@ class TestResolveValidColumns:
 
 class TestSafeScale:
     """safe_scale — scenarios loaded from
-    ``tests/test_cases/preprocessing/helpers_safe_scale.json``.
+    ``tests/test_cases/preprocessing/preprocessing_helpers.json`` (group ``safe_scale``).
     """
 
     @pytest.mark.parametrize(*_safe_scale_cases)
@@ -128,7 +130,7 @@ def test_to_pandas_converts_polars_frame() -> None:
 
 class TestIsPolars:
     """is_polars — scenarios loaded from
-    ``tests/test_cases/preprocessing/helpers_is_polars.json``.
+    ``tests/test_cases/preprocessing/preprocessing_helpers.json`` (group ``is_polars``).
     """
 
     @pytest.mark.parametrize(*_is_polars_cases)
@@ -144,7 +146,7 @@ class TestIsPolars:
 
 class TestAutoDetectTextColumns:
     """auto_detect_text_columns — scenarios loaded from
-    ``tests/test_cases/preprocessing/helpers_auto_detect_text_columns.json``.
+    ``tests/test_cases/preprocessing/preprocessing_helpers.json`` (group ``auto_detect_text_columns``).
     """
 
     @pytest.mark.parametrize(*_auto_detect_text_columns_cases)
@@ -169,7 +171,7 @@ class TestAutoDetectTextColumns:
 
 class TestAutoDetectNumericColumns:
     """auto_detect_numeric_columns — scenarios loaded from
-    ``tests/test_cases/preprocessing/helpers_auto_detect_numeric_columns.json``.
+    ``tests/test_cases/preprocessing/preprocessing_helpers.json`` (group ``auto_detect_numeric_columns``).
     """
 
     @pytest.mark.parametrize(*_auto_detect_numeric_columns_cases)
@@ -188,7 +190,7 @@ class TestAutoDetectNumericColumns:
 
 class TestAutoDetectDatetimeColumns:
     """auto_detect_datetime_columns — scenarios loaded from
-    ``tests/test_cases/preprocessing/helpers_auto_detect_datetime_columns.json``.
+    ``tests/test_cases/preprocessing/preprocessing_helpers.json`` (group ``auto_detect_datetime_columns``).
     """
 
     @pytest.mark.parametrize(*_auto_detect_datetime_columns_cases)

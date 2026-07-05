@@ -34,11 +34,17 @@ _APPLIER = FeatureGenerationApplier()
 _CALC = FeatureGenerationCalculator()
 
 _resolve_output_col_cases = TestCaseLoader(
-    "preprocessing/feature_generation_resolve_output_col"
+    "preprocessing/feature_generation_gaps", group="resolve_output_col"
 ).load()
-_coerce_float_cases = TestCaseLoader("preprocessing/feature_generation_coerce_float").load()
-_noop_skip_cases = TestCaseLoader("preprocessing/feature_generation_noop_skips").load()
-_arith_constant_cases = TestCaseLoader("preprocessing/feature_generation_arith_constant_ops").load()
+_coerce_float_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="coerce_float"
+).load()
+_noop_skip_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="noop_skips"
+).load()
+_arith_constant_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="arith_constant_ops"
+).load()
 
 
 # ---------------------------------------------------------------------------

@@ -25,29 +25,33 @@ from skyulf.preprocessing.outliers.manual_bounds import (
     _manual_bounds_col_mask_polars,
 )
 
-_col_mask_pandas_cases = TestCaseLoader("preprocessing/manual_bounds_col_mask_pandas").load()
-_col_mask_polars_cases = TestCaseLoader("preprocessing/manual_bounds_col_mask_polars").load()
+_col_mask_pandas_cases = TestCaseLoader(
+    "preprocessing/outliers_manual_bounds", group="col_mask_pandas"
+).load()
+_col_mask_polars_cases = TestCaseLoader(
+    "preprocessing/outliers_manual_bounds", group="col_mask_polars"
+).load()
 
 
-def _load_single_param(source_path: str) -> list:
+def _load_single_param(source_path: str, group: str | None = None) -> list:
     """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
 
     ``pytest.mark.parametrize`` treats a single (comma-less) param name
     specially: argvalues must be bare scalars, not 1-tuples, or the whole
     tuple gets bound to the parameter instead of its single element.
     """
-    params_string, scenarios = TestCaseLoader(source_path).load()
+    params_string, scenarios = TestCaseLoader(source_path, group=group).load()
     return [params_string, [scenario[0] for scenario in scenarios]]
 
 
 _applier_pandas_passthrough_cases = _load_single_param(
-    "preprocessing/manual_bounds_applier_pandas_passthrough"
+    "preprocessing/outliers_manual_bounds", group="applier_pandas_passthrough"
 )
 _applier_polars_passthrough_cases = _load_single_param(
-    "preprocessing/manual_bounds_applier_polars_passthrough"
+    "preprocessing/outliers_manual_bounds", group="applier_polars_passthrough"
 )
 _applier_polars_boundary_kept_cases = TestCaseLoader(
-    "preprocessing/manual_bounds_applier_polars_boundary_kept"
+    "preprocessing/outliers_manual_bounds", group="applier_polars_boundary_kept"
 ).load()
 
 # ---------------------------------------------------------------------------

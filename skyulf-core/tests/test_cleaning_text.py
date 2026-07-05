@@ -23,12 +23,12 @@ from skyulf.preprocessing.cleaning.text import (
     _trim_pandas,
 )
 
-_trim_pandas_cases = TestCaseLoader("preprocessing/text_cleaning_trim_pandas").load()
-_case_pandas_cases = TestCaseLoader("preprocessing/text_cleaning_case_pandas").load()
+_trim_pandas_cases = TestCaseLoader("preprocessing/cleaning_text", group="trim_pandas").load()
+_case_pandas_cases = TestCaseLoader("preprocessing/cleaning_text", group="case_pandas").load()
 _remove_special_pandas_cases = TestCaseLoader(
-    "preprocessing/text_cleaning_remove_special_pandas"
+    "preprocessing/cleaning_text", group="remove_special_pandas"
 ).load()
-_regex_pandas_cases = TestCaseLoader("preprocessing/text_cleaning_regex_pandas").load()
+_regex_pandas_cases = TestCaseLoader("preprocessing/cleaning_text", group="regex_pandas").load()
 
 
 def _assert_series_matches(result: pd.Series, expected: list) -> None:
@@ -297,7 +297,9 @@ def test_text_cleaning_apply_engine_parity_trim_lower(df: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 
 
-_polars_single_op_cases = TestCaseLoader("preprocessing/text_cleaning_polars_single_op").load()
+_polars_single_op_cases = TestCaseLoader(
+    "preprocessing/cleaning_text", group="polars_single_op"
+).load()
 
 
 @pytest.mark.parametrize(*_polars_single_op_cases)

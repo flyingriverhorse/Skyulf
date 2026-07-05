@@ -1,7 +1,0 @@
-{
-  "params": "calculator_name, columns",
-  "test_cases": {
-    "general_binning": {"calculator_name": "general", "columns": []},
-    "custom_binning": {"calculator_name": "custom", "columns": []}
-  }
-}

@@ -20,9 +20,13 @@ from skyulf.preprocessing.cleaning.value_replacement import (
     ValueReplacementCalculator,
 )
 
-_fit_mapping_cases = TestCaseLoader("preprocessing/value_replacement_fit_mapping").load()
-_roundtrip_cases = TestCaseLoader("preprocessing/value_replacement_fit_apply_roundtrip").load()
-_apply_scenario_cases = TestCaseLoader("preprocessing/value_replacement_apply_scenarios").load()
+_fit_mapping_cases = TestCaseLoader("preprocessing/value_replacement", group="fit_mapping").load()
+_roundtrip_cases = TestCaseLoader(
+    "preprocessing/value_replacement", group="fit_apply_roundtrip"
+).load()
+_apply_scenario_cases = TestCaseLoader(
+    "preprocessing/value_replacement", group="apply_scenarios"
+).load()
 
 
 def _coerce_numeric_keys(mapping: Any) -> Any:

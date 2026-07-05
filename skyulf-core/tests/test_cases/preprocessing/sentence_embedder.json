@@ -1,0 +1,87 @@
+{
+  "groups": {
+    "fit_artifact_fields": {
+      "params": "extra_config, artifact_key, expected",
+      "test_cases": {
+        "returns_artifact_type": {
+          "extra_config": {},
+          "artifact_key": "type",
+          "expected": "sentence_embedder"
+        },
+        "stores_embedding_dim": {
+          "extra_config": {},
+          "artifact_key": "embedding_dim",
+          "expected": 16
+        },
+        "stores_model_name": {
+          "extra_config": {"model_name": "custom-model-v1"},
+          "artifact_key": "model_name",
+          "expected": "custom-model-v1"
+        },
+        "stores_normalize_flag": {
+          "extra_config": {"normalize": false},
+          "artifact_key": "normalize",
+          "expected": false
+        },
+        "stores_drop_original": {
+          "extra_config": {"drop_original": true},
+          "artifact_key": "drop_original",
+          "expected": true
+        }
+      }
+    },
+    "fit_empty": {
+      "params": "columns_config, expected",
+      "test_cases": {
+        "empty_columns_returns_empty_dict": {
+          "columns_config": [],
+          "expected": {}
+        },
+        "missing_column_returns_empty_dict": {
+          "columns_config": ["no_such_column"],
+          "expected": {}
+        }
+      }
+    },
+    "apply_noop": {
+      "params": "params, expect_unchanged",
+      "test_cases": {
+        "empty_output_columns_returns_unchanged": {
+          "params": {
+            "columns": ["text"],
+            "output_columns": [],
+            "model_name": "any",
+            "normalize": true,
+            "drop_original": false
+          },
+          "expect_unchanged": true
+        },
+        "missing_column_in_params_returns_unchanged": {
+          "params": {
+            "columns": ["nonexistent"],
+            "output_columns": ["nonexistent__emb__0"],
+            "model_name": "any",
+            "normalize": true,
+            "drop_original": false
+          },
+          "expect_unchanged": true
+        }
+      }
+    },
+    "dimension_helper": {
+      "params": "spec, attr, dim",
+      "test_cases": {
+        "prefers_get_embedding_dimension": {
+          "spec": null,
+          "attr": "get_embedding_dimension",
+          "dim": 256
+        },
+        "falls_back_to_get_sentence_embedding_dimension": {
+          "spec": ["get_sentence_embedding_dimension"],
+          "attr": "get_sentence_embedding_dimension",
+          "dim": 384
+        }
+      }
+    }
+  }
+}

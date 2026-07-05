@@ -43,11 +43,13 @@ _MOCK_MODEL = _make_mock_model()
 _MODULE_PATH = "skyulf.preprocessing.vectorization.sentence_embedder._load_model"
 
 _fit_artifact_field_cases = TestCaseLoader(
-    "preprocessing/sentence_embedder_fit_artifact_fields"
+    "preprocessing/sentence_embedder", group="fit_artifact_fields"
 ).load()
-_fit_empty_cases = TestCaseLoader("preprocessing/sentence_embedder_fit_empty").load()
-_apply_noop_cases = TestCaseLoader("preprocessing/sentence_embedder_apply_noop").load()
-_dimension_helper_cases = TestCaseLoader("preprocessing/sentence_embedder_dimension_helper").load()
+_fit_empty_cases = TestCaseLoader("preprocessing/sentence_embedder", group="fit_empty").load()
+_apply_noop_cases = TestCaseLoader("preprocessing/sentence_embedder", group="apply_noop").load()
+_dimension_helper_cases = TestCaseLoader(
+    "preprocessing/sentence_embedder", group="dimension_helper"
+).load()
 
 # ---------------------------------------------------------------------------
 # Fixtures

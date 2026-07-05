@@ -1,8 +1,0 @@
-{
-  "params": "alias, expected",
-  "test_cases": {
-    "equal_width": {"alias": "equal_width", "expected": "uniform"},
-    "equal_frequency": {"alias": "equal_frequency", "expected": "quantile"},
-    "kmeans": {"alias": "kmeans", "expected": "kmeans"}
-  }
-}

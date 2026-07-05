@@ -6,7 +6,9 @@ plus the ``infer_output_schema`` predictions and registry wiring.
 
 import pandas as pd
 import polars as pl
+import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing import (
@@ -18,6 +20,13 @@ from skyulf.preprocessing import (
     RollingAggregateCalculator,
 )
 from skyulf.registry import NodeRegistry
+
+_lag_coerces_lags_cases = TestCaseLoader(
+    "preprocessing/time_series_nodes", group="lag_calculator_fit_coerces_lags"
+).load()
+_rolling_filters_aggregations_cases = TestCaseLoader(
+    "preprocessing/time_series_nodes", group="rolling_calculator_fit_filters_aggregations"
+).load()
 
 
 def _frame() -> pd.DataFrame:
@@ -51,9 +60,15 @@ def test_lag_features_parity_with_groups():
     assert pl_vals == pandas_out["v_lag_1"].fillna(-1).tolist()
 
 
-def test_lag_features_coerces_and_dedups_lags():
-    art = LagFeaturesCalculator().fit(_frame(), {"columns": ["v"], "lags": [2, 2, 1, 0, -1]})
-    assert art["lags"] == [1, 2]
+@pytest.mark.parametrize(*_lag_coerces_lags_cases)
+def test_lag_features_coerces_and_dedups_lags(lags_input, expected_lags):
+    """``LagFeaturesCalculator.fit`` coerces the ``lags`` config via ``coerce_lags``.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_nodes.json``
+    (group ``lag_calculator_fit_coerces_lags``).
+    """
+    art = LagFeaturesCalculator().fit(_frame(), {"columns": ["v"], "lags": lags_input})
+    assert art["lags"] == expected_lags
 
 
 def test_rolling_aggregate_parity():
@@ -68,11 +83,17 @@ def test_rolling_aggregate_parity():
     assert "v_roll_sum_2" in pandas_out.columns
 
 
-def test_rolling_aggregate_filters_unknown_aggs():
+@pytest.mark.parametrize(*_rolling_filters_aggregations_cases)
+def test_rolling_aggregate_filters_unknown_aggs(aggregations_input, expected_aggregations):
+    """``RollingAggregateCalculator.fit`` filters unrecognised aggregation names.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_nodes.json``
+    (group ``rolling_calculator_fit_filters_aggregations``).
+    """
     art = RollingAggregateCalculator().fit(
-        _frame(), {"columns": ["v"], "aggregations": ["mean", "nonsense"]}
+        _frame(), {"columns": ["v"], "aggregations": aggregations_input}
     )
-    assert art["aggregations"] == ["mean"]
+    assert art["aggregations"] == expected_aggregations
 
 
 def test_date_features_parity():

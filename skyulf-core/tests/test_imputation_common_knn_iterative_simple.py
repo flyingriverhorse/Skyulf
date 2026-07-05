@@ -37,34 +37,41 @@ _FINITE_FLOAT = st.floats(
 )
 
 
-def _load_single_param(source_path: str) -> list:
+def _load_single_param(source_path: str, group: str | None = None) -> list:
     """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
 
     ``pytest.mark.parametrize`` treats a single (comma-less) param name
     specially: argvalues must be bare scalars, not 1-tuples, or the whole
     tuple gets bound to the parameter instead of its single element.
     """
-    params_string, scenarios = TestCaseLoader(source_path).load()
+    params_string, scenarios = TestCaseLoader(source_path, group=group).load()
     return [params_string, [scenario[0] for scenario in scenarios]]
 
 
-_polars_stat_cases = TestCaseLoader("preprocessing/imputation_polars_stat_for_strategy").load()
+_polars_stat_cases = TestCaseLoader(
+    "preprocessing/imputation_common_knn_iterative_simple", group="polars_stat_for_strategy"
+).load()
 _compute_polars_fill_values_cases = TestCaseLoader(
-    "preprocessing/imputation_compute_polars_fill_values"
+    "preprocessing/imputation_common_knn_iterative_simple", group="compute_polars_fill_values"
 ).load()
 _iterative_estimator_cases = TestCaseLoader(
-    "preprocessing/imputation_iterative_estimator_aliases"
+    "preprocessing/imputation_common_knn_iterative_simple", group="iterative_estimator_aliases"
 ).load()
 _no_columns_or_numeric_cases = TestCaseLoader(
-    "preprocessing/imputation_no_columns_or_numeric_returns_empty"
+    "preprocessing/imputation_common_knn_iterative_simple",
+    group="no_columns_or_numeric_returns_empty",
 ).load()
-_applier_pandas_noop_cases = TestCaseLoader("preprocessing/imputation_applier_pandas_noop").load()
-_applier_polars_noop_cases = TestCaseLoader("preprocessing/imputation_applier_polars_noop").load()
+_applier_pandas_noop_cases = TestCaseLoader(
+    "preprocessing/imputation_common_knn_iterative_simple", group="applier_pandas_noop"
+).load()
+_applier_polars_noop_cases = TestCaseLoader(
+    "preprocessing/imputation_common_knn_iterative_simple", group="applier_polars_noop"
+).load()
 _infer_output_schema_cases = _load_single_param(
-    "preprocessing/imputation_infer_output_schema_passthrough"
+    "preprocessing/imputation_common_knn_iterative_simple", group="infer_output_schema_passthrough"
 )
 _all_imputers_empty_df_cases = _load_single_param(
-    "preprocessing/imputation_all_imputers_empty_dataframe"
+    "preprocessing/imputation_common_knn_iterative_simple", group="all_imputers_empty_dataframe"
 )
 
 # Maps a JSON-friendly imputer name to its Calculator/Applier classes, shared

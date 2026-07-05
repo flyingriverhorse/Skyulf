@@ -1,0 +1,138 @@
+{
+  "groups": {
+    "fit_mapping": {
+      "params": "config, expected_mapping, expected_columns",
+      "test_cases": {
+        "mapping_from_config": {
+          "config": {"columns": ["a"], "mapping": {"1": 100}},
+          "expected_mapping": {"1": 100},
+          "expected_columns": ["a"]
+        },
+        "replacements_list": {
+          "config": {
+            "columns": ["a"],
+            "replacements": [{"old": 1, "new": 10}, {"old": 2, "new": 20}]
+          },
+          "expected_mapping": {"1": 10, "2": 20},
+          "expected_columns": null
+        },
+        "replacements_overrides_mapping": {
+          "config": {
+            "columns": ["a"],
+            "mapping": {"1": 999},
+            "replacements": [{"old": 1, "new": 5}]
+          },
+          "expected_mapping": {"1": 5},
+          "expected_columns": null
+        }
+      }
+    },
+    "apply_scenarios": {
+      "params": "engine, data, config, expected",
+      "test_cases": {
+        "pandas_flat_mapping": {
+          "engine": "pandas",
+          "data": {"a": [1, 2, 3], "b": [1, 2, 3]},
+          "config": {"columns": ["a", "b"], "mapping": {"1": 100, "2": 200}},
+          "expected": {"a": [100, 200, 3], "b": [100, 200, 3]}
+        },
+        "polars_flat_mapping": {
+          "engine": "polars",
+          "data": {"a": [1, 2, 3], "b": [1, 2, 3]},
+          "config": {"columns": ["a", "b"], "mapping": {"1": 100, "2": 200}},
+          "expected": {"a": [100, 200, 3], "b": [100, 200, 3]}
+        },
+        "pandas_nested_mapping": {
+          "engine": "pandas",
+          "data": {"a": [1, 2], "b": [1, 2]},
+          "config": {"columns": ["a", "b"], "mapping": {"a": {"1": "one"}, "b": {"2": "two"}}},
+          "expected": {"a": ["one", 2], "b": [1, "two"]}
+        },
+        "polars_nested_mapping": {
+          "engine": "polars",
+          "data": {"a": [1, 2], "b": [1, 2]},
+          "config": {"columns": ["a", "b"], "mapping": {"a": {"1": 100}, "b": {"2": 200}}},
+          "expected": {"a": [100, 2], "b": [1, 200]}
+        },
+        "pandas_to_replace_scalar": {
+          "engine": "pandas",
+          "data": {"a": [1, 2, 1]},
+          "config": {"columns": ["a"], "to_replace": 1, "value": -9},
+          "expected": {"a": [-9, 2, -9]}
+        },
+        "polars_to_replace_scalar": {
+          "engine": "polars",
+          "data": {"a": [1, 2, 1]},
+          "config": {"columns": ["a"], "to_replace": 1, "value": -9},
+          "expected": {"a": [-9, 2, -9]}
+        },
+        "pandas_to_replace_mapping_like": {
+          "engine": "pandas",
+          "data": {"a": [1, 2, 3]},
+          "config": {"columns": ["a"], "to_replace": {"1": 10, "3": 30}},
+          "expected": {"a": [10, 2, 30]}
+        },
+        "polars_to_replace_mapping_like": {
+          "engine": "polars",
+          "data": {"a": [1, 2, 3]},
+          "config": {"columns": ["a"], "to_replace": {"1": 10, "3": 30}},
+          "expected": {"a": [10, 2, 30]}
+        },
+        "pandas_no_valid_columns": {
+          "engine": "pandas",
+          "data": {"a": [1, 2]},
+          "config": {"columns": ["missing"], "mapping": {"1": 100}},
+          "expected": {"a": [1, 2]}
+        },
+        "polars_no_valid_columns": {
+          "engine": "polars",
+          "data": {"a": [1, 2]},
+          "config": {"columns": ["missing"], "mapping": {"1": 100}},
+          "expected": {"a": [1, 2]}
+        },
+        "pandas_no_mapping_no_to_replace": {
+          "engine": "pandas",
+          "data": {"a": [1, 2, 3]},
+          "config": {"columns": ["a"]},
+          "expected": {"a": [1, 2, 3]}
+        },
+        "polars_no_mapping_no_to_replace": {
+          "engine": "polars",
+          "data": {"a": [1, 2, 3]},
+          "config": {"columns": ["a"]},
+          "expected": {"a": [1, 2, 3]}
+        },
+        "pandas_unseen_values": {
+          "engine": "pandas",
+          "data": {"a": [1, 2, 3]},
+          "config": {"columns": ["a"], "mapping": {"99": -1}},
+          "expected": {"a": [1, 2, 3]}
+        }
+      }
+    },
+    "fit_apply_roundtrip": {
+      "params": "data, config, column, expected",
+      "test_cases": {
+        "replacements_list": {
+          "data": {"grade": ["A", "B", "C"]},
+          "config": {
+            "columns": ["grade"],
+            "replacements": [
+              {"old": "A", "new": 4},
+              {"old": "B", "new": 3},
+              {"old": "C", "new": 2}
+            ]
+          },
+          "column": "grade",
+          "expected": [4, 3, 2]
+        },
+        "to_replace_value": {
+          "data": {"a": [-1, 0, -1, 5]},
+          "config": {"columns": ["a"], "to_replace": -1, "value": 0},
+          "column": "a",
+          "expected": [0, 0, 0, 5]
+        }
+      }
+    }
+  }
+}

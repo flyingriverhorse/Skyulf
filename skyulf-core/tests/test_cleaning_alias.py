@@ -29,12 +29,24 @@ from skyulf.preprocessing.cleaning.alias import (
     _resolve_alias_type,
 )
 
-_alias_type_resolution_cases = TestCaseLoader("preprocessing/alias_type_resolution").load()
-_normalize_custom_map_cases = TestCaseLoader("preprocessing/alias_normalize_custom_map").load()
-_resolve_mapping_cases = TestCaseLoader("preprocessing/alias_resolve_mapping").load()
-_normalize_pandas_value_cases = TestCaseLoader("preprocessing/alias_normalize_pandas_value").load()
-_applier_uniform_cases = TestCaseLoader("preprocessing/alias_applier_uniform_normalisation").load()
-_applier_value_list_cases = TestCaseLoader("preprocessing/alias_applier_value_lists").load()
+_alias_type_resolution_cases = TestCaseLoader(
+    "preprocessing/cleaning_alias", group="type_resolution"
+).load()
+_normalize_custom_map_cases = TestCaseLoader(
+    "preprocessing/cleaning_alias", group="normalize_custom_map"
+).load()
+_resolve_mapping_cases = TestCaseLoader(
+    "preprocessing/cleaning_alias", group="resolve_mapping"
+).load()
+_normalize_pandas_value_cases = TestCaseLoader(
+    "preprocessing/cleaning_alias", group="normalize_pandas_value"
+).load()
+_applier_uniform_cases = TestCaseLoader(
+    "preprocessing/cleaning_alias", group="applier_uniform_normalisation"
+).load()
+_applier_value_list_cases = TestCaseLoader(
+    "preprocessing/cleaning_alias", group="applier_value_lists"
+).load()
 
 # ---------------------------------------------------------------------------
 # _resolve_alias_type

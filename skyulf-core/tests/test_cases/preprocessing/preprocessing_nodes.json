@@ -1,0 +1,40 @@
+{
+  "groups": {
+    "simple_imputer_strategies": {
+      "params": "columns, strategy, extra_config, check_value",
+      "test_cases": {
+        "mean_imputation": {
+          "columns": ["a", "b"],
+          "strategy": "mean",
+          "extra_config": {},
+          "check_value": null
+        },
+        "median_imputation": {
+          "columns": ["a"],
+          "strategy": "median",
+          "extra_config": {},
+          "check_value": null
+        },
+        "constant_imputation": {
+          "columns": ["a"],
+          "strategy": "constant",
+          "extra_config": {"fill_value": -999},
+          "check_value": -999
+        }
+      }
+    },
+    "casting_target_type": {
+      "params": "values, target_type",
+      "test_cases": {
+        "cast_to_int": {
+          "values": [1.0, 2.0, 3.0, 4.0, 5.0],
+          "target_type": "int"
+        },
+        "cast_to_string": {
+          "values": [1, 2, 3],
+          "target_type": "str"
+        }
+      }
+    }
+  }
+}

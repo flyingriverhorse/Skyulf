@@ -24,8 +24,12 @@ from skyulf.preprocessing.transformations.simple import (
     SimpleTransformationCalculator,
 )
 
-_empty_artifact_cases = TestCaseLoader("preprocessing/power_transformer_empty_artifact").load()
-_simple_method_cases = TestCaseLoader("preprocessing/simple_transformation_methods").load()
+_empty_artifact_cases = TestCaseLoader(
+    "preprocessing/transformations_power_simple", group="empty_artifact"
+).load()
+_simple_method_cases = TestCaseLoader(
+    "preprocessing/transformations_power_simple", group="simple_methods"
+).load()
 
 # ---------------------------------------------------------------------------
 # PowerTransformer
@@ -58,7 +62,8 @@ def test_power_transformer_returns_empty_artifact(
 ) -> None:
     """Scenarios where fit() must yield an empty artifact — no valid/positive/numeric columns.
 
-    Loaded from ``tests/test_cases/preprocessing/power_transformer_empty_artifact.json``.
+    Loaded from ``tests/test_cases/preprocessing/transformations_power_simple.json``
+    (group ``empty_artifact``).
     """
     df = pd.DataFrame(df_data)
     art = PowerTransformerCalculator().fit(df, fit_config)
@@ -191,7 +196,8 @@ def test_simple_transformation_method(
 ) -> None:
     """Verifies per-method transform math and edge-case handling (NaN masking, clipping, unknown methods).
 
-    Loaded from ``tests/test_cases/preprocessing/simple_transformation_methods.json``.
+    Loaded from ``tests/test_cases/preprocessing/transformations_power_simple.json``
+    (group ``simple_methods``).
     """
     df = pd.DataFrame({"a": values})
     config = {"column": "a", "method": method, **extra_params}

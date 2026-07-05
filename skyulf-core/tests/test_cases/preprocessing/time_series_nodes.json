@@ -1,0 +1,38 @@
+{
+  "groups": {
+    "lag_calculator_fit_coerces_lags": {
+      "params": "lags_input, expected_lags",
+      "test_cases": {
+        "dedups_and_drops_non_positive": {
+          "lags_input": [2, 2, 1, 0, -1],
+          "expected_lags": [1, 2]
+        },
+        "single_int_wrapped": {
+          "lags_input": 3,
+          "expected_lags": [3]
+        },
+        "drops_non_positive_keeps_valid": {
+          "lags_input": [0, -1, 4],
+          "expected_lags": [4]
+        }
+      }
+    },
+    "rolling_calculator_fit_filters_aggregations": {
+      "params": "aggregations_input, expected_aggregations",
+      "test_cases": {
+        "filters_unknown_names": {
+          "aggregations_input": ["mean", "nonsense"],
+          "expected_aggregations": ["mean"]
+        },
+        "single_valid_string_wrapped": {
+          "aggregations_input": "sum",
+          "expected_aggregations": ["sum"]
+        },
+        "all_unknown_returns_empty": {
+          "aggregations_input": ["bogus", "nonsense"],
+          "expected_aggregations": []
+        }
+      }
+    }
+  }
+}

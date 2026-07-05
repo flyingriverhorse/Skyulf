@@ -14,9 +14,11 @@ from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.woe import WOEEncoderApplier, WOEEncoderCalculator
 
-_empty_params_cases = TestCaseLoader("preprocessing/encoding_woe_empty_params").load_with_ids()
+_empty_params_cases = TestCaseLoader(
+    "preprocessing/encoding_woe", group="empty_params"
+).load_with_ids()
 _no_resolvable_columns_cases = TestCaseLoader(
-    "preprocessing/encoding_woe_no_resolvable_columns"
+    "preprocessing/encoding_woe", group="no_resolvable_columns"
 ).load_with_ids()
 
 
@@ -98,7 +100,7 @@ def test_fit_polars_resolves_target_column_from_within_x() -> None:
 class TestBinaryTargetInvariantReturnsEmptyParams:
     """Scenarios (non-binary target, single-row, empty frame) that all fail the
     binary-target check and cause ``fit()`` to short-circuit to ``{}``. Loaded
-    from ``tests/test_cases/preprocessing/encoding_woe_empty_params.json``.
+    from ``tests/test_cases/preprocessing/encoding_woe.json`` (group ``empty_params``).
     """
 
     @pytest.mark.parametrize(
@@ -238,7 +240,7 @@ def test_woe_fit_polars_no_target_returns_empty_and_warns(
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
     Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_woe_no_resolvable_columns.json``.
+    ``tests/test_cases/preprocessing/encoding_woe.json`` (group ``no_resolvable_columns``).
     """
 
     @pytest.mark.parametrize(

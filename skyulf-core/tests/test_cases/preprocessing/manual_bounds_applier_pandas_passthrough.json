@@ -1,7 +1,0 @@
-{
-  "params": "config",
-  "test_cases": {
-    "no_bounds": {"config": {}},
-    "unknown_column_in_bounds": {"config": {"bounds": {"nonexistent": {"lower": 0.0}}}}
-  }
-}

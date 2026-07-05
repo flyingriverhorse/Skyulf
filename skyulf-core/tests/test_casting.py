@@ -27,7 +27,7 @@ from skyulf.preprocessing.casting import (
     _drop_fractional_or_raise,
 )
 
-_coerce_boolean_value_cases = TestCaseLoader("preprocessing/casting_coerce_boolean_value").load()
+_coerce_boolean_value_cases = TestCaseLoader("preprocessing/casting").load()
 
 # ---------------------------------------------------------------------------
 # TYPE_ALIASES sanity check

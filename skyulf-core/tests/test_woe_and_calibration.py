@@ -12,7 +12,7 @@ from tests.utils.test_case_loader import TestCaseLoader
 from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 from skyulf.registry import NodeRegistry
 
-_base_estimator_cases = TestCaseLoader("preprocessing/calibrated_classifier_base_estimator").load()
+_base_estimator_cases = TestCaseLoader("preprocessing/woe_and_calibration").load()
 
 
 def _import_from_path(dotted_path: str) -> type:
@@ -101,7 +101,7 @@ def test_calibrated_classifier_registered_and_predicts():
 
 class TestCalibratedClassifierBaseEstimator:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/calibrated_classifier_base_estimator.json``.
+    ``tests/test_cases/preprocessing/woe_and_calibration.json``.
     """
 
     @pytest.mark.parametrize(*_base_estimator_cases)

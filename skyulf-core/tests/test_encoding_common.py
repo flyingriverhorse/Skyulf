@@ -14,19 +14,19 @@ from skyulf.preprocessing.encoding._common import (
 )
 
 _parse_categories_order_cases = TestCaseLoader(
-    "preprocessing/encoding_common_parse_categories_order"
+    "preprocessing/encoding_common", group="parse_categories_order"
 ).load_with_ids()
 _exclude_target_column_cases = TestCaseLoader(
-    "preprocessing/encoding_common_exclude_target_column"
+    "preprocessing/encoding_common", group="exclude_target_column"
 ).load_with_ids()
 _detect_categorical_columns_cases = TestCaseLoader(
-    "preprocessing/encoding_common_detect_categorical_columns"
+    "preprocessing/encoding_common", group="detect_categorical_columns"
 ).load_with_ids()
 
 
 class TestParseCategoriesOrder:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/encoding_common_parse_categories_order.json``.
+    ``tests/test_cases/preprocessing/encoding_common.json`` (group ``parse_categories_order``).
     """
 
     @pytest.mark.parametrize(
@@ -40,7 +40,7 @@ class TestParseCategoriesOrder:
 
 class TestExcludeTargetColumn:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/encoding_common_exclude_target_column.json``.
+    ``tests/test_cases/preprocessing/encoding_common.json`` (group ``exclude_target_column``).
     """
 
     @pytest.mark.parametrize(
@@ -70,7 +70,7 @@ class TestExcludeTargetColumn:
 
 class TestDetectCategoricalColumns:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/encoding_common_detect_categorical_columns.json``.
+    ``tests/test_cases/preprocessing/encoding_common.json`` (group ``detect_categorical_columns``).
     """
 
     @pytest.mark.parametrize(

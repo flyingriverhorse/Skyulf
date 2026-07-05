@@ -12,8 +12,12 @@ import pandas as pd
 import pytest
 from tests.utils.test_case_loader import TestCaseLoader
 
-_simple_imputer_cases = TestCaseLoader("preprocessing/simple_imputer_strategies").load()
-_casting_cases = TestCaseLoader("preprocessing/casting_target_type").load()
+_simple_imputer_cases = TestCaseLoader(
+    "preprocessing/preprocessing_nodes", group="simple_imputer_strategies"
+).load()
+_casting_cases = TestCaseLoader(
+    "preprocessing/preprocessing_nodes", group="casting_target_type"
+).load()
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -206,7 +210,7 @@ class TestMaxAbsScaler:
 
 class TestSimpleImputer:
     """Imputation strategies — scenarios loaded from
-    ``tests/test_cases/preprocessing/simple_imputer_strategies.json``.
+    ``tests/test_cases/preprocessing/preprocessing_nodes.json`` (group ``simple_imputer_strategies``).
     """
 
     @pytest.mark.parametrize(*_simple_imputer_cases)
@@ -695,7 +699,7 @@ class TestPolynomialFeatures:
 
 class TestCasting:
     """Casting to different target types — scenarios loaded from
-    ``tests/test_cases/preprocessing/casting_target_type.json``.
+    ``tests/test_cases/preprocessing/preprocessing_nodes.json`` (group ``casting_target_type``).
     """
 
     @pytest.mark.parametrize(*_casting_cases)

@@ -1,8 +1,0 @@
-{
-  "params": "node, fit_extra",
-  "test_cases": {
-    "hashing_vectorizer": {"node": "hashing_vectorizer", "fit_extra": {"n_features": 8}},
-    "tfidf_vectorizer": {"node": "tfidf_vectorizer", "fit_extra": {"max_features": 10}},
-    "count_vectorizer": {"node": "count_vectorizer", "fit_extra": {}}
-  }
-}

@@ -36,16 +36,16 @@ def _flatten_single_param(cases: list) -> list:
 
 
 _simple_ops_cases = _flatten_single_param(
-    TestCaseLoader("preprocessing/transformations_general_simple_ops").load()
+    TestCaseLoader("preprocessing/transformations_general", group="simple_ops").load()
 )
 _polars_simple_ops_cases = _flatten_single_param(
-    TestCaseLoader("preprocessing/transformations_general_polars_simple_ops").load()
+    TestCaseLoader("preprocessing/transformations_general", group="polars_simple_ops").load()
 )
 _edge_case_value_cases = TestCaseLoader(
-    "preprocessing/transformations_general_edge_case_values"
+    "preprocessing/transformations_general", group="edge_case_values"
 ).load()
 _fit_power_engine_cases = _flatten_single_param(
-    TestCaseLoader("preprocessing/transformations_general_fit_power_engine").load()
+    TestCaseLoader("preprocessing/transformations_general", group="fit_power_engine").load()
 )
 
 # Maps a simple op's method name to the numpy function it must reproduce —
@@ -167,7 +167,7 @@ class TestFitArtifact:
 
 class TestApplySimpleOpsPandas:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/transformations_general_simple_ops.json``.
+    ``tests/test_cases/preprocessing/transformations_general.json`` (group ``simple_ops``).
     """
 
     @pytest.mark.parametrize(*_simple_ops_cases)
@@ -332,7 +332,7 @@ class TestApplyPowerTransforms:
 class TestEdgeCases:
     """``test_single_row_does_not_raise``/``test_constant_column_transforms_correctly``
     scenarios loaded from
-    ``tests/test_cases/preprocessing/transformations_general_edge_case_values.json``.
+    ``tests/test_cases/preprocessing/transformations_general.json`` (group ``edge_case_values``).
     """
 
     @pytest.mark.parametrize(*_edge_case_value_cases)
@@ -390,7 +390,7 @@ class TestEdgeCases:
 
 class TestPolarsPath:
     """``method`` scenarios loaded from
-    ``tests/test_cases/preprocessing/transformations_general_polars_simple_ops.json``.
+    ``tests/test_cases/preprocessing/transformations_general.json`` (group ``polars_simple_ops``).
     """
 
     @pytest.mark.parametrize(*_polars_simple_ops_cases)
@@ -450,7 +450,7 @@ class TestInternalHelpers:
     ) -> None:
         """_fit_power_for_column must return a dict with 'lambdas' for yeo-johnson,
         on both the pandas and polars code paths (loaded from
-        ``tests/test_cases/preprocessing/transformations_general_fit_power_engine.json``).
+        ``tests/test_cases/preprocessing/transformations_general.json`` (group ``fit_power_engine``)).
         """
         df = pl.from_pandas(pos_df) if is_polars else pos_df
         result = _fit_power_for_column(df, "a", "yeo-johnson", is_polars=is_polars)

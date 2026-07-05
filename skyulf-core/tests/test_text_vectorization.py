@@ -42,22 +42,22 @@ _VECTORIZER_NODES: dict[str, tuple[type, type]] = {
 }
 
 
-def _load_single_param(source_path: str) -> list[Any]:
+def _load_single_param(source_path: str, group: str | None = None) -> list[Any]:
     """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
 
     ``pytest.mark.parametrize`` treats a single (comma-less) param name
     specially: argvalues must be bare scalars, not 1-tuples, or the whole
     tuple gets bound to the parameter instead of its single element.
     """
-    params_string, scenarios = TestCaseLoader(source_path).load()
+    params_string, scenarios = TestCaseLoader(source_path, group=group).load()
     return [params_string, [scenario[0] for scenario in scenarios]]
 
 
 _empty_columns_noop_cases = _load_single_param(
-    "preprocessing/text_vectorization_empty_columns_noop"
+    "preprocessing/text_vectorization", group="empty_columns_noop"
 )
 _polars_roundtrip_cases = TestCaseLoader(
-    "preprocessing/text_vectorization_apply_polars_roundtrip"
+    "preprocessing/text_vectorization", group="apply_polars_roundtrip"
 ).load()
 
 

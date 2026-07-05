@@ -1,7 +1,0 @@
-{
-  "params": "values, dtype",
-  "test_cases": {
-    "non_numeric_column": {"values": ["a", "b", "c"], "dtype": "object"},
-    "empty_dataframe": {"values": [], "dtype": "float64"}
-  }
-}

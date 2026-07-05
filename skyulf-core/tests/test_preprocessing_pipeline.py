@@ -17,18 +17,20 @@ from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 _diff_generated_columns_cases = TestCaseLoader(
-    "preprocessing/pipeline_diff_generated_columns"
+    "preprocessing/preprocessing_pipeline", group="diff_generated_columns"
 ).load()
 _count_winsorize_diffs_simple_cases = TestCaseLoader(
-    "preprocessing/pipeline_count_winsorize_diffs_simple"
+    "preprocessing/preprocessing_pipeline", group="count_winsorize_diffs_simple"
 ).load()
 _count_winsorize_diffs_tuple_cases = TestCaseLoader(
-    "preprocessing/pipeline_count_winsorize_diffs_tuple"
+    "preprocessing/preprocessing_pipeline", group="count_winsorize_diffs_tuple"
 ).load()
 _metrics_from_fitted_params_cases = TestCaseLoader(
-    "preprocessing/pipeline_metrics_from_fitted_params_copies_keys"
+    "preprocessing/preprocessing_pipeline", group="metrics_from_fitted_params_copies_keys"
 ).load()
-_metrics_shape_change_cases = TestCaseLoader("preprocessing/pipeline_metrics_shape_change").load()
+_metrics_shape_change_cases = TestCaseLoader(
+    "preprocessing/preprocessing_pipeline", group="metrics_shape_change"
+).load()
 
 
 def _coerce_frame(value: Any) -> Any:

@@ -1,7 +1,0 @@
-{
-  "params": "is_polars",
-  "test_cases": {
-    "pandas": {"is_polars": false},
-    "polars": {"is_polars": true}
-  }
-}

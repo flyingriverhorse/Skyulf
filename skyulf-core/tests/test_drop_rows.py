@@ -19,8 +19,8 @@ from skyulf.preprocessing.drop_and_missing.drop_rows import (
     DropMissingRowsCalculator,
 )
 
-_shape_only_cases = TestCaseLoader("preprocessing/drop_rows_shape_only").load()
-_round_trip_cases = TestCaseLoader("preprocessing/drop_rows_round_trip").load()
+_shape_only_cases = TestCaseLoader("preprocessing/drop_rows", group="shape_only").load()
+_round_trip_cases = TestCaseLoader("preprocessing/drop_rows", group="round_trip").load()
 
 # ---------------------------------------------------------------------------
 # Calculator.fit
@@ -113,7 +113,7 @@ def test_apply_pandas_no_missing_values_keeps_all_rows() -> None:
 
 class TestApplyPandasShapeOnly:
     """Result shape for drop-everything edge cases — scenarios loaded from
-    ``tests/test_cases/preprocessing/drop_rows_shape_only.json``.
+    ``tests/test_cases/preprocessing/drop_rows.json`` (group ``shape_only``).
     """
 
     @pytest.mark.parametrize(*_shape_only_cases)
@@ -207,7 +207,7 @@ def test_apply_polars_tuple_xy_syncs_y_after_drop() -> None:
 
 class TestFitThenApplyRoundTrip:
     """fit() + apply() round trip across configs — scenarios loaded from
-    ``tests/test_cases/preprocessing/drop_rows_round_trip.json``.
+    ``tests/test_cases/preprocessing/drop_rows.json`` (group ``round_trip``).
     """
 
     @pytest.mark.parametrize(*_round_trip_cases)
