@@ -10,6 +10,7 @@ import math
 
 import pandas as pd
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_generation import (
     FeatureGenerationApplier,
@@ -569,3 +570,36 @@ class TestEdgeCases:
         assert out["dt_year"].iloc[0] == 2024
         assert out["dt_year"].iloc[2] == 2023
         assert math.isnan(out["dt_year"].iloc[1])
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values in ``age``/``income`` — closer to production data
+    than the small synthetic frame used elsewhere in this file.
+    """
+
+    def test_income_per_age_ratio_fills_missing_inputs_with_zero(self) -> None:
+        """Arithmetic ops treat missing inputs as 0 (documented ``fillna`` default),
+        rather than propagating NaN like the FeatureInteraction node does.
+        """
+        df = load_sample_dataset("customers")
+        out = _run(
+            [
+                {
+                    "operation_type": "arithmetic",
+                    "method": "divide",
+                    "input_columns": ["income", "age"],
+                }
+            ],
+            df,
+        )
+
+        # No missing inputs => result is never NaN, since they're filled with 0 first.
+        assert out["arithmetic_0"].notna().all()
+
+        complete_mask = df["income"].notna() & df["age"].notna()
+        pd.testing.assert_series_equal(
+            out.loc[complete_mask, "arithmetic_0"].reset_index(drop=True),
+            (df.loc[complete_mask, "income"] / df.loc[complete_mask, "age"]).reset_index(drop=True),
+            check_names=False,
+        )

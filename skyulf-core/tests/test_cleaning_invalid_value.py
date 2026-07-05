@@ -12,6 +12,7 @@ import polars as pl
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.cleaning.invalid_value import (
     InvalidValueReplacementApplier,
@@ -525,3 +526,32 @@ def test_invalid_value_apply_engine_parity_custom_range(df: pd.DataFrame) -> Non
         check_exact=False,
         rtol=1e-9,
     )
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``income`` values — closer to production data than the
+    small synthetic frame used elsewhere in this file.
+    """
+
+    def test_custom_range_replaces_income_outliers_and_preserves_missing(self) -> None:
+        df = load_sample_dataset("customers")
+        params: Dict[str, Any] = {
+            "columns": ["income"],
+            "rule": "custom_range",
+            "min_value": 30000.0,
+            "max_value": 90000.0,
+            "replacement": -1.0,
+            "replace_inf": False,
+            "replace_neg_inf": False,
+        }
+        out = InvalidValueReplacementApplier().apply(df, params)
+
+        out_of_range = (df["income"] < 30000.0) | (df["income"] > 90000.0)
+        assert (out.loc[out_of_range.fillna(False), "income"] == -1.0).all()
+        # Missing income values must remain missing, not be replaced.
+        assert out.loc[df["income"].isna(), "income"].isna().all()
+        in_range = ~out_of_range.fillna(True) & df["income"].notna()
+        pd.testing.assert_series_equal(
+            out.loc[in_range, "income"], df.loc[in_range, "income"], check_names=False
+        )

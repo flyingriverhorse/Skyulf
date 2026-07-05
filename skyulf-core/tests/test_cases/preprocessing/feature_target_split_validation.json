@@ -1,0 +1,13 @@
+{
+  "params": "target_column, error_match",
+  "test_cases": {
+    "missing_target_column_in_config": {
+      "target_column": null,
+      "error_match": "Target column must be specified"
+    },
+    "target_column_absent_from_frame": {
+      "target_column": "does_not_exist",
+      "error_match": "not found in dataset"
+    }
+  }
+}

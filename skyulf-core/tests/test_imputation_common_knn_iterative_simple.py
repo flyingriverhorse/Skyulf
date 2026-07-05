@@ -14,6 +14,7 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.imputation._common import (
     _build_iterative_estimator,
@@ -723,3 +724,24 @@ def test_simple_imputer_constant_engine_parity(df: pd.DataFrame, fill_value: flo
 
     assert pd_params["fill_values"] == pl_params["fill_values"]
     assert pd_params["columns"] == pl_params["columns"]
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values in ``age``/``income`` — closer to production data
+    than the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_mean_strategy_fills_age_and_income_nans(self) -> None:
+        df = load_sample_dataset("customers")
+        calc = SimpleImputerCalculator()
+        applier = SimpleImputerApplier()
+        params = calc.fit(df, {"columns": ["age", "income"], "strategy": "mean"})
+        out = applier.apply(df, params)
+
+        assert out["age"].isna().sum() == 0
+        assert out["income"].isna().sum() == 0
+        np.testing.assert_allclose(out.loc[df["age"].isna(), "age"], df["age"].mean(), rtol=1e-9)
+        np.testing.assert_allclose(
+            out.loc[df["income"].isna(), "income"], df["income"].mean(), rtol=1e-9
+        )

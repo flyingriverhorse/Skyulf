@@ -6,6 +6,7 @@ plus the ``infer_output_schema`` predictions and registry wiring.
 
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing import (
@@ -112,3 +113,30 @@ def test_date_features_infer_output_schema_drops_original():
     assert out is not None
     assert "d" not in out
     assert out.dtypes["d_year"] == "int64"
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that DateFeaturesCalculator extracts calendar features from the
+    real-world ``signup_date`` string column and that the pandas and polars
+    apply paths return identical results for all 15 rows.
+    """
+
+    def test_date_features_on_signup_date_pandas_polars_parity(self) -> None:
+        df = load_sample_dataset("customers")
+        df["signup_date"] = pd.to_datetime(df["signup_date"])
+        art = DateFeaturesCalculator().fit(
+            df, {"columns": ["signup_date"], "features": ["year", "month", "dayofweek"]}
+        )
+        pd_out = DateFeaturesApplier().apply(df, art)
+        pl_out = DateFeaturesApplier().apply(pl.from_pandas(df), art)
+        # All signup years must fall in the observed range.
+        assert pd_out["signup_date_year"].between(2018, 2023).all()
+        # Polars and pandas paths must agree exactly.
+        assert pl_out["signup_date_year"].to_list() == pd_out["signup_date_year"].tolist()

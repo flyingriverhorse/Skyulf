@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.geo import (
     GeoDistanceApplier,
@@ -16,6 +18,8 @@ from skyulf.preprocessing.geo import (
     H3IndexApplier,
     H3IndexCalculator,
 )
+
+_geo_distance_validation_cases = TestCaseLoader("geo/geo_distance_validation").load()
 
 # New York City (JFK) and Los Angeles (LAX) airport coordinates.
 # Known great-circle distance is ~3936 km (commonly cited reference value).
@@ -142,15 +146,32 @@ class TestEuclideanDistance:
 
 
 class TestGeoDistanceValidation:
-    """Config validation errors."""
+    """Config validation errors — scenarios loaded from
+    ``tests/test_cases/geo/geo_distance_validation.json``.
+    """
 
-    def test_missing_column_raises(self) -> None:
+    @pytest.mark.parametrize(*_geo_distance_validation_cases)
+    def test_invalid_config_raises(
+        self,
+        lat1_col: str,
+        lon1_col: str,
+        lat2_col: str,
+        lon2_col: str,
+        extra_config: dict,
+        error_match: str,
+    ) -> None:
         df = _cities_df()
         calc = GeoDistanceCalculator()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=error_match):
             calc.fit(
                 df,
-                {"lat1_col": "lat1", "lon1_col": "lon1", "lat2_col": "missing", "lon2_col": "lon2"},
+                {
+                    "lat1_col": lat1_col,
+                    "lon1_col": lon1_col,
+                    "lat2_col": lat2_col,
+                    "lon2_col": lon2_col,
+                    **extra_config,
+                },
             )
 
     def test_non_numeric_column_raises(self) -> None:
@@ -160,36 +181,6 @@ class TestGeoDistanceValidation:
         with pytest.raises(ValueError):
             calc.fit(
                 df, {"lat1_col": "lat1", "lon1_col": "lon1", "lat2_col": "lat2", "lon2_col": "lon2"}
-            )
-
-    def test_unsupported_method_raises(self) -> None:
-        df = _cities_df()
-        calc = GeoDistanceCalculator()
-        with pytest.raises(ValueError):
-            calc.fit(
-                df,
-                {
-                    "lat1_col": "lat1",
-                    "lon1_col": "lon1",
-                    "lat2_col": "lat2",
-                    "lon2_col": "lon2",
-                    "method": "manhattan",
-                },
-            )
-
-    def test_unsupported_unit_raises(self) -> None:
-        df = _cities_df()
-        calc = GeoDistanceCalculator()
-        with pytest.raises(ValueError):
-            calc.fit(
-                df,
-                {
-                    "lat1_col": "lat1",
-                    "lon1_col": "lon1",
-                    "lat2_col": "lat2",
-                    "lon2_col": "lon2",
-                    "unit": "furlongs",
-                },
             )
 
 
@@ -241,6 +232,34 @@ class TestGeoDistanceEngineParity:
             result_pl["geo_distance_km"].to_numpy(),
             rtol=1e-9,
         )
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing lat/lon rows — closer to production data than the
+    small synthetic ``_cities_df()`` frame used elsewhere in this file.
+    """
+
+    def test_distance_from_nyc_handles_missing_coordinates(self) -> None:
+        df = load_sample_dataset("customers")
+        # Match the exact New York coordinates used in customers.csv (Manhattan),
+        # not the airport-based _NYC_LAT/_NYC_LON reference used elsewhere in this file.
+        df["ref_lat"] = 40.7128
+        df["ref_lon"] = -74.0060
+
+        calc = GeoDistanceCalculator()
+        applier = GeoDistanceApplier()
+        params = calc.fit(
+            df, {"lat1_col": "lat", "lon1_col": "lon", "lat2_col": "ref_lat", "lon2_col": "ref_lon"}
+        )
+        result = applier.apply(df, params)
+
+        missing_mask = df["lat"].isna() | df["lon"].isna()
+        assert result.loc[missing_mask, "geo_distance_km"].isna().all()
+        assert result.loc[~missing_mask, "geo_distance_km"].notna().all()
+        # The New York customers should be ~0 km from the NYC reference point.
+        ny_rows = df["city"] == "New York"
+        np.testing.assert_allclose(result.loc[ny_rows, "geo_distance_km"], 0.0, atol=1.0)
 
 
 h3 = pytest.importorskip("h3", reason="h3 is an optional dependency (pip install skyulf-core[geo])")

@@ -10,6 +10,7 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 from sklearn.preprocessing import LabelEncoder, TargetEncoder
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.target import (
     TargetEncoderApplier,
@@ -375,3 +376,31 @@ def test_fit_target_encoder_reraises_unrelated_value_error() -> None:
     with pytest.raises(ValueError) as exc_info:
         _fit_target_encoder(X, y, config)
     assert "TargetEncoder failed" not in str(exc_info.value)
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``plan_type`` (no NaN, 3 categories) + binary ``churned`` target exercises the
+    TargetEncoder on production-like data: each plan group gets its own smoothed
+    target statistic, and the result is a numeric column of the same length.
+    """
+
+    def test_plan_type_target_encoding_with_binary_churn_target(self) -> None:
+        """TargetEncoder on ``plan_type`` with binary ``churned`` produces a numeric column.
+
+        Each distinct plan_type value maps to a different smoothed mean of the
+        binary churn target — verifies real-data fit→apply cycle without leakage.
+        """
+        df = load_sample_dataset("customers")
+        X = df[["plan_type"]].copy()
+        y = df["churned"]
+        config: dict[str, Any] = {"columns": ["plan_type"], "target_type": "binary"}
+
+        params = TargetEncoderCalculator().fit((X, y), config)
+        X_out, y_out = TargetEncoderApplier().apply((X, y), dict(params))
+
+        assert len(X_out) == len(df)
+        assert pd.api.types.is_float_dtype(X_out["plan_type"])
+        # Binary target encoding produces values in (0, 1) representing the smoothed churn rate.
+        assert X_out["plan_type"].between(0.0, 1.0).all()
+        assert list(y_out) == list(y)

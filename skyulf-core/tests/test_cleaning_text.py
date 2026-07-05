@@ -11,6 +11,7 @@ import polars as pl
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.cleaning.text import (
     TextCleaningApplier,
@@ -537,3 +538,61 @@ def test_polars_no_valid_columns_is_noop() -> None:
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
     assert result["text"].iloc[0] == "hello"
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has ``plan_type`` (lowercase strings) and ``city`` (mixed values with a
+    NaN row) — verifying that text operations on a real-shaped dataset handle
+    NaN passthrough correctly.
+    """
+
+    def test_trim_and_lowercase_plan_type_produces_clean_values(self) -> None:
+        """Applying trim+lowercase to ``plan_type`` on the customers dataset must
+        produce consistently lowercased values with no NaN introduced (plan_type
+        has no missing values in customers.csv).
+        """
+        df = load_sample_dataset("customers")
+        calc = TextCleaningCalculator()
+        applier = TextCleaningApplier()
+        params = calc.fit(
+            df,
+            {
+                "columns": ["plan_type"],
+                "operations": [
+                    {"op": "trim", "mode": "both"},
+                    {"op": "case", "mode": "lower"},
+                ],
+            },
+        )
+        result = applier.apply(df, params)
+
+        assert result["plan_type"].notna().all()
+        assert set(result["plan_type"].unique()) == {"basic", "premium", "enterprise"}
+
+    def test_text_cleaning_city_with_nan_non_null_values_are_trimmed(self) -> None:
+        """Applying trim to ``city`` on real data must leave the non-null city
+        strings unchanged (no surrounding whitespace exists in customers.csv).
+        Note: the text cleaning node casts object columns to str before applying
+        ops, so NaN cells become the literal string "nan" — this is the current
+        library behaviour, not a passthrough.
+        """
+        df = load_sample_dataset("customers")
+        calc = TextCleaningCalculator()
+        applier = TextCleaningApplier()
+        params = calc.fit(
+            df,
+            {"columns": ["city"], "operations": [{"op": "trim", "mode": "both"}]},
+        )
+        result = applier.apply(df, params)
+
+        # Non-null city values must not gain or lose any whitespace.
+        non_null_original = df.loc[df["city"].notna(), "city"].reset_index(drop=True)
+        non_null_result = result.loc[df["city"].notna(), "city"].reset_index(drop=True)
+        for orig, trimmed in zip(non_null_original, non_null_result):
+            assert trimmed == orig.strip()

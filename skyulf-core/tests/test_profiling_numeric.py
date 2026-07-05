@@ -10,6 +10,7 @@ from typing import Any
 import numpy as np
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 
@@ -55,3 +56,22 @@ def test_calculate_vif_generic_exception_returns_none(monkeypatch: pytest.Monkey
     result = analyzer._calculate_vif(["a", "b"])
 
     assert result is None
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``age``/``income`` rows — closer to production data than
+    the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_calculate_vif_on_customers_drops_missing_rows(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+
+        result = analyzer._calculate_vif(["age", "income"])
+
+        # 15 rows minus the ~5 rows with a missing age/income leaves 10, which
+        # clears the "len(numeric_cols) + 5" floor, so real VIF values come back.
+        assert result is not None
+        assert set(result.keys()) == {"age", "income"}
+        assert all(v >= 1.0 for v in result.values())

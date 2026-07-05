@@ -9,11 +9,15 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_generation import (
     FeatureInteractionApplier,
     FeatureInteractionCalculator,
 )
+
+_validation_cases = TestCaseLoader("preprocessing/feature_interaction_validation").load()
 
 
 def _sample_pandas_df() -> pd.DataFrame:
@@ -126,26 +130,17 @@ class TestIncludeBias:
 
 
 class TestValidation:
-    """Config validation errors."""
+    """Config validation errors — scenarios loaded from
+    ``tests/test_cases/preprocessing/feature_interaction_validation.json``.
+    """
 
-    def test_unsupported_degree_raises(self) -> None:
-        df = _sample_pandas_df()
-        calc = FeatureInteractionCalculator()
-        with pytest.raises(ValueError):
-            calc.fit(df, {"columns": ["x1", "x2"], "degree": 5})
-
-    def test_non_numeric_column_raises(self) -> None:
+    @pytest.mark.parametrize(*_validation_cases)
+    def test_invalid_config_raises(self, columns: list[str], degree: int, error_match: str) -> None:
         df = _sample_pandas_df()
         df["cat"] = ["a", "b", "c", "d"]
         calc = FeatureInteractionCalculator()
-        with pytest.raises(ValueError):
-            calc.fit(df, {"columns": ["x1", "cat"], "degree": 2})
-
-    def test_missing_column_raises(self) -> None:
-        df = _sample_pandas_df()
-        calc = FeatureInteractionCalculator()
-        with pytest.raises(ValueError):
-            calc.fit(df, {"columns": ["x1", "does_not_exist"], "degree": 2})
+        with pytest.raises(ValueError, match=error_match):
+            calc.fit(df, {"columns": columns, "degree": degree})
 
 
 class TestFitApplyRoundTrip:
@@ -222,4 +217,28 @@ class TestEngineParity:
         np.testing.assert_allclose(
             result_pd["x1_x_x2_x_x3_x_x4"].to_numpy(),
             result_pl["x1_x_x2_x_x3_x_x4"].to_numpy(),
+        )
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values and mixed dtypes — closer to production data than
+    the small synthetic frame used elsewhere in this file.
+    """
+
+    def test_income_age_interaction_ignores_missing_rows_correctly(self) -> None:
+        df = load_sample_dataset("customers")
+        calc = FeatureInteractionCalculator()
+        applier = FeatureInteractionApplier()
+        params = calc.fit(df, {"columns": ["age", "income"], "degree": 2})
+        result = applier.apply(df, params)
+
+        assert "age_x_income" in result.columns
+        # Rows with a missing age/income must propagate NaN, not silently drop.
+        missing_mask = df["age"].isna() | df["income"].isna()
+        assert result.loc[missing_mask, "age_x_income"].isna().all()
+        assert result.loc[~missing_mask, "age_x_income"].notna().all()
+        np.testing.assert_allclose(
+            result.loc[~missing_mask, "age_x_income"],
+            df.loc[~missing_mask, "age"] * df.loc[~missing_mask, "income"],
         )

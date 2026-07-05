@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification, make_regression
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling.base import BaseModelCalculator, StatefulEstimator
@@ -559,3 +560,32 @@ def test_sort_by_time_no_datetime_column_with_log_callback():
         calc, appl, X, y, config={}, n_folds=3, cv_type="time_series_split", time_column="ts"
     )
     assert len(result["folds"]) == 3
+
+
+# ---------------------------------------------------------------------------
+# perform_cross_validation — real-shaped dataset
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values — closer to production data than the synthetic
+    ``make_classification``/``make_regression`` fixtures used elsewhere in
+    this file.
+    """
+
+    def test_cross_validate_churn_classifier_on_customers_data(self) -> None:
+        df = load_sample_dataset("customers")
+        # LogisticRegression can't handle NaN, so rows with missing
+        # age/income are dropped rather than assumed clean.
+        df = df.dropna(subset=["age", "income"])
+        X = df[["age", "income"]]
+        y = df["churned"]
+        calc = LogisticRegressionCalculator()
+        appl = LogisticRegressionApplier()
+
+        result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="k_fold")
+
+        assert "aggregated_metrics" in result
+        assert "accuracy" in result["aggregated_metrics"]
+        assert len(result["folds"]) == 3

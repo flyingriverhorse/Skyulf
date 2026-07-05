@@ -9,6 +9,7 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.woe import WOEEncoderApplier, WOEEncoderCalculator
 
@@ -243,3 +244,28 @@ def test_woe_fit_pandas_no_resolvable_columns_returns_empty() -> None:
     y = pd.Series([0, 1, 0, 1], name="target")
     params = WOEEncoderCalculator().fit((X, y), {})
     assert params == {}
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``plan_type`` (no NaN, 3 categories) + binary ``churned`` target — exercises
+    multi-category WOE computation on production-like data, including a category
+    with zero positive-class observations (enterprise: all churned=0).
+    """
+
+    def test_plan_type_woe_encoding_with_binary_churn_target(self) -> None:
+        """WOE encoding of ``plan_type`` produces a finite WOE value for every category.
+
+        Regularization prevents ±inf WOE for the enterprise group (zero churned),
+        and every category must receive a distinct finite float mapping.
+        """
+        df = load_sample_dataset("customers")
+        X = df[["plan_type"]].copy()
+        y = df["churned"]
+        params = WOEEncoderCalculator().fit((X, y), {"columns": ["plan_type"]})
+
+        assert params != {}
+        assert set(params["mappings"]["plan_type"].keys()) == set(df["plan_type"].unique())
+        for woe_val in params["mappings"]["plan_type"].values():
+            assert isinstance(woe_val, float)
+            assert math.isfinite(woe_val)

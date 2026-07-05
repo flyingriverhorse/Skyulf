@@ -2,6 +2,7 @@
 
 import numpy as np
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling._analyzer import rules as rules_mod
 from skyulf.profiling.analyzer import EDAAnalyzer
@@ -122,3 +123,22 @@ def test_discover_rules_outer_exception(monkeypatch) -> None:
     monkeypatch.setattr(DecisionTreeClassifier, "fit", _boom)
     tree = analyzer._discover_rules(["a", "b"], "target")
     assert tree is None
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``age``/``income`` feature values — closer to
+    production data than the small synthetic frames used elsewhere in this
+    file.
+    """
+
+    def test_discover_rules_predicts_churned_from_age_and_income(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        tree = analyzer._discover_rules(["age", "income"], "churned", task_type="classification")
+
+        # Missing age/income are mean-imputed internally, so all 15 rows train.
+        assert tree is not None
+        assert tree.rules
+        assert tree.accuracy is not None
+        assert 0.0 <= tree.accuracy <= 1.0

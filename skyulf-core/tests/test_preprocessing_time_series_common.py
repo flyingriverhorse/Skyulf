@@ -1,6 +1,7 @@
 """Tests for skyulf.preprocessing.time_series._common helper functions."""
 
 import pandas as pd
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.time_series._common import (
     coerce_aggregations,
@@ -80,3 +81,24 @@ def test_sort_pandas_passthrough_when_sort_by_none():
     df = pd.DataFrame({"t": [3, 1, 2]})
     result = sort_pandas(df, None)
     assert list(result["t"]) == [3, 1, 2]
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: customers.csv (string-typed ISO date column)
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify sort_pandas behavior on customers.csv's signup_date column — a
+    real-shaped string-typed ISO date column that must sort correctly using
+    lexicographic order (ISO dates sort the same as alphabetic order).
+    """
+
+    def test_sort_pandas_by_signup_date_produces_ascending_order(self) -> None:
+        """sort_pandas on signup_date must return all rows in ISO-date ascending
+        order without dropping any rows or raising."""
+        df = load_sample_dataset("customers")
+        sorted_df = sort_pandas(df, "signup_date")
+        assert len(sorted_df) == len(df)
+        dates = sorted_df["signup_date"].tolist()
+        assert dates == sorted(dates)

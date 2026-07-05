@@ -15,6 +15,7 @@ import typing
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.outliers.manual_bounds import (
     ManualBoundsApplier,
@@ -304,3 +305,30 @@ class TestManualBoundsApplierPolars:
         params = ManualBoundsCalculator().fit(df_polars.to_pandas(), config)
         _, y_out = self._APPLIER.apply((df_polars, y), params)
         assert y_out is y
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: customers.csv (NaN in age/income)
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify that ManualBoundsApplier preserves NaN-valued rows when filtering
+    by numeric age bounds against customers.csv.  NaN must never be treated as
+    an outlier — rows where age is missing must always survive the filter.
+    """
+
+    def test_nan_age_rows_preserved_by_bounds_filter(self) -> None:
+        """Rows where age is NaN in customers.csv must survive a strict age
+        range filter — NaN is always an inlier by definition."""
+        df = load_sample_dataset("customers")
+        nan_age_count = int(df["age"].isna().sum())
+        config = {"bounds": {"age": {"lower": 20.0, "upper": 60.0}}}
+        params = ManualBoundsCalculator().fit(df, config)
+        out = ManualBoundsApplier().apply(df, params)
+        # All NaN-age rows must be preserved.
+        assert int(out["age"].isna().sum()) == nan_age_count
+        # Rows with age outside [20, 60] (age=19 and age=61) must be removed.
+        non_null = out["age"].dropna()
+        assert non_null.min() >= 20.0
+        assert non_null.max() <= 60.0

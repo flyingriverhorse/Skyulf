@@ -2,6 +2,7 @@
 
 import numpy as np
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 
@@ -178,3 +179,20 @@ def test_calculate_target_interactions_outer_exception(monkeypatch) -> None:
         "target", ["cat"], is_target_numeric=True
     )
     assert interactions == []
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``age``/``income`` rows — closer to production data than
+    the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_churn_target_correlations_handle_missing_values(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+
+        # churned is a 0/1 numeric label; age/income both have missing rows,
+        # which pl.corr should silently exclude pairwise.
+        corrs = analyzer._calculate_target_correlations("churned", ["age", "income", "churned"])
+        assert set(corrs.keys()) == {"age", "income"}
+        assert all(-1.0 <= v <= 1.0 for v in corrs.values())

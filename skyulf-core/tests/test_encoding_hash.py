@@ -6,6 +6,7 @@ import pandas as pd
 import polars as pl
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.hash import (
     HashEncoderApplier,
@@ -164,3 +165,26 @@ def test_fit_engine_parity_pandas_vs_polars(cats: list[str]) -> None:
     pl_params = HashEncoderCalculator().fit(df_pl, dict(config))
 
     assert pd_params == pl_params
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has categorical columns ``city``/``plan_type`` — closer to production
+    data than the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_plan_type_hash_encoding_stays_within_bucket_range(self) -> None:
+        """HashEncoder on ``plan_type`` (no NaN) maps every row to a valid bucket in [0, n_features).
+
+        Verifies the deterministic-hashing guarantee on a multi-category real column:
+        same plan_type value must always hash to the same bucket.
+        """
+        df = load_sample_dataset("customers")
+        n_features = 6
+        params, out = _fit_apply(df, {"columns": ["plan_type"], "n_features": n_features})
+
+        assert out["plan_type"].between(0, n_features - 1).all()
+        # Same plan_type value must hash to exactly one bucket every time.
+        for val in df["plan_type"].unique():
+            mask = df["plan_type"] == val
+            assert out.loc[mask, "plan_type"].nunique() == 1

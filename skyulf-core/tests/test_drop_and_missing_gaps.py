@@ -6,6 +6,7 @@ Targets the pandas+polars fit/apply branches, threshold parsing, and
 
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing._schema import SkyulfSchema
 from skyulf.preprocessing.drop_and_missing._common import (
@@ -305,3 +306,21 @@ def test_normalize_subset_filters_to_existing_columns() -> None:
 def test_normalize_subset_all_missing_returns_none() -> None:
     """A subset where none of the entries exist must resolve to None."""
     assert _normalize_subset(["nonexistent"], ["a", "b"]) is None
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values in ``age``/``income``/``city``/``lat``/``lon`` —
+    closer to production data than the small synthetic frame used elsewhere
+    in this file.
+    """
+
+    def test_missing_indicator_flags_columns_with_real_gaps(self) -> None:
+        df = load_sample_dataset("customers")
+        params = MissingIndicatorCalculator().fit(df, {})
+        assert set(params["columns"]) == {"age", "income", "city", "lat", "lon"}
+
+        out = MissingIndicatorApplier().apply(df, params)
+        for col in params["columns"]:
+            expected = df[col].isna().astype(int)
+            pd.testing.assert_series_equal(out[f"{col}_missing"], expected, check_names=False)

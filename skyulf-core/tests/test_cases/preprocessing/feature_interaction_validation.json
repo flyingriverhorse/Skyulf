@@ -1,0 +1,35 @@
+{
+  "params": "columns, degree, error_match",
+  "test_cases": {
+    "unsupported_degree_five": {
+      "columns": ["x1", "x2"],
+      "degree": 5,
+      "error_match": "only supports degree 2, 3 or 4"
+    },
+    "unsupported_degree_zero": {
+      "columns": ["x1", "x2"],
+      "degree": 0,
+      "error_match": "only supports degree 2, 3 or 4"
+    },
+    "unsupported_degree_one": {
+      "columns": ["x1", "x2"],
+      "degree": 1,
+      "error_match": "only supports degree 2, 3 or 4"
+    },
+    "unsupported_degree_negative": {
+      "columns": ["x1", "x2"],
+      "degree": -2,
+      "error_match": "only supports degree 2, 3 or 4"
+    },
+    "non_numeric_column": {
+      "columns": ["x1", "cat"],
+      "degree": 2,
+      "error_match": "requires numeric columns"
+    },
+    "missing_column": {
+      "columns": ["x1", "does_not_exist"],
+      "degree": 2,
+      "error_match": "columns not found in data"
+    }
+  }
+}

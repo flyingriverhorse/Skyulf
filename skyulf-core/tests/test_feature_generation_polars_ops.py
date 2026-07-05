@@ -11,6 +11,7 @@ import polars as pl
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_generation import (
     _featgen_apply_pandas,
@@ -527,3 +528,38 @@ def test_arith_engine_parity(op_type: str, method: str, df_pd: pd.DataFrame) -> 
     pd_vals = out_pd["result"].to_numpy()
     pl_vals = out_pl["result"].to_numpy()
     np.testing.assert_allclose(pd_vals, pl_vals, rtol=1e-6, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: null handling in polars arithmetic ops
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify that _featgen_apply_polars handles the customers.csv sample,
+    which contains null (NaN) values in age/income, without crashing and
+    preserves row count — nulls must propagate in arithmetic results, not
+    cause silent row removal.
+    """
+
+    def test_add_op_on_null_containing_columns_preserves_all_rows(self) -> None:
+        """An arithmetic add on age+income must not drop rows that have nulls —
+        row count must be identical to the input even when null-filling is applied."""
+        df = load_sample_dataset("customers", engine="polars")
+        params = {
+            "operations": [
+                {
+                    "operation_type": "arithmetic",
+                    "method": "add",
+                    "input_columns": ["age", "income"],
+                    "output_column": "age_plus_income",
+                }
+            ]
+        }
+        out, _ = _featgen_apply_polars(df, None, params)
+        # Row count must be preserved — nulls must not cause row removal.
+        assert out.shape[0] == df.shape[0]
+        assert "age_plus_income" in out.columns
+        # Rows where both age and income have values must produce a non-null result.
+        both_present = df["age"].is_not_null() & df["income"].is_not_null()
+        assert out.filter(both_present)["age_plus_income"].is_not_null().all()

@@ -22,6 +22,7 @@ from sklearn.feature_selection import (
     f_regression,
 )
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_selection._common import (
     _build_model_selector,
@@ -583,3 +584,36 @@ class TestResolveCandidateColumns:
         cols = _resolve_candidate_columns(df, {"columns": ["a", "b"]}, None)
         assert set(cols) == {"a", "b"}
         assert "c" not in cols
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: mixed-dtype customers.csv
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration check against customers.csv — verifies that _infer_problem_type
+    correctly classifies the binary ``churned`` target and that
+    _resolve_candidate_columns correctly excludes non-numeric and target columns
+    from a mixed-dtype frame that includes NaN in age/income/lat/lon.
+    """
+
+    def test_infer_problem_type_on_binary_churned_column(self) -> None:
+        """churned has only 2 unique integer values → must infer as classification."""
+        df = load_sample_dataset("customers")
+        assert _infer_problem_type(df["churned"]) == "classification"
+
+    def test_resolve_candidate_columns_excludes_target_and_non_numeric(self) -> None:
+        """Numeric columns (age, income, lat, lon, customer_id) minus churned
+        are candidates; string columns must not appear even with NaN present."""
+        df = load_sample_dataset("customers")
+        cols = _resolve_candidate_columns(df, {}, "churned")
+        # Target must be excluded.
+        assert "churned" not in cols
+        # Non-numeric columns must not appear.
+        assert "city" not in cols
+        assert "plan_type" not in cols
+        assert "signup_date" not in cols
+        # Numeric columns with NaN must still qualify as candidates.
+        assert "age" in cols
+        assert "income" in cols

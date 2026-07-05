@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_generation import (
     FeatureGenerationApplier,
@@ -634,3 +635,45 @@ def test_safe_divide_never_raises_or_produces_inf(a: list, b: list) -> None:
     result = _safe_divide(num, den, epsilon=1e-9)
     assert result.notna().all()
     assert not result.isin([float("inf"), float("-inf")]).any()
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``income`` has missing values — exercises group_agg NaN handling on
+    production-like data: rows with missing income must receive the group mean,
+    not NaN, because pandas ``groupby.transform("mean")`` excludes NaN from the
+    mean computation but still broadcasts the result to every row in the group.
+    """
+
+    def test_group_agg_income_by_plan_type_fills_nan_rows_with_group_mean(self) -> None:
+        """Group-mean of ``income`` by ``plan_type`` fills NaN-income rows with the group mean.
+
+        Verifies that missing ``income`` values do not propagate as NaN in the
+        aggregated column, and that all rows sharing a ``plan_type`` receive the
+        same aggregated value.
+        """
+        df = load_sample_dataset("customers")
+        params = _CALC.fit(
+            df,
+            {
+                "operations": [
+                    {
+                        "operation_type": "group_agg",
+                        "method": "mean",
+                        "input_columns": ["plan_type"],
+                        "secondary_columns": ["income"],
+                        "output_column": "plan_mean_income",
+                    }
+                ]
+            },
+        )
+        out = _APPLIER.apply(df, params)
+
+        assert "plan_mean_income" in out.columns
+        # NaN-income rows must receive the group mean, not propagate NaN.
+        nan_income_mask = df["income"].isna()
+        assert out.loc[nan_income_mask, "plan_mean_income"].notna().all()
+        # All rows in the same plan_type group share the same aggregated value.
+        for plan in df["plan_type"].unique():
+            group_vals = out.loc[df["plan_type"] == plan, "plan_mean_income"]
+            assert group_vals.nunique() == 1

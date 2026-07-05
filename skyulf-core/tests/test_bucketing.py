@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.bucketing import (
     CustomBinningApplier,
@@ -603,3 +604,32 @@ def test_fit_general_binning_unknown_strategy_yields_no_edges() -> None:
     params = GeneralBinningCalculator().fit(df, {"columns": ["x"], "strategy": "not_a_strategy"})
     assert "x" not in params["bin_edges"]
     assert "x" not in params["custom_labels"]
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values in ``age``/``income`` — closer to production data
+    than the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_bucketing_age_with_nan_preserves_missing_rows(self) -> None:
+        """Bucketing a numeric column containing NaN must produce a binned output
+        column where NaN rows remain NaN (missing_strategy='keep' default).
+        """
+        df = load_sample_dataset("customers")
+        calc = GeneralBinningCalculator()
+        applier = GeneralBinningApplier()
+        params = calc.fit(df, {"columns": ["age"], "strategy": "equal_width", "n_bins": 3})
+        result = applier.apply(df, params)
+
+        assert "age_binned" in result.columns
+        # Rows where age was NaN must still be NaN in the binned column.
+        nan_mask = df["age"].isna()
+        assert result.loc[nan_mask, "age_binned"].isna().all()
+        # Non-missing rows must have a valid bin index assigned.
+        assert result.loc[~nan_mask, "age_binned"].notna().all()

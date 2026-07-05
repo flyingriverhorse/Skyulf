@@ -1,0 +1,41 @@
+{
+  "params": "model_key, calculator_path, applier_path, config",
+  "test_cases": {
+    "logistic_regression": {
+      "model_key": "logistic_regression",
+      "calculator_path": "skyulf.modeling.classification.LogisticRegressionCalculator",
+      "applier_path": "skyulf.modeling.classification.LogisticRegressionApplier",
+      "config": {}
+    },
+    "random_forest_classifier": {
+      "model_key": "random_forest_classifier",
+      "calculator_path": "skyulf.modeling.classification.RandomForestClassifierCalculator",
+      "applier_path": "skyulf.modeling.classification.RandomForestClassifierApplier",
+      "config": {"params": {"n_estimators": 25}}
+    },
+    "k_neighbors_classifier": {
+      "model_key": "k_neighbors_classifier",
+      "calculator_path": "skyulf.modeling.classification.KNeighborsClassifierCalculator",
+      "applier_path": "skyulf.modeling.classification.KNeighborsClassifierApplier",
+      "config": {}
+    },
+    "gaussian_nb": {
+      "model_key": "gaussian_nb",
+      "calculator_path": "skyulf.modeling.classification.GaussianNBCalculator",
+      "applier_path": "skyulf.modeling.classification.GaussianNBApplier",
+      "config": {}
+    },
+    "svc": {
+      "model_key": "svc",
+      "calculator_path": "skyulf.modeling.classification.SVCCalculator",
+      "applier_path": "skyulf.modeling.classification.SVCApplier",
+      "config": {}
+    },
+    "decision_tree_classifier": {
+      "model_key": "decision_tree_classifier",
+      "calculator_path": "skyulf.modeling.classification.DecisionTreeClassifierCalculator",
+      "applier_path": "skyulf.modeling.classification.DecisionTreeClassifierApplier",
+      "config": {}
+    }
+  }
+}

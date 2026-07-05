@@ -1,0 +1,61 @@
+{
+  "params": "measure_col, measure_agg, split_col, filters, expected_value",
+  "test_cases": {
+    "global_sum": {
+      "measure_col": "sales",
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [],
+      "expected_value": 735
+    },
+    "global_count_without_measure": {
+      "measure_col": null,
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [],
+      "expected_value": 6
+    },
+    "applies_numeric_filter_as_string": {
+      "measure_col": "sales",
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [{"column": "sales", "operator": ">", "value": "100"}],
+      "expected_value": 500
+    },
+    "unknown_filter_matches_nulls": {
+      "measure_col": null,
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [{"column": "sales", "operator": "==", "value": "Unknown"}],
+      "expected_value": 0
+    },
+    "filters_are_ignored_for_unknown_columns": {
+      "measure_col": "sales",
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [{"column": "does_not_exist", "operator": "==", "value": 1}],
+      "expected_value": 735
+    },
+    "unknown_filter_not_equal_matches_non_nulls": {
+      "measure_col": null,
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [{"column": "sales", "operator": "!=", "value": "Unknown"}],
+      "expected_value": 6
+    },
+    "numeric_filter_value_not_castable_falls_back_to_string": {
+      "measure_col": null,
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [{"column": "sales", "operator": "==", "value": "not-a-number"}],
+      "expected_value": 0
+    },
+    "less_than_filter_global_sum": {
+      "measure_col": "sales",
+      "measure_agg": "sum",
+      "split_col": null,
+      "filters": [{"column": "sales", "operator": "<", "value": 50}],
+      "expected_value": 10
+    }
+  }
+}
