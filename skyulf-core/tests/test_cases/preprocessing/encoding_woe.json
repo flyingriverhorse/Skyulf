@@ -1,0 +1,37 @@
+{
+  "groups": {
+    "empty_params": {
+      "params": "city, y, city_dtype, y_dtype, columns",
+      "test_cases": {
+        "non_binary_target": {
+          "city": ["a", "b", "c"],
+          "y": [0, 1, 2],
+          "city_dtype": null,
+          "y_dtype": null,
+          "columns": ["city"]
+        },
+        "single_row_dataframe": {
+          "city": ["a"],
+          "y": [1],
+          "city_dtype": null,
+          "y_dtype": null,
+          "columns": ["city"]
+        },
+        "empty_dataframe": {
+          "city": [],
+          "y": [],
+          "city_dtype": "object",
+          "y_dtype": "int64",
+          "columns": ["city"]
+        }
+      }
+    },
+    "no_resolvable_columns": {
+      "params": "engine",
+      "test_cases": {
+        "pandas": {"engine": "pandas"},
+        "polars": {"engine": "polars"}
+      }
+    }
+  }
+}

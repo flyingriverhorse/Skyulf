@@ -17,10 +17,10 @@ from skyulf.preprocessing.encoding.one_hot import (
 )
 
 _no_resolvable_columns_cases = TestCaseLoader(
-    "preprocessing/encoding_one_hot_no_resolvable_columns"
+    "preprocessing/encoding_one_hot", group="no_resolvable_columns"
 ).load_with_ids()
 _apply_exception_cases = TestCaseLoader(
-    "preprocessing/encoding_one_hot_apply_exception"
+    "preprocessing/encoding_one_hot", group="apply_exception"
 ).load_with_ids()
 
 
@@ -216,7 +216,7 @@ def test_polars_apply_include_missing_fills_null_token() -> None:
 class TestApplyExceptionIsCaught:
     """A transform-time exception in the apply path is caught, logged, and X returned
     as-is. Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_one_hot_apply_exception.json``.
+    ``tests/test_cases/preprocessing/encoding_one_hot.json`` (group ``apply_exception``).
     """
 
     @pytest.mark.parametrize(
@@ -303,7 +303,7 @@ def test_zero_category_column_logs_warning(caplog: pytest.LogCaptureFixture) -> 
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
     Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_one_hot_no_resolvable_columns.json``.
+    ``tests/test_cases/preprocessing/encoding_one_hot.json`` (group ``no_resolvable_columns``).
     """
 
     @pytest.mark.parametrize(

@@ -56,18 +56,20 @@ def _unwrap_single_param(cases: list) -> list:
     return [params_string, scenarios]
 
 
-_dispatch_type_cases = TestCaseLoader("preprocessing/feature_selection_facade_dispatch_type").load()
+_dispatch_type_cases = TestCaseLoader(
+    "preprocessing/feature_selection_facade", group="dispatch_type"
+).load()
 _univariate_methods_cases = _unwrap_single_param(
-    TestCaseLoader("preprocessing/feature_selection_facade_univariate_methods").load()
+    TestCaseLoader("preprocessing/feature_selection_facade", group="univariate_methods").load()
 )
 _variance_selected_columns_cases = TestCaseLoader(
-    "preprocessing/feature_selection_variance_selected_columns"
+    "preprocessing/feature_selection_facade", group="variance_selected_columns"
 ).load()
 _applier_drops_column_cases = TestCaseLoader(
-    "preprocessing/feature_selection_applier_drops_column"
+    "preprocessing/feature_selection_facade", group="applier_drops_column"
 ).load()
 _applier_passthrough_cases = _unwrap_single_param(
-    TestCaseLoader("preprocessing/feature_selection_applier_passthrough").load()
+    TestCaseLoader("preprocessing/feature_selection_facade", group="applier_passthrough").load()
 )
 
 

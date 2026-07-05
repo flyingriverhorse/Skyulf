@@ -15,7 +15,7 @@ from skyulf.preprocessing.encoding.hash import (
     HashEncoderCalculator,
 )
 
-_n_features_cases = TestCaseLoader("preprocessing/encoding_hash_n_features").load_with_ids()
+_n_features_cases = TestCaseLoader("preprocessing/encoding_hash").load_with_ids()
 
 
 def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any], pd.DataFrame]:
@@ -28,7 +28,7 @@ def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any]
 class TestFitRecordsColumnsAndNFeatures:
     """fit() stores the resolved columns and configured (or default) n_features.
     Scenarios loaded from
-    ``tests/test_cases/preprocessing/encoding_hash_n_features.json``.
+    ``tests/test_cases/preprocessing/encoding_hash.json``.
     """
 
     @pytest.mark.parametrize(_n_features_cases[0], _n_features_cases[1], ids=_n_features_cases[2])

@@ -1,9 +1,0 @@
-{
-  "params": "calculator, df_data, config",
-  "test_cases": {
-    "knn_no_columns": {"calculator": "knn", "df_data": {"a": [1.0, null, 3.0]}, "config": {"columns": []}},
-    "knn_no_numeric_columns": {"calculator": "knn", "df_data": {"cat": ["x", "y", "z"]}, "config": {}},
-    "iterative_no_columns": {"calculator": "iterative", "df_data": {"a": [1.0, null, 3.0]}, "config": {"columns": []}},
-    "iterative_no_numeric_columns": {"calculator": "iterative", "df_data": {"cat": ["x", "y", "z"]}, "config": {}}
-  }
-}

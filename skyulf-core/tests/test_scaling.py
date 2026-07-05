@@ -34,7 +34,7 @@ from skyulf.preprocessing.scaling.standard import (
     StandardScalerCalculator,
 )
 
-_validation_cases = TestCaseLoader("preprocessing/scaling_validation").load()
+_validation_cases = TestCaseLoader("preprocessing/scaling").load()
 
 _SCALER_CALCULATORS: Dict[str, Any] = {
     "standard": StandardScalerCalculator,
@@ -663,7 +663,7 @@ def test_minmax_scaler_polars_apply_noop_when_missing_artifact() -> None:
 
 class TestValidation:
     """Config validation errors — scenarios loaded from
-    ``tests/test_cases/preprocessing/scaling_validation.json``.
+    ``tests/test_cases/preprocessing/scaling.json``.
     """
 
     @pytest.mark.parametrize(*_validation_cases)

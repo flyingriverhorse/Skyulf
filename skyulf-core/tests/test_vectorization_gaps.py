@@ -45,36 +45,40 @@ _VECTORIZER_NODES: dict[str, tuple[type, type]] = {
 }
 
 
-def _load_single_param(source_path: str) -> list[Any]:
+def _load_single_param(source_path: str, group: str | None = None) -> list[Any]:
     """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
 
     ``pytest.mark.parametrize`` treats a single (comma-less) param name
     specially: argvalues must be bare scalars, not 1-tuples, or the whole
     tuple gets bound to the parameter instead of its single element.
     """
-    params_string, scenarios = TestCaseLoader(source_path).load()
+    params_string, scenarios = TestCaseLoader(source_path, group=group).load()
     return [params_string, [scenario[0] for scenario in scenarios]]
 
 
 _invalid_fit_columns_cases = TestCaseLoader(
-    "preprocessing/vectorization_gaps_invalid_fit_columns"
+    "preprocessing/vectorization_gaps", group="invalid_fit_columns"
 ).load()
 _apply_missing_vectorizer_cases = _load_single_param(
-    "preprocessing/vectorization_gaps_apply_missing_vectorizer"
+    "preprocessing/vectorization_gaps", group="apply_missing_vectorizer"
 )
 _apply_all_columns_missing_cases = TestCaseLoader(
-    "preprocessing/vectorization_gaps_apply_all_columns_missing"
+    "preprocessing/vectorization_gaps", group="apply_all_columns_missing"
 ).load()
-_drop_original_cases = TestCaseLoader("preprocessing/vectorization_gaps_drop_original").load()
+_drop_original_cases = TestCaseLoader(
+    "preprocessing/vectorization_gaps", group="drop_original"
+).load()
 _large_vocab_warning_cases = TestCaseLoader(
-    "preprocessing/vectorization_gaps_large_vocab_warning"
+    "preprocessing/vectorization_gaps", group="large_vocab_warning"
 ).load()
-_polars_fit_input_cases = TestCaseLoader("preprocessing/vectorization_gaps_polars_fit_input").load()
+_polars_fit_input_cases = TestCaseLoader(
+    "preprocessing/vectorization_gaps", group="polars_fit_input"
+).load()
 _join_text_columns_cases = TestCaseLoader(
-    "preprocessing/vectorization_common_join_text_columns"
+    "preprocessing/vectorization_gaps", group="common_join_text_columns"
 ).load()
 _warn_large_output_cases = TestCaseLoader(
-    "preprocessing/vectorization_common_warn_large_output"
+    "preprocessing/vectorization_gaps", group="common_warn_large_output"
 ).load()
 
 

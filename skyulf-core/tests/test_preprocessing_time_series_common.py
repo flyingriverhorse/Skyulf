@@ -12,12 +12,14 @@ from skyulf.preprocessing.time_series._common import (
     sort_pandas,
 )
 
-_resolve_columns_cases = TestCaseLoader("preprocessing/time_series_common_resolve_columns").load()
-_coerce_lags_cases = TestCaseLoader("preprocessing/time_series_common_coerce_lags").load()
-_coerce_aggregations_cases = TestCaseLoader(
-    "preprocessing/time_series_common_coerce_aggregations"
+_resolve_columns_cases = TestCaseLoader(
+    "preprocessing/time_series_common", group="resolve_columns"
 ).load()
-_sort_pandas_cases = TestCaseLoader("preprocessing/time_series_common_sort_pandas").load()
+_coerce_lags_cases = TestCaseLoader("preprocessing/time_series_common", group="coerce_lags").load()
+_coerce_aggregations_cases = TestCaseLoader(
+    "preprocessing/time_series_common", group="coerce_aggregations"
+).load()
+_sort_pandas_cases = TestCaseLoader("preprocessing/time_series_common", group="sort_pandas").load()
 
 
 @pytest.mark.parametrize(*_resolve_columns_cases)
@@ -26,7 +28,7 @@ def test_resolve_columns(
 ) -> None:
     """``resolve_columns`` keeps only available columns, preserving order.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_common_resolve_columns.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``resolve_columns``).
     """
     assert resolve_columns(columns, available) == expected
 
@@ -35,7 +37,7 @@ def test_resolve_columns(
 def test_coerce_lags(lags_input: int | list[int] | None, expected: list[int]) -> None:
     """``coerce_lags`` normalises int/list/None input into a sorted, deduped, positive list.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_common_coerce_lags.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``coerce_lags``).
     """
     assert coerce_lags(lags_input) == expected
 
@@ -46,7 +48,7 @@ def test_coerce_aggregations(
 ) -> None:
     """``coerce_aggregations`` normalises string/list/None input, filtering unknown names.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_common_coerce_aggregations.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``coerce_aggregations``).
     """
     assert coerce_aggregations(aggregations_input) == expected
 
@@ -55,7 +57,7 @@ def test_coerce_aggregations(
 def test_sort_pandas(df_data: dict, sort_by: str | None, expected_cols: dict) -> None:
     """``sort_pandas`` stable-sorts by ``sort_by`` when present, and is a no-op otherwise.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_common_sort_pandas.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``sort_pandas``).
     """
     df = pd.DataFrame(df_data)
     result = sort_pandas(df, sort_by)

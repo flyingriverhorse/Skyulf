@@ -1,9 +1,0 @@
-{
-  "params": "alias, module, class_name",
-  "test_cases": {
-    "decision_tree": {"alias": "DecisionTree", "module": "sklearn.tree", "class_name": "DecisionTreeRegressor"},
-    "extra_trees": {"alias": "ExtraTrees", "module": "sklearn.ensemble", "class_name": "ExtraTreesRegressor"},
-    "kneighbors": {"alias": "KNeighbors", "module": "sklearn.neighbors", "class_name": "KNeighborsRegressor"},
-    "default_bayesian_ridge": {"alias": "something_else", "module": "sklearn.linear_model", "class_name": "BayesianRidge"}
-  }
-}

@@ -1,9 +1,0 @@
-{
-  "params": "engine, drop_columns, expected_columns",
-  "test_cases": {
-    "pandas_drops_unselected": {"engine": "pandas", "drop_columns": true, "expected_columns": ["a", "c"]},
-    "pandas_passthrough": {"engine": "pandas", "drop_columns": false, "expected_columns": ["a", "b", "c"]},
-    "polars_drops_unselected": {"engine": "polars", "drop_columns": true, "expected_columns": ["a", "c"]},
-    "polars_passthrough": {"engine": "polars", "drop_columns": false, "expected_columns": ["a", "b", "c"]}
-  }
-}

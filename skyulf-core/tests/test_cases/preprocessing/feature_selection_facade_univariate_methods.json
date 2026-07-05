@@ -1,9 +1,0 @@
-{
-  "params": "method",
-  "test_cases": {
-    "select_fpr": {"method": "select_fpr"},
-    "select_fdr": {"method": "select_fdr"},
-    "select_fwe": {"method": "select_fwe"},
-    "generic_univariate_select": {"method": "generic_univariate_select"}
-  }
-}

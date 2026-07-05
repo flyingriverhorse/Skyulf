@@ -10,7 +10,7 @@ from skyulf.core.schema import SkyulfSchema
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.base import BaseApplier, BaseCalculator, StatefulTransformer
 
-_split_dataset_guard_cases = TestCaseLoader("preprocessing/base_split_dataset_guard").load()
+_split_dataset_guard_cases = TestCaseLoader("preprocessing/preprocessing_base").load()
 
 
 class _AddOneCalculator(BaseCalculator):
@@ -191,7 +191,7 @@ def test_base_calculator_infer_output_schema_defaults_to_none():
 class TestSplitDatasetGuard:
     """fit_transform() and transform() must both guard against an Applier illegally
     returning a SplitDataset for any split (train/test/validation) — scenarios loaded
-    from ``tests/test_cases/preprocessing/base_split_dataset_guard.json``.
+    from ``tests/test_cases/preprocessing/preprocessing_base.json``.
     """
 
     @pytest.mark.parametrize(*_split_dataset_guard_cases)

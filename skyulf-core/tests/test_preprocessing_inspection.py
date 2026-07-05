@@ -15,7 +15,7 @@ from skyulf.preprocessing.inspection import (
     _extract_polars_numeric_stats,
 )
 
-_engine_cases = TestCaseLoader("preprocessing/inspection_engine").load()
+_engine_cases = TestCaseLoader("preprocessing/preprocessing_inspection").load()
 
 
 @pytest.fixture

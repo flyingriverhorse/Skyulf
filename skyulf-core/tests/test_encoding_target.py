@@ -27,10 +27,10 @@ settings.register_profile(
 settings.load_profile("encoding_target")
 
 _no_target_cases = TestCaseLoader(
-    "preprocessing/encoding_target_no_target_returns_empty"
+    "preprocessing/encoding_target", group="no_target_returns_empty"
 ).load_with_ids()
 _no_resolvable_columns_cases = TestCaseLoader(
-    "preprocessing/encoding_target_no_resolvable_columns"
+    "preprocessing/encoding_target", group="no_resolvable_columns"
 ).load_with_ids()
 
 
@@ -56,7 +56,7 @@ def test_binary_target_encoding_matches_raw_sklearn() -> None:
 class TestNoTargetReturnsEmptyAndWarns:
     """Fitting without a resolvable target logs a warning and returns {}.
     Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_target_no_target_returns_empty.json``.
+    ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_target_returns_empty``).
     """
 
     @pytest.mark.parametrize(_no_target_cases[0], _no_target_cases[1], ids=_no_target_cases[2])
@@ -326,7 +326,7 @@ def test_polars_fit_extracts_y_from_target_column() -> None:
 class TestFitNoResolvableColumnsReturnsEmpty:
     """A purely-numeric frame yields no encodable columns, so fit() returns {}.
     Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_target_no_resolvable_columns.json``.
+    ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_resolvable_columns``).
     """
 
     @pytest.mark.parametrize(

@@ -1,0 +1,65 @@
+{
+  "groups": {
+    "dispatch_type": {
+      "params": "needs_y, config, expected_type",
+      "test_cases": {
+        "variance_threshold": {
+          "needs_y": false,
+          "config": {"method": "variance_threshold", "threshold": 0.0},
+          "expected_type": "variance_threshold"
+        },
+        "correlation_threshold": {
+          "needs_y": false,
+          "config": {"method": "correlation_threshold", "threshold": 0.95},
+          "expected_type": "correlation_threshold"
+        },
+        "select_k_best": {
+          "needs_y": true,
+          "config": {"method": "select_k_best", "k": 2, "score_func": "f_classif"},
+          "expected_type": "univariate_selection"
+        },
+        "select_percentile": {
+          "needs_y": true,
+          "config": {"method": "select_percentile", "percentile": 50, "score_func": "f_classif"},
+          "expected_type": "univariate_selection"
+        }
+      }
+    },
+    "univariate_methods": {
+      "params": "method",
+      "test_cases": {
+        "select_fpr": {"method": "select_fpr"},
+        "select_fdr": {"method": "select_fdr"},
+        "select_fwe": {"method": "select_fwe"},
+        "generic_univariate_select": {"method": "generic_univariate_select"}
+      }
+    },
+    "variance_selected_columns": {
+      "params": "column, expected_in",
+      "test_cases": {
+        "constant_column_removed": {"column": "const", "expected_in": false},
+        "varying_column_kept": {"column": "a", "expected_in": true}
+      }
+    },
+    "applier_drops_column": {
+      "params": "config, expected_dropped",
+      "test_cases": {
+        "variance_threshold": {
+          "config": {"method": "variance_threshold", "threshold": 0.0},
+          "expected_dropped": "const"
+        },
+        "correlation_threshold": {
+          "config": {"method": "correlation_threshold", "threshold": 0.95},
+          "expected_dropped": "a_copy"
+        }
+      }
+    },
+    "applier_passthrough": {
+      "params": "params",
+      "test_cases": {
+        "unknown_type": {"params": {"type": "alien_selection", "selected_columns": ["a"]}},
+        "empty_params": {"params": {}}
+      }
+    }
+  }
+}

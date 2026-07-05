@@ -29,13 +29,13 @@ DATE_COL = "ts"
 DATES = ["2024-01-15", "2024-07-04", "2023-12-31", "2022-03-07"]
 
 _arithmetic_ops_cases = TestCaseLoader(
-    "preprocessing/feature_generation_full_arithmetic_ops"
+    "preprocessing/feature_generation_full", group="arithmetic_ops"
 ).load()
 _datetime_extract_cases = TestCaseLoader(
-    "preprocessing/feature_generation_full_datetime_extract"
+    "preprocessing/feature_generation_full", group="datetime_extract"
 ).load()
 _datetime_parity_cases = TestCaseLoader(
-    "preprocessing/feature_generation_full_datetime_parity"
+    "preprocessing/feature_generation_full", group="datetime_parity"
 ).load()
 
 

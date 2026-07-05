@@ -28,13 +28,17 @@ from skyulf.preprocessing.time_series.rolling import (
     RollingAggregateCalculator,
 )
 
-_resolve_columns_cases = TestCaseLoader("preprocessing/time_series_gaps_resolve_columns").load()
-_coerce_lags_cases = TestCaseLoader("preprocessing/time_series_gaps_coerce_lags").load()
-_coerce_aggregations_cases = TestCaseLoader(
-    "preprocessing/time_series_gaps_coerce_aggregations"
+_resolve_columns_cases = TestCaseLoader(
+    "preprocessing/time_series_gaps", group="resolve_columns"
 ).load()
-_sort_pandas_cases = TestCaseLoader("preprocessing/time_series_gaps_sort_pandas").load()
-_apply_noop_cases = TestCaseLoader("preprocessing/time_series_apply_noop_without_config").load()
+_coerce_lags_cases = TestCaseLoader("preprocessing/time_series_gaps", group="coerce_lags").load()
+_coerce_aggregations_cases = TestCaseLoader(
+    "preprocessing/time_series_gaps", group="coerce_aggregations"
+).load()
+_sort_pandas_cases = TestCaseLoader("preprocessing/time_series_gaps", group="sort_pandas").load()
+_apply_noop_cases = TestCaseLoader(
+    "preprocessing/time_series_gaps", group="apply_noop_without_config"
+).load()
 
 _NOOP_NODE_DF = {
     "lag": pd.DataFrame({"v": [1.0, 2.0]}),
@@ -58,7 +62,7 @@ def test_resolve_columns(
 ) -> None:
     """``resolve_columns`` keeps only available columns, preserving order.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_gaps_resolve_columns.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``resolve_columns``).
     """
     assert resolve_columns(columns, available) == expected
 
@@ -67,7 +71,7 @@ def test_resolve_columns(
 def test_coerce_lags(lags_input: int | list[int], expected: list[int]) -> None:
     """``coerce_lags`` normalises int/list input, dropping non-positive/duplicate values.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_gaps_coerce_lags.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``coerce_lags``).
     """
     assert coerce_lags(lags_input) == expected
 
@@ -76,7 +80,7 @@ def test_coerce_lags(lags_input: int | list[int], expected: list[int]) -> None:
 def test_coerce_aggregations(aggregations_input: str | list[str], expected: list[str]) -> None:
     """``coerce_aggregations`` normalises string/list input, filtering unknown names.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_gaps_coerce_aggregations.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``coerce_aggregations``).
     """
     assert coerce_aggregations(aggregations_input) == expected
 
@@ -85,7 +89,7 @@ def test_coerce_aggregations(aggregations_input: str | list[str], expected: list
 def test_sort_pandas(df_data: dict, sort_by: str | None, expected_v: list) -> None:
     """``sort_pandas`` is a no-op without ``sort_by`` and stable-sorts otherwise.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_gaps_sort_pandas.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``sort_pandas``).
     """
     df = pd.DataFrame(df_data)
     out = sort_pandas(df, sort_by)
@@ -98,7 +102,7 @@ def test_apply_noop_without_required_config(
 ) -> None:
     """LagFeatures/RollingAggregate/DateFeatures apply() must no-op when required config is missing.
 
-    Loaded from ``tests/test_cases/preprocessing/time_series_apply_noop_without_config.json``.
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``apply_noop_without_config``).
     """
     df = _NOOP_NODE_DF[node]
     input_df = pl.from_pandas(df) if engine == "polars" else df

@@ -1,0 +1,153 @@
+{
+  "groups": {
+    "resolve_output_col": {
+      "params": "op, index, existing, allow_overwrite, expected",
+      "test_cases": {
+        "no_collision": {
+          "op": {"output_column": "my_col"},
+          "index": 0,
+          "existing": ["a", "b"],
+          "allow_overwrite": false,
+          "expected": "my_col"
+        },
+        "default_name_from_operation_type": {
+          "op": {"operation_type": "arithmetic"},
+          "index": 3,
+          "existing": [],
+          "allow_overwrite": false,
+          "expected": "arithmetic_3"
+        },
+        "with_prefix": {
+          "op": {"operation_type": "ratio", "output_prefix": "custom"},
+          "index": 0,
+          "existing": [],
+          "allow_overwrite": false,
+          "expected": "custom_ratio_0"
+        },
+        "collision_appends_suffix": {
+          "op": {"output_column": "dup"},
+          "index": 0,
+          "existing": ["dup", "dup_1"],
+          "allow_overwrite": false,
+          "expected": "dup_2"
+        },
+        "overwrite_allowed_keeps_name": {
+          "op": {"output_column": "dup"},
+          "index": 0,
+          "existing": ["dup"],
+          "allow_overwrite": true,
+          "expected": "dup"
+        }
+      }
+    },
+    "coerce_float": {
+      "params": "value, expected",
+      "test_cases": {
+        "valid_numeric_string": {
+          "value": "3.5",
+          "expected": 3.5
+        },
+        "none_returns_none": {
+          "value": null,
+          "expected": null
+        },
+        "nan_returns_none": {
+          "value": NaN,
+          "expected": null
+        },
+        "non_numeric_string_returns_none": {
+          "value": "abc",
+          "expected": null
+        }
+      }
+    },
+    "noop_skips": {
+      "params": "engine, data, operation, expected_columns",
+      "test_cases": {
+        "divide_no_columns_no_constants_skips": {
+          "engine": "pandas",
+          "data": {"a": [1.0, 2.0]},
+          "operation": {"operation_type": "arithmetic", "method": "divide", "input_columns": []},
+          "expected_columns": ["a"]
+        },
+        "ratio_missing_denominator_columns_skips": {
+          "engine": "pandas",
+          "data": {"a": [1.0, 2.0]},
+          "operation": {
+            "operation_type": "ratio",
+            "input_columns": ["a"],
+            "secondary_columns": ["missing"]
+          },
+          "expected_columns": ["a"]
+        },
+        "similarity_unresolvable_pair_skips": {
+          "engine": "pandas",
+          "data": {"a": ["x", "y"]},
+          "operation": {
+            "operation_type": "similarity",
+            "input_columns": ["a"],
+            "secondary_columns": ["missing"]
+          },
+          "expected_columns": ["a"]
+        },
+        "unknown_operation_type_is_skipped": {
+          "engine": "pandas",
+          "data": {"a": [1.0, 2.0]},
+          "operation": {"operation_type": "not_a_real_op"},
+          "expected_columns": ["a"]
+        },
+        "malformed_operation_is_swallowed_without_raising": {
+          "engine": "pandas",
+          "data": {"a": [1.0, 2.0], "b": [3.0, 4.0]},
+          "operation": {
+            "operation_type": "arithmetic",
+            "method": "add",
+            "input_columns": ["a", "b"],
+            "round_digits": "not-a-number"
+          },
+          "expected_columns": ["a", "b"]
+        },
+        "polars_ratio_missing_denominator_columns_skips": {
+          "engine": "polars",
+          "data": {"a": [1.0, 2.0]},
+          "operation": {
+            "operation_type": "ratio",
+            "input_columns": ["a"],
+            "secondary_columns": ["missing"]
+          },
+          "expected_columns": ["a"]
+        },
+        "polars_malformed_operation_is_swallowed_without_raising": {
+          "engine": "polars",
+          "data": {"a": [1.0, 2.0], "b": [3.0, 4.0]},
+          "operation": {
+            "operation_type": "arithmetic",
+            "method": "add",
+            "input_columns": ["a", "b"],
+            "round_digits": "not-a-number"
+          },
+          "expected_columns": ["a", "b"]
+        }
+      }
+    },
+    "arith_constant_ops": {
+      "params": "method, input_values, input_column, constant, expected",
+      "test_cases": {
+        "subtract_with_constant": {
+          "method": "subtract",
+          "input_values": [10.0, 20.0],
+          "input_column": "a",
+          "constant": 3.0,
+          "expected": [7.0, 17.0]
+        },
+        "multiply_with_constant": {
+          "method": "multiply",
+          "input_values": [2.0, 3.0],
+          "input_column": "a",
+          "constant": 5.0,
+          "expected": [10.0, 15.0]
+        }
+      }
+    }
+  }
+}

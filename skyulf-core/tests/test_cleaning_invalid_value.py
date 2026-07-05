@@ -23,10 +23,18 @@ from skyulf.preprocessing.cleaning.invalid_value import (
     _resolve_invalid_replacement,
 )
 
-_pandas_mask_cases = TestCaseLoader("preprocessing/invalid_value_pandas_mask").load()
-_polars_rule_cases = TestCaseLoader("preprocessing/invalid_value_polars_rule").load()
-_applier_pandas_cases = TestCaseLoader("preprocessing/invalid_value_applier_pandas").load()
-_polars_applier_cases = TestCaseLoader("preprocessing/invalid_value_polars_applier").load()
+_pandas_mask_cases = TestCaseLoader(
+    "preprocessing/cleaning_invalid_value", group="pandas_mask"
+).load()
+_polars_rule_cases = TestCaseLoader(
+    "preprocessing/cleaning_invalid_value", group="polars_rule"
+).load()
+_applier_pandas_cases = TestCaseLoader(
+    "preprocessing/cleaning_invalid_value", group="applier_pandas"
+).load()
+_polars_applier_cases = TestCaseLoader(
+    "preprocessing/cleaning_invalid_value", group="polars_applier"
+).load()
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures

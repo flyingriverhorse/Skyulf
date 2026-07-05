@@ -1,0 +1,34 @@
+{
+  "groups": {
+    "shape_only": {
+      "params": "df_data, params, expected_shape",
+      "test_cases": {
+        "all_nan_column_drops_all_rows": {
+          "df_data": {"a": [null, null, null]},
+          "params": {"subset": null, "how": "any", "threshold": null},
+          "expected_shape": [0, 1]
+        },
+        "empty_dataframe": {
+          "df_data": {"a": []},
+          "params": {"subset": null, "how": "any", "threshold": null},
+          "expected_shape": [0, 1]
+        }
+      }
+    },
+    "round_trip": {
+      "params": "df_data, config, expected_a",
+      "test_cases": {
+        "subset": {
+          "df_data": {"a": [1.0, null, 3.0], "b": [null, null, null]},
+          "config": {"subset": ["a"]},
+          "expected_a": [1.0, 3.0]
+        },
+        "default_how_any": {
+          "df_data": {"a": [1.0, null], "b": [1.0, 2.0]},
+          "config": {},
+          "expected_a": [1.0]
+        }
+      }
+    }
+  }
+}

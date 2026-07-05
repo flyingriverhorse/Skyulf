@@ -1,0 +1,130 @@
+{
+  "groups": {
+    "type_resolution": {
+      "params": "config, expected",
+      "test_cases": {
+        "boolean_passes_through": {"config": {"alias_type": "boolean"}, "expected": "boolean"},
+        "country_passes_through": {"config": {"alias_type": "country"}, "expected": "country"},
+        "custom_passes_through": {"config": {"alias_type": "custom"}, "expected": "custom"},
+        "normalize_boolean_remaps_to_boolean": {
+          "config": {"alias_type": "normalize_boolean"},
+          "expected": "boolean"
+        },
+        "canonicalize_country_codes_remaps_to_country": {
+          "config": {"alias_type": "canonicalize_country_codes"},
+          "expected": "country"
+        },
+        "falls_back_to_mode_key": {"config": {"mode": "boolean"}, "expected": "boolean"},
+        "defaults_to_boolean_when_absent": {"config": {}, "expected": "boolean"}
+      }
+    },
+    "normalize_custom_map": {
+      "params": "input_map, expected",
+      "test_cases": {
+        "lowercases_string_keys": {
+          "input_map": {"YES": "Yes", "NO": "No"},
+          "expected": {"yes": "Yes", "no": "No"}
+        },
+        "strips_punctuation_from_keys": {
+          "input_map": {"Yes!": "Yes"},
+          "expected": {"yes": "Yes"}
+        },
+        "strips_spaces_from_keys": {
+          "input_map": {"United States": "USA"},
+          "expected": {"unitedstates": "USA"}
+        },
+        "empty_returns_empty": {
+          "input_map": {},
+          "expected": {}
+        }
+      }
+    },
+    "resolve_mapping": {
+      "params": "alias_type, custom_map, expected_kind",
+      "test_cases": {
+        "boolean_returns_common_aliases": {
+          "alias_type": "boolean",
+          "custom_map": {},
+          "expected_kind": "common_boolean_aliases"
+        },
+        "country_returns_country_map": {
+          "alias_type": "country",
+          "custom_map": {},
+          "expected_kind": "country_alias_map"
+        },
+        "custom_returns_provided_map": {
+          "alias_type": "custom",
+          "custom_map": {"foo": "bar"},
+          "expected_kind": "custom_map"
+        },
+        "unknown_returns_empty": {
+          "alias_type": "does_not_exist",
+          "custom_map": {},
+          "expected_kind": "empty"
+        }
+      }
+    },
+    "normalize_pandas_value": {
+      "params": "value, expected",
+      "test_cases": {
+        "matches_known_alias": {"value": "yes", "expected": "Yes"},
+        "unknown_value_preserved": {"value": "maybe", "expected": "maybe"},
+        "non_string_int_passthrough": {"value": 42, "expected": 42},
+        "non_string_none_passthrough": {"value": null, "expected": null},
+        "strips_punctuation_and_spaces_before_lookup": {"value": "Y.e.s", "expected": "Yes"}
+      }
+    },
+    "applier_uniform_normalisation": {
+      "params": "col_name, values, alias_type, expected_value",
+      "test_cases": {
+        "boolean_normalises_yes_variants": {
+          "col_name": "flag",
+          "values": ["yes", "Y", "TRUE", "1", "on", "True"],
+          "alias_type": "boolean",
+          "expected_value": "Yes"
+        },
+        "boolean_normalises_no_variants": {
+          "col_name": "flag",
+          "values": ["no", "N", "FALSE", "0", "off", "f"],
+          "alias_type": "boolean",
+          "expected_value": "No"
+        },
+        "country_normalises_uk_variants": {
+          "col_name": "country",
+          "values": ["UK", "England", "United Kingdom", "uk"],
+          "alias_type": "country",
+          "expected_value": "United Kingdom"
+        },
+        "country_normalises_usa_variants": {
+          "col_name": "country",
+          "values": ["USA", "US", "America", "States"],
+          "alias_type": "country",
+          "expected_value": "USA"
+        }
+      }
+    },
+    "applier_value_lists": {
+      "params": "values, alias_type, custom_map, expected",
+      "test_cases": {
+        "unknown_values_preserved": {
+          "values": ["maybe", "perhaps", "dunno"],
+          "alias_type": "boolean",
+          "custom_map": {},
+          "expected": ["maybe", "perhaps", "dunno"]
+        },
+        "custom_mapping": {
+          "values": ["Active", "Inactive", "Pending"],
+          "alias_type": "custom",
+          "custom_map": {"active": "active", "inactive": "inactive"},
+          "expected": ["active", "inactive", "Pending"]
+        },
+        "mixed_case_and_punctuation_normalised": {
+          "values": ["Y.e.s", "N-O", "T.R.U.E."],
+          "alias_type": "boolean",
+          "custom_map": {},
+          "expected": ["Yes", "No", "Yes"]
+        }
+      }
+    }
+  }
+}

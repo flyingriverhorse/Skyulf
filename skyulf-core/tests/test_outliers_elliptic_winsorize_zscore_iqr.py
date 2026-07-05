@@ -37,19 +37,23 @@ _CALCULATOR_BY_NODE: dict[str, Any] = {
 }
 
 
-def _load_single_param(source_path: str) -> list[Any]:
+def _load_single_param(source_path: str, group: str | None = None) -> list[Any]:
     """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
 
     ``pytest.mark.parametrize`` treats a single (comma-less) param name
     specially: argvalues must be bare scalars, not 1-tuples, or the whole
     tuple gets bound to the parameter instead of its single element.
     """
-    params_string, scenarios = TestCaseLoader(source_path).load()
+    params_string, scenarios = TestCaseLoader(source_path, group=group).load()
     return [params_string, [scenario[0] for scenario in scenarios]]
 
 
-_no_columns_cases = TestCaseLoader("preprocessing/outlier_no_columns_selected").load()
-_infer_schema_cases = _load_single_param("preprocessing/outlier_infer_output_schema_passthrough")
+_no_columns_cases = TestCaseLoader(
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="no_columns_selected"
+).load()
+_infer_schema_cases = _load_single_param(
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="infer_output_schema_passthrough"
+)
 
 
 class TestUserPickedNoColumns:
@@ -80,23 +84,27 @@ class TestInferOutputSchemaPassthrough:
 # ---------------------------------------------------------------------------
 
 _iqr_bounds_formula_cases = _load_single_param(
-    "preprocessing/outlier_iqr_calculator_bounds_formula"
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="iqr_bounds_formula"
 )
-_iqr_no_bounds_cases = TestCaseLoader("preprocessing/outlier_iqr_calculator_no_bounds").load()
+_iqr_no_bounds_cases = TestCaseLoader(
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="iqr_no_bounds"
+).load()
 _iqr_pandas_passthrough_cases = TestCaseLoader(
-    "preprocessing/outlier_iqr_applier_pandas_passthrough"
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="iqr_pandas_passthrough"
 ).load()
 _iqr_polars_passthrough_cases = TestCaseLoader(
-    "preprocessing/outlier_iqr_applier_polars_passthrough"
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="iqr_polars_passthrough"
 ).load()
 
 # ---------------------------------------------------------------------------
 # Z-Score fixtures
 # ---------------------------------------------------------------------------
 
-_zscore_warns_cases = TestCaseLoader("preprocessing/outlier_zscore_calculator_warns").load()
+_zscore_warns_cases = TestCaseLoader(
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="zscore_warns"
+).load()
 _zscore_polars_passthrough_cases = TestCaseLoader(
-    "preprocessing/outlier_zscore_applier_polars_passthrough"
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="zscore_polars_passthrough"
 ).load()
 
 # ---------------------------------------------------------------------------
@@ -104,10 +112,10 @@ _zscore_polars_passthrough_cases = TestCaseLoader(
 # ---------------------------------------------------------------------------
 
 _winsorize_pandas_passthrough_cases = TestCaseLoader(
-    "preprocessing/outlier_winsorize_applier_pandas_passthrough"
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="winsorize_pandas_passthrough"
 ).load()
 _winsorize_polars_passthrough_cases = TestCaseLoader(
-    "preprocessing/outlier_winsorize_applier_polars_passthrough"
+    "preprocessing/outliers_elliptic_winsorize_zscore_iqr", group="winsorize_polars_passthrough"
 ).load()
 
 

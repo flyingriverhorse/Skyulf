@@ -29,9 +29,11 @@ from skyulf.preprocessing.drop_and_missing.missing_indicator import (
 )
 
 _threshold_ignored_cases = TestCaseLoader(
-    "preprocessing/drop_missing_columns_threshold_ignored"
+    "preprocessing/drop_and_missing_gaps", group="threshold_ignored"
 ).load()
-_normalize_subset_cases = TestCaseLoader("preprocessing/normalize_subset_cases").load()
+_normalize_subset_cases = TestCaseLoader(
+    "preprocessing/drop_and_missing_gaps", group="normalize_subset"
+).load()
 
 
 def _missing_df() -> pd.DataFrame:
@@ -220,7 +222,7 @@ def test_drop_missing_columns_by_threshold_polars() -> None:
 class TestDropMissingColumnsThresholdIgnored:
     """A non-numeric or non-positive threshold is treated as "no threshold
     configured" — scenarios loaded from
-    ``tests/test_cases/preprocessing/drop_missing_columns_threshold_ignored.json``.
+    ``tests/test_cases/preprocessing/drop_and_missing_gaps.json`` (group ``threshold_ignored``).
     """
 
     @pytest.mark.parametrize(*_threshold_ignored_cases)
@@ -298,7 +300,7 @@ def test_polars_filter_y_by_kept_indices_non_polars_y_passthrough() -> None:
 
 class TestNormalizeSubset:
     """``_normalize_subset`` column-filtering behavior — scenarios loaded from
-    ``tests/test_cases/preprocessing/normalize_subset_cases.json``.
+    ``tests/test_cases/preprocessing/drop_and_missing_gaps.json`` (group ``normalize_subset``).
     """
 
     @pytest.mark.parametrize(*_normalize_subset_cases)

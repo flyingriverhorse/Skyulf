@@ -1,7 +1,0 @@
-{
-  "params": "config, expected_value",
-  "test_cases": {
-    "boundary_equality_lower": {"config": {"bounds": {"val": {"lower": 0.0}}}, "expected_value": 0.0},
-    "boundary_equality_upper": {"config": {"bounds": {"val": {"upper": 100.0}}}, "expected_value": 100.0}
-  }
-}

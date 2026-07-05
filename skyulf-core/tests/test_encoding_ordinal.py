@@ -26,10 +26,10 @@ settings.register_profile(
 settings.load_profile("encoding_ordinal")
 
 _apply_features_exception_cases = TestCaseLoader(
-    "preprocessing/encoding_ordinal_apply_features_exception"
+    "preprocessing/encoding_ordinal", group="apply_features_exception"
 ).load_with_ids()
 _apply_target_exception_cases = TestCaseLoader(
-    "preprocessing/encoding_ordinal_apply_target_exception"
+    "preprocessing/encoding_ordinal", group="apply_target_exception"
 ).load_with_ids()
 
 
@@ -237,7 +237,7 @@ def test_ordinal_apply_engine_parity_on_unseen_category() -> None:
 class TestApplyFeaturesExceptionIsCaught:
     """A transform-time exception in the feature-apply path is caught and logged.
     Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_ordinal_apply_features_exception.json``.
+    ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_features_exception``).
     """
 
     @pytest.mark.parametrize(
@@ -285,7 +285,7 @@ def test_apply_target_polars_encodes_y_correctly() -> None:
 class TestApplyTargetExceptionIsCaught:
     """A transform-time exception in the target-apply path is caught, logged, and y
     returned unchanged. Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_ordinal_apply_target_exception.json``.
+    ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_target_exception``).
     """
 
     @pytest.mark.parametrize(

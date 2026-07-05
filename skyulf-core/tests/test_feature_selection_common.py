@@ -81,35 +81,37 @@ _DROP_SELECTED_DF_BUILDERS = {
 }
 
 _infer_problem_type_cases = TestCaseLoader(
-    "preprocessing/feature_selection_infer_problem_type"
+    "preprocessing/feature_selection_common", group="infer_problem_type"
 ).load()
 _resolve_score_function_cases = TestCaseLoader(
-    "preprocessing/feature_selection_resolve_score_function"
+    "preprocessing/feature_selection_common", group="resolve_score_function"
 ).load()
 _resolve_estimator_cases = TestCaseLoader(
-    "preprocessing/feature_selection_resolve_estimator"
+    "preprocessing/feature_selection_common", group="resolve_estimator"
 ).load()
 _resolve_drop_list_cases = TestCaseLoader(
-    "preprocessing/feature_selection_resolve_drop_list"
+    "preprocessing/feature_selection_common", group="resolve_drop_list"
 ).load()
-_drop_selected_cases = TestCaseLoader("preprocessing/feature_selection_drop_selected").load()
+_drop_selected_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="drop_selected"
+).load()
 _resolve_problem_type_cases = TestCaseLoader(
-    "preprocessing/feature_selection_resolve_problem_type"
+    "preprocessing/feature_selection_common", group="resolve_problem_type"
 ).load()
 _resolve_generic_param_cases = TestCaseLoader(
-    "preprocessing/feature_selection_resolve_generic_param"
+    "preprocessing/feature_selection_common", group="resolve_generic_param"
 ).load()
 _build_univariate_selector_cases = TestCaseLoader(
-    "preprocessing/feature_selection_build_univariate_selector"
+    "preprocessing/feature_selection_common", group="build_univariate_selector"
 ).load()
 _build_model_selector_cases = TestCaseLoader(
-    "preprocessing/feature_selection_build_model_selector"
+    "preprocessing/feature_selection_common", group="build_model_selector"
 ).load()
 _maybe_chi2_rescale_cases = TestCaseLoader(
-    "preprocessing/feature_selection_maybe_chi2_rescale"
+    "preprocessing/feature_selection_common", group="maybe_chi2_rescale"
 ).load()
 _model_feature_importances_cases = TestCaseLoader(
-    "preprocessing/feature_selection_model_feature_importances"
+    "preprocessing/feature_selection_common", group="model_feature_importances"
 ).load()
 
 # ---------------------------------------------------------------------------

@@ -16,9 +16,7 @@ from skyulf.preprocessing.encoding.label import (
     LabelEncoderCalculator,
 )
 
-_maybe_pull_y_cases = TestCaseLoader(
-    "preprocessing/encoding_label_maybe_pull_y_extracts_target"
-).load_with_ids()
+_maybe_pull_y_cases = TestCaseLoader("preprocessing/encoding_label").load_with_ids()
 
 settings.register_profile(
     "encoding_label",
@@ -230,7 +228,7 @@ def test_y_to_str_array_without_to_numpy_uses_np_array_fallback() -> None:
 class TestMaybePullYExtractsTargetColumn:
     """`_maybe_pull_y_pandas`/`_maybe_pull_y_polars` pull the target column out of X
     when y is missing. Scenarios (pandas/polars) loaded from
-    ``tests/test_cases/preprocessing/encoding_label_maybe_pull_y_extracts_target.json``.
+    ``tests/test_cases/preprocessing/encoding_label.json``.
     """
 
     @pytest.mark.parametrize(

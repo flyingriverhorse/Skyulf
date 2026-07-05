@@ -37,15 +37,21 @@ from skyulf.preprocessing.feature_generation._polars_ops import (
 
 _DF = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [10.0, 20.0, 0.0, 40.0]})
 
-_arith_value_cases = TestCaseLoader("preprocessing/feature_generation_polars_arith_values").load()
-_arith_none_cases = TestCaseLoader("preprocessing/feature_generation_polars_arith_none").load()
+_arith_value_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="arith_values"
+).load()
+_arith_none_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="arith_none"
+).load()
 _group_agg_value_cases = TestCaseLoader(
-    "preprocessing/feature_generation_polars_group_agg_values"
+    "preprocessing/feature_generation_polars_ops", group="group_agg_values"
 ).load()
 _group_agg_none_cases = TestCaseLoader(
-    "preprocessing/feature_generation_polars_group_agg_none"
+    "preprocessing/feature_generation_polars_ops", group="group_agg_none"
 ).load()
-_ratio_none_cases = TestCaseLoader("preprocessing/feature_generation_polars_ratio_none").load()
+_ratio_none_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="ratio_none"
+).load()
 
 
 def _make_pl() -> pl.DataFrame:

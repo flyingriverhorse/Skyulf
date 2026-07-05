@@ -32,16 +32,30 @@ from skyulf.preprocessing.resampling import (
     _validate_numeric,
 )
 
-_import_error_cases = TestCaseLoader("preprocessing/resampling_import_error_validation").load()
-_fit_artifact_type_cases = TestCaseLoader("preprocessing/resampling_fit_artifact_type").load()
-_fit_stores_method_cases = TestCaseLoader("preprocessing/resampling_fit_stores_method").load()
-_non_numeric_cases = TestCaseLoader("preprocessing/resampling_non_numeric_validation").load()
-_missing_target_cases = TestCaseLoader("preprocessing/resampling_missing_target_validation").load()
-_polars_missing_target_cases = TestCaseLoader(
-    "preprocessing/resampling_polars_missing_target"
+_import_error_cases = TestCaseLoader(
+    "preprocessing/resampling", group="import_error_validation"
 ).load()
-_unknown_method_cases = TestCaseLoader("preprocessing/resampling_unknown_method_validation").load()
-_oversampler_builder_cases = TestCaseLoader("preprocessing/resampling_oversampler_builders").load()
+_fit_artifact_type_cases = TestCaseLoader(
+    "preprocessing/resampling", group="fit_artifact_type"
+).load()
+_fit_stores_method_cases = TestCaseLoader(
+    "preprocessing/resampling", group="fit_stores_method"
+).load()
+_non_numeric_cases = TestCaseLoader(
+    "preprocessing/resampling", group="non_numeric_validation"
+).load()
+_missing_target_cases = TestCaseLoader(
+    "preprocessing/resampling", group="missing_target_validation"
+).load()
+_polars_missing_target_cases = TestCaseLoader(
+    "preprocessing/resampling", group="polars_missing_target"
+).load()
+_unknown_method_cases = TestCaseLoader(
+    "preprocessing/resampling", group="unknown_method_validation"
+).load()
+_oversampler_builder_cases = TestCaseLoader(
+    "preprocessing/resampling", group="oversampler_builders"
+).load()
 
 # Maps a scenario's "kind" string (from JSON fixtures) to the Calculator/Applier
 # pair under test, so the same parametrized test body can exercise both
@@ -205,7 +219,7 @@ class TestUndersamplingFit:
 
 class TestFitArtifactType:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_fit_artifact_type.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``fit_artifact_type``).
     """
 
     @pytest.mark.parametrize(*_fit_artifact_type_cases)
@@ -219,7 +233,7 @@ class TestFitArtifactType:
 
 class TestFitStoresMethod:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_fit_stores_method.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``fit_stores_method``).
     """
 
     @pytest.mark.parametrize(*_fit_stores_method_cases)
@@ -302,7 +316,7 @@ class TestUndersamplingApply:
 
 class TestNonNumericValidation:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_non_numeric_validation.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``non_numeric_validation``).
     """
 
     @pytest.mark.parametrize(*_non_numeric_cases)
@@ -316,7 +330,7 @@ class TestNonNumericValidation:
 
 class TestMissingTargetReturnsUnchanged:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_missing_target_validation.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``missing_target_validation``).
     """
 
     @pytest.mark.parametrize(*_missing_target_cases)
@@ -333,7 +347,7 @@ class TestMissingTargetReturnsUnchanged:
 
 class TestUnknownMethodReturnsUnchanged:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_unknown_method_validation.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``unknown_method_validation``).
     """
 
     @pytest.mark.parametrize(*_unknown_method_cases)
@@ -507,7 +521,7 @@ class TestTomekLinksUndersampling:
 
 class TestAdditionalOversamplers:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_oversampler_builders.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``oversampler_builders``).
     """
 
     @pytest.mark.parametrize(*_oversampler_builder_cases)
@@ -561,7 +575,7 @@ class TestAdditionalOversamplers:
 
 class TestResamplePolarsEdgeCases:
     """``missing_target`` scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_polars_missing_target.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``polars_missing_target``).
     """
 
     @pytest.mark.parametrize(*_polars_missing_target_cases)
@@ -597,7 +611,7 @@ class TestResamplePolarsEdgeCases:
 
 class TestImblearnImportErrors:
     """Scenarios loaded from
-    ``tests/test_cases/preprocessing/resampling_import_error_validation.json``.
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``import_error_validation``).
     """
 
     @pytest.mark.parametrize(*_import_error_cases)

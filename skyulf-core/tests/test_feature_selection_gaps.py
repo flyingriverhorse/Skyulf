@@ -40,9 +40,11 @@ def _correlated_df(n: int = 50) -> pd.DataFrame:
     return pd.DataFrame({"a": a, "b": a * 2.0 + 1.0, "c": rng.normal(size=n)})
 
 
-_univariate_empty_cases = TestCaseLoader("preprocessing/feature_selection_univariate_empty").load()
+_univariate_empty_cases = TestCaseLoader(
+    "preprocessing/feature_selection_gaps", group="univariate_empty"
+).load()
 _model_based_empty_cases = TestCaseLoader(
-    "preprocessing/feature_selection_model_based_empty"
+    "preprocessing/feature_selection_gaps", group="model_based_empty"
 ).load()
 
 

@@ -1,9 +1,0 @@
-{
-  "params": "method, operator_symbol",
-  "test_cases": {
-    "add": {"method": "add", "operator_symbol": "+"},
-    "subtract": {"method": "subtract", "operator_symbol": "-"},
-    "multiply": {"method": "multiply", "operator_symbol": "*"},
-    "divide": {"method": "divide", "operator_symbol": "/"}
-  }
-}
