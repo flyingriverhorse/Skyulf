@@ -16,6 +16,7 @@ import pandas as pd
 import polars as pl
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.outliers.manual_bounds import (
     ManualBoundsApplier,
@@ -23,6 +24,31 @@ from skyulf.preprocessing.outliers.manual_bounds import (
     _manual_bounds_col_mask_pandas,
     _manual_bounds_col_mask_polars,
 )
+
+_col_mask_pandas_cases = TestCaseLoader("preprocessing/manual_bounds_col_mask_pandas").load()
+_col_mask_polars_cases = TestCaseLoader("preprocessing/manual_bounds_col_mask_polars").load()
+
+
+def _load_single_param(source_path: str) -> list:
+    """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
+
+    ``pytest.mark.parametrize`` treats a single (comma-less) param name
+    specially: argvalues must be bare scalars, not 1-tuples, or the whole
+    tuple gets bound to the parameter instead of its single element.
+    """
+    params_string, scenarios = TestCaseLoader(source_path).load()
+    return [params_string, [scenario[0] for scenario in scenarios]]
+
+
+_applier_pandas_passthrough_cases = _load_single_param(
+    "preprocessing/manual_bounds_applier_pandas_passthrough"
+)
+_applier_polars_passthrough_cases = _load_single_param(
+    "preprocessing/manual_bounds_applier_polars_passthrough"
+)
+_applier_polars_boundary_kept_cases = TestCaseLoader(
+    "preprocessing/manual_bounds_applier_polars_boundary_kept"
+).load()
 
 # ---------------------------------------------------------------------------
 # Helper fixtures
@@ -80,23 +106,12 @@ class TestManualBoundsCalculator:
 
 
 class TestManualBoundsColMaskPandas:
-    def test_lower_bound_only(self) -> None:
-        """Values below lower must be False; values at or above are True."""
-        s = pd.Series([-1.0, 0.0, 1.0, 5.0])
-        mask = _manual_bounds_col_mask_pandas(s, {"lower": 0.0})
-        assert mask.tolist() == [False, True, True, True]
-
-    def test_upper_bound_only(self) -> None:
-        """Values above upper must be False; boundary value is True."""
-        s = pd.Series([0.0, 5.0, 10.0, 11.0])
-        mask = _manual_bounds_col_mask_pandas(s, {"upper": 10.0})
-        assert mask.tolist() == [True, True, True, False]
-
-    def test_lower_and_upper(self) -> None:
-        """Values outside [lower, upper] are False; boundary values are True."""
-        s = pd.Series([-1.0, 0.0, 5.0, 10.0, 11.0])
-        mask = _manual_bounds_col_mask_pandas(s, {"lower": 0.0, "upper": 10.0})
-        assert mask.tolist() == [False, True, True, True, False]
+    @pytest.mark.parametrize(*_col_mask_pandas_cases)
+    def test_mask_matches_expected(self, values: list, bounds: dict, expected: list) -> None:
+        """The mask must be True for inliers (including NaN) and False for outliers."""
+        s = pd.Series(values)
+        mask = _manual_bounds_col_mask_pandas(s, bounds)
+        assert mask.tolist() == expected
 
     def test_nan_always_inlier(self) -> None:
         """NaN values must always pass the mask — we never remove missings."""
@@ -105,36 +120,15 @@ class TestManualBoundsColMaskPandas:
         assert mask.iloc[0] is True or bool(mask.iloc[0]) is True
         assert bool(mask.iloc[1]) is False
 
-    def test_no_bounds_all_true(self) -> None:
-        """Empty bounds dict means no restriction — all rows pass."""
-        s = pd.Series([-1000.0, 0.0, 1000.0])
-        mask = _manual_bounds_col_mask_pandas(s, {})
-        assert mask.all()
-
 
 class TestManualBoundsColMaskPolars:
-    def test_lower_bound_polars(self) -> None:
-        """Values below lower must be excluded by the Polars mask."""
-        df = pl.DataFrame({"v": [-1.0, 0.0, 1.0]})
-        mask_expr = _manual_bounds_col_mask_polars("v", {"lower": 0.0})
+    @pytest.mark.parametrize(*_col_mask_polars_cases)
+    def test_mask_matches_expected(self, values: list, bounds: dict, expected: list) -> None:
+        """The Polars mask must be True for inliers (including null) and False for outliers."""
+        df = pl.DataFrame({"v": values})
+        mask_expr = _manual_bounds_col_mask_polars("v", bounds)
         result = df.select(mask_expr.alias("m"))["m"].to_list()
-        assert result == [False, True, True]
-
-    def test_boundary_value_included_polars(self) -> None:
-        """The value exactly equal to upper should be kept (<=, not <)."""
-        df = pl.DataFrame({"v": [9.9, 10.0, 10.1]})
-        mask_expr = _manual_bounds_col_mask_polars("v", {"upper": 10.0})
-        result = df.select(mask_expr.alias("m"))["m"].to_list()
-        assert result == [True, True, False]
-
-    def test_null_always_inlier_polars(self) -> None:
-        """Nulls must pass through; they are not outliers by definition."""
-        df = pl.DataFrame({"v": [None, 0.0, 999.0]})
-        mask_expr = _manual_bounds_col_mask_polars("v", {"lower": 0.0, "upper": 10.0})
-        result = df.select(mask_expr.alias("m"))["m"].to_list()
-        assert result[0] is True  # null row kept
-        assert result[1] is True  # 0.0 at boundary kept
-        assert result[2] is False  # 999 > 10 removed
+        assert result == expected
 
 
 # ---------------------------------------------------------------------------
@@ -163,14 +157,10 @@ class TestManualBoundsApplierPandas:
         assert 0.0 in out["val"].values
         assert 20.0 in out["val"].values
 
-    def test_no_bounds_passthrough(self, df_pandas: pd.DataFrame) -> None:
-        """Empty bounds → all rows preserved."""
-        out = self._run(df_pandas, {})
-        assert len(out) == len(df_pandas)
-
-    def test_unknown_column_ignored(self, df_pandas: pd.DataFrame) -> None:
-        """Bounds referencing a column that doesn't exist must not raise."""
-        out = self._run(df_pandas, {"bounds": {"nonexistent": {"lower": 0.0}}})
+    @pytest.mark.parametrize(*_applier_pandas_passthrough_cases)
+    def test_passthrough(self, df_pandas: pd.DataFrame, config: dict) -> None:
+        """Empty bounds, or bounds for an unknown column, must preserve all rows."""
+        out = self._run(df_pandas, config)
         assert len(out) == len(df_pandas)
 
     def test_nan_rows_retained(self) -> None:
@@ -250,19 +240,18 @@ class TestManualBoundsApplierPolars:
         assert typing.cast(float, out["val"].min()) >= 0.0
         assert typing.cast(float, out["val"].max()) <= 50.0
 
-    def test_boundary_equality_lower(self, df_polars: pl.DataFrame) -> None:
-        """Value equal to lower must be kept (>= semantics)."""
-        out = self._run(df_polars, {"bounds": {"val": {"lower": 0.0}}})
-        assert 0.0 in out["val"].to_list()
+    @pytest.mark.parametrize(*_applier_polars_boundary_kept_cases)
+    def test_boundary_equality_kept(
+        self, df_polars: pl.DataFrame, config: dict, expected_value: float
+    ) -> None:
+        """A value exactly at the configured bound must be kept (inclusive semantics)."""
+        out = self._run(df_polars, config)
+        assert expected_value in out["val"].to_list()
 
-    def test_boundary_equality_upper(self, df_polars: pl.DataFrame) -> None:
-        """Value equal to upper must be kept (<= semantics)."""
-        out = self._run(df_polars, {"bounds": {"val": {"upper": 100.0}}})
-        assert 100.0 in out["val"].to_list()
-
-    def test_no_bounds_passthrough(self, df_polars: pl.DataFrame) -> None:
-        """Empty bounds → no rows removed by polars engine."""
-        out = self._run(df_polars, {})
+    @pytest.mark.parametrize(*_applier_polars_passthrough_cases)
+    def test_passthrough(self, df_polars: pl.DataFrame, config: dict) -> None:
+        """Empty bounds, or bounds for an unknown column, must preserve all rows."""
+        out = self._run(df_polars, config)
         assert out.shape[0] == df_polars.shape[0]
 
     def test_polars_parity_with_pandas(self, df_pandas: pd.DataFrame) -> None:
@@ -272,12 +261,6 @@ class TestManualBoundsApplierPolars:
         pd_out = ManualBoundsApplier().apply(df_pandas, params)
         pl_out = ManualBoundsApplier().apply(pl.from_pandas(df_pandas), params)
         assert list(pd_out["val"]) == pl_out["val"].to_list()
-
-    def test_unknown_column_ignored_polars(self, df_polars: pl.DataFrame) -> None:
-        """Bounds referencing a column absent from the Polars frame must not raise
-        (covers the ``continue`` branch in ``_apply_polars``)."""
-        out = self._run(df_polars, {"bounds": {"nonexistent": {"lower": 0.0}}})
-        assert out.shape[0] == df_polars.shape[0]
 
     def test_polars_tuple_xy_with_polars_series_y(self, df_polars: pl.DataFrame) -> None:
         """A Polars Series ``y`` paired with a Polars X must be filtered in sync."""

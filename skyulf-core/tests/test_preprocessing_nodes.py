@@ -10,6 +10,10 @@ from typing import List, cast
 import numpy as np
 import pandas as pd
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
+
+_simple_imputer_cases = TestCaseLoader("preprocessing/simple_imputer_strategies").load()
+_casting_cases = TestCaseLoader("preprocessing/casting_target_type").load()
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -201,38 +205,33 @@ class TestMaxAbsScaler:
 
 
 class TestSimpleImputer:
-    def test_mean_imputation(self, numeric_df: pd.DataFrame) -> None:
+    """Imputation strategies — scenarios loaded from
+    ``tests/test_cases/preprocessing/simple_imputer_strategies.json``.
+    """
+
+    @pytest.mark.parametrize(*_simple_imputer_cases)
+    def test_imputation_strategy(
+        self,
+        numeric_df: pd.DataFrame,
+        columns: list,
+        strategy: str,
+        extra_config: dict,
+        check_value: float | None,
+    ) -> None:
         from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
 
         calc = SimpleImputerCalculator()
         applier = SimpleImputerApplier()
-        params = calc.fit(numeric_df, {"columns": ["a", "b"], "strategy": "mean"})
-        assert "fill_values" in params
-        assert "a" in params["fill_values"]
+        config = {"columns": columns, "strategy": strategy, **extra_config}
+        params = calc.fit(numeric_df, config)
+        if strategy == "mean":
+            assert "fill_values" in params
+            assert "a" in params["fill_values"]
         result = applier.apply(numeric_df, params)
-        assert result["a"].isna().sum() == 0
-        assert result["b"].isna().sum() == 0
-
-    def test_median_imputation(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
-
-        calc = SimpleImputerCalculator()
-        applier = SimpleImputerApplier()
-        params = calc.fit(numeric_df, {"columns": ["a"], "strategy": "median"})
-        result = applier.apply(numeric_df, params)
-        assert result["a"].isna().sum() == 0
-
-    def test_constant_imputation(self, numeric_df: pd.DataFrame) -> None:
-        from skyulf.preprocessing.imputation import SimpleImputerApplier, SimpleImputerCalculator
-
-        calc = SimpleImputerCalculator()
-        applier = SimpleImputerApplier()
-        params = calc.fit(
-            numeric_df, {"columns": ["a"], "strategy": "constant", "fill_value": -999}
-        )
-        result = applier.apply(numeric_df, params)
-        assert result["a"].isna().sum() == 0
-        assert -999 in result["a"].values
+        for col in columns:
+            assert result[col].isna().sum() == 0
+        if check_value is not None:
+            assert check_value in result[columns[-1]].values
 
 
 class TestKNNImputer:
@@ -695,26 +694,24 @@ class TestPolynomialFeatures:
 
 
 class TestCasting:
-    def test_cast_to_int(self) -> None:
+    """Casting to different target types — scenarios loaded from
+    ``tests/test_cases/preprocessing/casting_target_type.json``.
+    """
+
+    @pytest.mark.parametrize(*_casting_cases)
+    def test_cast_to_target_type(self, values: list, target_type: str) -> None:
         from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
 
-        df = pd.DataFrame({"value": [1.0, 2.0, 3.0, 4.0, 5.0]})
+        df = pd.DataFrame({"value": values})
         calc = CastingCalculator()
         applier = CastingApplier()
         # Config uses 'target_type' + 'columns' keys
-        params = calc.fit(df, {"columns": ["value"], "target_type": "int"})
+        params = calc.fit(df, {"columns": ["value"], "target_type": target_type})
         result = applier.apply(df, params)
-        assert result["value"].dtype in [np.int64, np.int32, int, pd.Int64Dtype()]
-
-    def test_cast_to_string(self) -> None:
-        from skyulf.preprocessing.casting import CastingApplier, CastingCalculator
-
-        df = pd.DataFrame({"value": [1, 2, 3]})
-        calc = CastingCalculator()
-        applier = CastingApplier()
-        params = calc.fit(df, {"columns": ["value"], "target_type": "str"})
-        result = applier.apply(df, params)
-        assert pd.api.types.is_string_dtype(result["value"]) or result["value"].dtype == object
+        if target_type == "int":
+            assert result["value"].dtype in [np.int64, np.int32, int, pd.Int64Dtype()]
+        else:
+            assert pd.api.types.is_string_dtype(result["value"]) or result["value"].dtype == object
 
 
 # ===========================================================================

@@ -5,10 +5,14 @@ corpora, single-character/very short strings, drop_original interplay, the
 "norm=None" hashing path, and the shared ``_common.py`` helpers directly.
 """
 
+import importlib
+import logging
 from typing import Any
 
 import pandas as pd
 import polars as pl
+import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.vectorization._common import (
     _join_text_columns,
@@ -30,62 +34,145 @@ from skyulf.preprocessing.vectorization.tokenizer import TokenizerApplier, Token
 
 SHORT_CORPUS = ["a", "b b", ""]
 
+# Registry mapping a node name (as used in JSON fixtures) to its
+# Calculator/Applier pair, so parametrized tests can look up the right
+# classes for a given scenario without encoding class objects in JSON.
+_VECTORIZER_NODES: dict[str, tuple[type, type]] = {
+    "hashing_vectorizer": (HashingVectorizerCalculator, HashingVectorizerApplier),
+    "tfidf_vectorizer": (TfidfVectorizerCalculator, TfidfVectorizerApplier),
+    "count_vectorizer": (CountVectorizerCalculator, CountVectorizerApplier),
+    "tokenizer": (TokenizerCalculator, TokenizerApplier),
+}
+
+
+def _load_single_param(source_path: str) -> list[Any]:
+    """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
+
+    ``pytest.mark.parametrize`` treats a single (comma-less) param name
+    specially: argvalues must be bare scalars, not 1-tuples, or the whole
+    tuple gets bound to the parameter instead of its single element.
+    """
+    params_string, scenarios = TestCaseLoader(source_path).load()
+    return [params_string, [scenario[0] for scenario in scenarios]]
+
+
+_invalid_fit_columns_cases = TestCaseLoader(
+    "preprocessing/vectorization_gaps_invalid_fit_columns"
+).load()
+_apply_missing_vectorizer_cases = _load_single_param(
+    "preprocessing/vectorization_gaps_apply_missing_vectorizer"
+)
+_apply_all_columns_missing_cases = TestCaseLoader(
+    "preprocessing/vectorization_gaps_apply_all_columns_missing"
+).load()
+_drop_original_cases = TestCaseLoader("preprocessing/vectorization_gaps_drop_original").load()
+_large_vocab_warning_cases = TestCaseLoader(
+    "preprocessing/vectorization_gaps_large_vocab_warning"
+).load()
+_polars_fit_input_cases = TestCaseLoader("preprocessing/vectorization_gaps_polars_fit_input").load()
+_join_text_columns_cases = TestCaseLoader(
+    "preprocessing/vectorization_common_join_text_columns"
+).load()
+_warn_large_output_cases = TestCaseLoader(
+    "preprocessing/vectorization_common_warn_large_output"
+).load()
+
+
+@pytest.mark.parametrize(*_invalid_fit_columns_cases)
+def test_invalid_fit_columns_returns_empty_artifact(node: str, columns: list[str]) -> None:
+    """Empty or unmatched ``columns`` config yields an empty artifact at fit time."""
+    df = pd.DataFrame({"text": SHORT_CORPUS})
+    calculator_cls, _ = _VECTORIZER_NODES[node]
+    art = calculator_cls().fit(df, {"columns": columns})
+    assert art == {}
+
+
+@pytest.mark.parametrize(*_apply_missing_vectorizer_cases)
+def test_apply_missing_vectorizer_object_is_noop(node: str) -> None:
+    """Applying an artifact without a fitted vectorizer object leaves the frame unchanged."""
+    df = pd.DataFrame({"text": SHORT_CORPUS})
+    _, applier_cls = _VECTORIZER_NODES[node]
+    out = applier_cls().apply(df, {"columns": ["text"]})
+    assert list(out.columns) == ["text"]
+
+
+@pytest.mark.parametrize(*_apply_all_columns_missing_cases)
+def test_apply_all_fitted_columns_missing_is_noop(node: str, fit_extra: dict[str, Any]) -> None:
+    """If none of the fitted columns are present at apply time, the frame is unchanged."""
+    calculator_cls, applier_cls = _VECTORIZER_NODES[node]
+    fit_df = pd.DataFrame({"text": ["hello world"]})
+    art = calculator_cls().fit(fit_df, {"columns": ["text"], **fit_extra})
+    apply_df = pd.DataFrame({"other": ["unrelated"]})
+    out = applier_cls().apply(apply_df, art)
+    assert list(out.columns) == ["other"]
+
+
+@pytest.mark.parametrize(*_drop_original_cases)
+def test_drop_original_removes_source_column(node: str, fit_extra: dict[str, Any]) -> None:
+    """``drop_original=True`` removes the source text column after vectorizing."""
+    calculator_cls, applier_cls = _VECTORIZER_NODES[node]
+    df = pd.DataFrame({"text": ["hello world", "foo bar baz"]})
+    art = calculator_cls().fit(df, {"columns": ["text"], "drop_original": True, **fit_extra})
+    out = applier_cls().apply(df, art)
+    assert "text" not in out.columns
+
+
+@pytest.mark.parametrize(*_large_vocab_warning_cases)
+def test_large_vocabulary_logs_warning(
+    node: str, module_path: str, caplog: Any, monkeypatch: Any
+) -> None:
+    """A forced ``_warn_large_output`` result must surface through ``logger.warning``."""
+    calculator_cls, _ = _VECTORIZER_NODES[node]
+    module = importlib.import_module(module_path)
+    monkeypatch.setattr(module, "_warn_large_output", lambda output_cols: "forced warning for test")
+    with caplog.at_level(logging.WARNING):
+        df = pd.DataFrame({"text": ["hello world"]})
+        calculator_cls().fit(df, {"columns": ["text"]})
+    assert "forced warning for test" in caplog.text
+
+
+@pytest.mark.parametrize(*_polars_fit_input_cases)
+def test_fit_accepts_polars_input(node: str, fit_extra: dict[str, Any]) -> None:
+    """Fitting directly on a polars frame must route internally through pandas."""
+    calculator_cls, _ = _VECTORIZER_NODES[node]
+    df = pl.DataFrame({"text": ["hello world", "world of tokens"]})
+    art = calculator_cls().fit(df, {"columns": ["text"], **fit_extra})
+    assert art["columns"] == ["text"]
+    assert len(art["output_columns"]) > 0
+
 
 # ---------------------------------------------------------------------------
 # _common.py
 # ---------------------------------------------------------------------------
 
 
-def test_join_text_columns_single_column() -> None:
-    """A single text column is returned as-is (NaN filled to empty string)."""
-    df = pd.DataFrame({"x": ["hello", None]})
-    joined = _join_text_columns(df, ["x"])
-    assert joined.tolist() == ["hello", ""]
+@pytest.mark.parametrize(*_join_text_columns_cases)
+def test_join_text_columns(
+    columns_data: dict[str, Any], columns: list[str], expected: list[str]
+) -> None:
+    """Single and multiple text columns are joined (NaN filled to empty string)."""
+    df = pd.DataFrame(columns_data)
+    joined = _join_text_columns(df, columns)
+    assert joined.tolist() == expected
 
 
-def test_join_text_columns_multiple_columns_joined_with_space() -> None:
-    """Multiple text columns are concatenated with a single space separator."""
-    df = pd.DataFrame({"x": ["hello"], "y": ["world"]})
-    joined = _join_text_columns(df, ["x", "y"])
-    assert joined.tolist() == ["hello world"]
-
-
-def test_warn_large_output_below_threshold_returns_none() -> None:
-    """Output counts at/below the threshold produce no warning."""
-    assert _warn_large_output(100, threshold=10_000) is None
-
-
-def test_warn_large_output_above_threshold_returns_message() -> None:
-    """Exceeding the threshold returns a human-readable warning string."""
-    msg = _warn_large_output(20_000, threshold=10_000)
-    assert msg is not None
-    assert "20,000" in msg
+@pytest.mark.parametrize(*_warn_large_output_cases)
+def test_warn_large_output(
+    count: int, threshold: int, expect_none: bool, expect_substring: str | None
+) -> None:
+    """Output counts below threshold produce no warning; above, a human-readable message."""
+    msg = _warn_large_output(count, threshold=threshold)
+    if expect_none:
+        assert msg is None
+    else:
+        assert msg is not None
+        assert expect_substring is not None
+        assert expect_substring in msg
 
 
 # ---------------------------------------------------------------------------
 # HashingVectorizer edge cases
 # ---------------------------------------------------------------------------
-
-
-def test_hashing_vectorizer_empty_columns_config_returns_empty_artifact() -> None:
-    """No configured columns yields an empty artifact (no-op)."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    art = HashingVectorizerCalculator().fit(df, {"columns": []})
-    assert art == {}
-
-
-def test_hashing_vectorizer_missing_column_returns_empty_artifact() -> None:
-    """Configuring a column absent from the frame yields an empty artifact."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    art = HashingVectorizerCalculator().fit(df, {"columns": ["nonexistent"]})
-    assert art == {}
-
-
-def test_hashing_vectorizer_apply_missing_vectorizer_object_is_noop() -> None:
-    """Applying an artifact without a vectorizer object returns the frame unchanged."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    out = HashingVectorizerApplier().apply(df, {"columns": ["text"]})
-    assert list(out.columns) == ["text"]
 
 
 def test_hashing_vectorizer_norm_none_config() -> None:
@@ -114,29 +201,8 @@ def test_hashing_vectorizer_polars_input_at_fit_time() -> None:
     assert art["type"] == "hashing_vectorizer"
 
 
-def test_hashing_vectorizer_apply_all_columns_missing_is_noop() -> None:
-    """If none of the fitted columns are present at apply time, no-op (line 43)."""
-    fit_df = pd.DataFrame({"text": ["hello world"]})
-    art = HashingVectorizerCalculator().fit(fit_df, {"columns": ["text"], "n_features": 8})
-    apply_df = pd.DataFrame({"other": ["unrelated"]})
-    out = HashingVectorizerApplier().apply(apply_df, art)
-    assert list(out.columns) == ["other"]
-
-
-def test_hashing_vectorizer_drop_original_removes_source_column() -> None:
-    """``drop_original=True`` removes the source text column after vectorizing (line 57)."""
-    df = pd.DataFrame({"text": ["hello world", "foo bar baz"]})
-    art = HashingVectorizerCalculator().fit(
-        df, {"columns": ["text"], "n_features": 8, "drop_original": True}
-    )
-    out = HashingVectorizerApplier().apply(df, art)
-    assert "text" not in out.columns
-
-
 def test_hashing_vectorizer_large_n_features_logs_warning(caplog: Any) -> None:
     """A very large ``n_features`` triggers the ``logger.warning`` branch (line 129)."""
-    import logging
-
     df = pd.DataFrame({"text": ["hello world"]})
     with caplog.at_level(logging.WARNING):
         HashingVectorizerCalculator().fit(df, {"columns": ["text"], "n_features": 20_000})
@@ -148,75 +214,12 @@ def test_hashing_vectorizer_large_n_features_logs_warning(caplog: Any) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_tfidf_vectorizer_empty_columns_returns_empty_artifact() -> None:
-    """No configured columns yields an empty artifact."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    art = TfidfVectorizerCalculator().fit(df, {"columns": []})
-    assert art == {}
-
-
-def test_tfidf_vectorizer_apply_missing_vectorizer_is_noop() -> None:
-    """Applying without a fitted vectorizer object leaves the frame unchanged."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    out = TfidfVectorizerApplier().apply(df, {"columns": ["text"]})
-    assert list(out.columns) == ["text"]
-
-
-def test_tfidf_vectorizer_drop_original_removes_source_column() -> None:
-    """``drop_original=True`` removes the source text column after vectorizing."""
-    df = pd.DataFrame({"text": ["hello world", "foo bar baz"]})
-    art = TfidfVectorizerCalculator().fit(
-        df, {"columns": ["text"], "max_features": 10, "drop_original": True}
-    )
-    out = TfidfVectorizerApplier().apply(df, art)
-    assert "text" not in out.columns
-
-
 def test_tfidf_vectorizer_multi_column_join() -> None:
     """Two source columns are joined into one text stream before fitting."""
     df = pd.DataFrame({"title": ["hello"], "body": ["world"]})
     art = TfidfVectorizerCalculator().fit(df, {"columns": ["title", "body"], "max_features": 10})
     assert art["columns"] == ["title", "body"]
     assert all(c.startswith("title_body__tfidf__") for c in art["output_columns"])
-
-
-def test_tfidf_vectorizer_apply_all_columns_missing_is_noop() -> None:
-    """If none of the fitted columns are present at apply time, no-op (line 39)."""
-    fit_df = pd.DataFrame({"text": ["hello world"]})
-    art = TfidfVectorizerCalculator().fit(fit_df, {"columns": ["text"], "max_features": 10})
-    apply_df = pd.DataFrame({"other": ["unrelated"]})
-    out = TfidfVectorizerApplier().apply(apply_df, art)
-    assert list(out.columns) == ["other"]
-
-
-def test_tfidf_vectorizer_fit_accepts_polars_input() -> None:
-    """Fitting directly on a polars frame must route through ``to_pandas`` (line 99)."""
-    df = pl.DataFrame({"text": ["hello world", "world of tokens"]})
-    art = TfidfVectorizerCalculator().fit(df, {"columns": ["text"], "max_features": 10})
-    assert art["columns"] == ["text"]
-    assert len(art["output_columns"]) > 0
-
-
-def test_tfidf_vectorizer_missing_column_at_fit_returns_empty() -> None:
-    """A configured column absent from the frame yields an empty artifact (line 103)."""
-    df = pd.DataFrame({"text": ["hello world"]})
-    art = TfidfVectorizerCalculator().fit(df, {"columns": ["nonexistent"]})
-    assert art == {}
-
-
-def test_tfidf_vectorizer_large_vocabulary_logs_warning(caplog: Any, monkeypatch: Any) -> None:
-    """A very large vocabulary triggers the ``logger.warning`` branch (line 132)."""
-    import logging
-
-    from skyulf.preprocessing.vectorization import tfidf_vectorizer as tfidf_module
-
-    monkeypatch.setattr(
-        tfidf_module, "_warn_large_output", lambda output_cols: "forced warning for test"
-    )
-    with caplog.at_level(logging.WARNING):
-        df = pd.DataFrame({"text": ["hello world"]})
-        TfidfVectorizerCalculator().fit(df, {"columns": ["text"]})
-    assert "forced warning for test" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -235,62 +238,9 @@ def test_count_vectorizer_binary_mode_caps_counts_at_one() -> None:
     assert out[hello_col].iloc[0] == 1
 
 
-def test_count_vectorizer_missing_vectorizer_is_noop() -> None:
-    """Applying without a fitted vectorizer object leaves the frame unchanged."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    out = CountVectorizerApplier().apply(df, {"columns": ["text"]})
-    assert list(out.columns) == ["text"]
-
-
-def test_count_vectorizer_missing_column_at_fit_returns_empty() -> None:
-    """A configured column absent from the frame yields an empty artifact."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    art = CountVectorizerCalculator().fit(df, {"columns": ["nonexistent"]})
-    assert art == {}
-
-
-def test_count_vectorizer_apply_all_columns_missing_is_noop() -> None:
-    """If none of the fitted columns are present at apply time, no-op (line 45)."""
-    fit_df = pd.DataFrame({"text": ["hello world"]})
-    art = CountVectorizerCalculator().fit(fit_df, {"columns": ["text"]})
-    apply_df = pd.DataFrame({"other": ["unrelated"]})
-    out = CountVectorizerApplier().apply(apply_df, art)
-    assert list(out.columns) == ["other"]
-
-
-def test_count_vectorizer_fit_accepts_polars_input() -> None:
-    """Fitting directly on a polars frame must route through ``to_pandas`` (line 107)."""
-    df = pl.DataFrame({"text": ["hello world", "world of tokens"]})
-    art = CountVectorizerCalculator().fit(df, {"columns": ["text"], "max_features": 10})
-    assert art["columns"] == ["text"]
-    assert len(art["output_columns"]) > 0
-
-
-def test_count_vectorizer_large_vocabulary_logs_warning(caplog: Any, monkeypatch: Any) -> None:
-    """A very large vocabulary triggers the ``logger.warning`` branch (line 140)."""
-    import logging
-
-    from skyulf.preprocessing.vectorization import count_vectorizer as cv_module
-
-    monkeypatch.setattr(
-        cv_module, "_warn_large_output", lambda output_cols: "forced warning for test"
-    )
-    with caplog.at_level(logging.WARNING):
-        df = pd.DataFrame({"text": ["hello world"]})
-        CountVectorizerCalculator().fit(df, {"columns": ["text"]})
-    assert "forced warning for test" in caplog.text
-
-
 # ---------------------------------------------------------------------------
 # Tokenizer edge cases
 # ---------------------------------------------------------------------------
-
-
-def test_tokenizer_missing_column_at_fit_returns_empty() -> None:
-    """A configured column absent from the frame yields an empty artifact."""
-    df = pd.DataFrame({"text": SHORT_CORPUS})
-    art = TokenizerCalculator().fit(df, {"columns": ["nonexistent"]})
-    assert art == {}
 
 
 def test_tokenizer_apply_missing_columns_is_noop() -> None:

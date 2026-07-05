@@ -1,0 +1,41 @@
+{
+  "params": "node, config, expected_columns, engine",
+  "test_cases": {
+    "lag_pandas_noop": {
+      "node": "lag",
+      "config": {"columns": [], "lags": [1]},
+      "expected_columns": ["v"],
+      "engine": "pandas"
+    },
+    "lag_polars_noop": {
+      "node": "lag",
+      "config": {"columns": [], "lags": [1]},
+      "expected_columns": ["v"],
+      "engine": "polars"
+    },
+    "rolling_pandas_noop": {
+      "node": "rolling",
+      "config": {"columns": [], "aggregations": ["mean"]},
+      "expected_columns": ["v"],
+      "engine": "pandas"
+    },
+    "rolling_polars_noop": {
+      "node": "rolling",
+      "config": {"columns": [], "aggregations": ["mean"]},
+      "expected_columns": ["v"],
+      "engine": "polars"
+    },
+    "date_features_pandas_noop": {
+      "node": "date_features",
+      "config": {"columns": [], "features": ["year"]},
+      "expected_columns": ["d"],
+      "engine": "pandas"
+    },
+    "date_features_polars_noop": {
+      "node": "date_features",
+      "config": {"columns": [], "features": ["year"]},
+      "expected_columns": ["d"],
+      "engine": "polars"
+    }
+  }
+}

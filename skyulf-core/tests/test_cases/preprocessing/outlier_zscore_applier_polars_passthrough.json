@@ -1,0 +1,7 @@
+{
+  "params": "values, config, expected",
+  "test_cases": {
+    "no_stats": {"values": [1.0, 2.0, 1000.0], "config": {}, "expected": [1.0, 2.0, 1000.0]},
+    "unknown_column_in_stats": {"values": [1.0, 2.0, 3.0], "config": {"stats": {"nonexistent": {"mean": 0.0, "std": 1.0}}, "threshold": 3.0}, "expected": [1.0, 2.0, 3.0]}
+  }
+}

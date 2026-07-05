@@ -1,0 +1,13 @@
+{
+  "params": "aggregations_input, expected",
+  "test_cases": {
+    "single_string_wrapped": {
+      "aggregations_input": "mean",
+      "expected": ["mean"]
+    },
+    "filters_unknown_names": {
+      "aggregations_input": ["mean", "bogus", "sum"],
+      "expected": ["mean", "sum"]
+    }
+  }
+}

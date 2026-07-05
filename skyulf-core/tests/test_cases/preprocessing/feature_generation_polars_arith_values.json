@@ -1,0 +1,41 @@
+{
+  "params": "method, input_columns, constants, expected",
+  "test_cases": {
+    "add_two_columns": {
+      "method": "add",
+      "input_columns": ["a", "b"],
+      "constants": [],
+      "expected": [11.0, 22.0, 33.0, 44.0]
+    },
+    "add_with_constant": {
+      "method": "add",
+      "input_columns": ["a"],
+      "constants": [100.0],
+      "expected": [101.0, 102.0, 103.0, 104.0]
+    },
+    "subtract_two_columns": {
+      "method": "subtract",
+      "input_columns": ["a", "b"],
+      "constants": [],
+      "expected": [-9.0, -18.0, -27.0, -36.0]
+    },
+    "subtract_with_constant": {
+      "method": "subtract",
+      "input_columns": ["a"],
+      "constants": [1.0],
+      "expected": [0.0, 1.0, 2.0, 3.0]
+    },
+    "multiply_two_columns": {
+      "method": "multiply",
+      "input_columns": ["a", "b"],
+      "constants": [],
+      "expected": [10.0, 40.0, 90.0, 160.0]
+    },
+    "multiply_with_constant": {
+      "method": "multiply",
+      "input_columns": ["a"],
+      "constants": [2.0],
+      "expected": [2.0, 4.0, 6.0, 8.0]
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "params": "df_data, config, expected_a",
+  "test_cases": {
+    "subset": {
+      "df_data": {"a": [1.0, null, 3.0], "b": [null, null, null]},
+      "config": {"subset": ["a"]},
+      "expected_a": [1.0, 3.0]
+    },
+    "default_how_any": {
+      "df_data": {"a": [1.0, null], "b": [1.0, 2.0]},
+      "config": {},
+      "expected_a": [1.0]
+    }
+  }
+}

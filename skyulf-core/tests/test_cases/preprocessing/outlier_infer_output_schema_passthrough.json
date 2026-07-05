@@ -1,0 +1,9 @@
+{
+  "params": "node",
+  "test_cases": {
+    "iqr": {"node": "iqr"},
+    "zscore": {"node": "zscore"},
+    "winsorize": {"node": "winsorize"},
+    "elliptic_envelope": {"node": "elliptic_envelope"}
+  }
+}

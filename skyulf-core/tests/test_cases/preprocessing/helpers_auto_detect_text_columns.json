@@ -1,0 +1,29 @@
+{
+  "params": "frame_type, columns, category_columns, expected",
+  "test_cases": {
+    "pandas_object_dtype": {
+      "frame_type": "pandas",
+      "columns": {"name": ["a", "b"], "amount": [1.0, 2.0]},
+      "category_columns": [],
+      "expected": ["name"]
+    },
+    "pandas_category_dtype": {
+      "frame_type": "pandas",
+      "columns": {"cat": ["x", "y"], "num": [1, 2]},
+      "category_columns": ["cat"],
+      "expected": ["cat"]
+    },
+    "pandas_none_present": {
+      "frame_type": "pandas",
+      "columns": {"num": [1, 2, 3]},
+      "category_columns": [],
+      "expected": []
+    },
+    "polars_utf8": {
+      "frame_type": "polars",
+      "columns": {"name": ["a", "b"], "amount": [1.0, 2.0]},
+      "category_columns": [],
+      "expected": ["name"]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "params": "feature, expected",
+  "test_cases": {
+    "year": {"feature": "year", "expected": [2024, 2024, 2023, 2022]},
+    "quarter": {"feature": "quarter", "expected": [1, 3, 4, 1]},
+    "month": {"feature": "month", "expected": [1, 7, 12, 3]},
+    "month_name": {
+      "feature": "month_name",
+      "expected": ["January", "July", "December", "March"]
+    },
+    "week": {"feature": "week", "expected": [3, 27, 52, 10]},
+    "day": {"feature": "day", "expected": [15, 4, 31, 7]},
+    "day_name": {
+      "feature": "day_name",
+      "expected": ["Monday", "Thursday", "Sunday", "Monday"]
+    },
+    "weekday": {"feature": "weekday", "expected": [0, 3, 6, 0]},
+    "is_weekend": {"feature": "is_weekend", "expected": [0, 0, 1, 0]}
+  }
+}

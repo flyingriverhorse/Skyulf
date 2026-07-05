@@ -1,0 +1,13 @@
+{
+  "params": "method, input_columns",
+  "test_cases": {
+    "unknown_method_returns_none": {
+      "method": "nonexistent",
+      "input_columns": ["dept"]
+    },
+    "missing_group_col_returns_none": {
+      "method": "mean",
+      "input_columns": ["missing"]
+    }
+  }
+}

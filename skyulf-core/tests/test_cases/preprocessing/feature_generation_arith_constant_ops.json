@@ -1,0 +1,19 @@
+{
+  "params": "method, input_values, input_column, constant, expected",
+  "test_cases": {
+    "subtract_with_constant": {
+      "method": "subtract",
+      "input_values": [10.0, 20.0],
+      "input_column": "a",
+      "constant": 3.0,
+      "expected": [7.0, 17.0]
+    },
+    "multiply_with_constant": {
+      "method": "multiply",
+      "input_values": [2.0, 3.0],
+      "input_column": "a",
+      "constant": 5.0,
+      "expected": [10.0, 15.0]
+    }
+  }
+}

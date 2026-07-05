@@ -1,0 +1,13 @@
+{
+  "params": "columns_config, expected",
+  "test_cases": {
+    "empty_columns_returns_empty_dict": {
+      "columns_config": [],
+      "expected": {}
+    },
+    "missing_column_returns_empty_dict": {
+      "columns_config": ["no_such_column"],
+      "expected": {}
+    }
+  }
+}

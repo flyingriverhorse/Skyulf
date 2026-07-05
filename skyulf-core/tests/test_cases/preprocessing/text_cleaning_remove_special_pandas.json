@@ -1,0 +1,41 @@
+{
+  "params": "values, mode, replacement, expected",
+  "test_cases": {
+    "keep_alphanumeric_removes_symbols": {
+      "values": ["hello, world!", "abc123$%^"],
+      "mode": "keep_alphanumeric",
+      "replacement": "",
+      "expected": ["helloworld", "abc123"]
+    },
+    "keep_alphanumeric_space_preserves_spaces": {
+      "values": ["hello, world!"],
+      "mode": "keep_alphanumeric_space",
+      "replacement": "",
+      "expected": ["hello world"]
+    },
+    "letters_only": {
+      "values": ["abc123!"],
+      "mode": "letters_only",
+      "replacement": "",
+      "expected": ["abc"]
+    },
+    "digits_only": {
+      "values": ["abc123!"],
+      "mode": "digits_only",
+      "replacement": "",
+      "expected": ["123"]
+    },
+    "unknown_mode_is_noop": {
+      "values": ["hello!"],
+      "mode": "does_not_exist",
+      "replacement": "",
+      "expected": ["hello!"]
+    },
+    "with_replacement_char": {
+      "values": ["a$b"],
+      "mode": "keep_alphanumeric",
+      "replacement": "-",
+      "expected": ["a-b"]
+    }
+  }
+}

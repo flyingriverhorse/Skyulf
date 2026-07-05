@@ -1,0 +1,7 @@
+{
+  "params": "params",
+  "test_cases": {
+    "unknown_type": {"params": {"type": "alien_selection", "selected_columns": ["a"]}},
+    "empty_params": {"params": {}}
+  }
+}

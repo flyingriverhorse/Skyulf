@@ -5,14 +5,20 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.label import (
     LabelEncoderApplier,
     LabelEncoderCalculator,
 )
+
+_maybe_pull_y_cases = TestCaseLoader(
+    "preprocessing/encoding_label_maybe_pull_y_extracts_target"
+).load_with_ids()
 
 settings.register_profile(
     "encoding_label",
@@ -221,22 +227,22 @@ def test_y_to_str_array_without_to_numpy_uses_np_array_fallback() -> None:
     np.testing.assert_array_equal(result, np.array(["1", "2", "3"]))
 
 
-def test_maybe_pull_y_pandas_extracts_column_from_x() -> None:
-    """_maybe_pull_y_pandas pulls the target column out of X when y is missing."""
-    X = pd.DataFrame({"category": ["a", "b"], "target": ["yes", "no"]})
-    params = LabelEncoderCalculator().fit(
-        X, {"columns": ["category", "target"], "target_column": "target"}
-    )
-    assert "__target__" in params["encoders"]
+class TestMaybePullYExtractsTargetColumn:
+    """`_maybe_pull_y_pandas`/`_maybe_pull_y_polars` pull the target column out of X
+    when y is missing. Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_label_maybe_pull_y_extracts_target.json``.
+    """
 
-
-def test_maybe_pull_y_polars_extracts_column_from_x() -> None:
-    """_maybe_pull_y_polars pulls the target column out of X when y is missing (polars)."""
-    X = pl.DataFrame({"category": ["a", "b"], "target": ["yes", "no"]})
-    params = LabelEncoderCalculator().fit(
-        X, {"columns": ["category", "target"], "target_column": "target"}
+    @pytest.mark.parametrize(
+        _maybe_pull_y_cases[0], _maybe_pull_y_cases[1], ids=_maybe_pull_y_cases[2]
     )
-    assert "__target__" in params["encoders"]
+    def test_maybe_pull_y_extracts_column_from_x(self, engine: str) -> None:
+        data = {"category": ["a", "b"], "target": ["yes", "no"]}
+        X = pl.DataFrame(data) if engine == "polars" else pd.DataFrame(data)
+        params = LabelEncoderCalculator().fit(
+            X, {"columns": ["category", "target"], "target_column": "target"}
+        )
+        assert "__target__" in params["encoders"]
 
 
 def test_maybe_fit_target_skips_when_y_name_not_in_columns() -> None:

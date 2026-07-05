@@ -1,0 +1,7 @@
+{
+  "params": "values, config",
+  "test_cases": {
+    "no_bounds": {"values": [1.0, 2.0, 1000.0], "config": {}},
+    "unknown_column_in_bounds": {"values": [1.0, 2.0, 3.0], "config": {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}}
+  }
+}

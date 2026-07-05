@@ -1,0 +1,10 @@
+{
+  "params": "config, expected",
+  "test_cases": {
+    "explicit_param_returned": {"config": {"param": 42}, "expected": 42},
+    "k_best_mode_uses_k": {"config": {"mode": "k_best", "k": 5}, "expected": 5},
+    "k_best_default": {"config": {"mode": "k_best"}, "expected": 10},
+    "percentile_mode_uses_percentile": {"config": {"mode": "percentile", "percentile": 25}, "expected": 25},
+    "unknown_mode_defaults_to_alpha": {"config": {"mode": "fpr"}, "expected": 0.05}
+  }
+}

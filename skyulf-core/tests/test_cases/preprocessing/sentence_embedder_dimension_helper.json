@@ -1,0 +1,15 @@
+{
+  "params": "spec, attr, dim",
+  "test_cases": {
+    "prefers_get_embedding_dimension": {
+      "spec": null,
+      "attr": "get_embedding_dimension",
+      "dim": 256
+    },
+    "falls_back_to_get_sentence_embedding_dimension": {
+      "spec": ["get_sentence_embedding_dimension"],
+      "attr": "get_sentence_embedding_dimension",
+      "dim": 384
+    }
+  }
+}

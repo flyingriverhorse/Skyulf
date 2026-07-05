@@ -9,11 +9,32 @@ from typing import Any, Dict, List, cast
 import numpy as np
 import pandas as pd
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 # Trigger node registration by importing the package.
 import skyulf.preprocessing  # noqa: F401
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
+
+_diff_generated_columns_cases = TestCaseLoader(
+    "preprocessing/pipeline_diff_generated_columns"
+).load()
+_count_winsorize_diffs_simple_cases = TestCaseLoader(
+    "preprocessing/pipeline_count_winsorize_diffs_simple"
+).load()
+_count_winsorize_diffs_tuple_cases = TestCaseLoader(
+    "preprocessing/pipeline_count_winsorize_diffs_tuple"
+).load()
+_metrics_from_fitted_params_cases = TestCaseLoader(
+    "preprocessing/pipeline_metrics_from_fitted_params_copies_keys"
+).load()
+_metrics_shape_change_cases = TestCaseLoader("preprocessing/pipeline_metrics_shape_change").load()
+
+
+def _coerce_frame(value: Any) -> Any:
+    """Build a DataFrame from a dict fixture value; pass other types through unchanged."""
+    return pd.DataFrame(value) if isinstance(value, dict) else value
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -221,25 +242,13 @@ def test_unknown_transformer_raises(numeric_df: pd.DataFrame) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_diff_generated_columns_dataframe() -> None:
-    """Helper must return newly added column names."""
-    df_before = pd.DataFrame({"a": [1.0], "b": [2.0]})
-    df_after = pd.DataFrame({"a": [1.0], "b": [2.0], "c": [3.0]})
-    new_cols = FeatureEngineer._diff_generated_columns(df_before, df_after)
-    assert new_cols == ["c"]
-
-
-def test_diff_generated_columns_no_new_cols() -> None:
-    """Helper must return empty list when no columns were added."""
-    df = pd.DataFrame({"a": [1.0]})
-    new_cols = FeatureEngineer._diff_generated_columns(df, df.copy())
-    assert new_cols == []
-
-
-def test_diff_generated_columns_incompatible_types() -> None:
-    """Helper must return None when data types are incompatible."""
-    result = FeatureEngineer._diff_generated_columns("not_a_frame", pd.DataFrame())
-    assert result is None
+@pytest.mark.parametrize(*_diff_generated_columns_cases)
+def test_diff_generated_columns(df_before: Any, df_after: Any, expected: Any) -> None:
+    """Helper must return newly added column names, or None for incompatible types."""
+    new_cols = FeatureEngineer._diff_generated_columns(
+        _coerce_frame(df_before), _coerce_frame(df_after)
+    )
+    assert new_cols == expected
 
 
 # ---------------------------------------------------------------------------
@@ -247,24 +256,11 @@ def test_diff_generated_columns_incompatible_types() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_winsorize_diffs_identical_frames() -> None:
-    """Zero diffs when frames are identical."""
-    df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-    assert FeatureEngineer._count_winsorize_diffs(df, df.copy()) == 0
-
-
-def test_count_winsorize_diffs_shape_mismatch() -> None:
-    """Different shapes must return 0 rather than raising."""
-    d1 = pd.DataFrame({"x": [1.0, 2.0]})
-    d2 = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-    assert FeatureEngineer._count_winsorize_diffs(d1, d2) == 0
-
-
-def test_count_winsorize_diffs_modified_cell() -> None:
-    """One changed cell should be counted as 1 diff."""
-    d1 = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-    d2 = pd.DataFrame({"x": [99.0, 2.0, 3.0]})
-    assert FeatureEngineer._count_winsorize_diffs(d1, d2) == 1
+@pytest.mark.parametrize(*_count_winsorize_diffs_simple_cases)
+def test_count_winsorize_diffs_simple(before: Any, after: Any, expected: int) -> None:
+    """Cell-level diff count across identical, shape-mismatched, and modified frames."""
+    result = FeatureEngineer._count_winsorize_diffs(_coerce_frame(before), _coerce_frame(after))
+    assert result == expected
 
 
 # ---------------------------------------------------------------------------
@@ -446,88 +442,25 @@ def test_collect_step_metrics_dispatches_resampling_metrics() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_metrics_from_fitted_params_feature_selection_keys() -> None:
-    """All feature-selection metric keys must be copied when present."""
+@pytest.mark.parametrize(*_metrics_from_fitted_params_cases)
+def test_metrics_from_fitted_params_copies_keys(
+    transformer_type: str,
+    fitted_params: Dict[str, Any],
+    df_before: Dict[str, Any],
+    df_after: Dict[str, Any],
+    expected_metrics: Dict[str, Any],
+) -> None:
+    """_metrics_from_fitted_params must copy the transformer-family-specific keys
+    it recognizes (or derive them, e.g. ``generated_features``) into the metrics
+    dict, across every transformer family it handles.
+    """
     fe = FeatureEngineer(steps_config=[])
-    fitted_params = {
-        "feature_scores": {"a": 1.0},
-        "p_values": {"a": 0.01},
-        "feature_importances": {"a": 0.5},
-        "variances": {"a": 2.0},
-        "ranking": {"a": 1},
-        "selected_columns": ["a"],
-    }
     metrics: Dict[str, Any] = {}
     fe._metrics_from_fitted_params(
-        "UnivariateSelection", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics
+        transformer_type, fitted_params, pd.DataFrame(df_before), pd.DataFrame(df_after), metrics
     )
-    for key in fitted_params:
-        assert metrics[key] == fitted_params[key]
-
-
-# ---------------------------------------------------------------------------
-# _metrics_from_fitted_params: outlier keys (lines 299-311)
-# ---------------------------------------------------------------------------
-
-
-def test_metrics_from_fitted_params_outlier_warnings_and_bounds() -> None:
-    """IQR must copy warnings and bounds keys when present."""
-    fe = FeatureEngineer(steps_config=[])
-    fitted_params = {"warnings": ["clipped col a"], "bounds": {"a": (0.0, 10.0)}}
-    metrics: Dict[str, Any] = {}
-    fe._metrics_from_fitted_params("IQR", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics)
-    assert metrics["warnings"] == fitted_params["warnings"]
-    assert metrics["bounds"] == fitted_params["bounds"]
-
-
-def test_metrics_from_fitted_params_zscore_stats() -> None:
-    """ZScore must copy the stats key when present."""
-    fe = FeatureEngineer(steps_config=[])
-    fitted_params = {"stats": {"a": {"mean": 0.0, "std": 1.0}}}
-    metrics: Dict[str, Any] = {}
-    fe._metrics_from_fitted_params("ZScore", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics)
-    assert metrics["stats"] == fitted_params["stats"]
-
-
-def test_metrics_from_fitted_params_elliptic_contamination() -> None:
-    """EllipticEnvelope must copy the contamination key when present."""
-    fe = FeatureEngineer(steps_config=[])
-    fitted_params = {"contamination": 0.1}
-    metrics: Dict[str, Any] = {}
-    fe._metrics_from_fitted_params(
-        "EllipticEnvelope", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics
-    )
-    assert metrics["contamination"] == 0.1
-
-
-# ---------------------------------------------------------------------------
-# _metrics_from_fitted_params: feature generation keys (lines 314-319)
-# ---------------------------------------------------------------------------
-
-
-def test_metrics_from_fitted_params_feature_generation() -> None:
-    """FeatureMath must record operations count + list, plus generated_features diff."""
-    fe = FeatureEngineer(steps_config=[])
-    fitted_params = {"operations": [{"op": "add", "columns": ["a", "b"]}]}
-    df_before = pd.DataFrame({"a": [1.0], "b": [2.0]})
-    df_after = pd.DataFrame({"a": [1.0], "b": [2.0], "a_plus_b": [3.0]})
-    metrics: Dict[str, Any] = {}
-    fe._metrics_from_fitted_params("FeatureMath", fitted_params, df_before, df_after, metrics)
-    assert metrics["operations_count"] == 1
-    assert metrics["operations"] == fitted_params["operations"]
-    assert metrics["generated_features"] == ["a_plus_b"]
-
-
-def test_metrics_from_fitted_params_bucketing_keys() -> None:
-    """Bucketing transformer types must copy bin_edges/n_bins keys when present."""
-    fe = FeatureEngineer(steps_config=[])
-    fitted_params = {"bin_edges": {"a": [0.0, 1.0, 2.0]}, "n_bins": 3}
-    metrics: Dict[str, Any] = {}
-    fe._metrics_from_fitted_params(
-        "KBinsDiscretizer", fitted_params, pd.DataFrame(), pd.DataFrame(), metrics
-    )
-    assert metrics["bin_edges"] == fitted_params["bin_edges"]
-    assert metrics["n_bins"] == 3
+    for key, value in expected_metrics.items():
+        assert metrics[key] == value
 
 
 # ---------------------------------------------------------------------------
@@ -638,27 +571,19 @@ def test_metrics_resampling_handles_extraction_failure_gracefully() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_count_winsorize_diffs_tuple_path_counts_x_and_y_changes() -> None:
+@pytest.mark.parametrize(*_count_winsorize_diffs_tuple_cases)
+def test_count_winsorize_diffs_tuple_path(
+    before_x: Dict[str, Any],
+    before_y: List[Any],
+    after_x: Dict[str, Any],
+    after_y: List[Any],
+    expected: int,
+) -> None:
     """Tuple (X, y) diffs must sum differing cells across both X and y."""
-    x1 = pd.DataFrame({"a": [1.0, 2.0]})
-    x2 = pd.DataFrame({"a": [99.0, 2.0]})
-    y1 = pd.Series([0, 1])
-    y2 = pd.Series([0, 5])
-    diffs = FeatureEngineer._count_winsorize_diffs((x1, y1), (x2, y2))
-    assert diffs == 2
-
-
-def test_count_winsorize_diffs_tuple_path_no_changes() -> None:
-    """Identical tuple data must report zero diffs."""
-    x = pd.DataFrame({"a": [1.0, 2.0]})
-    y = pd.Series([0, 1])
-    diffs = FeatureEngineer._count_winsorize_diffs((x, y), (x.copy(), y.copy()))
-    assert diffs == 0
-
-
-def test_count_winsorize_diffs_non_tuple_non_dataframe_returns_zero() -> None:
-    """Unsupported types must fall through to the default 0."""
-    assert FeatureEngineer._count_winsorize_diffs("not_a_frame", 123) == 0
+    before = (pd.DataFrame(before_x), pd.Series(before_y))
+    after = (pd.DataFrame(after_x), pd.Series(after_y))
+    diffs = FeatureEngineer._count_winsorize_diffs(before, after)
+    assert diffs == expected
 
 
 # ---------------------------------------------------------------------------
@@ -713,92 +638,34 @@ def test_metrics_winsorize_clipped_swallows_exception(monkeypatch: pytest.Monkey
 # ---------------------------------------------------------------------------
 
 
-def test_metrics_shape_change_row_drop_type() -> None:
-    """Deduplicate (a row-drop type) must record removed/remaining/total rows."""
+@pytest.mark.parametrize(*_metrics_shape_change_cases)
+def test_metrics_shape_change(
+    transformer_type: str,
+    df_before: Dict[str, Any],
+    df_after: Dict[str, Any],
+    params: Dict[str, Any],
+    rows_before: int,
+    cols_before: List[str],
+    rows_after: int,
+    cols_after: List[str],
+    expected_metrics: Dict[str, Any],
+) -> None:
+    """_metrics_shape_change must record the transformer-family-specific
+    shape-change metrics (rows dropped, new/dropped columns, encoder counts)
+    across every transformer family it handles.
+    """
     fe = FeatureEngineer(steps_config=[])
     metrics: Dict[str, Any] = {}
     fe._metrics_shape_change(
-        "Deduplicate",
-        pd.DataFrame({"a": [1, 2, 3]}),
-        pd.DataFrame({"a": [1, 2]}),
-        {},
-        3,
-        {"a"},
-        2,
-        {"a"},
+        transformer_type,
+        pd.DataFrame(df_before),
+        pd.DataFrame(df_after),
+        params,
+        rows_before,
+        set(cols_before),
+        rows_after,
+        set(cols_after),
         metrics,
     )
-    assert metrics["Deduplicate_rows_removed"] == 1
-    assert metrics["Deduplicate_rows_remaining"] == 2
-    assert metrics["Deduplicate_rows_total"] == 3
-    assert metrics["rows_removed"] == 1
-    assert metrics["rows_total"] == 3
-
-
-def test_metrics_shape_change_winsorize_also_computes_clipped() -> None:
-    """Winsorize row-drop path must additionally compute values_clipped."""
-    fe = FeatureEngineer(steps_config=[])
-    before = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    after = pd.DataFrame({"a": [1.0, 2.0]})
-    metrics: Dict[str, Any] = {}
-    fe._metrics_shape_change("Winsorize", before, after, {}, 3, {"a"}, 2, {"a"}, metrics)
-    assert "values_clipped" in metrics
-
-
-def test_metrics_shape_change_missing_indicator() -> None:
-    """MissingIndicator must report the newly created indicator columns."""
-    fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
-    fe._metrics_shape_change(
-        "MissingIndicator",
-        pd.DataFrame({"a": [1]}),
-        pd.DataFrame({"a": [1], "a_missing": [0]}),
-        {},
-        1,
-        {"a"},
-        1,
-        {"a", "a_missing"},
-        metrics,
-    )
-    assert metrics["missing_indicators_created"] == 1
-    assert metrics["missing_indicators_columns"] == ["a_missing"]
-
-
-def test_metrics_shape_change_drop_missing_columns() -> None:
-    """DropMissingColumns must report dropped column names + count."""
-    fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
-    fe._metrics_shape_change(
-        "DropMissingColumns",
-        pd.DataFrame({"a": [1], "b": [None]}),
-        pd.DataFrame({"a": [1]}),
-        {},
-        1,
-        {"a", "b"},
-        1,
-        {"a"},
-        metrics,
-    )
-    assert metrics["dropped_columns"] == ["b"]
-    assert metrics["dropped_columns_count"] == 1
-
-
-def test_metrics_shape_change_encoder_with_categories_and_classes_count() -> None:
-    """Encoder types must report new feature count plus categories/classes counts."""
-    fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
-    fe._metrics_shape_change(
-        "OneHotEncoder",
-        pd.DataFrame({"grade": ["A"]}),
-        pd.DataFrame({"grade_A": [1], "grade_B": [0]}),
-        {"columns": ["grade"], "categories_count": 2, "classes_count": 3},
-        1,
-        {"grade"},
-        1,
-        {"grade_A", "grade_B"},
-        metrics,
-    )
-    assert metrics["new_features_count"] == 2
-    assert metrics["encoded_columns_count"] == 1
-    assert metrics["categories_count"] == 2
-    assert metrics["classes_count"] == 3
+    for key, value in expected_metrics.items():
+        assert metrics[key] == value

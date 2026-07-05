@@ -1,0 +1,13 @@
+{
+  "params": "config, expected_dropped",
+  "test_cases": {
+    "variance_threshold": {
+      "config": {"method": "variance_threshold", "threshold": 0.0},
+      "expected_dropped": "const"
+    },
+    "correlation_threshold": {
+      "config": {"method": "correlation_threshold", "threshold": 0.95},
+      "expected_dropped": "a_copy"
+    }
+  }
+}

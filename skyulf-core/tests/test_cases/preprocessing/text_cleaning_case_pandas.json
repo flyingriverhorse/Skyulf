@@ -1,0 +1,30 @@
+{
+  "params": "values, mode, expected",
+  "test_cases": {
+    "upper": {
+      "values": ["hello", "World"],
+      "mode": "upper",
+      "expected": ["HELLO", "WORLD"]
+    },
+    "title": {
+      "values": ["hello world"],
+      "mode": "title",
+      "expected": ["Hello World"]
+    },
+    "sentence_capitalises_first_letter": {
+      "values": ["hELLO WORLD"],
+      "mode": "sentence",
+      "expected": ["Hello world"]
+    },
+    "lower": {
+      "values": ["HELLO", "WoRLd"],
+      "mode": "lower",
+      "expected": ["hello", "world"]
+    },
+    "unknown_mode_falls_through_to_lower": {
+      "values": ["ABC"],
+      "mode": "banana",
+      "expected": ["abc"]
+    }
+  }
+}

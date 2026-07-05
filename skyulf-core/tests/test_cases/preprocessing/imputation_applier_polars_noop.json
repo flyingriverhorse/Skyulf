@@ -1,0 +1,9 @@
+{
+  "params": "applier, df_data, config, imputer_kind",
+  "test_cases": {
+    "knn_missing_columns": {"applier": "knn", "df_data": {"other": [1.0, 2.0, 3.0]}, "config": {"columns": ["a", "b"]}, "imputer_kind": "object"},
+    "knn_transform_error": {"applier": "knn", "df_data": {"a": [1.0, 2.0, 3.0]}, "config": {"columns": ["a"]}, "imputer_kind": "broken"},
+    "iterative_missing_columns": {"applier": "iterative", "df_data": {"other": [1.0, 2.0, 3.0]}, "config": {"columns": ["a", "b"]}, "imputer_kind": "object"},
+    "iterative_transform_error": {"applier": "iterative", "df_data": {"a": [1.0, 2.0, 3.0]}, "config": {"columns": ["a"]}, "imputer_kind": "broken"}
+  }
+}

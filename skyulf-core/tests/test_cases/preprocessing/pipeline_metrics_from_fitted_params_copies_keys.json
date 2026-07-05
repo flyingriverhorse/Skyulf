@@ -1,0 +1,71 @@
+{
+  "params": "transformer_type, fitted_params, df_before, df_after, expected_metrics",
+  "test_cases": {
+    "feature_selection_keys": {
+      "transformer_type": "UnivariateSelection",
+      "fitted_params": {
+        "feature_scores": {"a": 1.0},
+        "p_values": {"a": 0.01},
+        "feature_importances": {"a": 0.5},
+        "variances": {"a": 2.0},
+        "ranking": {"a": 1},
+        "selected_columns": ["a"]
+      },
+      "df_before": {},
+      "df_after": {},
+      "expected_metrics": {
+        "feature_scores": {"a": 1.0},
+        "p_values": {"a": 0.01},
+        "feature_importances": {"a": 0.5},
+        "variances": {"a": 2.0},
+        "ranking": {"a": 1},
+        "selected_columns": ["a"]
+      }
+    },
+    "outlier_warnings_and_bounds": {
+      "transformer_type": "IQR",
+      "fitted_params": {
+        "warnings": ["clipped col a"],
+        "bounds": {"a": [0.0, 10.0]}
+      },
+      "df_before": {},
+      "df_after": {},
+      "expected_metrics": {
+        "warnings": ["clipped col a"],
+        "bounds": {"a": [0.0, 10.0]}
+      }
+    },
+    "zscore_stats": {
+      "transformer_type": "ZScore",
+      "fitted_params": {"stats": {"a": {"mean": 0.0, "std": 1.0}}},
+      "df_before": {},
+      "df_after": {},
+      "expected_metrics": {"stats": {"a": {"mean": 0.0, "std": 1.0}}}
+    },
+    "elliptic_contamination": {
+      "transformer_type": "EllipticEnvelope",
+      "fitted_params": {"contamination": 0.1},
+      "df_before": {},
+      "df_after": {},
+      "expected_metrics": {"contamination": 0.1}
+    },
+    "bucketing_keys": {
+      "transformer_type": "KBinsDiscretizer",
+      "fitted_params": {"bin_edges": {"a": [0.0, 1.0, 2.0]}, "n_bins": 3},
+      "df_before": {},
+      "df_after": {},
+      "expected_metrics": {"bin_edges": {"a": [0.0, 1.0, 2.0]}, "n_bins": 3}
+    },
+    "feature_generation": {
+      "transformer_type": "FeatureMath",
+      "fitted_params": {"operations": [{"op": "add", "columns": ["a", "b"]}]},
+      "df_before": {"a": [1.0], "b": [2.0]},
+      "df_after": {"a": [1.0], "b": [2.0], "a_plus_b": [3.0]},
+      "expected_metrics": {
+        "operations_count": 1,
+        "operations": [{"op": "add", "columns": ["a", "b"]}],
+        "generated_features": ["a_plus_b"]
+      }
+    }
+  }
+}

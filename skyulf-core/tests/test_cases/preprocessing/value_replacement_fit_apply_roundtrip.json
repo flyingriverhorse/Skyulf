@@ -1,0 +1,24 @@
+{
+  "params": "data, config, column, expected",
+  "test_cases": {
+    "replacements_list": {
+      "data": {"grade": ["A", "B", "C"]},
+      "config": {
+        "columns": ["grade"],
+        "replacements": [
+          {"old": "A", "new": 4},
+          {"old": "B", "new": 3},
+          {"old": "C", "new": 2}
+        ]
+      },
+      "column": "grade",
+      "expected": [4, 3, 2]
+    },
+    "to_replace_value": {
+      "data": {"a": [-1, 0, -1, 5]},
+      "config": {"columns": ["a"], "to_replace": -1, "value": 0},
+      "column": "a",
+      "expected": [0, 0, 0, 5]
+    }
+  }
+}

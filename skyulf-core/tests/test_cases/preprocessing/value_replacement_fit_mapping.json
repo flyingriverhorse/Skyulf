@@ -1,0 +1,27 @@
+{
+  "params": "config, expected_mapping, expected_columns",
+  "test_cases": {
+    "mapping_from_config": {
+      "config": {"columns": ["a"], "mapping": {"1": 100}},
+      "expected_mapping": {"1": 100},
+      "expected_columns": ["a"]
+    },
+    "replacements_list": {
+      "config": {
+        "columns": ["a"],
+        "replacements": [{"old": 1, "new": 10}, {"old": 2, "new": 20}]
+      },
+      "expected_mapping": {"1": 10, "2": 20},
+      "expected_columns": null
+    },
+    "replacements_overrides_mapping": {
+      "config": {
+        "columns": ["a"],
+        "mapping": {"1": 999},
+        "replacements": [{"old": 1, "new": 5}]
+      },
+      "expected_mapping": {"1": 5},
+      "expected_columns": null
+    }
+  }
+}

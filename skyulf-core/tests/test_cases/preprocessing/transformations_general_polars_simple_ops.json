@@ -1,0 +1,11 @@
+{
+  "params": "method",
+  "test_cases": {
+    "log": {"method": "log"},
+    "sqrt": {"method": "sqrt"},
+    "square": {"method": "square"},
+    "exp": {"method": "exp"},
+    "cube_root": {"method": "cube_root"},
+    "reciprocal": {"method": "reciprocal"}
+  }
+}

@@ -11,6 +11,7 @@ import math
 import pandas as pd
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_generation import (
     FeatureGenerationApplier,
@@ -26,6 +27,16 @@ _CALC = FeatureGenerationCalculator()
 
 DATE_COL = "ts"
 DATES = ["2024-01-15", "2024-07-04", "2023-12-31", "2022-03-07"]
+
+_arithmetic_ops_cases = TestCaseLoader(
+    "preprocessing/feature_generation_full_arithmetic_ops"
+).load()
+_datetime_extract_cases = TestCaseLoader(
+    "preprocessing/feature_generation_full_datetime_extract"
+).load()
+_datetime_parity_cases = TestCaseLoader(
+    "preprocessing/feature_generation_full_datetime_parity"
+).load()
 
 
 def _make_df() -> pd.DataFrame:
@@ -67,40 +78,19 @@ def _run_polars(ops: list, df: pd.DataFrame | None = None) -> pd.DataFrame:
 
 
 class TestArithmeticPandas:
-    def test_add(self) -> None:
-        out = _run([{"operation_type": "arithmetic", "method": "add", "input_columns": ["a", "b"]}])
+    @pytest.mark.parametrize(*_arithmetic_ops_cases)
+    def test_binary_op(self, method: str, operator_symbol: str) -> None:
+        """add/subtract/multiply/divide on two columns must match the equivalent Python op."""
+        out = _run(
+            [{"operation_type": "arithmetic", "method": method, "input_columns": ["a", "b"]}]
+        )
         assert "arithmetic_0" in out.columns
-        pd.testing.assert_series_equal(
-            out["arithmetic_0"].reset_index(drop=True),
-            (out["a"] + out["b"]).reset_index(drop=True),
-            check_names=False,
-        )
-
-    def test_subtract(self) -> None:
-        out = _run(
-            [{"operation_type": "arithmetic", "method": "subtract", "input_columns": ["a", "b"]}]
-        )
-        pd.testing.assert_series_equal(
-            out["arithmetic_0"].reset_index(drop=True),
-            (out["a"] - out["b"]).reset_index(drop=True),
-            check_names=False,
-        )
-
-    def test_multiply(self) -> None:
-        out = _run(
-            [{"operation_type": "arithmetic", "method": "multiply", "input_columns": ["a", "b"]}]
-        )
-        pd.testing.assert_series_equal(
-            out["arithmetic_0"].reset_index(drop=True),
-            (out["a"] * out["b"]).reset_index(drop=True),
-            check_names=False,
-        )
-
-    def test_divide(self) -> None:
-        out = _run(
-            [{"operation_type": "arithmetic", "method": "divide", "input_columns": ["a", "b"]}]
-        )
-        expected = out["a"] / out["b"]
+        expected = {
+            "+": out["a"] + out["b"],
+            "-": out["a"] - out["b"],
+            "*": out["a"] * out["b"],
+            "/": out["a"] / out["b"],
+        }[operator_symbol]
         pd.testing.assert_series_equal(
             out["arithmetic_0"].reset_index(drop=True),
             expected.reset_index(drop=True),
@@ -245,23 +235,10 @@ class TestDatetimeExtractPandas:
             ]
         )
 
-    def test_year(self) -> None:
-        assert list(self.out[f"{DATE_COL}_year"]) == [2024, 2024, 2023, 2022]
-
-    def test_quarter(self) -> None:
-        # Jan → Q1, Jul → Q3, Dec → Q4, Mar → Q1
-        assert list(self.out[f"{DATE_COL}_quarter"]) == [1, 3, 4, 1]
-
-    def test_month_numeric(self) -> None:
-        assert list(self.out[f"{DATE_COL}_month"]) == [1, 7, 12, 3]
-
-    def test_month_name_strings(self) -> None:
-        assert list(self.out[f"{DATE_COL}_month_name"]) == [
-            "January",
-            "July",
-            "December",
-            "March",
-        ]
+    @pytest.mark.parametrize(*_datetime_extract_cases)
+    def test_extracted_feature_values(self, feature: str, expected: list) -> None:
+        """Each supported datetime_extract feature must produce the expected values."""
+        assert list(self.out[f"{DATE_COL}_{feature}"]) == expected
 
     def test_month_name_is_distinct_from_month(self) -> None:
         # month is int; month_name is str — they must not be equal
@@ -270,30 +247,11 @@ class TestDatetimeExtractPandas:
         assert self.out[f"{DATE_COL}_month"].dtype != object  # numeric
         assert self.out[f"{DATE_COL}_month_name"].dtype == object  # string
 
-    def test_week_iso(self) -> None:
-        # ISO week for 2024-01-15 = 3, 2024-07-04 = 27, 2023-12-31 = 52, 2022-03-07 = 10
-        assert list(self.out[f"{DATE_COL}_week"]) == [3, 27, 52, 10]
-
-    def test_day_of_month(self) -> None:
-        assert list(self.out[f"{DATE_COL}_day"]) == [15, 4, 31, 7]
-
-    def test_day_name_strings(self) -> None:
-        assert list(self.out[f"{DATE_COL}_day_name"]) == ["Monday", "Thursday", "Sunday", "Monday"]
-
     def test_day_name_is_distinct_from_day(self) -> None:
         assert f"{DATE_COL}_day" in self.out.columns
         assert f"{DATE_COL}_day_name" in self.out.columns
         assert self.out[f"{DATE_COL}_day"].dtype != object
         assert self.out[f"{DATE_COL}_day_name"].dtype == object
-
-    def test_weekday_zero_indexed(self) -> None:
-        # 2024-01-15 = Monday = 0; 2024-07-04 = Thursday = 3
-        # 2023-12-31 = Sunday = 6; 2022-03-07 = Monday = 0
-        assert list(self.out[f"{DATE_COL}_weekday"]) == [0, 3, 6, 0]
-
-    def test_is_weekend(self) -> None:
-        # Mon=0, Thu=0, Sun=1, Mon=0
-        assert list(self.out[f"{DATE_COL}_is_weekend"]) == [0, 0, 1, 0]
 
     def test_hour_is_zero_for_date_only(self) -> None:
         assert (self.out[f"{DATE_COL}_hour"] == 0).all()
@@ -371,18 +329,13 @@ class TestDatetimeExtractPolars:
             ]
         )
 
-    def test_year_parity(self) -> None:
+    @pytest.mark.parametrize(*_datetime_parity_cases)
+    def test_numeric_feature_parity(self, feature: str, check_dtype: bool) -> None:
+        """Numeric datetime_extract features must match between pandas and polars engines."""
         pd.testing.assert_series_equal(
-            self.out_pd[f"{DATE_COL}_year"].reset_index(drop=True),
-            self.out_pl[f"{DATE_COL}_year"].reset_index(drop=True),
-            check_dtype=False,
-        )
-
-    def test_month_parity(self) -> None:
-        pd.testing.assert_series_equal(
-            self.out_pd[f"{DATE_COL}_month"].reset_index(drop=True),
-            self.out_pl[f"{DATE_COL}_month"].reset_index(drop=True),
-            check_dtype=False,
+            self.out_pd[f"{DATE_COL}_{feature}"].reset_index(drop=True),
+            self.out_pl[f"{DATE_COL}_{feature}"].reset_index(drop=True),
+            check_dtype=check_dtype,
         )
 
     def test_month_name_parity(self) -> None:
@@ -390,37 +343,9 @@ class TestDatetimeExtractPolars:
             self.out_pl[f"{DATE_COL}_month_name"]
         )
 
-    def test_week_parity(self) -> None:
-        pd.testing.assert_series_equal(
-            self.out_pd[f"{DATE_COL}_week"].reset_index(drop=True),
-            self.out_pl[f"{DATE_COL}_week"].reset_index(drop=True),
-            check_dtype=False,
-        )
-
-    def test_day_parity(self) -> None:
-        pd.testing.assert_series_equal(
-            self.out_pd[f"{DATE_COL}_day"].reset_index(drop=True),
-            self.out_pl[f"{DATE_COL}_day"].reset_index(drop=True),
-            check_dtype=False,
-        )
-
     def test_day_name_parity(self) -> None:
         assert list(self.out_pd[f"{DATE_COL}_day_name"]) == list(
             self.out_pl[f"{DATE_COL}_day_name"]
-        )
-
-    def test_weekday_parity(self) -> None:
-        pd.testing.assert_series_equal(
-            self.out_pd[f"{DATE_COL}_weekday"].reset_index(drop=True),
-            self.out_pl[f"{DATE_COL}_weekday"].reset_index(drop=True),
-            check_dtype=False,
-        )
-
-    def test_is_weekend_parity(self) -> None:
-        pd.testing.assert_series_equal(
-            self.out_pd[f"{DATE_COL}_is_weekend"].reset_index(drop=True),
-            self.out_pl[f"{DATE_COL}_is_weekend"].reset_index(drop=True),
-            check_dtype=False,
         )
 
     def test_polars_no_columns_missing(self) -> None:

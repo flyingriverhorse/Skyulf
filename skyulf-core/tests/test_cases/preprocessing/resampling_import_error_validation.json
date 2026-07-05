@@ -1,0 +1,15 @@
+{
+  "params": "func_name, submodule, error_match",
+  "test_cases": {
+    "import_over_samplers": {
+      "func_name": "_import_over_samplers",
+      "submodule": "imblearn.over_sampling",
+      "error_match": "imblearn is required for oversampling"
+    },
+    "import_under_samplers": {
+      "func_name": "_import_under_samplers",
+      "submodule": "imblearn.under_sampling",
+      "error_match": "imblearn is required for undersampling"
+    }
+  }
+}

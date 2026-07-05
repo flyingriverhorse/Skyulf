@@ -1,0 +1,7 @@
+{
+  "params": "bins, expected_bin_edges",
+  "test_cases": {
+    "sorts_user_edges": {"bins": [9, 0, 5], "expected_bin_edges": {"x": [0, 5, 9]}},
+    "empty_bins_yields_empty_map": {"bins": [], "expected_bin_edges": {}}
+  }
+}

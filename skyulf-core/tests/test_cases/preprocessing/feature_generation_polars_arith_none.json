@@ -1,0 +1,13 @@
+{
+  "params": "method, input_columns",
+  "test_cases": {
+    "unknown_method_returns_none": {
+      "method": "hypercube",
+      "input_columns": ["a"]
+    },
+    "no_terms_returns_none": {
+      "method": "add",
+      "input_columns": ["nonexistent"]
+    }
+  }
+}

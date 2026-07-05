@@ -1,0 +1,7 @@
+{
+  "params": "column, expected_in",
+  "test_cases": {
+    "constant_column_removed": {"column": "const", "expected_in": false},
+    "varying_column_kept": {"column": "a", "expected_in": true}
+  }
+}

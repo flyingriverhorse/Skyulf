@@ -1,0 +1,8 @@
+{
+  "params": "calculator",
+  "test_cases": {
+    "simple": {"calculator": "simple"},
+    "knn": {"calculator": "knn"},
+    "iterative": {"calculator": "iterative"}
+  }
+}

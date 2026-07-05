@@ -1,0 +1,33 @@
+{
+  "params": "method, extra_config, use_overlap_data, rng_seed, min_minority",
+  "test_cases": {
+    "adasyn": {
+      "method": "adasyn",
+      "extra_config": {"k_neighbors": 3},
+      "use_overlap_data": true,
+      "rng_seed": 5,
+      "min_minority": 20
+    },
+    "kmeans_smote": {
+      "method": "kmeans_smote",
+      "extra_config": {"k_neighbors": 3, "cluster_balance_threshold": 0.01},
+      "use_overlap_data": true,
+      "rng_seed": 11,
+      "min_minority": 20
+    },
+    "borderline_smote": {
+      "method": "borderline_smote",
+      "extra_config": {"k_neighbors": 3, "m_neighbors": 5},
+      "use_overlap_data": false,
+      "rng_seed": null,
+      "min_minority": 20
+    },
+    "svm_smote": {
+      "method": "svm_smote",
+      "extra_config": {"k_neighbors": 3, "m_neighbors": 5, "out_step": 0.3},
+      "use_overlap_data": false,
+      "rng_seed": null,
+      "min_minority": 20
+    }
+  }
+}

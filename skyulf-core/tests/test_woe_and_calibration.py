@@ -1,12 +1,24 @@
 """Tests for the WOE/IV encoder and the calibrated classifier node."""
 
+import importlib
+
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 from skyulf.registry import NodeRegistry
+
+_base_estimator_cases = TestCaseLoader("preprocessing/calibrated_classifier_base_estimator").load()
+
+
+def _import_from_path(dotted_path: str) -> type:
+    """Import a class from a fully-qualified dotted path, e.g. ``sklearn.ensemble.RandomForestClassifier``."""
+    module_path, class_name = dotted_path.rsplit(".", 1)
+    return getattr(importlib.import_module(module_path), class_name)
 
 
 def _woe_frame() -> pd.DataFrame:
@@ -87,39 +99,40 @@ def test_calibrated_classifier_registered_and_predicts():
     assert ((proba.to_numpy() >= 0) & (proba.to_numpy() <= 1)).all()
 
 
-def test_calibrated_classifier_selectable_base_estimator():
-    from sklearn.ensemble import RandomForestClassifier
+class TestCalibratedClassifierBaseEstimator:
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/calibrated_classifier_base_estimator.json``.
+    """
 
-    rng = np.random.default_rng(1)
-    X = pd.DataFrame(
-        rng.normal(size=(40, 3)),
-        columns=["a", "b", "c"],  # ty: ignore[invalid-argument-type]
-    )
-    y = pd.Series((X["a"] + X["b"] > 0).astype(int))
+    @pytest.mark.parametrize(*_base_estimator_cases)
+    def test_base_estimator_resolution(
+        self,
+        base_estimator: str,
+        method: str | None,
+        expected_estimator_path: str,
+        expected_method: str | None,
+    ) -> None:
+        """A known ``base_estimator`` key resolves to its matching estimator class;
+        an unknown key falls back to logistic regression rather than raising.
+        """
+        rng = np.random.default_rng(1)
+        X = pd.DataFrame(
+            rng.normal(size=(40, 3)),
+            columns=["a", "b", "c"],  # ty: ignore[invalid-argument-type]
+        )
+        y = pd.Series((X["a"] + X["b"] > 0).astype(int))
 
-    calc = NodeRegistry.get_calculator("calibrated_classifier")()
-    model = calc.fit(X, y, {"base_estimator": "random_forest", "method": "isotonic", "cv": 3})
+        calc = NodeRegistry.get_calculator("calibrated_classifier")()
+        config = {"base_estimator": base_estimator, "cv": 3}
+        if method is not None:
+            config["method"] = method
+        model = calc.fit(X, y, config)
 
-    # The string key must be resolved into the matching estimator instance.
-    assert isinstance(model.estimator, RandomForestClassifier)
-    assert model.method == "isotonic"
-
-
-def test_calibrated_classifier_unknown_base_estimator_falls_back():
-    from sklearn.linear_model import LogisticRegression
-
-    rng = np.random.default_rng(2)
-    X = pd.DataFrame(
-        rng.normal(size=(30, 2)),
-        columns=["a", "b"],  # ty: ignore[invalid-argument-type]
-    )
-    y = pd.Series((X["a"] > 0).astype(int))
-
-    calc = NodeRegistry.get_calculator("calibrated_classifier")()
-    model = calc.fit(X, y, {"base_estimator": "does_not_exist", "cv": 3})
-
-    # Unknown keys fall back to logistic regression rather than raising.
-    assert isinstance(model.estimator, LogisticRegression)
+        # The string key must be resolved into the matching estimator instance
+        # (or fall back to logistic regression for an unknown key).
+        assert isinstance(model.estimator, _import_from_path(expected_estimator_path))
+        if expected_method is not None:
+            assert model.method == expected_method
 
 
 # ---------------------------------------------------------------------------

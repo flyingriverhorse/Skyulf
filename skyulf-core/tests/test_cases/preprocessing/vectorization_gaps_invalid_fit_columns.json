@@ -1,0 +1,11 @@
+{
+  "params": "node, columns",
+  "test_cases": {
+    "hashing_vectorizer_empty_columns": {"node": "hashing_vectorizer", "columns": []},
+    "hashing_vectorizer_missing_column": {"node": "hashing_vectorizer", "columns": ["nonexistent"]},
+    "tfidf_vectorizer_empty_columns": {"node": "tfidf_vectorizer", "columns": []},
+    "tfidf_vectorizer_missing_column": {"node": "tfidf_vectorizer", "columns": ["nonexistent"]},
+    "count_vectorizer_missing_column": {"node": "count_vectorizer", "columns": ["nonexistent"]},
+    "tokenizer_missing_column": {"node": "tokenizer", "columns": ["nonexistent"]}
+  }
+}
