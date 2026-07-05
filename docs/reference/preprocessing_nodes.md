@@ -598,6 +598,49 @@ Learned params:
 
 - `operations`, `epsilon`, `allow_overwrite`
 
+## Geo
+
+### GeoDistance
+
+Computes the great-circle (`haversine`) or flat-plane (`euclidean`) distance
+between two lat/lon coordinate pairs and appends it as a new numeric column.
+Pure math — no optional geospatial dependency required, and runs natively on
+both the pandas and polars engines.
+
+Config:
+
+- `lat1_col`: str
+- `lon1_col`: str
+- `lat2_col`: str
+- `lon2_col`: str
+- `method`: str (`"haversine"` default, or `"euclidean"` for a cheap flat-plane approximation)
+- `unit`: str (`"km"` default, or `"mi"`)
+- `output_column`: str (default `"geo_distance_km"`)
+
+Learned params:
+
+- `lat1_col`, `lon1_col`, `lat2_col`, `lon2_col`, `method`, `unit`, `output_column`
+
+### H3Index
+
+Computes the Uber H3 hierarchical hexagonal grid cell index for each lat/lon
+pair and appends it as a new string column, using `h3.latlng_to_cell`.
+Requires the optional `h3` package (`pip install skyulf-core[geo]` or
+`pip install h3`); `Calculator.fit()` raises a clear `ImportError` if it isn't
+installed. The pandas engine computes row-wise (h3 has no vectorized API);
+the polars engine converts to pandas internally and back.
+
+Config:
+
+- `lat_col`: str
+- `lon_col`: str
+- `resolution`: int (0-15, H3 grid resolution, default 9)
+- `output_column`: str (default `"h3_index"`)
+
+Learned params:
+
+- `lat_col`, `lon_col`, `resolution`, `output_column`
+
 ## Feature Selection
 
 ### VarianceThreshold
