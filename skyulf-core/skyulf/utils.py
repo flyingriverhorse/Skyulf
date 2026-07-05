@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Any, Callable, cast
 
 import numpy as np
 import pandas as pd
@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 def get_data_stats(
-    data: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any], SplitDataset],
-) -> Tuple[int, Set[str]]:
+    data: pd.DataFrame | SkyulfDataFrame | tuple[Any, Any] | SplitDataset,
+) -> tuple[int, set[str]]:
     """
     Calculates row count and column set for various data structures.
     Supports DataFrame, (X, y) tuple, and SplitDataset.
     """
     rows: int = 0
-    cols: Set[str] = set()
+    cols: set[str] = set()
 
     # Cast to Any so the hasattr-driven duck-typed access below type-checks.
     payload = cast(Any, data)
@@ -53,8 +53,8 @@ def get_data_stats(
 
 
 def unpack_pipeline_input(
-    data: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]],
-) -> Tuple[Any, Optional[Any], bool]:
+    data: pd.DataFrame | SkyulfDataFrame | tuple[Any, Any],
+) -> tuple[Any, Any | None, bool]:
     """
     Unpacks input which might be a DataFrame or a (X, y) tuple.
     Returns: (X, y, is_tuple)
@@ -73,8 +73,8 @@ def unpack_pipeline_input(
 
 
 def pack_pipeline_output(
-    X: Any, y: Optional[Any], was_tuple: bool
-) -> Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, Any]]:
+    X: Any, y: Any | None, was_tuple: bool
+) -> pd.DataFrame | SkyulfDataFrame | tuple[Any, Any]:
     """
     Packs output back into a tuple if the input was a tuple and y is present.
     Otherwise, if y is present, concatenates it back to X.
@@ -153,7 +153,7 @@ def pack_pipeline_output(
     return X
 
 
-def _is_binary_numeric(series: Union[pd.Series, Any]) -> bool:
+def _is_binary_numeric(series: pd.Series | Any) -> bool:
     """Check if a numeric series contains only 0s and 1s (or close to them)."""
     # Handle Polars Series
     if hasattr(series, "n_unique"):
@@ -178,10 +178,10 @@ def _is_binary_numeric(series: Union[pd.Series, Any]) -> bool:
 
 
 def detect_numeric_columns(
-    frame: Union[pd.DataFrame, SkyulfDataFrame],
+    frame: pd.DataFrame | SkyulfDataFrame,
     exclude_binary: bool = True,
     exclude_constant: bool = True,
-) -> List[str]:
+) -> list[str]:
     """
     Find numeric-like columns.
 
@@ -196,7 +196,7 @@ def detect_numeric_columns(
     if engine.name == EngineName.POLARS:
         import polars as pl
 
-        detected: List[str] = []
+        detected: list[str] = []
 
         # Select numeric columns first
         numeric_cols = [
@@ -247,8 +247,8 @@ def detect_numeric_columns(
         if hasattr(frame, "to_pandas"):
             frame = frame.to_pandas()
 
-    detected: List[str] = []
-    seen: Set[str] = set()
+    detected: list[str] = []
+    seen: set[str] = set()
 
     for column in frame.columns:
         if column in seen:
@@ -285,13 +285,11 @@ def detect_numeric_columns(
 
 
 def resolve_columns(
-    df: Union[pd.DataFrame, SkyulfDataFrame],
-    config: Dict[str, Any],
-    default_selection_func: Optional[
-        Callable[[Union[pd.DataFrame, SkyulfDataFrame]], List[str]]
-    ] = None,
+    df: pd.DataFrame | SkyulfDataFrame,
+    config: dict[str, Any],
+    default_selection_func: Callable[[pd.DataFrame | SkyulfDataFrame], list[str]] | None = None,
     target_column_key: str = "target_column",
-) -> List[str]:
+) -> list[str]:
     """
     Resolves the list of columns to process based on configuration and auto-detection.
 
@@ -325,7 +323,7 @@ def resolve_columns(
     return []
 
 
-def user_picked_no_columns(config: Dict[str, Any]) -> bool:
+def user_picked_no_columns(config: dict[str, Any]) -> bool:
     """Return True when the caller explicitly passed `columns: []`.
 
     Many preprocessing UIs let the user multi-select the columns to operate
