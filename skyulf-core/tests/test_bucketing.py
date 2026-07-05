@@ -14,6 +14,7 @@ import pandas as pd
 import polars as pl
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.bucketing import (
     CustomBinningApplier,
@@ -26,6 +27,22 @@ from skyulf.preprocessing.bucketing import (
     _resolve_kbins_strategy,
 )
 
+_fit_edges_cases = TestCaseLoader("preprocessing/bucketing_fit_edges").load()
+_resolve_kbins_strategy_cases = TestCaseLoader(
+    "preprocessing/bucketing_resolve_kbins_strategy_aliases"
+).load()
+_custom_binning_bin_edges_cases = TestCaseLoader(
+    "preprocessing/bucketing_custom_binning_bin_edges"
+).load()
+_out_of_range_missing_strategy_cases = TestCaseLoader(
+    "preprocessing/bucketing_apply_out_of_range_missing_strategy"
+).load()
+_no_columns_cases = TestCaseLoader(
+    "preprocessing/bucketing_no_columns_returns_empty_artifact"
+).load()
+
+_NO_COLUMNS_CALCULATORS = {"general": GeneralBinningCalculator, "custom": CustomBinningCalculator}
+
 
 def _series_0_to_9() -> pd.DataFrame:
     """A simple 10-row numeric DataFrame: x = 0..9."""
@@ -37,14 +54,21 @@ def _series_0_to_9() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def test_fit_equal_width_bin_edges_exact() -> None:
-    """equal_width with n_bins=5 on 0..9 must produce the known pandas.cut edges."""
-    df = _series_0_to_9()
-    params = GeneralBinningCalculator().fit(
-        df, {"columns": ["x"], "strategy": "equal_width", "n_bins": 5}
-    )
-    edges = params["bin_edges"]["x"]
-    assert edges == pytest.approx([0.0, 1.8, 3.6, 5.4, 7.2, 9.0])
+class TestFitBinEdgesByStrategy:
+    """Fit-time bin-edge computation across binning strategies — scenarios loaded
+    from ``tests/test_cases/preprocessing/bucketing_fit_edges.json``.
+    """
+
+    @pytest.mark.parametrize(*_fit_edges_cases)
+    def test_fit_bin_edges_exact(
+        self, strategy: str, n_bins: int, expected_edges: list[float]
+    ) -> None:
+        df = _series_0_to_9()
+        params = GeneralBinningCalculator().fit(
+            df, {"columns": ["x"], "strategy": strategy, "n_bins": n_bins}
+        )
+        edges = params["bin_edges"]["x"]
+        assert edges == pytest.approx(expected_edges)
 
 
 def test_fit_equal_width_edge_zero_clamped_to_series_min() -> None:
@@ -59,16 +83,6 @@ def test_fit_equal_width_edge_zero_clamped_to_series_min() -> None:
 # ---------------------------------------------------------------------------
 # Fit — equal_frequency (quantile)
 # ---------------------------------------------------------------------------
-
-
-def test_fit_equal_frequency_bin_edges_exact() -> None:
-    """equal_frequency (qcut) with n_bins=4 on 0..9 must produce quartile edges."""
-    df = _series_0_to_9()
-    params = GeneralBinningCalculator().fit(
-        df, {"columns": ["x"], "strategy": "equal_frequency", "n_bins": 4}
-    )
-    edges = params["bin_edges"]["x"]
-    assert edges == pytest.approx([0.0, 2.25, 4.5, 6.75, 9.0])
 
 
 def test_fit_equal_frequency_each_bin_has_similar_population() -> None:
@@ -88,16 +102,6 @@ def test_fit_equal_frequency_each_bin_has_similar_population() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_fit_kmeans_bin_edges_exact() -> None:
-    """kmeans strategy on 0..9 with n_bins=3 must match sklearn's KBinsDiscretizer directly."""
-    df = _series_0_to_9()
-    params = GeneralBinningCalculator().fit(
-        df, {"columns": ["x"], "strategy": "kmeans", "n_bins": 3}
-    )
-    edges = params["bin_edges"]["x"]
-    assert edges == pytest.approx([0.0, 3.25, 6.5, 9.0])
-
-
 def test_fit_kbins_via_wrapper_uses_uniform_edges() -> None:
     """KBinsDiscretizerCalculator with strategy='uniform' must match sklearn uniform edges."""
     df = _series_0_to_9()
@@ -108,11 +112,14 @@ def test_fit_kbins_via_wrapper_uses_uniform_edges() -> None:
     assert edges == pytest.approx([0.0, 3.0, 6.0, 9.0])
 
 
-def test_resolve_kbins_strategy_aliases() -> None:
-    """UI-friendly strategy aliases must map to sklearn's strategy names."""
-    assert _resolve_kbins_strategy("equal_width") == "uniform"
-    assert _resolve_kbins_strategy("equal_frequency") == "quantile"
-    assert _resolve_kbins_strategy("kmeans") == "kmeans"
+class TestResolveKBinsStrategyAliases:
+    """UI-friendly strategy alias mapping — scenarios loaded from
+    ``tests/test_cases/preprocessing/bucketing_resolve_kbins_strategy_aliases.json``.
+    """
+
+    @pytest.mark.parametrize(*_resolve_kbins_strategy_cases)
+    def test_resolve_kbins_strategy_aliases(self, alias: str, expected: str) -> None:
+        assert _resolve_kbins_strategy(alias) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -120,18 +127,18 @@ def test_resolve_kbins_strategy_aliases() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_fit_custom_binning_sorts_user_edges() -> None:
-    """CustomBinningCalculator must sort the user-supplied bin edges."""
-    df = _series_0_to_9()
-    params = CustomBinningCalculator().fit(df, {"columns": ["x"], "bins": [9, 0, 5]})
-    assert params["bin_edges"]["x"] == [0, 5, 9]
+class TestFitCustomBinningBinEdges:
+    """CustomBinningCalculator bin-edge resolution — scenarios loaded from
+    ``tests/test_cases/preprocessing/bucketing_custom_binning_bin_edges.json``.
+    """
 
-
-def test_fit_custom_binning_empty_bins_yields_empty_map() -> None:
-    """An empty `bins` list must produce an empty bin_edges map (no-op)."""
-    df = _series_0_to_9()
-    params = CustomBinningCalculator().fit(df, {"columns": ["x"], "bins": []})
-    assert params["bin_edges"] == {}
+    @pytest.mark.parametrize(*_custom_binning_bin_edges_cases)
+    def test_fit_custom_binning_bin_edges(
+        self, bins: list[int], expected_bin_edges: dict[str, list[int]]
+    ) -> None:
+        df = _series_0_to_9()
+        params = CustomBinningCalculator().fit(df, {"columns": ["x"], "bins": bins})
+        assert params["bin_edges"] == expected_bin_edges
 
 
 # ---------------------------------------------------------------------------
@@ -139,11 +146,20 @@ def test_fit_custom_binning_empty_bins_yields_empty_map() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_fit_general_binning_no_columns_returns_empty_artifact() -> None:
-    """An explicit empty `columns` list must short-circuit to an empty artifact."""
-    df = _series_0_to_9()
-    params = GeneralBinningCalculator().fit(df, {"columns": []})
-    assert params == {}
+class TestFitNoColumnsReturnsEmptyArtifact:
+    """An explicit empty ``columns`` list must short-circuit to an empty artifact,
+    for both GeneralBinningCalculator and CustomBinningCalculator — scenarios
+    loaded from ``tests/test_cases/preprocessing/bucketing_no_columns_returns_empty_artifact.json``.
+    """
+
+    @pytest.mark.parametrize(*_no_columns_cases)
+    def test_fit_no_columns_returns_empty_artifact(
+        self, calculator_name: str, columns: list[str]
+    ) -> None:
+        df = _series_0_to_9()
+        calculator_cls = _NO_COLUMNS_CALCULATORS[calculator_name]
+        params = calculator_cls().fit(df, {"columns": columns})
+        assert params == {}
 
 
 # ---------------------------------------------------------------------------
@@ -229,41 +245,32 @@ def test_apply_output_suffix_is_configurable() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_apply_out_of_range_values_become_nan() -> None:
-    """Values outside the fitted edges must become NaN at apply time (missing_strategy='keep')."""
-    df = pd.DataFrame({"x": [-5.0, 2.0, 7.0, 15.0]})
-    params: Dict[str, Any] = {
-        "bin_edges": {"x": [0.0, 5.0, 10.0]},
-        "output_suffix": "_binned",
-        "drop_original": False,
-        "label_format": "ordinal",
-        "missing_strategy": "keep",
-        "missing_label": "Missing",
-        "include_lowest": True,
-        "precision": 3,
-    }
-    result = GeneralBinningApplier().apply(df, params)
-    assert np.isnan(result["x_binned"].iloc[0])  # -5 below min
-    assert np.isnan(result["x_binned"].iloc[3])  # 15 above max
-    assert result["x_binned"].iloc[1] == 0.0
-    assert result["x_binned"].iloc[2] == 1.0
+class TestApplyOutOfRangeMissingStrategy:
+    """Out-of-range value handling by ``missing_strategy`` — scenarios loaded
+    from ``tests/test_cases/preprocessing/bucketing_apply_out_of_range_missing_strategy.json``.
+    """
 
-
-def test_apply_missing_strategy_label_tags_out_of_range() -> None:
-    """missing_strategy='label' must tag out-of-range/NaN values with missing_label."""
-    df = pd.DataFrame({"x": [-5.0, 2.0]})
-    params: Dict[str, Any] = {
-        "bin_edges": {"x": [0.0, 5.0, 10.0]},
-        "output_suffix": "_binned",
-        "drop_original": False,
-        "label_format": "ordinal",
-        "missing_strategy": "label",
-        "missing_label": "OOR",
-        "include_lowest": True,
-        "precision": 3,
-    }
-    result = GeneralBinningApplier().apply(df, params)
-    assert result["x_binned"].iloc[0] == "OOR"
+    @pytest.mark.parametrize(*_out_of_range_missing_strategy_cases)
+    def test_apply_out_of_range_values_by_missing_strategy(
+        self, missing_strategy: str, missing_label: str, expected: list[Any]
+    ) -> None:
+        df = pd.DataFrame({"x": [-5.0, 2.0, 7.0, 15.0]})
+        params: Dict[str, Any] = {
+            "bin_edges": {"x": [0.0, 5.0, 10.0]},
+            "output_suffix": "_binned",
+            "drop_original": False,
+            "label_format": "ordinal",
+            "missing_strategy": missing_strategy,
+            "missing_label": missing_label,
+            "include_lowest": True,
+            "precision": 3,
+        }
+        result = GeneralBinningApplier().apply(df, params)
+        for actual, expected_value in zip(result["x_binned"].tolist(), expected, strict=True):
+            if expected_value is None:
+                assert np.isnan(actual)
+            else:
+                assert actual == expected_value
 
 
 def test_apply_single_unique_value_column_assigns_one_bin() -> None:
@@ -584,18 +591,6 @@ def test_fit_one_column_into_maps_swallows_sklearn_errors() -> None:
         custom_labels_map,
     )
     assert "x" not in bin_edges_map
-
-
-# ---------------------------------------------------------------------------
-# Fit — CustomBinningCalculator no-columns short circuit
-# ---------------------------------------------------------------------------
-
-
-def test_fit_custom_binning_no_columns_returns_empty_artifact() -> None:
-    """An explicit empty `columns` list must short-circuit CustomBinningCalculator too."""
-    df = _series_0_to_9()
-    params = CustomBinningCalculator().fit(df, {"columns": []})
-    assert params == {}
 
 
 def test_fit_general_binning_unknown_strategy_yields_no_edges() -> None:

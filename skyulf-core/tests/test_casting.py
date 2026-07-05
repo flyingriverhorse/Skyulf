@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.casting import (
     TYPE_ALIASES,
@@ -25,6 +26,8 @@ from skyulf.preprocessing.casting import (
     _coerce_boolean_value,
     _drop_fractional_or_raise,
 )
+
+_coerce_boolean_value_cases = TestCaseLoader("preprocessing/casting_coerce_boolean_value").load()
 
 # ---------------------------------------------------------------------------
 # TYPE_ALIASES sanity check
@@ -52,28 +55,7 @@ def test_type_aliases_bool_resolves_to_boolean() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "value,expected",
-    [
-        (True, True),
-        (False, False),
-        (1, True),
-        (0, False),
-        ("true", True),
-        ("yes", True),
-        ("1", True),
-        ("on", True),
-        ("y", True),
-        ("t", True),
-        ("false", False),
-        ("no", False),
-        ("0", False),
-        ("off", False),
-        ("n", False),
-        ("f", False),
-        ("maybe", None),
-    ],
-)
+@pytest.mark.parametrize(*_coerce_boolean_value_cases)
 def test_coerce_boolean_value_parametrized(value: Any, expected: Any) -> None:
     """_coerce_boolean_value must convert common truthy/falsy strings and ints."""
     assert _coerce_boolean_value(value) == expected

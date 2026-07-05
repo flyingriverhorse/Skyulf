@@ -5,7 +5,7 @@ single-value helper, Calculator.fit branches, Applier.apply (boolean /
 country / custom), edge cases, and engine parity.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
 import polars as pl
@@ -13,6 +13,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.cleaning._common import (
     ALIAS_PUNCTUATION_TABLE,
@@ -28,44 +29,22 @@ from skyulf.preprocessing.cleaning.alias import (
     _resolve_alias_type,
 )
 
+_alias_type_resolution_cases = TestCaseLoader("preprocessing/alias_type_resolution").load()
+_normalize_custom_map_cases = TestCaseLoader("preprocessing/alias_normalize_custom_map").load()
+_resolve_mapping_cases = TestCaseLoader("preprocessing/alias_resolve_mapping").load()
+_normalize_pandas_value_cases = TestCaseLoader("preprocessing/alias_normalize_pandas_value").load()
+_applier_uniform_cases = TestCaseLoader("preprocessing/alias_applier_uniform_normalisation").load()
+_applier_value_list_cases = TestCaseLoader("preprocessing/alias_applier_value_lists").load()
+
 # ---------------------------------------------------------------------------
 # _resolve_alias_type
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_alias_type_boolean() -> None:
-    """'boolean' alias_type must pass through unchanged."""
-    assert _resolve_alias_type({"alias_type": "boolean"}) == "boolean"
-
-
-def test_resolve_alias_type_country() -> None:
-    """'country' alias_type must pass through unchanged."""
-    assert _resolve_alias_type({"alias_type": "country"}) == "country"
-
-
-def test_resolve_alias_type_custom() -> None:
-    """'custom' alias_type must pass through unchanged."""
-    assert _resolve_alias_type({"alias_type": "custom"}) == "custom"
-
-
-def test_resolve_alias_type_normalize_boolean_remaps_to_boolean() -> None:
-    """Legacy 'normalize_boolean' value must be remapped to 'boolean'."""
-    assert _resolve_alias_type({"alias_type": "normalize_boolean"}) == "boolean"
-
-
-def test_resolve_alias_type_canonicalize_country_codes_remaps() -> None:
-    """Legacy 'canonicalize_country_codes' must be remapped to 'country'."""
-    assert _resolve_alias_type({"alias_type": "canonicalize_country_codes"}) == "country"
-
-
-def test_resolve_alias_type_falls_back_to_mode() -> None:
-    """When alias_type is missing the 'mode' key is used as fallback."""
-    assert _resolve_alias_type({"mode": "boolean"}) == "boolean"
-
-
-def test_resolve_alias_type_defaults_to_boolean() -> None:
-    """When neither alias_type nor mode is provided the default is 'boolean'."""
-    assert _resolve_alias_type({}) == "boolean"
+@pytest.mark.parametrize(*_alias_type_resolution_cases)
+def test_resolve_alias_type(config: Dict[str, Any], expected: str) -> None:
+    """_resolve_alias_type must resolve legacy aliases and defaults correctly."""
+    assert _resolve_alias_type(config) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -73,23 +52,10 @@ def test_resolve_alias_type_defaults_to_boolean() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_normalize_custom_map_lowercases_string_keys() -> None:
-    """String keys must be lowercased during normalisation."""
-    result = _normalize_alias_custom_map({"YES": "Yes", "NO": "No"})
-    assert "yes" in result
-    assert "no" in result
-
-
-def test_normalize_custom_map_strips_punctuation_from_keys() -> None:
-    """Punctuation must be stripped from string keys."""
-    result = _normalize_alias_custom_map({"Yes!": "Yes"})
-    assert "yes" in result
-
-
-def test_normalize_custom_map_strips_spaces_from_keys() -> None:
-    """Spaces must be removed from string keys after lowercasing."""
-    result = _normalize_alias_custom_map({"United States": "USA"})
-    assert "unitedstates" in result
+@pytest.mark.parametrize(*_normalize_custom_map_cases)
+def test_normalize_alias_custom_map(input_map: Dict[str, str], expected: Dict[str, str]) -> None:
+    """_normalize_alias_custom_map must lowercase and strip punctuation from string keys."""
+    assert _normalize_alias_custom_map(input_map) == expected
 
 
 def test_normalize_custom_map_non_string_keys_unchanged() -> None:
@@ -98,39 +64,24 @@ def test_normalize_custom_map_non_string_keys_unchanged() -> None:
     assert result[1] == "one"
 
 
-def test_normalize_custom_map_empty_returns_empty() -> None:
-    """An empty input map must return an empty dict."""
-    assert _normalize_alias_custom_map({}) == {}
-
-
 # ---------------------------------------------------------------------------
 # _resolve_alias_mapping
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_mapping_boolean_returns_common_aliases() -> None:
-    """boolean alias type must return the canonical COMMON_BOOLEAN_ALIASES dict."""
-    result = _resolve_alias_mapping("boolean", {})
-    assert result is COMMON_BOOLEAN_ALIASES
-
-
-def test_resolve_mapping_country_returns_country_map() -> None:
-    """country alias type must return the canonical COUNTRY_ALIAS_MAP dict."""
-    result = _resolve_alias_mapping("country", {})
-    assert result is COUNTRY_ALIAS_MAP
-
-
-def test_resolve_mapping_custom_returns_provided_map() -> None:
-    """custom alias type must return the caller-supplied map."""
-    custom = {"foo": "bar"}
-    result = _resolve_alias_mapping("custom", custom)
-    assert result is custom
-
-
-def test_resolve_mapping_unknown_returns_empty() -> None:
-    """An unrecognised alias type must yield an empty dict."""
-    result = _resolve_alias_mapping("does_not_exist", {})
-    assert result == {}
+@pytest.mark.parametrize(*_resolve_mapping_cases)
+def test_resolve_alias_mapping(
+    alias_type: str, custom_map: Dict[str, str], expected_kind: str
+) -> None:
+    """_resolve_alias_mapping must select the canonical/custom map per alias_type."""
+    result = _resolve_alias_mapping(alias_type, custom_map)
+    expected = {
+        "common_boolean_aliases": COMMON_BOOLEAN_ALIASES,
+        "country_alias_map": COUNTRY_ALIAS_MAP,
+        "custom_map": custom_map,
+        "empty": {},
+    }[expected_kind]
+    assert result == expected
 
 
 # ---------------------------------------------------------------------------
@@ -138,28 +89,10 @@ def test_resolve_mapping_unknown_returns_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_normalize_alias_pandas_matches_key() -> None:
-    """A known alias must be resolved to its canonical value."""
-    mapping = COMMON_BOOLEAN_ALIASES
-    # "Yes " → clean → "yes" → maps to "Yes"
-    assert _normalize_alias_pandas("yes", mapping) == "Yes"
-
-
-def test_normalize_alias_pandas_unknown_value_preserved() -> None:
-    """A value with no matching alias must be returned unchanged."""
-    assert _normalize_alias_pandas("maybe", COMMON_BOOLEAN_ALIASES) == "maybe"
-
-
-def test_normalize_alias_pandas_non_string_passthrough() -> None:
-    """Non-string values (int, float, None) must pass through without error."""
-    assert _normalize_alias_pandas(42, COMMON_BOOLEAN_ALIASES) == 42
-    assert _normalize_alias_pandas(None, COMMON_BOOLEAN_ALIASES) is None
-
-
-def test_normalize_alias_pandas_strips_punctuation_and_spaces() -> None:
-    """Punctuation and spaces in the value must be stripped before lookup."""
-    # "Y.e.s" → lower → "y.e.s" → strip punct → "yes" → maps to "Yes"
-    assert _normalize_alias_pandas("Y.e.s", COMMON_BOOLEAN_ALIASES) == "Yes"
+@pytest.mark.parametrize(*_normalize_pandas_value_cases)
+def test_normalize_alias_pandas(value: Any, expected: Any) -> None:
+    """_normalize_alias_pandas must clean and resolve values against the mapping."""
+    assert _normalize_alias_pandas(value, COMMON_BOOLEAN_ALIASES) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -237,90 +170,32 @@ def test_calculator_fit_custom_pairs_alias() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_applier_boolean_normalises_yes_variants() -> None:
-    """Boolean applier must map 'yes', 'Y', 'TRUE', '1', etc. to 'Yes'."""
-    df = pd.DataFrame({"flag": ["yes", "Y", "TRUE", "1", "on", "True"]})
+@pytest.mark.parametrize(*_applier_uniform_cases)
+def test_applier_uniform_normalisation(
+    col_name: str, values: list, alias_type: str, expected_value: str
+) -> None:
+    """Applier must normalise every equivalent alias value to the canonical form."""
+    df = pd.DataFrame({col_name: values})
     calc = AliasReplacementCalculator()
     applier = AliasReplacementApplier()
-    params = calc.fit(df, {"columns": ["flag"], "alias_type": "boolean"})
+    params = calc.fit(df, {"columns": [col_name], "alias_type": alias_type})
     result = applier.apply(df, params)
-    assert (result["flag"] == "Yes").all()
+    assert (result[col_name] == expected_value).all()
 
 
-def test_applier_boolean_normalises_no_variants() -> None:
-    """Boolean applier must map 'no', 'N', 'FALSE', '0', 'off', etc. to 'No'."""
-    df = pd.DataFrame({"flag": ["no", "N", "FALSE", "0", "off", "f"]})
-    calc = AliasReplacementCalculator()
-    applier = AliasReplacementApplier()
-    params = calc.fit(df, {"columns": ["flag"], "alias_type": "boolean"})
-    result = applier.apply(df, params)
-    assert (result["flag"] == "No").all()
-
-
-def test_applier_unknown_values_preserved() -> None:
-    """Values that don't match any alias must be returned as-is."""
-    df = pd.DataFrame({"flag": ["maybe", "perhaps", "dunno"]})
+@pytest.mark.parametrize(*_applier_value_list_cases)
+def test_applier_value_lists(
+    values: list, alias_type: str, custom_map: Dict[str, str], expected: list
+) -> None:
+    """Applier must map/preserve each value in the list per the given alias config."""
+    df = pd.DataFrame({"flag": values})
     params: Dict[str, Any] = {
         "columns": ["flag"],
-        "alias_type": "boolean",
-        "custom_map": {},
+        "alias_type": alias_type,
+        "custom_map": custom_map,
     }
     result = AliasReplacementApplier().apply(df, params)
-    assert list(result["flag"]) == ["maybe", "perhaps", "dunno"]
-
-
-def test_applier_country_normalises_uk_variants() -> None:
-    """Country applier must map 'UK', 'England', etc. to 'United Kingdom'."""
-    df = pd.DataFrame({"country": ["UK", "England", "United Kingdom", "uk"]})
-    calc = AliasReplacementCalculator()
-    applier = AliasReplacementApplier()
-    params = calc.fit(df, {"columns": ["country"], "alias_type": "country"})
-    result = applier.apply(df, params)
-    assert (result["country"] == "United Kingdom").all()
-
-
-def test_applier_country_normalises_usa_variants() -> None:
-    """Country applier must map 'USA', 'US', 'United States', etc. consistently."""
-    df = pd.DataFrame({"country": ["USA", "US", "America", "States"]})
-    calc = AliasReplacementCalculator()
-    applier = AliasReplacementApplier()
-    params = calc.fit(df, {"columns": ["country"], "alias_type": "country"})
-    result = applier.apply(df, params)
-    assert (result["country"] == "USA").all()
-
-
-def test_applier_custom_mapping() -> None:
-    """Custom map must substitute only the mapped values."""
-    df = pd.DataFrame({"status": ["Active", "Inactive", "Pending"]})
-    calc = AliasReplacementCalculator()
-    applier = AliasReplacementApplier()
-    params = calc.fit(
-        df,
-        {
-            "columns": ["status"],
-            "alias_type": "custom",
-            "custom_map": {"Active": "active", "Inactive": "inactive"},
-        },
-    )
-    result = applier.apply(df, params)
-    assert result["status"].iloc[0] == "active"
-    assert result["status"].iloc[1] == "inactive"
-    # "Pending" has no mapping → preserved
-    assert result["status"].iloc[2] == "Pending"
-
-
-def test_applier_mixed_case_and_punctuation_normalised() -> None:
-    """Values with mixed case and punctuation must still be matched after cleaning."""
-    df = pd.DataFrame({"flag": ["Y.e.s", "N-O", "T.R.U.E."]})
-    params: Dict[str, Any] = {
-        "columns": ["flag"],
-        "alias_type": "boolean",
-        "custom_map": {},
-    }
-    result = AliasReplacementApplier().apply(df, params)
-    assert result["flag"].iloc[0] == "Yes"
-    assert result["flag"].iloc[1] == "No"
-    assert result["flag"].iloc[2] == "Yes"
+    assert list(result["flag"]) == expected
 
 
 def test_applier_empty_dataframe() -> None:

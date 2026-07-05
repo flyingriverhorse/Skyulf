@@ -1,0 +1,8 @@
+{
+  "params": "values, bounds, expected",
+  "test_cases": {
+    "lower_bound_only": {"values": [-1.0, 0.0, 1.0], "bounds": {"lower": 0.0}, "expected": [false, true, true]},
+    "boundary_value_included": {"values": [9.9, 10.0, 10.1], "bounds": {"upper": 10.0}, "expected": [true, true, false]},
+    "null_always_inlier": {"values": [null, 0.0, 999.0], "bounds": {"lower": 0.0, "upper": 10.0}, "expected": [true, true, false]}
+  }
+}

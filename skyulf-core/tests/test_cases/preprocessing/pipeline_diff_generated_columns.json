@@ -1,0 +1,20 @@
+{
+  "params": "df_before, df_after, expected",
+  "test_cases": {
+    "adds_new_column": {
+      "df_before": {"a": [1.0], "b": [2.0]},
+      "df_after": {"a": [1.0], "b": [2.0], "c": [3.0]},
+      "expected": ["c"]
+    },
+    "no_new_columns": {
+      "df_before": {"a": [1.0]},
+      "df_after": {"a": [1.0]},
+      "expected": []
+    },
+    "incompatible_types": {
+      "df_before": "not_a_frame",
+      "df_after": {},
+      "expected": null
+    }
+  }
+}

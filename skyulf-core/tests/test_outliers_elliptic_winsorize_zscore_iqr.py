@@ -15,6 +15,7 @@ import pandas as pd
 import polars as pl
 import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing.outliers.elliptic import (
@@ -25,15 +26,95 @@ from skyulf.preprocessing.outliers.iqr import IQRApplier, IQRCalculator
 from skyulf.preprocessing.outliers.winsorize import WinsorizeApplier, WinsorizeCalculator
 from skyulf.preprocessing.outliers.zscore import ZScoreApplier, ZScoreCalculator
 
+# Maps a JSON-friendly node name to its Calculator class, shared by the
+# cross-node parametrized tests below (e.g. "no columns selected" and
+# "infer_output_schema passthrough" behave identically across all four nodes).
+_CALCULATOR_BY_NODE: dict[str, Any] = {
+    "iqr": IQRCalculator,
+    "zscore": ZScoreCalculator,
+    "winsorize": WinsorizeCalculator,
+    "elliptic_envelope": EllipticEnvelopeCalculator,
+}
+
+
+def _load_single_param(source_path: str) -> list[Any]:
+    """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
+
+    ``pytest.mark.parametrize`` treats a single (comma-less) param name
+    specially: argvalues must be bare scalars, not 1-tuples, or the whole
+    tuple gets bound to the parameter instead of its single element.
+    """
+    params_string, scenarios = TestCaseLoader(source_path).load()
+    return [params_string, [scenario[0] for scenario in scenarios]]
+
+
+_no_columns_cases = TestCaseLoader("preprocessing/outlier_no_columns_selected").load()
+_infer_schema_cases = _load_single_param("preprocessing/outlier_infer_output_schema_passthrough")
+
+
+class TestUserPickedNoColumns:
+    """Explicit empty ``columns`` config is a no-op for every outlier node."""
+
+    @pytest.mark.parametrize(*_no_columns_cases)
+    def test_user_picked_no_columns_returns_empty(self, node: str, values: list) -> None:
+        df = pd.DataFrame({"val": values})
+        assert _CALCULATOR_BY_NODE[node]().fit(df, {"columns": []}) == {}
+
+
+class TestInferOutputSchemaPassthrough:
+    """Every outlier node filters/clips rows, not columns, so the output schema
+    always equals the input schema.
+    """
+
+    @pytest.mark.parametrize(*_infer_schema_cases)
+    def test_infer_output_schema_passes_through(self, node: str) -> None:
+        schema = object()
+        result = _CALCULATOR_BY_NODE[node]().infer_output_schema(
+            typing.cast(SkyulfSchema, schema), {}
+        )
+        assert result is schema
+
+
 # ---------------------------------------------------------------------------
 # IQR
 # ---------------------------------------------------------------------------
 
+_iqr_bounds_formula_cases = _load_single_param(
+    "preprocessing/outlier_iqr_calculator_bounds_formula"
+)
+_iqr_no_bounds_cases = TestCaseLoader("preprocessing/outlier_iqr_calculator_no_bounds").load()
+_iqr_pandas_passthrough_cases = TestCaseLoader(
+    "preprocessing/outlier_iqr_applier_pandas_passthrough"
+).load()
+_iqr_polars_passthrough_cases = TestCaseLoader(
+    "preprocessing/outlier_iqr_applier_polars_passthrough"
+).load()
+
+# ---------------------------------------------------------------------------
+# Z-Score fixtures
+# ---------------------------------------------------------------------------
+
+_zscore_warns_cases = TestCaseLoader("preprocessing/outlier_zscore_calculator_warns").load()
+_zscore_polars_passthrough_cases = TestCaseLoader(
+    "preprocessing/outlier_zscore_applier_polars_passthrough"
+).load()
+
+# ---------------------------------------------------------------------------
+# Winsorize fixtures
+# ---------------------------------------------------------------------------
+
+_winsorize_pandas_passthrough_cases = TestCaseLoader(
+    "preprocessing/outlier_winsorize_applier_pandas_passthrough"
+).load()
+_winsorize_polars_passthrough_cases = TestCaseLoader(
+    "preprocessing/outlier_winsorize_applier_polars_passthrough"
+).load()
+
 
 class TestIQRCalculator:
-    def test_bounds_match_q1_q3_formula(self) -> None:
+    @pytest.mark.parametrize(*_iqr_bounds_formula_cases)
+    def test_bounds_match_q1_q3_formula(self, values: list) -> None:
         """Bounds must equal Q1 - k*IQR and Q3 + k*IQR for the configured multiplier."""
-        values = list(range(1, 11))  # 1..10
         df = pd.DataFrame({"val": values})
         params = IQRCalculator().fit(df, {"columns": ["val"], "multiplier": 1.5})
 
@@ -49,37 +130,13 @@ class TestIQRCalculator:
         assert params["multiplier"] == 1.5
         assert params["warnings"] == []
 
-    def test_user_picked_no_columns_returns_empty(self) -> None:
-        """Explicit empty columns list means the node is a no-op."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 3.0]})
-        assert IQRCalculator().fit(df, {"columns": []}) == {}
-
-    def test_constant_column_zero_iqr_bounds_equal_value(self) -> None:
-        """A constant column has IQR=0, so both bounds collapse to the constant value."""
-        df = pd.DataFrame({"val": [5.0] * 10})
-        params = IQRCalculator().fit(df, {"columns": ["val"]})
-        bounds = params["bounds"]["val"]
-        assert bounds["lower"] == pytest.approx(5.0)
-        assert bounds["upper"] == pytest.approx(5.0)
-
-    def test_non_numeric_column_produces_warning_and_no_bounds(self) -> None:
-        """A column that is entirely non-numeric must warn and be excluded from bounds."""
-        df = pd.DataFrame({"val": ["a", "b", "c"]})
+    @pytest.mark.parametrize(*_iqr_no_bounds_cases)
+    def test_no_bounds_produced(self, values: list, dtype: str) -> None:
+        """A non-numeric or empty column must warn and be excluded from bounds."""
+        df = pd.DataFrame({"val": pd.Series(values, dtype=dtype)})
         params = IQRCalculator().fit(df, {"columns": ["val"]})
         assert params["bounds"] == {}
         assert any("val" in w for w in params["warnings"])
-
-    def test_empty_dataframe_returns_empty_bounds(self) -> None:
-        """Fitting on a zero-row frame must not raise and yields no bounds."""
-        df = pd.DataFrame({"val": pd.Series([], dtype=float)})
-        params = IQRCalculator().fit(df, {"columns": ["val"]})
-        assert params["bounds"] == {}
-        assert any("val" in w for w in params["warnings"])
-
-    def test_infer_output_schema_passes_through(self) -> None:
-        """IQR removes rows, not columns, so the output schema equals the input schema."""
-        schema = object()
-        assert IQRCalculator().infer_output_schema(typing.cast(SkyulfSchema, schema), {}) is schema
 
 
 class TestIQRApplier:
@@ -100,17 +157,11 @@ class TestIQRApplier:
         assert out["val"].isna().sum() == 1
         assert 1000.0 not in out["val"].dropna().values
 
-    def test_no_bounds_is_passthrough(self) -> None:
-        """Empty params (no columns fitted) must return the frame unchanged."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 1000.0]})
-        out = IQRApplier().apply(df, {})
-        assert len(out) == len(df)
-
-    def test_unknown_column_in_bounds_ignored(self) -> None:
-        """Bounds referencing a column absent from the frame must not raise."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 3.0]})
-        params = {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}
-        out = IQRApplier().apply(df, params)
+    @pytest.mark.parametrize(*_iqr_pandas_passthrough_cases)
+    def test_pandas_passthrough(self, values: list, config: dict) -> None:
+        """Empty bounds, or bounds for an unknown column, must return the frame unchanged."""
+        df = pd.DataFrame({"val": values})
+        out = IQRApplier().apply(df, config)
         assert len(out) == len(df)
 
     def test_polars_engine_matches_pandas_engine(self) -> None:
@@ -130,18 +181,12 @@ class TestIQRApplier:
         assert len(X_out) == len(y_out)
         assert 40 not in y_out.values
 
-    def test_polars_no_bounds_passthrough(self) -> None:
-        """Empty bounds dict must short-circuit the polars path and return input unchanged."""
-        df = pl.DataFrame({"val": [1.0, 2.0, 1000.0]})
-        out = IQRApplier().apply(df, {})
-        assert out["val"].to_list() == [1.0, 2.0, 1000.0]
-
-    def test_polars_unknown_column_in_bounds_skipped(self) -> None:
-        """Polars path must skip bound entries for columns absent from the frame."""
-        df = pl.DataFrame({"val": [1.0, 2.0, 3.0]})
-        params = {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}
-        out = IQRApplier().apply(df, params)
-        assert out["val"].to_list() == [1.0, 2.0, 3.0]
+    @pytest.mark.parametrize(*_iqr_polars_passthrough_cases)
+    def test_polars_passthrough(self, values: list, config: dict, expected: list) -> None:
+        """Empty bounds, or bounds for an unknown column, must return the frame unchanged."""
+        df = pl.DataFrame({"val": values})
+        out = IQRApplier().apply(df, config)
+        assert out["val"].to_list() == expected
 
 
 # ---------------------------------------------------------------------------
@@ -160,31 +205,13 @@ class TestZScoreCalculator:
         assert params["stats"]["val"]["std"] == pytest.approx(series.std(ddof=0))
         assert params["threshold"] == 3.0
 
-    def test_zero_variance_column_warns_and_excluded(self) -> None:
-        """A constant column has std=0 and must be skipped (division-by-zero guard)."""
-        df = pd.DataFrame({"val": [7.0] * 8})
+    @pytest.mark.parametrize(*_zscore_warns_cases)
+    def test_no_stats_and_warns(self, values: list, dtype: str, warning_substring: str) -> None:
+        """A zero-variance or non-numeric column must warn and be excluded from stats."""
+        df = pd.DataFrame({"val": pd.Series(values, dtype=dtype)})
         params = ZScoreCalculator().fit(df, {"columns": ["val"]})
         assert params["stats"] == {}
-        assert any("Zero variance" in w for w in params["warnings"])
-
-    def test_user_picked_no_columns_returns_empty(self) -> None:
-        """Explicit empty columns list means the node is a no-op."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 3.0]})
-        assert ZScoreCalculator().fit(df, {"columns": []}) == {}
-
-    def test_non_numeric_column_warns(self) -> None:
-        """Entirely non-numeric column must warn and be excluded from stats."""
-        df = pd.DataFrame({"val": ["x", "y"]})
-        params = ZScoreCalculator().fit(df, {"columns": ["val"]})
-        assert params["stats"] == {}
-        assert any("val" in w for w in params["warnings"])
-
-    def test_infer_output_schema_passes_through(self) -> None:
-        """Z-score removes rows, not columns; output schema equals input schema."""
-        schema = object()
-        assert (
-            ZScoreCalculator().infer_output_schema(typing.cast(SkyulfSchema, schema), {}) is schema
-        )
+        assert any(warning_substring in w for w in params["warnings"])
 
 
 class TestZScoreApplier:
@@ -237,18 +264,12 @@ class TestZScoreApplier:
         pl_out = ZScoreApplier().apply(pl.from_pandas(df), params)
         assert sorted(pd_out["val"].tolist()) == sorted(pl_out["val"].to_list())
 
-    def test_polars_no_stats_passthrough(self) -> None:
-        """Empty stats dict must short-circuit the polars path and return input unchanged."""
-        df = pl.DataFrame({"val": [1.0, 2.0, 1000.0]})
-        out = ZScoreApplier().apply(df, {})
-        assert out["val"].to_list() == [1.0, 2.0, 1000.0]
-
-    def test_polars_unknown_column_in_stats_skipped(self) -> None:
-        """Polars path must skip stat entries for columns absent from the frame."""
-        df = pl.DataFrame({"val": [1.0, 2.0, 3.0]})
-        params = {"stats": {"nonexistent": {"mean": 0.0, "std": 1.0}}, "threshold": 3.0}
-        out = ZScoreApplier().apply(df, params)
-        assert out["val"].to_list() == [1.0, 2.0, 3.0]
+    @pytest.mark.parametrize(*_zscore_polars_passthrough_cases)
+    def test_polars_passthrough(self, values: list, config: dict, expected: list) -> None:
+        """Empty stats, or stats for an unknown column, must return the frame unchanged."""
+        df = pl.DataFrame({"val": values})
+        out = ZScoreApplier().apply(df, config)
+        assert out["val"].to_list() == expected
 
 
 # ---------------------------------------------------------------------------
@@ -271,25 +292,12 @@ class TestWinsorizeCalculator:
         assert bounds["lower"] == pytest.approx(expected_lower)
         assert bounds["upper"] == pytest.approx(expected_upper)
 
-    def test_user_picked_no_columns_returns_empty(self) -> None:
-        """Explicit empty columns list means the node is a no-op."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 3.0]})
-        assert WinsorizeCalculator().fit(df, {"columns": []}) == {}
-
     def test_non_numeric_column_warns(self) -> None:
         """Entirely non-numeric column must warn and be excluded from bounds."""
         df = pd.DataFrame({"val": ["a", "b"]})
         params = WinsorizeCalculator().fit(df, {"columns": ["val"]})
         assert params["bounds"] == {}
         assert any("val" in w for w in params["warnings"])
-
-    def test_infer_output_schema_passes_through(self) -> None:
-        """Winsorize clips values in place; output schema equals input schema."""
-        schema = object()
-        assert (
-            WinsorizeCalculator().infer_output_schema(typing.cast(SkyulfSchema, schema), {})
-            is schema
-        )
 
 
 class TestWinsorizeApplier:
@@ -313,31 +321,19 @@ class TestWinsorizeApplier:
         out = WinsorizeApplier().apply(df, params)
         assert out["label"].tolist() == ["a", "b"]
 
-    def test_pandas_unknown_column_in_bounds_skipped(self) -> None:
-        """Pandas path must skip bound entries for columns absent from the frame."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 3.0]})
-        params = {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}
-        out = WinsorizeApplier().apply(df, params)
-        assert out["val"].tolist() == [1.0, 2.0, 3.0]
+    @pytest.mark.parametrize(*_winsorize_pandas_passthrough_cases)
+    def test_pandas_passthrough(self, values: list, config: dict, expected: list) -> None:
+        """Empty bounds, or bounds for an unknown column, must return the frame unchanged."""
+        df = pd.DataFrame({"val": values})
+        out = WinsorizeApplier().apply(df, config)
+        assert out["val"].tolist() == expected
 
-    def test_no_bounds_is_passthrough(self) -> None:
-        """Empty bounds (no columns fitted) must return the frame unchanged."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 1000.0]})
-        out = WinsorizeApplier().apply(df, {})
-        assert out["val"].tolist() == [1.0, 2.0, 1000.0]
-
-    def test_polars_no_bounds_passthrough(self) -> None:
-        """Empty bounds dict must short-circuit the polars path and return input unchanged."""
-        df = pl.DataFrame({"val": [1.0, 2.0, 1000.0]})
-        out = WinsorizeApplier().apply(df, {})
-        assert out["val"].to_list() == [1.0, 2.0, 1000.0]
-
-    def test_polars_unknown_column_in_bounds_skipped(self) -> None:
-        """Polars path must skip bound entries for columns absent from the frame."""
-        df = pl.DataFrame({"val": [1.0, 2.0, 3.0]})
-        params = {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}
-        out = WinsorizeApplier().apply(df, params)
-        assert out["val"].to_list() == [1.0, 2.0, 3.0]
+    @pytest.mark.parametrize(*_winsorize_polars_passthrough_cases)
+    def test_polars_passthrough(self, values: list, config: dict, expected: list) -> None:
+        """Empty bounds, or bounds for an unknown column, must return the frame unchanged."""
+        df = pl.DataFrame({"val": values})
+        out = WinsorizeApplier().apply(df, config)
+        assert out["val"].to_list() == expected
 
     def test_polars_engine_matches_pandas_engine(self) -> None:
         """Polars clip path must produce the same clipped values as the pandas path."""
@@ -397,19 +393,6 @@ class TestEllipticEnvelopeCalculator:
         params = EllipticEnvelopeCalculator().fit(df, {"columns": ["val"]})
         assert "val" not in params["models"]
         assert params["warnings"]
-
-    def test_user_picked_no_columns_returns_empty(self) -> None:
-        """Explicit empty columns list means the node is a no-op."""
-        df = pd.DataFrame({"val": [1.0, 2.0, 3.0, 4.0, 5.0]})
-        assert EllipticEnvelopeCalculator().fit(df, {"columns": []}) == {}
-
-    def test_infer_output_schema_passes_through(self) -> None:
-        """EllipticEnvelope filters rows, not columns; schema is passed through."""
-        schema = object()
-        assert (
-            EllipticEnvelopeCalculator().infer_output_schema(typing.cast(SkyulfSchema, schema), {})
-            is schema
-        )
 
 
 class TestEllipticEnvelopeApplier:

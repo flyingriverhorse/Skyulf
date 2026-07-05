@@ -2,12 +2,16 @@
 
 import pandas as pd
 import polars as pl
+import pytest
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_generation import (
     _featgen_apply_pandas,
     _featgen_apply_polars,
 )
+
+_pandas_agg_cases = TestCaseLoader("preprocessing/feature_generation_group_agg_pandas").load()
 
 
 def _build_data():
@@ -17,22 +21,23 @@ def _build_data():
     }
 
 
-def test_pandas_group_agg_mean():
+@pytest.mark.parametrize(*_pandas_agg_cases)
+def test_pandas_group_agg(method: str, output_column: str, expected: list) -> None:
     df = pd.DataFrame(_build_data())
     params = {
         "operations": [
             {
                 "operation_type": "group_agg",
-                "method": "mean",
+                "method": method,
                 "input_columns": ["dept"],
                 "secondary_columns": ["salary"],
-                "output_column": "dept_mean_salary",
+                "output_column": output_column,
             }
         ]
     }
     out, _ = _featgen_apply_pandas(df, None, params)
-    assert "dept_mean_salary" in out.columns
-    assert out["dept_mean_salary"].tolist() == [150.0, 150.0, 400.0, 400.0, 400.0]
+    assert output_column in out.columns
+    assert out[output_column].tolist() == expected
 
 
 def test_polars_group_agg_mean():
@@ -52,23 +57,6 @@ def test_polars_group_agg_mean():
     assert "dept_mean_salary" in out.columns
     vals = out["dept_mean_salary"].to_list()
     assert vals == [150.0, 150.0, 400.0, 400.0, 400.0]
-
-
-def test_pandas_group_agg_count():
-    df = pd.DataFrame(_build_data())
-    params = {
-        "operations": [
-            {
-                "operation_type": "group_agg",
-                "method": "count",
-                "input_columns": ["dept"],
-                "secondary_columns": ["salary"],
-                "output_column": "dept_n",
-            }
-        ]
-    }
-    out, _ = _featgen_apply_pandas(df, None, params)
-    assert out["dept_n"].tolist() == [2, 2, 3, 3, 3]
 
 
 class TestRealShapedDataset:
@@ -109,7 +97,7 @@ class TestRealShapedDataset:
 
 
 if __name__ == "__main__":
-    test_pandas_group_agg_mean()
+    test_pandas_group_agg("mean", "dept_mean_salary", [150.0, 150.0, 400.0, 400.0, 400.0])
     test_polars_group_agg_mean()
-    test_pandas_group_agg_count()
+    test_pandas_group_agg("count", "dept_n", [2, 2, 3, 3, 3])
     print("OK")

@@ -1,0 +1,13 @@
+{
+  "params": "lags_input, expected",
+  "test_cases": {
+    "single_int_wrapped": {
+      "lags_input": 5,
+      "expected": [5]
+    },
+    "drops_non_positive_and_dedupes": {
+      "lags_input": [2, 2, 0, -1, 1],
+      "expected": [1, 2]
+    }
+  }
+}

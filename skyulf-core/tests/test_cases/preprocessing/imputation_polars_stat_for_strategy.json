@@ -1,0 +1,8 @@
+{
+  "params": "strategy, values, expected",
+  "test_cases": {
+    "mean": {"strategy": "mean", "values": [1.0, 2.0, 3.0], "expected": 2.0},
+    "median": {"strategy": "median", "values": [1.0, 2.0, 100.0], "expected": 2.0},
+    "most_frequent": {"strategy": "most_frequent", "values": [1, 1, 2], "expected": 1}
+  }
+}

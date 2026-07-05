@@ -1,0 +1,25 @@
+{
+  "params": "values, mode, expected",
+  "test_cases": {
+    "both_strips_leading_and_trailing": {
+      "values": ["  hello  ", " world"],
+      "mode": "both",
+      "expected": ["hello", "world"]
+    },
+    "leading_only": {
+      "values": ["  hi  "],
+      "mode": "leading",
+      "expected": ["hi  "]
+    },
+    "trailing_only": {
+      "values": ["  hi  "],
+      "mode": "trailing",
+      "expected": ["  hi"]
+    },
+    "unknown_mode_falls_through_to_strip": {
+      "values": ["  x  "],
+      "mode": "unknown_mode",
+      "expected": ["x"]
+    }
+  }
+}

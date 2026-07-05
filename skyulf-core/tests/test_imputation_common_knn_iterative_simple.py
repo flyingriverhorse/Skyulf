@@ -15,6 +15,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.imputation._common import (
     _build_iterative_estimator,
@@ -36,6 +37,59 @@ _FINITE_FLOAT = st.floats(
 )
 
 
+def _load_single_param(source_path: str) -> list:
+    """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
+
+    ``pytest.mark.parametrize`` treats a single (comma-less) param name
+    specially: argvalues must be bare scalars, not 1-tuples, or the whole
+    tuple gets bound to the parameter instead of its single element.
+    """
+    params_string, scenarios = TestCaseLoader(source_path).load()
+    return [params_string, [scenario[0] for scenario in scenarios]]
+
+
+_polars_stat_cases = TestCaseLoader("preprocessing/imputation_polars_stat_for_strategy").load()
+_compute_polars_fill_values_cases = TestCaseLoader(
+    "preprocessing/imputation_compute_polars_fill_values"
+).load()
+_iterative_estimator_cases = TestCaseLoader(
+    "preprocessing/imputation_iterative_estimator_aliases"
+).load()
+_no_columns_or_numeric_cases = TestCaseLoader(
+    "preprocessing/imputation_no_columns_or_numeric_returns_empty"
+).load()
+_applier_pandas_noop_cases = TestCaseLoader("preprocessing/imputation_applier_pandas_noop").load()
+_applier_polars_noop_cases = TestCaseLoader("preprocessing/imputation_applier_polars_noop").load()
+_infer_output_schema_cases = _load_single_param(
+    "preprocessing/imputation_infer_output_schema_passthrough"
+)
+_all_imputers_empty_df_cases = _load_single_param(
+    "preprocessing/imputation_all_imputers_empty_dataframe"
+)
+
+# Maps a JSON-friendly imputer name to its Calculator/Applier classes, shared
+# by the cross-imputer parametrized tests below.
+_CALCULATOR_BY_NAME: dict[str, Any] = {
+    "simple": SimpleImputerCalculator,
+    "knn": KNNImputerCalculator,
+    "iterative": IterativeImputerCalculator,
+}
+_APPLIER_BY_NAME: dict[str, Any] = {
+    "knn": KNNImputerApplier,
+    "iterative": IterativeImputerApplier,
+}
+
+
+class _BrokenImputer:
+    """Stand-in sklearn imputer whose ``transform`` always raises."""
+
+    def transform(self, X: Any) -> Any:
+        raise RuntimeError("boom")
+
+
+_IMPUTER_KIND: dict[str, Any] = {"object": object, "broken": _BrokenImputer}
+
+
 @st.composite
 def _numeric_frame(draw: st.DrawFn, *, min_rows: int = 6, max_rows: int = 30) -> pd.DataFrame:
     """Generate a small two-column numeric DataFrame with no missing values."""
@@ -55,28 +109,15 @@ def test_polars_stat_for_strategy_constant_returns_none() -> None:
     assert _polars_stat_for_strategy("constant", 5) is None
 
 
-def test_polars_stat_for_strategy_mean_builds_mean_expr() -> None:
-    """The 'mean' strategy expression must compute a column mean via Polars."""
-    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
-    expr_builder = _polars_stat_for_strategy("mean", None)
+@pytest.mark.parametrize(*_polars_stat_cases)
+def test_polars_stat_for_strategy_builds_expected_expr(
+    strategy: str, values: list, expected: Any
+) -> None:
+    """Each supported strategy must build a Polars expression matching the reference stat."""
+    df = pl.DataFrame({"a": values})
+    expr_builder = _polars_stat_for_strategy(strategy, None)
     result = df.select([expr_builder("a")]).to_dict(as_series=False)
-    assert result["a"][0] == pytest.approx(2.0)
-
-
-def test_polars_stat_for_strategy_median_builds_median_expr() -> None:
-    """The 'median' strategy expression must compute a column median via Polars."""
-    df = pl.DataFrame({"a": [1.0, 2.0, 100.0]})
-    expr_builder = _polars_stat_for_strategy("median", None)
-    result = df.select([expr_builder("a")]).to_dict(as_series=False)
-    assert result["a"][0] == pytest.approx(2.0)
-
-
-def test_polars_stat_for_strategy_most_frequent_builds_mode_expr() -> None:
-    """The 'most_frequent' strategy expression must return the first mode value."""
-    df = pl.DataFrame({"a": [1, 1, 2]})
-    expr_builder = _polars_stat_for_strategy("most_frequent", None)
-    result = df.select([expr_builder("a")]).to_dict(as_series=False)
-    assert result["a"][0] == 1
+    assert result["a"][0] == pytest.approx(expected)
 
 
 def test_polars_stat_for_strategy_unknown_raises_value_error() -> None:
@@ -85,25 +126,15 @@ def test_polars_stat_for_strategy_unknown_raises_value_error() -> None:
         _polars_stat_for_strategy("bogus", None)
 
 
-def test_compute_polars_fill_values_constant_with_explicit_value() -> None:
-    """Constant strategy fills every requested column with the given value."""
-    df = pl.DataFrame({"a": [1.0, None], "b": [None, 4.0]})
-    result = _compute_polars_fill_values(df, ["a", "b"], "constant", 7)
-    assert result == {"a": 7, "b": 7}
-
-
-def test_compute_polars_fill_values_constant_defaults_to_zero() -> None:
-    """Constant strategy with fill_value=None defaults to filling with 0."""
-    df = pl.DataFrame({"a": [1.0, None]})
-    result = _compute_polars_fill_values(df, ["a"], "constant", None)
-    assert result == {"a": 0}
-
-
-def test_compute_polars_fill_values_mean_strategy() -> None:
-    """Mean strategy computes the per-column mean, ignoring nulls."""
-    df = pl.DataFrame({"a": [1.0, 3.0, None]})
-    result = _compute_polars_fill_values(df, ["a"], "mean", None)
-    assert result["a"] == pytest.approx(2.0)
+@pytest.mark.parametrize(*_compute_polars_fill_values_cases)
+def test_compute_polars_fill_values(
+    columns_data: dict, columns: list, strategy: str, fill_value: Any, expected: dict
+) -> None:
+    """Constant and mean strategies must compute the expected per-column fill values."""
+    df = pl.DataFrame(columns_data)
+    result = _compute_polars_fill_values(df, columns, strategy, fill_value)
+    for col, exp in expected.items():
+        assert result[col] == pytest.approx(exp)
 
 
 def test_polars_missing_counts_totals_nulls_per_column() -> None:
@@ -128,36 +159,15 @@ def test_resolve_simple_columns_most_frequent_includes_all_columns() -> None:
     assert set(cols) == {"num", "cat"}
 
 
-def test_build_iterative_estimator_decision_tree() -> None:
-    """The 'DecisionTree' alias maps to a DecisionTreeRegressor."""
-    from sklearn.tree import DecisionTreeRegressor
+@pytest.mark.parametrize(*_iterative_estimator_cases)
+def test_build_iterative_estimator_alias(alias: str, module: str, class_name: str) -> None:
+    """Each estimator alias (and the unrecognized-name default) must map to the
+    expected sklearn regressor class."""
+    import importlib
 
-    estimator = _build_iterative_estimator("DecisionTree")
-    assert isinstance(estimator, DecisionTreeRegressor)
-
-
-def test_build_iterative_estimator_extra_trees() -> None:
-    """The 'ExtraTrees' alias maps to an ExtraTreesRegressor."""
-    from sklearn.ensemble import ExtraTreesRegressor
-
-    estimator = _build_iterative_estimator("ExtraTrees")
-    assert isinstance(estimator, ExtraTreesRegressor)
-
-
-def test_build_iterative_estimator_kneighbors() -> None:
-    """The 'KNeighbors' alias maps to a KNeighborsRegressor."""
-    from sklearn.neighbors import KNeighborsRegressor
-
-    estimator = _build_iterative_estimator("KNeighbors")
-    assert isinstance(estimator, KNeighborsRegressor)
-
-
-def test_build_iterative_estimator_default_is_bayesian_ridge() -> None:
-    """Any unrecognized/default name falls back to BayesianRidge."""
-    from sklearn.linear_model import BayesianRidge
-
-    estimator = _build_iterative_estimator("something_else")
-    assert isinstance(estimator, BayesianRidge)
+    expected_cls = getattr(importlib.import_module(module), class_name)
+    estimator = _build_iterative_estimator(alias)
+    assert isinstance(estimator, expected_cls)
 
 
 def test_sklearn_transform_subset_pandas_writes_back_into_copy() -> None:
@@ -250,75 +260,46 @@ def test_knn_imputer_fit_apply_round_trip_polars() -> None:
     assert out["a"].null_count() == 0
 
 
-def test_knn_imputer_no_columns_short_circuits() -> None:
-    """Explicit empty columns list means 'do nothing' and returns {}."""
-    df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
-    params = KNNImputerCalculator().fit(df, {"columns": []})
+@pytest.mark.parametrize(*_no_columns_or_numeric_cases)
+def test_no_columns_or_numeric_returns_empty(calculator: str, df_data: dict, config: dict) -> None:
+    """Explicit empty columns, or no auto-detected numeric columns, is a no-op."""
+    df = pd.DataFrame(df_data)
+    params = _CALCULATOR_BY_NAME[calculator]().fit(df, config)
     assert params == {}
 
 
-def test_knn_imputer_no_numeric_columns_returns_empty() -> None:
-    """When auto-detection finds no numeric columns, fit returns {}."""
-    df = pd.DataFrame({"cat": ["x", "y", "z"]})
-    params = KNNImputerCalculator().fit(df, {})
-    assert params == {}
-
-
-def test_knn_imputer_apply_missing_columns_returns_input_unchanged() -> None:
-    """Applier is a no-op when the fitted columns no longer exist on X."""
-    df = pd.DataFrame({"other": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a", "b"], "imputer_object": object()}
-    out = KNNImputerApplier().apply(df, params)
+@pytest.mark.parametrize(*_applier_pandas_noop_cases)
+def test_applier_pandas_noop(
+    applier: str, df_data: dict, config: dict, imputer_kind: str | None
+) -> None:
+    """Applier must return X unchanged (pandas) when: fitted columns are missing
+    from X, no imputer object was fitted, or the sklearn imputer raises."""
+    df = pd.DataFrame(df_data)
+    full_config = dict(config)
+    if imputer_kind is not None:
+        full_config["imputer_object"] = _IMPUTER_KIND[imputer_kind]()
+    out = _APPLIER_BY_NAME[applier]().apply(df, full_config)
     pd.testing.assert_frame_equal(out, df)
 
 
-def test_knn_imputer_apply_no_imputer_object_returns_input_unchanged() -> None:
-    """Applier is a no-op when no imputer object was fitted (params == {})."""
-    df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
-    out = KNNImputerApplier().apply(df, {})
-    pd.testing.assert_frame_equal(out, df)
-
-
-def test_knn_imputer_apply_transform_error_logs_and_returns_input(caplog: Any) -> None:
-    """If the sklearn imputer raises during transform, the applier degrades gracefully."""
-
-    class _BrokenImputer:
-        def transform(self, X: Any) -> Any:
-            raise RuntimeError("boom")
-
-    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a"], "imputer_object": _BrokenImputer()}
-    out = KNNImputerApplier().apply(df, params)
-    pd.testing.assert_frame_equal(out, df)
-
-
-def test_knn_imputer_apply_polars_missing_columns_returns_input_unchanged() -> None:
-    """Polars apply branch is a no-op when the fitted columns don't exist on X."""
-    df = pl.DataFrame({"other": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a", "b"], "imputer_object": object()}
-    out = KNNImputerApplier().apply(df, params)
+@pytest.mark.parametrize(*_applier_polars_noop_cases)
+def test_applier_polars_noop(applier: str, df_data: dict, config: dict, imputer_kind: str) -> None:
+    """Applier must return X unchanged (Polars) when fitted columns are missing
+    from X, or the sklearn imputer raises during transform."""
+    df = pl.DataFrame(df_data)
+    full_config = dict(config)
+    full_config["imputer_object"] = _IMPUTER_KIND[imputer_kind]()
+    out = _APPLIER_BY_NAME[applier]().apply(df, full_config)
     assert out.equals(df)
 
 
-def test_knn_imputer_apply_polars_transform_error_logs_and_returns_input() -> None:
-    """Polars apply branch degrades gracefully when the sklearn imputer raises."""
-
-    class _BrokenImputer:
-        def transform(self, X: Any) -> Any:
-            raise RuntimeError("boom")
-
-    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a"], "imputer_object": _BrokenImputer()}
-    out = KNNImputerApplier().apply(df, params)
-    assert out.equals(df)
-
-
-def test_knn_imputer_infer_output_schema_passes_through() -> None:
+@pytest.mark.parametrize(*_infer_output_schema_cases)
+def test_imputer_infer_output_schema_passes_through(calculator: str) -> None:
     """Output schema is identical to input schema (columns preserved)."""
     from skyulf.preprocessing._schema import SkyulfSchema
 
     schema = SkyulfSchema(columns=("a",), dtypes={"a": "float64"})
-    result = KNNImputerCalculator().infer_output_schema(schema, {})
+    result = _CALCULATOR_BY_NAME[calculator]().infer_output_schema(schema, {})
     assert result is schema
 
 
@@ -371,20 +352,6 @@ def test_iterative_imputer_fit_apply_round_trip_polars() -> None:
     assert out["a"].null_count() == 0
 
 
-def test_iterative_imputer_no_columns_short_circuits() -> None:
-    """Explicit empty columns list means 'do nothing' and returns {}."""
-    df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
-    params = IterativeImputerCalculator().fit(df, {"columns": []})
-    assert params == {}
-
-
-def test_iterative_imputer_no_numeric_columns_returns_empty() -> None:
-    """When auto-detection finds no numeric columns, fit returns {}."""
-    df = pd.DataFrame({"cat": ["x", "y", "z"]})
-    params = IterativeImputerCalculator().fit(df, {})
-    assert params == {}
-
-
 def test_iterative_imputer_uses_kneighbors_estimator() -> None:
     """The 'KNeighbors' estimator alias is wired through the calculator fit."""
     rng = np.random.default_rng(2)
@@ -400,64 +367,6 @@ def test_iterative_imputer_uses_kneighbors_estimator() -> None:
     assert params["estimator"] == "KNeighbors"
     out = IterativeImputerApplier().apply(df, params)
     assert out["a"].isna().sum() == 0
-
-
-def test_iterative_imputer_apply_missing_columns_returns_input_unchanged() -> None:
-    """Applier is a no-op when the fitted columns no longer exist on X."""
-    df = pd.DataFrame({"other": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a", "b"], "imputer_object": object()}
-    out = IterativeImputerApplier().apply(df, params)
-    pd.testing.assert_frame_equal(out, df)
-
-
-def test_iterative_imputer_apply_no_imputer_object_returns_input_unchanged() -> None:
-    """Applier is a no-op when no imputer object was fitted (params == {})."""
-    df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
-    out = IterativeImputerApplier().apply(df, {})
-    pd.testing.assert_frame_equal(out, df)
-
-
-def test_iterative_imputer_apply_transform_error_logs_and_returns_input() -> None:
-    """If the sklearn imputer raises during transform, the applier degrades gracefully."""
-
-    class _BrokenImputer:
-        def transform(self, X: Any) -> Any:
-            raise RuntimeError("boom")
-
-    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a"], "imputer_object": _BrokenImputer()}
-    out = IterativeImputerApplier().apply(df, params)
-    pd.testing.assert_frame_equal(out, df)
-
-
-def test_iterative_imputer_apply_polars_missing_columns_returns_input_unchanged() -> None:
-    """Polars apply branch is a no-op when the fitted columns don't exist on X."""
-    df = pl.DataFrame({"other": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a", "b"], "imputer_object": object()}
-    out = IterativeImputerApplier().apply(df, params)
-    assert out.equals(df)
-
-
-def test_iterative_imputer_apply_polars_transform_error_logs_and_returns_input() -> None:
-    """Polars apply branch degrades gracefully when the sklearn imputer raises."""
-
-    class _BrokenImputer:
-        def transform(self, X: Any) -> Any:
-            raise RuntimeError("boom")
-
-    df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
-    params = {"columns": ["a"], "imputer_object": _BrokenImputer()}
-    out = IterativeImputerApplier().apply(df, params)
-    assert out.equals(df)
-
-
-def test_iterative_imputer_infer_output_schema_passes_through() -> None:
-    """Output schema is identical to input schema (columns preserved)."""
-    from skyulf.preprocessing._schema import SkyulfSchema
-
-    schema = SkyulfSchema(columns=("a",), dtypes={"a": "float64"})
-    result = IterativeImputerCalculator().infer_output_schema(schema, {})
-    assert result is schema
 
 
 # ---------------------------------------------------------------------------
@@ -612,14 +521,11 @@ def test_simple_imputer_pandas_mean_filters_non_numeric_and_returns_empty() -> N
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "calculator_cls",
-    [SimpleImputerCalculator, KNNImputerCalculator, IterativeImputerCalculator],
-)
-def test_all_imputers_empty_dataframe_returns_empty_params(calculator_cls: type) -> None:
+@pytest.mark.parametrize(*_all_imputers_empty_df_cases)
+def test_all_imputers_empty_dataframe_returns_empty_params(calculator: str) -> None:
     """Fitting on a fully empty DataFrame (no rows/cols) yields empty params."""
     df = pd.DataFrame()
-    params = calculator_cls().fit(df, {})
+    params = _CALCULATOR_BY_NAME[calculator]().fit(df, {})
     assert params == {}
 
 

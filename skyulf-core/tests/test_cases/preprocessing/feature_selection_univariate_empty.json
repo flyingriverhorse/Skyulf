@@ -1,0 +1,17 @@
+{
+  "params": "df_kind, config",
+  "test_cases": {
+    "missing_target": {
+      "df_kind": "classification",
+      "config": {"target_column": "nonexistent"}
+    },
+    "no_candidate_columns": {
+      "df_kind": "target_only",
+      "config": {"target_column": "target"}
+    },
+    "unknown_method": {
+      "df_kind": "classification",
+      "config": {"target_column": "target", "method": "totally_unknown_selector_method"}
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "params": "missing_threshold",
+  "test_cases": {
+    "non_numeric": {"missing_threshold": "not-a-number"},
+    "zero": {"missing_threshold": 0},
+    "negative": {"missing_threshold": -5}
+  }
+}

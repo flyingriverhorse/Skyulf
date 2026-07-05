@@ -1,0 +1,7 @@
+{
+  "params": "values, dtype, warning_substring",
+  "test_cases": {
+    "zero_variance_column": {"values": [7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0], "dtype": "float64", "warning_substring": "Zero variance"},
+    "non_numeric_column": {"values": ["x", "y"], "dtype": "object", "warning_substring": "val"}
+  }
+}

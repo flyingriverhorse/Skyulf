@@ -1,0 +1,25 @@
+{
+  "params": "needs_y, config, expected_type",
+  "test_cases": {
+    "variance_threshold": {
+      "needs_y": false,
+      "config": {"method": "variance_threshold", "threshold": 0.0},
+      "expected_type": "variance_threshold"
+    },
+    "correlation_threshold": {
+      "needs_y": false,
+      "config": {"method": "correlation_threshold", "threshold": 0.95},
+      "expected_type": "correlation_threshold"
+    },
+    "select_k_best": {
+      "needs_y": true,
+      "config": {"method": "select_k_best", "k": 2, "score_func": "f_classif"},
+      "expected_type": "univariate_selection"
+    },
+    "select_percentile": {
+      "needs_y": true,
+      "config": {"method": "select_percentile", "percentile": 50, "score_func": "f_classif"},
+      "expected_type": "univariate_selection"
+    }
+  }
+}

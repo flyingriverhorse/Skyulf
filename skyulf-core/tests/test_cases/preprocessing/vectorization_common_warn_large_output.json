@@ -1,0 +1,17 @@
+{
+  "params": "count, threshold, expect_none, expect_substring",
+  "test_cases": {
+    "below_threshold_returns_none": {
+      "count": 100,
+      "threshold": 10000,
+      "expect_none": true,
+      "expect_substring": null
+    },
+    "above_threshold_returns_message": {
+      "count": 20000,
+      "threshold": 10000,
+      "expect_none": false,
+      "expect_substring": "20,000"
+    }
+  }
+}

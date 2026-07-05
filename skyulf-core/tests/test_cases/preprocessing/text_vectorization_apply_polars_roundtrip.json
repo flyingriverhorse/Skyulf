@@ -1,0 +1,20 @@
+{
+  "params": "node, fit_extra, check_columns",
+  "test_cases": {
+    "count_vectorizer": {
+      "node": "count_vectorizer",
+      "fit_extra": {"max_features": 8},
+      "check_columns": true
+    },
+    "tfidf_vectorizer": {
+      "node": "tfidf_vectorizer",
+      "fit_extra": {"max_features": 8},
+      "check_columns": false
+    },
+    "hashing_vectorizer": {
+      "node": "hashing_vectorizer",
+      "fit_extra": {"n_features": 16},
+      "check_columns": false
+    }
+  }
+}

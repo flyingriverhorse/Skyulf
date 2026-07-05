@@ -1,0 +1,15 @@
+{
+  "params": "column_values, method, expected_values",
+  "test_cases": {
+    "single_row_sqrt": {
+      "column_values": [4.0],
+      "method": "sqrt",
+      "expected_values": [2.0]
+    },
+    "constant_column_square": {
+      "column_values": [3.0, 3.0, 3.0, 3.0],
+      "method": "square",
+      "expected_values": [9.0, 9.0, 9.0, 9.0]
+    }
+  }
+}

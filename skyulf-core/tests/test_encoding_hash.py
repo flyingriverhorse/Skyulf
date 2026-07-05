@@ -4,14 +4,18 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.hash import (
     HashEncoderApplier,
     HashEncoderCalculator,
 )
+
+_n_features_cases = TestCaseLoader("preprocessing/encoding_hash_n_features").load_with_ids()
 
 
 def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any], pd.DataFrame]:
@@ -21,20 +25,25 @@ def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any]
     return dict(params), result
 
 
-def test_fit_records_columns_and_n_features() -> None:
-    """fit() stores the resolved columns and configured (or default) n_features."""
-    df = pd.DataFrame({"city": ["ny", "la", "sf"]})
-    params = HashEncoderCalculator().fit(df, {"columns": ["city"], "n_features": 4})
-    assert params["columns"] == ["city"]
-    assert params["n_features"] == 4
-    assert params["type"] == "hash_encoder"
+class TestFitRecordsColumnsAndNFeatures:
+    """fit() stores the resolved columns and configured (or default) n_features.
+    Scenarios loaded from
+    ``tests/test_cases/preprocessing/encoding_hash_n_features.json``.
+    """
 
+    @pytest.mark.parametrize(_n_features_cases[0], _n_features_cases[1], ids=_n_features_cases[2])
+    def test_fit_records_columns_and_n_features(
+        self, config_n_features: int | None, expected_n_features: int
+    ) -> None:
+        df = pd.DataFrame({"city": ["ny", "la", "sf"]})
+        config: dict[str, Any] = {"columns": ["city"]}
+        if config_n_features is not None:
+            config["n_features"] = config_n_features
 
-def test_fit_default_n_features_is_ten() -> None:
-    """When n_features is omitted from config, fit() falls back to 10."""
-    df = pd.DataFrame({"city": ["ny", "la"]})
-    params = HashEncoderCalculator().fit(df, {"columns": ["city"]})
-    assert params["n_features"] == 10
+        params = HashEncoderCalculator().fit(df, config)
+        assert params["columns"] == ["city"]
+        assert params["n_features"] == expected_n_features
+        assert params["type"] == "hash_encoder"
 
 
 def test_apply_buckets_are_within_valid_range() -> None:

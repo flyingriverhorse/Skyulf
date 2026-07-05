@@ -1,0 +1,13 @@
+{
+  "params": "name, problem_type, expected_func_name",
+  "test_cases": {
+    "named_f_classif": {"name": "f_classif", "problem_type": "classification", "expected_func_name": "f_classif"},
+    "classification_default": {"name": null, "problem_type": "classification", "expected_func_name": "f_classif"},
+    "regression_default": {"name": null, "problem_type": "regression", "expected_func_name": "f_regression"},
+    "named_mutual_info_regression": {
+      "name": "mutual_info_regression",
+      "problem_type": "regression",
+      "expected_func_name": "mutual_info_regression"
+    }
+  }
+}

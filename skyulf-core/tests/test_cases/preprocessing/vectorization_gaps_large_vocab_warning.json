@@ -1,0 +1,13 @@
+{
+  "params": "node, module_path",
+  "test_cases": {
+    "tfidf_vectorizer": {
+      "node": "tfidf_vectorizer",
+      "module_path": "skyulf.preprocessing.vectorization.tfidf_vectorizer"
+    },
+    "count_vectorizer": {
+      "node": "count_vectorizer",
+      "module_path": "skyulf.preprocessing.vectorization.count_vectorizer"
+    }
+  }
+}

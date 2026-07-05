@@ -1,0 +1,30 @@
+{
+  "params": "df_kind, config",
+  "test_cases": {
+    "missing_target": {
+      "df_kind": "classification",
+      "config": {"target_column": "nonexistent"}
+    },
+    "unresolvable_estimator": {
+      "df_kind": "classification",
+      "config": {
+        "target_column": "target",
+        "estimator": "totally_bogus_estimator",
+        "problem_type": "classification"
+      }
+    },
+    "no_candidate_columns": {
+      "df_kind": "target_only",
+      "config": {"target_column": "target"}
+    },
+    "unknown_method": {
+      "df_kind": "classification",
+      "config": {
+        "target_column": "target",
+        "estimator": "random_forest",
+        "problem_type": "classification",
+        "method": "totally_unknown_selector_method"
+      }
+    }
+  }
+}

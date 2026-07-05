@@ -9,11 +9,19 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.one_hot import (
     OneHotEncoderApplier,
     OneHotEncoderCalculator,
 )
+
+_no_resolvable_columns_cases = TestCaseLoader(
+    "preprocessing/encoding_one_hot_no_resolvable_columns"
+).load_with_ids()
+_apply_exception_cases = TestCaseLoader(
+    "preprocessing/encoding_one_hot_apply_exception"
+).load_with_ids()
 
 
 def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any], pd.DataFrame]:
@@ -205,48 +213,38 @@ def test_polars_apply_include_missing_fills_null_token() -> None:
     assert out_pl[missing_cols[0]][1] == 1
 
 
-def test_polars_apply_exception_is_caught_and_returns_input(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A transform-time exception in the polars apply path is caught, logged, and X returned as-is."""
-    df_pl = pl.DataFrame({"color": ["red", "blue"]})
+class TestApplyExceptionIsCaught:
+    """A transform-time exception in the apply path is caught, logged, and X returned
+    as-is. Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_one_hot_apply_exception.json``.
+    """
 
-    class _BrokenEncoder:
-        def transform(self, _x: Any) -> Any:
-            raise ValueError("boom")
+    @pytest.mark.parametrize(
+        _apply_exception_cases[0], _apply_exception_cases[1], ids=_apply_exception_cases[2]
+    )
+    def test_apply_exception_is_caught_and_returns_input(
+        self, engine: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        class _BrokenEncoder:
+            def transform(self, _x: Any) -> Any:
+                raise ValueError("boom")
 
-    params = {
-        "columns": ["color"],
-        "encoder_object": _BrokenEncoder(),
-        "feature_names": ["color_x"],
-    }
-    with caplog.at_level("ERROR"):
-        out = OneHotEncoderApplier().apply(df_pl, dict(params))
+        params = {
+            "columns": ["color"],
+            "encoder_object": _BrokenEncoder(),
+            "feature_names": ["color_x"],
+        }
+        with caplog.at_level("ERROR"):
+            if engine == "polars":
+                df = pl.DataFrame({"color": ["red", "blue"]})
+                out = OneHotEncoderApplier().apply(df, dict(params))
+                assert out.equals(df)
+            else:
+                df = pd.DataFrame({"color": ["red", "blue"]})
+                out = OneHotEncoderApplier().apply(df, dict(params))
+                pd.testing.assert_frame_equal(out, df)
 
-    assert out.equals(df_pl)
-    assert any("OneHot Encoding failed" in rec.message for rec in caplog.records)
-
-
-def test_pandas_apply_exception_is_caught_and_logged(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A transform-time exception in the pandas apply path is caught and logged."""
-    df_pd = pd.DataFrame({"color": ["red", "blue"]})
-
-    class _BrokenEncoder:
-        def transform(self, _x: Any) -> Any:
-            raise ValueError("boom")
-
-    params = {
-        "columns": ["color"],
-        "encoder_object": _BrokenEncoder(),
-        "feature_names": ["color_x"],
-    }
-    with caplog.at_level("ERROR"):
-        out = OneHotEncoderApplier().apply(df_pd, dict(params))
-
-    pd.testing.assert_frame_equal(out, df_pd)
-    assert any("OneHot Encoding failed" in rec.message for rec in caplog.records)
+        assert any("OneHot Encoding failed" in rec.message for rec in caplog.records)
 
 
 def test_to_dense_handles_pandas_wrapped_output() -> None:
@@ -302,18 +300,25 @@ def test_zero_category_column_logs_warning(caplog: pytest.LogCaptureFixture) -> 
     assert any("0 categories" in rec.message for rec in caplog.records)
 
 
-def test_polars_fit_no_resolvable_columns_returns_empty() -> None:
-    """Polars fit falls back to auto-detection; a purely-numeric frame yields no columns."""
-    df_pl = pl.DataFrame({"amount": [1, 2, 3]})
-    params = OneHotEncoderCalculator().fit(df_pl, {})
-    assert params == {}
+class TestFitNoResolvableColumnsReturnsEmpty:
+    """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+    Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_one_hot_no_resolvable_columns.json``.
+    """
 
-
-def test_pandas_fit_no_resolvable_columns_returns_empty() -> None:
-    """Pandas fit falls back to auto-detection; a purely-numeric frame yields no columns."""
-    df_pd = pd.DataFrame({"amount": [1, 2, 3]})
-    params = OneHotEncoderCalculator().fit(df_pd, {})
-    assert params == {}
+    @pytest.mark.parametrize(
+        _no_resolvable_columns_cases[0],
+        _no_resolvable_columns_cases[1],
+        ids=_no_resolvable_columns_cases[2],
+    )
+    def test_fit_no_resolvable_columns_returns_empty(self, engine: str) -> None:
+        df = (
+            pl.DataFrame({"amount": [1, 2, 3]})
+            if engine == "polars"
+            else pd.DataFrame({"amount": [1, 2, 3]})
+        )
+        params = OneHotEncoderCalculator().fit(df, {})
+        assert params == {}
 
 
 class TestRealShapedDataset:

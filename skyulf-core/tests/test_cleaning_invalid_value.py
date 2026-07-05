@@ -4,7 +4,7 @@ Covers: mask helpers, inf-replacement helpers, resolver, Calculator.fit
 branches, Applier.apply (pandas + polars), edge cases, and engine-parity.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -13,6 +13,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.cleaning.invalid_value import (
     InvalidValueReplacementApplier,
@@ -21,6 +22,11 @@ from skyulf.preprocessing.cleaning.invalid_value import (
     _invalid_rule_polars,
     _resolve_invalid_replacement,
 )
+
+_pandas_mask_cases = TestCaseLoader("preprocessing/invalid_value_pandas_mask").load()
+_polars_rule_cases = TestCaseLoader("preprocessing/invalid_value_polars_rule").load()
+_applier_pandas_cases = TestCaseLoader("preprocessing/invalid_value_applier_pandas").load()
+_polars_applier_cases = TestCaseLoader("preprocessing/invalid_value_polars_applier").load()
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -65,58 +71,21 @@ def test_resolve_replacement_default_is_nan() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_pandas_mask_negative_marks_negatives() -> None:
-    """Negative rule must flag only values < 0."""
-    s = pd.Series([-1.0, 0.0, 1.0])
-    mask = _invalid_rule_pandas_mask(s, "negative", None, None)
-    assert list(mask) == [True, False, False]
-
-
-def test_pandas_mask_negative_to_nan_alias() -> None:
-    """Legacy 'negative_to_nan' must be treated as 'negative'."""
-    s = pd.Series([-2.0, 3.0])
-    mask = _invalid_rule_pandas_mask(s, "negative_to_nan", None, None)
-    assert list(mask) == [True, False]
-
-
-def test_pandas_mask_zero_marks_zeros() -> None:
-    """Zero rule must flag exactly the zero entries."""
-    s = pd.Series([0.0, 1.0, -1.0, 0.0])
-    mask = _invalid_rule_pandas_mask(s, "zero", None, None)
-    assert list(mask) == [True, False, False, True]
-
-
-def test_pandas_mask_custom_range_both_bounds() -> None:
-    """Values outside [min, max] should be flagged."""
-    s = pd.Series([0.0, 5.0, 11.0, -1.0])
-    mask = _invalid_rule_pandas_mask(s, "custom_range", 0.0, 10.0)
-    assert list(mask) == [False, False, True, True]
-
-
-def test_pandas_mask_custom_range_min_only() -> None:
-    """Only min set: values below min are flagged."""
-    s = pd.Series([1.0, 5.0, -3.0])
-    mask = _invalid_rule_pandas_mask(s, "custom_range", 2.0, None)
-    assert list(mask) == [True, False, True]
-
-
-def test_pandas_mask_custom_range_max_only() -> None:
-    """Only max set: values above max are flagged."""
-    s = pd.Series([1.0, 5.0, 11.0])
-    mask = _invalid_rule_pandas_mask(s, "custom_range", None, 8.0)
-    assert list(mask) == [False, False, True]
-
-
-def test_pandas_mask_custom_range_no_bounds_returns_none() -> None:
-    """custom_range with neither bound yields None (no-op)."""
-    s = pd.Series([1.0, 2.0])
-    assert _invalid_rule_pandas_mask(s, "custom_range", None, None) is None
-
-
-def test_pandas_mask_unknown_rule_returns_none() -> None:
-    """An unrecognised rule should return None rather than raise."""
-    s = pd.Series([1.0, 2.0])
-    assert _invalid_rule_pandas_mask(s, "does_not_exist", None, None) is None
+@pytest.mark.parametrize(*_pandas_mask_cases)
+def test_pandas_mask(
+    values: list,
+    rule: str,
+    min_value: Optional[float],
+    max_value: Optional[float],
+    expected: Optional[list],
+) -> None:
+    """_invalid_rule_pandas_mask must flag values per rule, or return None for no-ops."""
+    s = pd.Series(values)
+    mask = _invalid_rule_pandas_mask(s, rule, min_value, max_value)
+    if expected is None:
+        assert mask is None
+    else:
+        assert list(mask) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -129,60 +98,20 @@ def _eval_polars_expr(df: pl.DataFrame, col: str, expr: Any) -> list:
     return df.with_columns(expr.alias("out"))["out"].to_list()
 
 
-def test_polars_rule_negative_replaces_negatives() -> None:
-    """Polars negative rule replaces values < 0 with the fill value."""
-    df = pl.DataFrame({"v": [-2.0, 0.0, 3.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "negative", 0.0, None, None)
+@pytest.mark.parametrize(*_polars_rule_cases)
+def test_polars_rule(
+    values: list,
+    rule: str,
+    replacement: float,
+    min_value: Optional[float],
+    max_value: Optional[float],
+    expected: list,
+) -> None:
+    """_invalid_rule_polars must replace flagged values with the given replacement."""
+    df = pl.DataFrame({"v": values})
+    expr = _invalid_rule_polars(pl.col("v"), rule, replacement, min_value, max_value)
     result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [0.0, 0.0, 3.0]
-
-
-def test_polars_rule_zero_replaces_zeros() -> None:
-    """Polars zero rule must replace only the zero entry."""
-    df = pl.DataFrame({"v": [0.0, 1.0, -1.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "zero", -99.0, None, None)
-    result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [-99.0, 1.0, -1.0]
-
-
-def test_polars_rule_custom_range_both_bounds() -> None:
-    """Polars custom_range with both bounds replaces out-of-range values."""
-    df = pl.DataFrame({"v": [-1.0, 5.0, 11.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "custom_range", 0.0, 0.0, 10.0)
-    result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [0.0, 5.0, 0.0]
-
-
-def test_polars_rule_custom_range_min_only_replaces_below_min() -> None:
-    """Polars custom_range with only min_value must flag values below min."""
-    df = pl.DataFrame({"v": [1.0, 5.0, -3.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "custom_range", 0.0, 2.0, None)
-    result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [0.0, 5.0, 0.0]
-
-
-def test_polars_rule_custom_range_max_only_replaces_above_max() -> None:
-    """Polars custom_range with only max_value must flag values above max."""
-    df = pl.DataFrame({"v": [1.0, 5.0, 11.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "custom_range", 0.0, None, 8.0)
-    result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [1.0, 5.0, 0.0]
-
-
-def test_polars_rule_custom_range_no_bounds_is_noop() -> None:
-    """custom_range with no bounds must leave the column unchanged."""
-    df = pl.DataFrame({"v": [1.0, 2.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "custom_range", 0.0, None, None)
-    result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [1.0, 2.0]
-
-
-def test_polars_rule_unknown_is_noop() -> None:
-    """An unrecognised rule must leave the column unchanged."""
-    df = pl.DataFrame({"v": [1.0, 2.0]})
-    expr = _invalid_rule_polars(pl.col("v"), "unknown_rule", 0.0, None, None)
-    result = df.with_columns(expr.alias("out"))["out"].to_list()
-    assert result == [1.0, 2.0]
+    assert result == expected
 
 
 # ---------------------------------------------------------------------------
@@ -253,79 +182,16 @@ def test_calculator_fit_value_key_stored() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_applier_negative_rule_replaces_with_nan() -> None:
-    """Negative values must become NaN under the negative rule."""
-    df = _basic_df()
-    calc = InvalidValueReplacementCalculator()
-    applier = InvalidValueReplacementApplier()
-    params = calc.fit(df, {"columns": ["x"], "rule": "negative"})
-    result = applier.apply(df, params)
-    # -3.0 and -1.0 were negative; they should be NaN now
-    assert result["x"].iloc[0] != result["x"].iloc[0]  # NaN check
-    assert result["x"].iloc[3] == 1.0  # positive value unchanged
-
-
-def test_applier_zero_rule_replaces_zeros() -> None:
-    """Zero rule must replace zeros with NaN (default replacement)."""
-    df = pd.DataFrame({"v": [0.0, 1.0, 0.0, 5.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "rule": "zero",
-        "replacement": np.nan,
-        "replace_inf": False,
-        "replace_neg_inf": False,
-    }
+@pytest.mark.parametrize(*_applier_pandas_cases)
+def test_applier_pandas(values: list, params: Dict[str, Any], expected: list) -> None:
+    """InvalidValueReplacementApplier must replace flagged values per rule config."""
+    df = pd.DataFrame({"v": values})
     result = InvalidValueReplacementApplier().apply(df, params)
-    assert np.isnan(result["v"].iloc[0])
-    assert result["v"].iloc[1] == 1.0
-
-
-def test_applier_custom_range_replaces_out_of_range() -> None:
-    """Values outside [1, 9] must be replaced with the sentinel."""
-    df = pd.DataFrame({"v": [-5.0, 5.0, 15.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "rule": "custom_range",
-        "min_value": 1.0,
-        "max_value": 9.0,
-        "replacement": -1.0,
-        "replace_inf": False,
-        "replace_neg_inf": False,
-    }
-    result = InvalidValueReplacementApplier().apply(df, params)
-    assert result["v"].iloc[0] == -1.0  # < min
-    assert result["v"].iloc[1] == 5.0  # in range
-    assert result["v"].iloc[2] == -1.0  # > max
-
-
-def test_applier_replace_inf_only() -> None:
-    """Only +inf should be replaced when replace_inf=True, replace_neg_inf=False."""
-    df = pd.DataFrame({"v": [np.inf, -np.inf, 1.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "replace_inf": True,
-        "replace_neg_inf": False,
-        "replacement": 0.0,
-    }
-    result = InvalidValueReplacementApplier().apply(df, params)
-    assert result["v"].iloc[0] == 0.0
-    assert result["v"].iloc[1] == -np.inf  # untouched
-    assert result["v"].iloc[2] == 1.0
-
-
-def test_applier_replace_neg_inf_only() -> None:
-    """Only -inf should be replaced when replace_neg_inf=True, replace_inf=False."""
-    df = pd.DataFrame({"v": [np.inf, -np.inf, 2.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "replace_inf": False,
-        "replace_neg_inf": True,
-        "replacement": 0.0,
-    }
-    result = InvalidValueReplacementApplier().apply(df, params)
-    assert result["v"].iloc[0] == np.inf  # untouched
-    assert result["v"].iloc[1] == 0.0
-    assert result["v"].iloc[2] == 2.0
+    for got, exp in zip(result["v"], expected):
+        if exp is None:
+            assert np.isnan(got)
+        else:
+            assert got == exp
 
 
 def test_applier_empty_params_is_noop() -> None:
@@ -363,22 +229,6 @@ def test_applier_all_nan_column() -> None:
     assert result["v"].isna().all()
 
 
-def test_applier_custom_value_sentinel() -> None:
-    """When 'value' is set it overrides the 'replacement' fill value."""
-    df = pd.DataFrame({"v": [-1.0, 2.0, -3.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "rule": "negative",
-        "replacement": np.nan,
-        "value": -999.0,
-        "replace_inf": False,
-        "replace_neg_inf": False,
-    }
-    result = InvalidValueReplacementApplier().apply(df, params)
-    assert result["v"].iloc[0] == -999.0
-    assert result["v"].iloc[2] == -999.0
-
-
 # ---------------------------------------------------------------------------
 # fit → apply equivalence
 # ---------------------------------------------------------------------------
@@ -402,36 +252,14 @@ def test_fit_then_apply_matches_direct_params() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_polars_applier_replace_inf_via_polars_engine() -> None:
-    """Polars applier path must replace +inf when replace_inf=True."""
-    df = pl.DataFrame({"v": [float("inf"), -float("inf"), 1.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "replace_inf": True,
-        "replace_neg_inf": False,
-        "replacement": 0.0,
-    }
+@pytest.mark.parametrize(*_polars_applier_cases)
+def test_polars_applier(values: list, params: Dict[str, Any], expected: list) -> None:
+    """Polars applier path must replace +inf/-inf per the given flags."""
+    df = pl.DataFrame({"v": values})
     result = InvalidValueReplacementApplier().apply(df, params)
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
-    assert result["v"].iloc[0] == 0.0
-    assert result["v"].iloc[1] == -float("inf")  # untouched
-
-
-def test_polars_applier_replace_neg_inf_via_polars_engine() -> None:
-    """Polars applier path must replace -inf when replace_neg_inf=True."""
-    df = pl.DataFrame({"v": [float("inf"), -float("inf"), 2.0]})
-    params: Dict[str, Any] = {
-        "columns": ["v"],
-        "replace_inf": False,
-        "replace_neg_inf": True,
-        "replacement": 0.0,
-    }
-    result = InvalidValueReplacementApplier().apply(df, params)
-    if hasattr(result, "to_pandas"):
-        result = result.to_pandas()
-    assert result["v"].iloc[0] == float("inf")  # untouched
-    assert result["v"].iloc[1] == 0.0
+    assert list(result["v"]) == expected
 
 
 def test_polars_applier_no_valid_columns_is_noop() -> None:

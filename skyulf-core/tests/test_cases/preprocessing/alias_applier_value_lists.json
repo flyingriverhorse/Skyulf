@@ -1,0 +1,23 @@
+{
+  "params": "values, alias_type, custom_map, expected",
+  "test_cases": {
+    "unknown_values_preserved": {
+      "values": ["maybe", "perhaps", "dunno"],
+      "alias_type": "boolean",
+      "custom_map": {},
+      "expected": ["maybe", "perhaps", "dunno"]
+    },
+    "custom_mapping": {
+      "values": ["Active", "Inactive", "Pending"],
+      "alias_type": "custom",
+      "custom_map": {"active": "active", "inactive": "inactive"},
+      "expected": ["active", "inactive", "Pending"]
+    },
+    "mixed_case_and_punctuation_normalised": {
+      "values": ["Y.e.s", "N-O", "T.R.U.E."],
+      "alias_type": "boolean",
+      "custom_map": {},
+      "expected": ["Yes", "No", "Yes"]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "params": "estimator_name, columns, check_non_negative",
+  "test_cases": {
+    "tree_based_importances": {
+      "estimator_name": "RandomForestClassifier", "columns": ["feat_a", "feat_b"], "check_non_negative": true
+    },
+    "coef_based_importances": {
+      "estimator_name": "LogisticRegression", "columns": ["a", "b"], "check_non_negative": false
+    }
+  }
+}

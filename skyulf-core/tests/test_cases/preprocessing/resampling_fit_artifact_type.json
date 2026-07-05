@@ -1,0 +1,13 @@
+{
+  "params": "kind, expected_type",
+  "test_cases": {
+    "oversampling": {
+      "kind": "oversampling",
+      "expected_type": "oversampling"
+    },
+    "undersampling": {
+      "kind": "undersampling",
+      "expected_type": "undersampling"
+    }
+  }
+}

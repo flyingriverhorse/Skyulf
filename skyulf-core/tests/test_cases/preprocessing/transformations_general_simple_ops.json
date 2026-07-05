@@ -1,0 +1,9 @@
+{
+  "params": "method",
+  "test_cases": {
+    "log": {"method": "log"},
+    "sqrt": {"method": "sqrt"},
+    "square": {"method": "square"},
+    "cube_root": {"method": "cube_root"}
+  }
+}

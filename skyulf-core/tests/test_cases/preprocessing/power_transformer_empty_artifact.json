@@ -1,0 +1,17 @@
+{
+  "params": "df_data, fit_config",
+  "test_cases": {
+    "box_cox_all_invalid_columns": {
+      "df_data": {"has_zero": [0.0, -1.0, 2.0]},
+      "fit_config": {"method": "box-cox", "columns": ["has_zero"]}
+    },
+    "no_columns_configured": {
+      "df_data": {"a": [1.0, 2.0, 3.0]},
+      "fit_config": {"columns": []}
+    },
+    "no_numeric_candidate_columns": {
+      "df_data": {"cat": ["a", "b", "c"]},
+      "fit_config": {"method": "yeo-johnson"}
+    }
+  }
+}

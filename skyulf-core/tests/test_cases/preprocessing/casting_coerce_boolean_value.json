@@ -1,0 +1,22 @@
+{
+  "params": "value, expected",
+  "test_cases": {
+    "true_bool": {"value": true, "expected": true},
+    "false_bool": {"value": false, "expected": false},
+    "int_one": {"value": 1, "expected": true},
+    "int_zero": {"value": 0, "expected": false},
+    "str_true": {"value": "true", "expected": true},
+    "str_yes": {"value": "yes", "expected": true},
+    "str_one": {"value": "1", "expected": true},
+    "str_on": {"value": "on", "expected": true},
+    "str_y": {"value": "y", "expected": true},
+    "str_t": {"value": "t", "expected": true},
+    "str_false": {"value": "false", "expected": false},
+    "str_no": {"value": "no", "expected": false},
+    "str_zero": {"value": "0", "expected": false},
+    "str_off": {"value": "off", "expected": false},
+    "str_n": {"value": "n", "expected": false},
+    "str_f": {"value": "f", "expected": false},
+    "str_maybe_unknown": {"value": "maybe", "expected": null}
+  }
+}

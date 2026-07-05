@@ -10,8 +10,14 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.woe import WOEEncoderApplier, WOEEncoderCalculator
+
+_empty_params_cases = TestCaseLoader("preprocessing/encoding_woe_empty_params").load_with_ids()
+_no_resolvable_columns_cases = TestCaseLoader(
+    "preprocessing/encoding_woe_no_resolvable_columns"
+).load_with_ids()
 
 
 def _fit_apply(
@@ -89,12 +95,27 @@ def test_fit_polars_resolves_target_column_from_within_x() -> None:
     assert set(params["mappings"]["city"].keys()) == {"a", "b"}
 
 
-def test_non_binary_target_returns_empty_params() -> None:
-    """A target with != 2 classes fails the binary check and fit() returns {}."""
-    X = pd.DataFrame({"city": ["a", "b", "c"]})
-    y = pd.Series([0, 1, 2], name="target")  # 3 classes -> not binary
-    params = WOEEncoderCalculator().fit((X, y), {"columns": ["city"]})
-    assert params == {}
+class TestBinaryTargetInvariantReturnsEmptyParams:
+    """Scenarios (non-binary target, single-row, empty frame) that all fail the
+    binary-target check and cause ``fit()`` to short-circuit to ``{}``. Loaded
+    from ``tests/test_cases/preprocessing/encoding_woe_empty_params.json``.
+    """
+
+    @pytest.mark.parametrize(
+        _empty_params_cases[0], _empty_params_cases[1], ids=_empty_params_cases[2]
+    )
+    def test_returns_empty_params(
+        self,
+        city: list[str],
+        y: list[int],
+        city_dtype: str | None,
+        y_dtype: str | None,
+        columns: list[str],
+    ) -> None:
+        X = pd.DataFrame({"city": pd.Series(city, dtype=city_dtype)})
+        y_series = pd.Series(y, dtype=y_dtype, name="target")
+        params = WOEEncoderCalculator().fit((X, y_series), {"columns": columns})
+        assert params == {}
 
 
 def test_missing_target_returns_empty_params() -> None:
@@ -111,22 +132,6 @@ def test_target_column_resolved_from_config_key() -> None:
     assert params != {}
     assert "target" not in params["columns"]
     assert set(params["mappings"]["city"].keys()) == {"a", "b"}
-
-
-def test_single_row_dataframe_is_not_binary_and_returns_empty() -> None:
-    """A single-row frame has only 1 target class, failing the binary-target check."""
-    X = pd.DataFrame({"city": ["a"]})
-    y = pd.Series([1], name="target")
-    params = WOEEncoderCalculator().fit((X, y), {"columns": ["city"]})
-    assert params == {}
-
-
-def test_empty_dataframe_returns_empty_params() -> None:
-    """Fitting on a zero-row DataFrame yields {} (no classes to compute WOE from)."""
-    X = pd.DataFrame({"city": pd.Series([], dtype="object")})
-    y = pd.Series([], dtype="int64", name="target")
-    params = WOEEncoderCalculator().fit((X, y), {"columns": ["city"]})
-    assert params == {}
 
 
 def test_no_columns_selected_returns_input_unchanged() -> None:
@@ -230,20 +235,26 @@ def test_woe_fit_polars_no_target_returns_empty_and_warns(
     assert any("requires a target variable" in rec.message for rec in caplog.records)
 
 
-def test_woe_fit_polars_no_resolvable_columns_returns_empty() -> None:
-    """Polars fit with only numeric feature columns returns {} (nothing to encode)."""
-    X_pl = pl.DataFrame({"amount": [1, 2, 3, 4]})
-    y_pl = pl.Series("target", [0, 1, 0, 1])
-    params = WOEEncoderCalculator().fit((X_pl, y_pl), {})
-    assert params == {}
+class TestFitNoResolvableColumnsReturnsEmpty:
+    """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+    Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_woe_no_resolvable_columns.json``.
+    """
 
-
-def test_woe_fit_pandas_no_resolvable_columns_returns_empty() -> None:
-    """Pandas fit with only numeric feature columns returns {} (nothing to encode)."""
-    X = pd.DataFrame({"amount": [1, 2, 3, 4]})
-    y = pd.Series([0, 1, 0, 1], name="target")
-    params = WOEEncoderCalculator().fit((X, y), {})
-    assert params == {}
+    @pytest.mark.parametrize(
+        _no_resolvable_columns_cases[0],
+        _no_resolvable_columns_cases[1],
+        ids=_no_resolvable_columns_cases[2],
+    )
+    def test_fit_no_resolvable_columns_returns_empty(self, engine: str) -> None:
+        if engine == "polars":
+            X = pl.DataFrame({"amount": [1, 2, 3, 4]})
+            y = pl.Series("target", [0, 1, 0, 1])
+        else:
+            X = pd.DataFrame({"amount": [1, 2, 3, 4]})
+            y = pd.Series([0, 1, 0, 1], name="target")
+        params = WOEEncoderCalculator().fit((X, y), {})
+        assert params == {}
 
 
 class TestRealShapedDataset:

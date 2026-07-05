@@ -1,0 +1,20 @@
+{
+  "params": "columns, available, expected",
+  "test_cases": {
+    "filters_to_available_preserves_order": {
+      "columns": ["a", "z", "b"],
+      "available": ["a", "b", "c"],
+      "expected": ["a", "b"]
+    },
+    "none_returns_empty": {
+      "columns": null,
+      "available": ["a", "b"],
+      "expected": []
+    },
+    "empty_list_returns_empty": {
+      "columns": [],
+      "available": ["a", "b"],
+      "expected": []
+    }
+  }
+}
