@@ -1,0 +1,29 @@
+{
+  "params": "lat1_col, lon1_col, lat2_col, lon2_col, extra_config, error_match",
+  "test_cases": {
+    "missing_column": {
+      "lat1_col": "lat1",
+      "lon1_col": "lon1",
+      "lat2_col": "missing",
+      "lon2_col": "lon2",
+      "extra_config": {},
+      "error_match": "columns not found in data"
+    },
+    "unsupported_method": {
+      "lat1_col": "lat1",
+      "lon1_col": "lon1",
+      "lat2_col": "lat2",
+      "lon2_col": "lon2",
+      "extra_config": {"method": "manhattan"},
+      "error_match": "only supports"
+    },
+    "unsupported_unit": {
+      "lat1_col": "lat1",
+      "lon1_col": "lon1",
+      "lat2_col": "lat2",
+      "lon2_col": "lon2",
+      "extra_config": {"unit": "furlongs"},
+      "error_match": "only supports"
+    }
+  }
+}

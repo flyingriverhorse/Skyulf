@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding import WOEEncoderApplier, WOEEncoderCalculator
 from skyulf.registry import NodeRegistry
@@ -119,3 +120,29 @@ def test_calibrated_classifier_unknown_base_estimator_falls_back():
 
     # Unknown keys fall back to logistic regression rather than raising.
     assert isinstance(model.estimator, LogisticRegression)
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that WOEEncoderCalculator handles a real categorical column
+    (``plan_type``) with the binary ``churned`` target, producing a valid
+    WOE mapping for every category and applying float-valued WOE scores.
+    """
+
+    def test_woe_on_plan_type_with_churned_target(self) -> None:
+        df = load_sample_dataset("customers")
+        X = df[["plan_type"]]
+        y = df["churned"]
+        params = WOEEncoderCalculator().fit((X, y), {"columns": ["plan_type"]})
+        # A binary target must yield a valid WOE artifact.
+        assert params.get("type") == "woe_encoder"
+        assert set(params["mappings"]["plan_type"].keys()) == {"basic", "premium", "enterprise"}
+        # Applying WOE scores must yield float-valued column.
+        out = WOEEncoderApplier().apply(X.copy(), params)
+        assert out["plan_type"].dtype == float

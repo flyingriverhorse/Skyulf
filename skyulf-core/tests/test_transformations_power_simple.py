@@ -10,6 +10,7 @@ import pandas as pd
 import polars as pl
 import pytest
 from sklearn.preprocessing import PowerTransformer as SkPowerTransformer
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.transformations.power import (
     PowerTransformerApplier,
@@ -340,3 +341,29 @@ def test_simple_transformation_infer_output_schema_is_identity() -> None:
     schema = SkyulfSchema.from_columns(["a"], {"a": "float64"})
     out = SimpleTransformationCalculator().infer_output_schema(schema, {})
     assert out is schema
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that SimpleTransformationCalculator handles the real-world
+    ``income`` column (which has NaN values): NaN rows must be preserved
+    through a log transform, and non-missing rows must produce finite output.
+    """
+
+    def test_simple_log_on_income_preserves_nan(self) -> None:
+        df = load_sample_dataset("customers")
+        art = SimpleTransformationCalculator().fit(
+            df, {"transformations": [{"column": "income", "method": "log"}]}
+        )
+        out = SimpleTransformationApplier().apply(df, art)
+        # Rows where income was NaN must remain NaN after log.
+        assert out.loc[df["income"].isna(), "income"].isna().all()
+        # Non-missing rows must yield finite log1p values.
+        non_missing = ~df["income"].isna()
+        assert out.loc[non_missing, "income"].notna().all()

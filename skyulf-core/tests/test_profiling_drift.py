@@ -3,6 +3,7 @@
 import numpy as np
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.drift import DriftCalculator, DriftReport
 
@@ -226,3 +227,32 @@ def test_calculate_kl_handles_unexpected_exception(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(drift_module.np, "percentile", boom)
     kl = calc._calculate_kl(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
     assert kl == 0.0
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``age``/``income`` values — closer to production data
+    than the small synthetic ``pl.DataFrame`` fixtures used elsewhere in this
+    file.
+    """
+
+    def test_calculate_drift_between_plan_type_segments(self) -> None:
+        df = pl.from_pandas(load_sample_dataset("customers"))
+        # Compare the "basic" plan segment (reference) against everyone else
+        # (current) on the numeric age/income columns, both of which contain
+        # real missing values that drop_nulls() must tolerate.
+        reference = df.filter(pl.col("plan_type") == "basic").select(["age", "income"])
+        current = df.filter(pl.col("plan_type") != "basic").select(["age", "income"])
+
+        report = DriftCalculator(reference, current).calculate_drift()
+
+        assert report.missing_columns == []
+        assert report.new_columns == []
+        assert "age" in report.column_drifts
+        assert "income" in report.column_drifts
+        # Both columns retain some non-null rows on each side, so metrics must be computed.
+        for column in ("age", "income"):
+            metric_names = {m.metric for m in report.column_drifts[column].metrics}
+            assert {"wasserstein_distance", "ks_test_p_value", "psi", "kl_divergence"} == (
+                metric_names
+            )

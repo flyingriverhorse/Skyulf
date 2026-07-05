@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.one_hot import (
     OneHotEncoderApplier,
@@ -313,3 +314,21 @@ def test_pandas_fit_no_resolvable_columns_returns_empty() -> None:
     df_pd = pd.DataFrame({"amount": [1, 2, 3]})
     params = OneHotEncoderCalculator().fit(df_pd, {})
     assert params == {}
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has no missing values in ``plan_type`` — closer to production data
+    than the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_plan_type_encoding_produces_one_column_per_category(self) -> None:
+        df = load_sample_dataset("customers")
+        params, out = _fit_apply(df, {"columns": ["plan_type"]})
+
+        assert "plan_type" not in out.columns
+        expected_cols = {f"plan_type_{v}" for v in df["plan_type"].unique()}
+        assert expected_cols.issubset(set(out.columns))
+        for value in df["plan_type"].unique():
+            rows = df["plan_type"] == value
+            assert (out.loc[rows, f"plan_type_{value}"] == 1).all()

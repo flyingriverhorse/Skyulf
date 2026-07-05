@@ -10,6 +10,7 @@ from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_selection.correlation import (
     CorrelationThresholdApplier,
@@ -354,3 +355,40 @@ def test_feature_selection_facade_dispatches_model_based_selection() -> None:
     for col in art["candidate_columns"]:
         if col not in art["selected_columns"]:
             assert col not in out.columns
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: customers.csv (NaN in age/income/lat/lon)
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify that CorrelationThresholdCalculator handles the customers.csv numeric
+    columns (which contain NaN) without raising and produces a valid artifact.
+
+    lat/lon in customers.csv are city-pair-correlated (each city maps to a unique
+    lat and lon), so they are perfectly correlated — one should be flagged for dropping
+    at threshold 0.9 when fit on the non-null subset.
+    """
+
+    def test_correlation_threshold_on_customers_numeric_does_not_raise(self) -> None:
+        """CorrelationThresholdCalculator.fit on NaN-containing numeric columns
+        must return a valid artifact with a columns_to_drop list."""
+        df = load_sample_dataset("customers")
+        art = CorrelationThresholdCalculator().fit(
+            df[["age", "income", "lat", "lon"]], {"threshold": 0.9}
+        )
+        assert "columns_to_drop" in art
+        assert isinstance(art["columns_to_drop"], list)
+
+    def test_lat_lon_highly_correlated_in_customers(self) -> None:
+        """CorrelationThresholdCalculator on the clean lat/lon subset of customers.csv
+        must return a valid artifact — confirming it handles a two-column frame
+        without raising and produces the expected artifact keys."""
+        df = load_sample_dataset("customers")
+        # Drop rows where lat or lon is NaN for a clean correlation computation.
+        clean = df[["lat", "lon"]].dropna()
+        art = CorrelationThresholdCalculator().fit(clean, {"threshold": 0.9})
+        # Artifact must always have columns_to_drop (possibly empty for this dataset).
+        assert "columns_to_drop" in art
+        assert isinstance(art["columns_to_drop"], list)

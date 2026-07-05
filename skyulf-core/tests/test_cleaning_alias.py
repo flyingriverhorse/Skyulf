@@ -12,6 +12,7 @@ import polars as pl
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.cleaning._common import (
     ALIAS_PUNCTUATION_TABLE,
@@ -415,3 +416,34 @@ def test_alias_apply_engine_parity_boolean(df: pd.DataFrame) -> None:
         pd_result.reset_index(drop=True),
         pl_result.reset_index(drop=True),
     )
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has a ``city`` column with a missing value — verifying NaN passthrough
+    in the alias replacement path when no matching alias is found.
+    """
+
+    def test_boolean_alias_on_city_with_nan_passes_through_unchanged(self) -> None:
+        """Applying boolean alias replacement to a column that contains NaN and
+        non-matching values must leave those values unchanged (NaN stays NaN,
+        unrecognised strings are returned as-is).
+        """
+        df = load_sample_dataset("customers")
+        calc = AliasReplacementCalculator()
+        applier = AliasReplacementApplier()
+        params = calc.fit(df, {"columns": ["city"], "alias_type": "boolean"})
+        result = applier.apply(df, params)
+
+        # City values like "New York", "Chicago" do not match any boolean alias
+        # so they must be preserved verbatim.
+        original_non_null = df.loc[df["city"].notna(), "city"]
+        result_non_null = result.loc[df["city"].notna(), "city"]
+        assert list(original_non_null) == list(result_non_null)
+        # The NaN row must remain NaN after alias replacement.
+        assert result.loc[df["city"].isna(), "city"].isna().all()

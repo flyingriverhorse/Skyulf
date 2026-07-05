@@ -1,9 +1,15 @@
 """Tests for skyulf.profiling._analyzer.decomposition.DecompositionMixin."""
 
+from typing import Any
+
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.profiling.analyzer import EDAAnalyzer
+
+_decomposition_split_cases = TestCaseLoader("profiling/decomposition_split_scenarios").load()
 
 
 def _decomposition_df() -> pl.DataFrame:
@@ -16,22 +22,25 @@ def _decomposition_df() -> pl.DataFrame:
     )
 
 
-def test_get_decomposition_split_global_sum() -> None:
-    """No split column: measure_agg='sum' should return a single 'Total' row."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col="sales", measure_agg="sum", split_col=None, filters=[]
-    )
-    assert result == [{"name": "Total", "value": 735, "ratio": 1.0}]
+class TestGlobalAggregateScenarios:
+    """Global (no ``split_col``) aggregate scenarios over the shared ``sales`` fixture —
+    scenarios loaded from ``tests/test_cases/profiling/decomposition_split_scenarios.json``.
+    """
 
-
-def test_get_decomposition_split_global_count_without_measure() -> None:
-    """No measure_col and no split_col: falls back to row-count."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col=None, measure_agg="sum", split_col=None, filters=[]
-    )
-    assert result == [{"name": "Total", "value": 6, "ratio": 1.0}]
+    @pytest.mark.parametrize(*_decomposition_split_cases)
+    def test_get_decomposition_split_global_scenario(
+        self,
+        measure_col: str | None,
+        measure_agg: str,
+        split_col: str | None,
+        filters: list[dict[str, Any]],
+        expected_value: float,
+    ) -> None:
+        analyzer = EDAAnalyzer(_decomposition_df())
+        result = analyzer.get_decomposition_split(
+            measure_col=measure_col, measure_agg=measure_agg, split_col=split_col, filters=filters
+        )
+        assert result == [{"name": "Total", "value": expected_value, "ratio": 1.0}]
 
 
 def test_get_decomposition_split_group_by_sum_and_ratio() -> None:
@@ -73,18 +82,6 @@ def test_get_decomposition_split_group_by_min_max() -> None:
     assert max_by_name["north"] == 200
 
 
-def test_get_decomposition_split_applies_numeric_filter_as_string() -> None:
-    """Numeric filter values arriving as strings (from the frontend) should be coerced."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col="sales",
-        measure_agg="sum",
-        split_col=None,
-        filters=[{"column": "sales", "operator": ">", "value": "100"}],
-    )
-    assert result == [{"name": "Total", "value": 500, "ratio": 1.0}]
-
-
 def test_get_decomposition_split_applies_float_filter_value_from_string() -> None:
     """Numeric string filter values should be coerced to ``float`` for Float columns."""
     df = pl.DataFrame(
@@ -103,19 +100,6 @@ def test_get_decomposition_split_applies_float_filter_value_from_string() -> Non
     assert result == [{"name": "Total", "value": pytest.approx(300.75), "ratio": 1.0}]
 
 
-def test_get_decomposition_split_unknown_filter_matches_nulls() -> None:
-    """The FE sentinel value 'Unknown' should filter on null/not-null for numeric columns."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col=None,
-        measure_agg="sum",
-        split_col=None,
-        filters=[{"column": "sales", "operator": "==", "value": "Unknown"}],
-    )
-    # No nulls in the numeric "sales" column, so this filters everything out.
-    assert result == [{"name": "Total", "value": 0, "ratio": 1.0}]
-
-
 def test_get_decomposition_split_missing_column_returns_empty() -> None:
     """An unknown split/measure column should yield an empty list rather than raising."""
     analyzer = EDAAnalyzer(_decomposition_df())
@@ -131,44 +115,6 @@ def test_get_decomposition_split_missing_column_returns_empty() -> None:
         )
         == []
     )
-
-
-def test_get_decomposition_split_filters_are_ignored_for_unknown_columns() -> None:
-    """Filters referencing a non-existent column should simply be skipped."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col="sales",
-        measure_agg="sum",
-        split_col=None,
-        filters=[{"column": "does_not_exist", "operator": "==", "value": 1}],
-    )
-    assert result == [{"name": "Total", "value": 735, "ratio": 1.0}]
-
-
-def test_get_decomposition_split_unknown_filter_not_equal_matches_non_nulls() -> None:
-    """The 'Unknown' sentinel with '!=' should filter to non-null rows for numeric columns."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col=None,
-        measure_agg="sum",
-        split_col=None,
-        filters=[{"column": "sales", "operator": "!=", "value": "Unknown"}],
-    )
-    # No nulls in "sales" so every row survives the not-null filter.
-    assert result == [{"name": "Total", "value": 6, "ratio": 1.0}]
-
-
-def test_get_decomposition_split_numeric_filter_value_not_castable_falls_back_to_string() -> None:
-    """A non-numeric string value for a numeric column should fall back to a string cast."""
-    analyzer = EDAAnalyzer(_decomposition_df())
-    result = analyzer.get_decomposition_split(
-        measure_col=None,
-        measure_agg="sum",
-        split_col=None,
-        filters=[{"column": "sales", "operator": "==", "value": "not-a-number"}],
-    )
-    # Casting "sales" to Utf8 means no row will ever equal "not-a-number".
-    assert result == [{"name": "Total", "value": 0, "ratio": 1.0}]
 
 
 def test_get_decomposition_split_equality_and_inequality_filters() -> None:
@@ -309,3 +255,26 @@ def test_get_decomposition_split_group_by_zero_total_gives_zero_ratios() -> None
         measure_col="sales", measure_agg="sum", split_col="region", filters=[]
     )
     assert all(row["ratio"] == 0.0 for row in result)
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``income`` values and a ``city`` column with an empty
+    slot — closer to production data than the small synthetic frames used
+    elsewhere in this file.
+    """
+
+    def test_income_sum_split_by_city_handles_missing_values(self) -> None:
+        df = pl.from_pandas(load_sample_dataset("customers"))
+        analyzer = EDAAnalyzer(df)
+        result = analyzer.get_decomposition_split(
+            measure_col="income", measure_agg="sum", split_col="city", filters=[]
+        )
+        by_name = {row["name"]: row["value"] for row in result}
+
+        # The blank city cell (row 6) surfaces as "Unknown", not a silently dropped row.
+        assert "Unknown" in by_name
+        # Sum of income for New York rows (52000 + 94000 + 83000 + None) ignoring nulls.
+        assert by_name["New York"] == pytest.approx(52000 + 94000 + 83000)
+        total_ratio = sum(row["ratio"] for row in result)
+        assert abs(total_ratio - 1.0) < 1e-9

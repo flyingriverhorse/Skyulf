@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.ordinal import (
     OrdinalEncoderApplier,
@@ -376,3 +377,25 @@ def test_no_feature_columns_but_target_encoding_fits_target_only() -> None:
     assert params["columns"] == []
     assert params["encoder_object"] is None
     assert "__target__" in params["encoders"]
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``plan_type`` (no NaN, 3 categories: basic/enterprise/premium) exercises the
+    full fit→apply round-trip on production-like data with a multi-class column.
+    """
+
+    def test_plan_type_ordinal_encoding_produces_valid_codes(self) -> None:
+        """OrdinalEncoder on ``plan_type`` assigns codes 0.0/1.0/2.0 in alphabetical order.
+
+        Verifies the three-category case on real data: every row gets a code
+        and same plan_type values share the same ordinal code.
+        """
+        df = load_sample_dataset("customers")
+        params, result = _fit_apply(df, {"columns": ["plan_type"]})
+
+        assert params["categories_count"] == [3]  # basic, enterprise, premium
+        assert result["plan_type"].between(0.0, 2.0).all()
+        for val in df["plan_type"].unique():
+            mask = df["plan_type"] == val
+            assert result.loc[mask, "plan_type"].nunique() == 1

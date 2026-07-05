@@ -10,6 +10,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.drop_and_missing.drop_rows import (
     DropMissingRowsApplier,
@@ -220,3 +221,47 @@ def test_fit_then_apply_round_trip_default_how_any() -> None:
     result = applier.apply(df, params)
     assert result.shape[0] == 1
     assert result["a"].tolist() == [1.0]
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has NaN values across multiple columns (``age``, ``income``, ``city``,
+    ``lat``, ``lon``) — closer to production data than the small synthetic
+    frames used elsewhere in this file.
+    """
+
+    def test_drop_any_nan_rows_reduces_row_count(self) -> None:
+        """Dropping rows where any column has a NaN must reduce the 15-row
+        customers dataset since multiple rows have missing values.
+        """
+        df = load_sample_dataset("customers")
+        assert df.shape[0] == 15
+
+        calc = DropMissingRowsCalculator()
+        applier = DropMissingRowsApplier()
+        params = calc.fit(df, {"how": "any"})
+        result = applier.apply(df, params)
+
+        assert result.shape[0] < 15
+        assert result.isna().sum().sum() == 0
+
+    def test_drop_subset_age_removes_only_missing_age_rows(self) -> None:
+        """Dropping on subset=['age'] must remove only the rows where age is NaN,
+        leaving income/city NaN rows intact.
+        """
+        df = load_sample_dataset("customers")
+        n_age_nan = df["age"].isna().sum()
+        assert n_age_nan > 0
+
+        calc = DropMissingRowsCalculator()
+        applier = DropMissingRowsApplier()
+        params = calc.fit(df, {"how": "any", "subset": ["age"]})
+        result = applier.apply(df, params)
+
+        assert result.shape[0] == 15 - n_age_nan
+        assert result["age"].isna().sum() == 0

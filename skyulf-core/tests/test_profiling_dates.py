@@ -2,6 +2,7 @@
 
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 
@@ -118,3 +119,20 @@ def test_analyze_date_computes_duration_in_days() -> None:
     assert stats.duration_days == 10
     assert stats.min_date == str(row["d__min"])
     assert stats.max_date == str(row["d__max"])
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    whose ``signup_date`` column is a plain ISO date string — closer to
+    production data than the hand-built date fixtures used elsewhere in this
+    file.
+    """
+
+    def test_cast_date_columns_parses_signup_date(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        analyzer._cast_date_columns()
+
+        assert analyzer.df["signup_date"].dtype in (pl.Date, pl.Datetime)
+        # All 15 rows have a signup_date, so parsing should not drop any values.
+        assert analyzer.df["signup_date"].drop_nulls().len() == df.height

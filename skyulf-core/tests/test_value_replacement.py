@@ -11,6 +11,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.cleaning.value_replacement import (
     ValueReplacementApplier,
@@ -246,3 +247,30 @@ def test_fit_then_apply_round_trip_to_replace_value() -> None:
     params = calc.fit(df, {"columns": ["a"], "to_replace": -1, "value": 0})
     result = applier.apply(df, params)
     assert result["a"].tolist() == [0, 0, 0, 5]
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that ValueReplacementCalculator / Applier correctly maps
+    categorical ``plan_type`` values to numeric codes across the full 15-row
+    dataset with mixed dtypes, and that no rows are dropped or duplicated.
+    """
+
+    def test_plan_type_mapping_to_numeric_codes(self) -> None:
+        df = load_sample_dataset("customers")
+        calc = ValueReplacementCalculator()
+        applier = ValueReplacementApplier()
+        config = {
+            "columns": ["plan_type"],
+            "mapping": {"basic": 1, "premium": 2, "enterprise": 3},
+        }
+        params = calc.fit(df, config)
+        result = applier.apply(df, params)
+        assert len(result) == len(df)
+        assert set(result["plan_type"].unique()).issubset({1, 2, 3})

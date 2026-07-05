@@ -10,6 +10,7 @@ Covers:
 
 import pandas as pd
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_selection.facade import (
     FeatureSelectionApplier,
@@ -209,3 +210,26 @@ class TestFitApplyCycle:
         params = _CALC.fit(train, {"method": "variance_threshold", "threshold": 0.0})
         out = _APPLIER.apply(test, dict(params))
         assert set(out.columns) == set(params.get("selected_columns", out.columns))
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: customers.csv (NaN in age/income/lat/lon)
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify that FeatureSelectionCalculator and FeatureSelectionApplier handle
+    the customers.csv sample, which has NaN in numeric columns age/income/lat/lon,
+    without raising. Exercises the full fit→apply cycle on real-shaped mixed-dtype data.
+    """
+
+    def test_variance_threshold_on_customers_numeric_columns_does_not_raise(self) -> None:
+        """Variance threshold fit/apply on NaN-containing numeric columns must not raise
+        and must return a result whose columns are a subset of the input columns."""
+        df = load_sample_dataset("customers")
+        num_df = df[["age", "income", "lat", "lon"]]
+        params = _CALC.fit(num_df, {"method": "variance_threshold", "threshold": 0.0})
+        out = _APPLIER.apply(num_df, dict(params))
+        assert set(out.columns).issubset({"age", "income", "lat", "lon"})
+        # All input columns have non-zero variance → none should be dropped.
+        assert len(out.columns) == 4

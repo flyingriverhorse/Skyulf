@@ -6,6 +6,7 @@ import pytest
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.modeling._evaluation.classification import (
     _compute_confusion_matrix,
@@ -188,3 +189,25 @@ def test_compute_confusion_matrix_without_label_values_uses_labels_directly():
     y_pred = ["a", "b", "b", "a"]
     cm_data = _compute_confusion_matrix(y_true, y_pred, ["a", "b"])
     assert cm_data.matrix == [[1, 1], [1, 1]]
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values — closer to production data than the small
+    synthetic fixtures used elsewhere in this file.
+    """
+
+    def test_evaluate_churn_classifier_on_customers_data(self) -> None:
+        df = load_sample_dataset("customers")
+        # LogisticRegression can't handle NaN, so rows with missing
+        # age/income are dropped rather than assumed clean.
+        df = df.dropna(subset=["age", "income"])
+        X = df[["age", "income"]]
+        y = df["churned"]
+        model = LogisticRegression().fit(X, y)
+
+        report = evaluate_classification_model(model, X, y, dataset_name="customers")
+        assert isinstance(report, ModelEvaluationReport)
+        assert report.classification is not None
+        assert "accuracy" in report.metrics
+        assert all(np.isfinite(v) for v in report.metrics.values())

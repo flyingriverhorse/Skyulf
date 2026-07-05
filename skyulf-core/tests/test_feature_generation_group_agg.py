@@ -2,6 +2,7 @@
 
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.feature_generation import (
     _featgen_apply_pandas,
@@ -68,6 +69,43 @@ def test_pandas_group_agg_count():
     }
     out, _ = _featgen_apply_pandas(df, None, params)
     assert out["dept_n"].tolist() == [2, 2, 3, 3, 3]
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    verifying group_agg on a real categorical/numeric pair that includes missing
+    values — ``income`` is NaN for several rows.
+    """
+
+    def test_pandas_group_agg_mean_income_by_plan_type(self) -> None:
+        """Group-mean of ``income`` by ``plan_type`` fills NaN-income rows with the group mean.
+
+        pandas ``groupby.transform("mean")`` excludes NaN from the mean but broadcasts
+        the result back to every row, so NaN-income rows receive the group mean rather
+        than NaN — verifying this behavior on real heterogeneous data.
+        """
+        df = load_sample_dataset("customers")
+        params = {
+            "operations": [
+                {
+                    "operation_type": "group_agg",
+                    "method": "mean",
+                    "input_columns": ["plan_type"],
+                    "secondary_columns": ["income"],
+                    "output_column": "plan_mean_income",
+                }
+            ]
+        }
+        out, _ = _featgen_apply_pandas(df, None, params)
+
+        assert "plan_mean_income" in out.columns
+        # NaN-income rows must receive the group mean, not propagate NaN.
+        nan_income_mask = df["income"].isna()
+        assert out.loc[nan_income_mask, "plan_mean_income"].notna().all()
+        # All rows in the same plan_type group share the same aggregated value.
+        for plan in df["plan_type"].unique():
+            group_vals = out.loc[df["plan_type"] == plan, "plan_mean_income"]
+            assert group_vals.nunique() == 1
 
 
 if __name__ == "__main__":

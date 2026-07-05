@@ -7,6 +7,7 @@ import pandas as pd
 import polars as pl
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.label import (
     LabelEncoderApplier,
@@ -244,3 +245,30 @@ def test_maybe_fit_target_skips_when_y_name_not_in_columns() -> None:
     y = pd.Series(["p", "q"], name="unrelated")
     params = LabelEncoderCalculator().fit((X, y), {"columns": ["category"]})
     assert "__target__" not in params["encoders"]
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``city`` has one missing value (NaN) — verifies that the LabelEncoder
+    stringifies NaN to a "nan" class rather than propagating it as missing.
+    """
+
+    def test_city_label_encoding_treats_nan_as_string_class(self) -> None:
+        """``city`` contains one NaN; LabelEncoder stringifies it and assigns a valid code.
+
+        Ensures that the NaN row receives a deterministic non-null integer code
+        and that all same-city rows share the same code.
+        """
+        df = load_sample_dataset("customers")
+        params = LabelEncoderCalculator().fit(df, {"columns": ["city"]})
+        result = LabelEncoderApplier().apply(df, dict(params))
+
+        # No raw NaN must survive encoding.
+        assert result["city"].isna().sum() == 0
+        # The single NaN row must map to exactly one consistent code.
+        nan_mask = df["city"].isna()
+        assert result.loc[nan_mask, "city"].nunique() == 1
+        # Known cities must each map to a distinct, consistent code.
+        for val in df.loc[~nan_mask, "city"].unique():
+            mask = df["city"] == val
+            assert result.loc[mask, "city"].nunique() == 1

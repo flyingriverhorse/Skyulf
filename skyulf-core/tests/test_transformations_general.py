@@ -12,6 +12,7 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.transformations.general import (
     GeneralTransformationApplier,
@@ -498,6 +499,32 @@ def test_general_transform_engine_parity(method: str, df: pd.DataFrame) -> None:
     np.testing.assert_allclose(
         pd_vals, pl_vals, rtol=1e-5, atol=1e-5, err_msg=f"Engine divergence for method={method!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that GeneralTransformationCalculator handles real-world numeric
+    columns (``income``) that contain NaN values: transformed output must
+    preserve NaN positions, and non-missing rows must be finite after log.
+    """
+
+    def test_log_transform_preserves_nan_in_income_column(self) -> None:
+        df = load_sample_dataset("customers")
+        calc = GeneralTransformationCalculator()
+        appl = GeneralTransformationApplier()
+        art = calc.fit(df, {"transformations": [{"column": "income", "method": "log"}]})
+        out = appl.apply(df, art)
+        # NaN income rows must remain NaN, not be silently filled.
+        assert out.loc[df["income"].isna(), "income"].isna().all()
+        # Non-missing rows must yield finite log1p values.
+        non_missing = ~df["income"].isna()
+        assert out.loc[non_missing, "income"].notna().all()
 
 
 @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.too_slow])

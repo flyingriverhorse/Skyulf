@@ -1,0 +1,17 @@
+{
+  "params": "scaler_name, error_match",
+  "test_cases": {
+    "standard_scaler_empty_dataframe": {
+      "scaler_name": "standard",
+      "error_match": "0 sample.*StandardScaler"
+    },
+    "minmax_scaler_empty_dataframe": {
+      "scaler_name": "minmax",
+      "error_match": "0 sample.*MinMaxScaler"
+    },
+    "robust_scaler_empty_dataframe": {
+      "scaler_name": "robust",
+      "error_match": "0 sample.*RobustScaler"
+    }
+  }
+}

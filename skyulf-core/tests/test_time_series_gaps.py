@@ -8,6 +8,7 @@ helpers.
 
 import pandas as pd
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.time_series._common import (
     coerce_aggregations,
@@ -327,3 +328,29 @@ def test_date_features_polars_drop_original_removes_source_column() -> None:
     out = DateFeaturesApplier().apply(pl.from_pandas(df), art)
     assert "d" not in out.columns
     assert "d_year" in out.columns
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that LagFeaturesCalculator correctly handles a real-world income
+    column (which contains NaN values) when sorted by ``signup_date``: the
+    lagged column must be present and must contain at least one NaN (the first
+    row after sorting has no preceding value).
+    """
+
+    def test_lag_on_income_sorted_by_signup_date(self) -> None:
+        df = load_sample_dataset("customers")
+        df["signup_date"] = pd.to_datetime(df["signup_date"])
+        art = LagFeaturesCalculator().fit(
+            df, {"columns": ["income"], "lags": [1], "sort_by": "signup_date"}
+        )
+        out = LagFeaturesApplier().apply(df, art)
+        assert "income_lag_1" in out.columns
+        # First row after sorting has no predecessor — must be NaN.
+        assert out["income_lag_1"].isna().sum() >= 1

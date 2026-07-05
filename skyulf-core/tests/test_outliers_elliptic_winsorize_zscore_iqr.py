@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing.outliers.elliptic import (
@@ -519,3 +520,22 @@ class TestEllipticEnvelopeApplier:
         X_out, y_out = EllipticEnvelopeApplier().apply((X, y), params)
         assert len(X_out) == len(y_out)
         assert len(values) - 1 not in y_out.values
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has a missing ``income`` value — closer to production data than the
+    small synthetic frames used elsewhere in this file.
+    """
+
+    def test_iqr_removes_income_outliers_and_keeps_missing_rows(self) -> None:
+        df = load_sample_dataset("customers")
+        params = IQRCalculator().fit(df, {"columns": ["income"]})
+        out = IQRApplier().apply(df, params)
+
+        bounds = params["bounds"]["income"]
+        kept_income = out["income"]
+        in_bounds = (kept_income >= bounds["lower"]) & (kept_income <= bounds["upper"])
+        assert (in_bounds | kept_income.isna()).all()
+        # Rows with a missing income must be retained, not treated as outliers.
+        assert df["income"].isna().sum() == out["income"].isna().sum()

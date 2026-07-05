@@ -1,0 +1,35 @@
+{
+  "params": "model_key, calculator_path, applier_path, config",
+  "test_cases": {
+    "linear_regression": {
+      "model_key": "linear_regression",
+      "calculator_path": "skyulf.modeling.regression.LinearRegressionCalculator",
+      "applier_path": "skyulf.modeling.regression.LinearRegressionApplier",
+      "config": {}
+    },
+    "ridge_regression": {
+      "model_key": "ridge_regression",
+      "calculator_path": "skyulf.modeling.regression.RidgeRegressionCalculator",
+      "applier_path": "skyulf.modeling.regression.RidgeRegressionApplier",
+      "config": {}
+    },
+    "lasso_regression": {
+      "model_key": "lasso_regression",
+      "calculator_path": "skyulf.modeling.regression.LassoRegressionCalculator",
+      "applier_path": "skyulf.modeling.regression.LassoRegressionApplier",
+      "config": {}
+    },
+    "random_forest_regressor": {
+      "model_key": "random_forest_regressor",
+      "calculator_path": "skyulf.modeling.regression.RandomForestRegressorCalculator",
+      "applier_path": "skyulf.modeling.regression.RandomForestRegressorApplier",
+      "config": {"params": {"n_estimators": 25}}
+    },
+    "k_neighbors_regressor": {
+      "model_key": "k_neighbors_regressor",
+      "calculator_path": "skyulf.modeling.regression.KNeighborsRegressorCalculator",
+      "applier_path": "skyulf.modeling.regression.KNeighborsRegressorApplier",
+      "config": {}
+    }
+  }
+}
