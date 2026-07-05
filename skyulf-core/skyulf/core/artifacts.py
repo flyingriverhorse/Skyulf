@@ -261,6 +261,28 @@ class FeatureInteractionArtifact(TypedDict, total=False):
     feature_names: List[str]
 
 
+# ── Geo ───────────────────────────────────────────────────────────────────────
+
+
+class GeoDistanceArtifact(TypedDict, total=False):
+    type: str
+    lat1_col: str
+    lon1_col: str
+    lat2_col: str
+    lon2_col: str
+    method: str
+    unit: str
+    output_column: str
+
+
+class H3IndexArtifact(TypedDict, total=False):
+    type: str
+    lat_col: str
+    lon_col: str
+    resolution: int
+    output_column: str
+
+
 # ── Feature selection ────────────────────────────────────────────────────────
 
 

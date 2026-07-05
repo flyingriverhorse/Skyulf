@@ -53,6 +53,12 @@ from .feature_selection import (
     VarianceThresholdApplier,
     VarianceThresholdCalculator,
 )
+from .geo import (
+    GeoDistanceApplier,
+    GeoDistanceCalculator,
+    H3IndexApplier,
+    H3IndexCalculator,
+)
 from .imputation import (
     IterativeImputerApplier,
     IterativeImputerCalculator,
@@ -192,6 +198,10 @@ __all__ = [
     "FeatureInteractionApplier",
     "PolynomialFeaturesCalculator",
     "PolynomialFeaturesApplier",
+    "GeoDistanceCalculator",
+    "GeoDistanceApplier",
+    "H3IndexCalculator",
+    "H3IndexApplier",
     "VarianceThresholdCalculator",
     "VarianceThresholdApplier",
     "CorrelationThresholdCalculator",
