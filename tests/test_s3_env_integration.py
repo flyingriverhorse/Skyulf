@@ -67,24 +67,26 @@ def test_s3_catalog_init_with_env_vars():
         "AWS_REGION": "us-east-1",
     }
 
-    with patch.dict(os.environ, env_vars):
-        with patch.dict("sys.modules", {"s3fs": mock_s3fs}):
-            # Init with empty options
-            catalog = S3Catalog(bucket_name="test-bucket", storage_options={})
+    with (
+        patch.dict(os.environ, env_vars),
+        patch.dict("sys.modules", {"s3fs": mock_s3fs}),
+    ):
+        # Init with empty options
+        catalog = S3Catalog(bucket_name="test-bucket", storage_options={})
 
-            # Verify s3fs.S3FileSystem was called
-            # It should be called with empty kwargs if we rely on env vars,
-            # OR our _prepare_s3fs_options might pick up env vars if we explicitly coded that (we didn't, s3fs does it).
-            # So we expect empty kwargs or just what was passed.
+        # Verify s3fs.S3FileSystem was called
+        # It should be called with empty kwargs if we rely on env vars,
+        # OR our _prepare_s3fs_options might pick up env vars if we explicitly coded that (we didn't, s3fs does it).
+        # So we expect empty kwargs or just what was passed.
 
-            mock_s3fs.S3FileSystem.assert_called()
-            call_kwargs = mock_s3fs.S3FileSystem.call_args[1]
+        mock_s3fs.S3FileSystem.assert_called()
+        call_kwargs = mock_s3fs.S3FileSystem.call_args[1]
 
-            # We expect NO explicit key/secret in kwargs if they weren't in storage_options
-            assert "key" not in call_kwargs
-            assert "secret" not in call_kwargs
+        # We expect NO explicit key/secret in kwargs if they weren't in storage_options
+        assert "key" not in call_kwargs
+        assert "secret" not in call_kwargs
 
-            # s3fs will pick them up from os.environ itself.
+        # s3fs will pick them up from os.environ itself.
 
 
 def test_s3_catalog_explicit_creds_mapping():

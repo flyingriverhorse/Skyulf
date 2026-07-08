@@ -109,10 +109,11 @@ def main():
     print("   Predictions:", predictions.tolist())
 
     # Cleanup
-    import os
+    from pathlib import Path
 
-    if os.path.exists("my_model.pkl"):
-        os.remove("my_model.pkl")
+    model_path = Path("my_model.pkl")
+    if model_path.exists():
+        model_path.unlink()
         print("\n   (Cleaned up 'my_model.pkl')")
 
 

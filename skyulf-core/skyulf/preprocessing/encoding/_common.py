@@ -83,7 +83,7 @@ def detect_categorical_columns(df: Any) -> list[str]:
         df_pl: Any = df
         return [
             c
-            for c, t in zip(df_pl.columns, df_pl.dtypes)
+            for c, t in zip(df_pl.columns, df_pl.dtypes, strict=True)
             if t in [pl.Utf8, pl.Categorical, pl.Object]
         ]
     return df.select_dtypes(include=["object", "category"]).columns.tolist()

@@ -140,7 +140,7 @@ class SimpleImputerCalculator(BaseCalculator):
         imputer.fit(X[cols])
 
         statistics = imputer.statistics_.tolist()
-        fill_values = dict(zip(cols, statistics))
+        fill_values = dict(zip(cols, statistics, strict=True))
         missing_counts = X[cols].isnull().sum().to_dict()
         total_missing = int(sum(missing_counts.values()))
 

@@ -1,5 +1,5 @@
-import os
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -44,11 +44,11 @@ def regression_data():
 @pytest.fixture
 def artifact_store():
     path = "temp_test_artifacts_modeling"
-    if os.path.exists(path):
+    if Path(path).exists():
         shutil.rmtree(path)
     store = LocalArtifactStore(path)
     yield store
-    if os.path.exists(path):
+    if Path(path).exists():
         shutil.rmtree(path)
 
 

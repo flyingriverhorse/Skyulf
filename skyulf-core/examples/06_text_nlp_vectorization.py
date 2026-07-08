@@ -244,7 +244,7 @@ def demo_multinomial_nb() -> None:
     preds = nb_appl.predict(test_vec[feature_cols], model_art)
 
     print("  Predictions vs ground truth:")
-    for i, (pred, actual) in enumerate(zip(preds, REVIEWS_TEST["label"])):
+    for i, (pred, actual) in enumerate(zip(preds, REVIEWS_TEST["label"], strict=True)):
         label = "positive" if pred == 1 else "negative"
         match = "✓" if pred == actual else "✗"
         print(f"    [{match}] '{REVIEWS_TEST['review'].iloc[i][:40]}…'  → {label}")
@@ -300,7 +300,7 @@ def demo_bernoulli_nb() -> None:
     preds = nb_appl.predict(test_vec[feature_cols], model_art)
 
     print("  Predictions:")
-    for msg, pred in zip(spam_test["message"], preds):
+    for msg, pred in zip(spam_test["message"], preds, strict=True):
         label = "SPAM" if pred == 1 else "HAM "
         print(f"    [{label}] '{msg}'")
 

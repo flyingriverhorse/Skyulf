@@ -38,4 +38,4 @@ def cleanup_error_events(self) -> dict:  # type: ignore[override]
         return {"deleted": deleted, "retention_days": retention_days}
     except Exception as exc:
         logger.exception("cleanup_error_events failed")
-        raise self.retry(exc=exc, countdown=3600)
+        raise self.retry(exc=exc, countdown=3600) from exc

@@ -1,5 +1,5 @@
-import os
 import shutil
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -37,11 +37,11 @@ def sample_data():
 @pytest.fixture
 def artifact_store():
     path = "temp_test_artifacts"
-    if os.path.exists(path):
+    if Path(path).exists():
         shutil.rmtree(path)
     store = LocalArtifactStore(path)
     yield store
-    if os.path.exists(path):
+    if Path(path).exists():
         shutil.rmtree(path)
 
 

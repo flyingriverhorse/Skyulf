@@ -1,5 +1,6 @@
 """Shared helpers for feature-selection nodes."""
 
+import contextlib
 import logging
 from collections.abc import Callable
 from typing import Any, cast
@@ -185,10 +186,9 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
     if method == "select_from_model":
         threshold = config.get("threshold", "mean")
         if isinstance(threshold, str):
-            try:
+            # Keep as string (e.g. "mean", "1.25*mean")
+            with contextlib.suppress(ValueError):
                 threshold = float(threshold)
-            except ValueError:
-                pass  # Keep as string (e.g. "mean", "1.25*mean")
         return SelectFromModel(
             estimator=estimator,
             threshold=threshold,
@@ -232,10 +232,10 @@ def _univariate_score_dicts(
     pvalues: dict[str, float] = {}
     if hasattr(selector, "scores_"):
         safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
-        scores = dict(zip(cols, safe_scores.tolist()))
+        scores = dict(zip(cols, safe_scores.tolist(), strict=True))
     if hasattr(selector, "pvalues_"):
         safe_pvalues = np.nan_to_num(cast(Any, selector.pvalues_), nan=1.0)
-        pvalues = dict(zip(cols, safe_pvalues.tolist()))
+        pvalues = dict(zip(cols, safe_pvalues.tolist(), strict=True))
     return scores, pvalues
 
 
@@ -263,10 +263,10 @@ def _model_feature_importances(selector: Any, cols: list[str]) -> dict[str, floa
     if estimator is None:
         return {}
     if hasattr(estimator, "feature_importances_"):
-        return dict(zip(cols, estimator.feature_importances_.tolist()))
+        return dict(zip(cols, estimator.feature_importances_.tolist(), strict=True))
     if hasattr(estimator, "coef_"):
         coef = estimator.coef_
         if coef.ndim > 1:
             coef = coef[0]
-        return dict(zip(cols, np.abs(coef).tolist()))
+        return dict(zip(cols, np.abs(coef).tolist(), strict=True))
     return {}

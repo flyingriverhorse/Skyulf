@@ -11,9 +11,7 @@ from .schemas import CurvePoint
 def _is_finite_number(value: Any) -> bool:
     if isinstance(value, (float, np.floating)):
         return math.isfinite(float(value))
-    if isinstance(value, (int, np.integer)):
-        return True
-    return False
+    return isinstance(value, (int, np.integer))
 
 
 def _sanitize_structure(value: Any, *, warnings: list[str], context: str) -> Any:

@@ -1,5 +1,6 @@
+import contextlib
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 import joblib
@@ -48,7 +49,7 @@ class S3ArtifactStore(ArtifactStore):
 
             self.fs = s3fs.S3FileSystem(**self.storage_options)
         except ImportError:
-            raise ImportError("s3fs is required for S3ArtifactStore")
+            raise ImportError("s3fs is required for S3ArtifactStore") from None
         except Exception as e:
             logger.error("Failed to initialize S3 filesystem client: %s", self._sanitize_error(e))
             raise RuntimeError("Failed to initialize S3 artifact storage") from e
@@ -166,7 +167,7 @@ class S3ArtifactStore(ArtifactStore):
                     normalized = normalized[len(prefix) :]
                 if "/" in normalized.strip("/"):
                     continue
-                filename = os.path.basename(normalized)
+                filename = Path(normalized).name
                 if filename.endswith(".joblib"):
                     keys.append(filename[:-7])
                 else:
@@ -186,7 +187,6 @@ class S3ArtifactStore(ArtifactStore):
             close()
 
     def __del__(self) -> None:
-        try:
+        # best-effort cleanup; logging is unsafe during interpreter shutdown
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass  # nosec B110 - best-effort cleanup; logging is unsafe during interpreter shutdown

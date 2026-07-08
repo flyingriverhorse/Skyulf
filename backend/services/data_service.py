@@ -190,10 +190,7 @@ class DataService:
             self._save_pandas(data, path_str)
 
     def _save_pandas(self, data: Any, path: str):
-        if hasattr(data, "to_pandas"):
-            df = data.to_pandas()
-        else:
-            df = data
+        df = data.to_pandas() if hasattr(data, "to_pandas") else data
 
         if path.endswith(".parquet"):
             df.to_parquet(path)

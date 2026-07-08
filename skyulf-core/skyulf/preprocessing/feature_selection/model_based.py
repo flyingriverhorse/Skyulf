@@ -75,7 +75,7 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         X_np, _ = SklearnBridge.to_sklearn(X_pd[cols].fillna(0))
         selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
         support = selector.get_support()
-        selected_cols = [c for c, s in zip(cols, support) if s]
+        selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
 
         return cast(
             ModelBasedSelectionArtifact,

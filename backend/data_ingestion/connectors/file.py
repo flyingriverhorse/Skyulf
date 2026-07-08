@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import cast
 
@@ -48,17 +47,17 @@ class LocalFileConnector(BaseConnector):
         return str(resolved)
 
     async def connect(self) -> bool:
-        if not os.path.exists(self.file_path):
+        if not Path(self.file_path).exists():
             raise FileNotFoundError(f"File not found: {self.file_path}")
 
-        ext = os.path.splitext(self.file_path)[1].lower()
+        ext = Path(self.file_path).suffix.lower()
         if ext not in self.SUPPORTED_EXTENSIONS:
             raise ValueError(f"Unsupported file extension: {ext}")
 
         return True
 
     def _ext(self) -> str:
-        return os.path.splitext(self.file_path)[1].lower()
+        return Path(self.file_path).suffix.lower()
 
     def _scan(self) -> pl.LazyFrame | None:
         """Return a lazy frame for formats that support scanning."""

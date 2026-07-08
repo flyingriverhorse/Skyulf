@@ -1033,10 +1033,7 @@ def test_label_encoder_parity():
     # But here we expect Series
 
     # Convert Polars y to pandas for comparison
-    if isinstance(res_pl_y, pl.Series):
-        res_pl_y_pd = res_pl_y.to_pandas()
-    else:
-        res_pl_y_pd = res_pl_y
+    res_pl_y_pd = res_pl_y.to_pandas() if isinstance(res_pl_y, pl.Series) else res_pl_y
 
     pd.testing.assert_series_equal(res_pd_y, res_pl_y_pd, check_names=False, check_dtype=False)
     print("LabelEncoder Parity Test Passed!")

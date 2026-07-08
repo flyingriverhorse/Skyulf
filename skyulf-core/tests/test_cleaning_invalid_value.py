@@ -195,7 +195,7 @@ def test_applier_pandas(values: list, params: dict[str, Any], expected: list) ->
     """InvalidValueReplacementApplier must replace flagged values per rule config."""
     df = pd.DataFrame({"v": values})
     result = InvalidValueReplacementApplier().apply(df, params)
-    for got, exp in zip(result["v"], expected):
+    for got, exp in zip(result["v"], expected, strict=True):
         if exp is None:
             assert np.isnan(got)
         else:

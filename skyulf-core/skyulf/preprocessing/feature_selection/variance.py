@@ -49,9 +49,9 @@ class VarianceThresholdCalculator(BaseCalculator):
         selector.fit(X_np)
 
         support = selector.get_support()
-        selected_cols = [c for c, s in zip(cols, support) if s]
+        selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
         variances = (
-            dict(zip(cols, selector.variances_.tolist())) if hasattr(selector, "variances_") else {}
+            dict(zip(cols, selector.variances_.tolist(), strict=True)) if hasattr(selector, "variances_") else {}
         )
         return cast(
             VarianceThresholdArtifact,

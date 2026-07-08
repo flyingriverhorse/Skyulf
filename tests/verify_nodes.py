@@ -14,7 +14,7 @@ def import_submodules(package_name):
     """Import all submodules of a module, recursively, including subpackages"""
     package = importlib.import_module(package_name)
     results = {}
-    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
+    for _loader, name, _is_pkg in pkgutil.walk_packages(package.__path__):
         full_name = package.__name__ + "." + name
         try:
             results[full_name] = importlib.import_module(full_name)

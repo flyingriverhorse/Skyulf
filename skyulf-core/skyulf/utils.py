@@ -1,3 +1,4 @@
+import contextlib
 import logging
 from collections.abc import Callable
 from typing import Any, cast
@@ -106,11 +107,9 @@ def pack_pipeline_output(
 
             y_series = y
             if not isinstance(y, (pl.Series, pl.DataFrame)):
-                # Try to convert y to Series
-                try:
+                # Try to convert y to Series; let it fail or handle otherwise
+                with contextlib.suppress(Exception):
                     y_series = pl.Series(y)
-                except Exception:
-                    pass  # nosec B110 - Let it fail or handle otherwise
 
             # Helper to get raw df
             raw_df = X
@@ -138,15 +137,9 @@ def pack_pipeline_output(
             return result
 
         # Default to Pandas behavior (convert if needed or assume Pandas)
-        if hasattr(X, "to_pandas"):
-            X_pd = X.to_pandas()
-        else:
-            X_pd = X
+        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
 
-        if hasattr(y, "to_pandas"):
-            y_pd = y.to_pandas()
-        else:
-            y_pd = y
+        y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
 
         # Ensure indices align (they should if coming from same operation)
         return pd.concat([X_pd, y_pd], axis=1)
@@ -202,7 +195,7 @@ def detect_numeric_columns(
         # Select numeric columns first
         numeric_cols = [
             c
-            for c, t in zip(frame.columns, frame.dtypes)
+            for c, t in zip(frame.columns, frame.dtypes, strict=True)
             if t
             in [
                 pl.Float32,
@@ -244,9 +237,8 @@ def detect_numeric_columns(
 
     # Pandas Path
     # Convert to Pandas for analysis if not already
-    if not isinstance(frame, pd.DataFrame):
-        if hasattr(frame, "to_pandas"):
-            frame = frame.to_pandas()
+    if not isinstance(frame, pd.DataFrame) and hasattr(frame, "to_pandas"):
+        frame = frame.to_pandas()
 
     detected: list[str] = []
     seen: set[str] = set()

@@ -140,9 +140,8 @@ class AsyncJSONSafeSerializer:
     async def _handle_float(obj: Any) -> Any:
         # Use math.isnan/isinf or numpy instead of pandas if possible to reduce dependency
         # But pd.isna is robust.
-        if isinstance(obj, float):
-            if np.isnan(obj) or np.isinf(obj):
-                return None
+        if isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+            return None
         return AsyncJSONSafeSerializer._NOT_HANDLED
 
     @staticmethod

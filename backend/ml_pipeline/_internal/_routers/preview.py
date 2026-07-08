@@ -268,12 +268,15 @@ async def preview_pipeline(  # noqa: C901
                 return None
             target = node_list[-1]
             target_id = target.node_id
-            if target.step_type in [
-                StepType.BASIC_TRAINING,
-                StepType.ADVANCED_TUNING,
-            ]:
-                if target.inputs:
-                    target_id = target.inputs[0]
+            if (
+                target.step_type
+                in [
+                    StepType.BASIC_TRAINING,
+                    StepType.ADVANCED_TUNING,
+                ]
+                and target.inputs
+            ):
+                target_id = target.inputs[0]
             return target_id
 
         def extract_preview(target_node_id: str | None):
@@ -506,7 +509,7 @@ async def preview_pipeline(  # noqa: C901
 
     except Exception:
         logger.exception("Pipeline preview failed")
-        raise SkyulfException(message="Pipeline preview failed")
+        raise SkyulfException(message="Pipeline preview failed") from None
     finally:
         # 5. Cleanup — close sync session before removing temp artefacts.
         if sync_session is not None:

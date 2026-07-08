@@ -251,6 +251,6 @@ def client_with_celery():
             "backend.ml_pipeline._internal._routers.run_pipeline.resolve_pipeline_nodes",
             return_value=None,
         ),
+        TestClient(app, base_url="http://localhost") as c,
     ):
-        with TestClient(app, base_url="http://localhost") as c:
-            yield c, mock_batch_task.delay
+        yield c, mock_batch_task.delay

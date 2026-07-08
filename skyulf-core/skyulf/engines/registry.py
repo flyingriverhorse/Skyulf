@@ -91,14 +91,12 @@ class EngineRegistry:
             return cls.get("polars")
         if "pandas" in module:
             return cls.get("pandas")
-        if "pyspark" in module:
+        if "pyspark" in module and "spark" in cls._engines:
             # Future proofing
-            if "spark" in cls._engines:
-                return cls.get("spark")
-        if "dask" in module:
+            return cls.get("spark")
+        if "dask" in module and "dask" in cls._engines:
             # Future proofing
-            if "dask" in cls._engines:
-                return cls.get("dask")
+            return cls.get("dask")
 
         # Fallback to default if unknown (or let it fail later)
         logger.warning(

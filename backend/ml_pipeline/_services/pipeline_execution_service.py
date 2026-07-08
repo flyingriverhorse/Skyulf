@@ -6,6 +6,7 @@ called (and unit-tested) without a Celery worker context.
 call ``execute_pipeline`` directly with a real or mocked session.
 """
 
+import contextlib
 import logging
 import re
 import traceback
@@ -181,10 +182,8 @@ def _resolve_dataset_name(session: Session, job: object) -> str:
     if source_id:
         ds = session.query(DataSource).filter(DataSource.source_id == source_id).first()
         if not ds:
-            try:
+            with contextlib.suppress(ValueError):
                 ds = session.query(DataSource).filter(DataSource.id == int(source_id)).first()
-            except ValueError:
-                pass
         if ds:
             dataset_name = ds.name
 

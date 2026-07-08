@@ -1,6 +1,6 @@
 import logging
-import os
 import shutil
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -20,15 +20,15 @@ _LOCAL_WORKSPACE = r"c:\Users\Murat\Desktop\skyulf-mlflow"
 
 
 @pytest.mark.skipif(
-    not os.path.exists(_LOCAL_WORKSPACE),
+    not Path(_LOCAL_WORKSPACE).exists(),
     reason="Requires local skyulf-mlflow workspace; skipped on CI",
 )
 def test_full_inference_pipeline():
     # 1. Setup
     base_path = r"c:\Users\Murat\Desktop\skyulf-mlflow\temp_test_artifacts_full"
-    if os.path.exists(base_path):
+    if Path(base_path).exists():
         shutil.rmtree(base_path)
-    os.makedirs(base_path)
+    Path(base_path).mkdir()
 
     store = LocalArtifactStore(base_path)
     catalog = FileSystemCatalog()
@@ -61,7 +61,7 @@ def test_full_inference_pipeline():
             "target": [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
         }
     )
-    data_path = os.path.join(base_path, "data.csv")
+    data_path = str(Path(base_path) / "data.csv")
     df.to_csv(data_path, index=False)
 
     # 3. Define Pipeline
@@ -272,10 +272,7 @@ def test_full_inference_pipeline():
 
             try:
                 res = applier.apply(current_df, params)
-                if isinstance(res, tuple):
-                    current_df = res[0]
-                else:
-                    current_df = res
+                current_df = res[0] if isinstance(res, tuple) else res
             except Exception as e:
                 print(f"Error applying {t_type}: {e}")
                 import traceback

@@ -217,7 +217,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 except Exception as e:
                     # If it fails or isn't a valid transformer, re-raise
                     if "Unknown transformer type" in str(e):
-                        raise ValueError(f"Unknown step type: {node.step_type}")
+                        raise ValueError(f"Unknown step type: {node.step_type}") from e
                     raise e
 
             duration = time.time() - start_ts

@@ -442,4 +442,4 @@ async def export_pipeline_notebook(
         raise
     except Exception:
         logger.exception("Failed to export notebook for dataset %s", dataset_id)
-        raise HTTPException(status_code=500, detail="Failed to generate notebook")
+        raise HTTPException(status_code=500, detail="Failed to generate notebook") from None

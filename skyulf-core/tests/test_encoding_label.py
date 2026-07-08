@@ -38,7 +38,7 @@ def test_fit_apply_roundtrip_sorts_classes_alphabetically() -> None:
 
     assert params["classes_count"] == {"category": 3}
     expected = {"a": 0, "b": 1, "c": 2}
-    for raw, code in zip(df["category"], result["category"]):
+    for raw, code in zip(df["category"], result["category"], strict=True):
         assert code == expected[raw]
 
 

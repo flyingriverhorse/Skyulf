@@ -6,7 +6,7 @@ Handles async connection pooling and concurrent access optimization for SQLite a
 import asyncio
 import atexit
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any, cast
 
@@ -102,17 +102,14 @@ class AsyncSQLiteConnectionManager:
 
             except Exception:
                 if conn:
-                    try:
+                    # connection already broken; rollback best-effort only
+                    with suppress(Exception):
                         await conn.rollback()
-                    except Exception:
-                        pass  # nosec B110 - connection already broken; rollback best-effort only
                 raise
             finally:
                 if conn:
-                    try:
+                    with suppress(Exception):
                         await conn.close()
-                    except Exception:
-                        pass
 
     async def execute_query(
         self,
@@ -130,7 +127,7 @@ class AsyncSQLiteConnectionManager:
             rows = await cursor.fetchall()
             await cursor.close()
 
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=True)) for row in rows]
 
     async def execute_update(
         self,
@@ -246,7 +243,7 @@ class AsyncPostgreSQLConnectionManager:
             result = await conn.execute(text(query), params or {})
             columns = result.keys()
             rows = result.fetchall()
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=True)) for row in rows]
 
     async def execute_update(
         self,

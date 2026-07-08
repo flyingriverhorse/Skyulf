@@ -98,13 +98,13 @@ async def get_job_evaluation(  # noqa: C901
         return await EvaluationService.get_job_evaluation(session, job_id)
     except ValueError as e:
         if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception:
         logger.exception("Failed to retrieve evaluation for job %s", job_id)
-        raise SkyulfException(message="Failed to retrieve evaluation data")
+        raise SkyulfException(message="Failed to retrieve evaluation data") from None
 
 
 @router.get("/jobs", response_model=list[JobInfo])

@@ -46,14 +46,13 @@ def safe_delete_path(
     path = Path(path)
 
     # Guard against path-traversal when a base directory is enforced.
-    if allowed_base is not None:
-        if not _is_within_base(path, Path(allowed_base)):
-            logger.error(
-                "safe_delete_path: refusing to delete %s — path escapes allowed base %s",
-                path,
-                allowed_base,
-            )
-            return False
+    if allowed_base is not None and not _is_within_base(path, Path(allowed_base)):
+        logger.error(
+            "safe_delete_path: refusing to delete %s — path escapes allowed base %s",
+            path,
+            allowed_base,
+        )
+        return False
 
     if not path.exists():
         logger.warning(f"Path does not exist: {path}")
@@ -120,7 +119,7 @@ def cleanup_empty_directories(base_path: str | Path) -> int:
 
     try:
         # Walk bottom-up to remove empty directories
-        for dirpath, dirnames, filenames in os.walk(base_path, topdown=False):
+        for dirpath, _dirnames, _filenames in os.walk(base_path, topdown=False):
             dir_path = Path(dirpath)
 
             # Skip the base directory itself

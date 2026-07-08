@@ -6,7 +6,7 @@ for training and tuning jobs.
 """
 
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,7 @@ class EvaluationService:
         if not artifact_uri:
             # Fallback for old jobs or local jobs without explicit URI
             settings = get_settings()
-            artifact_uri = os.path.join(settings.TRAINING_ARTIFACT_DIR, job_id)
+            artifact_uri = str(Path(settings.TRAINING_ARTIFACT_DIR) / job_id)
 
         artifact_store = ArtifactFactory.get_artifact_store(artifact_uri)
 
@@ -113,4 +113,4 @@ class EvaluationService:
 
             return data
         except Exception as e:
-            raise RuntimeError(f"Failed to load evaluation data: {str(e)}")
+            raise RuntimeError(f"Failed to load evaluation data: {str(e)}") from e

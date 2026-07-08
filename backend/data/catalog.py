@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import tempfile
@@ -90,7 +91,7 @@ class FileSystemCatalog(DataCatalog):
                     df = pd.read_parquet(path)
                     return df.head(limit) if limit else df
                 except Exception:
-                    raise ValueError(f"Unsupported format or file not found: {dataset_id}")
+                    raise ValueError(f"Unsupported format or file not found: {dataset_id}") from None
         except Exception as e:
             logger.error(f"Error loading dataset {dataset_id}: {e}")
             raise e
@@ -150,7 +151,7 @@ class S3Catalog(DataCatalog):
             logger.error(
                 "s3fs is required for S3Catalog. Please install it with `pip install s3fs`."
             )
-            raise ImportError("s3fs is required for S3Catalog")
+            raise ImportError("s3fs is required for S3Catalog") from None
 
     def _prepare_s3fs_options(self, options: dict) -> dict:
         """
@@ -326,10 +327,9 @@ class SmartCatalog(DataCatalog):
         if not self.s3_catalog:
             bucket = os.getenv("S3_BUCKET_NAME")
             if bucket:
-                try:
+                # s3fs not installed or configured
+                with contextlib.suppress(ImportError):
                     self.s3_catalog = S3Catalog(bucket_name=bucket)
-                except ImportError:
-                    pass  # s3fs not installed or configured
 
     def _resolve_id(self, dataset_id: str) -> tuple[str, dict]:
         """
@@ -375,7 +375,7 @@ class SmartCatalog(DataCatalog):
                         bucket_name="placeholder"
                     )  # Bucket name ignored if full path used
                 except ImportError:
-                    raise ValueError("S3 path encountered but s3fs is not installed.")
+                    raise ValueError("S3 path encountered but s3fs is not installed.") from None
             return self.s3_catalog
         return self.fs_catalog
 

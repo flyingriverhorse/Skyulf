@@ -172,7 +172,7 @@ class JobStrategyFactory:
         Tries to find the job in all known tables.
         Returns (job, strategy) or (None, None).
         """
-        for name, strategy in cls._strategies.items():
+        for strategy in cls._strategies.values():
             job = strategy.get_job(session, job_id)
             if job:
                 return job, strategy

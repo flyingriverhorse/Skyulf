@@ -76,7 +76,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
 
         selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
         support = selector.get_support()
-        selected_cols = [c for c, s in zip(cols, support) if s]
+        selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
         scores, pvalues = _univariate_score_dicts(selector, cols)
 
         return cast(

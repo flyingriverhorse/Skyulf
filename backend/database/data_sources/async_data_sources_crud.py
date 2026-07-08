@@ -64,7 +64,7 @@ async def create(settings: Settings, row: dict[str, Any]) -> Any:  # noqa: C901
                     )
 
             logger.exception("SQLite insert failed for data_sources")
-            raise RuntimeError("Failed to persist data_sources row to primary database (SQLite)")
+            raise RuntimeError("Failed to persist data_sources row to primary database (SQLite)") from e
 
         # Secondary sync to PostgreSQL (best-effort)
         try:
@@ -106,7 +106,7 @@ async def create(settings: Settings, row: dict[str, Any]) -> Any:  # noqa: C901
             logger.exception("PostgreSQL insert failed for data_sources")
             raise RuntimeError(
                 "Failed to persist data_sources row to primary database (PostgreSQL)"
-            )
+            ) from e
 
         # Secondary sync to SQLite (best-effort)
         try:
@@ -139,7 +139,7 @@ async def read(
             return rows
         except Exception:
             logger.exception("Failed reading data_sources from SQLite (primary database)")
-            raise RuntimeError("Failed to read from primary database (SQLite)")
+            raise RuntimeError("Failed to read from primary database (SQLite)") from None
 
     elif primary_db == "postgres":
         try:
@@ -149,7 +149,7 @@ async def read(
             return rows
         except Exception:
             logger.exception("Failed reading data_sources from PostgreSQL (primary database)")
-            raise RuntimeError("Failed to read from primary database (PostgreSQL)")
+            raise RuntimeError("Failed to read from primary database (PostgreSQL)") from None
 
     else:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
@@ -183,7 +183,7 @@ async def update(settings: Settings, filter_dict: dict[str, Any], update_data: d
             logger.info(f"Successfully updated data source in SQLite (primary): {filter_dict}")
         except Exception:
             logger.exception("SQLite update failed for data_sources")
-            raise RuntimeError("Failed to update in primary database (SQLite)")
+            raise RuntimeError("Failed to update in primary database (SQLite)") from None
 
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
@@ -201,7 +201,7 @@ async def update(settings: Settings, filter_dict: dict[str, Any], update_data: d
             logger.info(f"Successfully updated data source in PostgreSQL (primary): {filter_dict}")
         except Exception:
             logger.exception("PostgreSQL update failed for data_sources")
-            raise RuntimeError("Failed to update in primary database (PostgreSQL)")
+            raise RuntimeError("Failed to update in primary database (PostgreSQL)") from None
 
         # Optional SQLite sync (best-effort, non-blocking)
         try:
@@ -244,7 +244,7 @@ async def delete(settings: Settings, filter_dict: dict[str, Any]):
             logger.info(f"Successfully deleted data source from SQLite (primary): {filter_dict}")
         except Exception:
             logger.exception("SQLite delete failed for data_sources")
-            raise RuntimeError("Failed to delete from primary database (SQLite)")
+            raise RuntimeError("Failed to delete from primary database (SQLite)") from None
 
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
@@ -264,7 +264,7 @@ async def delete(settings: Settings, filter_dict: dict[str, Any]):
             )
         except Exception:
             logger.exception("PostgreSQL delete failed for data_sources")
-            raise RuntimeError("Failed to delete from primary database (PostgreSQL)")
+            raise RuntimeError("Failed to delete from primary database (PostgreSQL)") from None
 
         # Optional SQLite sync (best-effort, non-blocking)
         try:
@@ -334,7 +334,7 @@ async def migrate_to_postgres(settings: Settings) -> dict[str, int]:
         return stats
     except Exception:
         logger.exception("Migration from SQLite to PostgreSQL failed")
-        raise RuntimeError("Migration to PostgreSQL failed")
+        raise RuntimeError("Migration to PostgreSQL failed") from None
 
 
 async def get_database_status(settings: Settings) -> dict[str, Any]:

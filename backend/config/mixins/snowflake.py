@@ -35,7 +35,7 @@ class SnowflakeMixin:
         ]
         missing = [
             name
-            for name, val in zip(config_names, values)
+            for name, val in zip(config_names, values, strict=True)
             if not val or val in ("x", "your-account", "your-user")
         ]
         if missing:
