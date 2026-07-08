@@ -34,7 +34,7 @@ class NodeRegistry:
                 cls._metadata[name] = metadata
             # 2. Otherwise check for __node_meta__ (from @node_meta decorator)
             elif hasattr(calculator_cls, "__node_meta__"):
-                meta = getattr(calculator_cls, "__node_meta__")
+                meta = calculator_cls.__node_meta__
                 cls._metadata[name] = {
                     "id": meta.id,
                     "name": meta.name,

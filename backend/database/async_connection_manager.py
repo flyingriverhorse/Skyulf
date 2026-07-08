@@ -6,8 +6,8 @@ Handles async connection pooling and concurrent access optimization for SQLite a
 import asyncio
 import atexit
 import logging
-import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, cast
 
 import aiosqlite
@@ -43,7 +43,7 @@ class AsyncSQLiteConnectionManager:
         """Initialize the async SQLite manager with optimized settings"""
         try:
             # Ensure database directory exists
-            os.makedirs(os.path.dirname(self.database_path), exist_ok=True)
+            Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Enable WAL mode and optimizations
             await self._setup_database_optimizations()
@@ -285,8 +285,8 @@ class AsyncDatabaseManager:
             # Initialize SQLite if configured
             sqlite_path = getattr(self.settings, "DB_PATH", None)
             if sqlite_path:
-                if not os.path.isabs(sqlite_path):
-                    sqlite_path = os.path.join(os.getcwd(), sqlite_path)
+                if not Path(sqlite_path).is_absolute():
+                    sqlite_path = str(Path.cwd() / sqlite_path)
 
                 pool_size = getattr(self.settings, "sqlite_pool_size", 10)
                 timeout = getattr(self.settings, "sqlite_timeout", 30)

@@ -43,7 +43,7 @@ def _compute_polars_fill_values(
     """Compute {col: fill_value} for Polars across all SimpleImputer strategies."""
     if strategy == "constant":
         default = fill_value if fill_value is not None else 0
-        return {c: default for c in cols}
+        return dict.fromkeys(cols, default)
 
     expr_builder = _polars_stat_for_strategy(strategy, fill_value)
     stats = X_pl.select([expr_builder(c) for c in cols]).to_dict(as_series=False)

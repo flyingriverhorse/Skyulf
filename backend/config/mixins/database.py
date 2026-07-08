@@ -1,7 +1,7 @@
 """Database and pipeline storage settings."""
 
-import os
 import urllib.parse
+from pathlib import Path
 from typing import Any
 
 
@@ -36,7 +36,7 @@ class DatabaseMixin:
     def get_sqlite_url(self) -> str:
         """Get SQLite database URL."""
         db_path = self.DB_PATH or "mlops_database.db"  # type: ignore[attr-defined]
-        if os.path.isabs(db_path):
+        if Path(db_path).is_absolute():
             return f"sqlite+aiosqlite:///{db_path}"
         return f"sqlite+aiosqlite:///./{db_path}"
 

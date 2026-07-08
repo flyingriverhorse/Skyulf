@@ -1,6 +1,7 @@
 import logging
 import os
 import tempfile
+from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
@@ -62,16 +63,16 @@ class FileSystemCatalog(DataCatalog):
         path = self._get_path(dataset_id)
 
         # Auto-resolve extension if not found (legacy support for simple IDs)
-        if not os.path.exists(path):
-            if os.path.exists(path + ".parquet"):
+        if not Path(path).exists():
+            if Path(path + ".parquet").exists():
                 path += ".parquet"
-            elif os.path.exists(path + ".csv"):
+            elif Path(path + ".csv").exists():
                 path += ".csv"
             else:
                 raise FileNotFoundError(f"Dataset {dataset_id} not found at {path}")
 
         # Handle sampling if requested
-        limit = kwargs.get("limit", None)
+        limit = kwargs.get("limit")
 
         try:
             if path.endswith(".csv"):
@@ -98,7 +99,7 @@ class FileSystemCatalog(DataCatalog):
         path = self._get_path(dataset_id)
 
         # Ensure directory exists
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
 
         if path.endswith(".csv"):
             data.to_csv(path, index=False)
@@ -111,7 +112,7 @@ class FileSystemCatalog(DataCatalog):
             data.to_parquet(path, index=False)
 
     def exists(self, dataset_id: str) -> bool:
-        return os.path.exists(self._get_path(dataset_id))
+        return Path(self._get_path(dataset_id)).exists()
 
 
 class S3Catalog(DataCatalog):
@@ -135,8 +136,8 @@ class S3Catalog(DataCatalog):
             self.storage_options["region"] = region_name
 
         # Cache setup
-        self.cache_dir = cache_dir or os.path.join(tempfile.gettempdir(), "skyulf_s3_cache")
-        os.makedirs(self.cache_dir, exist_ok=True)
+        self.cache_dir = cache_dir or str(Path(tempfile.gettempdir()) / "skyulf_s3_cache")
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
         # Check for s3fs
         try:
@@ -203,11 +204,11 @@ class S3Catalog(DataCatalog):
     def _get_cache_path(self, s3_path: str) -> str:
         # Create a safe filename from the S3 path
         safe_name = s3_path.replace("s3://", "").replace("/", "_")
-        return os.path.join(self.cache_dir, safe_name)
+        return str(Path(self.cache_dir) / safe_name)
 
     def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
         path = self._get_s3_path(dataset_id)
-        limit = kwargs.get("limit", None)
+        limit = kwargs.get("limit")
 
         # Merge storage options
         storage_options = self.storage_options.copy()
@@ -221,13 +222,13 @@ class S3Catalog(DataCatalog):
 
         # Check local cache first
         cache_path = self._get_cache_path(path)
-        if os.path.exists(cache_path):
+        if Path(cache_path).exists():
             try:
                 # If custom credentials are provided, skip cache validation to avoid auth issues.
                 # Otherwise, check if the S3 file is newer than the cache.
                 if "storage_options" not in kwargs:
                     s3_info = self.fs.info(path)
-                    local_mtime = os.path.getmtime(cache_path)
+                    local_mtime = Path(cache_path).stat().st_mtime
 
                     if s3_info["LastModified"].timestamp() < local_mtime:
                         logger.info(f"Cache hit for {path}")

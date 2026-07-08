@@ -476,12 +476,12 @@ def test_optuna_integration_second_fallback_path_succeeds():
     import types
 
     fake_module = types.ModuleType("optuna.integration.sklearn")
-    setattr(fake_module, "OptunaSearchCV", object())  # sentinel marker class
+    fake_module.OptunaSearchCV = object()  # sentinel marker class
     variant = _load_engine_variant(
         {"optuna.integration": None, "optuna.integration.sklearn": fake_module}
     )
     assert variant.HAS_OPTUNA is True
-    assert variant.OptunaSearchCV is getattr(fake_module, "OptunaSearchCV")
+    assert variant.OptunaSearchCV is fake_module.OptunaSearchCV
 
 
 def test_optuna_integration_third_fallback_path_succeeds():
@@ -492,7 +492,7 @@ def test_optuna_integration_third_fallback_path_succeeds():
     import types
 
     fake_module = types.ModuleType("optuna_integration.sklearn")
-    setattr(fake_module, "OptunaSearchCV", object())  # sentinel marker class
+    fake_module.OptunaSearchCV = object()  # sentinel marker class
     variant = _load_engine_variant(
         {
             "optuna.integration": None,
@@ -501,7 +501,7 @@ def test_optuna_integration_third_fallback_path_succeeds():
         }
     )
     assert variant.HAS_OPTUNA is True
-    assert variant.OptunaSearchCV is getattr(fake_module, "OptunaSearchCV")
+    assert variant.OptunaSearchCV is fake_module.OptunaSearchCV
 
 
 # ---------------------------------------------------------------------------

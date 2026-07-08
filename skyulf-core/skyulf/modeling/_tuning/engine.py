@@ -229,7 +229,7 @@ class TuningCalculator(BaseModelCalculator):
             raise ValueError("Tuner currently only supports SklearnCalculator")
 
         # `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.
-        model_class: Any = getattr(self.model_calculator, "model_class")
+        model_class: Any = self.model_calculator.model_class
 
         # ``default_params`` may carry structural args (e.g. an ensemble's
         # resolved ``estimators``); the instantiator filters/routes them safely.

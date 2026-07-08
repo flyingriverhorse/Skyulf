@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import urllib.parse
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import field_validator, model_validator
@@ -151,7 +152,7 @@ class Settings(
         elif self.DB_TYPE == "sqlite":
             if not self.DATABASE_URL.startswith("sqlite"):
                 db_path = self.DB_PATH or "mlops_database.db"
-                if os.path.isabs(db_path):
+                if Path(db_path).is_absolute():
                     self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
                 else:
                     self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"

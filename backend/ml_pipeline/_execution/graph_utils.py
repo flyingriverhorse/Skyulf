@@ -324,7 +324,7 @@ def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[st
                 queue.append(parent_id)
 
     # Pass 2 — Kahn's algorithm: build in-degree map for the subgraph.
-    in_degree: dict[str, int] = {nid: 0 for nid in discovered}
+    in_degree: dict[str, int] = dict.fromkeys(discovered, 0)
     children: dict[str, list[str]] = {nid: [] for nid in discovered}
     for nid in discovered:
         for parent_id in node_map[nid].inputs:

@@ -72,7 +72,7 @@ def _build_adjacency(
     nodes: list[_NodeIn],
 ) -> tuple[dict[str, _NodeIn], dict[str, int], dict[str, list[str]]]:
     by_id = {n.node_id: n for n in nodes}
-    indeg: dict[str, int] = {nid: 0 for nid in by_id}
+    indeg: dict[str, int] = dict.fromkeys(by_id, 0)
     children: dict[str, list[str]] = {nid: [] for nid in by_id}
     for n in nodes:
         for src in n.inputs:
@@ -133,9 +133,7 @@ def _classify(
             train_test = train_test or n
         elif st in _MODELING_STEPS:
             model = model or n
-        elif st in _RESAMPLER_STEPS:
-            preprocess.append(n)
-        elif st not in _PREVIEW_STEPS:
+        elif st in _RESAMPLER_STEPS or st not in _PREVIEW_STEPS:
             preprocess.append(n)
     return loader, preprocess, feat_target, train_test, model
 
