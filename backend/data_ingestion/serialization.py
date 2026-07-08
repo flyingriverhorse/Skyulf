@@ -103,9 +103,7 @@ class AsyncJSONSafeSerializer:
             return AsyncJSONSafeSerializer._NOT_HANDLED
         if len(obj) > 100:
             await asyncio.sleep(0)
-        result = []
-        for item in obj:
-            result.append(await AsyncJSONSafeSerializer.clean_for_json(item))
+        result = [await AsyncJSONSafeSerializer.clean_for_json(item) for item in obj]
         return result
 
     @staticmethod

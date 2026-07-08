@@ -154,10 +154,7 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
         unique_vals = series.drop_nulls().unique()
         if len(unique_vals) > 2:
             return False
-        for val in unique_vals:
-            if not (np.isclose(val, 0) or np.isclose(val, 1)):
-                return False
-        return True
+        return all(np.isclose(val, 0) or np.isclose(val, 1) for val in unique_vals)
 
     # Pandas Series
     unique_vals = series.dropna().unique()
@@ -165,10 +162,7 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
         return False
 
     # Check if values are close to 0 or 1
-    for val in unique_vals:
-        if not (np.isclose(val, 0) or np.isclose(val, 1)):
-            return False
-    return True
+    return all(np.isclose(val, 0) or np.isclose(val, 1) for val in unique_vals)
 
 
 def detect_numeric_columns(

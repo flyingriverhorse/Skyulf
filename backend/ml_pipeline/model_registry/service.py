@@ -240,24 +240,24 @@ class ModelRegistryService:
             .where(BasicTrainingJob.model_type == model_type)
             .order_by(BasicTrainingJob.created_at.desc())
         )
-        for job in train_jobs.scalars().all():
-            versions.append(
-                ModelVersion(
-                    job_id=job.id,
-                    pipeline_id=job.pipeline_id,
-                    node_id=job.node_id,
-                    model_type=model_type,
-                    version=cast(str, job.version),
-                    source="training",
-                    status=job.status,
-                    metrics=cast(dict[str, Any] | None, job.metrics),
-                    hyperparameters=cast(dict[str, Any] | None, job.hyperparameters),
-                    created_at=cast(datetime | None, job.created_at),
-                    artifact_uri=job.artifact_uri,
-                    is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(job.id),
-                )
+        versions.extend(
+            ModelVersion(
+                job_id=job.id,
+                pipeline_id=job.pipeline_id,
+                node_id=job.node_id,
+                model_type=model_type,
+                version=cast(str, job.version),
+                source="training",
+                status=job.status,
+                metrics=cast(dict[str, Any] | None, job.metrics),
+                hyperparameters=cast(dict[str, Any] | None, job.hyperparameters),
+                created_at=cast(datetime | None, job.created_at),
+                artifact_uri=job.artifact_uri,
+                is_deployed=job.id in deployed_job_ids,
+                deployment_id=deployed_job_ids.get(job.id),
             )
+            for job in train_jobs.scalars().all()
+        )
 
         # Tuning Jobs
         tune_jobs = await session.execute(
