@@ -1,7 +1,8 @@
 """Ordinal Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Mapping, Tuple, Union, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -25,16 +26,16 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-def _resolve_apply_inputs(X: Any, params: Dict[str, Any]) -> Tuple[List[str], Any, Dict[str, Any]]:
+def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], Any, dict[str, Any]]:
     """Return ``(valid_cols, feature_encoder, target_encoders)``."""
     cols = params.get("columns", [])
     encoder = params.get("encoder_object")
-    target_encoders: Dict[str, Any] = params.get("encoders", {})
+    target_encoders: dict[str, Any] = params.get("encoders", {})
     valid_cols = [c for c in cols if c in X.columns]
     return valid_cols, encoder, target_encoders
 
 
-def _apply_features_polars(X: Any, valid_cols: List[str], encoder: Any) -> Any:
+def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     import polars as pl
 
     try:
@@ -48,7 +49,7 @@ def _apply_features_polars(X: Any, valid_cols: List[str], encoder: Any) -> Any:
         return X
 
 
-def _apply_features_pandas(X: Any, valid_cols: List[str], encoder: Any) -> Any:
+def _apply_features_pandas(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     X_out = X.copy()
     try:
         X_subset = X_out[valid_cols].astype(str)
@@ -90,7 +91,7 @@ def _apply_target_pandas(y: Any, enc: OrdinalEncoder) -> Any:
         return y
 
 
-def _ordinal_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _ordinal_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, encoder, target_encoders = _resolve_apply_inputs(X, params)
     if not valid_cols and "__target__" not in target_encoders:
         return X, y
@@ -105,7 +106,7 @@ def _ordinal_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
     return X_out, y_out
 
 
-def _ordinal_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _ordinal_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, encoder, target_encoders = _resolve_apply_inputs(X, params)
     if not valid_cols and "__target__" not in target_encoders:
         return X, y
@@ -122,7 +123,7 @@ def _ordinal_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
 
 class OrdinalEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -136,14 +137,14 @@ class OrdinalEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _resolve_handle_unknown(config: Dict[str, Any]) -> str:
+def _resolve_handle_unknown(config: dict[str, Any]) -> str:
     """OrdinalEncoder only accepts 'error' or 'use_encoded_value'."""
     raw = config.get("handle_unknown", "use_encoded_value")
     return raw if raw in ("error", "use_encoded_value") else "use_encoded_value"
 
 
 def _make_ordinal_encoder(
-    categories: Union[str, List[List[str]]], handle_unknown: str, unknown_value: Any
+    categories: str | list[list[str]], handle_unknown: str, unknown_value: Any
 ) -> OrdinalEncoder:
     return OrdinalEncoder(
         categories=categories,
@@ -155,7 +156,7 @@ def _make_ordinal_encoder(
 
 def _fit_target_encoder(
     y_series: Any,
-    categories: Union[str, List[List[str]]],
+    categories: str | list[list[str]],
     handle_unknown: str,
     unknown_value: Any,
 ) -> OrdinalEncoder:
@@ -170,7 +171,7 @@ def _fit_target_encoder(
     return enc
 
 
-def _resolve_target_categories(raw_order: Any, n_features: int) -> Union[str, List[List[str]]]:
+def _resolve_target_categories(raw_order: Any, n_features: int) -> str | list[list[str]]:
     """Slice the per-target row out of the categories_order table."""
     parsed = _parse_categories_order(raw_order, n_features + 1)
     if isinstance(parsed, list) and len(parsed) == n_features + 1:
@@ -178,7 +179,7 @@ def _resolve_target_categories(raw_order: Any, n_features: int) -> Union[str, Li
     return "auto"
 
 
-def _build_subset_polars(X: Any, feature_cols: List[str]) -> Any:
+def _build_subset_polars(X: Any, feature_cols: list[str]) -> Any:
     import polars as pl
 
     return X.select(feature_cols).select([pl.col(c).cast(pl.Utf8) for c in feature_cols])
@@ -186,9 +187,9 @@ def _build_subset_polars(X: Any, feature_cols: List[str]) -> Any:
 
 def _fit_feature_encoder(
     X_subset: Any,
-    feature_cols: List[str],
-    config: Dict[str, Any],
-) -> Tuple[OrdinalEncoder, List[int]]:
+    feature_cols: list[str],
+    config: dict[str, Any],
+) -> tuple[OrdinalEncoder, list[int]]:
     cats = _parse_categories_order(config.get("categories_order"), len(feature_cols))
     enc = _make_ordinal_encoder(
         cats, _resolve_handle_unknown(config), config.get("unknown_value", -1)
@@ -199,9 +200,9 @@ def _fit_feature_encoder(
     return enc, counts
 
 
-def _ordinal_fit_no_columns(y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _ordinal_fit_no_columns(y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     """Fit-time fallback when the user picked no feature columns."""
-    target_encoders: Dict[str, Any] = {}
+    target_encoders: dict[str, Any] = {}
     if y is not None:
         cats_y = _parse_categories_order(config.get("categories_order"), 1)
         target_encoders["__target__"] = _fit_target_encoder(
@@ -216,7 +217,7 @@ def _ordinal_fit_no_columns(y: Any, config: Dict[str, Any]) -> Mapping[str, Any]
     }
 
 
-def _should_encode_target(X: Any, y: Any, config: Dict[str, Any]) -> bool:
+def _should_encode_target(X: Any, y: Any, config: dict[str, Any]) -> bool:
     """True iff ``y`` exists and the configured target name is in `columns`
     but not in ``X``."""
     if y is None:
@@ -224,21 +225,21 @@ def _should_encode_target(X: Any, y: Any, config: Dict[str, Any]) -> bool:
     target_col = config.get("target_column") or getattr(y, "name", None)
     if not target_col:
         return False
-    cols_raw: List[str] = config.get("columns") or []
+    cols_raw: list[str] = config.get("columns") or []
     return target_col in cols_raw and target_col not in X.columns
 
 
 def _maybe_fit_features(
-    X: Any, feature_cols: List[str], config: Dict[str, Any], build_subset: Any
-) -> Tuple["OrdinalEncoder | None", List[int]]:
+    X: Any, feature_cols: list[str], config: dict[str, Any], build_subset: Any
+) -> tuple["OrdinalEncoder | None", list[int]]:
     if not feature_cols:
         return None, []
     return _fit_feature_encoder(build_subset(X, feature_cols), feature_cols, config)
 
 
 def _maybe_fit_target_block(
-    y: Any, n_features: int, config: Dict[str, Any], encode_target: bool
-) -> Dict[str, Any]:
+    y: Any, n_features: int, config: dict[str, Any], encode_target: bool
+) -> dict[str, Any]:
     if not (encode_target and y is not None):
         return {}
     cats_y = _resolve_target_categories(config.get("categories_order"), n_features)
@@ -251,7 +252,7 @@ def _maybe_fit_target_block(
 def _ordinal_fit_dispatch(
     X: Any,
     y: Any,
-    config: Dict[str, Any],
+    config: dict[str, Any],
     build_subset: Any,
 ) -> Mapping[str, Any]:
     """Engine-agnostic fit body. ``build_subset(X, feature_cols) -> X_subset``."""
@@ -276,11 +277,11 @@ def _ordinal_fit_dispatch(
     }
 
 
-def _ordinal_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _ordinal_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     return _ordinal_fit_dispatch(X, y, config, _build_subset_polars)
 
 
-def _ordinal_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _ordinal_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     return _ordinal_fit_dispatch(X, y, config, lambda Xi, fc: Xi[fc].astype(str))
 
 
@@ -299,14 +300,14 @@ def _ordinal_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, 
 )
 class OrdinalEncoderCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Ordinal encoding replaces categorical values with ints in place;
         # column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> OrdinalArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> OrdinalArtifact:  # pylint: disable=arguments-differ
         return cast(
             OrdinalArtifact,
             fit_dual_engine(

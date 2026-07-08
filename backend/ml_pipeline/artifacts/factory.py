@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from backend.config import get_settings
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
@@ -59,8 +59,8 @@ class ArtifactFactory:
 
     @staticmethod
     def create_store_for_job(
-        job_id: str, is_s3_source: bool = False, artifact_path_name: Optional[str] = None
-    ) -> Tuple[ArtifactStore, str]:
+        job_id: str, is_s3_source: bool = False, artifact_path_name: str | None = None
+    ) -> tuple[ArtifactStore, str]:
         """
         Determines the correct storage location for a new job based on:
         1. The data source type (S3 vs Local)

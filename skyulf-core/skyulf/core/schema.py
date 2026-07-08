@@ -13,8 +13,9 @@ The default returns `None`, meaning "I can't predict my output schema
 from config alone" — callers fall back to runtime introspection.
 """
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any
 
 
 class SchemaMismatchError(ValueError):
@@ -37,9 +38,9 @@ class SchemaMismatchError(ValueError):
         self,
         message: str,
         *,
-        missing: Optional[List[str]] = None,
-        unexpected: Optional[List[str]] = None,
-        dtype_mismatches: Optional[Dict[str, Tuple[str, str]]] = None,
+        missing: list[str] | None = None,
+        unexpected: list[str] | None = None,
+        dtype_mismatches: dict[str, tuple[str, str]] | None = None,
         order_mismatch: bool = False,
     ) -> None:
         super().__init__(message)
@@ -62,14 +63,14 @@ class SkyulfSchema:
             ``dtypes`` when its type is unknown.
     """
 
-    columns: Tuple[str, ...]
-    dtypes: Dict[str, str] = field(default_factory=dict)
+    columns: tuple[str, ...]
+    dtypes: dict[str, str] = field(default_factory=dict)
 
     # ---- Constructors -----------------------------------------------------
 
     @classmethod
     def from_columns(
-        cls, columns: Iterable[str], dtypes: Optional[Dict[str, str]] = None
+        cls, columns: Iterable[str], dtypes: dict[str, str] | None = None
     ) -> "SkyulfSchema":
         cols = tuple(columns)
         return cls(columns=cols, dtypes=dict(dtypes or {}))
@@ -99,9 +100,9 @@ class SkyulfSchema:
         new_dtypes[name] = dtype
         return replace(self, columns=self.columns + (name,), dtypes=new_dtypes)
 
-    def rename(self, mapping: Dict[str, str]) -> "SkyulfSchema":
+    def rename(self, mapping: dict[str, str]) -> "SkyulfSchema":
         new_cols = tuple(mapping.get(c, c) for c in self.columns)
-        new_dtypes: Dict[str, str] = {}
+        new_dtypes: dict[str, str] = {}
         for k, v in self.dtypes.items():
             new_dtypes[mapping.get(k, k)] = v
         return replace(self, columns=new_cols, dtypes=new_dtypes)
@@ -118,7 +119,7 @@ class SkyulfSchema:
     def has(self, name: str) -> bool:
         return name in self.columns
 
-    def column_list(self) -> List[str]:
+    def column_list(self) -> list[str]:
         return list(self.columns)
 
     def __contains__(self, item: object) -> bool:
@@ -165,7 +166,7 @@ class SkyulfSchema:
             )
 
 
-def _presence_diff(expected: "SkyulfSchema", actual: "SkyulfSchema") -> Tuple[List[str], List[str]]:
+def _presence_diff(expected: "SkyulfSchema", actual: "SkyulfSchema") -> tuple[list[str], list[str]]:
     """Return ``(missing, unexpected)`` column-name lists between two schemas."""
     actual_cols = set(actual.columns)
     expected_cols = set(expected.columns)
@@ -176,10 +177,10 @@ def _presence_diff(expected: "SkyulfSchema", actual: "SkyulfSchema") -> Tuple[Li
 
 def _dtype_mismatches(
     expected: "SkyulfSchema", actual: "SkyulfSchema"
-) -> Dict[str, Tuple[str, str]]:
+) -> dict[str, tuple[str, str]]:
     """Return ``{column: (expected_dtype, actual_dtype)}`` for shared columns."""
     actual_cols = set(actual.columns)
-    out: Dict[str, Tuple[str, str]] = {}
+    out: dict[str, tuple[str, str]] = {}
     for col in expected.columns:
         if col in actual_cols and col in expected.dtypes and col in actual.dtypes:
             exp_dt, act_dt = expected.dtypes[col], actual.dtypes[col]
@@ -189,7 +190,7 @@ def _dtype_mismatches(
 
 
 def _check_order(
-    expected: "SkyulfSchema", actual: "SkyulfSchema", check_order: bool, missing: List[str]
+    expected: "SkyulfSchema", actual: "SkyulfSchema", check_order: bool, missing: list[str]
 ) -> bool:
     """Return ``True`` when shared columns appear in a different relative order.
 
@@ -207,13 +208,13 @@ def _check_order(
 
 def _format_mismatch(
     where: str,
-    missing: List[str],
-    unexpected: List[str],
-    dtype_mismatches: Dict[str, Tuple[str, str]],
+    missing: list[str],
+    unexpected: list[str],
+    dtype_mismatches: dict[str, tuple[str, str]],
     order_mismatch: bool,
 ) -> str:
     """Build a human-readable mismatch message from the collected diffs."""
-    parts: List[str] = [f"Schema mismatch on {where}:"]
+    parts: list[str] = [f"Schema mismatch on {where}:"]
     if missing:
         parts.append(f" missing columns {missing}")
     if unexpected:
@@ -251,7 +252,7 @@ def validate_schema(
     )
 
 
-def _extract_pandas_dtypes(df: Any) -> Dict[str, str]:
+def _extract_pandas_dtypes(df: Any) -> dict[str, str]:
     pd_dtypes = getattr(df, "dtypes", None)
     if pd_dtypes is None or not hasattr(pd_dtypes, "items"):
         return {}
@@ -261,7 +262,7 @@ def _extract_pandas_dtypes(df: Any) -> Dict[str, str]:
         return {}
 
 
-def _extract_polars_dtypes(df: Any) -> Dict[str, str]:
+def _extract_polars_dtypes(df: Any) -> dict[str, str]:
     schema_attr = getattr(df, "schema", None)
     if schema_attr is None:
         return {}

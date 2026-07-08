@@ -14,7 +14,8 @@ Boundary with ``dispatcher.py``:
       dispatcher never implements column-level logic.
 """
 
-from typing import Any, Iterable, List, Union
+from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -22,7 +23,7 @@ import pandas as pd
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 
-def resolve_valid_columns(X: Any, requested: Iterable[str]) -> List[str]:
+def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
     """Filter ``requested`` to columns that actually exist on ``X``.
 
     Works for any frame exposing ``.columns`` (Pandas, Polars, our wrapper).
@@ -60,7 +61,7 @@ def is_polars(X: Any) -> bool:
     return get_engine(X).name == EngineName.POLARS
 
 
-def auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return string-like columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
@@ -72,7 +73,7 @@ def auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[s
     return list(df.select_dtypes(include=["object", "string", "category"]).columns)
 
 
-def auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return numeric columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
@@ -94,7 +95,7 @@ def auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> Lis
     return list(df.select_dtypes(include=["number"]).columns)
 
 
-def auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def auto_detect_datetime_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return datetime/date columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:

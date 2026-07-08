@@ -6,7 +6,7 @@ strategies (``most_frequent`` / ``constant``), and shared edge cases
 (empty frame, all-NaN column, single row, no missing values).
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -232,7 +232,7 @@ def test_knn_imputer_fit_apply_round_trip_pandas() -> None:
             "b": [1.0, 2.0, 3.0, 4.0, 5.0],
         }
     )
-    config: Dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
+    config: dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
     calc = KNNImputerCalculator()
     params = calc.fit(df, config)
 
@@ -257,7 +257,7 @@ def test_knn_imputer_fit_apply_round_trip_polars() -> None:
         }
     )
     df = pl.from_pandas(pdf)
-    config: Dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
+    config: dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
     calc = KNNImputerCalculator()
     params = calc.fit(df, config)
 
@@ -324,7 +324,7 @@ def test_iterative_imputer_fit_apply_round_trip_pandas() -> None:
     df = pd.DataFrame({"a": a, "b": b})
     df.loc[5, "a"] = np.nan
 
-    config: Dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5, "estimator": "BayesianRidge"}
+    config: dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5, "estimator": "BayesianRidge"}
     calc = IterativeImputerCalculator()
     params = calc.fit(df, config)
 
@@ -349,7 +349,7 @@ def test_iterative_imputer_fit_apply_round_trip_polars() -> None:
     pdf.loc[3, "a"] = np.nan
     df = pl.from_pandas(pdf)
 
-    config: Dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5}
+    config: dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5}
     calc = IterativeImputerCalculator()
     params = calc.fit(df, config)
 
@@ -627,7 +627,7 @@ def test_compute_polars_fill_values_mean_matches_pandas_mean(df: pd.DataFrame) -
 @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_simple_imputer_constant_engine_parity(df: pd.DataFrame, fill_value: float) -> None:
     """SimpleImputer constant-strategy fit is identical across pandas and polars."""
-    config: Dict[str, Any] = {
+    config: dict[str, Any] = {
         "columns": ["a", "b"],
         "strategy": "constant",
         "fill_value": fill_value,

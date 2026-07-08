@@ -8,7 +8,7 @@ single-column, empty) and asserts that schema inference never crashes:
   ``SkyulfSchema`` without raising, for a generic column-based config.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -29,7 +29,7 @@ def _weird_frame(draw: st.DrawFn) -> pd.DataFrame:
     n_cols = draw(st.integers(min_value=1, max_value=4))
     n_rows = draw(st.integers(min_value=0, max_value=5))
     names = draw(st.lists(_COLUMN_NAMES, min_size=n_cols, max_size=n_cols, unique=True))
-    data: Dict[str, List[Any]] = {}
+    data: dict[str, list[Any]] = {}
     for name in names:
         kind = draw(st.sampled_from(["int", "float", "str", "all_null", "bool"]))
         if kind == "int":
@@ -59,8 +59,8 @@ def test_from_dataframe_never_crashes(df: pd.DataFrame) -> None:
     assert len(schema) == len(df.columns)
 
 
-def _all_calculators() -> List[type]:
-    calculators: List[type] = []
+def _all_calculators() -> list[type]:
+    calculators: list[type] = []
     for node_id in NodeRegistry.get_all_metadata():
         try:
             calc = NodeRegistry.get_calculator(node_id)

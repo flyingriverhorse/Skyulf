@@ -1,6 +1,6 @@
 """Tests for skyulf.modeling._evaluation.common helpers."""
 
-from typing import Dict, cast
+from typing import cast
 
 import numpy as np
 import pytest
@@ -112,7 +112,7 @@ def test_sanitize_metrics_all_nan():
 def test_sanitize_metrics_converts_numpy_float():
     """numpy floats should be cast to plain Python floats."""
     metrics = {"score": np.float64(0.75)}
-    result = sanitize_metrics(cast(Dict[str, float], metrics))
+    result = sanitize_metrics(cast(dict[str, float], metrics))
     assert isinstance(result["score"], float)
     assert result["score"] == pytest.approx(0.75)
 

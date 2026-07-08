@@ -1,7 +1,8 @@
 """Classification models."""
 
 import logging
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from sklearn.base import BaseEstimator
 from sklearn.calibration import CalibratedClassifierCV
@@ -110,7 +111,7 @@ class CalibratedClassifierCalculator(SklearnCalculator):
 
     # Map of selectable base estimators → factory. Each must support
     # ``predict_proba`` (or ``decision_function``) so calibration is meaningful.
-    BASE_ESTIMATORS: Dict[str, Callable[[], BaseEstimator]] = {
+    BASE_ESTIMATORS: dict[str, Callable[[], BaseEstimator]] = {
         "logistic_regression": lambda: LogisticRegression(max_iter=1000),
         "random_forest": lambda: RandomForestClassifier(n_estimators=100, random_state=42),
         "gradient_boosting": lambda: GradientBoostingClassifier(random_state=42),
@@ -134,16 +135,16 @@ class CalibratedClassifierCalculator(SklearnCalculator):
         self,
         X: Any,
         y: Any,
-        config: Dict[str, Any],
-        progress_callback: Optional[Callable[..., Any]] = None,
-        log_callback: Optional[Callable[..., Any]] = None,
+        config: dict[str, Any],
+        progress_callback: Callable[..., Any] | None = None,
+        log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
     ) -> Any:
         config = self._resolve_base_estimator(config)
         return super().fit(X, y, config, progress_callback, log_callback, validation_data)
 
     @classmethod
-    def _resolve_base_estimator(cls, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _resolve_base_estimator(cls, config: dict[str, Any] | None) -> dict[str, Any]:
         """Translate a ``base_estimator`` string key into an estimator instance.
 
         Supports both the flat config shape and the nested ``{"params": {...}}``

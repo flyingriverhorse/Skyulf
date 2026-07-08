@@ -1,6 +1,5 @@
 """Per-column dispatch: semantic typing + the big ``_analyze_column`` orchestrator."""
 
-from typing import List, Tuple
 
 import numpy as np
 import polars as pl
@@ -58,13 +57,13 @@ class ColumnMixin(_AnalyzerState):
         basic_stats: dict,
         advanced_stats: dict,
         semantic_types: dict,
-    ) -> Tuple[ColumnProfile, List[Alert]]:
+    ) -> tuple[ColumnProfile, list[Alert]]:
         """Build the per-column ``ColumnProfile`` from already-batched aggregations.
 
         Reads ``basic_stats`` / ``advanced_stats`` rows produced by
         :meth:`EDAAnalyzer.analyze` and dispatches to the per-type analyzers.
         """
-        alerts: List[Alert] = []
+        alerts: list[Alert] = []
 
         semantic_type = semantic_types[col]
         null_count = basic_stats.get(f"{col}__null", 0)

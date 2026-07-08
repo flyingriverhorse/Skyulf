@@ -19,8 +19,8 @@ upstream-input resolution helpers, and the ``log`` shim.
 
 import logging
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 import pandas as pd
 
@@ -59,15 +59,15 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         self.artifact_store = artifact_store
         self.catalog = catalog
         self.log_callback = log_callback
-        self.executed_transformers: List[
+        self.executed_transformers: list[
             Any
         ] = []  # Track fitted transformers for inference pipeline
-        self._results: Dict[str, NodeExecutionResult] = {}
-        self._node_configs: Dict[str, NodeConfig] = {}
+        self._results: dict[str, NodeExecutionResult] = {}
+        self._node_configs: dict[str, NodeConfig] = {}
         # Engine-emitted advisories surfaced via PipelineExecutionResult.
         # Initialized here (not just in run()) so direct callers of
         # _merge_inputs / _merge_frames in tests don't hit AttributeError.
-        self.merge_warnings: List[Dict[str, Any]] = []
+        self.merge_warnings: list[dict[str, Any]] = []
 
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
@@ -76,7 +76,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             for node in self._node_configs.values()
         )
 
-    def _predict_schemas_safe(self, config: PipelineConfig) -> Dict[str, Optional[Dict[str, Any]]]:
+    def _predict_schemas_safe(self, config: PipelineConfig) -> dict[str, dict[str, Any] | None]:
         """C7 Phase B helper: best-effort pre-run schema prediction.
 
         Errors are swallowed so a broken predictor never blocks a real run.
@@ -100,13 +100,13 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
         self.dataset_name = dataset_name
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         self.executed_transformers = []  # Reset for new run
         self._node_configs = {n.node_id: n for n in config.nodes}
         self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
         # Per-run merge advisories surfaced to API/UI so the user understands
         # what fan-in semantics were applied (column union, last-wins, etc.).
-        self.merge_warnings: List[Dict[str, Any]] = []
+        self.merge_warnings: list[dict[str, Any]] = []
 
         self._current_pipeline_id = config.pipeline_id
         pipeline_result = PipelineExecutionResult(
@@ -158,14 +158,14 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             pipeline_result.node_warnings = warn_handler.drain()
             warn_handler.detach()
 
-        pipeline_result.end_time = datetime.now(timezone.utc)
+        pipeline_result.end_time = datetime.now(UTC)
         # Dedup advisories: a merge node executed in multiple branches/parts
         # (e.g. FeatureTargetSplit hit once per parallel branch) re-appends
         # the same advisory each pass. Collapse on (node_id, kind, inputs,
         # overlap_columns, dropped_columns, part) so the UI shows one row
         # per logically distinct merge instead of N copies.
         seen_keys: set = set()
-        deduped: List[Dict[str, Any]] = []
+        deduped: list[dict[str, Any]] = []
         for w in self.merge_warnings:
             key = (
                 w.get("node_id"),
@@ -189,7 +189,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
 
         try:
             output_artifact_id = None
-            metrics: Dict[str, Any] = {}
+            metrics: dict[str, Any] = {}
 
             if node.step_type == StepType.DATA_LOADER:
                 output_artifact_id = self._run_data_loader(node, job_id=job_id)
@@ -228,7 +228,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             # keeps summary logic out of the per-runner methods. We
             # tolerate any failure - a missing summary just means the
             # card falls back to its static description.
-            metadata: Dict[str, Any] = {}
+            metadata: dict[str, Any] = {}
             # Output / upstream loads are best-effort and isolated from
             # the summary call - for trainers and tuners the summary
             # comes purely from `metrics`, so a failed model load (e.g.
@@ -239,7 +239,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 output = self.artifact_store.load(node.node_id)
             except Exception:
                 logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
-            input_shape: Optional[Tuple[int, int]] = None
+            input_shape: tuple[int, int] | None = None
             try:
                 if node.inputs:
                     upstream = self.artifact_store.load(node.inputs[0])
@@ -289,7 +289,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         input_node_id = node.inputs[index]
         return self.artifact_store.load(input_node_id)
 
-    def _resolve_all_inputs(self, node: NodeConfig) -> List[Any]:
+    def _resolve_all_inputs(self, node: NodeConfig) -> list[Any]:
         """Load artifacts from ALL upstream nodes, ordered by topology.
 
         Duplicate edges from the same source node (which the frontend can emit
@@ -298,7 +298,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         """
         if not node.inputs:
             raise ValueError(f"Node {node.node_id} has no inputs")
-        deduped_ids: List[str] = []
+        deduped_ids: list[str] = []
         seen: set[str] = set()
         for nid in node.inputs:
             if nid in seen:

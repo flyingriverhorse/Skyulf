@@ -4,7 +4,7 @@ This is the async equivalent of the Flask db/data_sources/sqlite_queries.py
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from sqlalchemy import column, delete, func, literal_column, select, table, update
 from sqlalchemy import text as sa_text
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 TABLE = "data_sources"
 
 
-async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[str, Any]:
+async def insert_data_source(settings: Settings, row: dict[str, Any]) -> dict[str, Any]:
     """Insert a row into the data_sources table. Returns the inserted row dict."""
     async with async_session_or_connection(settings) as session:
         try:
@@ -68,9 +68,9 @@ async def insert_data_source(settings: Settings, row: Dict[str, Any]) -> Dict[st
 
 async def select_data_sources(
     settings: Settings,
-    filter_dict: Optional[Dict[str, Any]] = None,
+    filter_dict: dict[str, Any] | None = None,
     one: bool = False,
-) -> List[Dict[str, Any]] | Dict[str, Any] | None:
+) -> list[dict[str, Any]] | dict[str, Any] | None:
     """Select data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
         try:
@@ -100,7 +100,7 @@ async def select_data_sources(
 
 
 async def update_data_source(
-    settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]
+    settings: Settings, filter_dict: dict[str, Any], update_data: dict[str, Any]
 ):
     """Update data source records."""
     async with async_session_or_connection(settings) as session:
@@ -127,7 +127,7 @@ async def update_data_source(
             raise
 
 
-async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
+async def delete_data_source(settings: Settings, filter_dict: dict[str, Any]):
     """Delete data source records."""
     async with async_session_or_connection(settings) as session:
         try:
@@ -150,7 +150,7 @@ async def delete_data_source(settings: Settings, filter_dict: Dict[str, Any]):
 
 
 async def count_data_sources(
-    settings: Settings, filter_dict: Optional[Dict[str, Any]] = None
+    settings: Settings, filter_dict: dict[str, Any] | None = None
 ) -> int:
     """Count data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
@@ -172,7 +172,7 @@ async def count_data_sources(
 
 async def select_data_source_by_file_hash(
     settings: Settings, file_hash: str
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Select a single data source by the stored file hash (JSON field)."""
     if not file_hash:
         return None

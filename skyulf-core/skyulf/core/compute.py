@@ -8,7 +8,8 @@ so behaviour is unchanged until a backend is explicitly installed.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 R = TypeVar("R")
 

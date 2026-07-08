@@ -1,43 +1,43 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
 class NumericStats(BaseModel):
-    mean: Optional[float] = None
-    median: Optional[float] = None
-    std: Optional[float] = None
-    variance: Optional[float] = None
-    min: Optional[float] = None
-    max: Optional[float] = None
-    q25: Optional[float] = None
-    q75: Optional[float] = None
-    skewness: Optional[float] = None
-    kurtosis: Optional[float] = None
-    zeros_count: Optional[int] = None
-    negatives_count: Optional[int] = None
-    normality_test: Optional[Dict[str, Any]] = None
+    mean: float | None = None
+    median: float | None = None
+    std: float | None = None
+    variance: float | None = None
+    min: float | None = None
+    max: float | None = None
+    q25: float | None = None
+    q75: float | None = None
+    skewness: float | None = None
+    kurtosis: float | None = None
+    zeros_count: int | None = None
+    negatives_count: int | None = None
+    normality_test: dict[str, Any] | None = None
 
 
 class CategoricalStats(BaseModel):
     unique_count: int
-    top_k: List[Dict[str, Any]] = Field(default_factory=list)  # [{"value": "A", "count": 10}, ...]
+    top_k: list[dict[str, Any]] = Field(default_factory=list)  # [{"value": "A", "count": 10}, ...]
     rare_labels_count: int = 0
 
 
 class DateStats(BaseModel):
-    min_date: Optional[str] = None
-    max_date: Optional[str] = None
-    duration_days: Optional[float] = None
+    min_date: str | None = None
+    max_date: str | None = None
+    duration_days: float | None = None
 
 
 class TextStats(BaseModel):
-    avg_length: Optional[float] = None
-    min_length: Optional[int] = None
-    max_length: Optional[int] = None
-    common_words: List[Dict[str, Any]] = Field(default_factory=list)
-    sentiment_distribution: Optional[Dict[str, float]] = (
+    avg_length: float | None = None
+    min_length: int | None = None
+    max_length: int | None = None
+    common_words: list[dict[str, Any]] = Field(default_factory=list)
+    sentiment_distribution: dict[str, float] | None = (
         None  # {"positive": 0.6, "neutral": 0.3, "negative": 0.1}
     )
 
@@ -67,27 +67,27 @@ class CausalEdge(BaseModel):
 
 
 class CausalGraph(BaseModel):
-    nodes: List[CausalNode]
-    edges: List[CausalEdge]
+    nodes: list[CausalNode]
+    edges: list[CausalEdge]
 
 
 class RuleNode(BaseModel):
     id: int
-    feature: Optional[str] = None
-    threshold: Optional[float] = None
+    feature: str | None = None
+    threshold: float | None = None
     impurity: float
     samples: int
-    value: List[float]  # Class distribution
-    class_name: Optional[str] = None  # Predicted class
+    value: list[float]  # Class distribution
+    class_name: str | None = None  # Predicted class
     is_leaf: bool
-    children: List[int] = Field(default_factory=list)  # IDs of children
+    children: list[int] = Field(default_factory=list)  # IDs of children
 
 
 class RuleTree(BaseModel):
-    nodes: List[RuleNode]
-    accuracy: Optional[float] = None  # Surrogate model accuracy
-    rules: Optional[List[str]] = None  # Human readable rules
-    feature_importances: Optional[List[Dict[str, Union[str, float]]]] = (
+    nodes: list[RuleNode]
+    accuracy: float | None = None  # Surrogate model accuracy
+    rules: list[str] | None = None  # Human readable rules
+    feature_importances: list[dict[str, str | float]] | None = (
         None  # Feature importance from surrogate model
     )
 
@@ -99,14 +99,14 @@ class ColumnProfile(BaseModel):
     missing_percentage: float
 
     # Type-specific stats
-    numeric_stats: Optional[NumericStats] = None
-    categorical_stats: Optional[CategoricalStats] = None
-    date_stats: Optional[DateStats] = None
-    text_stats: Optional[TextStats] = None
+    numeric_stats: NumericStats | None = None
+    categorical_stats: CategoricalStats | None = None
+    date_stats: DateStats | None = None
+    text_stats: TextStats | None = None
 
     # Distribution
-    histogram: Optional[List[HistogramBin]] = None
-    normality_test: Optional[NormalityTestResult] = None
+    histogram: list[HistogramBin] | None = None
+    normality_test: NormalityTestResult | None = None
 
     # Quality
     is_constant: bool = False
@@ -114,25 +114,25 @@ class ColumnProfile(BaseModel):
 
 
 class CorrelationMatrix(BaseModel):
-    columns: List[str]
-    values: List[List[float]]  # 2D array
+    columns: list[str]
+    values: list[list[float]]  # 2D array
 
 
 class ScatterSample(BaseModel):
     x: str
     y: str
-    data: List[Dict[str, Any]]  # [{"x": 1, "y": 2}, ...]
+    data: list[dict[str, Any]]  # [{"x": 1, "y": 2}, ...]
 
 
 class Alert(BaseModel):
-    column: Optional[str] = None
+    column: str | None = None
     type: str  # "High Null", "Constant", "High Cardinality", "Leakage", "Outlier"
     message: str
     severity: str = "warning"  # "info", "warning", "error"
 
 
 class Recommendation(BaseModel):
-    column: Optional[str] = None
+    column: str | None = None
     action: str  # "Drop", "Impute", "Transform", "Encode"
     reason: str
     suggestion: str
@@ -141,20 +141,20 @@ class Recommendation(BaseModel):
 class PCAComponent(BaseModel):
     component: str  # "PC1", "PC2", "PC3"
     explained_variance_ratio: float
-    top_features: Dict[str, float]  # feature_name -> weight/loading
+    top_features: dict[str, float]  # feature_name -> weight/loading
 
 
 class PCAPoint(BaseModel):
     x: float
     y: float
-    z: Optional[float] = None
-    label: Optional[str] = None  # For target coloring
+    z: float | None = None
+    label: str | None = None  # For target coloring
 
 
 class GeoPoint(BaseModel):
     lat: float
     lon: float
-    label: Optional[str] = None
+    label: str | None = None
 
 
 class GeospatialStats(BaseModel):
@@ -166,12 +166,12 @@ class GeospatialStats(BaseModel):
     max_lon: float
     centroid_lat: float
     centroid_lon: float
-    sample_points: List[GeoPoint]
+    sample_points: list[GeoPoint]
 
 
 class TimeSeriesPoint(BaseModel):
     date: str
-    values: Dict[str, float]
+    values: dict[str, float]
 
 
 class BoxPlotStats(BaseModel):
@@ -190,28 +190,28 @@ class CategoryBoxPlot(BaseModel):
 class TargetInteraction(BaseModel):
     feature: str
     plot_type: str  # "boxplot"
-    data: List[CategoryBoxPlot]
-    p_value: Optional[float] = None  # ANOVA p-value
+    data: list[CategoryBoxPlot]
+    p_value: float | None = None  # ANOVA p-value
 
 
 class SeasonalityStats(BaseModel):
-    day_of_week: List[Dict[str, Any]]
-    month_of_year: List[Dict[str, Any]]
+    day_of_week: list[dict[str, Any]]
+    month_of_year: list[dict[str, Any]]
 
 
 class TimeSeriesAnalysis(BaseModel):
     date_col: str
-    trend: List[TimeSeriesPoint]
+    trend: list[TimeSeriesPoint]
     seasonality: SeasonalityStats
-    autocorrelation: Optional[List[Dict[str, Any]]] = None
-    stationarity_test: Optional[Dict[str, Any]] = None
+    autocorrelation: list[dict[str, Any]] | None = None
+    stationarity_test: dict[str, Any] | None = None
 
 
 class OutlierPoint(BaseModel):
     index: int
-    values: Dict[str, Any]  # Key values for context
+    values: dict[str, Any]  # Key values for context
     score: float  # Anomaly score (lower is more anomalous for IF, or distance for others)
-    explanation: Optional[List[Dict[str, Any]]] = (
+    explanation: list[dict[str, Any]] | None = (
         None  # [{"feature": "Age", "value": 95, "mean": 35, "diff": 60}, ...]
     )
 
@@ -220,8 +220,8 @@ class OutlierAnalysis(BaseModel):
     method: str  # "IsolationForest" or "IQR"
     total_outliers: int
     outlier_percentage: float
-    top_outliers: List[OutlierPoint]
-    plot_data: Optional[List[Dict[str, Any]]] = (
+    top_outliers: list[OutlierPoint]
+    plot_data: list[dict[str, Any]] | None = (
         None  # For visualization (e.g. PCA projection of outliers)
     )
 
@@ -230,22 +230,22 @@ class ClusteringPoint(BaseModel):
     x: float
     y: float
     cluster: int
-    label: Optional[str] = None
+    label: str | None = None
 
 
 class ClusterStats(BaseModel):
     cluster_id: int
     size: int
     percentage: float
-    center: Dict[str, float]
+    center: dict[str, float]
 
 
 class ClusteringAnalysis(BaseModel):
     method: str = "KMeans"
     n_clusters: int
     inertia: float
-    clusters: List[ClusterStats]
-    points: List[ClusteringPoint]
+    clusters: list[ClusterStats]
+    points: list[ClusteringPoint]
 
 
 class Filter(BaseModel):
@@ -261,36 +261,36 @@ class DatasetProfile(BaseModel):
     missing_cells_percentage: float
     memory_usage_mb: float
 
-    columns: Dict[str, ColumnProfile]
-    correlations: Optional[CorrelationMatrix] = None
-    correlations_with_target: Optional[CorrelationMatrix] = None
-    alerts: List[Alert] = Field(default_factory=list)
-    recommendations: List[Recommendation] = Field(default_factory=list)
-    sample_data: Optional[List[Dict[str, Any]]] = None
+    columns: dict[str, ColumnProfile]
+    correlations: CorrelationMatrix | None = None
+    correlations_with_target: CorrelationMatrix | None = None
+    alerts: list[Alert] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
+    sample_data: list[dict[str, Any]] | None = None
 
     # Target Analysis
-    target_col: Optional[str] = None
-    task_type: Optional[str] = None  # "Classification" or "Regression"
-    target_correlations: Optional[Dict[str, float]] = None
-    target_interactions: Optional[List[TargetInteraction]] = None
+    target_col: str | None = None
+    task_type: str | None = None  # "Classification" or "Regression"
+    target_correlations: dict[str, float] | None = None
+    target_interactions: list[TargetInteraction] | None = None
 
     # Multivariate
-    pca_data: Optional[List[PCAPoint]] = None
-    pca_components: Optional[List[PCAComponent]] = None
-    outliers: Optional[OutlierAnalysis] = None
-    clustering: Optional[ClusteringAnalysis] = None
-    causal_graph: Optional[CausalGraph] = None
-    rule_tree: Optional[RuleTree] = None
-    vif: Optional[Dict[str, float]] = None  # Variance Inflation Factor for numeric columns
+    pca_data: list[PCAPoint] | None = None
+    pca_components: list[PCAComponent] | None = None
+    outliers: OutlierAnalysis | None = None
+    clustering: ClusteringAnalysis | None = None
+    causal_graph: CausalGraph | None = None
+    rule_tree: RuleTree | None = None
+    vif: dict[str, float] | None = None  # Variance Inflation Factor for numeric columns
 
     # Geospatial
-    geospatial: Optional[GeospatialStats] = None
+    geospatial: GeospatialStats | None = None
 
     # Time Series
-    timeseries: Optional[TimeSeriesAnalysis] = None
+    timeseries: TimeSeriesAnalysis | None = None
 
     # Metadata
-    excluded_columns: List[str] = Field(default_factory=list)
-    active_filters: Optional[List[Filter]] = None
+    excluded_columns: list[str] = Field(default_factory=list)
+    active_filters: list[Filter] | None = None
 
     generated_at: datetime = Field(default_factory=datetime.now)

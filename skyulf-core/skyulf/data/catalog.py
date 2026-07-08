@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Union
 
 import pandas as pd
 
@@ -13,7 +12,7 @@ class DataCatalog(ABC):
     """
 
     @abstractmethod
-    def load(self, dataset_id: str, **kwargs) -> Union[pd.DataFrame, SkyulfDataFrame]:
+    def load(self, dataset_id: str, **kwargs) -> pd.DataFrame | SkyulfDataFrame:
         """
         Load a dataset by its identifier.
 
@@ -23,7 +22,7 @@ class DataCatalog(ABC):
         """
 
     @abstractmethod
-    def save(self, dataset_id: str, data: Union[pd.DataFrame, SkyulfDataFrame], **kwargs) -> None:
+    def save(self, dataset_id: str, data: pd.DataFrame | SkyulfDataFrame, **kwargs) -> None:
         """
         Save a dataset.
 
@@ -36,6 +35,6 @@ class DataCatalog(ABC):
     def exists(self, dataset_id: str) -> bool:
         """Check if a dataset exists."""
 
-    def get_dataset_name(self, dataset_id: str) -> Optional[str]:
+    def get_dataset_name(self, dataset_id: str) -> str | None:
         """Returns the human-readable name of the dataset, if available."""
         return None

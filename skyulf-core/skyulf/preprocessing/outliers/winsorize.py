@@ -1,6 +1,6 @@
 """Winsorize node (clip extreme values to percentile bounds)."""
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ from ..dispatcher import apply_dual_engine
 
 class WinsorizeApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
         # own unpack_pipeline_input doesn't silently drop y. Winsorize never
         # filters rows, but the wrap keeps behavior consistent with the other
@@ -25,7 +25,7 @@ class WinsorizeApplier(BaseApplier):
         return apply_dual_engine(input_data, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         bounds = params.get("bounds", {})
@@ -43,7 +43,7 @@ class WinsorizeApplier(BaseApplier):
         return X.with_columns(exprs), y
 
     @staticmethod
-    def _apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         bounds = params.get("bounds", {})
         if not bounds:
             return X, y
@@ -67,13 +67,13 @@ class WinsorizeApplier(BaseApplier):
 )
 class WinsorizeCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Winsorize clips values in place; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> WinsorizeArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> WinsorizeArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 
@@ -84,7 +84,7 @@ class WinsorizeCalculator(BaseCalculator):
         if not cols:
             return {}
 
-        bounds: Dict[str, Dict[str, float]] = {}
+        bounds: dict[str, dict[str, float]] = {}
         warnings = []
         for col in cols:
             series = pd.to_numeric(X_pd[col], errors="coerce").dropna()

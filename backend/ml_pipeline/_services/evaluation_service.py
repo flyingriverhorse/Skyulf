@@ -7,7 +7,7 @@ for training and tuning jobs.
 
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +26,7 @@ class EvaluationService:
     """Service for managing evaluation data retrieval."""
 
     @staticmethod
-    async def get_job_evaluation(session: AsyncSession, job_id: str) -> Dict[str, Any]:
+    async def get_job_evaluation(session: AsyncSession, job_id: str) -> dict[str, Any]:
         """
         Retrieves the raw evaluation data (y_true, y_pred) for a job.
         Decodes target labels if a LabelEncoder was used.

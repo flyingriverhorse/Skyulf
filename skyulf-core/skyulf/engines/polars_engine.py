@@ -1,4 +1,5 @@
-from typing import Any, List, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -25,13 +26,13 @@ class SkyulfPolarsWrapper:
         return self._df.columns
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self._df.shape
 
-    def select(self, columns: List[str]) -> "SkyulfDataFrame":
+    def select(self, columns: list[str]) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.select(columns))
 
-    def drop(self, columns: List[str]) -> "SkyulfDataFrame":
+    def drop(self, columns: list[str]) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.drop(columns))
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":

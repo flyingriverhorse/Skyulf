@@ -1,6 +1,5 @@
 """Tests for skyulf.modeling.cross_validation."""
 
-from typing import Any, Dict, List
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -266,7 +265,7 @@ def test_perform_cv_progress_callback_called_per_fold():
     calc = LogisticRegressionCalculator()
     appl = LogisticRegressionApplier()
 
-    calls: List[tuple] = []
+    calls: list[tuple] = []
     perform_cross_validation(
         calc,
         appl,
@@ -287,7 +286,7 @@ def test_perform_cv_log_callback_receives_messages():
     calc = LogisticRegressionCalculator()
     appl = LogisticRegressionApplier()
 
-    messages: List[str] = []
+    messages: list[str] = []
     perform_cross_validation(calc, appl, X, y, config={}, n_folds=2, log_callback=messages.append)
     assert len(messages) >= 2
 
@@ -458,8 +457,8 @@ def test_perform_nested_cv_with_callbacks_and_numpy_arrays():
     calc = LogisticRegressionCalculator()
     appl = LogisticRegressionApplier()
 
-    progress_calls: List[tuple] = []
-    messages: List[str] = []
+    progress_calls: list[tuple] = []
+    messages: list[str] = []
     result = perform_cross_validation(
         calc,
         appl,
@@ -488,7 +487,7 @@ def test_sort_by_time_auto_detect_datetime_with_log_callback():
     import logging
 
     logger = logging.getLogger(__name__)
-    messages: List[str] = []
+    messages: list[str] = []
 
     dates = pd.to_datetime(["2023-03-01", "2023-01-01", "2023-02-01"])
     X = pd.DataFrame({"ts": dates, "val": [30, 10, 20]})
@@ -523,7 +522,7 @@ def test_sort_by_time_missing_specified_column_with_log_callback():
     import logging
 
     logger = logging.getLogger(__name__)
-    messages: List[str] = []
+    messages: list[str] = []
 
     X = pd.DataFrame({"a": [3, 1, 2]})
     y = pd.Series([3, 1, 2])
@@ -538,7 +537,7 @@ def test_sort_by_time_no_datetime_column_with_log_callback():
     import logging
 
     logger = logging.getLogger(__name__)
-    messages: List[str] = []
+    messages: list[str] = []
 
     X = pd.DataFrame({"a": [3, 1, 2], "b": [1, 2, 3]})
     y = pd.Series([3, 1, 2])

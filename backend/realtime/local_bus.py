@@ -14,7 +14,6 @@ running loop.
 
 import asyncio
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +22,8 @@ class LocalBus:
     """Single-process bridge from sync publishers to one async listener."""
 
     def __init__(self) -> None:
-        self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._queue: Optional[asyncio.Queue[str]] = None
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._queue: asyncio.Queue[str] | None = None
 
     def attach(self, loop: asyncio.AbstractEventLoop) -> asyncio.Queue[str]:
         """Bind the bus to a running event loop and return its queue."""

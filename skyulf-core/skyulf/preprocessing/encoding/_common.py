@@ -1,7 +1,7 @@
 """Shared helpers and constants for all encoder modules."""
 
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from ...engines import EngineName, get_engine
 
@@ -22,7 +22,7 @@ _COLUMN_DESTROYING_ENCODERS = frozenset(
 _TARGET_SAFE_ENCODERS = frozenset(["LabelEncoder", "OrdinalEncoder"])
 
 
-def _parse_categories_order(raw: Any, n_cols: int) -> Union[str, List[List[str]]]:
+def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """Convert the frontend categories_order string/list into sklearn-compatible categories.
 
     The frontend sends a newline-separated string where each line holds
@@ -46,11 +46,11 @@ def _parse_categories_order(raw: Any, n_cols: int) -> Union[str, List[List[str]]
 
 
 def _exclude_target_column(
-    columns: List[str],
-    config: Dict[str, Any],
+    columns: list[str],
+    config: dict[str, Any],
     encoder_name: str,
     y: Any = None,
-) -> List[str]:
+) -> list[str]:
     """Remove the target column from the encoding list for column-destroying encoders.
 
     Detects the target column from config['target_column'] or the name of y.
@@ -75,7 +75,7 @@ def _exclude_target_column(
     return columns
 
 
-def detect_categorical_columns(df: Any) -> List[str]:
+def detect_categorical_columns(df: Any) -> list[str]:
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
         import polars as pl

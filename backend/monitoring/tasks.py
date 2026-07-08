@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from backend.celery_app import celery_app
 from backend.config import get_settings
@@ -16,7 +16,7 @@ def cleanup_error_events(self) -> dict:  # type: ignore[override]
     """Delete error_events older than ERROR_LOG_RETENTION_DAYS. Runs daily."""
     settings = get_settings()
     retention_days: int = getattr(settings, "ERROR_LOG_RETENTION_DAYS", 30)
-    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    cutoff = datetime.now(UTC) - timedelta(days=retention_days)
 
     async def _run() -> int:
         from sqlalchemy import delete

@@ -14,7 +14,7 @@ both :class:`DataSplitter` methods and :class:`FeatureTargetSplitApplier`.
 """
 
 import logging
-from typing import Any, Dict, Optional, Tuple, Union, cast
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-def _to_pandas_remember_engine(data: Any) -> Tuple[Any, bool]:
+def _to_pandas_remember_engine(data: Any) -> tuple[Any, bool]:
     """Return ``(pandas_data, was_polars)``. Pass through pandas/None unchanged."""
     if data is None:
         return None, False
@@ -78,7 +78,7 @@ def _safe_stratify(y: Any, label: str) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def _build_splitter(params: Dict[str, Any]) -> "DataSplitter":
+def _build_splitter(params: dict[str, Any]) -> "DataSplitter":
     """Construct a :class:`DataSplitter` from the node's params dict."""
     stratify = params.get("stratify", False)
     target_col = params.get("target_column")
@@ -99,8 +99,8 @@ def _build_splitter(params: Dict[str, Any]) -> "DataSplitter":
 class SplitApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        params: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        params: dict[str, Any],
     ) -> SplitDataset:
         target_col = params.get("target_column")
         splitter = _build_splitter(params)
@@ -139,7 +139,7 @@ class SplitApplier(BaseApplier):
 )
 class SplitCalculator(BaseCalculator):
     def fit(
-        self, df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any], config: Dict[str, Any]
+        self, df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any, config: dict[str, Any]
     ) -> SplitArtifact:
         # No learning from data; pass through known split params from config.
         # Constructed explicitly so the artifact shape matches SplitArtifact
@@ -160,8 +160,8 @@ class SplitCalculator(BaseCalculator):
     def infer_output_schema(
         self,
         input_schema: SkyulfSchema,
-        config: Dict[str, Any],
-    ) -> Optional[SkyulfSchema]:
+        config: dict[str, Any],
+    ) -> SkyulfSchema | None:
         # Split produces a SplitDataset whose train/test/val frames carry
         # the full input schema. Downstream consumers see the same columns.
         return input_schema
@@ -181,7 +181,7 @@ class DataSplitter:
         validation_size: float = 0.0,
         random_state: int = 42,
         shuffle: bool = True,
-        stratify_col: Optional[str] = None,
+        stratify_col: str | None = None,
     ):
         self.test_size = test_size
         self.validation_size = validation_size
@@ -192,7 +192,7 @@ class DataSplitter:
     # ---- public API ---------------------------------------------------------
 
     def split_xy(
-        self, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]
+        self, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
     ) -> SplitDataset:
         X_pd, was_polars = _to_pandas_remember_engine(X)
         y_pd, _ = _to_pandas_remember_engine(y)
@@ -219,7 +219,7 @@ class DataSplitter:
             )
         return SplitDataset(train=train, test=test, validation=validation)
 
-    def split(self, df: Union[pd.DataFrame, SkyulfDataFrame]) -> SplitDataset:
+    def split(self, df: pd.DataFrame | SkyulfDataFrame) -> SplitDataset:
         df_pd, was_polars = _to_pandas_remember_engine(df)
         stratify = self._frame_stratify(df_pd, label="Stratified split")
 
@@ -246,7 +246,7 @@ class DataSplitter:
             return None
         return _safe_stratify(df_pd[self.stratify_col], label)
 
-    def _maybe_split_validation_xy(self, X_tv: Any, y_tv: Any) -> Tuple[Any, Any, Any]:
+    def _maybe_split_validation_xy(self, X_tv: Any, y_tv: Any) -> tuple[Any, Any, Any]:
         """Carve a validation set off of (X_tv, y_tv); returns (val, X_train, y_train)."""
         if self.validation_size <= 0:
             return None, X_tv, y_tv
@@ -265,7 +265,7 @@ class DataSplitter:
         )
         return (X_val, y_val), X_train, y_train
 
-    def _maybe_split_validation_frame(self, train_val: Any) -> Tuple[Any, Any]:
+    def _maybe_split_validation_frame(self, train_val: Any) -> tuple[Any, Any]:
         """Carve a validation set off of ``train_val`` (frame mode); returns (val, train)."""
         if self.validation_size <= 0:
             return None, train_val
@@ -287,7 +287,7 @@ class DataSplitter:
 # -----------------------------------------------------------------------------
 
 
-def _split_xy_one_polars(data: Any, target_col: str) -> Tuple[Any, Any]:
+def _split_xy_one_polars(data: Any, target_col: str) -> tuple[Any, Any]:
     import polars as pl
 
     if target_col not in data.columns:
@@ -297,7 +297,7 @@ def _split_xy_one_polars(data: Any, target_col: str) -> Tuple[Any, Any]:
     return X, y
 
 
-def _split_xy_one_pandas(data: Any, target_col: str) -> Tuple[Any, Any]:
+def _split_xy_one_pandas(data: Any, target_col: str) -> tuple[Any, Any]:
     if target_col not in data.columns:
         raise ValueError(f"Target column '{target_col}' not found in dataset")
     y = data[target_col]
@@ -305,14 +305,14 @@ def _split_xy_one_pandas(data: Any, target_col: str) -> Tuple[Any, Any]:
     return X, y
 
 
-def _split_xy_one(data: Any, target_col: str) -> Tuple[Any, Any]:
+def _split_xy_one(data: Any, target_col: str) -> tuple[Any, Any]:
     """Engine-aware single-frame X/y split."""
     if is_polars(data):
         return _split_xy_one_polars(data, target_col)
     return _split_xy_one_pandas(data, target_col)
 
 
-def _maybe_split_xy_member(data: Any, target_col: str) -> Tuple[Any, Any]:
+def _maybe_split_xy_member(data: Any, target_col: str) -> tuple[Any, Any]:
     """Apply X/y split to one member of a SplitDataset (handles already-split tuples)."""
     if isinstance(data, tuple) and len(data) == 2:
         X, y = data
@@ -327,9 +327,9 @@ def _maybe_split_xy_member(data: Any, target_col: str) -> Tuple[Any, Any]:
 class FeatureTargetSplitApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...]],
-        params: Dict[str, Any],
-    ) -> Union[Tuple[pd.DataFrame, pd.Series], SplitDataset]:
+        df: pd.DataFrame | SkyulfDataFrame | SplitDataset | tuple[Any, ...],
+        params: dict[str, Any],
+    ) -> tuple[pd.DataFrame, pd.Series] | SplitDataset:
         target_col = params.get("target_column")
         if not target_col:
             raise ValueError("Target column must be specified for FeatureTargetSplitter")
@@ -345,7 +345,7 @@ class FeatureTargetSplitApplier(BaseApplier):
             return SplitDataset(train=train, test=test, validation=validation)
 
         if isinstance(df, tuple):
-            return cast(Tuple[pd.DataFrame, pd.Series], df)
+            return cast(tuple[pd.DataFrame, pd.Series], df)
 
         return _split_xy_one(df, target_col)
 
@@ -361,8 +361,8 @@ class FeatureTargetSplitApplier(BaseApplier):
 class FeatureTargetSplitCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset, Tuple[Any, ...], Any],
-        config: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | SplitDataset | tuple[Any, ...] | Any,
+        config: dict[str, Any],
     ) -> FeatureTargetSplitArtifact:
         # Only ``target_column`` is consumed downstream by the Applier.
         # Build a typed artifact rather than echoing the raw config dict.
@@ -374,8 +374,8 @@ class FeatureTargetSplitCalculator(BaseCalculator):
     def infer_output_schema(
         self,
         input_schema: SkyulfSchema,
-        config: Dict[str, Any],
-    ) -> Optional[SkyulfSchema]:
+        config: dict[str, Any],
+    ) -> SkyulfSchema | None:
         # Output is (X, y). The target column lives in the y slot but is still
         # part of the dataset, so we keep it in the downstream schema. This
         # lets downstream column pickers (Encoder, Scaler, etc.) see and select

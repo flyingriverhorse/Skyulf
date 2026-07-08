@@ -1,6 +1,5 @@
 """Target-feature association: correlations, eta², box-plot interactions."""
 
-from typing import Dict, List
 
 import numpy as np
 import polars as pl
@@ -13,8 +12,8 @@ class TargetMixin(_AnalyzerState):
     """Target-relationship helpers for :class:`EDAAnalyzer`."""
 
     def _calculate_target_correlations(
-        self, target_col: str, numeric_cols: List[str]
-    ) -> Dict[str, float]:
+        self, target_col: str, numeric_cols: list[str]
+    ) -> dict[str, float]:
         try:
             features = [c for c in numeric_cols if c != target_col]
             if not features:
@@ -42,8 +41,8 @@ class TargetMixin(_AnalyzerState):
             return {}
 
     def _calculate_categorical_target_associations(
-        self, target_col: str, numeric_cols: List[str]
-    ) -> Dict[str, float]:
+        self, target_col: str, numeric_cols: list[str]
+    ) -> dict[str, float]:
         """Correlation Ratio (η) between a categorical target and numeric features.
 
         η² = SS_between / SS_total. We return η so the magnitude is comparable
@@ -84,8 +83,8 @@ class TargetMixin(_AnalyzerState):
             return {}
 
     def _calculate_target_interactions(
-        self, target_col: str, features: List[str], is_target_numeric: bool
-    ) -> List[TargetInteraction]:
+        self, target_col: str, features: list[str], is_target_numeric: bool
+    ) -> list[TargetInteraction]:
         """Per-feature box-plot stats vs target, plus ANOVA p-value when SciPy is available."""
         interactions = []
         try:

@@ -1,5 +1,4 @@
 import re
-from typing import Dict, Optional, Tuple
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +8,7 @@ from backend.database.models import DataSource
 _BRANCH_RE = re.compile(r"^(.+?)__branch_(\d+)(?:_(\d+))?$")
 
 
-def parse_branch_info(pipeline_id: str) -> Tuple[Optional[str], Optional[int]]:
+def parse_branch_info(pipeline_id: str) -> tuple[str | None, int | None]:
     """Extract (parent_pipeline_id, branch_index) from a branch pipeline_id.
 
     Returns (None, None) for non-branch pipelines.
@@ -23,8 +22,8 @@ def parse_branch_info(pipeline_id: str) -> Tuple[Optional[str], Optional[int]]:
 
 
 async def resolve_dataset_name(
-    session: AsyncSession, dataset_source_id: Optional[str]
-) -> Optional[str]:
+    session: AsyncSession, dataset_source_id: str | None
+) -> str | None:
     """
     Resolves the dataset name from a dataset_source_id.
     Handles both integer IDs (as strings) and UUIDs.
@@ -48,7 +47,7 @@ async def resolve_dataset_name(
     return dataset_name
 
 
-async def get_dataset_map(session: AsyncSession) -> Dict[str, str]:
+async def get_dataset_map(session: AsyncSession) -> dict[str, str]:
     """
     Returns a map of dataset IDs (and UUIDs) to dataset names.
     Useful for bulk resolution.

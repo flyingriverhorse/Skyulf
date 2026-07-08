@@ -1,6 +1,6 @@
 """Value replacement node (mapping / to_replace)."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -18,11 +18,11 @@ def _is_mapping_like(obj: Any) -> bool:
     return isinstance(obj, (dict, pd.Series)) or hasattr(obj, "items")
 
 
-def _polars_mapping_exprs(valid: List[str], mapping: Dict[str, Any]) -> List[Any]:
+def _polars_mapping_exprs(valid: list[str], mapping: dict[str, Any]) -> list[Any]:
     import polars as pl
 
     is_nested = any(isinstance(v, dict) for v in mapping.values())
-    exprs: List[Any] = []
+    exprs: list[Any] = []
     for col in valid:
         if is_nested and col in mapping:
             exprs.append(pl.col(col).replace(mapping[col], default=pl.col(col)).alias(col))
@@ -31,10 +31,10 @@ def _polars_mapping_exprs(valid: List[str], mapping: Dict[str, Any]) -> List[Any
     return exprs
 
 
-def _polars_to_replace_exprs(valid: List[str], to_replace: Any, value: Any) -> List[Any]:
+def _polars_to_replace_exprs(valid: list[str], to_replace: Any, value: Any) -> list[Any]:
     import polars as pl
 
-    exprs: List[Any] = []
+    exprs: list[Any] = []
     is_map = _is_mapping_like(to_replace)
     for col in valid:
         if is_map:
@@ -45,11 +45,11 @@ def _polars_to_replace_exprs(valid: List[str], to_replace: Any, value: Any) -> L
 
 
 def _value_replacement_exprs_polars(
-    valid: List[str],
-    mapping: Optional[Dict[str, Any]],
+    valid: list[str],
+    mapping: dict[str, Any] | None,
     to_replace: Any,
     value: Any,
-) -> List[Any]:
+) -> list[Any]:
     if mapping:
         return _polars_mapping_exprs(valid, mapping)
     if to_replace is None:
@@ -58,7 +58,7 @@ def _value_replacement_exprs_polars(
 
 
 def _pandas_apply_mapping(
-    df_out: pd.DataFrame, valid: List[str], mapping: Dict[str, Any]
+    df_out: pd.DataFrame, valid: list[str], mapping: dict[str, Any]
 ) -> pd.DataFrame:
     is_nested = any(isinstance(v, dict) for v in mapping.values())
     if is_nested:
@@ -72,7 +72,7 @@ def _pandas_apply_mapping(
 
 
 def _pandas_apply_to_replace(
-    df_out: pd.DataFrame, valid: List[str], to_replace: Any, value: Any
+    df_out: pd.DataFrame, valid: list[str], to_replace: Any, value: Any
 ) -> pd.DataFrame:
     is_map = _is_mapping_like(to_replace)
     for col in valid:
@@ -85,8 +85,8 @@ def _pandas_apply_to_replace(
 
 def _apply_value_replacement_pandas(
     df_out: pd.DataFrame,
-    valid: List[str],
-    mapping: Optional[Dict[str, Any]],
+    valid: list[str],
+    mapping: dict[str, Any] | None,
     to_replace: Any,
     value: Any,
 ) -> pd.DataFrame:
@@ -99,11 +99,11 @@ def _apply_value_replacement_pandas(
 
 class ValueReplacementApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y
@@ -116,7 +116,7 @@ class ValueReplacementApplier(BaseApplier):
         return (X.with_columns(exprs) if exprs else X), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y
@@ -141,13 +141,13 @@ class ValueReplacementApplier(BaseApplier):
 )
 class ValueReplacementCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Value mapping replaces values in place; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> ValueReplacementArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> ValueReplacementArtifact:  # pylint: disable=arguments-differ
         cols = resolve_columns(X, config)
         mapping = config.get("mapping")
         replacements = config.get("replacements")

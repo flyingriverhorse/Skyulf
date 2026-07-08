@@ -1,6 +1,6 @@
 """Simple imputer node (mean / median / most_frequent / constant)."""
 
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 from sklearn.impute import SimpleImputer
 
@@ -20,11 +20,11 @@ from ._common import (
 
 class SimpleImputerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -32,7 +32,7 @@ class SimpleImputerApplier(BaseApplier):
         if not cols:
             return X, _y
 
-        exprs: List[Any] = []
+        exprs: list[Any] = []
         for col in X.columns:
             if col in cols and col in fill_values:
                 exprs.append(pl.col(col).fill_null(fill_values[col]).alias(col))
@@ -47,7 +47,7 @@ class SimpleImputerApplier(BaseApplier):
         return X.select(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         fill_values = params.get("fill_values", {})
         if not cols:
@@ -75,13 +75,13 @@ class SimpleImputerApplier(BaseApplier):
 )
 class SimpleImputerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Imputers fill NaNs in place; column set and order are preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SimpleImputerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 
@@ -106,8 +106,8 @@ class SimpleImputerCalculator(BaseCalculator):
         )
 
     @staticmethod
-    def _fit_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Dict[str, Any]:
-        cols: List[str] = params["_resolved_cols"]
+    def _fit_polars(X: Any, _y: Any, params: dict[str, Any]) -> dict[str, Any]:
+        cols: list[str] = params["_resolved_cols"]
         strategy: str = params["_resolved_strategy"]
         fill_value = params["_resolved_fill_value"]
 
@@ -124,8 +124,8 @@ class SimpleImputerCalculator(BaseCalculator):
         }
 
     @staticmethod
-    def _fit_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Dict[str, Any]:
-        cols: List[str] = params["_resolved_cols"]
+    def _fit_pandas(X: Any, _y: Any, params: dict[str, Any]) -> dict[str, Any]:
+        cols: list[str] = params["_resolved_cols"]
         strategy: str = params["_resolved_strategy"]
         fill_value = params["_resolved_fill_value"]
 

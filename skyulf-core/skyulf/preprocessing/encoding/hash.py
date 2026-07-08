@@ -1,7 +1,7 @@
 """Hash Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -15,13 +15,13 @@ from ._common import _exclude_target_column, detect_categorical_columns
 logger = logging.getLogger(__name__)
 
 
-def _resolve_valid_cols(X: Any, params: Dict[str, Any]) -> List[str]:
+def _resolve_valid_cols(X: Any, params: dict[str, Any]) -> list[str]:
     """Filter requested columns down to those present in ``X``."""
     cols = params.get("columns", [])
     return [c for c in cols if c in X.columns]
 
 
-def _hash_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Polars apply path — uses Polars native ``hash()`` for speed."""
     import polars as pl
 
@@ -34,7 +34,7 @@ def _hash_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any
     return X.with_columns(exprs), y
 
 
-def _hash_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Pandas apply path — Python's built-in ``hash`` per value."""
     valid_cols = _resolve_valid_cols(X, params)
     if not valid_cols:
@@ -49,7 +49,7 @@ def _hash_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any
 
 class HashEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -68,7 +68,7 @@ class HashEncoderApplier(BaseApplier):
 )
 class HashEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> HashEncoderArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> HashEncoderArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 
@@ -86,8 +86,8 @@ class HashEncoderCalculator(BaseCalculator):
     def infer_output_schema(
         self,
         input_schema: SkyulfSchema,
-        config: Dict[str, Any],
-    ) -> Optional[SkyulfSchema]:
+        config: dict[str, Any],
+    ) -> SkyulfSchema | None:
         # Hash encoder replaces values in source columns in place
         # (`pl.col(col)...alias(col)`). Schema is unchanged.
         return input_schema

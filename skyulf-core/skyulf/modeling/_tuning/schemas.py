@@ -1,7 +1,7 @@
 """Tuning configuration schemas."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 
 @dataclass
@@ -11,9 +11,9 @@ class TuningConfig:
     strategy: Literal["grid", "random", "optuna", "halving_grid", "halving_random"] = "random"
     metric: str = "accuracy"  # or 'mse', 'f1', etc.
     n_trials: int = 10
-    timeout: Optional[int] = None  # Seconds
-    search_space: Dict[str, List[Any]] = field(default_factory=dict)  # e.g. {"C": [0.1, 1.0, 10.0]}
-    strategy_params: Dict[str, Any] = field(
+    timeout: int | None = None  # Seconds
+    search_space: dict[str, list[Any]] = field(default_factory=dict)  # e.g. {"C": [0.1, 1.0, 10.0]}
+    strategy_params: dict[str, Any] = field(
         default_factory=dict
     )  # e.g. {"factor": 3, "sampler": "tpe"}
     cv_enabled: bool = True
@@ -33,8 +33,8 @@ class TuningConfig:
 class TuningResult:
     """Result of a tuning session."""
 
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_score: float
     n_trials: int
-    trials: List[Dict[str, Any]]  # List of {params, score}
-    scoring_metric: Optional[str] = None  # Actual sklearn metric used (e.g. "f1_weighted")
+    trials: list[dict[str, Any]]  # List of {params, score}
+    scoring_metric: str | None = None  # Actual sklearn metric used (e.g. "f1_weighted")

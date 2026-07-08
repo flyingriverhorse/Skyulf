@@ -1,8 +1,8 @@
 import io
 import logging
 import re
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, cast
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 import pandas as pd
 import polars as pl
@@ -34,25 +34,25 @@ class DriftJobOption(BaseModel):
     job_id: str
     dataset_name: str
     filename: str
-    created_at: Optional[str] = None
-    model_type: Optional[str] = None
-    target_column: Optional[str] = None
-    n_features: Optional[int] = None
-    n_rows: Optional[int] = None
-    description: Optional[str] = None
-    best_metric: Optional[str] = None
+    created_at: str | None = None
+    model_type: str | None = None
+    target_column: str | None = None
+    n_features: int | None = None
+    n_rows: int | None = None
+    description: str | None = None
+    best_metric: str | None = None
 
 
-@router.get("/jobs", response_model=List[DriftJobOption])
+@router.get("/jobs", response_model=list[DriftJobOption])
 async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
     """
     List all jobs that have reference data available for drift calculation.
     Scans subdirectories in the artifact folder, enriched with DB metadata.
     """
-    jobs: List[DriftJobOption] = []
+    jobs: list[DriftJobOption] = []
 
     # Discover reference artifacts via the storage seam (local today; UC/S3-ready).
-    found_jobs: List[DriftJobOption] = [
+    found_jobs: list[DriftJobOption] = [
         DriftJobOption(
             job_id=ref.job_id,
             dataset_name=ref.dataset_name,
@@ -84,7 +84,7 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
 
             # Extract target column from graph
             try:
-                graph: Dict[str, Any] = cast(Dict[str, Any], db_row.graph or {})
+                graph: dict[str, Any] = cast(dict[str, Any], db_row.graph or {})
                 node_id: str = cast(str, db_row.node_id or "")
                 _, target_col, _ = extract_job_details(graph, node_id)
                 job.target_column = target_col
@@ -92,12 +92,12 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
                 pass  # nosec B110 - target column is optional metadata; job listing still succeeds
 
             # Description from job_metadata
-            meta: Dict[str, Any] = cast(Dict[str, Any], db_row.job_metadata or {})
+            meta: dict[str, Any] = cast(dict[str, Any], db_row.job_metadata or {})
             if isinstance(meta, dict):
                 job.description = meta.get("description")
 
             # Best metric from metrics dict
-            metrics: Dict[str, Any] = cast(Dict[str, Any], db_row.metrics or {})
+            metrics: dict[str, Any] = cast(dict[str, Any], db_row.metrics or {})
             if isinstance(metrics, dict):
                 # Data shape
                 if "n_rows" in metrics:
@@ -106,7 +106,7 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
                     job.n_features = int(metrics["n_features"])
 
                 # Collect all test metrics into a compact summary
-                metric_parts: List[str] = []
+                metric_parts: list[str] = []
                 for key, label in [
                     ("test_accuracy", "acc"),
                     ("test_f1_weighted", "f1"),
@@ -146,7 +146,7 @@ async def update_job_description(
         result = await db.execute(stmt)
         row = result.scalar_one_or_none()
         if row:
-            meta_raw: Dict[str, Any] = cast(Dict[str, Any], row.job_metadata or {})
+            meta_raw: dict[str, Any] = cast(dict[str, Any], row.job_metadata or {})
             if not isinstance(meta_raw, dict):
                 meta_raw = {}
             meta_raw["description"] = body.description
@@ -163,10 +163,10 @@ class EnrichedDriftReport(BaseModel):
     reference_rows: int
     current_rows: int
     drifted_columns_count: int
-    column_drifts: Dict[str, Any]
-    missing_columns: List[str] = []
-    new_columns: List[str] = []
-    feature_importances: Optional[Dict[str, float]] = None
+    column_drifts: dict[str, Any]
+    missing_columns: list[str] = []
+    new_columns: list[str] = []
+    feature_importances: dict[str, float] | None = None
 
 
 @router.post("/drift/calculate", response_model=EnrichedDriftReport)
@@ -175,11 +175,11 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
     request: Request,
     job_id: str = Form(...),
     file: UploadFile = File(...),
-    dataset_name: Optional[str] = Form(None),
-    threshold_psi: Optional[float] = Form(None),
-    threshold_ks: Optional[float] = Form(None),
-    threshold_wasserstein: Optional[float] = Form(None),
-    threshold_kl: Optional[float] = Form(None),
+    dataset_name: str | None = Form(None),
+    threshold_psi: float | None = Form(None),
+    threshold_ks: float | None = Form(None),
+    threshold_wasserstein: float | None = Form(None),
+    threshold_kl: float | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ) -> EnrichedDriftReport:
     # 1. Find the job folder (via the storage seam) and its artifact store.
@@ -246,7 +246,7 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
 
     # 4. Calculate Drift
     try:
-        custom_thresholds: Dict[str, float] = {}
+        custom_thresholds: dict[str, float] = {}
         if threshold_psi is not None:
             custom_thresholds["psi"] = threshold_psi
         if threshold_ks is not None:
@@ -264,9 +264,9 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
     # 5. Save drift check result to DB for history
     try:
         # Build per-column summary (PSI + Wasserstein, compact)
-        col_summary: Dict[str, Any] = {}
+        col_summary: dict[str, Any] = {}
         for col_name, col_drift in report.column_drifts.items():
-            metrics_map: Dict[str, float] = {}
+            metrics_map: dict[str, float] = {}
             for m in col_drift.metrics:
                 metrics_map[m.metric] = m.value
             col_summary[col_name] = {
@@ -300,14 +300,14 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
         logger.warning("Failed to save drift check result", exc_info=True)
 
     # 6. Load feature importances from training job
-    feature_importances: Optional[Dict[str, float]] = None
+    feature_importances: dict[str, float] | None = None
     try:
         for model_cls in (BasicTrainingJob, AdvancedTuningJob):
             stmt = select(model_cls).where(model_cls.id == job_id)
             result = await db.execute(stmt)
             row = result.scalar_one_or_none()
             if row:
-                job_metrics: Dict[str, Any] = cast(Dict[str, Any], row.metrics or {})
+                job_metrics: dict[str, Any] = cast(dict[str, Any], row.metrics or {})
                 if "feature_importances" in job_metrics:
                     feature_importances = job_metrics["feature_importances"]
                 break
@@ -328,20 +328,20 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
 class DriftHistoryEntry(BaseModel):
     id: int
     job_id: str
-    dataset_name: Optional[str] = None
-    reference_rows: Optional[int] = None
-    current_rows: Optional[int] = None
-    drifted_columns_count: Optional[int] = None
-    total_columns: Optional[int] = None
-    summary: Optional[Dict[str, Any]] = None
-    created_at: Optional[str] = None
+    dataset_name: str | None = None
+    reference_rows: int | None = None
+    current_rows: int | None = None
+    drifted_columns_count: int | None = None
+    total_columns: int | None = None
+    summary: dict[str, Any] | None = None
+    created_at: str | None = None
 
 
-@router.get("/drift/history/{job_id}", response_model=List[DriftHistoryEntry])
+@router.get("/drift/history/{job_id}", response_model=list[DriftHistoryEntry])
 async def get_drift_history(
     job_id: str,
     db: AsyncSession = Depends(get_db),
-) -> List[DriftHistoryEntry]:
+) -> list[DriftHistoryEntry]:
     """Return all drift check results for a given job, newest first."""
     stmt = (
         select(DriftCheckResult)
@@ -359,7 +359,7 @@ async def get_drift_history(
             current_rows=r.current_rows,
             drifted_columns_count=r.drifted_columns_count,
             total_columns=r.total_columns,
-            summary=cast(Optional[Dict[str, Any]], r.summary),
+            summary=cast(dict[str, Any] | None, r.summary),
             created_at=r.created_at.isoformat() if r.created_at else None,
         )
         for r in rows
@@ -369,7 +369,7 @@ async def get_drift_history(
 class DriftStatusSummary(BaseModel):
     has_drift: bool
     drifted_jobs: int
-    latest_check: Optional[str] = None
+    latest_check: str | None = None
 
 
 @router.get("/drift/status", response_model=DriftStatusSummary)
@@ -391,7 +391,7 @@ async def get_drift_status(
     # Deduplicate: keep only the latest check per job_id
     seen_jobs: set[str] = set()
     drifted_count = 0
-    latest_check: Optional[str] = None
+    latest_check: str | None = None
     for r in rows:
         job_id = r.job_id
         if job_id in seen_jobs:
@@ -419,11 +419,11 @@ class ErrorEventResponse(BaseModel):
     route: str
     error_type: str
     message: str
-    traceback: Optional[str] = None
-    job_id: Optional[str] = None
+    traceback: str | None = None
+    job_id: str | None = None
     status_code: int
-    created_at: Optional[str] = None
-    resolved_at: Optional[str] = None
+    created_at: str | None = None
+    resolved_at: str | None = None
 
 
 class ErrorCountResponse(BaseModel):
@@ -438,9 +438,9 @@ class ErrorGroupedEntry(BaseModel):
     error_type: str
     route: str
     count: int
-    last_seen: Optional[str] = None
-    first_seen: Optional[str] = None
-    sample_id: Optional[int] = None
+    last_seen: str | None = None
+    first_seen: str | None = None
+    sample_id: int | None = None
 
 
 class ErrorTimelineEntry(BaseModel):
@@ -448,13 +448,13 @@ class ErrorTimelineEntry(BaseModel):
     count: int
 
 
-@router.get("/errors", response_model=List[ErrorEventResponse])
+@router.get("/errors", response_model=list[ErrorEventResponse])
 async def list_error_events(
     limit: int = 100,
-    since: Optional[str] = None,
+    since: str | None = None,
     show_resolved: bool = False,
     db: AsyncSession = Depends(get_db),
-) -> List[ErrorEventResponse]:
+) -> list[ErrorEventResponse]:
     """Return the most recent error events (newest first, max 500).
 
     By default only unresolved events are returned. Pass ``show_resolved=true``
@@ -510,10 +510,10 @@ async def clear_error_events(
     return ErrorDeleteResponse(deleted=deleted)
 
 
-@router.get("/errors/grouped", response_model=List[ErrorGroupedEntry])
+@router.get("/errors/grouped", response_model=list[ErrorGroupedEntry])
 async def get_errors_grouped(
     db: AsyncSession = Depends(get_db),
-) -> List[ErrorGroupedEntry]:
+) -> list[ErrorGroupedEntry]:
     """Aggregate error events by (error_type, route) — unresolved only."""
     from sqlalchemy import func as sa_func
 
@@ -545,11 +545,11 @@ async def get_errors_grouped(
     ]
 
 
-@router.get("/errors/timeline", response_model=List[ErrorTimelineEntry])
+@router.get("/errors/timeline", response_model=list[ErrorTimelineEntry])
 async def get_error_timeline(
     hours: int = 24,
     db: AsyncSession = Depends(get_db),
-) -> List[ErrorTimelineEntry]:
+) -> list[ErrorTimelineEntry]:
     """Return error count bucketed by hour for the last N hours.
 
     Returns a list of ``{ hour: <ISO string>, count: N }`` entries,
@@ -557,7 +557,7 @@ async def get_error_timeline(
     so the chart always has a complete x-axis.
     """
     hours = min(max(1, hours), 168)  # cap at 7 days
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(hours=hours)
 
     stmt = select(ErrorEvent.created_at).where(ErrorEvent.created_at >= cutoff)
@@ -565,7 +565,7 @@ async def get_error_timeline(
     timestamps = [row[0] for row in result.all()]
 
     # Build a zero-filled bucket dict: { slot_iso: count }
-    buckets: Dict[str, int] = {}
+    buckets: dict[str, int] = {}
     for i in range(hours):
         slot = (cutoff + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
         buckets[slot.strftime("%Y-%m-%dT%H:00")] = 0
@@ -575,7 +575,7 @@ async def get_error_timeline(
             continue
         # Normalise to UTC-aware
         if hasattr(ts, "tzinfo") and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         slot_key = ts.strftime("%Y-%m-%dT%H:00")
         if slot_key in buckets:
             buckets[slot_key] += 1
@@ -594,7 +594,7 @@ async def resolve_error_event(
     event = result.scalar_one_or_none()
     if event is None:
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
-    event.resolved_at = datetime.now(timezone.utc)
+    event.resolved_at = datetime.now(UTC)
     await db.commit()
     return ErrorEventResponse(**event.to_dict())
 
@@ -646,17 +646,17 @@ class SlowNodeAggregate(BaseModel):
     avg_seconds: float
     p95_seconds: float
     max_seconds: float
-    sample_node_id: Optional[str] = None
+    sample_node_id: str | None = None
 
 
 class SlowNodesResponse(BaseModel):
     days: int
     total_jobs_scanned: int
     total_node_runs: int
-    aggregates: List[SlowNodeAggregate]
+    aggregates: list[SlowNodeAggregate]
 
 
-def _percentile(values: List[float], pct: float) -> float:
+def _percentile(values: list[float], pct: float) -> float:
     """Cheap nearest-rank percentile — avoids pulling numpy into the route."""
     if not values:
         return 0.0
@@ -681,10 +681,10 @@ async def list_slow_nodes(
     days = max(1, min(days, 90))
     limit = max(1, min(limit, 50))
 
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
-    by_step: Dict[str, List[float]] = {}
-    sample_node: Dict[str, str] = {}
+    by_step: dict[str, list[float]] = {}
+    sample_node: dict[str, str] = {}
     jobs_scanned = 0
     runs_seen = 0
 
@@ -716,7 +716,7 @@ async def list_slow_nodes(
                 sample_node.setdefault(step, str(entry.get("node_id") or ""))
                 runs_seen += 1
 
-    aggregates: List[SlowNodeAggregate] = []
+    aggregates: list[SlowNodeAggregate] = []
     for step, values in by_step.items():
         total = sum(values)
         aggregates.append(
@@ -746,34 +746,34 @@ async def list_slow_nodes(
 
 
 class PipelineLogEntry(BaseModel):
-    node_id: Optional[str] = None
-    node_type: Optional[str] = None
+    node_id: str | None = None
+    node_type: str | None = None
     level: str = "error"
-    logger: Optional[str] = None
+    logger: str | None = None
     message: str
 
 
 class PipelineLogBatch(BaseModel):
-    pipeline_id: Optional[str] = None
-    entries: List[PipelineLogEntry]
+    pipeline_id: str | None = None
+    entries: list[PipelineLogEntry]
 
 
 class PipelineRunLogResponse(BaseModel):
     id: int
-    pipeline_id: Optional[str] = None
-    node_id: Optional[str] = None
-    node_type: Optional[str] = None
+    pipeline_id: str | None = None
+    node_id: str | None = None
+    node_type: str | None = None
     level: str
-    logger: Optional[str] = None
+    logger: str | None = None
     message: str
-    run_at: Optional[str] = None
+    run_at: str | None = None
 
 
-@router.post("/pipeline-logs", response_model=List[PipelineRunLogResponse], status_code=201)
+@router.post("/pipeline-logs", response_model=list[PipelineRunLogResponse], status_code=201)
 async def create_pipeline_logs(
     batch: PipelineLogBatch,
     db: AsyncSession = Depends(get_db),
-) -> List[PipelineRunLogResponse]:
+) -> list[PipelineRunLogResponse]:
     """Persist a batch of node failures / warnings from a pipeline preview run."""
     if not batch.entries:
         return []
@@ -795,13 +795,13 @@ async def create_pipeline_logs(
     return [PipelineRunLogResponse(**r.to_dict()) for r in rows]
 
 
-@router.get("/pipeline-logs", response_model=List[PipelineRunLogResponse])
+@router.get("/pipeline-logs", response_model=list[PipelineRunLogResponse])
 async def list_pipeline_logs(
     limit: int = 200,
-    since: Optional[str] = None,
-    pipeline_id: Optional[str] = None,
+    since: str | None = None,
+    pipeline_id: str | None = None,
     db: AsyncSession = Depends(get_db),
-) -> List[PipelineRunLogResponse]:
+) -> list[PipelineRunLogResponse]:
     """Return persisted pipeline run logs (newest first, max 500)."""
     from sqlalchemy import and_
 

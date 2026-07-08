@@ -1,7 +1,7 @@
 """Model-based (importance-weight) feature selector."""
 
 import logging
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 class ModelBasedSelectionApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
@@ -41,7 +41,7 @@ class ModelBasedSelectionApplier(BaseApplier):
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> ModelBasedSelectionArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> ModelBasedSelectionArtifact:  # pylint: disable=arguments-differ
         target_col = config.get("target_column")
         X_pd = to_pandas(X)
 

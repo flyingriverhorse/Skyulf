@@ -5,7 +5,7 @@ edge cases (balanced input, 1-sample class, non-numeric columns, missing target)
 """
 
 import importlib.util
-from typing import Any, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -73,7 +73,7 @@ _IMPORT_FUNCS = {
 
 
 @pytest.fixture
-def imbalanced_pandas() -> Tuple[pd.DataFrame, pd.Series]:
+def imbalanced_pandas() -> tuple[pd.DataFrame, pd.Series]:
     """Imbalanced binary dataset: 80 majority / 20 minority samples."""
     rng = np.random.default_rng(0)
     n_maj, n_min = 80, 20
@@ -88,7 +88,7 @@ def imbalanced_pandas() -> Tuple[pd.DataFrame, pd.Series]:
 
 
 @pytest.fixture
-def balanced_pandas() -> Tuple[pd.DataFrame, pd.Series]:
+def balanced_pandas() -> tuple[pd.DataFrame, pd.Series]:
     """Already-balanced binary dataset: 50 samples per class."""
     rng = np.random.default_rng(1)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 100), "f2": rng.normal(0, 1, 100)})

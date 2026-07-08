@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Annotated, List
+from typing import Annotated
 
 from pydantic_settings import NoDecode
 
@@ -17,7 +17,7 @@ class FilesMixin:
     # Docker Compose users can override with: MAX_UPLOAD_SIZE=5368709120
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024 * 1024  # 10 GB
     # NoDecode: pydantic-settings must not JSON-decode this before field_validator runs.
-    ALLOWED_EXTENSIONS: Annotated[List[str], NoDecode] = [
+    ALLOWED_EXTENSIONS: Annotated[list[str], NoDecode] = [
         ".csv",
         ".xlsx",
         ".xls",
@@ -42,7 +42,7 @@ class FilesMixin:
 
     def create_directories(self) -> None:
         """Create all necessary directories if they don't exist."""
-        directories: List[str | Path] = [
+        directories: list[str | Path] = [
             self.UPLOAD_DIR,  # type: ignore[attr-defined]
             self.TEMP_DIR,  # type: ignore[attr-defined]
             self.EXPORT_DIR,  # type: ignore[attr-defined]

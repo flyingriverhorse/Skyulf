@@ -1,7 +1,7 @@
 import logging
 import os
 import tempfile
-from typing import Any, Optional, cast
+from typing import Any, cast
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -18,7 +18,7 @@ class FileSystemCatalog(DataCatalog):
     Replaces the old 'DataLoader'.
     """
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: str | None = None):
         if base_path is None:
             base_path = get_settings().UPLOAD_DIR
         self.base_path = base_path
@@ -124,9 +124,9 @@ class S3Catalog(DataCatalog):
     def __init__(
         self,
         bucket_name: str,
-        region_name: Optional[str] = None,
-        cache_dir: Optional[str] = None,
-        storage_options: Optional[dict] = None,
+        region_name: str | None = None,
+        cache_dir: str | None = None,
+        storage_options: dict | None = None,
     ):
         self.bucket_name = bucket_name
         self.storage_options = (storage_options or {}).copy()
@@ -314,8 +314,8 @@ class SmartCatalog(DataCatalog):
     def __init__(
         self,
         session: Session,
-        fs_catalog: Optional[FileSystemCatalog] = None,
-        s3_catalog: Optional[S3Catalog] = None,
+        fs_catalog: FileSystemCatalog | None = None,
+        s3_catalog: S3Catalog | None = None,
     ):
         self.session = session
         self.fs_catalog = fs_catalog or FileSystemCatalog()
@@ -417,7 +417,7 @@ class SmartCatalog(DataCatalog):
         catalog = self._get_catalog_for_path(resolved_id)
         return catalog.exists(resolved_id)
 
-    def get_dataset_name(self, dataset_id: str) -> Optional[str]:
+    def get_dataset_name(self, dataset_id: str) -> str | None:
         """Resolves dataset ID to name via DB."""
         if str(dataset_id).isdigit():
             try:
@@ -432,7 +432,7 @@ class SmartCatalog(DataCatalog):
 
 
 def create_catalog_from_options(
-    storage_options: Optional[dict], nodes: Optional[list] = None, session=None
+    storage_options: dict | None, nodes: list | None = None, session=None
 ) -> DataCatalog:
     """
     Factory to create the appropriate DataCatalog based on storage options and node paths.

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 import polars as pl
 
@@ -12,11 +12,11 @@ class DataProfiler:
     """
 
     @staticmethod
-    def profile(df: pl.DataFrame) -> Dict[str, Any]:
+    def profile(df: pl.DataFrame) -> dict[str, Any]:
         """
         Generate a profile of the dataframe.
         """
-        profile: Dict[str, Any] = {
+        profile: dict[str, Any] = {
             "row_count": len(df),
             "column_count": len(df.columns),
             "columns": {},
@@ -25,7 +25,7 @@ class DataProfiler:
         }
 
         for col in df.columns:
-            col_stats: Dict[str, Any] = {}
+            col_stats: dict[str, Any] = {}
             series = df[col]
             dtype = str(series.dtype)
 

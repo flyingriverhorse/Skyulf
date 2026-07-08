@@ -1,6 +1,6 @@
 """Shared mask helpers for outlier nodes."""
 
-from typing import Any, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -16,7 +16,7 @@ def _filter_y_polars(y: Any, mask_series: Any) -> Any:
     return y
 
 
-def _apply_pandas_mask(X_pd: Any, y: Any, mask: pd.Series) -> Tuple[Any, Any]:
+def _apply_pandas_mask(X_pd: Any, y: Any, mask: pd.Series) -> tuple[Any, Any]:
     """Apply a Pandas boolean mask to X (and y if non-null)."""
     X_filtered = X_pd[mask]
     if y is None:

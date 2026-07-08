@@ -1,4 +1,4 @@
-from typing import Any, Protocol, Tuple, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import pandas as pd
 
@@ -18,7 +18,7 @@ class SkyulfDataFrame(Protocol):
         ...
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         """Return the shape of the dataframe (rows, cols)."""
         ...
 

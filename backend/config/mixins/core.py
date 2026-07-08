@@ -1,7 +1,6 @@
 """Core application metadata and server settings."""
 
 from importlib.metadata import PackageNotFoundError, version
-from typing import Optional
 
 try:
     _APP_VERSION = version("skyulf")
@@ -30,4 +29,4 @@ class CoreMixin:
     WORKERS: int = 1
 
     # Observability — opt-in; no-op when not set
-    SENTRY_DSN: Optional[str] = None
+    SENTRY_DSN: str | None = None

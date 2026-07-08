@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import urllib.parse
-from typing import Any, List, cast
+from typing import Any, cast
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -75,49 +75,49 @@ class Settings(
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: Any) -> List[str]:
+    def parse_cors_origins(cls, v: Any) -> list[str]:
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
                 try:
-                    return cast(List[str], json.loads(v))
+                    return cast(list[str], json.loads(v))
                 except json.JSONDecodeError:
                     v = v[1:-1]  # strip brackets, fall through to split
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return cast(List[str], v)
+        return cast(list[str], v)
 
     @field_validator("ALLOWED_HOSTS", mode="before")
     @classmethod
-    def parse_allowed_hosts(cls, v: Any) -> List[str]:
+    def parse_allowed_hosts(cls, v: Any) -> list[str]:
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
                 try:
-                    return cast(List[str], json.loads(v))
+                    return cast(list[str], json.loads(v))
                 except json.JSONDecodeError:
                     v = v[1:-1]  # strip brackets, fall through to split
             return [host.strip() for host in v.split(",") if host.strip()]
-        return cast(List[str], v)
+        return cast(list[str], v)
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
-    def parse_allowed_extensions(cls, v: Any) -> List[str]:
+    def parse_allowed_extensions(cls, v: Any) -> list[str]:
         if isinstance(v, str):
             v = v.strip()
             if v.startswith("["):
                 try:
-                    return cast(List[str], json.loads(v))
+                    return cast(list[str], json.loads(v))
                 except json.JSONDecodeError:
                     v = v[1:-1]  # strip brackets, fall through to split
             return [ext.strip() for ext in v.split(",") if ext.strip()]
-        return cast(List[str], v)
+        return cast(list[str], v)
 
     @field_validator("API_DOCS_SERVERS", mode="before")
     @classmethod
-    def parse_api_docs_servers(cls, v: Any) -> List[str]:
+    def parse_api_docs_servers(cls, v: Any) -> list[str]:
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
-        return cast(List[str], v)
+        return cast(list[str], v)
 
     @model_validator(mode="after")
     def validate_database_config(self) -> "Settings":

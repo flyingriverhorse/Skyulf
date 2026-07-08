@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +54,7 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
     return await DeploymentService.get_deployment_details(session, deployment)
 
 
-@router.get("/history", response_model=List[DeploymentInfo])
+@router.get("/history", response_model=list[DeploymentInfo])
 async def list_deployments(
     limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):

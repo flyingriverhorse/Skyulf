@@ -1,6 +1,5 @@
 """Numeric column profiling + multicollinearity (VIF)."""
 
-from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -27,7 +26,7 @@ class NumericMixin(_AnalyzerState):
             negatives_count=row.get(f"{col}__negatives", 0),
         )
 
-    def _calculate_vif(self, numeric_cols: List[str]) -> Optional[Dict[str, float]]:
+    def _calculate_vif(self, numeric_cols: list[str]) -> dict[str, float] | None:
         """Variance Inflation Factor via diagonal of the inverse correlation matrix.
 
         Equivalent to ``1 / (1 - R_i^2)`` where ``R_i^2`` is the R² of regressing

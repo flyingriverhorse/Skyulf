@@ -1,6 +1,6 @@
 """Drop-missing-columns node (drop columns over a missing-% threshold)."""
 
-from typing import Any, Dict, Optional, Tuple, cast
+from typing import Any, cast
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -10,25 +10,25 @@ from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 
 
-def _drop_missing_cols_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _drop_missing_cols_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     cols = [c for c in params.get("columns_to_drop", []) if c in X.columns]
     return (X.drop(cols) if cols else X), y
 
 
-def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _drop_missing_cols_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     cols = [c for c in params.get("columns_to_drop", []) if c in X.columns]
     return (X.drop(columns=cols) if cols else X), y
 
 
 class DropMissingColumnsApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             X, params, _drop_missing_cols_apply_polars, _drop_missing_cols_apply_pandas
         )
 
 
-def _resolve_threshold(raw: Any) -> Optional[float]:
+def _resolve_threshold(raw: Any) -> float | None:
     """Parse a missing-percentage threshold; ``None`` if absent or non-numeric."""
     if raw is None:
         return None
@@ -53,7 +53,7 @@ def _high_missing_cols_pandas(X: Any, threshold_pct: float) -> list:
 
 
 def _drop_missing_cols_fit_polars(
-    X: Any, _y: Any, config: Dict[str, Any]
+    X: Any, _y: Any, config: dict[str, Any]
 ) -> DropMissingColumnsArtifact:
     explicit = config.get("columns", []) or []
     cols = {c for c in explicit if c in X.columns}
@@ -68,7 +68,7 @@ def _drop_missing_cols_fit_polars(
 
 
 def _drop_missing_cols_fit_pandas(
-    X: Any, _y: Any, config: Dict[str, Any]
+    X: Any, _y: Any, config: dict[str, Any]
 ) -> DropMissingColumnsArtifact:
     explicit = config.get("columns", []) or []
     cols = {c for c in explicit if c in X.columns}
@@ -92,8 +92,8 @@ def _drop_missing_cols_fit_pandas(
 )
 class DropMissingColumnsCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
-    ) -> Optional[SkyulfSchema]:
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
+    ) -> SkyulfSchema | None:
         # Threshold path is data-dependent; only predictable when the user
         # supplied an explicit column list and no positive threshold.
         if _resolve_threshold(config.get("missing_threshold")) is not None:
@@ -101,7 +101,7 @@ class DropMissingColumnsCalculator(BaseCalculator):
         explicit = config.get("columns", []) or []
         return input_schema if not explicit else input_schema.drop(explicit)
 
-    def fit(self, df: Any, config: Dict[str, Any]) -> DropMissingColumnsArtifact:
+    def fit(self, df: Any, config: dict[str, Any]) -> DropMissingColumnsArtifact:
         return cast(
             DropMissingColumnsArtifact,
             fit_dual_engine(

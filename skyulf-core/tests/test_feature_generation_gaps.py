@@ -6,7 +6,7 @@ similarity-fallback path (no rapidfuzz), the polynomial features node, and
 several `_common.py` helpers directly.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -81,7 +81,7 @@ def test_safe_divide_handles_nan_denominator() -> None:
 
 @pytest.mark.parametrize(*_resolve_output_col_cases)
 def test_resolve_output_col(
-    op: Dict[str, Any], index: int, existing: list, allow_overwrite: bool, expected: str
+    op: dict[str, Any], index: int, existing: list, allow_overwrite: bool, expected: str
 ) -> None:
     """``_resolve_output_col`` picks explicit/default/prefixed names and dedupes collisions."""
     assert _resolve_output_col(op, index, existing, allow_overwrite=allow_overwrite) == expected
@@ -437,7 +437,7 @@ def test_arithmetic_divide_by_only_constants() -> None:
 
 @pytest.mark.parametrize(*_noop_skip_cases)
 def test_feature_generation_noop_skips(
-    engine: str, data: Dict[str, list], operation: Dict[str, Any], expected_columns: list
+    engine: str, data: dict[str, list], operation: dict[str, Any], expected_columns: list
 ) -> None:
     """Unresolvable/unknown/malformed ops must be skipped silently (no-op), on both engines.
 

@@ -16,7 +16,6 @@ errors when drivers or configuration are missing.
 """
 
 import logging
-from typing import Optional
 
 from backend.config import Settings
 
@@ -87,7 +86,7 @@ async def _try_init_mongodb(settings: Settings):
     return False
 
 
-async def initialize(settings: Optional[Settings] = None) -> bool:
+async def initialize(settings: Settings | None = None) -> bool:
     """
     Initialize the database backend based on configuration.
 

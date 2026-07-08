@@ -9,7 +9,8 @@ Relies on ``self._node_configs``, ``self._resolve_all_inputs``,
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import pandas as pd
 
@@ -23,14 +24,14 @@ logger = logging.getLogger(__name__)
 class MergeMixin:
     # Type-only stubs so ty can resolve attributes/methods provided by
     # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
-    _node_configs: Dict[str, NodeConfig]
-    merge_warnings: List[Dict[str, Any]]
+    _node_configs: dict[str, NodeConfig]
+    merge_warnings: list[dict[str, Any]]
     log: Callable[[str], None]
     _resolve_all_inputs: Any
     _ancestors_of: Any
     """Frame coercion + multi-input merging split out of :class:`PipelineEngine`."""
 
-    def _coerce_to_frame(self, payload: Any, target_col: str = "") -> Optional[pd.DataFrame]:
+    def _coerce_to_frame(self, payload: Any, target_col: str = "") -> pd.DataFrame | None:
         """Best-effort coercion of a single payload to a DataFrame.
 
         Returns ``None`` for empty / missing payloads (e.g. an empty test split)
@@ -90,7 +91,7 @@ class MergeMixin:
 
     def _merge_frames(
         self,
-        frames: List[pd.DataFrame],
+        frames: list[pd.DataFrame],
         node_id: str,
         part_label: str = "",
     ) -> pd.DataFrame:
@@ -126,9 +127,9 @@ class MergeMixin:
             # update semantics give us "later writes win", so iterating
             # forward yields last_wins and reversed yields first_wins.
             iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
-            result_cols: Dict[str, pd.Series] = {}
-            overwrites: List[str] = []
-            new_only: List[str] = []
+            result_cols: dict[str, pd.Series] = {}
+            overwrites: list[str] = []
+            new_only: list[str] = []
             for df in iter_frames:
                 df_aligned = df.reset_index(drop=True)
                 for col in df.columns:
@@ -229,7 +230,7 @@ class MergeMixin:
                 # Compute concrete overlap columns + winner per artifact pair so
                 # the UI banner can show "Tx overrides DMC on [Id, SepalLengthCm]"
                 # instead of vague "last-wins on overlap".
-                input_cols: List[List[str]] = []
+                input_cols: list[list[str]] = []
                 for art in artifacts:
                     if isinstance(art, pd.DataFrame):
                         input_cols.append(list(art.columns))
@@ -244,8 +245,8 @@ class MergeMixin:
                         input_cols.append([])
 
                 # Overlap = columns appearing in 2+ inputs (subject to last-wins).
-                seen: Dict[str, int] = {}
-                overlap: List[str] = []
+                seen: dict[str, int] = {}
+                overlap: list[str] = []
                 for cols in input_cols:
                     for c in cols:
                         seen[c] = seen.get(c, 0) + 1
@@ -298,11 +299,11 @@ class MergeMixin:
             return (merged_x, artifacts[0][1])
 
         if all_splits:
-            split_artifacts: List[SplitDataset] = [
+            split_artifacts: list[SplitDataset] = [
                 a for a in artifacts if isinstance(a, SplitDataset)
             ]
 
-            def merge_part(part_label: str, parts: List[Any]) -> Any:
+            def merge_part(part_label: str, parts: list[Any]) -> Any:
                 """Merge one SplitDataset slot (train/test/validation) across branches.
 
                 Preserves ``(X, y)`` tuple shape when every branch produced a
@@ -316,7 +317,7 @@ class MergeMixin:
                 # keep y from the first branch (all branches descend from the
                 # same Splitter, so y is identical).
                 if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
-                    x_frames: List[pd.DataFrame] = []
+                    x_frames: list[pd.DataFrame] = []
                     for p in non_empty:
                         x = p[0]
                         if isinstance(x, pd.DataFrame) and not x.empty:
@@ -362,7 +363,7 @@ class MergeMixin:
                 "merging on train portions only; held-out splits are dropped."
             )
 
-        dataframes: List[pd.DataFrame] = []
+        dataframes: list[pd.DataFrame] = []
         for i, art in enumerate(artifacts):
             df = self._coerce_to_frame(art, target_col)
             if df is None:

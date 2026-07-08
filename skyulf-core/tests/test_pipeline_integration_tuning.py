@@ -9,7 +9,7 @@ split -> tuned model fit -> best-params retrieval -> predict on held-out data
 Optuna-backed ("bayes") search strategies.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,7 @@ from skyulf.preprocessing.scaling.standard import (
 
 
 def _fit_apply(
-    calculator: Any, applier: Any, df: pd.DataFrame, config: Dict[str, Any]
+    calculator: Any, applier: Any, df: pd.DataFrame, config: dict[str, Any]
 ) -> pd.DataFrame:
     """Run ``calculator.fit`` then ``applier.apply`` and return the transformed frame."""
     params = calculator.fit(df, config)
@@ -180,7 +180,7 @@ class TestGridSearchRegression:
         X_arr = X.to_numpy()
         y_arr = y.to_numpy()
         scorer = get_scorer("r2")
-        manual_scores: Dict[float, float] = {}
+        manual_scores: dict[float, float] = {}
         for alpha in [0.01, 0.1, 1.0, 10.0]:
             cv = KFold(n_splits=4, shuffle=True, random_state=42)
             fold_scores = []

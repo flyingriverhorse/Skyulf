@@ -1,6 +1,5 @@
 """Tests for skyulf.profiling._analyzer.multivariate.MultivariateMixin."""
 
-from typing import Any, Optional, Tuple
 
 import numpy as np
 import polars as pl

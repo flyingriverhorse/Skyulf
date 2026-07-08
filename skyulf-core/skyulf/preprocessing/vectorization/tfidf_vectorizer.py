@@ -6,7 +6,7 @@ Output is **always dense**.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -24,11 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 def _tfidf_apply_pandas(
-    X: pd.DataFrame, y: Any, params: Dict[str, Any]
-) -> Tuple[pd.DataFrame, Any]:
-    cols: List[str] = params.get("columns", [])
-    vectorizer: Optional[TfidfVectorizer] = params.get("vectorizer_object")
-    output_columns: List[str] = params.get("output_columns", [])
+    X: pd.DataFrame, y: Any, params: dict[str, Any]
+) -> tuple[pd.DataFrame, Any]:
+    cols: list[str] = params.get("columns", [])
+    vectorizer: TfidfVectorizer | None = params.get("vectorizer_object")
+    output_columns: list[str] = params.get("output_columns", [])
     drop_original: bool = params.get("drop_original", False)
 
     if not cols or vectorizer is None or not output_columns:
@@ -56,7 +56,7 @@ def _tfidf_apply_pandas(
 
 class TfidfVectorizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _tfidf_apply_pandas)
 
 
@@ -86,12 +86,12 @@ class TfidfVectorizerApplier(BaseApplier):
     tags=["text", "nlp", "tfidf", "vectorizer"],
 )
 class TfidfVectorizerCalculator(BaseCalculator):
-    def infer_output_schema(self, input_schema: Any, config: Dict[str, Any]) -> None:
+    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TfidfVectorizerArtifact:  # pylint: disable=arguments-differ
-        cols: List[str] = config.get("columns", [])
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TfidfVectorizerArtifact:  # pylint: disable=arguments-differ
+        cols: list[str] = config.get("columns", [])
         if not cols:
             return {}
 
@@ -102,13 +102,13 @@ class TfidfVectorizerCalculator(BaseCalculator):
         if not valid_cols:
             return {}
 
-        max_features: Optional[int] = config.get("max_features") or None
+        max_features: int | None = config.get("max_features") or None
         min_df: Any = config.get("min_df", 1)
         max_df: Any = config.get("max_df", 1.0)
         ngram_min, ngram_max = config.get("ngram_range", [1, 1])
         sublinear_tf: bool = bool(config.get("sublinear_tf", False))
         lowercase: bool = bool(config.get("lowercase", True))
-        stop_words: Optional[str] = config.get("stop_words") or None
+        stop_words: str | None = config.get("stop_words") or None
 
         vectorizer = TfidfVectorizer(
             max_features=max_features,
@@ -123,7 +123,7 @@ class TfidfVectorizerCalculator(BaseCalculator):
         text = _join_text_columns(X, valid_cols)
         vectorizer.fit(text)
 
-        feature_names: List[str] = vectorizer.get_feature_names_out().tolist()
+        feature_names: list[str] = vectorizer.get_feature_names_out().tolist()
         prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
         output_columns = [f"{prefix}__tfidf__{name}" for name in feature_names]
 

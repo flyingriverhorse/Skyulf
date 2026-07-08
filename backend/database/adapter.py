@@ -14,7 +14,7 @@ Supports:
 
 import logging
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any
 
 # Import settings with fallback
 try:
@@ -81,7 +81,7 @@ def get_db_type(settings: Settings) -> str:
     return get_db_type_from_url(settings.DATABASE_URL)
 
 
-def build_connection_config(settings: Settings) -> Dict[str, Any]:
+def build_connection_config(settings: Settings) -> dict[str, Any]:
     """
     Build connection configuration from settings.
 
@@ -108,7 +108,7 @@ def build_connection_config(settings: Settings) -> Dict[str, Any]:
 
 @asynccontextmanager
 async def async_session_or_connection(  # noqa: C901
-    settings: Settings, config: Optional[Dict[str, Any]] = None
+    settings: Settings, config: dict[str, Any] | None = None
 ):
     """
     Async context manager that yields appropriate database connection/session.
@@ -237,7 +237,7 @@ class AsyncSnowflakeConnection:
         self._connection = connection
         self._executor = executor
 
-    async def execute(self, query: str, params: Optional[tuple] = None):
+    async def execute(self, query: str, params: tuple | None = None):
         """Execute a query asynchronously."""
         import asyncio
 

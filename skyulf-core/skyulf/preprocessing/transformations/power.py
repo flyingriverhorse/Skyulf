@@ -1,7 +1,7 @@
 """Power Transformer node (Box-Cox / Yeo-Johnson)."""
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -23,8 +23,8 @@ def _build_pretrained_power_transformer(
     method: str,
     standardize: bool,
     lambdas_arr: np.ndarray,
-    scaler_params: Dict[str, Any],
-    col_indices: List[int],
+    scaler_params: dict[str, Any],
+    col_indices: list[int],
     n_total_cols: int,
 ) -> PowerTransformer:
     """Reconstruct a fitted PowerTransformer from stored lambdas + scaler params."""
@@ -48,7 +48,7 @@ def _build_pretrained_power_transformer(
 
 
 def _power_transform_array(
-    X_vals: np.ndarray, params: Dict[str, Any], cols: List[str], valid_cols: List[str]
+    X_vals: np.ndarray, params: dict[str, Any], cols: list[str], valid_cols: list[str]
 ) -> np.ndarray:
     """Run the rebuilt PowerTransformer over a numpy array; return transformed array."""
     col_indices = [cols.index(c) for c in valid_cols]
@@ -66,7 +66,7 @@ def _power_transform_array(
     return X_trans.to_numpy() if hasattr(X_trans, "to_numpy") else X_trans
 
 
-def _filter_power_columns(X_pd: pd.DataFrame, cols: List[str], method: str) -> List[str]:
+def _filter_power_columns(X_pd: pd.DataFrame, cols: list[str], method: str) -> list[str]:
     """Box-Cox requires strictly positive data — drop columns that violate it."""
     if not cols:
         return []
@@ -75,7 +75,7 @@ def _filter_power_columns(X_pd: pd.DataFrame, cols: List[str], method: str) -> L
     return cols
 
 
-def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> Dict[str, Any]:
+def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> dict[str, Any]:
     """Pull mean/scale arrays out of a fitted PowerTransformer's internal scaler."""
     if not standardize:
         return {}
@@ -90,11 +90,11 @@ def _extract_scaler_params(transformer: PowerTransformer, standardize: bool) -> 
 
 class PowerTransformerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -114,7 +114,7 @@ class PowerTransformerApplier(BaseApplier):
             return X, _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         if params.get("lambdas") is None:
             return X, _y
@@ -142,13 +142,13 @@ class PowerTransformerApplier(BaseApplier):
 )
 class PowerTransformerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Power transforms are applied in place on the same columns.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> PowerTransformerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PowerTransformerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

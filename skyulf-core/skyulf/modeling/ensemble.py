@@ -17,7 +17,8 @@ Strategies:
 """
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from sklearn.base import BaseEstimator
 from sklearn.calibration import CalibratedClassifierCV
@@ -79,7 +80,7 @@ logger = logging.getLogger(__name__)
 # Selectable base learners. Each value is a zero-arg factory so every fit builds
 # fresh, unfitted instances (sklearn clones them internally, but rebuilding keeps
 # repeated fits independent of any shared state).
-BASE_ESTIMATORS_CLF: Dict[str, Callable[[], BaseEstimator]] = {
+BASE_ESTIMATORS_CLF: dict[str, Callable[[], BaseEstimator]] = {
     "logistic_regression": lambda: LogisticRegression(max_iter=1000),
     "random_forest": lambda: RandomForestClassifier(n_estimators=100, random_state=42),
     "extra_trees": lambda: ExtraTreesClassifier(n_estimators=100, random_state=42),
@@ -92,7 +93,7 @@ BASE_ESTIMATORS_CLF: Dict[str, Callable[[], BaseEstimator]] = {
     "knn": lambda: KNeighborsClassifier(),
 }
 
-BASE_ESTIMATORS_REG: Dict[str, Callable[[], BaseEstimator]] = {
+BASE_ESTIMATORS_REG: dict[str, Callable[[], BaseEstimator]] = {
     "linear_regression": lambda: LinearRegression(),
     "ridge": lambda: Ridge(),
     "lasso": lambda: Lasso(),
@@ -131,8 +132,8 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     applied during basic training and post-tuning cross-validation alike.
     """
 
-    BASE_ESTIMATORS: Dict[str, Callable[[], BaseEstimator]] = {}
-    DEFAULT_KEYS: Tuple[str, ...] = ()
+    BASE_ESTIMATORS: dict[str, Callable[[], BaseEstimator]] = {}
+    DEFAULT_KEYS: tuple[str, ...] = ()
     DEFAULT_FINAL_KEY: str = ""
     MODEL_KEY: str = ""  # Registry id, e.g. "voting_classifier".
     IS_STACKING: bool = False
@@ -142,10 +143,10 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         super().__init__(*args, **kwargs)
         # Structural config remembered when tuning so the meta-estimator can be
         # rebuilt with the user's base learners during post-tuning CV refits.
-        self._tuning_base_config: Dict[str, Any] = {}
+        self._tuning_base_config: dict[str, Any] = {}
 
     @property
-    def default_params(self) -> Dict[str, Any]:
+    def default_params(self) -> dict[str, Any]:
         """Base defaults, plus resolved ``estimators`` while tuning.
 
         The tuner builds the meta-estimator from ``default_params``; without the
@@ -173,9 +174,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         self,
         X: Any,
         y: Any,
-        config: Dict[str, Any],
-        progress_callback: Optional[Callable[..., Any]] = None,
-        log_callback: Optional[Callable[..., Any]] = None,
+        config: dict[str, Any],
+        progress_callback: Callable[..., Any] | None = None,
+        log_callback: Callable[..., Any] | None = None,
         validation_data: Any = None,
     ) -> Any:
         config = self._inject_tuning_base_config(config)
@@ -184,7 +185,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
 
     # --- tuning hooks -------------------------------------------------------
 
-    def prepare_tuning_params(self, config: Dict[str, Any]) -> None:
+    def prepare_tuning_params(self, config: dict[str, Any]) -> None:
         """Remember the structural selection so the tuner can build the model."""
         src = config.get("params") if isinstance(config.get("params"), dict) else config
         src = src or {}
@@ -204,7 +205,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         )
         self._tuning_base_config = {k: src[k] for k in keep if k in src}
 
-    def build_tuning_search_space(self, config: Dict[str, Any], strategy: str) -> Dict[str, Any]:
+    def build_tuning_search_space(self, config: dict[str, Any], strategy: str) -> dict[str, Any]:
         """Auto-build the ensemble's tuning space.
 
         Always includes the meta-params (``voting`` / ``cv``). When
@@ -229,7 +230,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             calibrate_base_models=bool(src.get("calibrate_base_models")),
         )
 
-    def _inject_tuning_base_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _inject_tuning_base_config(self, config: dict[str, Any]) -> dict[str, Any]:
         """Merge the captured structural config when it is missing.
 
         During post-tuning CV the config carries only ``best_params`` (no base
@@ -253,9 +254,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     def _build_estimators(
         self,
         keys: Any,
-        params_map: Optional[Dict[str, Any]] = None,
-        calibration: Optional[Dict[str, Any]] = None,
-    ) -> List[Tuple[str, BaseEstimator]]:
+        params_map: dict[str, Any] | None = None,
+        calibration: dict[str, Any] | None = None,
+    ) -> list[tuple[str, BaseEstimator]]:
         """Translate a list of string keys into ``(name, instance)`` tuples.
 
         Unknown keys are skipped with a warning; an empty/invalid selection
@@ -267,7 +268,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         if not isinstance(keys, (list, tuple)) or not keys:
             keys = self.DEFAULT_KEYS
         params_map = params_map if isinstance(params_map, dict) else {}
-        estimators: List[Tuple[str, BaseEstimator]] = []
+        estimators: list[tuple[str, BaseEstimator]] = []
         seen: set = set()
         for key in keys:
             if not isinstance(key, str) or key in seen:
@@ -284,7 +285,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         return estimators
 
     def _maybe_calibrate(
-        self, estimator: BaseEstimator, calibration: Optional[Dict[str, Any]]
+        self, estimator: BaseEstimator, calibration: dict[str, Any] | None
     ) -> BaseEstimator:
         """Wrap a base classifier in ``CalibratedClassifierCV`` when requested.
 
@@ -323,7 +324,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             key = self.DEFAULT_FINAL_KEY
         return self._apply_params(factory(), params, str(key))
 
-    def _clean_meta_keys(self, bucket: Dict[str, Any], final_params: Any = None) -> None:
+    def _clean_meta_keys(self, bucket: dict[str, Any], final_params: Any = None) -> None:
         """Keep only the meta-keys valid for this estimator family."""
         # ``n_jobs`` (parallel base-model fitting) is valid for every family;
         # coerce to int and drop anything malformed so sklearn never sees junk.
@@ -364,9 +365,9 @@ class _BaseEnsembleCalculator(SklearnCalculator):
 
     @staticmethod
     def _absorb_nested_keys(
-        bucket: Dict[str, Any],
-        base_params: Dict[str, Any],
-        final_params: Dict[str, Any],
+        bucket: dict[str, Any],
+        base_params: dict[str, Any],
+        final_params: dict[str, Any],
     ) -> None:
         """Fold ``<name>__<param>`` keys into the per-estimator param maps."""
         nested = [k for k in bucket if isinstance(k, str) and "__" in k]
@@ -378,7 +379,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             else:
                 base_params.setdefault(prefix, {})[param] = value
 
-    def _resolve_estimators(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    def _resolve_estimators(self, config: dict[str, Any] | None) -> dict[str, Any]:
         """Inject ``estimators`` (+ ``final_estimator`` for stacking) into config.
 
         Supports both the flat config shape and the nested ``{"params": {...}}``
@@ -387,8 +388,8 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         resolved = dict(config) if config else {}
         nested = isinstance(resolved.get("params"), dict)
         bucket = dict(resolved["params"]) if nested else resolved
-        base_params: Dict[str, Any] = dict(bucket.pop("base_estimator_params", None) or {})
-        final_params: Dict[str, Any] = dict(bucket.pop("final_estimator_params", None) or {})
+        base_params: dict[str, Any] = dict(bucket.pop("base_estimator_params", None) or {})
+        final_params: dict[str, Any] = dict(bucket.pop("final_estimator_params", None) or {})
         # Calibration is a structural choice (wrap base classifiers), not a sklearn
         # meta-estimator param — pop it here so it never reaches the constructor.
         calibration = self._extract_calibration(bucket)
@@ -403,7 +404,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         return bucket
 
     @staticmethod
-    def _extract_calibration(bucket: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _extract_calibration(bucket: dict[str, Any]) -> dict[str, Any] | None:
         """Pop and normalise calibration settings from *bucket*.
 
         Returns a ``{"method", "cv"}`` dict when ``calibrate_base_models`` is truthy,

@@ -1,6 +1,5 @@
 """Heuristic data-cleaning recommendations derived from column profiles."""
 
-from typing import Dict, List, Optional
 
 from ..schemas import Alert, ColumnProfile, Recommendation
 from ._utils import _AnalyzerState
@@ -11,11 +10,11 @@ class RecommendationsMixin(_AnalyzerState):
 
     def _generate_recommendations(
         self,
-        profiles: Dict[str, ColumnProfile],
-        alerts: List[Alert],
-        target_col: Optional[str],
-    ) -> List[Recommendation]:
-        recs: List[Recommendation] = []
+        profiles: dict[str, ColumnProfile],
+        alerts: list[Alert],
+        target_col: str | None,
+    ) -> list[Recommendation]:
+        recs: list[Recommendation] = []
 
         for col, profile in profiles.items():
             if profile.missing_percentage > 50:

@@ -8,12 +8,12 @@ Uses model_post_init to set overrides — avoids Pydantic "shadows parent" warni
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from backend.config.base import Settings
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
-_DEV_DEFAULTS: Dict[str, Any] = {
+_DEV_DEFAULTS: dict[str, Any] = {
     "DEBUG": True,
     "LOG_LEVEL": "DEBUG",
     "DB_ECHO": False,
@@ -21,7 +21,7 @@ _DEV_DEFAULTS: Dict[str, Any] = {
     "CORS_ORIGINS": ["*"],
 }
 
-_PROD_DEFAULTS: Dict[str, Any] = {
+_PROD_DEFAULTS: dict[str, Any] = {
     "DEBUG": False,
     "LOG_LEVEL": "INFO",
     "DB_ECHO": False,
@@ -29,7 +29,7 @@ _PROD_DEFAULTS: Dict[str, Any] = {
     "ALLOWED_HOSTS": ["skyulf.com", "app.yourdomain.com"],
 }
 
-_TEST_DEFAULTS: Dict[str, Any] = {
+_TEST_DEFAULTS: dict[str, Any] = {
     "TESTING": True,
     "DEBUG": True,
     "DATABASE_URL": "sqlite+aiosqlite:///./test_mlops.db",
@@ -37,7 +37,7 @@ _TEST_DEFAULTS: Dict[str, Any] = {
     "ACCESS_TOKEN_EXPIRE_MINUTES": 480,
 }
 
-_PROD_SECURITY_HEADERS: Dict[str, str] = {
+_PROD_SECURITY_HEADERS: dict[str, str] = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "X-XSS-Protection": "1; mode=block",
@@ -51,7 +51,7 @@ _PROD_SECURITY_HEADERS: Dict[str, str] = {
 }
 
 
-def _apply_defaults(instance: Settings, defaults: Dict[str, Any]) -> None:
+def _apply_defaults(instance: Settings, defaults: dict[str, Any]) -> None:
     """Apply default values only for fields not explicitly set via env / .env."""
     for field, value in defaults.items():
         if not instance.is_field_set(field):
@@ -75,7 +75,7 @@ class DevelopmentSettings(Settings):
 class ProductionSettings(Settings):
     """Production environment settings with enhanced security."""
 
-    SECURITY_HEADERS: Dict[str, str] = _PROD_SECURITY_HEADERS
+    SECURITY_HEADERS: dict[str, str] = _PROD_SECURITY_HEADERS
     ML_MODEL_CACHE_SIZE: int = 5000
     DATA_SAMPLE_SIZE: int = 50000
 

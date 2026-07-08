@@ -1,7 +1,8 @@
 """Shared helpers for feature-selection nodes."""
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -29,7 +30,7 @@ from .._artifacts import UnivariateSelectionArtifact
 
 logger = logging.getLogger(__name__)
 
-SCORE_FUNCTIONS: Dict[str, Callable] = {
+SCORE_FUNCTIONS: dict[str, Callable] = {
     "f_classif": f_classif,
     "f_regression": f_regression,
     "mutual_info_classif": mutual_info_classif,
@@ -50,7 +51,7 @@ def _infer_problem_type(series: pd.Series) -> str:
     return "regression"
 
 
-def _resolve_score_function(name: Optional[str], problem_type: str) -> Any:
+def _resolve_score_function(name: str | None, problem_type: str) -> Any:
     if name and name in SCORE_FUNCTIONS:
         return SCORE_FUNCTIONS[name]
 
@@ -59,7 +60,7 @@ def _resolve_score_function(name: Optional[str], problem_type: str) -> Any:
     return f_regression
 
 
-def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
+def _resolve_estimator(key: str | None, problem_type: str) -> Any:
     key = (key or "auto").lower()
     if problem_type == "classification":
         if key in {"auto", "logistic_regression", "logisticregression"}:
@@ -81,7 +82,7 @@ def _resolve_estimator(key: Optional[str], problem_type: str) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def _resolve_drop_list(params: Dict[str, Any], existing_cols: List[str]) -> List[str]:
+def _resolve_drop_list(params: dict[str, Any], existing_cols: list[str]) -> list[str]:
     """Compute the column-drop list from selected/candidate params."""
     selected = params.get("selected_columns")
     candidates = params.get("candidate_columns", [])
@@ -90,7 +91,7 @@ def _resolve_drop_list(params: Dict[str, Any], existing_cols: List[str]) -> List
     return [c for c in (set(candidates) - set(selected)) if c in existing_cols]
 
 
-def _drop_selected_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _drop_selected_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Polars apply path for selectors that drop ``candidate \\ selected`` columns."""
     if not params.get("drop_columns", True):
         return X, y
@@ -100,7 +101,7 @@ def _drop_selected_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
     return X, y
 
 
-def _drop_selected_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _drop_selected_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Pandas apply path for selectors that drop ``candidate \\ selected`` columns."""
     if not params.get("drop_columns", True):
         return X, y
@@ -115,7 +116,7 @@ def _drop_selected_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
 # -----------------------------------------------------------------------------
 
 
-def _extract_target(X_pd: pd.DataFrame, y: Any, target_col: Optional[str]) -> Optional[pd.Series]:
+def _extract_target(X_pd: pd.DataFrame, y: Any, target_col: str | None) -> pd.Series | None:
     """Return ``y`` if provided; else pull ``target_col`` from the (pandas) frame."""
     if y is not None:
         return y
@@ -142,13 +143,13 @@ def _resolve_problem_type(declared: str, y: Any) -> str:
     return _infer_problem_type(y)
 
 
-_GENERIC_PARAM_KEYS: Dict[str, Tuple[str, Any]] = {
+_GENERIC_PARAM_KEYS: dict[str, tuple[str, Any]] = {
     "k_best": ("k", 10),
     "percentile": ("percentile", 10),
 }
 
 
-def _resolve_generic_param(config: Dict[str, Any]) -> Any:
+def _resolve_generic_param(config: dict[str, Any]) -> Any:
     """Pick the GenericUnivariateSelect ``param`` from explicit or mode-derived config."""
     if "param" in config:
         return config.get("param")
@@ -157,7 +158,7 @@ def _resolve_generic_param(config: Dict[str, Any]) -> Any:
     return config.get(key, default)
 
 
-_UNIVARIATE_SELECTOR_BUILDERS: Dict[str, Callable[[Any, Dict[str, Any]], Any]] = {
+_UNIVARIATE_SELECTOR_BUILDERS: dict[str, Callable[[Any, dict[str, Any]], Any]] = {
     "select_k_best": lambda sf, cfg: SelectKBest(score_func=sf, k=cfg.get("k", 10)),
     "select_percentile": lambda sf, cfg: SelectPercentile(
         score_func=sf, percentile=cfg.get("percentile", 10)
@@ -172,14 +173,14 @@ _UNIVARIATE_SELECTOR_BUILDERS: Dict[str, Callable[[Any, Dict[str, Any]], Any]] =
 
 
 def _build_univariate_selector(
-    method: str, score_func: Any, config: Dict[str, Any]
-) -> Optional[Any]:
+    method: str, score_func: Any, config: dict[str, Any]
+) -> Any | None:
     """Construct the sklearn univariate selector named by ``method``."""
     builder = _UNIVARIATE_SELECTOR_BUILDERS.get(method)
     return builder(score_func, config) if builder else None
 
 
-def _build_model_selector(method: str, estimator: Any, config: Dict[str, Any]) -> Optional[Any]:
+def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -> Any | None:
     """Construct the sklearn model-based selector named by ``method``."""
     if method == "select_from_model":
         threshold = config.get("threshold", "mean")
@@ -202,7 +203,7 @@ def _build_model_selector(method: str, estimator: Any, config: Dict[str, Any]) -
     return None
 
 
-def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: Optional[str]) -> np.ndarray:
+def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: str | None) -> np.ndarray:
     """Apply MinMax rescale when chi2 is requested but features contain negatives."""
     if score_func_name != "chi2" or not (X_np < 0).any():
         return X_np
@@ -216,19 +217,19 @@ def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: Optional[str]) -> np.
 
 
 def _resolve_candidate_columns(
-    X_pd: pd.DataFrame, config: Dict[str, Any], target_col: Optional[str]
-) -> List[str]:
+    X_pd: pd.DataFrame, config: dict[str, Any], target_col: str | None
+) -> list[str]:
     """Return numeric candidate columns minus the target."""
     cols = resolve_columns(X_pd, config, lambda d: detect_numeric_columns(d, exclude_binary=False))
     return [c for c in cols if c != target_col]
 
 
 def _univariate_score_dicts(
-    selector: Any, cols: List[str]
-) -> Tuple[Dict[str, float], Dict[str, float]]:
+    selector: Any, cols: list[str]
+) -> tuple[dict[str, float], dict[str, float]]:
     """Pull (scores, pvalues) off a fitted univariate selector, NaN-safe."""
-    scores: Dict[str, float] = {}
-    pvalues: Dict[str, float] = {}
+    scores: dict[str, float] = {}
+    pvalues: dict[str, float] = {}
     if hasattr(selector, "scores_"):
         safe_scores = np.nan_to_num(selector.scores_, nan=0.0, posinf=0.0, neginf=0.0)
         scores = dict(zip(cols, safe_scores.tolist()))
@@ -239,7 +240,7 @@ def _univariate_score_dicts(
 
 
 def _univariate_no_target_artifact(
-    cols: List[str], method: str, config: Dict[str, Any]
+    cols: list[str], method: str, config: dict[str, Any]
 ) -> "UnivariateSelectionArtifact":
     """Artifact returned when the selector ran without a target (passthrough)."""
     return cast(
@@ -256,7 +257,7 @@ def _univariate_no_target_artifact(
     )
 
 
-def _model_feature_importances(selector: Any, cols: List[str]) -> Dict[str, float]:
+def _model_feature_importances(selector: Any, cols: list[str]) -> dict[str, float]:
     """Pull importances or |coef| off a fitted model-based selector."""
     estimator = getattr(selector, "estimator_", None)
     if estimator is None:

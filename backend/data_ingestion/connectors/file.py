@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Dict, Optional, cast
+from typing import cast
 
 import polars as pl
 
@@ -30,8 +30,8 @@ class LocalFileConnector(BaseConnector):
         self._testing = getattr(settings, "TESTING", False)
         self.file_path = self._resolve_file_path(file_path)
         self.kwargs = kwargs
-        self._df: Optional[pl.DataFrame] = None
-        self._schema: Optional[Dict[str, str]] = None
+        self._df: pl.DataFrame | None = None
+        self._schema: dict[str, str] | None = None
 
     def _resolve_file_path(self, file_path: str) -> str:
         candidate = Path(file_path).expanduser()
@@ -60,7 +60,7 @@ class LocalFileConnector(BaseConnector):
     def _ext(self) -> str:
         return os.path.splitext(self.file_path)[1].lower()
 
-    def _scan(self) -> Optional[pl.LazyFrame]:
+    def _scan(self) -> pl.LazyFrame | None:
         """Return a lazy frame for formats that support scanning."""
         ext = self._ext()
         try:
@@ -91,7 +91,7 @@ class LocalFileConnector(BaseConnector):
         except Exception as e:
             raise RuntimeError(f"Failed to read file {Path(self.file_path).name}") from e
 
-    async def get_schema(self) -> Dict[str, str]:
+    async def get_schema(self) -> dict[str, str]:
         if self._schema is not None:
             return self._schema
 
@@ -107,7 +107,7 @@ class LocalFileConnector(BaseConnector):
         self._schema = {col: str(dtype) for col, dtype in self._df.schema.items()}
         return self._schema
 
-    def _try_lazy_schema(self) -> Optional[Dict[str, str]]:
+    def _try_lazy_schema(self) -> dict[str, str] | None:
         """Read just the file header / parquet footer when the format supports it."""
         if self._df is not None or self._ext() not in self._LAZY_EXTENSIONS:
             return None
@@ -121,7 +121,7 @@ class LocalFileConnector(BaseConnector):
             return None
 
     async def fetch_data(
-        self, query: Optional[str] = None, limit: Optional[int] = None
+        self, query: str | None = None, limit: int | None = None
     ) -> pl.DataFrame:
         lazy_head = self._try_lazy_head(query=query, limit=limit)
         if lazy_head is not None:
@@ -139,8 +139,8 @@ class LocalFileConnector(BaseConnector):
         return df
 
     def _try_lazy_head(
-        self, *, query: Optional[str], limit: Optional[int]
-    ) -> Optional[pl.DataFrame]:
+        self, *, query: str | None, limit: int | None
+    ) -> pl.DataFrame | None:
         """Stream a bounded head from CSV/Parquet without materialising the file."""
         if (
             limit is None

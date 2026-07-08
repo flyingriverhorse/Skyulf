@@ -1,19 +1,18 @@
 """Snowflake data warehouse settings."""
 
-from typing import Optional
 
 
 class SnowflakeMixin:
     """Snowflake connection and feature toggle."""
 
     SNOWFLAKE_CONNECTION_TYPE: str = "native"
-    SNOWFLAKE_ACCOUNT: Optional[str] = None
-    SNOWFLAKE_USER: Optional[str] = None
-    SNOWFLAKE_PASSWORD: Optional[str] = None
-    SNOWFLAKE_WAREHOUSE: Optional[str] = None
-    SNOWFLAKE_DATABASE: Optional[str] = None
-    SNOWFLAKE_ROLE: Optional[str] = None
-    SNOWFLAKE_SCHEMA: Optional[str] = None
+    SNOWFLAKE_ACCOUNT: str | None = None
+    SNOWFLAKE_USER: str | None = None
+    SNOWFLAKE_PASSWORD: str | None = None
+    SNOWFLAKE_WAREHOUSE: str | None = None
+    SNOWFLAKE_DATABASE: str | None = None
+    SNOWFLAKE_ROLE: str | None = None
+    SNOWFLAKE_SCHEMA: str | None = None
     FEATURE_SNOWFLAKE: bool = False
 
     def validate_snowflake_config(self) -> bool:

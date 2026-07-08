@@ -10,7 +10,7 @@ Exercises branches not hit by the existing end-to-end test in test_pipeline.py:
 * `predict()` raising when the pipeline has no fitted model.
 """
 
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 import pandas as pd
 import pytest
@@ -221,7 +221,7 @@ def numeric_classification_data() -> pd.DataFrame:
 def test_fit_uses_split_dataset_produced_by_preprocessing(numeric_classification_data) -> None:
     """When preprocessing yields a SplitDataset, fit() must use it directly
     (the `isinstance(transformed_data, SplitDataset)` branch), not wrap it."""
-    config: Dict[str, Any] = {
+    config: dict[str, Any] = {
         "preprocessing": [
             {
                 "name": "split",
@@ -244,7 +244,7 @@ def test_fit_uses_split_dataset_produced_by_preprocessing(numeric_classification
 def test_fit_records_modeling_error_when_evaluation_fails(numeric_classification_data) -> None:
     """If model_estimator.evaluate() raises, fit() must catch it and record
     metrics['modeling_error'] instead of propagating the exception."""
-    config: Dict[str, Any] = {
+    config: dict[str, Any] = {
         "preprocessing": [],
         "modeling": {"type": "logistic_regression"},
     }

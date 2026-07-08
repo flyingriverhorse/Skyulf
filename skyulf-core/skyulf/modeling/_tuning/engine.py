@@ -2,7 +2,8 @@
 
 import logging
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Union, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -77,12 +78,12 @@ class TuningCalculator(BaseModelCalculator):
     def problem_type(self) -> str:
         return self.model_calculator.problem_type
 
-    def _clean_search_space(self, search_space: Dict[str, Any]) -> Dict[str, Any]:
+    def _clean_search_space(self, search_space: dict[str, Any]) -> dict[str, Any]:
         """
         Recursively cleans the search space.
         - Converts "none" string to None.
         """
-        cleaned: Dict[str, Any] = {}
+        cleaned: dict[str, Any] = {}
         for k, v in search_space.items():
             if isinstance(v, list):
                 cleaned[k] = [None if x == "none" else x for x in v]
@@ -93,7 +94,7 @@ class TuningCalculator(BaseModelCalculator):
         return cleaned
 
     @staticmethod
-    def _instantiate_model(model_class: Any, params: Dict[str, Any]) -> Any:
+    def _instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:
         """Build an estimator, routing nested ``a__b`` keys through ``set_params``.
 
         Constructor args (no ``__``) are filtered to the model's signature
@@ -120,16 +121,12 @@ class TuningCalculator(BaseModelCalculator):
 
     def fit(
         self,
-        X: Union[pd.DataFrame, SkyulfDataFrame],
-        y: Union[pd.Series, Any],
-        config: Dict[str, Any],
-        progress_callback: Optional[
-            Callable[[int, int, Optional[float], Optional[Dict]], None]
-        ] = None,
-        log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[
-            tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]
-        ] = None,
+        X: pd.DataFrame | SkyulfDataFrame,
+        y: pd.Series | Any,
+        config: dict[str, Any],
+        progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+        validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
     ) -> Any:
         """
         Fits the tuner (runs tuning).
@@ -217,11 +214,9 @@ class TuningCalculator(BaseModelCalculator):
         X: Any,
         y: Any,
         config: TuningConfig,
-        progress_callback: Optional[
-            Callable[[int, int, Optional[float], Optional[Dict]], None]
-        ] = None,
-        log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[tuple[Any, Any]] = None,
+        progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+        validation_data: tuple[Any, Any] | None = None,
     ) -> TuningResult:
         """
         Runs hyperparameter tuning.
@@ -415,7 +410,7 @@ class TuningCalculator(BaseModelCalculator):
             if log_callback:
                 log_callback(f"Total candidates to evaluate: {total_candidates}")
 
-            trials: List[Dict[str, Any]] = []
+            trials: list[dict[str, Any]] = []
             best_score = -float("inf")
             best_params = None
 
@@ -779,9 +774,9 @@ class TuningApplier(BaseModelApplier):
 
     def predict(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame],
+        df: pd.DataFrame | SkyulfDataFrame,
         model_artifact: Any,
-    ) -> Union[pd.Series, Any]:
+    ) -> pd.Series | Any:
         # model_artifact is (fitted_model, tuning_result)
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
@@ -791,9 +786,9 @@ class TuningApplier(BaseModelApplier):
 
     def predict_proba(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame],
+        df: pd.DataFrame | SkyulfDataFrame,
         model_artifact: Any,
-    ) -> Optional[Union[pd.DataFrame, SkyulfDataFrame]]:
+    ) -> pd.DataFrame | SkyulfDataFrame | None:
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict_proba(df, model)

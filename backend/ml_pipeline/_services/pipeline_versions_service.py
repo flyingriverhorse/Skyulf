@@ -11,7 +11,7 @@ pipeline per dataset means dataset_source_id is the natural identity.
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,9 +46,9 @@ class PipelineVersionsService:
         graph: Any,
         name: str,
         kind: str = "manual",
-        note: Optional[str] = None,
-        dataset_name: Optional[str] = None,
-        user_id: Optional[int] = None,
+        note: str | None = None,
+        dataset_name: str | None = None,
+        user_id: int | None = None,
         pinned: bool = False,
     ) -> PipelineVersion:
         # Next version_int = max+1 for this dataset.
@@ -79,7 +79,7 @@ class PipelineVersionsService:
         return version
 
     @staticmethod
-    async def list_versions(session: AsyncSession, dataset_source_id: str) -> List[PipelineVersion]:
+    async def list_versions(session: AsyncSession, dataset_source_id: str) -> list[PipelineVersion]:
         # Pinned first, then newest first.
         stmt = (
             select(PipelineVersion)
@@ -93,7 +93,7 @@ class PipelineVersionsService:
         return list(result.scalars().all())
 
     @staticmethod
-    async def get_version(session: AsyncSession, version_id: int) -> Optional[PipelineVersion]:
+    async def get_version(session: AsyncSession, version_id: int) -> PipelineVersion | None:
         return await session.get(PipelineVersion, version_id)
 
     @staticmethod
@@ -101,10 +101,10 @@ class PipelineVersionsService:
         session: AsyncSession,
         version_id: int,
         *,
-        name: Optional[str] = None,
-        note: Optional[str] = None,
-        pinned: Optional[bool] = None,
-    ) -> Optional[PipelineVersion]:
+        name: str | None = None,
+        note: str | None = None,
+        pinned: bool | None = None,
+    ) -> PipelineVersion | None:
         version = await session.get(PipelineVersion, version_id)
         if version is None:
             return None

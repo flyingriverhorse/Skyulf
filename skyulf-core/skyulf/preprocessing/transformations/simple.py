@@ -1,6 +1,6 @@
 """Simple Transformation node (log, sqrt, square, etc.)."""
 
-from typing import Any, Dict, Tuple, Union
+from typing import Any
 
 import pandas as pd
 
@@ -16,11 +16,11 @@ from ._ops import _PANDAS_OPS, _POLARS_OPS
 
 class SimpleTransformationApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         transformations = params.get("transformations", [])
         if not transformations:
             return X, _y
@@ -38,7 +38,7 @@ class SimpleTransformationApplier(BaseApplier):
         return X_out, _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         transformations = params.get("transformations", [])
         if not transformations:
             return X, _y
@@ -66,15 +66,15 @@ class SimpleTransformationApplier(BaseApplier):
 )
 class SimpleTransformationCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Simple transformations replace values in place; column set is preserved.
         return input_schema
 
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        config: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        config: dict[str, Any],
     ) -> SimpleTransformationArtifact:
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'}, ...]}
         return {

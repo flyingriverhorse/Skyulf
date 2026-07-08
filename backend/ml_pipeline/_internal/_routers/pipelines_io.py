@@ -9,7 +9,7 @@ plus a small JSON-on-disk fallback for the "json" storage backend.
 import json
 import logging
 import os
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -128,7 +128,7 @@ async def load_pipeline(
         if not os.path.exists(file_path):
             return None
         try:
-            with open(file_path, "r") as f:
+            with open(file_path) as f:
                 return json.load(f)
         except Exception as e:
             raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}")
@@ -160,7 +160,7 @@ async def load_pipeline(
 async def list_pipeline_versions(
     dataset_source_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """List all snapshots for a dataset (pinned first, newest first)."""
     versions = await PipelineVersionsService.list_versions(session, dataset_source_id)
     return [v.to_dict() for v in versions]
@@ -171,7 +171,7 @@ async def create_pipeline_version(
     dataset_source_id: str,
     payload: PipelineVersionCreateModel,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Explicitly create a snapshot. `kind` defaults to 'manual'; pass
     'auto' from background callers (e.g. successful Run hooks)."""
     try:
@@ -197,7 +197,7 @@ async def update_pipeline_version(
     version_id: int,
     payload: PipelineVersionPatchModel,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Toggle pin, rename, or edit the note on a snapshot."""
     version = await PipelineVersionsService.get_version(session, version_id)
     if version is None or version.dataset_source_id != dataset_source_id:
@@ -219,7 +219,7 @@ async def delete_pipeline_version(
     dataset_source_id: str,
     version_id: int,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Hard-delete a snapshot. Pinned rows are not protected from
     explicit user deletion (matches the localStorage behavior)."""
     version = await PipelineVersionsService.get_version(session, version_id)
@@ -240,7 +240,7 @@ async def delete_pipeline_version(
 # ---------------------------------------------------------------------------
 
 
-def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
+def _node_set(graph: Any) -> dict[str, dict[str, Any]]:
     """Index a saved graph by node id for O(1) diff lookups.
 
     Tolerates both the canonical `{nodes: [...], edges: [...]}` shape and
@@ -252,7 +252,7 @@ def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
     nodes = graph.get("nodes")
     if not isinstance(nodes, list):
         return {}
-    indexed: Dict[str, Dict[str, Any]] = {}
+    indexed: dict[str, dict[str, Any]] = {}
     for n in nodes:
         if isinstance(n, dict):
             nid = n.get("id")
@@ -261,13 +261,13 @@ def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
     return indexed
 
 
-def _diff_versions(prev: Any, curr: Any) -> Dict[str, Any]:
+def _diff_versions(prev: Any, curr: Any) -> dict[str, Any]:
     """Compute a compact node-level diff between two saved graphs."""
     a = _node_set(prev)
     b = _node_set(curr)
     added = sorted(set(b) - set(a))
     removed = sorted(set(a) - set(b))
-    modified: List[str] = []
+    modified: list[str] = []
     for nid in set(a) & set(b):
         # Cheap structural compare — sufficient because saved graphs are
         # JSON round-tripped (no datetimes, no sets, no class instances).
@@ -286,7 +286,7 @@ async def get_pipeline_audit_log(
     dataset_source_id: str,
     limit: int = 50,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a chronological audit trail for one dataset's pipeline.
 
     Each entry is a saved `PipelineVersion` augmented with a per-node diff
@@ -298,7 +298,7 @@ async def get_pipeline_audit_log(
     # Service returns newest-first; walk oldest->newest so each diff sees the
     # prior version, then re-reverse for the response.
     chronological = list(reversed(versions))
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     prev_graph: Any = None
     for v in chronological:
         diff = _diff_versions(prev_graph, v.graph)

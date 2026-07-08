@@ -1,6 +1,7 @@
 """Tests for the structural protocols in `skyulf.core.protocols`."""
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 import pandas as pd
 import pytest

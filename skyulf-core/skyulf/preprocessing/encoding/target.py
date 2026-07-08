@@ -1,7 +1,8 @@
 """Target Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 from sklearn.preprocessing import TargetEncoder
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-def _resolve_apply_inputs(X: Any, params: Dict[str, Any]) -> Tuple[List[str], Any]:
+def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], Any]:
     """Return ``(valid_cols, encoder)`` or ``([], None)`` if nothing to do."""
     cols = params.get("columns", [])
     encoder = params.get("encoder_object")
@@ -33,7 +34,7 @@ def _resolve_apply_inputs(X: Any, params: Dict[str, Any]) -> Tuple[List[str], An
     return valid_cols, encoder
 
 
-def _target_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
     valid_cols, encoder = _resolve_apply_inputs(X, params)
@@ -63,7 +64,7 @@ def _target_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, A
         return X, y
 
 
-def _target_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, encoder = _resolve_apply_inputs(X, params)
     if not valid_cols:
         return X, y
@@ -91,7 +92,7 @@ def _target_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, A
 
 class TargetEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -105,7 +106,7 @@ class TargetEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _maybe_extract_y_polars(X: Any, y: Any, target_col: Optional[str]) -> Any:
+def _maybe_extract_y_polars(X: Any, y: Any, target_col: str | None) -> Any:
     """Polars fit-time fallback: pull ``y`` out of ``X`` if missing."""
     if y is not None or not target_col:
         return y
@@ -114,7 +115,7 @@ def _maybe_extract_y_polars(X: Any, y: Any, target_col: Optional[str]) -> Any:
     return y
 
 
-def _maybe_extract_y_pandas(X: Any, y: Any, target_col: Optional[str]) -> Any:
+def _maybe_extract_y_pandas(X: Any, y: Any, target_col: str | None) -> Any:
     """Pandas fit-time fallback: pull ``y`` out of ``X`` if missing."""
     if y is not None or not target_col:
         return y
@@ -132,13 +133,13 @@ def _y_to_numpy(y: Any) -> Any:
     return y
 
 
-def _resolve_fit_cols(X: Any, y: Any, config: Dict[str, Any]) -> List[str]:
+def _resolve_fit_cols(X: Any, y: Any, config: dict[str, Any]) -> list[str]:
     """Pick the categorical columns to encode, excluding the target."""
     cols = resolve_columns(X, config, detect_categorical_columns)
     return _exclude_target_column(cols, config, "TargetEncoder", y)
 
 
-def _fit_target_encoder(X_subset: Any, y: Any, config: Dict[str, Any]) -> TargetEncoder:
+def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> TargetEncoder:
     """Run sklearn ``TargetEncoder.fit`` on a prepared subset.
 
     Handles both numeric and string (categorical) target columns:
@@ -175,7 +176,7 @@ def _fit_target_encoder(X_subset: Any, y: Any, config: Dict[str, Any]) -> Target
     return encoder
 
 
-def _target_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     y = _maybe_extract_y_polars(X, y, config.get("target_column"))
     if y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
@@ -189,7 +190,7 @@ def _target_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, A
     return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
 
 
-def _target_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     y = _maybe_extract_y_pandas(X, y, config.get("target_column"))
     if y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
@@ -213,7 +214,7 @@ def _target_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, A
 )
 class TargetEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> TargetEncoderArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> TargetEncoderArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         return cast(
@@ -229,8 +230,8 @@ class TargetEncoderCalculator(BaseCalculator):
     def infer_output_schema(
         self,
         input_schema: SkyulfSchema,
-        config: Dict[str, Any],
-    ) -> Optional[SkyulfSchema]:
+        config: dict[str, Any],
+    ) -> SkyulfSchema | None:
         # Target encoder replaces values in source columns in place — same
         # column names, dtype becomes float (per-column dtype is best-effort
         # so we don't bother rewriting it).

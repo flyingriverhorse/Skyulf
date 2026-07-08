@@ -97,7 +97,7 @@ def test_copy_tuple_payloads_are_independent() -> None:
     ds = SplitDataset(train=(X_train, y_train), test=(X_test, y_test))
     ds_copy = ds.copy()
 
-    X_copy, y_copy = typing.cast(typing.Tuple[pd.DataFrame, pd.Series], ds_copy.train)
+    X_copy, y_copy = typing.cast(tuple[pd.DataFrame, pd.Series], ds_copy.train)
     X_copy.loc[0, "f"] = 999.0
     # Original X_train must still have 1.0.
     assert X_train.loc[0, "f"] == 1.0

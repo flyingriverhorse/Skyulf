@@ -1,7 +1,7 @@
 """Elliptic Envelope outlier node (Gaussian covariance estimation)."""
 
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
 import pandas as pd
 from sklearn.covariance import EllipticEnvelope
@@ -19,7 +19,7 @@ from ._common import _apply_pandas_mask
 logger = logging.getLogger(__name__)
 
 
-def _elliptic_filter_pandas(X_pd: Any, models: Dict[str, Any]) -> pd.Series:
+def _elliptic_filter_pandas(X_pd: Any, models: dict[str, Any]) -> pd.Series:
     """Build a row-keep mask by applying every fitted EllipticEnvelope model."""
     mask = pd.Series(True, index=X_pd.index)
     for col, model in models.items():
@@ -42,7 +42,7 @@ def _elliptic_filter_pandas(X_pd: Any, models: Dict[str, Any]) -> pd.Series:
 
 class EllipticEnvelopeApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         # apply_method already unpacked (X, y); re-wrap so apply_dual_engine's
         # own unpack_pipeline_input doesn't silently drop y (leaving it
         # unfiltered when X rows are removed). Omit the wrap when y is None
@@ -51,7 +51,7 @@ class EllipticEnvelopeApplier(BaseApplier):
         return apply_dual_engine(input_data, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         # sklearn models require numpy/pandas input — convert, filter, convert back.
         import polars as pl
 
@@ -73,7 +73,7 @@ class EllipticEnvelopeApplier(BaseApplier):
         return X_out, y_out
 
     @staticmethod
-    def _apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         models = params.get("models", {})
         if not models:
             return X, y
@@ -91,13 +91,13 @@ class EllipticEnvelopeApplier(BaseApplier):
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Elliptic envelope filters outlier *rows*; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> EllipticEnvelopeArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> EllipticEnvelopeArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 
@@ -107,7 +107,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
         if not cols:
             return {}
 
-        models: Dict[str, Any] = {}
+        models: dict[str, Any] = {}
         warnings = []
         for col in cols:
             series = pd.to_numeric(X_pd[col], errors="coerce").dropna()

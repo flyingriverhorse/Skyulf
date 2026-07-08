@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -19,7 +19,7 @@ _SENSITIVE_CONFIG_KEYS = frozenset(
 )
 
 
-def _redact_config(config: Dict[str, Any]) -> Dict[str, Any]:
+def _redact_config(config: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *config* with sensitive keys removed."""
     return {k: v for k, v in config.items() if k not in _SENSITIVE_CONFIG_KEYS}
 
@@ -27,40 +27,40 @@ def _redact_config(config: Dict[str, Any]) -> Dict[str, Any]:
 class DataSourceCreate(BaseModel):
     name: str
     type: str = "file"
-    config: Dict[str, Any] = {}
-    description: Optional[str] = None
+    config: dict[str, Any] = {}
+    description: str | None = None
 
 
 class IngestionJobResponse(BaseModel):
     job_id: str
     status: str
     message: str
-    file_id: Optional[str] = None
+    file_id: str | None = None
 
 
 class IngestionStatus(BaseModel):
     status: str  # pending, processing, completed, failed
     progress: float
-    error: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    error: str | None = None
+    details: dict[str, Any] | None = None
     updated_at: datetime
 
 
 class DataSourceRead(BaseModel):
     id: int
-    source_id: Optional[str]
+    source_id: str | None
     name: str
     type: str
-    config: Dict[str, Any]
+    config: dict[str, Any]
     is_active: bool
     test_status: str
     created_at: datetime
     updated_at: datetime
-    source_metadata: Optional[Dict[str, Any]] = Field(None, alias="source_metadata")
+    source_metadata: dict[str, Any] | None = Field(None, alias="source_metadata")
 
-    rows: Optional[int] = None
-    columns: Optional[int] = None
-    size_bytes: Optional[int] = None
+    rows: int | None = None
+    columns: int | None = None
+    size_bytes: int | None = None
 
     @field_validator("config", mode="before")
     @classmethod
@@ -89,4 +89,4 @@ class DataSourceResponse(BaseModel):
 
 
 class DataSourceSampleResponse(BaseModel):
-    data: list[Dict[str, Any]]
+    data: list[dict[str, Any]]

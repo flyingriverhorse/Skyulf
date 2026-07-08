@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -9,24 +9,24 @@ class ModelVersion(BaseModel):
     pipeline_id: str
     node_id: str
     model_type: str
-    version: Union[int, str]  # version for training, run_number for tuning
+    version: int | str  # version for training, run_number for tuning
     source: str  # "training" or "tuning"
     status: str
-    metrics: Optional[Dict[str, Any]] = None
-    hyperparameters: Optional[Dict[str, Any]] = None
-    created_at: Optional[datetime] = None
-    artifact_uri: Optional[str] = None
+    metrics: dict[str, Any] | None = None
+    hyperparameters: dict[str, Any] | None = None
+    created_at: datetime | None = None
+    artifact_uri: str | None = None
     is_deployed: bool = False
-    deployment_id: Optional[int] = None
+    deployment_id: int | None = None
 
 
 class ModelRegistryEntry(BaseModel):
     model_type: str
     dataset_id: str
     dataset_name: str
-    dataset_type: Optional[str] = "unknown"
-    latest_version: Optional[ModelVersion] = None
-    versions: List[ModelVersion] = []
+    dataset_type: str | None = "unknown"
+    latest_version: ModelVersion | None = None
+    versions: list[ModelVersion] = []
     deployment_count: int = 0
 
 
@@ -39,4 +39,4 @@ class RegistryStats(BaseModel):
 class ArtifactListResponse(BaseModel):
     storage_type: str
     base_uri: str
-    files: List[str]
+    files: list[str]

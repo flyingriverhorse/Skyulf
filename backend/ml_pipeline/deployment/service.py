@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional, Sequence, Union, cast
+from collections.abc import Sequence
+from typing import Any, cast
 
 import pandas as pd
 import sklearn
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _maybe_decode_predictions(
     predictions: Any,
     feature_engineer: Any,
-    target_column: Optional[str] = None,
+    target_column: str | None = None,
 ) -> Any:
     """Decode numeric class predictions to original labels if possible.
 
@@ -52,7 +53,7 @@ def _maybe_decode_predictions(
 class DeploymentService:
     @staticmethod
     async def deploy_model(
-        session: AsyncSession, job_id: str, user_id: Optional[int] = None
+        session: AsyncSession, job_id: str, user_id: int | None = None
     ) -> Deployment:
         # 1. Get Job Entity
         db_job = await JobService.get_job_by_id(session, job_id)
@@ -123,7 +124,7 @@ class DeploymentService:
         return deployment
 
     @staticmethod
-    async def get_active_deployment(session: AsyncSession) -> Optional[Deployment]:
+    async def get_active_deployment(session: AsyncSession) -> Deployment | None:
         stmt = select(Deployment).where(Deployment.is_active).order_by(Deployment.created_at.desc())
         result = await session.execute(stmt)
         return result.scalars().first()
@@ -260,7 +261,7 @@ class DeploymentService:
                     predictions, feature_engineer, target_column=target_col
                 )
                 if hasattr(predictions, "tolist"):
-                    return cast(List[Any], predictions.tolist())
+                    return cast(list[Any], predictions.tolist())
                 return list(predictions)
             except Exception as e:
                 logger.error(f"Prediction failed: {e}")
@@ -284,7 +285,7 @@ class DeploymentService:
 
             predictions = artifact.predict(df)
             if hasattr(predictions, "tolist"):
-                return cast(List[Any], predictions.tolist())
+                return cast(list[Any], predictions.tolist())
             return list(predictions)
         else:
             raise ValueError(
@@ -294,7 +295,7 @@ class DeploymentService:
     @staticmethod
     async def get_deployment_details(  # noqa: C901  # orchestrator: aggregates many optional fields
         session: AsyncSession, deployment: Deployment
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Returns deployment info enriched with input/output schema from the artifact.
         """
@@ -305,7 +306,7 @@ class DeploymentService:
         try:
             # Load Artifact (Reuse logic from predict - simplified)
             artifact_uri = str(deployment.artifact_uri)
-            store: Union[S3ArtifactStore, LocalArtifactStore]
+            store: S3ArtifactStore | LocalArtifactStore
 
             if artifact_uri.startswith("s3://"):
                 # Parse bucket and key: s3://bucket/key
@@ -430,4 +431,4 @@ class DeploymentService:
         except Exception as e:
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
 
-        return cast(Dict[str, Any], info)
+        return cast(dict[str, Any], info)

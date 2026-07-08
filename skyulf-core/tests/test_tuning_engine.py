@@ -3,7 +3,7 @@
 import importlib.util
 import sys
 import typing
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -288,7 +288,7 @@ def test_fit_progress_callback_invoked():
     X, y = _clf_xy()
     tuner = _tuner_clf()
 
-    calls: List[tuple] = []
+    calls: list[tuple] = []
 
     def _cb(current, total, score, params):
         calls.append((current, total, score, params))
@@ -302,7 +302,7 @@ def test_fit_log_callback_receives_messages():
     X, y = _clf_xy()
     tuner = _tuner_clf()
 
-    messages: List[str] = []
+    messages: list[str] = []
     tuner.fit(X, y, config=_clf_config(), log_callback=messages.append)
     assert len(messages) >= 2
 
@@ -322,7 +322,7 @@ def test_fit_accepts_tuning_config_object():
         search_space={"C": [1.0]},
         cv_folds=3,
     )
-    model, result = tuner.fit(X, y, config=typing.cast(Dict[str, Any], cfg))
+    model, result = tuner.fit(X, y, config=typing.cast(dict[str, Any], cfg))
     assert result.best_params["C"] == 1.0
 
 
@@ -423,14 +423,14 @@ def test_fit_halving_grid_search():
 # ---------------------------------------------------------------------------
 
 
-def _load_engine_variant(extra_sys_modules: Dict[str, Any]):
+def _load_engine_variant(extra_sys_modules: dict[str, Any]):
     """Execute engine.py's module source fresh, under a distinct module
     object (not registered in ``sys.modules`` under the canonical name), so
     the optuna-import fallback branches can be exercised without touching —
     or corrupting coverage tracking of — the real cached
     ``skyulf.modeling._tuning.engine`` module used by the rest of the suite.
     """
-    saved: Dict[str, Any] = {}
+    saved: dict[str, Any] = {}
     sentinel = object()
     for name, mod in extra_sys_modules.items():
         saved[name] = sys.modules.get(name, sentinel)
@@ -545,7 +545,7 @@ class _FlipModelClassCalculator(BaseModelCalculator):
         return "classification"
 
     @property
-    def default_params(self) -> Dict[str, Any]:
+    def default_params(self) -> dict[str, Any]:
         return {"max_iter": 200, "random_state": 42}
 
     @property
@@ -680,7 +680,7 @@ def test_fit_grid_search_handles_failing_candidate():
     # C=-5 is invalid for LogisticRegression and will raise on every fold.
     cfg = _clf_config(search_space={"C": [-5, 1.0]}, cv_folds=3)
 
-    logs: List[str] = []
+    logs: list[str] = []
     model, result = tuner.fit(X, y, config=cfg, log_callback=logs.append)
 
     assert result.best_params["C"] == 1.0
@@ -705,7 +705,7 @@ def test_fit_halving_grid_with_log_callback():
         cv_folds=3,
         random_state=42,
     )
-    logs: List[str] = []
+    logs: list[str] = []
     model, result = tuner.fit(X, y, config=cfg.__dict__, log_callback=logs.append)
     assert any("Starting halving_grid search" in msg for msg in logs)
     assert any("Tuning Completed (halving_grid)" in msg for msg in logs)
@@ -725,7 +725,7 @@ def test_fit_halving_random_with_log_callback_and_string_min_resources():
         random_state=42,
         strategy_params={"min_resources": "20"},
     )
-    logs: List[str] = []
+    logs: list[str] = []
     model, result = tuner.fit(X, y, config=cfg.__dict__, log_callback=logs.append)
     assert any("Starting halving_random search" in msg for msg in logs)
     assert hasattr(model, "predict")
@@ -749,8 +749,8 @@ def test_fit_optuna_strategy_basic():
         cv_folds=3,
         random_state=42,
     )
-    progress_calls: List[tuple] = []
-    logs: List[str] = []
+    progress_calls: list[tuple] = []
+    logs: list[str] = []
     model, result = tuner.fit(
         X,
         y,
@@ -818,7 +818,7 @@ def test_fit_optuna_with_non_list_search_space_value():
     # pre-built Optuna distribution objects at runtime (see engine.py's
     # `else: distributions[k] = v` fallback) — cast to satisfy the type checker.
     search_space = typing.cast(
-        Dict[str, List[Any]],
+        dict[str, list[Any]],
         {
             "C": optuna.distributions.FloatDistribution(0.1, 10.0),
             "solver": ["lbfgs", "liblinear"],
@@ -924,11 +924,11 @@ class _FakeSearcher:
 
     def __init__(
         self,
-        fit_exception: Optional[Exception] = None,
-        best_params_exception: Optional[Exception] = None,
-        best_params: Optional[Dict[str, Any]] = None,
+        fit_exception: Exception | None = None,
+        best_params_exception: Exception | None = None,
+        best_params: dict[str, Any] | None = None,
         best_score: float = 0.9,
-        cv_results: Optional[Dict[str, Any]] = None,
+        cv_results: dict[str, Any] | None = None,
     ):
         self._fit_exception = fit_exception
         self._best_params_exception = best_params_exception

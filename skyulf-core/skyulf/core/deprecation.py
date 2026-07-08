@@ -15,7 +15,8 @@ Usage:
 
 import functools
 import warnings
-from typing import Any, Callable, Optional, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 __all__ = ["deprecated", "warn_deprecated"]
 
@@ -24,9 +25,9 @@ _F = TypeVar("_F", bound=Callable[..., Any])
 
 def _build_message(
     name: str,
-    since: Optional[str],
-    removed_in: Optional[str],
-    replacement: Optional[str],
+    since: str | None,
+    removed_in: str | None,
+    replacement: str | None,
 ) -> str:
     parts = [f"'{name}' is deprecated"]
     if since:
@@ -42,9 +43,9 @@ def _build_message(
 def warn_deprecated(
     name: str,
     *,
-    since: Optional[str] = None,
-    removed_in: Optional[str] = None,
-    replacement: Optional[str] = None,
+    since: str | None = None,
+    removed_in: str | None = None,
+    replacement: str | None = None,
     stacklevel: int = 2,
 ) -> None:
     """Emit a standardised ``DeprecationWarning`` for ``name``.
@@ -61,9 +62,9 @@ def warn_deprecated(
 
 def deprecated(
     *,
-    since: Optional[str] = None,
-    removed_in: Optional[str] = None,
-    replacement: Optional[str] = None,
+    since: str | None = None,
+    removed_in: str | None = None,
+    replacement: str | None = None,
 ) -> Callable[[_F], _F]:
     """Decorator that marks a callable as deprecated.
 

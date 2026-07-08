@@ -5,7 +5,7 @@ The pandas apply path was previously a single CCN-busting function; it is now
 split per dtype family (`float / int / bool / datetime / other`).
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -79,7 +79,7 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
     return None
 
 
-def _casting_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Any:
+def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     import polars as pl
 
     type_map = params.get("type_map", {})
@@ -104,7 +104,7 @@ def _casting_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def _coerce_boolean_value(value: Any) -> Optional[bool]:
+def _coerce_boolean_value(value: Any) -> bool | None:
     """Robustly coerce a single value to bool; ``None`` if undecidable."""
     if pd.isna(value):
         return None
@@ -182,7 +182,7 @@ def _cast_one_column(
     return series.astype(target_dtype)
 
 
-def _casting_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Any:
+def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
     type_map = params.get("type_map", {})
     if not type_map:
         return X, y
@@ -203,7 +203,7 @@ def _casting_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Any:
 
 class CastingApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _casting_apply_polars, _casting_apply_pandas)
 
 
@@ -217,7 +217,7 @@ class CastingApplier(BaseApplier):
 )
 class CastingCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Casting preserves the column set but rewrites dtype labels.
         column_types = dict(config.get("column_types", {}) or {})
@@ -233,7 +233,7 @@ class CastingCalculator(BaseCalculator):
         return new_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CastingArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CastingArtifact:  # pylint: disable=arguments-differ
         # Config supports two shapes:
         #   {'columns': ['col1'], 'target_type': 'float'}
         #   {'column_types': {'col1': 'float', 'col2': 'int'}}
@@ -241,7 +241,7 @@ class CastingCalculator(BaseCalculator):
         columns = config.get("columns", [])
         column_types = config.get("column_types", {})
 
-        final_map: Dict[str, Any] = {}
+        final_map: dict[str, Any] = {}
         for col, dtype in column_types.items():
             if col in X.columns:
                 final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)

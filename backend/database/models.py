@@ -5,9 +5,10 @@ SQLAlchemy models that mirror the existing Flask database structure.
 These models are compatible with the existing database schema.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 from sqlalchemy import (
     JSON,
@@ -49,7 +50,7 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # User profile information
-    full_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    full_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     # User status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -57,7 +58,7 @@ class User(Base, TimestampMixin):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Authentication tracking
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     login_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Relationship to DataSource model
@@ -93,7 +94,7 @@ class DataSource(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     # UUID string identifier for file naming
-    source_id: Mapped[Optional[str]] = mapped_column(
+    source_id: Mapped[str | None] = mapped_column(
         String(50), unique=True, nullable=True, index=True
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
@@ -104,16 +105,16 @@ class DataSource(Base, TimestampMixin):
     config: Mapped[Any] = mapped_column(JSON, nullable=False)
 
     # Credentials (encrypted in production)
-    credentials: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    credentials: Mapped[Any | None] = mapped_column(JSON, nullable=True)
 
     # Status and metadata
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_tested: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_tested: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # 'success', 'failed', 'untested'
     test_status: Mapped[str] = mapped_column(String(20), default="untested", nullable=False)
 
     # User who created this source
-    created_by: Mapped[Optional[int]] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
 
@@ -121,10 +122,10 @@ class DataSource(Base, TimestampMixin):
     creator = relationship("User", back_populates="data_sources")
 
     # Description and documentation
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Additional source metadata (stored as JSON)
-    source_metadata: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    source_metadata: Mapped[Any | None] = mapped_column(JSON, nullable=True)
 
     def __repr__(self):
         return f"<DataSource {self.name} ({self.type})>"
@@ -175,9 +176,9 @@ class FeatureEngineeringPipeline(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     dataset_source_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False, default="Draft pipeline")
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     graph: Mapped[Any] = mapped_column(JSON, nullable=False)
-    pipeline_metadata: Mapped[Optional[Any]] = mapped_column("metadata", JSON, nullable=True)
+    pipeline_metadata: Mapped[Any | None] = mapped_column("metadata", JSON, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     def to_dict(self) -> dict:
@@ -213,14 +214,14 @@ class PipelineVersion(Base):
     dataset_source_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     version_int: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String(150), nullable=False, default="Pipeline")
-    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
     kind: Mapped[str] = mapped_column(String(16), nullable=False, default="manual", index=True)
     pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     graph: Mapped[Any] = mapped_column(JSON, nullable=False)
     node_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     edge_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    dataset_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
+    dataset_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -254,22 +255,22 @@ class MLJob(Base, TimestampMixin):
     pipeline_id: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     node_id: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     dataset_source_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="queued", index=True)
     model_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    job_metadata: Mapped[Optional[Any]] = mapped_column("metadata", JSON, nullable=True)
-    metrics: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    job_metadata: Mapped[Any | None] = mapped_column("metadata", JSON, nullable=True)
+    metrics: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     graph: Mapped[Any] = mapped_column(JSON, nullable=False)
-    artifact_uri: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    artifact_uri: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     progress: Mapped[int] = mapped_column(Integer, default=0)
-    current_step: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    logs: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    promoted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    current_step: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    logs: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    promoted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def to_dict_base(self) -> dict:
         """Convert common model fields to dictionary."""
@@ -302,7 +303,7 @@ class BasicTrainingJob(MLJob):
     __tablename__ = "basic_training_jobs"
 
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    hyperparameters: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    hyperparameters: Mapped[Any | None] = mapped_column(JSON, nullable=True)
 
     owner = relationship("User", backref="basic_training_jobs")
 
@@ -324,15 +325,15 @@ class AdvancedTuningJob(MLJob):
 
     run_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     search_strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="random")
-    search_space: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    baseline_hyperparameters: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    n_iterations: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    scoring: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    random_state: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    cross_validation: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    results: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    best_params: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    best_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    search_space: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    baseline_hyperparameters: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    n_iterations: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    scoring: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    random_state: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cross_validation: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    results: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    best_params: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    best_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     owner = relationship("User", backref="advanced_tuning_jobs")
 
@@ -369,7 +370,7 @@ class Deployment(Base, TimestampMixin):
     model_type: Mapped[str] = mapped_column(String(100), nullable=False)
     artifact_uri: Mapped[str] = mapped_column(String(500), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    deployed_by: Mapped[Optional[int]] = mapped_column(
+    deployed_by: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
 
@@ -403,8 +404,8 @@ class EDAReport(Base, TimestampMixin):
     # PENDING, COMPLETED, FAILED
     status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False)
     config: Mapped[Any] = mapped_column(JSON, nullable=False, default={})
-    profile_data: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    profile_data: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     test_status: Mapped[str] = mapped_column(String(20), default="untested", nullable=False)
 
@@ -444,13 +445,13 @@ class DriftCheckResult(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    dataset_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    reference_rows: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    current_rows: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    drifted_columns_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    total_columns: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    summary: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
-    column_drifts: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    dataset_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    reference_rows: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    current_rows: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    drifted_columns_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_columns: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    summary: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    column_drifts: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
 
 
@@ -466,16 +467,16 @@ class ErrorEvent(Base):
     error_type: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     # Full Python traceback
-    traceback: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    traceback: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Optional pipeline job_id when the error originates from a pipeline run
-    job_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    job_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     # HTTP status code (0 for background task errors)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False, index=True
     )
     # Set when an operator marks the event as resolved/dismissed
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
 
     def to_dict(self):
         return {
@@ -497,12 +498,12 @@ class PipelineRunLog(Base):
     __tablename__ = "pipeline_run_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    pipeline_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
-    node_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    node_type: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    pipeline_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    node_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    node_type: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # 'error' for node failures, 'warning' / 'info' for soft advisories
     level: Mapped[str] = mapped_column(String(20), nullable=False, default="error", index=True)
-    logger: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    logger: Mapped[str | None] = mapped_column(String(200), nullable=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     run_at: Mapped[datetime] = mapped_column(
         DateTime, default=func.now(), nullable=False, index=True
@@ -527,7 +528,7 @@ class PipelineRunLog(Base):
 
 @asynccontextmanager
 async def get_database_session(
-    engine: Optional[AsyncEngine] = None,
+    engine: AsyncEngine | None = None,
     *,
     expire_on_commit: bool = False,
 ) -> AsyncIterator[AsyncSession]:

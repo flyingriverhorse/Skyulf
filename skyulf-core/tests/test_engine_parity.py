@@ -7,7 +7,7 @@ Backlog item E4 — second slice: imputation + outlier calculators added
 alongside the first-slice scalers.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -75,12 +75,12 @@ def _assert_artifacts_equal(pd_params: Any, pl_params: Any) -> None:
 
 
 def _assert_bounds_equal(
-    pd_params: Dict[str, Any], pl_params: Dict[str, Any], *, bounds_key: str = "bounds"
+    pd_params: dict[str, Any], pl_params: dict[str, Any], *, bounds_key: str = "bounds"
 ) -> None:
     """Compare outlier-detector artifacts that use per-column bound dicts."""
     assert pd_params.get("type") == pl_params.get("type")
-    pd_bounds: Dict[str, Any] = pd_params.get(bounds_key, {})
-    pl_bounds: Dict[str, Any] = pl_params.get(bounds_key, {})
+    pd_bounds: dict[str, Any] = pd_params.get(bounds_key, {})
+    pl_bounds: dict[str, Any] = pl_params.get(bounds_key, {})
     assert set(pd_bounds.keys()) == set(pl_bounds.keys()), (
         f"Bounds column mismatch: pandas={set(pd_bounds)} polars={set(pl_bounds)}"
     )
@@ -101,8 +101,8 @@ def _assert_fill_values_equal(pd_params: Any, pl_params: Any) -> None:
     assert pd_params.get("type") == pl_params.get("type")
     assert pd_params.get("strategy") == pl_params.get("strategy")
     assert pd_params.get("columns") == pl_params.get("columns")
-    pd_fv: Dict[str, Any] = pd_params.get("fill_values", {})
-    pl_fv: Dict[str, Any] = pl_params.get("fill_values", {})
+    pd_fv: dict[str, Any] = pd_params.get("fill_values", {})
+    pl_fv: dict[str, Any] = pl_params.get("fill_values", {})
     assert set(pd_fv.keys()) == set(pl_fv.keys())
     for col in pd_fv:
         np.testing.assert_allclose(
@@ -129,7 +129,7 @@ def _assert_fill_values_equal(pd_params: Any, pl_params: Any) -> None:
 )
 @given(df=_numeric_frame())
 def test_scaler_fit_engine_parity(
-    calculator_path: str, config: Dict[str, Any], df: pd.DataFrame
+    calculator_path: str, config: dict[str, Any], df: pd.DataFrame
 ) -> None:
     """Pandas and polars inputs must produce identical fitted artifacts."""
     module_name, class_name = calculator_path.split(":")
@@ -147,7 +147,7 @@ def test_robust_scaler_fit_engine_parity(df: pd.DataFrame) -> None:
     """RobustScaler uses quantile statistics — verify pandas/polars parity."""
     from skyulf.preprocessing.scaling import RobustScalerCalculator
 
-    config: Dict[str, Any] = {"columns": ["a", "b"]}
+    config: dict[str, Any] = {"columns": ["a", "b"]}
     pd_params = RobustScalerCalculator().fit(df, dict(config))
     pl_params = RobustScalerCalculator().fit(pl.from_pandas(df), dict(config))
 
@@ -173,7 +173,7 @@ def test_simple_imputer_fit_engine_parity(strategy: str, df: pd.DataFrame) -> No
     # skip the frame if either column has no variance to keep parity valid.
     assume(df["a"].nunique() > 1 and df["b"].nunique() > 1)
 
-    config: Dict[str, Any] = {"columns": ["a", "b"], "strategy": strategy}
+    config: dict[str, Any] = {"columns": ["a", "b"], "strategy": strategy}
     pd_params = SimpleImputerCalculator().fit(df, dict(config))
     pl_params = SimpleImputerCalculator().fit(pl.from_pandas(df), dict(config))
 
@@ -198,7 +198,7 @@ def test_simple_imputer_fit_engine_parity(strategy: str, df: pd.DataFrame) -> No
 )
 @given(df=_numeric_frame(min_rows=10, max_rows=80))
 def test_outlier_calculator_engine_parity(
-    calculator_path: str, extra_config: Dict[str, Any], df: pd.DataFrame
+    calculator_path: str, extra_config: dict[str, Any], df: pd.DataFrame
 ) -> None:
     """Outlier calculators convert polars → pandas internally.
 
@@ -208,7 +208,7 @@ def test_outlier_calculator_engine_parity(
     module = __import__(module_name, fromlist=[class_name])
     calc_cls = getattr(module, class_name)
 
-    config: Dict[str, Any] = {"columns": ["a", "b"], **extra_config}
+    config: dict[str, Any] = {"columns": ["a", "b"], **extra_config}
     pd_params = calc_cls().fit(df, dict(config))
     pl_params = calc_cls().fit(pl.from_pandas(df), dict(config))
 
@@ -268,7 +268,7 @@ def test_woe_encoder_fit_engine_parity(df: pd.DataFrame) -> None:
     """WOEEncoder yields a plain-dict artifact — pandas/polars must match."""
     from skyulf.preprocessing.encoding import WOEEncoderCalculator
 
-    config: Dict[str, Any] = {"columns": ["city"]}
+    config: dict[str, Any] = {"columns": ["city"]}
     pd_params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), dict(config))
     pl_params = WOEEncoderCalculator().fit(
         (pl.from_pandas(df[["city"]]), pl.Series("target", df["target"])), dict(config)

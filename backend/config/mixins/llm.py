@@ -1,18 +1,18 @@
 """LLM (Large Language Model) provider settings."""
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class LLMMixin:
     """OpenAI, DeepSeek, Anthropic, and local LLM configuration."""
 
     # OpenAI
-    OPENAI_API_KEY: Optional[str] = None
-    OPENAI_ORG_ID: Optional[str] = None
+    OPENAI_API_KEY: str | None = None
+    OPENAI_ORG_ID: str | None = None
     OPENAI_DEFAULT_MODEL: str = "gpt-4"
 
     # DeepSeek
-    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_API_KEY: str | None = None
     DEEPSEEK_API_URL: str = "https://api.deepseek.com"
     DEEPSEEK_DEFAULT_MODEL: str = "deepseek-chat"
     DEEPSEEK_CODE_MODEL: str = "deepseek-coder"
@@ -22,7 +22,7 @@ class LLMMixin:
     DEEPSEEK_RETRY_BACKOFF_SECONDS: int = 2
 
     # Anthropic
-    ANTHROPIC_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: str | None = None
     CLAUDE_DEFAULT_MODEL: str = "claude-3-opus-20240229"
 
     # Local LLM (e.g. Ollama)
@@ -41,7 +41,7 @@ class LLMMixin:
     LLM_CELL_HISTORY_MESSAGES: int = 5
     LLM_CELL_HISTORY_CHAR_LENGTH: int = 1000
 
-    def get_llm_config(self) -> Dict[str, Any]:
+    def get_llm_config(self) -> dict[str, Any]:
         """Package LLM configuration as a dictionary for the LLM service."""
         return {
             "OPENAI_API_KEY": self.OPENAI_API_KEY,  # type: ignore[attr-defined]
