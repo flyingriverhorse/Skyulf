@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.6.7"
+version = "0.6.8"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -143,36 +143,26 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Conservative swap from flake8: same blocking surface (critical errors) plus
-# import sorting (I) and Python modernization (UP, pyupgrade) since we target
-# py312 only. E501/line-length stays non-blocking — it was never in the
-# flake8 blocking select. Expand rule classes (E, W, B, ...) later if desired.
-# B (flake8-bugbear), C4 (flake8-comprehensions), SIM (flake8-simplify), and
-# PERF (perflint) were added after a full pass fixed every violation found at
-# the time (raise-from, contextlib.suppress, ternaries, comprehensions, zip
-# strict=, etc.) — see git history for the modernization commit.
+# UP (pyupgrade), B (bugbear), C4 (comprehensions), SIM (simplify), PERF
+# (perflint) added on top of the original flake8-parity set (E9/F63/F7/F82)
+# plus import sorting (I), now that the codebase targets py312 only.
 select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF"]
-# E203 (whitespace before punctuation) is owned by the formatter. W503 has no Ruff
-# equivalent (ruff-format handles line breaks around binary operators).
-# UP042/UP046/UP047 are excluded deliberately: converting `(str, Enum)` to
-# `StrEnum` changes str()/repr() output (see enum.StrEnum docs), and PEP 695
-# generic syntax is a bigger structural change. Both need case-by-case review
-# rather than blanket enforcement.
-# B008 is ignored repo-wide: FastAPI's `Depends()`/`Body()`/`Query()`/`File()`
-# default-argument pattern is the framework's documented dependency-injection
-# idiom, not a bug — see https://fastapi.tiangolo.com/tutorial/dependencies/.
+# E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
+# case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
+# default-argument idiom, not a bug.
 ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
-# E402 (module import not at top of file) is intentional in these files: routers
-# append sys.path or set env vars before importing their dependencies;
-# analyzer.py wraps optional sklearn/scipy/etc imports in try/except blocks.
+# E402: these modules append sys.path/set env vars before importing, or wrap
+# optional imports in try/except.
 "backend/ml_pipeline/deployment/api.py" = ["E402"]
 "backend/ml_pipeline/execution/graph_utils.py" = ["E402"]
 "backend/ml_pipeline/execution/schemas.py" = ["E402"]
 "backend/ml_pipeline/model_registry/api.py" = ["E402"]
 "backend/monitoring/router.py" = ["E402"]
 "skyulf-core/skyulf/profiling/analyzer.py" = ["E402"]
+# Notebook zip() pairs two same-length lists; out of scope for tooling.
+"skyulf-core/examples/05_leakage_proof_titanic.ipynb" = ["B905"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["skyulf", "backend"]
