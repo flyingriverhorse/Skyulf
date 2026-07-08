@@ -276,7 +276,10 @@ class MergeMixin:
                 self.log(f"WARN: {advisory['message']}")
 
         # Reject obvious wiring mistakes (model object plugged into a data input).
-        for input_id, art in zip(node.inputs, artifacts):
+        # noqa: B905 -- `artifacts` may be shorter than `node.inputs` when duplicate
+        # input edges are deduped in `_resolve_all_inputs`; `strict=True` would raise
+        # in that legitimate case, so the length mismatch is intentional here.
+        for input_id, art in zip(node.inputs, artifacts):  # noqa: B905
             if hasattr(art, "predict") or (hasattr(art, "fit") and not hasattr(art, "transform")):
                 raise ValueError(
                     f"Node {node.node_id}: input from '{input_id}' is a Model object "

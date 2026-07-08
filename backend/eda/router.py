@@ -327,7 +327,7 @@ async def get_decomposition(
                     df = pl.from_pandas(pdf)
         except Exception:
             logger.exception("Failed to load dataset")
-            raise SkyulfException(message="Failed to load dataset")
+            raise SkyulfException(message="Failed to load dataset") from None
 
         # 5. Run Analysis
         analyzer = EDAAnalyzer(cast(Any, df))
@@ -351,4 +351,4 @@ async def get_decomposition(
         raise
     except Exception:
         logger.exception("Unexpected error in get_decomposition")
-        raise SkyulfException(message="Internal server error")
+        raise SkyulfException(message="Internal server error") from None

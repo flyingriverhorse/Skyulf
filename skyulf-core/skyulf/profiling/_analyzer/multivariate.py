@@ -172,7 +172,7 @@ class MultivariateMixin(_AnalyzerState):
             feature_names = numeric_cols
             for i, label in enumerate(unique_labels):
                 center_dict = {
-                    col: float(val) for col, val in zip(feature_names, centers_original[i])
+                    col: float(val) for col, val in zip(feature_names, centers_original[i], strict=True)
                 }
                 clusters_stats.append(
                     ClusterStats(
@@ -244,7 +244,7 @@ class MultivariateMixin(_AnalyzerState):
             if total_outliers == 0:
                 return None
 
-            scored_indices = list(zip(range(len(scores)), scores))
+            scored_indices = list(zip(range(len(scores)), scores, strict=True))
             scored_indices.sort(key=lambda x: x[1])
 
             top_k = 20

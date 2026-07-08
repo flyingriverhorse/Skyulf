@@ -86,7 +86,7 @@ class S3Connector(BaseConnector):
                         "S3 Connection Error: Could not find AWS credentials. "
                         "If running locally, ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
                         "are set or passed in storage_options."
-                    )
+                    ) from e
                 raise ValueError(
                     f"Could not infer schema for {self.path}. Ensure it is a valid Parquet or CSV file "
                     "and that the configured S3 credentials have access."

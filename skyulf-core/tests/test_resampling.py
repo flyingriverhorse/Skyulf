@@ -373,7 +373,7 @@ class TestSingleSampleMinorityClass:
         X = pd.DataFrame({"f1": rng.normal(0, 1, 11), "f2": rng.normal(0, 1, 11)})
         y = pd.Series([0] * 10 + [1], name="target")  # only 1 minority sample
         art = OversamplingCalculator().fit((X, y), {"method": "smote", "k_neighbors": 5})
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             # imblearn raises ValueError when k_neighbors >= minority sample count
             OversamplingApplier().apply((X, y), art)
 

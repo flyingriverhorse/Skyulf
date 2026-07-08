@@ -155,7 +155,7 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
         return DataProfiler.generate_profile(df)
     except Exception:
         logger.exception("Failed to profile dataset %s", dataset_id)
-        raise SkyulfException(message="Failed to profile dataset")
+        raise SkyulfException(message="Failed to profile dataset") from None
 
 
 @router.get("/hyperparameters/{model_type}")

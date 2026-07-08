@@ -184,10 +184,9 @@ class ModelRegistryService:
             # Resolve dataset name and type
             # Try exact match, then string conversion
             ds_info = ds_map.get(ds_id)
-            if not ds_info:
+            if not ds_info and isinstance(ds_id, str) and ds_id.isdigit():
                 # Fallback: check if ds_id is numeric string and try int key
-                if isinstance(ds_id, str) and ds_id.isdigit():
-                    ds_info = ds_map.get(int(ds_id))
+                ds_info = ds_map.get(int(ds_id))
 
             if ds_info:
                 ds_name = ds_info["name"]

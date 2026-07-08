@@ -313,33 +313,32 @@ class TuningCalculator(BaseModelCalculator):
         # --- VALIDATION: Metric Consistency Check ---
         # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy"
         # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
-        if self.model_calculator.problem_type == "regression":
-            if metric in [
-                "accuracy",
-                "f1",
-                "precision",
-                "recall",
-                "roc_auc",
-                "f1_weighted",
-                "balanced_accuracy",
-                "log_loss",
-                "matthews_corrcoef",
-                "roc_auc_weighted",
-                "roc_auc_ovr",
-                "roc_auc_ovo",
-                "roc_auc_ovr_weighted",
-                "roc_auc_ovo_weighted",
-                "pr_auc",
-                "pr_auc_weighted",
-                "g_score",
-            ]:
-                raise ValueError(
-                    f"Configuration Error: You selected '{metric}' as the tuning metric, "
-                    "but this is a Regression model. "
-                    "Accuracy/F1/AUC are for Classification only. "
-                    "Please open 'Advanced Settings' on this node and select a regression metric "
-                    "(e.g., R2, RMSE, MAE)."
-                )
+        if self.model_calculator.problem_type == "regression" and metric in [
+            "accuracy",
+            "f1",
+            "precision",
+            "recall",
+            "roc_auc",
+            "f1_weighted",
+            "balanced_accuracy",
+            "log_loss",
+            "matthews_corrcoef",
+            "roc_auc_weighted",
+            "roc_auc_ovr",
+            "roc_auc_ovo",
+            "roc_auc_ovr_weighted",
+            "roc_auc_ovo_weighted",
+            "pr_auc",
+            "pr_auc_weighted",
+            "g_score",
+        ]:
+            raise ValueError(
+                f"Configuration Error: You selected '{metric}' as the tuning metric, "
+                "but this is a Regression model. "
+                "Accuracy/F1/AUC are for Classification only. "
+                "Please open 'Advanced Settings' on this node and select a regression metric "
+                "(e.g., R2, RMSE, MAE)."
+            )
         # -----------------------------------------------
 
         # Map common user-friendly metrics to sklearn scoring strings
@@ -473,10 +472,7 @@ class TuningCalculator(BaseModelCalculator):
 
                 # Filter out failed folds for mean calculation if possible, or penalize
                 valid_scores = [s for s in fold_scores if s != -float("inf")]
-                if valid_scores:
-                    mean_score = np.mean(valid_scores)
-                else:
-                    mean_score = -float("inf")
+                mean_score = np.mean(valid_scores) if valid_scores else -float("inf")
 
                 if log_callback:
                     log_callback(f"Candidate {i + 1} Mean Score: {mean_score:.4f}")

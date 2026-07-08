@@ -235,10 +235,7 @@ def _sort_by_time(
     if sort_col and sort_col in X.columns:
         sort_order = X[sort_col].argsort()
         X = X.iloc[sort_order].reset_index(drop=True)
-        if hasattr(y, "iloc"):
-            y = y.iloc[sort_order].reset_index(drop=True)
-        else:
-            y = y[sort_order]
+        y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
         msg = f"Time Series CV: data sorted by '{sort_col}'."
         if log_callback:
             log_callback(msg)

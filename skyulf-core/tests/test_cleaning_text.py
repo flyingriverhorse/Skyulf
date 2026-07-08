@@ -33,7 +33,7 @@ _regex_pandas_cases = TestCaseLoader("preprocessing/cleaning_text", group="regex
 
 def _assert_series_matches(result: pd.Series, expected: list) -> None:
     """Compare a pandas Series against an expected list, treating None as NaN."""
-    for got, exp in zip(result, expected):
+    for got, exp in zip(result, expected, strict=True):
         if exp is None:
             assert pd.isna(got)
         else:
@@ -380,5 +380,5 @@ class TestRealShapedDataset:
         # Non-null city values must not gain or lose any whitespace.
         non_null_original = df.loc[df["city"].notna(), "city"].reset_index(drop=True)
         non_null_result = result.loc[df["city"].notna(), "city"].reset_index(drop=True)
-        for orig, trimmed in zip(non_null_original, non_null_result):
+        for orig, trimmed in zip(non_null_original, non_null_result, strict=True):
             assert trimmed == orig.strip()

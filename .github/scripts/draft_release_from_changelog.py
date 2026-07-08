@@ -41,10 +41,7 @@ def main():
     next_header_pattern = re.compile(r"^##\s+v\d", re.MULTILINE)
     next_match = next_header_pattern.search(content, pos=start_idx)
 
-    if next_match:
-        end_idx = next_match.start()
-    else:
-        end_idx = len(content)
+    end_idx = next_match.start() if next_match else len(content)
 
     notes = content[start_idx:end_idx].strip()
 

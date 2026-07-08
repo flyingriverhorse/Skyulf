@@ -46,12 +46,12 @@ def _profile_fit_polars(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProf
     profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),
-        "dtypes": {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)},
+        "dtypes": {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes, strict=True)},
         "missing": {col: X[col].null_count() for col in X.columns},
     }
     numeric_cols = [
         col
-        for col, dtype in zip(X.columns, X.dtypes)
+        for col, dtype in zip(X.columns, X.dtypes, strict=True)
         if dtype in (pl.Float64, pl.Float32, pl.Int64, pl.Int32)
     ]
     if numeric_cols:

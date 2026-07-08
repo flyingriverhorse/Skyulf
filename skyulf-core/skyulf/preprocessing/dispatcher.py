@@ -65,10 +65,7 @@ def apply_dual_engine(
     else:
         # Pandas path
         # Ensure X is pandas
-        if hasattr(X, "to_pandas"):
-            X_pd = X.to_pandas()
-        else:
-            X_pd = X
+        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
 
         try:
             X_out, y_out = pandas_func(X_pd, y, params)
@@ -107,10 +104,7 @@ def fit_dual_engine(
             # logger.error(f"Polars Engine Fit Failed: {e}")
             raise e
     else:
-        if hasattr(X, "to_pandas"):
-            X_pd = X.to_pandas()
-        else:
-            X_pd = X
+        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:
             return dict(pandas_func(X_pd, y, params))
         except Exception as e:

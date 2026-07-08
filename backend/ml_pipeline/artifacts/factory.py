@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from backend.config import get_settings
@@ -101,8 +102,8 @@ class ArtifactFactory:
         else:
             # Create Local Store
             artifact_root = ArtifactFactory._resolve_artifact_root(settings.TRAINING_ARTIFACT_DIR)
-            base_path = os.path.join(artifact_root, folder_name)
-            os.makedirs(base_path, exist_ok=True)
+            base_path = str(Path(artifact_root) / folder_name)
+            Path(base_path).mkdir(parents=True, exist_ok=True)
             store = LocalArtifactStore(base_path)
             return store, base_path
 
@@ -131,11 +132,14 @@ class ArtifactFactory:
         # Skip containment check in test mode — tests use tmp_path / synthetic URIs
         from backend.config import get_settings
 
-        if not getattr(get_settings(), "TESTING", False):
-            if not resolved.startswith(root + os.sep) and resolved != root:
-                raise PermissionError(
-                    "Artifact path resolves outside the configured artifact directory"
-                )
+        if (
+            not getattr(get_settings(), "TESTING", False)
+            and not resolved.startswith(root + os.sep)
+            and resolved != root
+        ):
+            raise PermissionError(
+                "Artifact path resolves outside the configured artifact directory"
+            )
         return resolved
 
     @staticmethod

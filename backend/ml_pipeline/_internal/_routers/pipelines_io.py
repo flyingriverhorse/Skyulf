@@ -8,7 +8,7 @@ plus a small JSON-on-disk fallback for the "json" storage backend.
 
 import json
 import logging
-import os
+from pathlib import Path
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -46,18 +46,18 @@ async def save_pipeline(
 
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
-        os.makedirs(storage_dir, exist_ok=True)
+        Path(storage_dir).mkdir(parents=True, exist_ok=True)
         # Guard against path traversal in dataset_id (e.g. "../../etc/passwd")
-        safe_id = os.path.basename(dataset_id)
+        safe_id = Path(dataset_id).name
         if not safe_id or safe_id != dataset_id:
             raise HTTPException(status_code=400, detail="Invalid dataset_id")
-        file_path = os.path.join(storage_dir, f"{safe_id}.json")
+        file_path = Path(storage_dir) / f"{safe_id}.json"
         try:
-            with open(file_path, "w") as f:
+            with file_path.open("w") as f:
                 json.dump(payload.model_dump(), f, indent=2)
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
-            raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}")
+            raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}") from e
 
     # Default: Database Storage
     try:
@@ -107,7 +107,7 @@ async def save_pipeline(
         return {"status": "success", "id": dataset_id, "storage": "database"}
     except Exception as e:
         await session.rollback()
-        raise SkyulfException(message=f"Failed to save pipeline: {str(e)}")
+        raise SkyulfException(message=f"Failed to save pipeline: {str(e)}") from e
 
 
 @router.get("/load/{dataset_id}")
@@ -121,17 +121,17 @@ async def load_pipeline(
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
         # Guard against path traversal in dataset_id
-        safe_id = os.path.basename(dataset_id)
+        safe_id = Path(dataset_id).name
         if not safe_id or safe_id != dataset_id:
             return None
-        file_path = os.path.join(storage_dir, f"{safe_id}.json")
-        if not os.path.exists(file_path):
+        file_path = Path(storage_dir) / f"{safe_id}.json"
+        if not file_path.exists():
             return None
         try:
-            with open(file_path) as f:
+            with file_path.open() as f:
                 return json.load(f)
         except Exception as e:
-            raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}")
+            raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}") from e
 
     # Default: Database Storage
     try:
@@ -145,7 +145,7 @@ async def load_pipeline(
             return None
         return pipeline.to_dict()
     except Exception as e:
-        raise SkyulfException(message=f"Failed to load pipeline: {str(e)}")
+        raise SkyulfException(message=f"Failed to load pipeline: {str(e)}") from e
 
 
 # --- L7: Server-side pipeline versioning ---
@@ -188,7 +188,7 @@ async def create_pipeline_version(
         return version.to_dict()
     except Exception as e:  # noqa: BLE001
         await session.rollback()
-        raise SkyulfException(message=f"Failed to create pipeline version: {str(e)}")
+        raise SkyulfException(message=f"Failed to create pipeline version: {str(e)}") from e
 
 
 @router.patch("/versions/{dataset_source_id}/{version_id}")

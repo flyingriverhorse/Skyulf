@@ -296,9 +296,8 @@ class FeatureEngineer:
                 if key in fitted_params:
                     metrics[key] = fitted_params[key]
 
-        if transformer_type in self._OUTLIER_TYPES:
-            if "warnings" in fitted_params:
-                metrics["warnings"] = fitted_params["warnings"]
+        if transformer_type in self._OUTLIER_TYPES and "warnings" in fitted_params:
+            metrics["warnings"] = fitted_params["warnings"]
         if transformer_type in {"IQR", "Winsorize"} and "bounds" in fitted_params:
             metrics["bounds"] = fitted_params["bounds"]
         if transformer_type == "ZScore" and "stats" in fitted_params:
@@ -480,4 +479,4 @@ class FeatureEngineer:
                 NodeRegistry.get_applier(type_name)(),
             )
         except ValueError:
-            raise ValueError(f"Unknown transformer type: {type_name}")
+            raise ValueError(f"Unknown transformer type: {type_name}") from None

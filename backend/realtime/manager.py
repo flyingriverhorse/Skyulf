@@ -6,6 +6,7 @@ subscribes to the Redis pub/sub channel and broadcasts every message.
 """
 
 import asyncio
+import contextlib
 import logging
 from typing import Any
 
@@ -79,19 +80,17 @@ class ConnectionManager:
         self._stop.set()
         if self._subscriber_task:
             self._subscriber_task.cancel()
-            try:
+            # best-effort task teardown during shutdown
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._subscriber_task
-            except (asyncio.CancelledError, Exception):
-                pass  # nosec B110 - best-effort task teardown during shutdown
             self._subscriber_task = None
         async with self._lock:
             clients = list(self._clients)
             self._clients.clear()
         for ws in clients:
-            try:
+            # best-effort socket close during shutdown
+            with contextlib.suppress(Exception):
                 await ws.close()
-            except Exception:
-                pass  # nosec B110 - best-effort socket close during shutdown
 
     async def _drain_pubsub(self, pubsub: Any) -> None:
         """Forward messages from a Redis pubsub stream until stop is set."""
@@ -130,10 +129,8 @@ class ConnectionManager:
                 raise
             except Exception as exc:
                 logger.warning("Realtime subscriber error: %s (retry in %.1fs)", exc, backoff)
-                try:
+                with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._stop.wait(), timeout=backoff)
-                except TimeoutError:
-                    pass
                 backoff = min(backoff * 2, 30.0)
 
     async def _local_loop(self) -> None:

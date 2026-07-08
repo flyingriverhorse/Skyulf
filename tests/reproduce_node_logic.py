@@ -50,10 +50,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         res = applier.apply(df, params)
 
         # Depending on implementation, it might return just DF (if input was DF)
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         # Check result
         # (val - mean) / std
@@ -83,10 +80,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = IQRApplier()
         res = applier.apply(df, params)
 
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         print(f"Original Row Count: {df.height}")
         print(f"Filtered Row Count: {out_df.height}")
@@ -145,10 +139,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = SimpleImputerApplier()
         res = applier.apply(df, params)
 
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         # Check filled value
         filled_a = out_df.get_column("a").to_list()
@@ -159,10 +150,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         params_const = calc.fit(df, config_const)
         res_const = applier.apply(df, params_const)
 
-        if isinstance(res_const, tuple):
-            out_df_const = res_const[0]
-        else:
-            out_df_const = res_const
+        out_df_const = res_const[0] if isinstance(res_const, tuple) else res_const
 
         filled_b = out_df_const.get_column("b").to_list()
         self.assertEqual(filled_b[0], 999.0)
@@ -187,10 +175,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = OneHotEncoderApplier()
         res = applier.apply(df, params)
 
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         # columns should include color_blue, color_green, color_red (assuming auto sort)
         # and original 'color' should be dropped by default
@@ -217,10 +202,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = OrdinalEncoderApplier()
         res = applier.apply(df, params)
 
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         grade_col = out_df.get_column("grade").to_list()
         # A should be encoded to same integer (0.0 probably)
@@ -272,10 +254,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = DropMissingRowsApplier()
         res = applier.apply(df, params)
 
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         self.assertEqual(out_df.height, 2)
         self.assertEqual(out_df["a"].to_list(), [1, 3])
@@ -295,10 +274,7 @@ class TestPreprocessingNodes(unittest.TestCase):
         applier = DeduplicateApplier()
         res = applier.apply(df, params)
 
-        if isinstance(res, tuple):
-            out_df = res[0]
-        else:
-            out_df = res
+        out_df = res[0] if isinstance(res, tuple) else res
 
         self.assertEqual(out_df.height, 3)
         self.assertEqual(out_df.filter(pl.col("id") == 1)["val"][0], 10)

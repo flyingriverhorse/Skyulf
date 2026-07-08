@@ -149,13 +149,12 @@ class Settings(
                     url += f"?{'&'.join(params)}"
 
                 self.DATABASE_URL = url
-        elif self.DB_TYPE == "sqlite":
-            if not self.DATABASE_URL.startswith("sqlite"):
-                db_path = self.DB_PATH or "mlops_database.db"
-                if Path(db_path).is_absolute():
-                    self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
-                else:
-                    self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
+        elif self.DB_TYPE == "sqlite" and not self.DATABASE_URL.startswith("sqlite"):
+            db_path = self.DB_PATH or "mlops_database.db"
+            if Path(db_path).is_absolute():
+                self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
+            else:
+                self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
         return self
 
     @model_validator(mode="after")

@@ -147,7 +147,7 @@ async def async_session_or_connection(  # noqa: C901
         try:
             import aiomysql  # type: ignore
         except ImportError:
-            raise RuntimeError("aiomysql package required for MySQL async support")
+            raise RuntimeError("aiomysql package required for MySQL async support") from None
 
         # Parse connection details from URL or config
         import urllib.parse as urlparse
@@ -173,7 +173,7 @@ async def async_session_or_connection(  # noqa: C901
         try:
             from motor.motor_asyncio import AsyncIOMotorClient  # type: ignore
         except ImportError:
-            raise RuntimeError("motor package required for MongoDB async support")
+            raise RuntimeError("motor package required for MongoDB async support") from None
 
         client = AsyncIOMotorClient(cfg["database_url"])
 
@@ -197,7 +197,7 @@ async def async_session_or_connection(  # noqa: C901
         try:
             import snowflake.connector  # type: ignore
         except ImportError:
-            raise RuntimeError("snowflake-connector-python package required for Snowflake support")
+            raise RuntimeError("snowflake-connector-python package required for Snowflake support") from None
 
         # Create connection in thread pool since Snowflake is sync-only
         executor = ThreadPoolExecutor(max_workers=1)

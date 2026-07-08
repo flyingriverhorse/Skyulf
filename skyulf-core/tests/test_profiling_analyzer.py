@@ -30,7 +30,7 @@ def _mixed_dataset(n: int = 120) -> pl.DataFrame:
 
     months = rng.integers(1, 13, size=n)
     days = rng.integers(1, 28, size=n)
-    dates = [f"2021-{m:02d}-{d:02d}" for m, d in zip(months, days)]
+    dates = [f"2021-{m:02d}-{d:02d}" for m, d in zip(months, days, strict=True)]
 
     words = ["good", "bad", "excellent", "terrible", "average", "great"]
     text_col = [" ".join(rng.choice(words, size=4)) + f" note {i}" for i in range(n)]

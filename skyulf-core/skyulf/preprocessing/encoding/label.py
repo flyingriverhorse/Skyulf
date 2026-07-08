@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 def _le_mapping(le: LabelEncoder) -> dict[Any, int]:
     """Return ``{class -> int}`` mapping for a fitted LabelEncoder."""
-    return dict(zip(le.classes_, le.transform(le.classes_)))
+    return dict(zip(le.classes_, le.transform(le.classes_), strict=True))
 
 
 def _le_mapping_str(le: LabelEncoder) -> dict[str, int]:
     """String-keyed variant for Polars `replace`."""
-    return {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))}
+    return {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_), strict=True)}
 
 
 def _build_polars_feature_exprs(

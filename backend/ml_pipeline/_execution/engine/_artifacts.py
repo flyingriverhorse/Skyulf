@@ -70,7 +70,7 @@ class ArtifactsMixin:
                     importances = abs(coef)
 
             if importances is not None and len(importances) == len(feature_names):
-                return {name: round(float(val), 6) for name, val in zip(feature_names, importances)}
+                return {name: round(float(val), 6) for name, val in zip(feature_names, importances, strict=True)}
         except Exception:
             logger.debug(
                 "Failed to extract feature importances for step_type=%s",
@@ -116,10 +116,8 @@ class ArtifactsMixin:
             train_df = None
 
             # 1. Extract Training Data
-            if isinstance(data, SplitDataset):
-                raw_train = data.train
-            else:
-                raw_train = data  # Assume it's the full dataset if not split
+            # Assume it's the full dataset if not split
+            raw_train = data.train if isinstance(data, SplitDataset) else data
 
             # 2. Normalize to DataFrame
             if isinstance(raw_train, pd.DataFrame):

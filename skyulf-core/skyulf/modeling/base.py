@@ -239,16 +239,12 @@ class StatefulEstimator:
         # Test Predictions
         is_test_empty = False
         test_df = None
-        if isinstance(dataset.test, tuple):
-            test_df = dataset.test[0]
-        else:
-            test_df = dataset.test
+        test_df = dataset.test[0] if isinstance(dataset.test, tuple) else dataset.test
 
-        if hasattr(test_df, "empty"):
-            is_test_empty = test_df.empty
-        else:
-            # Polars
-            is_test_empty = test_df.is_empty()
+        # is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`
+        is_test_empty = (
+            test_df.empty if hasattr(test_df, "empty") else test_df.is_empty()
+        )
 
         if not is_test_empty:
             if isinstance(dataset.test, tuple):

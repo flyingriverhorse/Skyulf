@@ -330,10 +330,7 @@ class TestTargetEncoder:
         params = calc.fit((X, y), {"columns": ["color"], "target_column": "target"})
         result = applier.apply((X, y), params)
         # Result should be a tuple (X, y)
-        if isinstance(result, tuple):
-            X_out = result[0]
-        else:
-            X_out = result
+        X_out = result[0] if isinstance(result, tuple) else result
         assert pd.api.types.is_numeric_dtype(X_out["color"])
 
 

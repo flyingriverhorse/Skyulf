@@ -118,7 +118,7 @@ class NodeRunnersMixin:
             # Try to resolve name for better error message
             raise FileNotFoundError(
                 f"Dataset {dataset_id} not found. Please check if the file exists."
-            )
+            ) from None
 
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
@@ -570,7 +570,7 @@ class NodeRunnersMixin:
             return calculator_cls(), applier_cls()
         except ValueError:
             # Fallback: Raise original error if not found in registry
-            raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})")
+            raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})") from None
 
     def _run_data_preview(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         """

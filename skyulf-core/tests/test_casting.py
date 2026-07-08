@@ -197,7 +197,7 @@ def test_cast_datetime_bad_string_coerced_to_nat() -> None:
 def test_cast_datetime_bad_string_raises_without_coerce() -> None:
     """Non-parseable strings with coerce_on_error=False must raise."""
     s = pd.Series(["not-a-date"])
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         _cast_datetime(s, coerce_on_error=False)
 
 
@@ -323,7 +323,7 @@ def test_casting_applier_coerce_false_raises_on_bad_cast() -> None:
     """coerce_on_error=False must propagate exceptions from bad casts."""
     df = pd.DataFrame({"a": ["not_a_number", "also_bad"]})
     params: dict[str, Any] = {"type_map": {"a": "float64"}, "coerce_on_error": False}
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         CastingApplier().apply(df, params)
 
 

@@ -1,5 +1,6 @@
 """Evaluation metrics calculation."""
 
+import contextlib
 import importlib
 import math
 import warnings
@@ -29,10 +30,8 @@ from ...engines import SkyulfDataFrame
 from ...modeling.sklearn_wrapper import SklearnBridge
 
 _imblearn_metrics = None
-try:
+with contextlib.suppress(ModuleNotFoundError):
     _imblearn_metrics = importlib.import_module("imblearn.metrics")
-except ModuleNotFoundError:
-    pass
 
 geometric_mean_score = None
 if _imblearn_metrics is not None:
@@ -85,10 +84,8 @@ def calculate_classification_metrics(
         pass
 
     if geometric_mean_score is not None:
-        try:
+        with contextlib.suppress(Exception):
             metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
-        except Exception:
-            pass
 
     try:
         if hasattr(model, "predict_proba"):
@@ -97,10 +94,8 @@ def calculate_classification_metrics(
                 proba = model.predict_proba(X_np)
             if proba.ndim == 2 and proba.shape[1] >= 2:
                 class_count = proba.shape[1]
-                try:
+                with contextlib.suppress(Exception):
                     metrics["log_loss"] = float(log_loss(y_arr, proba))
-                except Exception:
-                    pass
                 try:
                     if class_count == 2:
                         metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))

@@ -52,7 +52,7 @@ async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_as
         return await ModelRegistryService.get_job_artifacts(session, job_id)
     except ValueError as e:
         logger.warning("Artifact lookup failed for job %s: %s", job_id, e)
-        raise HTTPException(status_code=404, detail="Job artifacts not found")
+        raise HTTPException(status_code=404, detail="Job artifacts not found") from e
     except Exception:
         logger.exception("Failed to list artifacts for job %s", job_id)
-        raise SkyulfException(message="Failed to retrieve job artifacts")
+        raise SkyulfException(message="Failed to retrieve job artifacts") from None
