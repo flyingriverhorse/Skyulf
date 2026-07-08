@@ -6,7 +6,7 @@ Uses the repository pattern to separate database operations from business logic.
 """
 
 import logging
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import CursorResult
@@ -20,11 +20,7 @@ from .models import DataSource, User
 
 logger = logging.getLogger(__name__)
 
-# Generic type for repository operations
-ModelType = TypeVar("ModelType", bound=Base)
-
-
-class BaseRepository(Generic[ModelType]):
+class BaseRepository[ModelType: Base]:
     """
     Generic repository class for common database operations.
     Provides async equivalents of Flask CRUD operations.

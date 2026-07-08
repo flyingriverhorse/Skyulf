@@ -3,7 +3,7 @@ import time
 import tracemalloc
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from typing import Any, TypeVar, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -16,7 +16,6 @@ from ._schema import SkyulfSchema
 # TypeVar lets the specific NodeArtifact TypedDict flow through fit_method
 # so callers see the concrete return type. Bound to Mapping (not Dict) so
 # TypedDicts — which are not LSP-substitutable for Dict — are valid returns.
-_NodeParams = TypeVar("_NodeParams", bound=Mapping[str, Any])
 
 
 def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -50,19 +49,19 @@ def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-def fit_method(fn: Callable[..., _NodeParams]) -> Callable[..., _NodeParams]:
+def fit_method[T: Mapping[str, Any]](fn: Callable[..., T]) -> Callable[..., T]:
     """Decorator that handles unpack boilerplate around a Calculator's `fit`.
 
     The decorated method is written as ``(self, X, y, config)`` and may
     ignore ``y`` for X-only fits. No packing is done — `fit` returns a
     params dict, not a frame.
 
-    The TypeVar ``_NodeParams`` preserves the specific TypedDict return type
+    The type parameter ``T`` preserves the specific TypedDict return type
     (see ``preprocessing._artifacts``) so callers see the concrete shape.
     """
 
     @functools.wraps(fn)
-    def wrapper(self: Any, df: Any, config: dict[str, Any]) -> _NodeParams:
+    def wrapper(self: Any, df: Any, config: dict[str, Any]) -> T:
         X, y, _ = unpack_pipeline_input(df)
         return fn(self, X, y, config)
 

@@ -113,10 +113,9 @@ _SCALER_LABEL: dict[str, str] = {
 
 
 def _normalize(step_type: Any) -> str:
-    # Prefer the enum's underlying value so `StepType.BASIC_TRAINING`
-    # normalises to `"basictraining"`, not `"steptype.basictraining"`
-    # (Python ≥ 3.11 changes `str(IntEnum)`/`str(StrEnum)` semantics; the
-    # project supports both 3.10 and 3.12, so don't rely on `str(enum)`).
+    # `step_type` may arrive as either a `StepType` member or a plain string
+    # (e.g. from a Pydantic field typed as `str`). Prefer `.value` explicitly
+    # rather than `str(step_type)` so both inputs normalise consistently.
     raw = getattr(step_type, "value", step_type)
     return str(raw or "").lower().replace(" ", "").replace("-", "").replace("_", "")
 

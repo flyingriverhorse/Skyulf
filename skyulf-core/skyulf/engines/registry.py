@@ -6,7 +6,7 @@ This module handles the auto-detection of the appropriate compute engine
 """
 
 import logging
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 # We import the protocol for type checking, but we don't strictly need it at runtime here
@@ -16,7 +16,7 @@ from .protocol import SkyulfDataFrame
 logger = logging.getLogger(__name__)
 
 
-class EngineName(str, Enum):
+class EngineName(StrEnum):
     PANDAS = "pandas"
     POLARS = "polars"
     BASE = "base"

@@ -5,7 +5,6 @@ import sys
 import typing
 from typing import Any
 
-import numpy as np
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification, make_regression
@@ -21,7 +20,6 @@ from skyulf.modeling.classification import (
     LogisticRegressionCalculator,
 )
 from skyulf.modeling.regression import (
-    RandomForestRegressorApplier,
     RandomForestRegressorCalculator,
 )
 

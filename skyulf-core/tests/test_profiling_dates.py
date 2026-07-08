@@ -1,7 +1,6 @@
 """Tests for skyulf.profiling._analyzer.dates.DatesMixin."""
 
 import polars as pl
-import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer

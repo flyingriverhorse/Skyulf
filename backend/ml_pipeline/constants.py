@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class StepType(str, Enum):
+class StepType(StrEnum):
     DATA_LOADER = "data_loader"
     FEATURE_ENGINEERING = "feature_engineering"
     BASIC_TRAINING = "basic_training"

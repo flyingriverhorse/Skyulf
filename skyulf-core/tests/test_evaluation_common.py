@@ -8,7 +8,6 @@ import pytest
 from skyulf.modeling._evaluation.common import (
     _align_thresholds,
     _downsample_indices,
-    _is_finite_number,
     _sanitize_structure,
     downsample_curve,
     sanitize_metrics,

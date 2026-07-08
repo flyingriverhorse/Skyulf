@@ -12,7 +12,6 @@ import pytest
 from tests.utils.test_case_loader import TestCaseLoader
 
 # Trigger node registration by importing the package.
-import skyulf.preprocessing
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -300,7 +299,6 @@ def test_node_id_prefix_used_in_step_ids(numeric_df: pd.DataFrame) -> None:
 
 def test_extract_y_for_resampling_tuple_path() -> None:
     """_extract_y_for_resampling must return y from (X, y) tuple."""
-    from skyulf.data.dataset import SplitDataset
 
     X = pd.DataFrame({"f": [1, 2]})
     y = pd.Series([0, 1], name="label")

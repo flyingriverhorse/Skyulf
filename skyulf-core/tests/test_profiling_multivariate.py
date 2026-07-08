@@ -3,7 +3,6 @@
 
 import numpy as np
 import polars as pl
-import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling._analyzer import multivariate as multivariate_mod

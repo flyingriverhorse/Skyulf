@@ -16,7 +16,6 @@ from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.cleaning._common import (
-    ALIAS_PUNCTUATION_TABLE,
     COMMON_BOOLEAN_ALIASES,
     COUNTRY_ALIAS_MAP,
 )

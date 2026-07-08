@@ -18,6 +18,13 @@ def test_engine_name_enum_values():
     assert EngineName.BASE == "base"
 
 
+def test_engine_name_str_returns_value():
+    """EngineName is a StrEnum: str()/f-string must yield the bare value,
+    not `ClassName.MEMBER` (regression guard against reverting to `(str, Enum)`)."""
+    assert str(EngineName.PANDAS) == "pandas"
+    assert f"{EngineName.POLARS}" == "polars"
+
+
 def test_base_engine_is_compatible_raises_not_implemented():
     """BaseEngine.is_compatible is abstract and must raise if not overridden."""
     with pytest.raises(NotImplementedError):
