@@ -12,6 +12,8 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.casting import (
     TYPE_ALIASES,
@@ -24,6 +26,8 @@ from skyulf.preprocessing.casting import (
     _coerce_boolean_value,
     _drop_fractional_or_raise,
 )
+
+_coerce_boolean_value_cases = TestCaseLoader("preprocessing/casting").load()
 
 # ---------------------------------------------------------------------------
 # TYPE_ALIASES sanity check
@@ -51,28 +55,7 @@ def test_type_aliases_bool_resolves_to_boolean() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "value,expected",
-    [
-        (True, True),
-        (False, False),
-        (1, True),
-        (0, False),
-        ("true", True),
-        ("yes", True),
-        ("1", True),
-        ("on", True),
-        ("y", True),
-        ("t", True),
-        ("false", False),
-        ("no", False),
-        ("0", False),
-        ("off", False),
-        ("n", False),
-        ("f", False),
-        ("maybe", None),
-    ],
-)
+@pytest.mark.parametrize(*_coerce_boolean_value_cases)
 def test_coerce_boolean_value_parametrized(value: Any, expected: Any) -> None:
     """_coerce_boolean_value must convert common truthy/falsy strings and ints."""
     assert _coerce_boolean_value(value) == expected
@@ -529,3 +512,37 @@ if _POLARS_AVAILABLE:
         # 'a' must remain untouched (Int64), 'b' must be cast to String.
         assert result["a"].dtype == df_pl["a"].dtype
         assert result["b"].dtype == pl.String
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which contains a ``signup_date`` string column and ``plan_type`` strings —
+    closer to production data than the small synthetic frames used elsewhere.
+    """
+
+    def test_cast_signup_date_to_datetime(self) -> None:
+        """Casting the ``signup_date`` string column to datetime must succeed and
+        produce a datetime64 column with no NaT values (all dates are valid ISO strings).
+        """
+        df = load_sample_dataset("customers")
+        artifact = CastingCalculator().fit(df, {"column_types": {"signup_date": "datetime"}})
+        result = CastingApplier().apply(df, artifact)
+
+        assert pd.api.types.is_datetime64_any_dtype(result["signup_date"])
+        assert result["signup_date"].notna().all()
+
+    def test_cast_plan_type_to_category(self) -> None:
+        """Casting ``plan_type`` to category dtype must produce a pandas Categorical column
+        with the three distinct values from the dataset: basic, premium, enterprise.
+        """
+        df = load_sample_dataset("customers")
+        artifact = CastingCalculator().fit(df, {"column_types": {"plan_type": "category"}})
+        result = CastingApplier().apply(df, artifact)
+
+        assert result["plan_type"].dtype.name == "category"
+        assert set(result["plan_type"].cat.categories) == {"basic", "enterprise", "premium"}

@@ -11,7 +11,7 @@ interface TrainTestSplitConfig {
   stratify: boolean;
   shuffle: boolean;
   target_column?: string;
-  datasetId?: string;
+  datasetId?: string | undefined;
 }
 
 const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange: (c: TrainTestSplitConfig) => void; nodeId?: string }> = ({
@@ -30,9 +30,13 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   React.useEffect(() => {
     const updates: Partial<TrainTestSplitConfig> = {};
 
-    // Propagate datasetId
+    // Propagate datasetId, and clear it if the upstream dataset connection is removed
+    // (otherwise a stale datasetId lingers on this node's data forever, making
+    // downstream nodes think a dataset is still connected when it isn't).
     if (upstreamDatasetId && config.datasetId !== upstreamDatasetId) {
       updates.datasetId = upstreamDatasetId;
+    } else if (!upstreamDatasetId && config.datasetId) {
+      updates.datasetId = undefined;
     }
 
     // Propagate target_column if upstream has it and we don't (or if we want to enforce it)

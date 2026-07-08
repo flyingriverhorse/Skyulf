@@ -5,6 +5,7 @@ import typing
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.inspection import (
     DatasetProfileApplier,
@@ -13,6 +14,8 @@ from skyulf.preprocessing.inspection import (
     DataSnapshotCalculator,
     _extract_polars_numeric_stats,
 )
+
+_engine_cases = TestCaseLoader("preprocessing/preprocessing_inspection").load()
 
 
 @pytest.fixture
@@ -32,46 +35,30 @@ def polars_df():
 # ---------------------------------------------------------------------------
 
 
-def test_dataset_profile_fit_pandas_reports_shape(pandas_df):
-    """Fitting on a pandas frame should report correct row/column counts."""
-    artifact = DatasetProfileCalculator().fit(pandas_df, {})
+@pytest.mark.parametrize(*_engine_cases)
+def test_dataset_profile_fit_reports_shape(engine, pandas_df, polars_df) -> None:
+    """Fitting on either engine's frame should report correct row/column counts."""
+    df = pandas_df if engine == "pandas" else polars_df
+    artifact = DatasetProfileCalculator().fit(df, {})
     profile = artifact["profile"]
     assert profile["rows"] == 4
     assert profile["columns"] == 2
 
 
-def test_dataset_profile_fit_pandas_reports_missing_counts(pandas_df):
-    """Missing-value counts per column should be captured for the pandas path."""
-    artifact = DatasetProfileCalculator().fit(pandas_df, {})
+@pytest.mark.parametrize(*_engine_cases)
+def test_dataset_profile_fit_reports_missing_counts(engine, pandas_df, polars_df) -> None:
+    """Missing-value counts per column should be captured for either engine's path."""
+    df = pandas_df if engine == "pandas" else polars_df
+    artifact = DatasetProfileCalculator().fit(df, {})
     assert artifact["profile"]["missing"]["num"] == 1
     assert artifact["profile"]["missing"]["cat"] == 0
 
 
-def test_dataset_profile_fit_pandas_numeric_stats_present(pandas_df):
-    """describe()-based numeric stats should be attached for numeric columns."""
-    artifact = DatasetProfileCalculator().fit(pandas_df, {})
-    assert "numeric_stats" in artifact["profile"]
-    assert "num" in artifact["profile"]["numeric_stats"]
-
-
-def test_dataset_profile_fit_polars_reports_shape(polars_df):
-    """Fitting on a polars frame should report correct row/column counts."""
-    artifact = DatasetProfileCalculator().fit(polars_df, {})
-    profile = artifact["profile"]
-    assert profile["rows"] == 4
-    assert profile["columns"] == 2
-
-
-def test_dataset_profile_fit_polars_reports_missing_counts(polars_df):
-    """Missing-value counts per column should be captured for the polars path."""
-    artifact = DatasetProfileCalculator().fit(polars_df, {})
-    assert artifact["profile"]["missing"]["num"] == 1
-    assert artifact["profile"]["missing"]["cat"] == 0
-
-
-def test_dataset_profile_fit_polars_numeric_stats_present(polars_df):
-    """Polars describe()-derived numeric stats should be attached for numeric columns."""
-    artifact = DatasetProfileCalculator().fit(polars_df, {})
+@pytest.mark.parametrize(*_engine_cases)
+def test_dataset_profile_fit_numeric_stats_present(engine, pandas_df, polars_df) -> None:
+    """describe()-based numeric stats should be attached for numeric columns, either engine."""
+    df = pandas_df if engine == "pandas" else polars_df
+    artifact = DatasetProfileCalculator().fit(df, {})
     assert "numeric_stats" in artifact["profile"]
     assert "num" in artifact["profile"]["numeric_stats"]
 
@@ -135,17 +122,11 @@ def test_data_snapshot_fit_pandas_default_n_rows(pandas_df):
     assert artifact["type"] == "data_snapshot"
 
 
-def test_data_snapshot_fit_pandas_respects_n_rows(pandas_df):
-    """A configured n_rows should limit the number of snapshot records returned."""
-    artifact = DataSnapshotCalculator().fit(pandas_df, {"n_rows": 2})
-    snapshot = typing.cast(list, artifact["snapshot"])
-    assert len(snapshot) == 2
-    assert snapshot[0]["cat"] == "a"
-
-
-def test_data_snapshot_fit_polars_respects_n_rows(polars_df):
-    """The polars fit path should also honor a configured n_rows."""
-    artifact = DataSnapshotCalculator().fit(polars_df, {"n_rows": 2})
+@pytest.mark.parametrize(*_engine_cases)
+def test_data_snapshot_fit_respects_n_rows(engine, pandas_df, polars_df) -> None:
+    """A configured n_rows should limit the number of snapshot records returned, either engine."""
+    df = pandas_df if engine == "pandas" else polars_df
+    artifact = DataSnapshotCalculator().fit(df, {"n_rows": 2})
     snapshot = typing.cast(list, artifact["snapshot"])
     assert len(snapshot) == 2
     assert snapshot[0]["cat"] == "a"

@@ -1,0 +1,61 @@
+{
+  "groups": {
+    "fit_edges": {
+      "params": "strategy, n_bins, expected_edges",
+      "test_cases": {
+        "equal_width": {
+          "strategy": "equal_width",
+          "n_bins": 5,
+          "expected_edges": [0.0, 1.8, 3.6, 5.4, 7.2, 9.0]
+        },
+        "equal_frequency": {
+          "strategy": "equal_frequency",
+          "n_bins": 4,
+          "expected_edges": [0.0, 2.25, 4.5, 6.75, 9.0]
+        },
+        "kmeans": {
+          "strategy": "kmeans",
+          "n_bins": 3,
+          "expected_edges": [0.0, 3.25, 6.5, 9.0]
+        }
+      }
+    },
+    "resolve_kbins_strategy_aliases": {
+      "params": "alias, expected",
+      "test_cases": {
+        "equal_width": {"alias": "equal_width", "expected": "uniform"},
+        "equal_frequency": {"alias": "equal_frequency", "expected": "quantile"},
+        "kmeans": {"alias": "kmeans", "expected": "kmeans"}
+      }
+    },
+    "custom_binning_bin_edges": {
+      "params": "bins, expected_bin_edges",
+      "test_cases": {
+        "sorts_user_edges": {"bins": [9, 0, 5], "expected_bin_edges": {"x": [0, 5, 9]}},
+        "empty_bins_yields_empty_map": {"bins": [], "expected_bin_edges": {}}
+      }
+    },
+    "apply_out_of_range_missing_strategy": {
+      "params": "missing_strategy, missing_label, expected",
+      "test_cases": {
+        "keep_becomes_nan": {
+          "missing_strategy": "keep",
+          "missing_label": "Missing",
+          "expected": [null, 0.0, 1.0, null]
+        },
+        "label_tags_out_of_range": {
+          "missing_strategy": "label",
+          "missing_label": "OOR",
+          "expected": ["OOR", 0.0, 1.0, "OOR"]
+        }
+      }
+    },
+    "no_columns_returns_empty_artifact": {
+      "params": "calculator_name, columns",
+      "test_cases": {
+        "general_binning": {"calculator_name": "general", "columns": []},
+        "custom_binning": {"calculator_name": "custom", "columns": []}
+      }
+    }
+  }
+}

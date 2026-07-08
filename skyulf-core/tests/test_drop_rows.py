@@ -10,11 +10,17 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 import polars as pl
+import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.drop_and_missing.drop_rows import (
     DropMissingRowsApplier,
     DropMissingRowsCalculator,
 )
+
+_shape_only_cases = TestCaseLoader("preprocessing/drop_rows", group="shape_only").load()
+_round_trip_cases = TestCaseLoader("preprocessing/drop_rows", group="round_trip").load()
 
 # ---------------------------------------------------------------------------
 # Calculator.fit
@@ -105,20 +111,18 @@ def test_apply_pandas_no_missing_values_keeps_all_rows() -> None:
     assert result["a"].tolist() == [1.0, 2.0, 3.0]
 
 
-def test_apply_pandas_all_nan_column_drops_all_rows() -> None:
-    """An all-NaN column with how='any' must drop every row."""
-    df = pd.DataFrame({"a": [np.nan, np.nan, np.nan]})
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
-    result = DropMissingRowsApplier().apply(df, params)
-    assert result.shape[0] == 0
+class TestApplyPandasShapeOnly:
+    """Result shape for drop-everything edge cases — scenarios loaded from
+    ``tests/test_cases/preprocessing/drop_rows.json`` (group ``shape_only``).
+    """
 
-
-def test_apply_pandas_empty_dataframe() -> None:
-    """Applying to an already-empty DataFrame must not raise."""
-    df = pd.DataFrame({"a": pd.Series([], dtype=float)})
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
-    result = DropMissingRowsApplier().apply(df, params)
-    assert result.shape == (0, 1)
+    @pytest.mark.parametrize(*_shape_only_cases)
+    def test_apply_pandas_result_shape(
+        self, df_data: Dict[str, list], params: Dict[str, Any], expected_shape: list[int]
+    ) -> None:
+        df = pd.DataFrame({col: pd.Series(values, dtype=float) for col, values in df_data.items()})
+        result = DropMissingRowsApplier().apply(df, params)
+        assert result.shape == tuple(expected_shape)
 
 
 def test_apply_pandas_tuple_xy_syncs_y_after_drop() -> None:
@@ -201,22 +205,62 @@ def test_apply_polars_tuple_xy_syncs_y_after_drop() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_fit_then_apply_round_trip_subset() -> None:
-    """fit()+apply() must drop only rows missing values in the fitted subset."""
-    df = pd.DataFrame({"a": [1.0, np.nan, 3.0], "b": [np.nan, np.nan, np.nan]})
-    calc = DropMissingRowsCalculator()
-    applier = DropMissingRowsApplier()
-    params = calc.fit(df, {"subset": ["a"]})
-    result = applier.apply(df, params)
-    assert result["a"].tolist() == [1.0, 3.0]
+class TestFitThenApplyRoundTrip:
+    """fit() + apply() round trip across configs — scenarios loaded from
+    ``tests/test_cases/preprocessing/drop_rows.json`` (group ``round_trip``).
+    """
+
+    @pytest.mark.parametrize(*_round_trip_cases)
+    def test_fit_then_apply_round_trip(
+        self, df_data: Dict[str, list], config: Dict[str, Any], expected_a: list[float]
+    ) -> None:
+        df = pd.DataFrame(df_data)
+        calc = DropMissingRowsCalculator()
+        applier = DropMissingRowsApplier()
+        params = calc.fit(df, config)
+        result = applier.apply(df, params)
+        assert result["a"].tolist() == expected_a
 
 
-def test_fit_then_apply_round_trip_default_how_any() -> None:
-    """fit()+apply() with default config drops any row containing a NaN."""
-    df = pd.DataFrame({"a": [1.0, np.nan], "b": [1.0, 2.0]})
-    calc = DropMissingRowsCalculator()
-    applier = DropMissingRowsApplier()
-    params = calc.fit(df, {})
-    result = applier.apply(df, params)
-    assert result.shape[0] == 1
-    assert result["a"].tolist() == [1.0]
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has NaN values across multiple columns (``age``, ``income``, ``city``,
+    ``lat``, ``lon``) — closer to production data than the small synthetic
+    frames used elsewhere in this file.
+    """
+
+    def test_drop_any_nan_rows_reduces_row_count(self) -> None:
+        """Dropping rows where any column has a NaN must reduce the 15-row
+        customers dataset since multiple rows have missing values.
+        """
+        df = load_sample_dataset("customers")
+        assert df.shape[0] == 15
+
+        calc = DropMissingRowsCalculator()
+        applier = DropMissingRowsApplier()
+        params = calc.fit(df, {"how": "any"})
+        result = applier.apply(df, params)
+
+        assert result.shape[0] < 15
+        assert result.isna().sum().sum() == 0
+
+    def test_drop_subset_age_removes_only_missing_age_rows(self) -> None:
+        """Dropping on subset=['age'] must remove only the rows where age is NaN,
+        leaving income/city NaN rows intact.
+        """
+        df = load_sample_dataset("customers")
+        n_age_nan = df["age"].isna().sum()
+        assert n_age_nan > 0
+
+        calc = DropMissingRowsCalculator()
+        applier = DropMissingRowsApplier()
+        params = calc.fit(df, {"how": "any", "subset": ["age"]})
+        result = applier.apply(df, params)
+
+        assert result.shape[0] == 15 - n_age_nan
+        assert result["age"].isna().sum() == 0

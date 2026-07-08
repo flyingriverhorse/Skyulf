@@ -1,0 +1,68 @@
+{
+  "groups": {
+    "empty_artifact": {
+      "params": "df_data, fit_config",
+      "test_cases": {
+        "box_cox_all_invalid_columns": {
+          "df_data": {"has_zero": [0.0, -1.0, 2.0]},
+          "fit_config": {"method": "box-cox", "columns": ["has_zero"]}
+        },
+        "no_columns_configured": {
+          "df_data": {"a": [1.0, 2.0, 3.0]},
+          "fit_config": {"columns": []}
+        },
+        "no_numeric_candidate_columns": {
+          "df_data": {"cat": ["a", "b", "c"]},
+          "fit_config": {"method": "yeo-johnson"}
+        }
+      }
+    },
+    "simple_methods": {
+      "params": "values, method, extra_params, expected",
+      "test_cases": {
+        "log_negative_values_become_nan": {
+          "values": [-1.0, 0.0, 3.0],
+          "method": "log",
+          "extra_params": {},
+          "expected": [null, 0.0, 1.3862943611198906]
+        },
+        "sqrt_negative_values_become_nan": {
+          "values": [-4.0, 4.0],
+          "method": "sqrt",
+          "extra_params": {},
+          "expected": [null, 2.0]
+        },
+        "square": {
+          "values": [-3.0, 0.0, 4.0],
+          "method": "square",
+          "extra_params": {},
+          "expected": [9.0, 0.0, 16.0]
+        },
+        "reciprocal_zero_becomes_nan": {
+          "values": [0.0, 2.0],
+          "method": "reciprocal",
+          "extra_params": {},
+          "expected": [null, 0.5]
+        },
+        "exp_clips_large_values": {
+          "values": [1000.0],
+          "method": "exp",
+          "extra_params": {"clip_threshold": 10},
+          "expected": [22026.465794806718]
+        },
+        "cube_root_handles_negative_values": {
+          "values": [-8.0, 8.0],
+          "method": "cube_root",
+          "extra_params": {},
+          "expected": [-2.0, 2.0]
+        },
+        "unknown_method_skipped": {
+          "values": [1.0, 2.0],
+          "method": "bogus_method",
+          "extra_params": {},
+          "expected": [1.0, 2.0]
+        }
+      }
+    }
+  }
+}

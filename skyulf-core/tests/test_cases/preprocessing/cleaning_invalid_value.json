@@ -1,0 +1,223 @@
+{
+  "groups": {
+    "pandas_mask": {
+      "params": "values, rule, min_value, max_value, expected",
+      "test_cases": {
+        "negative_marks_negatives": {
+          "values": [-1.0, 0.0, 1.0],
+          "rule": "negative",
+          "min_value": null,
+          "max_value": null,
+          "expected": [true, false, false]
+        },
+        "negative_to_nan_alias": {
+          "values": [-2.0, 3.0],
+          "rule": "negative_to_nan",
+          "min_value": null,
+          "max_value": null,
+          "expected": [true, false]
+        },
+        "zero_marks_zeros": {
+          "values": [0.0, 1.0, -1.0, 0.0],
+          "rule": "zero",
+          "min_value": null,
+          "max_value": null,
+          "expected": [true, false, false, true]
+        },
+        "custom_range_both_bounds": {
+          "values": [0.0, 5.0, 11.0, -1.0],
+          "rule": "custom_range",
+          "min_value": 0.0,
+          "max_value": 10.0,
+          "expected": [false, false, true, true]
+        },
+        "custom_range_min_only": {
+          "values": [1.0, 5.0, -3.0],
+          "rule": "custom_range",
+          "min_value": 2.0,
+          "max_value": null,
+          "expected": [true, false, true]
+        },
+        "custom_range_max_only": {
+          "values": [1.0, 5.0, 11.0],
+          "rule": "custom_range",
+          "min_value": null,
+          "max_value": 8.0,
+          "expected": [false, false, true]
+        },
+        "custom_range_no_bounds_returns_none": {
+          "values": [1.0, 2.0],
+          "rule": "custom_range",
+          "min_value": null,
+          "max_value": null,
+          "expected": null
+        },
+        "unknown_rule_returns_none": {
+          "values": [1.0, 2.0],
+          "rule": "does_not_exist",
+          "min_value": null,
+          "max_value": null,
+          "expected": null
+        }
+      }
+    },
+    "polars_rule": {
+      "params": "values, rule, replacement, min_value, max_value, expected",
+      "test_cases": {
+        "negative_replaces_negatives": {
+          "values": [-2.0, 0.0, 3.0],
+          "rule": "negative",
+          "replacement": 0.0,
+          "min_value": null,
+          "max_value": null,
+          "expected": [0.0, 0.0, 3.0]
+        },
+        "zero_replaces_zeros": {
+          "values": [0.0, 1.0, -1.0],
+          "rule": "zero",
+          "replacement": -99.0,
+          "min_value": null,
+          "max_value": null,
+          "expected": [-99.0, 1.0, -1.0]
+        },
+        "custom_range_both_bounds": {
+          "values": [-1.0, 5.0, 11.0],
+          "rule": "custom_range",
+          "replacement": 0.0,
+          "min_value": 0.0,
+          "max_value": 10.0,
+          "expected": [0.0, 5.0, 0.0]
+        },
+        "custom_range_min_only_replaces_below_min": {
+          "values": [1.0, 5.0, -3.0],
+          "rule": "custom_range",
+          "replacement": 0.0,
+          "min_value": 2.0,
+          "max_value": null,
+          "expected": [0.0, 5.0, 0.0]
+        },
+        "custom_range_max_only_replaces_above_max": {
+          "values": [1.0, 5.0, 11.0],
+          "rule": "custom_range",
+          "replacement": 0.0,
+          "min_value": null,
+          "max_value": 8.0,
+          "expected": [1.0, 5.0, 0.0]
+        },
+        "custom_range_no_bounds_is_noop": {
+          "values": [1.0, 2.0],
+          "rule": "custom_range",
+          "replacement": 0.0,
+          "min_value": null,
+          "max_value": null,
+          "expected": [1.0, 2.0]
+        },
+        "unknown_rule_is_noop": {
+          "values": [1.0, 2.0],
+          "rule": "unknown_rule",
+          "replacement": 0.0,
+          "min_value": null,
+          "max_value": null,
+          "expected": [1.0, 2.0]
+        }
+      }
+    },
+    "applier_pandas": {
+      "params": "values, params, expected",
+      "test_cases": {
+        "negative_rule_replaces_with_nan": {
+          "values": [-3.0, -1.0, 0.0, 1.0, 5.0],
+          "params": {
+            "columns": ["v"],
+            "rule": "negative",
+            "replacement": null,
+            "replace_inf": false,
+            "replace_neg_inf": false
+          },
+          "expected": [null, null, 0.0, 1.0, 5.0]
+        },
+        "zero_rule_replaces_zeros": {
+          "values": [0.0, 1.0, 0.0, 5.0],
+          "params": {
+            "columns": ["v"],
+            "rule": "zero",
+            "replacement": null,
+            "replace_inf": false,
+            "replace_neg_inf": false
+          },
+          "expected": [null, 1.0, null, 5.0]
+        },
+        "custom_range_replaces_out_of_range": {
+          "values": [-5.0, 5.0, 15.0],
+          "params": {
+            "columns": ["v"],
+            "rule": "custom_range",
+            "min_value": 1.0,
+            "max_value": 9.0,
+            "replacement": -1.0,
+            "replace_inf": false,
+            "replace_neg_inf": false
+          },
+          "expected": [-1.0, 5.0, -1.0]
+        },
+        "replace_inf_only": {
+          "values": [Infinity, -Infinity, 1.0],
+          "params": {
+            "columns": ["v"],
+            "replace_inf": true,
+            "replace_neg_inf": false,
+            "replacement": 0.0
+          },
+          "expected": [0.0, -Infinity, 1.0]
+        },
+        "replace_neg_inf_only": {
+          "values": [Infinity, -Infinity, 2.0],
+          "params": {
+            "columns": ["v"],
+            "replace_inf": false,
+            "replace_neg_inf": true,
+            "replacement": 0.0
+          },
+          "expected": [Infinity, 0.0, 2.0]
+        },
+        "custom_value_sentinel_overrides_replacement": {
+          "values": [-1.0, 2.0, -3.0],
+          "params": {
+            "columns": ["v"],
+            "rule": "negative",
+            "replacement": null,
+            "value": -999.0,
+            "replace_inf": false,
+            "replace_neg_inf": false
+          },
+          "expected": [-999.0, 2.0, -999.0]
+        }
+      }
+    },
+    "polars_applier": {
+      "params": "values, params, expected",
+      "test_cases": {
+        "replace_inf_via_polars_engine": {
+          "values": [Infinity, -Infinity, 1.0],
+          "params": {
+            "columns": ["v"],
+            "replace_inf": true,
+            "replace_neg_inf": false,
+            "replacement": 0.0
+          },
+          "expected": [0.0, -Infinity, 1.0]
+        },
+        "replace_neg_inf_via_polars_engine": {
+          "values": [Infinity, -Infinity, 2.0],
+          "params": {
+            "columns": ["v"],
+            "replace_inf": false,
+            "replace_neg_inf": true,
+            "replacement": 0.0
+          },
+          "expected": [Infinity, 0.0, 2.0]
+        }
+      }
+    }
+  }
+}

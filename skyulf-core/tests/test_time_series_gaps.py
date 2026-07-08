@@ -8,6 +8,9 @@ helpers.
 
 import pandas as pd
 import polars as pl
+import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.time_series._common import (
     coerce_aggregations,
@@ -25,54 +28,86 @@ from skyulf.preprocessing.time_series.rolling import (
     RollingAggregateCalculator,
 )
 
+_resolve_columns_cases = TestCaseLoader(
+    "preprocessing/time_series_gaps", group="resolve_columns"
+).load()
+_coerce_lags_cases = TestCaseLoader("preprocessing/time_series_gaps", group="coerce_lags").load()
+_coerce_aggregations_cases = TestCaseLoader(
+    "preprocessing/time_series_gaps", group="coerce_aggregations"
+).load()
+_sort_pandas_cases = TestCaseLoader("preprocessing/time_series_gaps", group="sort_pandas").load()
+_apply_noop_cases = TestCaseLoader(
+    "preprocessing/time_series_gaps", group="apply_noop_without_config"
+).load()
+
+_NOOP_NODE_DF = {
+    "lag": pd.DataFrame({"v": [1.0, 2.0]}),
+    "rolling": pd.DataFrame({"v": [1.0, 2.0]}),
+    "date_features": pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])}),
+}
+_NOOP_NODE_APPLIER = {
+    "lag": LagFeaturesApplier,
+    "rolling": RollingAggregateApplier,
+    "date_features": DateFeaturesApplier,
+}
+
 # ---------------------------------------------------------------------------
 # _common.py helpers
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_columns_filters_to_available() -> None:
-    """Only columns present in ``available`` are kept, order preserved."""
-    assert resolve_columns(["a", "missing", "b"], ["a", "b"]) == ["a", "b"]
+@pytest.mark.parametrize(*_resolve_columns_cases)
+def test_resolve_columns(
+    columns: list[str] | None, available: list[str], expected: list[str]
+) -> None:
+    """``resolve_columns`` keeps only available columns, preserving order.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``resolve_columns``).
+    """
+    assert resolve_columns(columns, available) == expected
 
 
-def test_resolve_columns_empty_input_returns_empty() -> None:
-    """An empty/None ``columns`` config resolves to an empty list."""
-    assert resolve_columns(None, ["a"]) == []
-    assert resolve_columns([], ["a"]) == []
+@pytest.mark.parametrize(*_coerce_lags_cases)
+def test_coerce_lags(lags_input: int | list[int], expected: list[int]) -> None:
+    """``coerce_lags`` normalises int/list input, dropping non-positive/duplicate values.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``coerce_lags``).
+    """
+    assert coerce_lags(lags_input) == expected
 
 
-def test_coerce_lags_accepts_single_int() -> None:
-    """A bare int ``lags`` value is wrapped into a single-element list."""
-    assert coerce_lags(5) == [5]
+@pytest.mark.parametrize(*_coerce_aggregations_cases)
+def test_coerce_aggregations(aggregations_input: str | list[str], expected: list[str]) -> None:
+    """``coerce_aggregations`` normalises string/list input, filtering unknown names.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``coerce_aggregations``).
+    """
+    assert coerce_aggregations(aggregations_input) == expected
 
 
-def test_coerce_lags_drops_non_positive_and_dedupes() -> None:
-    """Zero/negative lags are dropped and duplicates are removed, sorted."""
-    assert coerce_lags([2, 2, 0, -1, 1]) == [1, 2]
+@pytest.mark.parametrize(*_sort_pandas_cases)
+def test_sort_pandas(df_data: dict, sort_by: str | None, expected_v: list) -> None:
+    """``sort_pandas`` is a no-op without ``sort_by`` and stable-sorts otherwise.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``sort_pandas``).
+    """
+    df = pd.DataFrame(df_data)
+    out = sort_pandas(df, sort_by)
+    assert out["v"].tolist() == expected_v
 
 
-def test_coerce_aggregations_accepts_single_string() -> None:
-    """A bare string ``aggregations`` value is wrapped into a list."""
-    assert coerce_aggregations("mean") == ["mean"]
+@pytest.mark.parametrize(*_apply_noop_cases)
+def test_apply_noop_without_required_config(
+    node: str, config: dict, expected_columns: list[str], engine: str
+) -> None:
+    """LagFeatures/RollingAggregate/DateFeatures apply() must no-op when required config is missing.
 
-
-def test_coerce_aggregations_filters_unknown_names() -> None:
-    """Unrecognised aggregation names are dropped, order preserved."""
-    assert coerce_aggregations(["mean", "bogus", "sum"]) == ["mean", "sum"]
-
-
-def test_sort_pandas_noop_without_sort_by() -> None:
-    """Without a ``sort_by`` column, the frame is returned unchanged."""
-    df = pd.DataFrame({"v": [3, 1, 2]})
-    out = sort_pandas(df, None)
-    assert out["v"].tolist() == [3, 1, 2]
-
-
-def test_sort_pandas_sorts_stable() -> None:
-    """A configured ``sort_by`` column stable-sorts the frame."""
-    df = pd.DataFrame({"t": [3, 1, 2], "v": ["c", "a", "b"]})
-    out = sort_pandas(df, "t")
-    assert out["v"].tolist() == ["a", "b", "c"]
+    Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``apply_noop_without_config``).
+    """
+    df = _NOOP_NODE_DF[node]
+    input_df = pl.from_pandas(df) if engine == "polars" else df
+    out = _NOOP_NODE_APPLIER[node]().apply(input_df, config)
+    assert list(out.columns) == expected_columns
 
 
 # ---------------------------------------------------------------------------
@@ -108,13 +143,6 @@ def test_lag_features_sort_by_reorders_before_lagging() -> None:
     assert pl_vals == [-1.0, 10.0, 20.0]
 
 
-def test_lag_features_apply_noop_without_columns_or_lags() -> None:
-    """Missing ``columns``/``lags`` leaves the frame unchanged."""
-    df = pd.DataFrame({"v": [1.0, 2.0]})
-    out = LagFeaturesApplier().apply(df, {"columns": [], "lags": [1]})
-    assert list(out.columns) == ["v"]
-
-
 def test_lag_features_infer_output_schema_skips_unresolved_columns() -> None:
     """Configured columns absent from the schema are skipped, not erroring."""
     from skyulf.core.schema import SkyulfSchema
@@ -126,14 +154,6 @@ def test_lag_features_infer_output_schema_skips_unresolved_columns() -> None:
     assert out is not None
     assert "v_lag_1" in out
     assert "missing_lag_1" not in out
-
-
-def test_lag_features_polars_apply_noop_without_columns_or_lags() -> None:
-    """Missing columns/lags must no-op on the polars apply path (line 43)."""
-    df = pd.DataFrame({"v": [1.0, 2.0]})
-    pl_df = pl.from_pandas(df)
-    out = LagFeaturesApplier().apply(pl_df, {"columns": [], "lags": [1]})
-    assert list(out.columns) == ["v"]
 
 
 def test_lag_features_polars_skips_missing_column() -> None:
@@ -193,21 +213,6 @@ def test_rolling_aggregate_group_by_computed_within_groups() -> None:
     )
     out = RollingAggregateApplier().apply(df, art)
     assert out["v_roll_sum_2"].tolist() == [1.0, 4.0, 100.0, 300.0]
-
-
-def test_rolling_aggregate_apply_noop_without_columns_or_aggs() -> None:
-    """Missing ``columns``/``aggregations`` leaves the frame unchanged."""
-    df = pd.DataFrame({"v": [1.0, 2.0]})
-    out = RollingAggregateApplier().apply(df, {"columns": [], "aggregations": ["mean"]})
-    assert list(out.columns) == ["v"]
-
-
-def test_rolling_aggregate_polars_apply_noop_without_columns_or_aggs() -> None:
-    """Missing columns/aggregations must no-op on the polars apply path (line 61)."""
-    df = pd.DataFrame({"v": [1.0, 2.0]})
-    pl_df = pl.from_pandas(df)
-    out = RollingAggregateApplier().apply(pl_df, {"columns": [], "aggregations": ["mean"]})
-    assert list(out.columns) == ["v"]
 
 
 def test_rolling_aggregate_polars_skips_missing_column() -> None:
@@ -272,13 +277,6 @@ def test_date_features_invalid_feature_name_filtered_out() -> None:
     assert art["features"] == ["year"]
 
 
-def test_date_features_apply_noop_without_columns_or_features() -> None:
-    """Missing ``columns``/``features`` leaves the frame unchanged."""
-    df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])})
-    out = DateFeaturesApplier().apply(df, {"columns": [], "features": ["year"]})
-    assert list(out.columns) == ["d"]
-
-
 def test_date_features_infer_output_schema_skips_unresolved_columns() -> None:
     """Columns absent from the input schema are skipped during inference."""
     from skyulf.core.schema import SkyulfSchema
@@ -310,14 +308,6 @@ def test_date_features_polars_skips_missing_column() -> None:
     assert "missing_year" not in out.columns
 
 
-def test_date_features_polars_apply_noop_without_columns_or_features() -> None:
-    """Missing columns/features must no-op on the polars apply path (line 94)."""
-    df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01"])})
-    pl_df = pl.from_pandas(df)
-    out = DateFeaturesApplier().apply(pl_df, {"columns": [], "features": ["year"]})
-    assert list(out.columns) == ["d"]
-
-
 def test_date_features_polars_drop_original_removes_source_column() -> None:
     """``drop_original=True`` must drop the source column on the polars path (lines 101-103)."""
     df = pd.DataFrame({"d": pd.to_datetime(["2021-01-01", "2021-06-15"])})
@@ -327,3 +317,29 @@ def test_date_features_polars_drop_original_removes_source_column() -> None:
     out = DateFeaturesApplier().apply(pl.from_pandas(df), art)
     assert "d" not in out.columns
     assert "d_year" in out.columns
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that LagFeaturesCalculator correctly handles a real-world income
+    column (which contains NaN values) when sorted by ``signup_date``: the
+    lagged column must be present and must contain at least one NaN (the first
+    row after sorting has no preceding value).
+    """
+
+    def test_lag_on_income_sorted_by_signup_date(self) -> None:
+        df = load_sample_dataset("customers")
+        df["signup_date"] = pd.to_datetime(df["signup_date"])
+        art = LagFeaturesCalculator().fit(
+            df, {"columns": ["income"], "lags": [1], "sort_by": "signup_date"}
+        )
+        out = LagFeaturesApplier().apply(df, art)
+        assert "income_lag_1" in out.columns
+        # First row after sorting has no predecessor — must be NaN.
+        assert out["income_lag_1"].isna().sum() >= 1

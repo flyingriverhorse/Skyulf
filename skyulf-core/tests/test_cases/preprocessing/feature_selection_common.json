@@ -1,0 +1,201 @@
+{
+  "groups": {
+    "infer_problem_type": {
+      "params": "values, dtype, expected",
+      "test_cases": {
+        "bool_column_is_classification": {
+          "values": [true, false, true],
+          "dtype": null,
+          "expected": "classification"
+        },
+        "object_column_is_classification": {
+          "values": ["cat", "dog", "cat"],
+          "dtype": null,
+          "expected": "classification"
+        },
+        "few_unique_numeric_is_classification": {
+          "values": [1, 2, 3, 1, 2],
+          "dtype": null,
+          "expected": "classification"
+        },
+        "many_unique_numeric_is_regression": {
+          "values": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0],
+          "dtype": null,
+          "expected": "regression"
+        },
+        "empty_series_defaults_to_classification": {
+          "values": [],
+          "dtype": "float64",
+          "expected": "classification"
+        }
+      }
+    },
+    "resolve_score_function": {
+      "params": "name, problem_type, expected_func_name",
+      "test_cases": {
+        "named_f_classif": {"name": "f_classif", "problem_type": "classification", "expected_func_name": "f_classif"},
+        "classification_default": {"name": null, "problem_type": "classification", "expected_func_name": "f_classif"},
+        "regression_default": {"name": null, "problem_type": "regression", "expected_func_name": "f_regression"},
+        "named_mutual_info_regression": {
+          "name": "mutual_info_regression",
+          "problem_type": "regression",
+          "expected_func_name": "mutual_info_regression"
+        }
+      }
+    },
+    "resolve_estimator": {
+      "params": "key, problem_type, expected_class_name",
+      "test_cases": {
+        "auto_classification_gives_logistic": {
+          "key": "auto", "problem_type": "classification", "expected_class_name": "LogisticRegression"
+        },
+        "auto_regression_gives_linear": {
+          "key": "auto", "problem_type": "regression", "expected_class_name": "LinearRegression"
+        },
+        "random_forest_classification": {
+          "key": "random_forest", "problem_type": "classification", "expected_class_name": "RandomForestClassifier"
+        },
+        "random_forest_regression": {
+          "key": "random_forest", "problem_type": "regression", "expected_class_name": "RandomForestRegressor"
+        },
+        "unknown_key_returns_none": {
+          "key": "quantum_forest", "problem_type": "classification", "expected_class_name": null
+        },
+        "case_insensitive": {
+          "key": "LogisticRegression", "problem_type": "classification", "expected_class_name": "LogisticRegression"
+        }
+      }
+    },
+    "resolve_drop_list": {
+      "params": "config, existing_cols, expected_drop",
+      "test_cases": {
+        "drops_candidates_minus_selected": {
+          "config": {"selected_columns": ["a"], "candidate_columns": ["a", "b", "c"]},
+          "existing_cols": ["a", "b", "c"],
+          "expected_drop": ["b", "c"]
+        },
+        "no_selected_returns_empty": {
+          "config": {"candidate_columns": ["a", "b"]},
+          "existing_cols": ["a", "b"],
+          "expected_drop": []
+        },
+        "column_not_in_existing_excluded": {
+          "config": {"selected_columns": [], "candidate_columns": ["a", "b"]},
+          "existing_cols": ["a"],
+          "expected_drop": ["a"]
+        },
+        "empty_candidates_empty_drop": {
+          "config": {"selected_columns": [], "candidate_columns": []},
+          "existing_cols": ["a", "b"],
+          "expected_drop": []
+        }
+      }
+    },
+    "drop_selected": {
+      "params": "engine, drop_columns, expected_columns",
+      "test_cases": {
+        "pandas_drops_unselected": {"engine": "pandas", "drop_columns": true, "expected_columns": ["a", "c"]},
+        "pandas_passthrough": {"engine": "pandas", "drop_columns": false, "expected_columns": ["a", "b", "c"]},
+        "polars_drops_unselected": {"engine": "polars", "drop_columns": true, "expected_columns": ["a", "c"]},
+        "polars_passthrough": {"engine": "polars", "drop_columns": false, "expected_columns": ["a", "b", "c"]}
+      }
+    },
+    "resolve_problem_type": {
+      "params": "mode, y_values, expected",
+      "test_cases": {
+        "explicit_classification_returned": {"mode": "classification", "y_values": null, "expected": "classification"},
+        "explicit_regression_returned": {"mode": "regression", "y_values": [1, 2], "expected": "regression"},
+        "auto_with_none_y_defaults_classification": {"mode": "auto", "y_values": null, "expected": "classification"},
+        "auto_infers_regression_from_y": {
+          "mode": "auto",
+          "y_values": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0],
+          "expected": "regression"
+        }
+      }
+    },
+    "resolve_generic_param": {
+      "params": "config, expected",
+      "test_cases": {
+        "explicit_param_returned": {"config": {"param": 42}, "expected": 42},
+        "k_best_mode_uses_k": {"config": {"mode": "k_best", "k": 5}, "expected": 5},
+        "k_best_default": {"config": {"mode": "k_best"}, "expected": 10},
+        "percentile_mode_uses_percentile": {"config": {"mode": "percentile", "percentile": 25}, "expected": 25},
+        "unknown_mode_defaults_to_alpha": {"config": {"mode": "fpr"}, "expected": 0.05}
+      }
+    },
+    "build_univariate_selector": {
+      "params": "method, config, expected_class_name, attr_name, attr_value",
+      "test_cases": {
+        "select_k_best": {
+          "method": "select_k_best", "config": {"k": 3},
+          "expected_class_name": "SelectKBest", "attr_name": "k", "attr_value": 3
+        },
+        "select_percentile": {
+          "method": "select_percentile", "config": {"percentile": 50},
+          "expected_class_name": "SelectPercentile", "attr_name": "percentile", "attr_value": 50
+        },
+        "select_fpr": {
+          "method": "select_fpr", "config": {"alpha": 0.05},
+          "expected_class_name": "SelectFpr", "attr_name": null, "attr_value": null
+        },
+        "select_fdr": {
+          "method": "select_fdr", "config": {},
+          "expected_class_name": "SelectFdr", "attr_name": null, "attr_value": null
+        },
+        "select_fwe": {
+          "method": "select_fwe", "config": {},
+          "expected_class_name": "SelectFwe", "attr_name": null, "attr_value": null
+        },
+        "unknown_method_returns_none": {
+          "method": "select_magic", "config": {},
+          "expected_class_name": null, "attr_name": null, "attr_value": null
+        }
+      }
+    },
+    "build_model_selector": {
+      "params": "method, estimator_name, config, expected_class_name, attr_name, attr_value",
+      "test_cases": {
+        "select_from_model": {
+          "method": "select_from_model", "estimator_name": "LogisticRegression", "config": {},
+          "expected_class_name": "SelectFromModel", "attr_name": null, "attr_value": null
+        },
+        "select_from_model_float_threshold": {
+          "method": "select_from_model", "estimator_name": "LinearRegression", "config": {"threshold": "0.5"},
+          "expected_class_name": "SelectFromModel", "attr_name": "threshold", "attr_value": 0.5
+        },
+        "select_from_model_string_threshold_kept": {
+          "method": "select_from_model", "estimator_name": "LinearRegression", "config": {"threshold": "mean"},
+          "expected_class_name": "SelectFromModel", "attr_name": "threshold", "attr_value": "mean"
+        },
+        "rfe": {
+          "method": "rfe", "estimator_name": "LogisticRegression", "config": {"n_features_to_select": 2, "step": 1},
+          "expected_class_name": "RFE", "attr_name": "n_features_to_select", "attr_value": 2
+        },
+        "unknown_method_returns_none": {
+          "method": "telepathy", "estimator_name": "LinearRegression", "config": {},
+          "expected_class_name": null, "attr_name": null, "attr_value": null
+        }
+      }
+    },
+    "maybe_chi2_rescale": {
+      "params": "x, score_func, expect_rescale",
+      "test_cases": {
+        "no_rescale_for_non_chi2": {"x": [[-1.0, 2.0], [3.0, -4.0]], "score_func": "f_classif", "expect_rescale": false},
+        "no_rescale_when_all_non_negative": {"x": [[0.0, 1.0], [2.0, 3.0]], "score_func": "chi2", "expect_rescale": false},
+        "rescales_when_chi2_and_negatives": {"x": [[-1.0, 2.0], [3.0, 4.0]], "score_func": "chi2", "expect_rescale": true},
+        "rescale_none_score_func": {"x": [[-1.0, 2.0]], "score_func": null, "expect_rescale": false}
+      }
+    },
+    "model_feature_importances": {
+      "params": "estimator_name, columns, check_non_negative",
+      "test_cases": {
+        "tree_based_importances": {
+          "estimator_name": "RandomForestClassifier", "columns": ["feat_a", "feat_b"], "check_non_negative": true
+        },
+        "coef_based_importances": {
+          "estimator_name": "LogisticRegression", "columns": ["a", "b"], "check_non_negative": false
+        }
+      }
+    }
+  }
+}

@@ -20,8 +20,11 @@ from sklearn.feature_selection import (
     SelectPercentile,
     f_classif,
     f_regression,
+    mutual_info_regression,
 )
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_selection._common import (
     _build_model_selector,
@@ -43,35 +46,85 @@ from skyulf.preprocessing.feature_selection._common import (
     _univariate_score_dicts,
 )
 
+# Registries mapping JSON-fixture name strings to the real sklearn objects.
+_SCORE_FUNC_REGISTRY = {
+    "f_classif": f_classif,
+    "f_regression": f_regression,
+    "mutual_info_regression": mutual_info_regression,
+}
+_ESTIMATOR_CLASS_REGISTRY = {
+    "LogisticRegression": LogisticRegression,
+    "LinearRegression": LinearRegression,
+    "RandomForestClassifier": RandomForestClassifier,
+    "RandomForestRegressor": RandomForestRegressor,
+}
+_UNIVARIATE_SELECTOR_CLASSES = {
+    "SelectKBest": SelectKBest,
+    "SelectPercentile": SelectPercentile,
+    "SelectFpr": SelectFpr,
+    "SelectFdr": SelectFdr,
+    "SelectFwe": SelectFwe,
+}
+_MODEL_SELECTOR_CLASSES = {"SelectFromModel": SelectFromModel, "RFE": RFE}
+_ESTIMATOR_FACTORIES = {
+    "LogisticRegression": LogisticRegression,
+    "LinearRegression": LinearRegression,
+}
+_IMPORTANCE_ESTIMATOR_FACTORIES = {
+    "RandomForestClassifier": lambda: RandomForestClassifier(n_estimators=5, random_state=0),
+    "LogisticRegression": lambda: LogisticRegression(max_iter=1000),
+}
+_DROP_SELECTED_FUNCS = {"pandas": _drop_selected_pandas, "polars": _drop_selected_polars}
+_DROP_SELECTED_DF_BUILDERS = {
+    "pandas": lambda: pd.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]}),
+    "polars": lambda: pl.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]}),
+}
+
+_infer_problem_type_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="infer_problem_type"
+).load()
+_resolve_score_function_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="resolve_score_function"
+).load()
+_resolve_estimator_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="resolve_estimator"
+).load()
+_resolve_drop_list_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="resolve_drop_list"
+).load()
+_drop_selected_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="drop_selected"
+).load()
+_resolve_problem_type_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="resolve_problem_type"
+).load()
+_resolve_generic_param_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="resolve_generic_param"
+).load()
+_build_univariate_selector_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="build_univariate_selector"
+).load()
+_build_model_selector_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="build_model_selector"
+).load()
+_maybe_chi2_rescale_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="maybe_chi2_rescale"
+).load()
+_model_feature_importances_cases = TestCaseLoader(
+    "preprocessing/feature_selection_common", group="model_feature_importances"
+).load()
+
 # ---------------------------------------------------------------------------
 # _infer_problem_type
 # ---------------------------------------------------------------------------
 
 
 class TestInferProblemType:
-    def test_bool_column_is_classification(self) -> None:
-        """Boolean dtype must infer as classification."""
-        s = pd.Series([True, False, True])
-        assert _infer_problem_type(s) == "classification"
-
-    def test_object_column_is_classification(self) -> None:
-        """String/object dtype is always classification."""
-        s = pd.Series(["cat", "dog", "cat"])
-        assert _infer_problem_type(s) == "classification"
-
-    def test_few_unique_numeric_is_classification(self) -> None:
-        """Ten or fewer unique values → classification even for numeric."""
-        s = pd.Series([1, 2, 3, 1, 2])
-        assert _infer_problem_type(s) == "classification"
-
-    def test_many_unique_numeric_is_regression(self) -> None:
-        """More than ten unique float values → regression."""
-        s = pd.Series([float(i) for i in range(20)])
-        assert _infer_problem_type(s) == "regression"
-
-    def test_empty_series_defaults_to_classification(self) -> None:
-        """An empty Series should default to classification to be safe."""
-        assert _infer_problem_type(pd.Series([], dtype=float)) == "classification"
+    @pytest.mark.parametrize(*_infer_problem_type_cases)
+    def test_infer_problem_type(self, values: list, dtype: str | None, expected: str) -> None:
+        """Various Series shapes/dtypes must infer the documented problem type."""
+        s = pd.Series(values, dtype=dtype)
+        assert _infer_problem_type(s) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -80,25 +133,13 @@ class TestInferProblemType:
 
 
 class TestResolveScoreFunction:
-    def test_named_function_returned(self) -> None:
-        """An explicitly named score function must be returned directly."""
-        assert _resolve_score_function("f_classif", "classification") is f_classif
-
-    def test_classification_default_is_f_classif(self) -> None:
-        """Unknown name + classification problem → f_classif fallback."""
-        assert _resolve_score_function(None, "classification") is f_classif
-
-    def test_regression_default_is_f_regression(self) -> None:
-        """Unknown name + regression problem → f_regression fallback."""
-        assert _resolve_score_function(None, "regression") is f_regression
-
-    def test_named_mutual_info_regression(self) -> None:
-        """mutual_info_regression must be returned when explicitly named."""
-        from sklearn.feature_selection import mutual_info_regression
-
+    @pytest.mark.parametrize(*_resolve_score_function_cases)
+    def test_resolve_score_function(
+        self, name: str | None, problem_type: str, expected_func_name: str
+    ) -> None:
+        """An explicit name or problem-type default must resolve to the right score function."""
         assert (
-            _resolve_score_function("mutual_info_regression", "regression")
-            is mutual_info_regression
+            _resolve_score_function(name, problem_type) is _SCORE_FUNC_REGISTRY[expected_func_name]
         )
 
 
@@ -108,34 +149,16 @@ class TestResolveScoreFunction:
 
 
 class TestResolveEstimator:
-    def test_auto_classification_gives_logistic(self) -> None:
-        """'auto' for classification should produce a LogisticRegression."""
-        est = _resolve_estimator("auto", "classification")
-        assert isinstance(est, LogisticRegression)
-
-    def test_auto_regression_gives_linear(self) -> None:
-        """'auto' for regression should produce a LinearRegression."""
-        est = _resolve_estimator("auto", "regression")
-        assert isinstance(est, LinearRegression)
-
-    def test_random_forest_classification(self) -> None:
-        """'random_forest' for classification must give a RandomForestClassifier."""
-        est = _resolve_estimator("random_forest", "classification")
-        assert isinstance(est, RandomForestClassifier)
-
-    def test_random_forest_regression(self) -> None:
-        """'random_forest' for regression must give a RandomForestRegressor."""
-        est = _resolve_estimator("random_forest", "regression")
-        assert isinstance(est, RandomForestRegressor)
-
-    def test_unknown_key_returns_none(self) -> None:
-        """A completely unknown key should return None, not raise."""
-        assert _resolve_estimator("quantum_forest", "classification") is None
-
-    def test_case_insensitive(self) -> None:
-        """Estimator key resolution must be case-insensitive."""
-        est = _resolve_estimator("LogisticRegression", "classification")
-        assert isinstance(est, LogisticRegression)
+    @pytest.mark.parametrize(*_resolve_estimator_cases)
+    def test_resolve_estimator(
+        self, key: str, problem_type: str, expected_class_name: str | None
+    ) -> None:
+        """Known estimator keys must resolve to the right estimator class; unknown keys to None."""
+        est = _resolve_estimator(key, problem_type)
+        if expected_class_name is None:
+            assert est is None
+        else:
+            assert isinstance(est, _ESTIMATOR_CLASS_REGISTRY[expected_class_name])
 
 
 # ---------------------------------------------------------------------------
@@ -144,28 +167,12 @@ class TestResolveEstimator:
 
 
 class TestResolveDropList:
-    def test_drops_candidates_minus_selected(self) -> None:
-        """Columns in candidates but not in selected must be in the drop list."""
-        params = {"selected_columns": ["a"], "candidate_columns": ["a", "b", "c"]}
-        drop = _resolve_drop_list(params, ["a", "b", "c"])
-        assert set(drop) == {"b", "c"}
-
-    def test_no_selected_returns_empty(self) -> None:
-        """Missing selected_columns key → nothing to drop."""
-        params = {"candidate_columns": ["a", "b"]}
-        assert _resolve_drop_list(params, ["a", "b"]) == []
-
-    def test_column_not_in_existing_excluded(self) -> None:
-        """Drop list is filtered by existing_cols; phantom columns are excluded."""
-        params = {"selected_columns": [], "candidate_columns": ["a", "b"]}
-        drop = _resolve_drop_list(params, ["a"])
-        # b is not in existing_cols, so only a is dropped.
-        assert drop == ["a"]
-
-    def test_empty_candidates_empty_drop(self) -> None:
-        """No candidate columns → nothing to drop."""
-        params = {"selected_columns": [], "candidate_columns": []}
-        assert _resolve_drop_list(params, ["a", "b"]) == []
+    @pytest.mark.parametrize(*_resolve_drop_list_cases)
+    def test_resolve_drop_list(
+        self, config: dict, existing_cols: list, expected_drop: list
+    ) -> None:
+        """The drop list must be candidates minus selected, filtered by existing_cols."""
+        assert set(_resolve_drop_list(config, existing_cols)) == set(expected_drop)
 
 
 # ---------------------------------------------------------------------------
@@ -173,33 +180,24 @@ class TestResolveDropList:
 # ---------------------------------------------------------------------------
 
 
+class TestDropSelected:
+    @pytest.mark.parametrize(*_drop_selected_cases)
+    def test_drop_selected(self, engine: str, drop_columns: bool, expected_columns: list) -> None:
+        """Both pandas and polars engines must drop/keep columns identically."""
+        df = _DROP_SELECTED_DF_BUILDERS[engine]()
+        params = {
+            "drop_columns": drop_columns,
+            "selected_columns": ["a"],
+            "candidate_columns": ["a", "b"],
+        }
+        X_out, _ = _DROP_SELECTED_FUNCS[engine](df, None, params)
+        assert set(X_out.columns) == set(expected_columns)
+
+
 class TestDropSelectedPandas:
     def _df(self) -> pd.DataFrame:
         """Small DataFrame with three columns."""
         return pd.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]})
-
-    def test_drops_unselected_columns(self) -> None:
-        """Columns in candidates but not selected must be removed."""
-        params = {
-            "drop_columns": True,
-            "selected_columns": ["a"],
-            "candidate_columns": ["a", "b"],
-        }
-        X_out, _ = _drop_selected_pandas(self._df(), None, params)
-        assert "b" not in X_out.columns
-        assert "a" in X_out.columns
-        # c was not a candidate so it survives.
-        assert "c" in X_out.columns
-
-    def test_drop_columns_false_is_passthrough(self) -> None:
-        """drop_columns=False must return the frame unchanged."""
-        params = {
-            "drop_columns": False,
-            "selected_columns": ["a"],
-            "candidate_columns": ["a", "b"],
-        }
-        X_out, _ = _drop_selected_pandas(self._df(), None, params)
-        assert list(X_out.columns) == ["a", "b", "c"]
 
     def test_y_returned_unchanged(self) -> None:
         """y is not modified by the column-drop helper."""
@@ -211,33 +209,6 @@ class TestDropSelectedPandas:
         }
         _, y_out = _drop_selected_pandas(self._df(), y, params)
         pd.testing.assert_series_equal(y, y_out)
-
-
-class TestDropSelectedPolars:
-    def _df(self) -> pl.DataFrame:
-        """Small Polars DataFrame with three columns."""
-        return pl.DataFrame({"a": [1, 2], "b": [3, 4], "c": [5, 6]})
-
-    def test_drops_unselected_columns_polars(self) -> None:
-        """Polars path must drop the same columns as the pandas path."""
-        params = {
-            "drop_columns": True,
-            "selected_columns": ["a"],
-            "candidate_columns": ["a", "b"],
-        }
-        X_out, _ = _drop_selected_polars(self._df(), None, params)
-        assert "b" not in X_out.columns
-        assert "a" in X_out.columns
-
-    def test_drop_columns_false_passthrough_polars(self) -> None:
-        """drop_columns=False must leave the Polars frame intact."""
-        params = {
-            "drop_columns": False,
-            "selected_columns": ["a"],
-            "candidate_columns": ["a", "b"],
-        }
-        X_out, _ = _drop_selected_polars(self._df(), None, params)
-        assert list(X_out.columns) == ["a", "b", "c"]
 
 
 # ---------------------------------------------------------------------------
@@ -306,22 +277,11 @@ class TestPrepareSklearnY:
 
 
 class TestResolveProblemType:
-    def test_explicit_classification_returned(self) -> None:
-        """An explicit 'classification' declaration must be returned unchanged."""
-        assert _resolve_problem_type("classification", None) == "classification"
-
-    def test_explicit_regression_returned(self) -> None:
-        """An explicit 'regression' declaration must be returned unchanged."""
-        assert _resolve_problem_type("regression", pd.Series([1, 2])) == "regression"
-
-    def test_auto_with_none_y_defaults_classification(self) -> None:
-        """'auto' with no y available falls back to classification."""
-        assert _resolve_problem_type("auto", None) == "classification"
-
-    def test_auto_infers_regression_from_y(self) -> None:
-        """'auto' with a continuous y must resolve to regression."""
-        y = pd.Series([float(i) for i in range(20)])
-        assert _resolve_problem_type("auto", y) == "regression"
+    @pytest.mark.parametrize(*_resolve_problem_type_cases)
+    def test_resolve_problem_type(self, mode: str, y_values: list | None, expected: str) -> None:
+        """Explicit modes and 'auto' inference must resolve to the right problem type."""
+        y = pd.Series(y_values) if y_values is not None else None
+        assert _resolve_problem_type(mode, y) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -330,26 +290,10 @@ class TestResolveProblemType:
 
 
 class TestResolveGenericParam:
-    def test_explicit_param_returned(self) -> None:
-        """An explicit 'param' key in config must be returned directly."""
-        assert _resolve_generic_param({"param": 42}) == 42
-
-    def test_k_best_mode_uses_k(self) -> None:
-        """k_best mode reads the 'k' key (default 10)."""
-        assert _resolve_generic_param({"mode": "k_best", "k": 5}) == 5
-
-    def test_k_best_default(self) -> None:
-        """k_best without explicit k defaults to 10."""
-        assert _resolve_generic_param({"mode": "k_best"}) == 10
-
-    def test_percentile_mode_uses_percentile(self) -> None:
-        """percentile mode reads the 'percentile' key."""
-        assert _resolve_generic_param({"mode": "percentile", "percentile": 25}) == 25
-
-    def test_unknown_mode_defaults_to_alpha(self) -> None:
-        """An unknown mode falls through to alpha (default 0.05)."""
-        val = _resolve_generic_param({"mode": "fpr"})
-        assert val == 0.05
+    @pytest.mark.parametrize(*_resolve_generic_param_cases)
+    def test_resolve_generic_param(self, config: dict, expected: float) -> None:
+        """Explicit params, mode-based defaults, and unknown-mode fallback must all resolve."""
+        assert _resolve_generic_param(config) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -358,36 +302,26 @@ class TestResolveGenericParam:
 
 
 class TestBuildUnivariateSelector:
-    def test_select_k_best(self) -> None:
-        """select_k_best must produce a SelectKBest instance with the right k."""
-        sel = _build_univariate_selector("select_k_best", f_classif, {"k": 3})
-        assert isinstance(sel, SelectKBest)
-        assert sel.k == 3
+    @pytest.mark.parametrize(*_build_univariate_selector_cases)
+    def test_build_univariate_selector(
+        self,
+        method: str,
+        config: dict,
+        expected_class_name: str | None,
+        attr_name: str | None,
+        attr_value: object,
+    ) -> None:
+        """Each method must build the right selector class (or None if unrecognised)."""
+        sel = _build_univariate_selector(method, f_classif, config)
+        if expected_class_name is None:
+            assert sel is None
+            return
+        assert isinstance(sel, _UNIVARIATE_SELECTOR_CLASSES[expected_class_name])
+        if attr_name is not None:
+            assert getattr(sel, attr_name) == attr_value
 
-    def test_select_percentile(self) -> None:
-        """select_percentile must produce a SelectPercentile with the right percentile."""
-        sel = _build_univariate_selector("select_percentile", f_classif, {"percentile": 50})
-        assert isinstance(sel, SelectPercentile)
-        assert sel.percentile == 50
-
-    def test_select_fpr(self) -> None:
-        """select_fpr must produce a SelectFpr."""
-        sel = _build_univariate_selector("select_fpr", f_classif, {"alpha": 0.05})
-        assert isinstance(sel, SelectFpr)
-
-    def test_select_fdr(self) -> None:
-        """select_fdr must produce a SelectFdr."""
-        sel = _build_univariate_selector("select_fdr", f_classif, {})
-        assert isinstance(sel, SelectFdr)
-
-    def test_select_fwe(self) -> None:
-        """select_fwe must produce a SelectFwe."""
-        sel = _build_univariate_selector("select_fwe", f_classif, {})
-        assert isinstance(sel, SelectFwe)
-
-    def test_unknown_method_returns_none(self) -> None:
-        """An unrecognised method name must return None."""
-        assert _build_univariate_selector("select_magic", f_classif, {}) is None
+        if attr_name is not None:
+            assert getattr(sel, attr_name) == attr_value
 
 
 # ---------------------------------------------------------------------------
@@ -396,36 +330,25 @@ class TestBuildUnivariateSelector:
 
 
 class TestBuildModelSelector:
-    def test_select_from_model(self) -> None:
-        """select_from_model must produce a SelectFromModel."""
-        est = LogisticRegression()
-        sel = _build_model_selector("select_from_model", est, {})
-        assert isinstance(sel, SelectFromModel)
-
-    def test_select_from_model_float_threshold(self) -> None:
-        """A numeric string threshold must be coerced to float."""
-        est = LinearRegression()
-        sel = _build_model_selector("select_from_model", est, {"threshold": "0.5"})
-        assert isinstance(sel, SelectFromModel)
-        assert sel.threshold == 0.5
-
-    def test_select_from_model_string_threshold_kept(self) -> None:
-        """A non-numeric string threshold such as 'mean' must stay as a string."""
-        est = LinearRegression()
-        sel = _build_model_selector("select_from_model", est, {"threshold": "mean"})
-        assert sel is not None
-        assert sel.threshold == "mean"
-
-    def test_rfe(self) -> None:
-        """rfe must produce an RFE instance."""
-        est = LogisticRegression()
-        sel = _build_model_selector("rfe", est, {"n_features_to_select": 2, "step": 1})
-        assert isinstance(sel, RFE)
-        assert sel.n_features_to_select == 2
-
-    def test_unknown_method_returns_none(self) -> None:
-        """An unrecognised model selector method must return None."""
-        assert _build_model_selector("telepathy", LinearRegression(), {}) is None
+    @pytest.mark.parametrize(*_build_model_selector_cases)
+    def test_build_model_selector(
+        self,
+        method: str,
+        estimator_name: str,
+        config: dict,
+        expected_class_name: str | None,
+        attr_name: str | None,
+        attr_value: object,
+    ) -> None:
+        """Each method must build the right selector class (or None if unrecognised)."""
+        est = _ESTIMATOR_FACTORIES[estimator_name]()
+        sel = _build_model_selector(method, est, config)
+        if expected_class_name is None:
+            assert sel is None
+            return
+        assert isinstance(sel, _MODEL_SELECTOR_CLASSES[expected_class_name])
+        if attr_name is not None:
+            assert getattr(sel, attr_name) == attr_value
 
 
 # ---------------------------------------------------------------------------
@@ -434,30 +357,18 @@ class TestBuildModelSelector:
 
 
 class TestMaybeChi2Rescale:
-    def test_no_rescale_for_non_chi2(self) -> None:
-        """Non-chi2 score functions must leave the array unchanged."""
-        X = np.array([[-1.0, 2.0], [3.0, -4.0]])
-        result = _maybe_chi2_rescale(X, "f_classif")
-        np.testing.assert_array_equal(result, X)
-
-    def test_no_rescale_when_all_non_negative(self) -> None:
-        """chi2 with no negative values must not trigger rescaling."""
-        X = np.array([[0.0, 1.0], [2.0, 3.0]])
-        result = _maybe_chi2_rescale(X, "chi2")
-        np.testing.assert_array_equal(result, X)
-
-    def test_rescales_when_chi2_and_negatives(self) -> None:
-        """chi2 with negative values must be MinMax-scaled to [0, 1]."""
-        X = np.array([[-1.0, 2.0], [3.0, 4.0]])
-        result = _maybe_chi2_rescale(X, "chi2")
-        assert result.min() >= 0.0
-        assert result.max() <= 1.0 + 1e-9
-
-    def test_rescale_none_score_func(self) -> None:
-        """None score_func (not chi2) must leave the array unchanged."""
-        X = np.array([[-1.0, 2.0]])
-        result = _maybe_chi2_rescale(X, None)
-        np.testing.assert_array_equal(result, X)
+    @pytest.mark.parametrize(*_maybe_chi2_rescale_cases)
+    def test_maybe_chi2_rescale(
+        self, x: list, score_func: str | None, expect_rescale: bool
+    ) -> None:
+        """chi2 with negative values must be rescaled; every other case is a passthrough."""
+        X = np.array(x)
+        result = _maybe_chi2_rescale(X, score_func)
+        if expect_rescale:
+            assert result.min() >= 0.0
+            assert result.max() <= 1.0 + 1e-9
+        else:
+            np.testing.assert_array_equal(result, X)
 
 
 # ---------------------------------------------------------------------------
@@ -532,28 +443,21 @@ class TestUnivariateNoTargetArtifact:
 
 
 class TestModelFeatureImportances:
-    def test_tree_based_importances(self) -> None:
-        """A fitted forest's feature_importances_ must be returned as a dict."""
+    @pytest.mark.parametrize(*_model_feature_importances_cases)
+    def test_model_feature_importances(
+        self, estimator_name: str, columns: list, check_non_negative: bool
+    ) -> None:
+        """Both tree-based and coefficient-based estimators must yield a per-column dict."""
         X = np.array([[1.0, 0.0], [2.0, 1.0], [3.0, 0.0], [4.0, 1.0]])
         y = np.array([0, 1, 0, 1])
-        rf = RandomForestClassifier(n_estimators=5, random_state=0)
-        rf.fit(X, y)
-
+        est = _IMPORTANCE_ESTIMATOR_FACTORIES[estimator_name]()
+        est.fit(X, y)
         # Wrap in a minimal SelectFromModel so estimator_ attribute is set.
-        sfm = SelectFromModel(rf, threshold="mean").fit(X, y)
-        imps = _model_feature_importances(sfm, ["feat_a", "feat_b"])
-        assert set(imps.keys()) == {"feat_a", "feat_b"}
-        assert all(v >= 0 for v in imps.values())
-
-    def test_coef_based_importances(self) -> None:
-        """A fitted linear model's |coef| must be returned as a dict."""
-        X = np.array([[1.0, 0.0], [2.0, 1.0], [3.0, 0.0], [4.0, 1.0]])
-        y = np.array([0, 1, 0, 1])
-        lr = LogisticRegression(max_iter=1000)
-        lr.fit(X, y)
-        sfm = SelectFromModel(lr, threshold="mean").fit(X, y)
-        imps = _model_feature_importances(sfm, ["a", "b"])
-        assert set(imps.keys()) == {"a", "b"}
+        sfm = SelectFromModel(est, threshold="mean").fit(X, y)
+        imps = _model_feature_importances(sfm, columns)
+        assert set(imps.keys()) == set(columns)
+        if check_non_negative:
+            assert all(v >= 0 for v in imps.values())
 
     def test_no_estimator_attr_returns_empty(self) -> None:
         """An object with no estimator_ must return an empty dict."""
@@ -583,3 +487,36 @@ class TestResolveCandidateColumns:
         cols = _resolve_candidate_columns(df, {"columns": ["a", "b"]}, None)
         assert set(cols) == {"a", "b"}
         assert "c" not in cols
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: mixed-dtype customers.csv
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration check against customers.csv — verifies that _infer_problem_type
+    correctly classifies the binary ``churned`` target and that
+    _resolve_candidate_columns correctly excludes non-numeric and target columns
+    from a mixed-dtype frame that includes NaN in age/income/lat/lon.
+    """
+
+    def test_infer_problem_type_on_binary_churned_column(self) -> None:
+        """churned has only 2 unique integer values → must infer as classification."""
+        df = load_sample_dataset("customers")
+        assert _infer_problem_type(df["churned"]) == "classification"
+
+    def test_resolve_candidate_columns_excludes_target_and_non_numeric(self) -> None:
+        """Numeric columns (age, income, lat, lon, customer_id) minus churned
+        are candidates; string columns must not appear even with NaN present."""
+        df = load_sample_dataset("customers")
+        cols = _resolve_candidate_columns(df, {}, "churned")
+        # Target must be excluded.
+        assert "churned" not in cols
+        # Non-numeric columns must not appear.
+        assert "city" not in cols
+        assert "plan_type" not in cols
+        assert "signup_date" not in cols
+        # Numeric columns with NaN must still qualify as candidates.
+        assert "age" in cols
+        assert "income" in cols

@@ -12,6 +12,7 @@ from typing import List
 import numpy as np
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 from skyulf.profiling.schemas import DatasetProfile
@@ -495,3 +496,40 @@ def test_analyze_infers_native_categorical_semantic_type() -> None:
     profile = EDAAnalyzer(df).analyze()
 
     assert profile.columns["native_cat"].dtype == "Categorical"
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values and mixed dtypes across numeric/categorical/geo/date
+    columns — closer to production data than the synthetic ``mixed_df`` fixture
+    used elsewhere in this file.
+    """
+
+    def test_analyze_profiles_numeric_categorical_geo_and_date_columns(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        profile = analyzer.analyze(target_col="churned", task_type="Classification")
+
+        assert isinstance(profile, DatasetProfile)
+        assert profile.row_count == df.height
+
+        # Numeric columns with missing values (age/income) should still get stats.
+        assert profile.columns["age"].dtype == "Numeric"
+        assert profile.columns["age"].numeric_stats is not None
+        assert profile.columns["age"].missing_percentage > 0
+
+        # city is a low-cardinality string, but with only 15 rows its unique
+        # ratio (4/14 non-null) is above the 5% categorical threshold, so it's
+        # classified as free-form Text rather than Categorical.
+        assert profile.columns["city"].dtype == "Text"
+        assert profile.columns["city"].missing_percentage > 0
+
+        # signup_date should be auto-detected and cast to a Date/Datetime dtype.
+        assert profile.columns["signup_date"].dtype == "DateTime"
+        assert profile.columns["signup_date"].date_stats is not None
+
+        # lat/lon should be auto-detected as the geospatial pair.
+        assert profile.geospatial is not None
+        assert profile.geospatial.lat_col == "lat"
+        assert profile.geospatial.lon_col == "lon"
+        assert profile.geospatial.min_lat <= profile.geospatial.max_lat

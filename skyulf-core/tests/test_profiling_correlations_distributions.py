@@ -4,6 +4,7 @@ skyulf.profiling.distributions.calculate_histogram.
 
 import numpy as np
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.correlations import calculate_correlations
 from skyulf.profiling.distributions import calculate_histogram
@@ -108,3 +109,25 @@ def test_calculate_histogram_skips_unparseable_null_bin_group() -> None:
     assert hist is not None
     # The single null value is excluded from every bin's count.
     assert sum(b.count for b in hist) == 4
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing age/income values — closer to production data than the
+    small synthetic frames used elsewhere in this file.
+    """
+
+    def test_correlations_and_histogram_on_customers_income(self) -> None:
+        df_eager = load_sample_dataset("customers", engine="polars")
+        df = df_eager.lazy()
+
+        matrix = calculate_correlations(df, ["age", "income"])
+        assert matrix is not None
+        assert set(matrix.columns) == {"age", "income"}
+
+        hist = calculate_histogram(df, "income", bins=5)
+        assert hist is not None
+        # 3 of the 15 rows have a missing income; those rows are excluded from
+        # every bin's count.
+        non_null_income = df_eager["income"].drop_nulls().len()
+        assert sum(b.count for b in hist) == non_null_income

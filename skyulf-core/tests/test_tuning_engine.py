@@ -10,6 +10,7 @@ import pandas as pd
 import pytest
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LogisticRegression
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.modeling._tuning import engine as engine_mod
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
@@ -23,6 +24,9 @@ from skyulf.modeling.regression import (
     RandomForestRegressorApplier,
     RandomForestRegressorCalculator,
 )
+
+_searcher_failure_cases = TestCaseLoader("modeling/tuning_searcher_failure_validation").load()
+_EXCEPTION_TYPES = {"ValueError": ValueError, "RuntimeError": RuntimeError}
 
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
@@ -966,44 +970,28 @@ def _run_with_fake_halving_grid_searcher(monkeypatch, fake_searcher):
     return tuner.fit(X, y, config=cfg.__dict__)
 
 
-def test_tune_fit_no_trials_completed_error_message(monkeypatch):
-    """searcher.fit() raising 'No trials are completed yet' should be
-    translated into a user-friendly ValueError."""
-    fake = _FakeSearcher(fit_exception=ValueError("No trials are completed yet somehow"))
-    with pytest.raises(ValueError, match="No trials completed successfully"):
-        _run_with_fake_halving_grid_searcher(monkeypatch, fake)
+class TestSearcherFailureTranslation:
+    """searcher.fit() / best_params_ failures — scenarios loaded from
+    ``tests/test_cases/modeling/tuning_searcher_failure_validation.json``.
+    """
 
-
-def test_tune_fit_halving_dataset_too_small_error_message(monkeypatch):
-    """searcher.fit() raising sklearn's halving 'n_samples ... resample ... Got 0'
-    error should be translated into a clearer dataset-size ValueError."""
-    fake = _FakeSearcher(
-        fit_exception=ValueError("n_samples=10 ... cannot resample ... Got 0 candidates")
-    )
-    with pytest.raises(ValueError, match="dataset is too small"):
-        _run_with_fake_halving_grid_searcher(monkeypatch, fake)
-
-
-def test_tune_fit_generic_exception_reraised(monkeypatch):
-    """Any other exception from searcher.fit() should be re-raised unchanged."""
-    fake = _FakeSearcher(fit_exception=RuntimeError("totally unrelated failure"))
-    with pytest.raises(RuntimeError, match="totally unrelated failure"):
-        _run_with_fake_halving_grid_searcher(monkeypatch, fake)
-
-
-def test_tune_best_params_no_trials_completed_error_message(monkeypatch):
-    """Accessing best_params_ raising 'No trials are completed yet' should be
-    translated into a user-friendly ValueError about all trials failing."""
-    fake = _FakeSearcher(best_params_exception=ValueError("No trials are completed yet."))
-    with pytest.raises(ValueError, match="All trials failed"):
-        _run_with_fake_halving_grid_searcher(monkeypatch, fake)
-
-
-def test_tune_best_params_generic_value_error_reraised(monkeypatch):
-    """Any other ValueError from best_params_ access should be re-raised unchanged."""
-    fake = _FakeSearcher(best_params_exception=ValueError("some other unrelated issue"))
-    with pytest.raises(ValueError, match="some other unrelated issue"):
-        _run_with_fake_halving_grid_searcher(monkeypatch, fake)
+    @pytest.mark.parametrize(*_searcher_failure_cases)
+    def test_searcher_failure_translated_to_expected_error(
+        self,
+        monkeypatch,
+        exception_type: str,
+        exception_message: str,
+        exception_field: str,
+        error_match: str,
+    ) -> None:
+        exc_cls = _EXCEPTION_TYPES[exception_type]
+        exc = exc_cls(exception_message)
+        if exception_field == "fit_exception":
+            fake = _FakeSearcher(fit_exception=exc)
+        else:
+            fake = _FakeSearcher(best_params_exception=exc)
+        with pytest.raises(exc_cls, match=error_match):
+            _run_with_fake_halving_grid_searcher(monkeypatch, fake)
 
 
 # ---------------------------------------------------------------------------

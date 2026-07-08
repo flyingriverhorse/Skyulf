@@ -12,6 +12,8 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.transformations.general import (
     GeneralTransformationApplier,
@@ -20,6 +22,40 @@ from skyulf.preprocessing.transformations.general import (
     _apply_power_to_polars_col,
     _fit_power_for_column,
 )
+
+
+def _flatten_single_param(cases: list) -> list:
+    """Unwrap single-element scenario tuples for a bare (comma-less) parametrize name.
+
+    ``pytest.mark.parametrize("method", [("log",), ...])`` would otherwise assign the
+    whole 1-tuple to ``method`` instead of unpacking it, since a single param name
+    (no comma) is not treated as a sequence to destructure.
+    """
+    params, scenarios = cases
+    return [params, [scenario[0] for scenario in scenarios]]
+
+
+_simple_ops_cases = _flatten_single_param(
+    TestCaseLoader("preprocessing/transformations_general", group="simple_ops").load()
+)
+_polars_simple_ops_cases = _flatten_single_param(
+    TestCaseLoader("preprocessing/transformations_general", group="polars_simple_ops").load()
+)
+_edge_case_value_cases = TestCaseLoader(
+    "preprocessing/transformations_general", group="edge_case_values"
+).load()
+_fit_power_engine_cases = _flatten_single_param(
+    TestCaseLoader("preprocessing/transformations_general", group="fit_power_engine").load()
+)
+
+# Maps a simple op's method name to the numpy function it must reproduce —
+# scenarios only carry the method name (JSON can't serialize a callable).
+_SIMPLE_OP_FNS = {
+    "log": lambda v: np.log1p(v),
+    "sqrt": lambda v: np.sqrt(v),
+    "square": lambda v: np.square(v),
+    "cube_root": lambda v: np.cbrt(v),
+}
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -130,24 +166,20 @@ class TestFitArtifact:
 
 
 class TestApplySimpleOpsPandas:
-    @pytest.mark.parametrize(
-        "method,expected_fn",
-        [
-            ("log", lambda v: np.log1p(v)),
-            ("sqrt", lambda v: np.sqrt(v)),
-            ("square", lambda v: np.square(v)),
-            ("cube_root", lambda v: np.cbrt(v)),
-        ],
-    )
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/transformations_general.json`` (group ``simple_ops``).
+    """
+
+    @pytest.mark.parametrize(*_simple_ops_cases)
     def test_op_transforms_values_correctly(
-        self, calc: Any, appl: Any, pos_df: pd.DataFrame, method: str, expected_fn: Any
+        self, calc: Any, appl: Any, pos_df: pd.DataFrame, method: str
     ) -> None:
         """Each op must produce values matching its mathematical definition."""
         art = calc.fit(pos_df, {"transformations": [{"column": "a", "method": method}]})
         result = appl.apply(pos_df, art)
         np.testing.assert_allclose(
             result["a"].values,
-            expected_fn(pos_df["a"].values),
+            _SIMPLE_OP_FNS[method](pos_df["a"].values),
             rtol=1e-6,
             atol=1e-6,
         )
@@ -298,12 +330,25 @@ class TestApplyPowerTransforms:
 
 
 class TestEdgeCases:
-    def test_single_row_does_not_raise(self, calc: Any, appl: Any) -> None:
-        """A one-row DataFrame must transform without raising."""
-        df = pd.DataFrame({"x": [4.0]})
-        art = calc.fit(df, {"transformations": [{"column": "x", "method": "sqrt"}]})
+    """``test_single_row_does_not_raise``/``test_constant_column_transforms_correctly``
+    scenarios loaded from
+    ``tests/test_cases/preprocessing/transformations_general.json`` (group ``edge_case_values``).
+    """
+
+    @pytest.mark.parametrize(*_edge_case_value_cases)
+    def test_op_transforms_edge_case_values(
+        self,
+        calc: Any,
+        appl: Any,
+        column_values: list[float],
+        method: str,
+        expected_values: list[float],
+    ) -> None:
+        """A one-row or constant-valued column must transform without raising."""
+        df = pd.DataFrame({"x": column_values})
+        art = calc.fit(df, {"transformations": [{"column": "x", "method": method}]})
         result = appl.apply(df, art)
-        np.testing.assert_allclose(result["x"].values, [2.0])
+        np.testing.assert_allclose(result["x"].values, expected_values)
 
     def test_all_nan_column_survives_transform(self, calc: Any, appl: Any) -> None:
         """An all-NaN column should remain all-NaN after a simple op, without raising."""
@@ -311,13 +356,6 @@ class TestEdgeCases:
         art = calc.fit(df, {"transformations": [{"column": "x", "method": "log"}]})
         result = appl.apply(df, art)
         assert result["x"].isna().all()
-
-    def test_constant_column_transforms_correctly(self, calc: Any, appl: Any) -> None:
-        """A constant column should return a constant transformed column."""
-        df = pd.DataFrame({"x": [3.0, 3.0, 3.0, 3.0]})
-        art = calc.fit(df, {"transformations": [{"column": "x", "method": "square"}]})
-        result = appl.apply(df, art)
-        np.testing.assert_allclose(result["x"].values, 9.0)
 
     def test_large_dataframe_does_not_raise(self, calc: Any, appl: Any) -> None:
         """Large DataFrames must transform without memory or performance failures."""
@@ -351,7 +389,11 @@ class TestEdgeCases:
 
 
 class TestPolarsPath:
-    @pytest.mark.parametrize("method", ["log", "sqrt", "square", "exp", "cube_root", "reciprocal"])
+    """``method`` scenarios loaded from
+    ``tests/test_cases/preprocessing/transformations_general.json`` (group ``polars_simple_ops``).
+    """
+
+    @pytest.mark.parametrize(*_polars_simple_ops_cases)
     def test_simple_op_returns_polars_frame(
         self, calc: Any, appl: Any, pos_df: pd.DataFrame, method: str
     ) -> None:
@@ -402,17 +444,19 @@ class TestPolarsPath:
 
 
 class TestInternalHelpers:
-    def test_fit_power_for_column_returns_lambdas(self, pos_df: pd.DataFrame) -> None:
-        """_fit_power_for_column must return a dict with 'lambdas' for yeo-johnson."""
-        result = _fit_power_for_column(pos_df, "a", "yeo-johnson", is_polars=False)
+    @pytest.mark.parametrize(*_fit_power_engine_cases)
+    def test_fit_power_for_column_returns_lambdas(
+        self, pos_df: pd.DataFrame, is_polars: bool
+    ) -> None:
+        """_fit_power_for_column must return a dict with 'lambdas' for yeo-johnson,
+        on both the pandas and polars code paths (loaded from
+        ``tests/test_cases/preprocessing/transformations_general.json`` (group ``fit_power_engine``)).
+        """
+        df = pl.from_pandas(pos_df) if is_polars else pos_df
+        result = _fit_power_for_column(df, "a", "yeo-johnson", is_polars=is_polars)
         assert "lambdas" in result
-        assert len(result["lambdas"]) == 1
-
-    def test_fit_power_for_column_polars(self, pos_df: pd.DataFrame) -> None:
-        """_fit_power_for_column polars path converts to pandas and produces lambdas."""
-        pl_df = pl.from_pandas(pos_df)
-        result = _fit_power_for_column(pl_df, "a", "yeo-johnson", is_polars=True)
-        assert "lambdas" in result
+        if not is_polars:
+            assert len(result["lambdas"]) == 1
 
     def test_apply_power_pandas_missing_lambdas_is_noop(self, pos_df: pd.DataFrame) -> None:
         """_apply_power_to_pandas_col with lambdas=None returns the frame unchanged."""
@@ -498,6 +542,32 @@ def test_general_transform_engine_parity(method: str, df: pd.DataFrame) -> None:
     np.testing.assert_allclose(
         pd_vals, pl_vals, rtol=1e-5, atol=1e-5, err_msg=f"Engine divergence for method={method!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that GeneralTransformationCalculator handles real-world numeric
+    columns (``income``) that contain NaN values: transformed output must
+    preserve NaN positions, and non-missing rows must be finite after log.
+    """
+
+    def test_log_transform_preserves_nan_in_income_column(self) -> None:
+        df = load_sample_dataset("customers")
+        calc = GeneralTransformationCalculator()
+        appl = GeneralTransformationApplier()
+        art = calc.fit(df, {"transformations": [{"column": "income", "method": "log"}]})
+        out = appl.apply(df, art)
+        # NaN income rows must remain NaN, not be silently filled.
+        assert out.loc[df["income"].isna(), "income"].isna().all()
+        # Non-missing rows must yield finite log1p values.
+        non_missing = ~df["income"].isna()
+        assert out.loc[non_missing, "income"].notna().all()
 
 
 @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.too_slow])

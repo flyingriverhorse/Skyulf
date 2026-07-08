@@ -10,6 +10,7 @@ from typing import Any, List
 
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 import skyulf.profiling._analyzer.text as text_module
 from skyulf.profiling.analyzer import EDAAnalyzer
@@ -120,3 +121,26 @@ def test_analyze_sentiment_outer_exception_returns_none(monkeypatch: pytest.Monk
     result = analyzer._analyze_sentiment(analyzer.df["t"])
 
     assert result is None
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has a repeated, missing-value ``city`` column — closer to
+    production data than the small synthetic text lists used elsewhere in
+    this file.
+    """
+
+    def test_analyze_text_common_words_on_city_column(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        stats = analyzer._analyze_text(
+            "city", {"city__avg_len": 8.0, "city__min_len": 7, "city__max_len": 11}
+        )
+
+        word_counts = {w["word"]: w["count"] for w in stats.common_words}
+        # "Chicago"/"New York" each appear 4 times, "Houston"/"Los Angeles" 3 times;
+        # one row has a missing city that must not surface as a word.
+        assert word_counts["chicago"] == 4
+        assert word_counts["york"] == 4
+        assert word_counts["houston"] == 3
+        assert stats.avg_length == 8.0

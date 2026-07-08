@@ -1,0 +1,35 @@
+{
+  "params": "columns, numeric_cols, expected_lat_col, expected_lon_col",
+  "test_cases": {
+    "infers_latitude_candidate": {
+      "columns": {"latitude": [1.0, 2.0, 3.0], "lng": [10.0, 11.0, 12.0]},
+      "numeric_cols": ["latitude", "lng"],
+      "expected_lat_col": "latitude",
+      "expected_lon_col": null
+    },
+    "infers_longitude_candidate": {
+      "columns": {"lat": [1.0, 2.0, 3.0], "longitude": [10.0, 11.0, 12.0]},
+      "numeric_cols": ["lat", "longitude"],
+      "expected_lat_col": "lat",
+      "expected_lon_col": "longitude"
+    },
+    "infers_lng_candidate": {
+      "columns": {"lat": [1.0, 2.0, 3.0], "lng": [10.0, 11.0, 12.0]},
+      "numeric_cols": ["lat", "lng"],
+      "expected_lat_col": null,
+      "expected_lon_col": "lng"
+    },
+    "infers_lon_candidate": {
+      "columns": {"lat": [1.0, 2.0, 3.0], "lon": [10.0, 11.0, 12.0]},
+      "numeric_cols": ["lat", "lon"],
+      "expected_lat_col": null,
+      "expected_lon_col": "lon"
+    },
+    "infers_long_candidate": {
+      "columns": {"lat": [1.0, 2.0, 3.0], "long": [10.0, 11.0, 12.0]},
+      "numeric_cols": ["lat", "long"],
+      "expected_lat_col": null,
+      "expected_lon_col": "long"
+    }
+  }
+}

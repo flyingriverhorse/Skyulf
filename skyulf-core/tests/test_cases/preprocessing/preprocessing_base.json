@@ -1,0 +1,35 @@
+{
+  "params": "method, trigger_after, include_validation",
+  "test_cases": {
+    "fit_transform_train_guard": {
+      "method": "fit_transform",
+      "trigger_after": 0,
+      "include_validation": false
+    },
+    "fit_transform_test_guard": {
+      "method": "fit_transform",
+      "trigger_after": 1,
+      "include_validation": false
+    },
+    "fit_transform_validation_guard": {
+      "method": "fit_transform",
+      "trigger_after": 2,
+      "include_validation": true
+    },
+    "transform_train_guard": {
+      "method": "transform",
+      "trigger_after": 0,
+      "include_validation": false
+    },
+    "transform_test_guard": {
+      "method": "transform",
+      "trigger_after": 1,
+      "include_validation": false
+    },
+    "transform_validation_guard": {
+      "method": "transform",
+      "trigger_after": 2,
+      "include_validation": true
+    }
+  }
+}

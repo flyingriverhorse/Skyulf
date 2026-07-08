@@ -1,0 +1,91 @@
+{
+  "groups": {
+    "polars_stat_for_strategy": {
+      "params": "strategy, values, expected",
+      "test_cases": {
+        "mean": {"strategy": "mean", "values": [1.0, 2.0, 3.0], "expected": 2.0},
+        "median": {"strategy": "median", "values": [1.0, 2.0, 100.0], "expected": 2.0},
+        "most_frequent": {"strategy": "most_frequent", "values": [1, 1, 2], "expected": 1}
+      }
+    },
+    "compute_polars_fill_values": {
+      "params": "columns_data, columns, strategy, fill_value, expected",
+      "test_cases": {
+        "constant_with_explicit_value": {
+          "columns_data": {"a": [1.0, null], "b": [null, 4.0]},
+          "columns": ["a", "b"],
+          "strategy": "constant",
+          "fill_value": 7,
+          "expected": {"a": 7, "b": 7}
+        },
+        "constant_defaults_to_zero": {
+          "columns_data": {"a": [1.0, null]},
+          "columns": ["a"],
+          "strategy": "constant",
+          "fill_value": null,
+          "expected": {"a": 0}
+        },
+        "mean_strategy": {
+          "columns_data": {"a": [1.0, 3.0, null]},
+          "columns": ["a"],
+          "strategy": "mean",
+          "fill_value": null,
+          "expected": {"a": 2.0}
+        }
+      }
+    },
+    "iterative_estimator_aliases": {
+      "params": "alias, module, class_name",
+      "test_cases": {
+        "decision_tree": {"alias": "DecisionTree", "module": "sklearn.tree", "class_name": "DecisionTreeRegressor"},
+        "extra_trees": {"alias": "ExtraTrees", "module": "sklearn.ensemble", "class_name": "ExtraTreesRegressor"},
+        "kneighbors": {"alias": "KNeighbors", "module": "sklearn.neighbors", "class_name": "KNeighborsRegressor"},
+        "default_bayesian_ridge": {"alias": "something_else", "module": "sklearn.linear_model", "class_name": "BayesianRidge"}
+      }
+    },
+    "no_columns_or_numeric_returns_empty": {
+      "params": "calculator, df_data, config",
+      "test_cases": {
+        "knn_no_columns": {"calculator": "knn", "df_data": {"a": [1.0, null, 3.0]}, "config": {"columns": []}},
+        "knn_no_numeric_columns": {"calculator": "knn", "df_data": {"cat": ["x", "y", "z"]}, "config": {}},
+        "iterative_no_columns": {"calculator": "iterative", "df_data": {"a": [1.0, null, 3.0]}, "config": {"columns": []}},
+        "iterative_no_numeric_columns": {"calculator": "iterative", "df_data": {"cat": ["x", "y", "z"]}, "config": {}}
+      }
+    },
+    "applier_pandas_noop": {
+      "params": "applier, df_data, config, imputer_kind",
+      "test_cases": {
+        "knn_missing_columns": {"applier": "knn", "df_data": {"other": [1.0, 2.0, 3.0]}, "config": {"columns": ["a", "b"]}, "imputer_kind": "object"},
+        "knn_no_imputer_object": {"applier": "knn", "df_data": {"a": [1.0, null, 3.0]}, "config": {}, "imputer_kind": null},
+        "knn_transform_error": {"applier": "knn", "df_data": {"a": [1.0, 2.0, 3.0]}, "config": {"columns": ["a"]}, "imputer_kind": "broken"},
+        "iterative_missing_columns": {"applier": "iterative", "df_data": {"other": [1.0, 2.0, 3.0]}, "config": {"columns": ["a", "b"]}, "imputer_kind": "object"},
+        "iterative_no_imputer_object": {"applier": "iterative", "df_data": {"a": [1.0, null, 3.0]}, "config": {}, "imputer_kind": null},
+        "iterative_transform_error": {"applier": "iterative", "df_data": {"a": [1.0, 2.0, 3.0]}, "config": {"columns": ["a"]}, "imputer_kind": "broken"}
+      }
+    },
+    "applier_polars_noop": {
+      "params": "applier, df_data, config, imputer_kind",
+      "test_cases": {
+        "knn_missing_columns": {"applier": "knn", "df_data": {"other": [1.0, 2.0, 3.0]}, "config": {"columns": ["a", "b"]}, "imputer_kind": "object"},
+        "knn_transform_error": {"applier": "knn", "df_data": {"a": [1.0, 2.0, 3.0]}, "config": {"columns": ["a"]}, "imputer_kind": "broken"},
+        "iterative_missing_columns": {"applier": "iterative", "df_data": {"other": [1.0, 2.0, 3.0]}, "config": {"columns": ["a", "b"]}, "imputer_kind": "object"},
+        "iterative_transform_error": {"applier": "iterative", "df_data": {"a": [1.0, 2.0, 3.0]}, "config": {"columns": ["a"]}, "imputer_kind": "broken"}
+      }
+    },
+    "infer_output_schema_passthrough": {
+      "params": "calculator",
+      "test_cases": {
+        "knn": {"calculator": "knn"},
+        "iterative": {"calculator": "iterative"}
+      }
+    },
+    "all_imputers_empty_dataframe": {
+      "params": "calculator",
+      "test_cases": {
+        "simple": {"calculator": "simple"},
+        "knn": {"calculator": "knn"},
+        "iterative": {"calculator": "iterative"}
+      }
+    }
+  }
+}

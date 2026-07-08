@@ -10,6 +10,8 @@ import pandas as pd
 import polars as pl
 import pytest
 from sklearn.preprocessing import PowerTransformer as SkPowerTransformer
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.transformations.power import (
     PowerTransformerApplier,
@@ -21,6 +23,13 @@ from skyulf.preprocessing.transformations.simple import (
     SimpleTransformationApplier,
     SimpleTransformationCalculator,
 )
+
+_empty_artifact_cases = TestCaseLoader(
+    "preprocessing/transformations_power_simple", group="empty_artifact"
+).load()
+_simple_method_cases = TestCaseLoader(
+    "preprocessing/transformations_power_simple", group="simple_methods"
+).load()
 
 # ---------------------------------------------------------------------------
 # PowerTransformer
@@ -47,17 +56,17 @@ def test_power_transformer_box_cox_excludes_non_positive_columns() -> None:
     assert art["columns"] == ["pos"]
 
 
-def test_power_transformer_no_valid_columns_returns_empty_artifact() -> None:
-    """If every candidate column fails the box-cox positivity check, artifact is empty."""
-    df = pd.DataFrame({"has_zero": [0.0, -1.0, 2.0]})
-    art = PowerTransformerCalculator().fit(df, {"method": "box-cox", "columns": ["has_zero"]})
-    assert art == {}
+@pytest.mark.parametrize(*_empty_artifact_cases)
+def test_power_transformer_returns_empty_artifact(
+    df_data: dict[str, list], fit_config: dict
+) -> None:
+    """Scenarios where fit() must yield an empty artifact — no valid/positive/numeric columns.
 
-
-def test_power_transformer_no_columns_configured_returns_empty() -> None:
-    """``user_picked_no_columns`` short-circuits fit to an empty artifact."""
-    df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    art = PowerTransformerCalculator().fit(df, {"columns": []})
+    Loaded from ``tests/test_cases/preprocessing/transformations_power_simple.json``
+    (group ``empty_artifact``).
+    """
+    df = pd.DataFrame(df_data)
+    art = PowerTransformerCalculator().fit(df, fit_config)
     assert art == {}
 
 
@@ -97,17 +106,6 @@ def test_power_transformer_infer_output_schema_is_identity() -> None:
     schema = SkyulfSchema.from_columns(["a"], {"a": "float64"})
     out = PowerTransformerCalculator().infer_output_schema(schema, {"columns": ["a"]})
     assert out is schema
-
-
-def test_power_transformer_no_numeric_candidate_columns_returns_empty() -> None:
-    """No numeric candidate columns (e.g. all-string frame) yields an empty artifact.
-
-    Exercises _filter_power_columns's early-return for an empty `cols` list (line 72),
-    reached before the box-cox positivity filter even runs.
-    """
-    df = pd.DataFrame({"cat": ["a", "b", "c"]})
-    art = PowerTransformerCalculator().fit(df, {"method": "yeo-johnson"})
-    assert art == {}
 
 
 def test_filter_power_columns_empty_input_returns_empty() -> None:
@@ -192,78 +190,26 @@ def test_power_transformer_apply_pandas_swallows_exception(
 # ---------------------------------------------------------------------------
 
 
-def test_simple_transformation_log_negative_values_become_nan() -> None:
-    """Negative inputs to "log" are masked to NaN before ``log1p``."""
-    df = pd.DataFrame({"a": [-1.0, 0.0, 3.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "log"}]}
-    )
+@pytest.mark.parametrize(*_simple_method_cases)
+def test_simple_transformation_method(
+    values: list[float], method: str, extra_params: dict, expected: list[float | None]
+) -> None:
+    """Verifies per-method transform math and edge-case handling (NaN masking, clipping, unknown methods).
+
+    Loaded from ``tests/test_cases/preprocessing/transformations_power_simple.json``
+    (group ``simple_methods``).
+    """
+    df = pd.DataFrame({"a": values})
+    config = {"column": "a", "method": method, **extra_params}
+    art = SimpleTransformationCalculator().fit(df, {"transformations": [config]})
     out = SimpleTransformationApplier().apply(df, art)
-    assert np.isnan(out["a"].iloc[0])
-    assert out["a"].iloc[1] == 0.0
-    np.testing.assert_allclose(out["a"].iloc[2], np.log1p(3.0))
-
-
-def test_simple_transformation_sqrt_negative_values_become_nan() -> None:
-    """Negative inputs to "sqrt" are masked to NaN."""
-    df = pd.DataFrame({"a": [-4.0, 4.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "sqrt"}]}
-    )
-    out = SimpleTransformationApplier().apply(df, art)
-    assert np.isnan(out["a"].iloc[0])
-    assert out["a"].iloc[1] == 2.0
-
-
-def test_simple_transformation_square() -> None:
-    """ "square" squares every value, matching ``numpy.square``."""
-    df = pd.DataFrame({"a": [-3.0, 0.0, 4.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "square"}]}
-    )
-    out = SimpleTransformationApplier().apply(df, art)
-    assert out["a"].tolist() == [9.0, 0.0, 16.0]
-
-
-def test_simple_transformation_reciprocal_zero_becomes_nan() -> None:
-    """Dividing by zero in "reciprocal" produces NaN, not inf/exception."""
-    df = pd.DataFrame({"a": [0.0, 2.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "reciprocal"}]}
-    )
-    out = SimpleTransformationApplier().apply(df, art)
-    assert np.isnan(out["a"].iloc[0])
-    assert out["a"].iloc[1] == 0.5
-
-
-def test_simple_transformation_exp_clips_large_values() -> None:
-    """ "exp" clips inputs above ``clip_threshold`` before exponentiating."""
-    df = pd.DataFrame({"a": [1000.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "exp", "clip_threshold": 10}]}
-    )
-    out = SimpleTransformationApplier().apply(df, art)
-    np.testing.assert_allclose(out["a"].iloc[0], np.exp(10))
-
-
-def test_simple_transformation_cube_root_handles_negative_values() -> None:
-    """ "cube_root" handles negative inputs correctly (unlike sqrt/log)."""
-    df = pd.DataFrame({"a": [-8.0, 8.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "cube_root"}]}
-    )
-    out = SimpleTransformationApplier().apply(df, art)
-    np.testing.assert_allclose(out["a"].tolist(), [-2.0, 2.0])
-
-
-def test_simple_transformation_unknown_method_skipped() -> None:
-    """An unrecognised method is skipped, leaving the source column untouched."""
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    art = SimpleTransformationCalculator().fit(
-        df, {"transformations": [{"column": "a", "method": "bogus_method"}]}
-    )
-    out = SimpleTransformationApplier().apply(df, art)
-    assert out["a"].tolist() == [1.0, 2.0]
+    result = out["a"].tolist()
+    assert len(result) == len(expected)
+    for actual, exp in zip(result, expected):
+        if exp is None:
+            assert np.isnan(actual)
+        else:
+            np.testing.assert_allclose(actual, exp, rtol=1e-6, atol=1e-9)
 
 
 def test_simple_transformation_missing_column_skipped() -> None:
@@ -340,3 +286,29 @@ def test_simple_transformation_infer_output_schema_is_identity() -> None:
     schema = SkyulfSchema.from_columns(["a"], {"a": "float64"})
     out = SimpleTransformationCalculator().infer_output_schema(schema, {})
     assert out is schema
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that SimpleTransformationCalculator handles the real-world
+    ``income`` column (which has NaN values): NaN rows must be preserved
+    through a log transform, and non-missing rows must produce finite output.
+    """
+
+    def test_simple_log_on_income_preserves_nan(self) -> None:
+        df = load_sample_dataset("customers")
+        art = SimpleTransformationCalculator().fit(
+            df, {"transformations": [{"column": "income", "method": "log"}]}
+        )
+        out = SimpleTransformationApplier().apply(df, art)
+        # Rows where income was NaN must remain NaN after log.
+        assert out.loc[df["income"].isna(), "income"].isna().all()
+        # Non-missing rows must yield finite log1p values.
+        non_missing = ~df["income"].isna()
+        assert out.loc[non_missing, "income"].notna().all()

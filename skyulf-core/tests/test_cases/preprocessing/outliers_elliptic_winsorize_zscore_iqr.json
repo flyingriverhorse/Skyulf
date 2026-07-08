@@ -1,0 +1,78 @@
+{
+  "groups": {
+    "no_columns_selected": {
+      "params": "node, values",
+      "test_cases": {
+        "iqr": {"node": "iqr", "values": [1.0, 2.0, 3.0]},
+        "zscore": {"node": "zscore", "values": [1.0, 2.0, 3.0]},
+        "winsorize": {"node": "winsorize", "values": [1.0, 2.0, 3.0]},
+        "elliptic_envelope": {"node": "elliptic_envelope", "values": [1.0, 2.0, 3.0, 4.0, 5.0]}
+      }
+    },
+    "infer_output_schema_passthrough": {
+      "params": "node",
+      "test_cases": {
+        "iqr": {"node": "iqr"},
+        "zscore": {"node": "zscore"},
+        "winsorize": {"node": "winsorize"},
+        "elliptic_envelope": {"node": "elliptic_envelope"}
+      }
+    },
+    "iqr_bounds_formula": {
+      "params": "values",
+      "test_cases": {
+        "increasing_range_multiplier_1_5": {"values": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]},
+        "constant_column_zero_iqr": {"values": [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]}
+      }
+    },
+    "iqr_no_bounds": {
+      "params": "values, dtype",
+      "test_cases": {
+        "non_numeric_column": {"values": ["a", "b", "c"], "dtype": "object"},
+        "empty_dataframe": {"values": [], "dtype": "float64"}
+      }
+    },
+    "iqr_pandas_passthrough": {
+      "params": "values, config",
+      "test_cases": {
+        "no_bounds": {"values": [1.0, 2.0, 1000.0], "config": {}},
+        "unknown_column_in_bounds": {"values": [1.0, 2.0, 3.0], "config": {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}}
+      }
+    },
+    "iqr_polars_passthrough": {
+      "params": "values, config, expected",
+      "test_cases": {
+        "no_bounds": {"values": [1.0, 2.0, 1000.0], "config": {}, "expected": [1.0, 2.0, 1000.0]},
+        "unknown_column_in_bounds": {"values": [1.0, 2.0, 3.0], "config": {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}, "expected": [1.0, 2.0, 3.0]}
+      }
+    },
+    "zscore_warns": {
+      "params": "values, dtype, warning_substring",
+      "test_cases": {
+        "zero_variance_column": {"values": [7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0, 7.0], "dtype": "float64", "warning_substring": "Zero variance"},
+        "non_numeric_column": {"values": ["x", "y"], "dtype": "object", "warning_substring": "val"}
+      }
+    },
+    "zscore_polars_passthrough": {
+      "params": "values, config, expected",
+      "test_cases": {
+        "no_stats": {"values": [1.0, 2.0, 1000.0], "config": {}, "expected": [1.0, 2.0, 1000.0]},
+        "unknown_column_in_stats": {"values": [1.0, 2.0, 3.0], "config": {"stats": {"nonexistent": {"mean": 0.0, "std": 1.0}}, "threshold": 3.0}, "expected": [1.0, 2.0, 3.0]}
+      }
+    },
+    "winsorize_pandas_passthrough": {
+      "params": "values, config, expected",
+      "test_cases": {
+        "unknown_column_in_bounds": {"values": [1.0, 2.0, 3.0], "config": {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}, "expected": [1.0, 2.0, 3.0]},
+        "no_bounds": {"values": [1.0, 2.0, 1000.0], "config": {}, "expected": [1.0, 2.0, 1000.0]}
+      }
+    },
+    "winsorize_polars_passthrough": {
+      "params": "values, config, expected",
+      "test_cases": {
+        "no_bounds": {"values": [1.0, 2.0, 1000.0], "config": {}, "expected": [1.0, 2.0, 1000.0]},
+        "unknown_column_in_bounds": {"values": [1.0, 2.0, 3.0], "config": {"bounds": {"nonexistent": {"lower": 0.0, "upper": 1.0}}}, "expected": [1.0, 2.0, 3.0]}
+      }
+    }
+  }
+}

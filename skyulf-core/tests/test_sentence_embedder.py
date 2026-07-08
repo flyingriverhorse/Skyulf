@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 # ---------------------------------------------------------------------------
 # Mock helper — creates a fake sentence-transformer model
@@ -40,6 +41,15 @@ def _make_mock_model(dim: int = _EMBED_DIM) -> MagicMock:
 _MOCK_MODEL = _make_mock_model()
 
 _MODULE_PATH = "skyulf.preprocessing.vectorization.sentence_embedder._load_model"
+
+_fit_artifact_field_cases = TestCaseLoader(
+    "preprocessing/sentence_embedder", group="fit_artifact_fields"
+).load()
+_fit_empty_cases = TestCaseLoader("preprocessing/sentence_embedder", group="fit_empty").load()
+_apply_noop_cases = TestCaseLoader("preprocessing/sentence_embedder", group="apply_noop").load()
+_dimension_helper_cases = TestCaseLoader(
+    "preprocessing/sentence_embedder", group="dimension_helper"
+).load()
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -80,20 +90,20 @@ def multi_col_df() -> pd.DataFrame:
 
 class TestSentenceEmbedderCalculatorFit:
     @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_fit_returns_artifact_type(self, _mock: Any, text_df: pd.DataFrame) -> None:
-        """fit() must return an artifact with type='sentence_embedder'."""
+    @pytest.mark.parametrize(*_fit_artifact_field_cases)
+    def test_fit_artifact_field(
+        self,
+        _mock: Any,
+        text_df: pd.DataFrame,
+        extra_config: dict[str, Any],
+        artifact_key: str,
+        expected: Any,
+    ) -> None:
+        """fit() must persist the expected artifact field for each config scenario."""
         from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
 
-        art = SentenceEmbedderCalculator().fit(text_df, {"columns": ["text"]})
-        assert art["type"] == "sentence_embedder"
-
-    @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_fit_stores_embedding_dim(self, _mock: Any, text_df: pd.DataFrame) -> None:
-        """fit() must store the model's embedding dimension in the artifact."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
-
-        art = SentenceEmbedderCalculator().fit(text_df, {"columns": ["text"]})
-        assert art["embedding_dim"] == _EMBED_DIM
+        art = SentenceEmbedderCalculator().fit(text_df, {"columns": ["text"], **extra_config})
+        assert dict(art)[artifact_key] == expected
 
     @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
     def test_fit_generates_output_columns(self, _mock: Any, text_df: pd.DataFrame) -> None:
@@ -105,47 +115,15 @@ class TestSentenceEmbedderCalculatorFit:
         assert art["output_columns"][0] == "text__emb__0"
         assert art["output_columns"][-1] == f"text__emb__{_EMBED_DIM - 1}"
 
-    @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_fit_stores_model_name(self, _mock: Any, text_df: pd.DataFrame) -> None:
-        """The configured model_name must be persisted in the artifact."""
+    @pytest.mark.parametrize(*_fit_empty_cases)
+    def test_fit_returns_empty_dict(
+        self, text_df: pd.DataFrame, columns_config: list[str], expected: dict[str, Any]
+    ) -> None:
+        """fit() with no resolvable columns must return an empty dict without calling the model."""
         from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
 
-        art = SentenceEmbedderCalculator().fit(
-            text_df, {"columns": ["text"], "model_name": "custom-model-v1"}
-        )
-        assert art["model_name"] == "custom-model-v1"
-
-    @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_fit_stores_normalize_flag(self, _mock: Any, text_df: pd.DataFrame) -> None:
-        """The normalize flag must be persisted in the artifact."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
-
-        art = SentenceEmbedderCalculator().fit(text_df, {"columns": ["text"], "normalize": False})
-        assert art["normalize"] is False
-
-    @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_fit_stores_drop_original(self, _mock: Any, text_df: pd.DataFrame) -> None:
-        """The drop_original flag must be stored in the artifact."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
-
-        art = SentenceEmbedderCalculator().fit(
-            text_df, {"columns": ["text"], "drop_original": True}
-        )
-        assert art["drop_original"] is True
-
-    def test_fit_empty_columns_returns_empty_dict(self, text_df: pd.DataFrame) -> None:
-        """fit() with no columns config must return an empty dict without calling the model."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
-
-        art = SentenceEmbedderCalculator().fit(text_df, {"columns": []})
-        assert art == {}
-
-    def test_fit_missing_column_returns_empty_dict(self, text_df: pd.DataFrame) -> None:
-        """fit() with all-missing column names must return an empty dict."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderCalculator
-
-        art = SentenceEmbedderCalculator().fit(text_df, {"columns": ["no_such_column"]})
-        assert art == {}
+        art = SentenceEmbedderCalculator().fit(text_df, {"columns": columns_config})
+        assert art == expected
 
     @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
     def test_fit_multi_column_prefix_is_joined(
@@ -258,37 +236,15 @@ class TestSentenceEmbedderApplierApply:
         assert result.shape == (len(text_df), expected_cols)
 
     @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_apply_empty_output_columns_returns_unchanged(
-        self, _mock: Any, text_df: pd.DataFrame
+    @pytest.mark.parametrize(*_apply_noop_cases)
+    def test_apply_returns_unchanged(
+        self, _mock: Any, text_df: pd.DataFrame, params: dict[str, Any], expect_unchanged: bool
     ) -> None:
-        """If output_columns is empty in params, apply() returns the frame unchanged."""
+        """apply() with no resolvable output must return the frame unchanged."""
         from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderApplier
 
-        params = {
-            "columns": ["text"],
-            "output_columns": [],  # empty → early return path
-            "model_name": "any",
-            "normalize": True,
-            "drop_original": False,
-        }
         result = SentenceEmbedderApplier().apply(text_df, params)
-        pd.testing.assert_frame_equal(result, text_df)
-
-    @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
-    def test_apply_missing_column_in_params_returns_unchanged(
-        self, _mock: Any, text_df: pd.DataFrame
-    ) -> None:
-        """If params.columns reference a missing column, apply() returns unchanged."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import SentenceEmbedderApplier
-
-        params = {
-            "columns": ["nonexistent"],
-            "output_columns": ["nonexistent__emb__0"],
-            "model_name": "any",
-            "normalize": True,
-            "drop_original": False,
-        }
-        result = SentenceEmbedderApplier().apply(text_df, params)
+        assert expect_unchanged
         pd.testing.assert_frame_equal(result, text_df)
 
     @patch(_MODULE_PATH, return_value=_MOCK_MODEL)
@@ -344,21 +300,14 @@ class TestSentenceEmbedderApplierApply:
 
 
 class TestEmbeddingDimensionHelper:
-    def test_uses_get_embedding_dimension_if_available(self) -> None:
-        """_embedding_dimension must prefer the newer get_embedding_dimension API."""
+    @pytest.mark.parametrize(*_dimension_helper_cases)
+    def test_embedding_dimension(self, spec: list[str] | None, attr: str, dim: int) -> None:
+        """_embedding_dimension must prefer the newer API and fall back to the older one."""
         from skyulf.preprocessing.vectorization.sentence_embedder import _embedding_dimension
 
-        model = MagicMock()
-        model.get_embedding_dimension.return_value = 256
-        assert _embedding_dimension(model) == 256
-
-    def test_falls_back_to_get_sentence_embedding_dimension(self) -> None:
-        """_embedding_dimension falls back to the old API when the new one is absent."""
-        from skyulf.preprocessing.vectorization.sentence_embedder import _embedding_dimension
-
-        model = MagicMock(spec=["get_sentence_embedding_dimension"])
-        model.get_sentence_embedding_dimension.return_value = 384
-        assert _embedding_dimension(model) == 384
+        model = MagicMock(spec=spec)
+        getattr(model, attr).return_value = dim
+        assert _embedding_dimension(model) == dim
 
 
 # ---------------------------------------------------------------------------

@@ -53,7 +53,16 @@ async def test_all_transformers(sample_data, tmp_path):
         "feature_selection",
     }
 
+    try:
+        import h3
+
+        has_h3 = True
+    except ImportError:
+        has_h3 = False
+
     transformers = [nid for nid in ALL_NODES.keys() if nid not in excluded]
+    if not has_h3:
+        transformers = [nid for nid in transformers if nid != "H3Index"]
 
     for node_id in transformers:
         print(f"Testing node: {node_id}")
@@ -83,6 +92,18 @@ async def test_all_transformers(sample_data, tmp_path):
         elif node_id == "FeatureGenerationNode":
             pipeline_config["nodes"][1]["params"]["expression"] = "A + C"
             pipeline_config["nodes"][1]["params"]["new_column"] = "generated"
+        elif node_id == "GeoDistance":
+            pipeline_config["nodes"][1]["params"] = {
+                "lat1_col": "target",
+                "lon1_col": "C",
+                "lat2_col": "target",
+                "lon2_col": "C",
+            }
+        elif node_id == "H3Index":
+            pipeline_config["nodes"][1]["params"] = {
+                "lat_col": "target",
+                "lon_col": "C",
+            }
         elif node_id == "ValueReplacement":
             pipeline_config["nodes"][1]["params"]["to_replace"] = {"a": "x"}
         elif node_id == "Casting":

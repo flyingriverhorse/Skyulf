@@ -1,0 +1,90 @@
+{
+  "groups": {
+    "invalid_fit_columns": {
+      "params": "node, columns",
+      "test_cases": {
+        "hashing_vectorizer_empty_columns": {"node": "hashing_vectorizer", "columns": []},
+        "hashing_vectorizer_missing_column": {"node": "hashing_vectorizer", "columns": ["nonexistent"]},
+        "tfidf_vectorizer_empty_columns": {"node": "tfidf_vectorizer", "columns": []},
+        "tfidf_vectorizer_missing_column": {"node": "tfidf_vectorizer", "columns": ["nonexistent"]},
+        "count_vectorizer_missing_column": {"node": "count_vectorizer", "columns": ["nonexistent"]},
+        "tokenizer_missing_column": {"node": "tokenizer", "columns": ["nonexistent"]}
+      }
+    },
+    "apply_missing_vectorizer": {
+      "params": "node",
+      "test_cases": {
+        "hashing_vectorizer": {"node": "hashing_vectorizer"},
+        "tfidf_vectorizer": {"node": "tfidf_vectorizer"},
+        "count_vectorizer": {"node": "count_vectorizer"}
+      }
+    },
+    "apply_all_columns_missing": {
+      "params": "node, fit_extra",
+      "test_cases": {
+        "hashing_vectorizer": {"node": "hashing_vectorizer", "fit_extra": {"n_features": 8}},
+        "tfidf_vectorizer": {"node": "tfidf_vectorizer", "fit_extra": {"max_features": 10}},
+        "count_vectorizer": {"node": "count_vectorizer", "fit_extra": {}}
+      }
+    },
+    "drop_original": {
+      "params": "node, fit_extra",
+      "test_cases": {
+        "hashing_vectorizer": {"node": "hashing_vectorizer", "fit_extra": {"n_features": 8}},
+        "tfidf_vectorizer": {"node": "tfidf_vectorizer", "fit_extra": {"max_features": 10}}
+      }
+    },
+    "large_vocab_warning": {
+      "params": "node, module_path",
+      "test_cases": {
+        "tfidf_vectorizer": {
+          "node": "tfidf_vectorizer",
+          "module_path": "skyulf.preprocessing.vectorization.tfidf_vectorizer"
+        },
+        "count_vectorizer": {
+          "node": "count_vectorizer",
+          "module_path": "skyulf.preprocessing.vectorization.count_vectorizer"
+        }
+      }
+    },
+    "polars_fit_input": {
+      "params": "node, fit_extra",
+      "test_cases": {
+        "tfidf_vectorizer": {"node": "tfidf_vectorizer", "fit_extra": {"max_features": 10}},
+        "count_vectorizer": {"node": "count_vectorizer", "fit_extra": {"max_features": 10}}
+      }
+    },
+    "common_join_text_columns": {
+      "params": "columns_data, columns, expected",
+      "test_cases": {
+        "single_column": {
+          "columns_data": {"x": ["hello", null]},
+          "columns": ["x"],
+          "expected": ["hello", ""]
+        },
+        "multiple_columns_joined_with_space": {
+          "columns_data": {"x": ["hello"], "y": ["world"]},
+          "columns": ["x", "y"],
+          "expected": ["hello world"]
+        }
+      }
+    },
+    "common_warn_large_output": {
+      "params": "count, threshold, expect_none, expect_substring",
+      "test_cases": {
+        "below_threshold_returns_none": {
+          "count": 100,
+          "threshold": 10000,
+          "expect_none": true,
+          "expect_substring": null
+        },
+        "above_threshold_returns_message": {
+          "count": 20000,
+          "threshold": 10000,
+          "expect_none": false,
+          "expect_substring": "20,000"
+        }
+      }
+    }
+  }
+}

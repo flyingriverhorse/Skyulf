@@ -1,0 +1,130 @@
+{
+  "groups": {
+    "import_error_validation": {
+      "params": "func_name, submodule, error_match",
+      "test_cases": {
+        "import_over_samplers": {
+          "func_name": "_import_over_samplers",
+          "submodule": "imblearn.over_sampling",
+          "error_match": "imblearn is required for oversampling"
+        },
+        "import_under_samplers": {
+          "func_name": "_import_under_samplers",
+          "submodule": "imblearn.under_sampling",
+          "error_match": "imblearn is required for undersampling"
+        }
+      }
+    },
+    "fit_artifact_type": {
+      "params": "kind, expected_type",
+      "test_cases": {
+        "oversampling": {
+          "kind": "oversampling",
+          "expected_type": "oversampling"
+        },
+        "undersampling": {
+          "kind": "undersampling",
+          "expected_type": "undersampling"
+        }
+      }
+    },
+    "fit_stores_method": {
+      "params": "kind, method",
+      "test_cases": {
+        "oversampling_smote": {
+          "kind": "oversampling",
+          "method": "smote"
+        },
+        "undersampling_random_under_sampling": {
+          "kind": "undersampling",
+          "method": "random_under_sampling"
+        }
+      }
+    },
+    "non_numeric_validation": {
+      "params": "kind, method",
+      "test_cases": {
+        "oversampling_smote": {
+          "kind": "oversampling",
+          "method": "smote"
+        },
+        "undersampling_random_under_sampling": {
+          "kind": "undersampling",
+          "method": "random_under_sampling"
+        }
+      }
+    },
+    "missing_target_validation": {
+      "params": "kind, method",
+      "test_cases": {
+        "oversampling_smote": {
+          "kind": "oversampling",
+          "method": "smote"
+        },
+        "undersampling_random_under_sampling": {
+          "kind": "undersampling",
+          "method": "random_under_sampling"
+        }
+      }
+    },
+    "polars_missing_target": {
+      "params": "kind, method",
+      "test_cases": {
+        "oversampling_smote": {
+          "kind": "oversampling",
+          "method": "smote"
+        },
+        "undersampling_random_under_sampling": {
+          "kind": "undersampling",
+          "method": "random_under_sampling"
+        }
+      }
+    },
+    "unknown_method_validation": {
+      "params": "kind, method",
+      "test_cases": {
+        "oversampling_smote": {
+          "kind": "oversampling",
+          "method": "smote"
+        },
+        "undersampling_random_under_sampling": {
+          "kind": "undersampling",
+          "method": "random_under_sampling"
+        }
+      }
+    },
+    "oversampler_builders": {
+      "params": "method, extra_config, use_overlap_data, rng_seed, min_minority",
+      "test_cases": {
+        "adasyn": {
+          "method": "adasyn",
+          "extra_config": {"k_neighbors": 3},
+          "use_overlap_data": true,
+          "rng_seed": 5,
+          "min_minority": 20
+        },
+        "kmeans_smote": {
+          "method": "kmeans_smote",
+          "extra_config": {"k_neighbors": 3, "cluster_balance_threshold": 0.01},
+          "use_overlap_data": true,
+          "rng_seed": 11,
+          "min_minority": 20
+        },
+        "borderline_smote": {
+          "method": "borderline_smote",
+          "extra_config": {"k_neighbors": 3, "m_neighbors": 5},
+          "use_overlap_data": false,
+          "rng_seed": null,
+          "min_minority": 20
+        },
+        "svm_smote": {
+          "method": "svm_smote",
+          "extra_config": {"k_neighbors": 3, "m_neighbors": 5, "out_step": 0.3},
+          "use_overlap_data": false,
+          "rng_seed": null,
+          "min_minority": 20
+        }
+      }
+    }
+  }
+}

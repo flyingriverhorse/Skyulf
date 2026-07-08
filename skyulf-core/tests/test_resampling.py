@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 # Skip entire module if imbalanced-learn is not installed.
 pytest.importorskip(
@@ -25,9 +26,46 @@ from skyulf.preprocessing.resampling import (
     _extract_y_pandas,
     _extract_y_polars,
     _finalize_resampled,
+    _import_over_samplers,
+    _import_under_samplers,
     _to_pandas_y,
     _validate_numeric,
 )
+
+_import_error_cases = TestCaseLoader(
+    "preprocessing/resampling", group="import_error_validation"
+).load()
+_fit_artifact_type_cases = TestCaseLoader(
+    "preprocessing/resampling", group="fit_artifact_type"
+).load()
+_fit_stores_method_cases = TestCaseLoader(
+    "preprocessing/resampling", group="fit_stores_method"
+).load()
+_non_numeric_cases = TestCaseLoader(
+    "preprocessing/resampling", group="non_numeric_validation"
+).load()
+_missing_target_cases = TestCaseLoader(
+    "preprocessing/resampling", group="missing_target_validation"
+).load()
+_polars_missing_target_cases = TestCaseLoader(
+    "preprocessing/resampling", group="polars_missing_target"
+).load()
+_unknown_method_cases = TestCaseLoader(
+    "preprocessing/resampling", group="unknown_method_validation"
+).load()
+_oversampler_builder_cases = TestCaseLoader(
+    "preprocessing/resampling", group="oversampler_builders"
+).load()
+
+# Maps a scenario's "kind" string (from JSON fixtures) to the Calculator/Applier
+# pair under test, so the same parametrized test body can exercise both
+# oversampling and undersampling without duplicating the assertions.
+_CALCULATORS = {"oversampling": OversamplingCalculator, "undersampling": UndersamplingCalculator}
+_APPLIERS = {"oversampling": OversamplingApplier, "undersampling": UndersamplingApplier}
+_IMPORT_FUNCS = {
+    "_import_over_samplers": _import_over_samplers,
+    "_import_under_samplers": _import_under_samplers,
+}
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -78,18 +116,6 @@ def imbalanced_with_target_col() -> pd.DataFrame:
 
 
 class TestOversamplingFit:
-    def test_fit_returns_artifact_type(self, imbalanced_pandas: Any) -> None:
-        """OversamplingCalculator.fit() must return an artifact with type='oversampling'."""
-        X, y = imbalanced_pandas
-        art = OversamplingCalculator().fit((X, y), {})
-        assert art["type"] == "oversampling"
-
-    def test_fit_stores_method(self, imbalanced_pandas: Any) -> None:
-        """Configured method must be persisted in the artifact."""
-        X, y = imbalanced_pandas
-        art = OversamplingCalculator().fit((X, y), {"method": "smote"})
-        assert art["method"] == "smote"
-
     def test_fit_stores_defaults(self, imbalanced_pandas: Any) -> None:
         """Default params (random_state=42, k_neighbors=5, sampling_strategy='auto') are persisted."""
         X, y = imbalanced_pandas
@@ -161,30 +187,6 @@ class TestOversamplingApply:
         assert len(X_res) == len(X)
         assert y_res.value_counts()[0] == y_res.value_counts()[1]
 
-    def test_smote_unknown_method_returns_unchanged(self, imbalanced_pandas: Any) -> None:
-        """An unknown method name must return the data unchanged (no sampler built)."""
-        X, y = imbalanced_pandas
-        art = OversamplingCalculator().fit((X, y), {"method": "smote"})
-        art["method"] = "totally_unknown_method"
-        X_res, y_res = OversamplingApplier().apply((X, y), art)
-        assert len(X_res) == len(X)
-
-    def test_smote_non_numeric_raises(self) -> None:
-        """Non-numeric feature columns must raise ValueError before reaching imblearn."""
-        X = pd.DataFrame({"f1": [1.0, 2.0, 3.0, 4.0], "cat": ["a", "b", "a", "b"]})
-        y = pd.Series([0, 0, 1, 1], name="target")
-        art = OversamplingCalculator().fit((X, y), {"method": "smote"})
-        with pytest.raises(ValueError, match="non-numeric"):
-            OversamplingApplier().apply((X, y), art)
-
-    def test_smote_missing_target_returns_unchanged(self, imbalanced_pandas: Any) -> None:
-        """If target cannot be resolved (no y and no target_column), apply returns unchanged."""
-        X, _ = imbalanced_pandas
-        # Pass X alone (no y, no target_column param)
-        art = OversamplingCalculator().fit(X, {"method": "smote"})
-        result = OversamplingApplier().apply(X, art)
-        pd.testing.assert_frame_equal(result, X)
-
     def test_smote_polars_input_returns_polars(self, imbalanced_pandas: Any) -> None:
         """Polars input must return polars output after SMOTE (via pandas round-trip)."""
         X, y = imbalanced_pandas
@@ -201,24 +203,44 @@ class TestOversamplingApply:
 
 
 class TestUndersamplingFit:
-    def test_fit_returns_artifact_type(self, imbalanced_pandas: Any) -> None:
-        """UndersamplingCalculator.fit() must return artifact with type='undersampling'."""
-        X, y = imbalanced_pandas
-        art = UndersamplingCalculator().fit((X, y), {})
-        assert art["type"] == "undersampling"
-
-    def test_fit_stores_method(self, imbalanced_pandas: Any) -> None:
-        """Configured method must be persisted in the artifact."""
-        X, y = imbalanced_pandas
-        art = UndersamplingCalculator().fit((X, y), {"method": "random_under_sampling"})
-        assert art["method"] == "random_under_sampling"
-
     def test_fit_stores_defaults(self, imbalanced_pandas: Any) -> None:
         """Default random_state and replacement must be stored."""
         X, y = imbalanced_pandas
         art = UndersamplingCalculator().fit((X, y), {})
         assert art["random_state"] == 42
         assert art["replacement"] is False
+
+
+# ---------------------------------------------------------------------------
+# Fit artifact — shared type/method scenarios (both oversampling and
+# undersampling), loaded from tests/test_cases/preprocessing/.
+# ---------------------------------------------------------------------------
+
+
+class TestFitArtifactType:
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``fit_artifact_type``).
+    """
+
+    @pytest.mark.parametrize(*_fit_artifact_type_cases)
+    def test_fit_returns_artifact_type(
+        self, kind: str, expected_type: str, imbalanced_pandas: Any
+    ) -> None:
+        X, y = imbalanced_pandas
+        art = _CALCULATORS[kind]().fit((X, y), {})
+        assert art["type"] == expected_type
+
+
+class TestFitStoresMethod:
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``fit_stores_method``).
+    """
+
+    @pytest.mark.parametrize(*_fit_stores_method_cases)
+    def test_fit_stores_method(self, kind: str, method: str, imbalanced_pandas: Any) -> None:
+        X, y = imbalanced_pandas
+        art = _CALCULATORS[kind]().fit((X, y), {"method": method})
+        assert art["method"] == method
 
 
 # ---------------------------------------------------------------------------
@@ -268,29 +290,6 @@ class TestUndersamplingApply:
         assert isinstance(result, pd.DataFrame)
         assert len(result) < len(df)
 
-    def test_undersampling_unknown_method_returns_unchanged(self, imbalanced_pandas: Any) -> None:
-        """An unknown method name must return data unchanged (no sampler built)."""
-        X, y = imbalanced_pandas
-        art = UndersamplingCalculator().fit((X, y), {"method": "random_under_sampling"})
-        art["method"] = "unknown_sampler"
-        X_res, y_res = UndersamplingApplier().apply((X, y), art)
-        assert len(X_res) == len(X)
-
-    def test_undersampling_non_numeric_raises(self) -> None:
-        """Non-numeric feature columns must raise ValueError before reaching imblearn."""
-        X = pd.DataFrame({"f1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "cat": ["a", "b"] * 3})
-        y = pd.Series([0, 0, 0, 0, 1, 1], name="target")
-        art = UndersamplingCalculator().fit((X, y), {"method": "random_under_sampling"})
-        with pytest.raises(ValueError, match="non-numeric"):
-            UndersamplingApplier().apply((X, y), art)
-
-    def test_undersampling_missing_target_returns_unchanged(self, imbalanced_pandas: Any) -> None:
-        """If target cannot be resolved, apply must return the frame unchanged."""
-        X, _ = imbalanced_pandas
-        art = UndersamplingCalculator().fit(X, {"method": "random_under_sampling"})
-        result = UndersamplingApplier().apply(X, art)
-        pd.testing.assert_frame_equal(result, X)
-
     def test_undersampling_polars_input_returns_polars(self, imbalanced_pandas: Any) -> None:
         """Polars input must return polars output after undersampling."""
         X, y = imbalanced_pandas
@@ -307,6 +306,60 @@ class TestUndersamplingApply:
         _, y_res = UndersamplingApplier().apply((X, y), art)
         assert isinstance(y_res, pd.Series)
         assert y_res.name == "target"
+
+
+# ---------------------------------------------------------------------------
+# Apply() — shared no-op / validation scenarios (oversampling and
+# undersampling), loaded from tests/test_cases/preprocessing/.
+# ---------------------------------------------------------------------------
+
+
+class TestNonNumericValidation:
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``non_numeric_validation``).
+    """
+
+    @pytest.mark.parametrize(*_non_numeric_cases)
+    def test_non_numeric_raises(self, kind: str, method: str) -> None:
+        X = pd.DataFrame({"f1": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "cat": ["a", "b"] * 3})
+        y = pd.Series([0, 0, 0, 0, 1, 1], name="target")
+        art = _CALCULATORS[kind]().fit((X, y), {"method": method})
+        with pytest.raises(ValueError, match="non-numeric"):
+            _APPLIERS[kind]().apply((X, y), art)
+
+
+class TestMissingTargetReturnsUnchanged:
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``missing_target_validation``).
+    """
+
+    @pytest.mark.parametrize(*_missing_target_cases)
+    def test_missing_target_returns_unchanged(
+        self, kind: str, method: str, imbalanced_pandas: Any
+    ) -> None:
+        """If target cannot be resolved (no y and no target_column), apply returns unchanged."""
+        X, _ = imbalanced_pandas
+        # Pass X alone (no y, no target_column param)
+        art = _CALCULATORS[kind]().fit(X, {"method": method})
+        result = _APPLIERS[kind]().apply(X, art)
+        pd.testing.assert_frame_equal(result, X)
+
+
+class TestUnknownMethodReturnsUnchanged:
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``unknown_method_validation``).
+    """
+
+    @pytest.mark.parametrize(*_unknown_method_cases)
+    def test_unknown_method_returns_unchanged(
+        self, kind: str, method: str, imbalanced_pandas: Any
+    ) -> None:
+        """An unknown method name must return the data unchanged (no sampler built)."""
+        X, y = imbalanced_pandas
+        art = _CALCULATORS[kind]().fit((X, y), {"method": method})
+        art["method"] = "totally_unknown_method"
+        X_res, y_res = _APPLIERS[kind]().apply((X, y), art)
+        assert len(X_res) == len(X)
 
 
 # ---------------------------------------------------------------------------
@@ -467,59 +520,44 @@ class TestTomekLinksUndersampling:
 
 
 class TestAdditionalOversamplers:
-    def test_adasyn_balances_classes(self) -> None:
-        """ADASYN must increase minority class count on overlapping class data."""
-        # ADASYN requires class overlap — perfectly separated data triggers a RuntimeError.
-        rng = np.random.default_rng(5)
-        n_maj, n_min = 60, 20
-        X = pd.DataFrame(
-            {
-                "f1": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
-                "f2": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
-            }
-        )
-        y = pd.Series([0] * n_maj + [1] * n_min, name="target")
-        art = OversamplingCalculator().fit((X, y), {"method": "adasyn", "k_neighbors": 3})
-        X_res, y_res = OversamplingApplier().apply((X, y), art)
-        # ADASYN generates synthetic samples — minority class must grow
-        assert y_res.value_counts()[1] > n_min
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``oversampler_builders``).
+    """
 
-    def test_borderline_smote_balances_classes(self, imbalanced_pandas: Any) -> None:
-        """BorderlineSMOTE must balance classes without error on well-separated data."""
-        X, y = imbalanced_pandas
-        art = OversamplingCalculator().fit(
-            (X, y),
-            {"method": "borderline_smote", "k_neighbors": 3, "m_neighbors": 5},
-        )
-        X_res, y_res = OversamplingApplier().apply((X, y), art)
-        assert y_res.value_counts()[1] >= 20
+    @pytest.mark.parametrize(*_oversampler_builder_cases)
+    def test_oversampler_builder_balances_classes(
+        self,
+        method: str,
+        extra_config: dict,
+        use_overlap_data: bool,
+        rng_seed: int | None,
+        min_minority: int,
+        imbalanced_pandas: Any,
+    ) -> None:
+        """Each additional oversampler must increase (or restore balance to) the minority class."""
+        if use_overlap_data:
+            # ADASYN/KMeansSMOTE require class overlap — perfectly separated
+            # data triggers a RuntimeError for these builders.
+            rng = np.random.default_rng(rng_seed)
+            n_maj, n_min = 60, min_minority
+            X = pd.DataFrame(
+                {
+                    "f1": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
+                    "f2": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
+                }
+            )
+            y = pd.Series([0] * n_maj + [1] * n_min, name="target")
+        else:
+            X, y = imbalanced_pandas
 
-    def test_svm_smote_balances_classes(self, imbalanced_pandas: Any) -> None:
-        """SVMSMOTE must balance classes on overlapping/imbalanced data."""
-        X, y = imbalanced_pandas
-        art = OversamplingCalculator().fit(
-            (X, y),
-            {"method": "svm_smote", "k_neighbors": 3, "m_neighbors": 5, "out_step": 0.3},
-        )
+        art = OversamplingCalculator().fit((X, y), {"method": method, **extra_config})
         X_res, y_res = OversamplingApplier().apply((X, y), art)
-        assert y_res.value_counts()[1] >= 20
-
-    def test_kmeans_smote_balances_classes(self) -> None:
-        """KMeansSMOTE must balance classes when class overlap exists."""
-        rng = np.random.default_rng(11)
-        n_maj, n_min = 60, 20
-        X = pd.DataFrame(
-            {
-                "f1": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
-                "f2": np.concatenate([rng.normal(0, 2, n_maj), rng.normal(1, 2, n_min)]),
-            }
-        )
-        y = pd.Series([0] * n_maj + [1] * n_min, name="target")
-        art = OversamplingCalculator().fit(
-            (X, y), {"method": "kmeans_smote", "k_neighbors": 3, "cluster_balance_threshold": 0.01}
-        )
-        X_res, y_res = OversamplingApplier().apply((X, y), art)
-        assert y_res.value_counts()[1] > n_min
+        # Overlap-data builders must strictly grow the minority class; the
+        # separated-data builders only need to reach/keep the minority floor.
+        if use_overlap_data:
+            assert y_res.value_counts()[1] > min_minority
+        else:
+            assert y_res.value_counts()[1] >= min_minority
 
     def test_smote_tomek_balances_classes(self, imbalanced_pandas: Any) -> None:
         """SMOTETomek (combined over/under sampler) must balance classes."""
@@ -536,14 +574,19 @@ class TestAdditionalOversamplers:
 
 
 class TestResamplePolarsEdgeCases:
-    def test_oversampling_polars_missing_target_returns_unchanged(
-        self, imbalanced_pandas: Any
+    """``missing_target`` scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``polars_missing_target``).
+    """
+
+    @pytest.mark.parametrize(*_polars_missing_target_cases)
+    def test_polars_missing_target_returns_unchanged(
+        self, kind: str, method: str, imbalanced_pandas: Any
     ) -> None:
         """Polars input without y/target_column must short-circuit and return unchanged."""
         X, _ = imbalanced_pandas
         pl_X = pl.from_pandas(X)
-        art = OversamplingCalculator().fit(X, {"method": "smote"})
-        result = OversamplingApplier().apply(pl_X, art)
+        art = _CALCULATORS[kind]().fit(X, {"method": method})
+        result = _APPLIERS[kind]().apply(pl_X, art)
         assert isinstance(result, pl.DataFrame)
         assert result.shape == pl_X.shape
 
@@ -560,17 +603,6 @@ class TestResamplePolarsEdgeCases:
         assert isinstance(X_res, pl.DataFrame)
         assert X_res.shape[0] == pl_X.shape[0]
 
-    def test_undersampling_polars_missing_target_returns_unchanged(
-        self, imbalanced_pandas: Any
-    ) -> None:
-        """Polars input without y/target_column must short-circuit for undersampling too."""
-        X, _ = imbalanced_pandas
-        pl_X = pl.from_pandas(X)
-        art = UndersamplingCalculator().fit(X, {"method": "random_under_sampling"})
-        result = UndersamplingApplier().apply(pl_X, art)
-        assert isinstance(result, pl.DataFrame)
-        assert result.shape == pl_X.shape
-
 
 # ---------------------------------------------------------------------------
 # ImportError branches when imblearn submodules are unavailable
@@ -578,40 +610,28 @@ class TestResamplePolarsEdgeCases:
 
 
 class TestImblearnImportErrors:
-    def test_import_over_samplers_raises_import_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """_import_over_samplers must re-raise ImportError with a clear message."""
-        import builtins
+    """Scenarios loaded from
+    ``tests/test_cases/preprocessing/resampling.json`` (group ``import_error_validation``).
+    """
 
-        from skyulf.preprocessing.resampling import _import_over_samplers
+    @pytest.mark.parametrize(*_import_error_cases)
+    def test_import_raises_import_error(
+        self,
+        func_name: str,
+        submodule: str,
+        error_match: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """``_import_over_samplers``/``_import_under_samplers`` must re-raise ImportError."""
+        import builtins
 
         real_import = builtins.__import__
 
         def _fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
-            if name == "imblearn.over_sampling" or name.startswith("imblearn.over_sampling"):
+            if name == submodule or name.startswith(submodule):
                 raise ImportError("simulated missing imblearn")
             return real_import(name, *args, **kwargs)
 
         monkeypatch.setattr(builtins, "__import__", _fake_import)
-        with pytest.raises(ImportError, match="imblearn is required for oversampling"):
-            _import_over_samplers()
-
-    def test_import_under_samplers_raises_import_error(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """_import_under_samplers must re-raise ImportError with a clear message."""
-        import builtins
-
-        from skyulf.preprocessing.resampling import _import_under_samplers
-
-        real_import = builtins.__import__
-
-        def _fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
-            if name == "imblearn.under_sampling" or name.startswith("imblearn.under_sampling"):
-                raise ImportError("simulated missing imblearn")
-            return real_import(name, *args, **kwargs)
-
-        monkeypatch.setattr(builtins, "__import__", _fake_import)
-        with pytest.raises(ImportError, match="imblearn is required for undersampling"):
-            _import_under_samplers()
+        with pytest.raises(ImportError, match=error_match):
+            _IMPORT_FUNCS[func_name]()

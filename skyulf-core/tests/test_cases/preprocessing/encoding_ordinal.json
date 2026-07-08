@@ -1,0 +1,18 @@
+{
+  "groups": {
+    "apply_features_exception": {
+      "params": "engine",
+      "test_cases": {
+        "polars": {"engine": "polars"},
+        "pandas": {"engine": "pandas"}
+      }
+    },
+    "apply_target_exception": {
+      "params": "engine",
+      "test_cases": {
+        "polars": {"engine": "polars"},
+        "pandas": {"engine": "pandas"}
+      }
+    }
+  }
+}

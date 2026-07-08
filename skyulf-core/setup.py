@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.3.5",
+    version="0.3.6",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -55,6 +55,7 @@ setup(
             "rtree>=1.3.0,<2.0.0",
             "libpysal>=4.10.0,<5.0.0",
             "esda>=2.5.0,<3.0.0",
+            "h3>=4.0.0,<5.0.0",
         ],
         "tuning": [
             "optuna>=3.0.0",
