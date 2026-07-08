@@ -31,7 +31,7 @@ _INSTALL_HINT = (
 def _import_h3() -> Any:
     """Lazily import the optional ``h3`` package."""
     try:
-        import h3
+        import h3  # ty: ignore[unresolved-import]
     except ImportError as exc:  # pragma: no cover - depends on optional extra
         raise ImportError(_INSTALL_HINT) from exc
     return h3
