@@ -1,5 +1,17 @@
 """Pytest fixtures for SDK tests."""
 
+import sys
+from pathlib import Path
+
+# In full-monorepo test setups (like Docker smoke tests), the root tests/ and
+# skyulf-core/tests/ are both present. Since pytest runs from the root, an import of
+# `tests.utils` from skyulf-core tests can resolve to the root tests/ package, which lacks
+# the utils directory. Placing skyulf-core at the head of sys.path ensures correct
+# resolution of tests.utils.
+skyulf_core_root = Path(__file__).resolve().parents[1]
+if str(skyulf_core_root) not in sys.path:
+    sys.path.insert(0, str(skyulf_core_root))
+
 import numpy as np
 import pandas as pd
 import pytest
