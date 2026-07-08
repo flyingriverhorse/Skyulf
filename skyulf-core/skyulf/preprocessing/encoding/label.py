@@ -44,7 +44,7 @@ def _build_polars_feature_exprs(
             exprs.append(
                 pl.col(col)
                 .cast(pl.Utf8)
-                .replace(mapping, default=missing_code)
+                .replace_strict(mapping, default=missing_code)
                 .cast(pl.Int64)
                 .alias(col)
             )
@@ -68,7 +68,7 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping_str(encoders["__target__"])
-        y_out = y_out.cast(pl.Utf8).replace(mapping, default=missing_code).cast(pl.Int64)
+        y_out = y_out.cast(pl.Utf8).replace_strict(mapping, default=missing_code).cast(pl.Int64)
 
     return X_out, y_out
 

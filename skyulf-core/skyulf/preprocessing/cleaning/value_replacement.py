@@ -25,9 +25,9 @@ def _polars_mapping_exprs(valid: list[str], mapping: dict[str, Any]) -> list[Any
     exprs: list[Any] = []
     for col in valid:
         if is_nested and col in mapping:
-            exprs.append(pl.col(col).replace(mapping[col], default=pl.col(col)).alias(col))
+            exprs.append(pl.col(col).replace_strict(mapping[col], default=pl.col(col)).alias(col))
         elif not is_nested:
-            exprs.append(pl.col(col).replace(mapping, default=pl.col(col)).alias(col))
+            exprs.append(pl.col(col).replace_strict(mapping, default=pl.col(col)).alias(col))
     return exprs
 
 
@@ -38,9 +38,9 @@ def _polars_to_replace_exprs(valid: list[str], to_replace: Any, value: Any) -> l
     is_map = _is_mapping_like(to_replace)
     for col in valid:
         if is_map:
-            exprs.append(pl.col(col).replace(to_replace, default=pl.col(col)).alias(col))
+            exprs.append(pl.col(col).replace_strict(to_replace, default=pl.col(col)).alias(col))
         else:
-            exprs.append(pl.col(col).replace({to_replace: value}, default=pl.col(col)).alias(col))
+            exprs.append(pl.col(col).replace_strict({to_replace: value}, default=pl.col(col)).alias(col))
     return exprs
 
 
@@ -61,13 +61,18 @@ def _pandas_apply_mapping(
     df_out: pd.DataFrame, valid: list[str], mapping: dict[str, Any]
 ) -> pd.DataFrame:
     is_nested = any(isinstance(v, dict) for v in mapping.values())
-    if is_nested:
-        for col, map_dict in mapping.items():
-            if col in valid:
-                df_out[col] = df_out[col].replace(map_dict)
-    else:
-        for col in valid:
-            df_out[col] = df_out[col].replace(mapping)
+    # `replace`'s implicit downcasting is deprecated (pandas GH#54710). Opt into
+    # the future (no-silent-downcast) behavior for this call only, then apply
+    # the same downcast explicitly via `infer_objects` to preserve current
+    # dtype behavior without the warning.
+    with pd.option_context("future.no_silent_downcasting", True):
+        if is_nested:
+            for col, map_dict in mapping.items():
+                if col in valid:
+                    df_out[col] = df_out[col].replace(map_dict).infer_objects(copy=False)
+        else:
+            for col in valid:
+                df_out[col] = df_out[col].replace(mapping).infer_objects(copy=False)
     return df_out
 
 
@@ -75,11 +80,12 @@ def _pandas_apply_to_replace(
     df_out: pd.DataFrame, valid: list[str], to_replace: Any, value: Any
 ) -> pd.DataFrame:
     is_map = _is_mapping_like(to_replace)
-    for col in valid:
-        if is_map:
-            df_out[col] = df_out[col].replace(to_replace)
-        else:
-            df_out[col] = df_out[col].replace(to_replace, value)
+    with pd.option_context("future.no_silent_downcasting", True):
+        for col in valid:
+            if is_map:
+                df_out[col] = df_out[col].replace(to_replace).infer_objects(copy=False)
+            else:
+                df_out[col] = df_out[col].replace(to_replace, value).infer_objects(copy=False)
     return df_out
 
 

@@ -86,7 +86,7 @@ class AliasReplacementApplier(BaseApplier):
             )
             # Polars `replace(default=None)` returns null for non-matches, so we
             # coalesce back to the original value.
-            mapped_expr = clean_expr.replace(mapping, default=None)
+            mapped_expr = clean_expr.replace_strict(mapping, default=None)
             final_expr = pl.coalesce([mapped_expr, pl.col(col)])
             exprs.append(final_expr.alias(col))
         return X.with_columns(exprs), _y
