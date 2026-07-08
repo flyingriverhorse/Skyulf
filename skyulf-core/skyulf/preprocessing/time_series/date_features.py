@@ -82,8 +82,9 @@ def _polars_date_exprs(columns: list[str], available: list[str], features: list[
         if col not in available:
             continue
         base = pl.col(col).cast(pl.Datetime, strict=False)
-        for feature in features:
-            exprs.append(_polars_feature(base, feature).alias(_feat_name(col, feature)))
+        exprs.extend(
+            _polars_feature(base, feature).alias(_feat_name(col, feature)) for feature in features
+        )
     return exprs
 
 

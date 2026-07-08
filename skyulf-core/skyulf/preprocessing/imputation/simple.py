@@ -40,9 +40,11 @@ class SimpleImputerApplier(BaseApplier):
                 exprs.append(pl.col(col))
 
         # Restore columns that were present at fit time but missing in input X.
-        for col in cols:
-            if col not in X.columns and col in fill_values:
-                exprs.append(pl.lit(fill_values[col]).alias(col))
+        exprs.extend(
+            pl.lit(fill_values[col]).alias(col)
+            for col in cols
+            if col not in X.columns and col in fill_values
+        )
 
         return X.select(exprs), _y
 

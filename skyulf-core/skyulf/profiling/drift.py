@@ -234,16 +234,15 @@ class DriftCalculator:
             ref_hist, bin_edges = np.histogram(ref_data, bins=bins, range=(min_val, max_val))
             curr_hist, _ = np.histogram(curr_data, bins=bins, range=(min_val, max_val))
 
-            drift_bins = []
-            for i in range(len(ref_hist)):
-                drift_bins.append(
-                    DriftBin(
-                        bin_start=float(bin_edges[i]),
-                        bin_end=float(bin_edges[i + 1]),
-                        reference_count=int(ref_hist[i]),
-                        current_count=int(curr_hist[i]),
-                    )
+            drift_bins = [
+                DriftBin(
+                    bin_start=float(bin_edges[i]),
+                    bin_end=float(bin_edges[i + 1]),
+                    reference_count=int(ref_hist[i]),
+                    current_count=int(curr_hist[i]),
                 )
+                for i in range(len(ref_hist))
+            ]
 
             return DriftDistribution(bins=drift_bins)
         except Exception:

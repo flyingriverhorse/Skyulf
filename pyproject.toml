@@ -147,14 +147,21 @@ extend-exclude = [
 # import sorting (I) and Python modernization (UP, pyupgrade) since we target
 # py312 only. E501/line-length stays non-blocking — it was never in the
 # flake8 blocking select. Expand rule classes (E, W, B, ...) later if desired.
-select = ["E9", "F63", "F7", "F82", "I", "UP"]
+# B (flake8-bugbear), C4 (flake8-comprehensions), SIM (flake8-simplify), and
+# PERF (perflint) were added after a full pass fixed every violation found at
+# the time (raise-from, contextlib.suppress, ternaries, comprehensions, zip
+# strict=, etc.) — see git history for the modernization commit.
+select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF"]
 # E203 (whitespace before punctuation) is owned by the formatter. W503 has no Ruff
 # equivalent (ruff-format handles line breaks around binary operators).
 # UP042/UP046/UP047 are excluded deliberately: converting `(str, Enum)` to
 # `StrEnum` changes str()/repr() output (see enum.StrEnum docs), and PEP 695
 # generic syntax is a bigger structural change. Both need case-by-case review
 # rather than blanket enforcement.
-ignore = ["E203", "UP042", "UP046", "UP047"]
+# B008 is ignored repo-wide: FastAPI's `Depends()`/`Body()`/`Query()`/`File()`
+# default-argument pattern is the framework's documented dependency-injection
+# idiom, not a bug — see https://fastapi.tiangolo.com/tutorial/dependencies/.
+ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
 # E402 (module import not at top of file) is intentional in these files: routers

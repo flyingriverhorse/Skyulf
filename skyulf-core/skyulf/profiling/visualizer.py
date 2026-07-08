@@ -563,19 +563,18 @@ class EDAVisualizer:
 
         for i, interaction in enumerate(display_items):
             plt.subplot(1, n_plots, i + 1)
-            bxp_stats = []
-            for cat_data in interaction.data:
-                bxp_stats.append(
-                    {
-                        "label": cat_data.name,
-                        "whislo": cat_data.stats.min,
-                        "q1": cat_data.stats.q1,
-                        "med": cat_data.stats.median,
-                        "q3": cat_data.stats.q3,
-                        "whishi": cat_data.stats.max,
-                        "fliers": [],
-                    }
-                )
+            bxp_stats = [
+                {
+                    "label": cat_data.name,
+                    "whislo": cat_data.stats.min,
+                    "q1": cat_data.stats.q1,
+                    "med": cat_data.stats.median,
+                    "q3": cat_data.stats.q3,
+                    "whishi": cat_data.stats.max,
+                    "fliers": [],
+                }
+                for cat_data in interaction.data
+            ]
             ax = plt.gca()
             ax.bxp(bxp_stats, showfliers=False)
             title = f"{interaction.feature} by Target"
