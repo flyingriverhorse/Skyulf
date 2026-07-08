@@ -37,8 +37,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # something else.
 ENV DATABASE_URL=sqlite+aiosqlite:///./mlops_database.db
 
-# --import-mode=importlib avoids pytest's default rootdir-relative module
-# naming, which collides here: tests/ and skyulf-core/tests/ both contain
-# same-named files (e.g. test_split.py) with no __init__.py packages.
-CMD ["python", "-m", "pytest", "-q", "--disable-warnings", "--import-mode=importlib", \
-     "--cov", "--cov-branch", "--cov-report=term-missing", "--cov-report=html"]
+# Run the two test suites in separate pytest invocations to avoid module-name
+# collisions (same test filenames exist under tests/ and skyulf-core/tests)
+# while keeping each suite's expected import context.
+CMD ["bash", "-lc", "python -m pytest tests -q --disable-warnings --cov --cov-branch --cov-report=term-missing --cov-report=html && cd skyulf-core && python -m pytest tests -q --disable-warnings --cov --cov-branch --cov-report=term-missing --cov-report=html"]
