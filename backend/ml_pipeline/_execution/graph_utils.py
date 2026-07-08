@@ -146,9 +146,7 @@ def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
                 continue
             visited.add(cur)
             component.append(cur)
-            for neighbor in adj[cur]:
-                if neighbor not in visited:
-                    queue.append(neighbor)
+            queue.extend(neighbor for neighbor in adj[cur] if neighbor not in visited)
         components.append(component)
 
     if len(components) <= 1:
@@ -319,9 +317,11 @@ def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[st
         if nid in discovered or nid not in node_map:
             continue
         discovered.add(nid)
-        for parent_id in node_map[nid].inputs:
-            if parent_id in node_map and parent_id not in discovered:
-                queue.append(parent_id)
+        queue.extend(
+            parent_id
+            for parent_id in node_map[nid].inputs
+            if parent_id in node_map and parent_id not in discovered
+        )
 
     # Pass 2 — Kahn's algorithm: build in-degree map for the subgraph.
     in_degree: dict[str, int] = dict.fromkeys(discovered, 0)

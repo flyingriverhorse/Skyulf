@@ -267,12 +267,13 @@ def _diff_versions(prev: Any, curr: Any) -> dict[str, Any]:
     b = _node_set(curr)
     added = sorted(set(b) - set(a))
     removed = sorted(set(a) - set(b))
-    modified: list[str] = []
-    for nid in set(a) & set(b):
+    modified: list[str] = [
+        nid
+        for nid in set(a) & set(b)
         # Cheap structural compare — sufficient because saved graphs are
         # JSON round-tripped (no datetimes, no sets, no class instances).
-        if json.dumps(a[nid], sort_keys=True) != json.dumps(b[nid], sort_keys=True):
-            modified.append(nid)
+        if json.dumps(a[nid], sort_keys=True) != json.dumps(b[nid], sort_keys=True)
+    ]
     return {
         "nodes_added": added,
         "nodes_removed": removed,

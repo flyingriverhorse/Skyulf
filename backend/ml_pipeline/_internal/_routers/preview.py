@@ -409,7 +409,7 @@ async def preview_pipeline(  # noqa: C901
                 if term_id not in ids:
                     ids.append(term_id)
         terminal_suffix: dict[str, str] = {}
-        for _mt, ids in terminals_by_model.items():
+        for ids in terminals_by_model.values():
             if len(ids) < 2:
                 continue
             for n_, term_id in enumerate(ids, start=1):

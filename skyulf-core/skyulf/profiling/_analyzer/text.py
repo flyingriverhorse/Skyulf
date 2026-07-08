@@ -96,7 +96,4 @@ class TextMixin(_AnalyzerState):
         sample = self.df[col].drop_nulls().head(20).to_list()  # type: ignore[attr-defined]
         email_pattern = r"[^@]+@[^@]+\.[^@]+"
 
-        for val in sample:
-            if re.match(email_pattern, str(val)):
-                return True
-        return False
+        return any(re.match(email_pattern, str(val)) for val in sample)
