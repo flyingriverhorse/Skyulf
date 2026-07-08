@@ -10,7 +10,6 @@ import os
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +24,10 @@ def _is_within_base(path: Path, base: Path) -> bool:
 
 
 def safe_delete_path(
-    path: Union[str, Path],
+    path: str | Path,
     force_delete: bool = True,
     files_only: bool = True,
-    allowed_base: Optional[Union[str, Path]] = None,
+    allowed_base: str | Path | None = None,
 ) -> bool:
     """
     Safely delete a file or directory.
@@ -103,7 +102,7 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
         return False
 
 
-def cleanup_empty_directories(base_path: Union[str, Path]) -> int:
+def cleanup_empty_directories(base_path: str | Path) -> int:
     """
     Remove empty directories recursively from base_path.
 
@@ -143,7 +142,7 @@ def cleanup_empty_directories(base_path: Union[str, Path]) -> int:
     return removed_count
 
 
-def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
+def extract_file_path_from_source(source_data: dict) -> Path | None:
     """
     Extract the file path from a data source record.
 
@@ -207,7 +206,7 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
 
 
 def cleanup_old_files(
-    directory: Union[str, Path],
+    directory: str | Path,
     max_files: int = 10,
     max_age_days: int = 7,
     file_pattern: str = "*",
@@ -285,10 +284,10 @@ def cleanup_old_files(
 
 
 def cleanup_uploads_directory(
-    uploads_dir: Union[str, Path],
+    uploads_dir: str | Path,
     max_files: int = 10,
     max_age_days: int = 7,
-    file_extensions: Optional[List[str]] = None,
+    file_extensions: list[str] | None = None,
 ) -> dict:
     """
     Clean up uploaded files based on settings.

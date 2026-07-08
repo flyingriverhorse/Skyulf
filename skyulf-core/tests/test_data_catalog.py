@@ -13,7 +13,7 @@ class _InMemoryCatalog(DataCatalog):
     """Minimal concrete DataCatalog used to exercise the abstract base."""
 
     def __init__(self) -> None:
-        self._store: dict[str, "pd.DataFrame | SkyulfDataFrame"] = {}
+        self._store: dict[str, pd.DataFrame | SkyulfDataFrame] = {}
 
     def load(self, dataset_id: str, **kwargs) -> "pd.DataFrame | SkyulfDataFrame":
         return self._store[dataset_id]

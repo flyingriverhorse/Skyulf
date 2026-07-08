@@ -1,6 +1,6 @@
 """Invalid-value replacement node."""
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -18,7 +18,7 @@ from ..dispatcher import apply_dual_engine
 
 def _invalid_rule_polars(
     expr: Any,
-    rule: Optional[str],
+    rule: str | None,
     final_replacement: Any,
     min_value: Any,
     max_value: Any,
@@ -45,7 +45,7 @@ def _invalid_rule_polars(
 
 def _invalid_rule_pandas_mask(
     series: pd.Series,
-    rule: Optional[str],
+    rule: str | None,
     min_value: Any,
     max_value: Any,
 ) -> Any:
@@ -76,7 +76,7 @@ def _invalid_inf_replacement_polars(
     return expr
 
 
-def _resolve_invalid_replacement(params: Dict[str, Any]) -> Any:
+def _resolve_invalid_replacement(params: dict[str, Any]) -> Any:
     replacement = params.get("replacement", np.nan)
     value = params.get("value")
     return value if value is not None else replacement
@@ -84,11 +84,11 @@ def _resolve_invalid_replacement(params: Dict[str, Any]) -> Any:
 
 class InvalidValueReplacementApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         valid = resolve_valid_columns(X, params.get("columns", []))
@@ -113,7 +113,7 @@ class InvalidValueReplacementApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y
@@ -151,13 +151,13 @@ class InvalidValueReplacementApplier(BaseApplier):
 )
 class InvalidValueReplacementCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Replaces invalid sentinel values with NaN in place; columns preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> InvalidValueReplacementArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> InvalidValueReplacementArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         cols = resolve_columns(X, config, _auto_detect_numeric_columns)

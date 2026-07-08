@@ -1,6 +1,5 @@
 """Cache configuration settings."""
 
-from typing import Optional
 
 
 class CacheMixin:
@@ -8,5 +7,5 @@ class CacheMixin:
 
     CACHE_TYPE: str = "filesystem"
     CACHE_DEFAULT_TIMEOUT: int = 3600
-    REDIS_URL: Optional[str] = None
+    REDIS_URL: str | None = None
     CACHE_TTL: int = 300

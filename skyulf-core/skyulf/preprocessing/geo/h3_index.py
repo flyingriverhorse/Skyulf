@@ -8,7 +8,7 @@ so the rest of skyulf-core works without it installed.
 pandas internally and compute the cell index with a row-wise ``.apply()``.
 """
 
-from typing import Any, Dict, Tuple, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -37,7 +37,7 @@ def _import_h3() -> Any:
     return h3
 
 
-def _h3_index_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _h3_index_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute the H3 cell index per row and append it as a new pandas column."""
     lat_col, lon_col = params["lat_col"], params["lon_col"]
     if lat_col not in X.columns or lon_col not in X.columns:
@@ -54,7 +54,7 @@ def _h3_index_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any
     return out, _y
 
 
-def _h3_index_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _h3_index_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute the H3 cell index via pandas conversion, then rebuild a polars frame."""
     import polars as pl
 
@@ -68,7 +68,7 @@ def _h3_index_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any
 
 class H3IndexApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _h3_index_apply_polars, _h3_index_apply_pandas)
 
 
@@ -86,7 +86,7 @@ class H3IndexApplier(BaseApplier):
 )
 class H3IndexCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> H3IndexArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> H3IndexArtifact:  # pylint: disable=arguments-differ
         # Fail fast with a clear message if the optional dependency is missing,
         # rather than only failing later inside Applier.apply().
         _import_h3()

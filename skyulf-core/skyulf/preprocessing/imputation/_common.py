@@ -1,7 +1,7 @@
 """Shared helpers for imputation nodes."""
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.linear_model import BayesianRidge
@@ -14,7 +14,7 @@ from ...utils import detect_numeric_columns, resolve_columns
 logger = logging.getLogger(__name__)
 
 
-def _resolve_simple_columns(X: Any, config: Dict[str, Any], strategy: str) -> List[str]:
+def _resolve_simple_columns(X: Any, config: dict[str, Any], strategy: str) -> list[str]:
     """Pick the column-detection function based on strategy and resolve."""
     detect_func = (
         detect_numeric_columns if strategy in ("mean", "median") else (lambda d: list(d.columns))
@@ -38,8 +38,8 @@ def _polars_stat_for_strategy(strategy: str, fill_value: Any) -> Any:
 
 
 def _compute_polars_fill_values(
-    X_pl: Any, cols: List[str], strategy: str, fill_value: Any
-) -> Dict[str, Any]:
+    X_pl: Any, cols: list[str], strategy: str, fill_value: Any
+) -> dict[str, Any]:
     """Compute {col: fill_value} for Polars across all SimpleImputer strategies."""
     if strategy == "constant":
         default = fill_value if fill_value is not None else 0
@@ -50,7 +50,7 @@ def _compute_polars_fill_values(
     return {c: stats[c][0] for c in cols}
 
 
-def _polars_missing_counts(X_pl: Any, cols: List[str]) -> Tuple[Dict[str, int], int]:
+def _polars_missing_counts(X_pl: Any, cols: list[str]) -> tuple[dict[str, int], int]:
     import polars as pl
 
     raw = X_pl.select([pl.col(c).null_count() for c in cols]).to_dict(as_series=False)
@@ -58,7 +58,7 @@ def _polars_missing_counts(X_pl: Any, cols: List[str]) -> Tuple[Dict[str, int], 
     return counts, sum(counts.values())
 
 
-def _sklearn_transform_subset(X: Any, cols: List[str], imputer: Any, is_polars: bool) -> Any:
+def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: bool) -> Any:
     """Run a fitted sklearn imputer over X[cols] and write back into a copy of X.
 
     Used by KNN + Iterative imputers; both share the exact same transform shape.

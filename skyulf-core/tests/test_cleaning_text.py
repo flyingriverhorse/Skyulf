@@ -4,7 +4,7 @@ Covers: trim / case / remove_special / regex helpers (pandas + polars),
 Calculator.fit branches, Applier.apply edge cases, and engine parity.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pandas as pd
 import polars as pl
@@ -86,7 +86,7 @@ def test_remove_special_pandas(values: list, mode: str, replacement: str, expect
 
 @pytest.mark.parametrize(*_regex_pandas_cases)
 def test_regex_pandas(
-    values: list, mode: str, pattern: Optional[str], repl: str, expected: list
+    values: list, mode: str, pattern: str | None, repl: str, expected: list
 ) -> None:
     """_regex_pandas must apply the regex behavior matching the given mode."""
     s = pd.Series(values)
@@ -173,7 +173,7 @@ def test_applier_trim_and_lower() -> None:
 def test_applier_no_operations_is_noop() -> None:
     """Empty operations list must leave the DataFrame unchanged."""
     df = pd.DataFrame({"text": ["  Hello  "]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["text"],
         "operations": [],
     }
@@ -184,7 +184,7 @@ def test_applier_no_operations_is_noop() -> None:
 def test_applier_no_valid_columns_is_noop() -> None:
     """Columns not present in the DataFrame must be silently skipped."""
     df = pd.DataFrame({"text": ["hello"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["nonexistent"],
         "operations": [{"op": "trim", "mode": "both"}],
     }
@@ -195,7 +195,7 @@ def test_applier_no_valid_columns_is_noop() -> None:
 def test_applier_empty_string_survives() -> None:
     """Empty strings must not raise; trim/case should produce an empty string."""
     df = pd.DataFrame({"text": ["", "  ", "hello"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["text"],
         "operations": [
             {"op": "trim", "mode": "both"},
@@ -211,7 +211,7 @@ def test_applier_empty_string_survives() -> None:
 def test_applier_unicode_text() -> None:
     """Unicode strings must be processed without encoding errors."""
     df = pd.DataFrame({"text": ["  héllo  ", "  wörld  "]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["text"],
         "operations": [{"op": "trim", "mode": "both"}],
     }
@@ -223,7 +223,7 @@ def test_applier_unicode_text() -> None:
 def test_applier_remove_special_keeps_alphanumeric() -> None:
     """remove_special(keep_alphanumeric) must strip all punctuation."""
     df = pd.DataFrame({"text": ["hello, world!", "foo@bar.baz"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["text"],
         "operations": [{"op": "remove_special", "mode": "keep_alphanumeric", "replacement": ""}],
     }
@@ -235,7 +235,7 @@ def test_applier_remove_special_keeps_alphanumeric() -> None:
 def test_applier_collapse_whitespace_via_regex() -> None:
     """regex/collapse_whitespace must collapse consecutive spaces to one."""
     df = pd.DataFrame({"text": ["hello   world", "a  b  c"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["text"],
         "operations": [{"op": "regex", "mode": "collapse_whitespace"}],
     }
@@ -247,7 +247,7 @@ def test_applier_collapse_whitespace_via_regex() -> None:
 def test_applier_non_string_column_is_cast_to_str() -> None:
     """A numeric column must be cast to string before text ops are applied."""
     df = pd.DataFrame({"num": [123, 456]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["num"],
         "operations": [{"op": "case", "mode": "upper"}],
     }
@@ -274,7 +274,7 @@ def _text_frame(draw: st.DrawFn, min_rows: int = 4, max_rows: int = 20) -> pd.Da
 @given(df=_text_frame())
 def test_text_cleaning_apply_engine_parity_trim_lower(df: pd.DataFrame) -> None:
     """trim+lowercase must produce identical results from pandas and polars paths."""
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["text"],
         "operations": [
             {"op": "trim", "mode": "both"},
@@ -303,10 +303,10 @@ _polars_single_op_cases = TestCaseLoader(
 
 
 @pytest.mark.parametrize(*_polars_single_op_cases)
-def test_polars_single_op(texts: list, operation: Dict[str, Any], expected: list) -> None:
+def test_polars_single_op(texts: list, operation: dict[str, Any], expected: list) -> None:
     """A single text-cleaning op applied via the polars path must match expected output."""
     df = pl.DataFrame({"text": texts})
-    params: Dict[str, Any] = {"columns": ["text"], "operations": [operation]}
+    params: dict[str, Any] = {"columns": ["text"], "operations": [operation]}
     result = TextCleaningApplier().apply(df, params)
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
@@ -316,7 +316,7 @@ def test_polars_single_op(texts: list, operation: Dict[str, Any], expected: list
 def test_polars_no_valid_columns_is_noop() -> None:
     """Polars applier with missing columns must return the DataFrame unchanged."""
     df = pl.DataFrame({"text": ["hello"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["nonexistent"],
         "operations": [{"op": "trim", "mode": "both"}],
     }

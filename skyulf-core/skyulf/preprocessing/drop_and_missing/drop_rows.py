@@ -1,6 +1,6 @@
 """Drop-missing-rows node (drop rows with NaNs, y-synced)."""
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -11,7 +11,7 @@ from ..dispatcher import apply_dual_engine
 from ._common import _normalize_subset, _polars_filter_y_by_kept_indices
 
 
-def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: Optional[int]) -> Any:
+def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: int | None) -> Any:
     """Build the polars filter for dropna with optional threshold/how."""
     import polars as pl
 
@@ -22,7 +22,7 @@ def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: Optiona
     return X.drop_nulls(subset=check_cols)
 
 
-def _drop_missing_rows_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _drop_missing_rows_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     subset = _normalize_subset(params.get("subset"), list(X.columns))
     how = params.get("how", "any")
     threshold = params.get("threshold")
@@ -38,7 +38,7 @@ def _drop_missing_rows_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> T
     return X_out, _polars_filter_y_by_kept_indices(y, kept)
 
 
-def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     subset = _normalize_subset(params.get("subset"), list(X.columns))
     how = params.get("how", "any")
     threshold = params.get("threshold")
@@ -56,7 +56,7 @@ def _drop_missing_rows_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> T
 
 class DropMissingRowsApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -75,12 +75,12 @@ class DropMissingRowsApplier(BaseApplier):
 )
 class DropMissingRowsCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Drops rows; column set is preserved.
         return input_schema
 
-    def fit(self, df: Any, config: Dict[str, Any]) -> DropMissingRowsArtifact:
+    def fit(self, df: Any, config: dict[str, Any]) -> DropMissingRowsArtifact:
         return {
             "type": "drop_missing_rows",
             "subset": config.get("subset"),

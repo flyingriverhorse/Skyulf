@@ -5,7 +5,7 @@ Covers: Calculator.fit artifact shape, Applier.apply for pandas + polars
 input, and edge cases (empty DataFrame, all-NaN column, no missing values).
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -60,7 +60,7 @@ def test_fit_infer_output_schema_passes_through() -> None:
 def test_apply_pandas_how_any_drops_rows_with_any_nan() -> None:
     """how='any' must drop a row if any column in subset has a NaN."""
     df = pd.DataFrame({"a": [1.0, np.nan, 3.0], "b": [1.0, 2.0, np.nan]})
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     # Rows 0 kept (no NaN); rows 1 and 2 dropped (each has a NaN).
     assert result["a"].tolist() == [1.0]
@@ -70,7 +70,7 @@ def test_apply_pandas_how_any_drops_rows_with_any_nan() -> None:
 def test_apply_pandas_how_all_drops_only_fully_nan_rows() -> None:
     """how='all' must drop a row only when every subset column is NaN."""
     df = pd.DataFrame({"a": [1.0, np.nan, np.nan], "b": [1.0, 2.0, np.nan]})
-    params: Dict[str, Any] = {"subset": None, "how": "all", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "all", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     # Row 1 (a=NaN, b=2.0) kept because not all NaN; row 2 (both NaN) dropped.
     assert result.shape[0] == 2
@@ -81,7 +81,7 @@ def test_apply_pandas_how_all_drops_only_fully_nan_rows() -> None:
 def test_apply_pandas_subset_limits_check_columns() -> None:
     """Only columns in `subset` should trigger a drop; other NaNs must be ignored."""
     df = pd.DataFrame({"a": [1.0, np.nan, 3.0], "b": [np.nan, np.nan, np.nan]})
-    params: Dict[str, Any] = {"subset": ["a"], "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": ["a"], "how": "any", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     # Only row index 1 (a is NaN) should be dropped; b's NaNs are irrelevant.
     assert result["a"].tolist() == [1.0, 3.0]
@@ -97,7 +97,7 @@ def test_apply_pandas_threshold_keeps_rows_with_enough_non_na() -> None:
             "c": [1.0, np.nan, 1.0],
         }
     )
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": 2}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": 2}
     result = DropMissingRowsApplier().apply(df, params)
     # Row 0: 3 non-null (kept). Row 1: 1 non-null (dropped). Row 2: 2 non-null (kept).
     assert result["a"].tolist() == [1.0, 3.0]
@@ -106,7 +106,7 @@ def test_apply_pandas_threshold_keeps_rows_with_enough_non_na() -> None:
 def test_apply_pandas_no_missing_values_keeps_all_rows() -> None:
     """A DataFrame with no missing values must have all rows retained."""
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     assert result["a"].tolist() == [1.0, 2.0, 3.0]
 
@@ -118,7 +118,7 @@ class TestApplyPandasShapeOnly:
 
     @pytest.mark.parametrize(*_shape_only_cases)
     def test_apply_pandas_result_shape(
-        self, df_data: Dict[str, list], params: Dict[str, Any], expected_shape: list[int]
+        self, df_data: dict[str, list], params: dict[str, Any], expected_shape: list[int]
     ) -> None:
         df = pd.DataFrame({col: pd.Series(values, dtype=float) for col, values in df_data.items()})
         result = DropMissingRowsApplier().apply(df, params)
@@ -129,7 +129,7 @@ def test_apply_pandas_tuple_xy_syncs_y_after_drop() -> None:
     """Dropping rows from X (as an (X, y) tuple) must drop the same rows from y."""
     X = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
     y = pd.Series([10, 20, 30])
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
     X_out, y_out = DropMissingRowsApplier().apply((X, y), params)
     assert X_out["a"].tolist() == [1.0, 3.0]
     assert y_out.tolist() == [10, 30]
@@ -143,7 +143,7 @@ def test_apply_pandas_tuple_xy_syncs_y_after_drop() -> None:
 def test_apply_polars_how_any_drops_rows_with_any_null() -> None:
     """Polars path: how='any' must drop rows containing any null in subset."""
     df = pl.DataFrame({"a": [1.0, None, 3.0], "b": [1.0, 2.0, None]})
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
@@ -153,7 +153,7 @@ def test_apply_polars_how_any_drops_rows_with_any_null() -> None:
 def test_apply_polars_how_all_drops_only_fully_null_rows() -> None:
     """Polars path: how='all' drops a row only when every subset column is null."""
     df = pl.DataFrame({"a": [1.0, None, None], "b": [1.0, 2.0, None]})
-    params: Dict[str, Any] = {"subset": None, "how": "all", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "all", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
@@ -163,7 +163,7 @@ def test_apply_polars_how_all_drops_only_fully_null_rows() -> None:
 def test_apply_polars_subset_limits_check_columns() -> None:
     """Polars path: only subset columns must trigger a row drop."""
     df = pl.DataFrame({"a": [1.0, None, 3.0], "b": [None, None, None]})
-    params: Dict[str, Any] = {"subset": ["a"], "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": ["a"], "how": "any", "threshold": None}
     result = DropMissingRowsApplier().apply(df, params)
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
@@ -179,7 +179,7 @@ def test_apply_polars_threshold_keeps_rows_with_enough_non_null() -> None:
             "c": [1.0, None, 1.0],
         }
     )
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": 2}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": 2}
     result = DropMissingRowsApplier().apply(df, params)
     if hasattr(result, "to_pandas"):
         result = result.to_pandas()
@@ -190,7 +190,7 @@ def test_apply_polars_tuple_xy_syncs_y_after_drop() -> None:
     """Polars path: dropping rows from X must drop matching rows from a polars y series."""
     X = pl.DataFrame({"a": [1.0, None, 3.0]})
     y = pl.Series("target", [10, 20, 30])
-    params: Dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
+    params: dict[str, Any] = {"subset": None, "how": "any", "threshold": None}
     X_out, y_out = DropMissingRowsApplier().apply((X, y), params)
     if hasattr(X_out, "to_pandas"):
         X_out = X_out.to_pandas()
@@ -212,7 +212,7 @@ class TestFitThenApplyRoundTrip:
 
     @pytest.mark.parametrize(*_round_trip_cases)
     def test_fit_then_apply_round_trip(
-        self, df_data: Dict[str, list], config: Dict[str, Any], expected_a: list[float]
+        self, df_data: dict[str, list], config: dict[str, Any], expected_a: list[float]
     ) -> None:
         df = pd.DataFrame(df_data)
         calc = DropMissingRowsCalculator()

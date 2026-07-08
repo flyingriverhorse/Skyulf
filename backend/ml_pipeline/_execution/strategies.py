@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import Dict, Optional, Type
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -17,10 +16,10 @@ class JobStrategy(ABC):
     """
 
     @abstractmethod
-    def get_job_model(self) -> Type[MLJob]:
+    def get_job_model(self) -> type[MLJob]:
         """Returns the SQLAlchemy model class for this job type."""
 
-    def get_job(self, session: Session, job_id: str) -> Optional[MLJob]:
+    def get_job(self, session: Session, job_id: str) -> MLJob | None:
         """Fetches the job from the database."""
         return session.query(self.get_job_model()).filter(self.get_job_model().id == job_id).first()
 
@@ -102,11 +101,11 @@ class JobStrategy(ABC):
         """Updates the job with failure information."""
         job.status = "failed"
         job.error_message = error_msg
-        job.finished_at = datetime.now(timezone.utc)
+        job.finished_at = datetime.now(UTC)
 
 
 class BasicTrainingStrategy(JobStrategy):
-    def get_job_model(self) -> Type[MLJob]:
+    def get_job_model(self) -> type[MLJob]:
         return BasicTrainingJob
 
     def get_initial_log(self, job: MLJob) -> str:
@@ -118,7 +117,7 @@ class BasicTrainingStrategy(JobStrategy):
 
 
 class AdvancedTuningStrategy(JobStrategy):
-    def get_job_model(self) -> Type[MLJob]:
+    def get_job_model(self) -> type[MLJob]:
         return AdvancedTuningJob
 
     def get_initial_log(self, job: MLJob) -> str:
@@ -143,7 +142,7 @@ class AdvancedTuningStrategy(JobStrategy):
 
 
 class JobStrategyFactory:
-    _strategies: Dict[str, JobStrategy] = {
+    _strategies: dict[str, JobStrategy] = {
         StepType.BASIC_TRAINING: BasicTrainingStrategy(),
         StepType.ADVANCED_TUNING: AdvancedTuningStrategy(),
         # Add more strategies here as needed
@@ -168,7 +167,7 @@ class JobStrategyFactory:
     @classmethod
     def find_job(
         cls, session: Session, job_id: str
-    ) -> tuple[Optional[MLJob], Optional[JobStrategy]]:
+    ) -> tuple[MLJob | None, JobStrategy | None]:
         """
         Tries to find the job in all known tables.
         Returns (job, strategy) or (None, None).

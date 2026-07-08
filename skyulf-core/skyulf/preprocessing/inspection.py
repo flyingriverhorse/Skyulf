@@ -5,7 +5,7 @@ collect engine-specific summary statistics, so they route through
 :func:`fit_dual_engine`.
 """
 
-from typing import Any, Dict, Tuple, Union, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -23,12 +23,12 @@ from .dispatcher import fit_dual_engine
 # -----------------------------------------------------------------------------
 
 
-def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> Dict[str, Dict[str, object]]:
+def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> dict[str, dict[str, object]]:
     """Convert Polars ``describe()`` output into a per-column stats dict."""
     if not numeric_cols:
         return {}
     desc_df = X.select(numeric_cols).describe()
-    stats: Dict[str, Dict[str, object]] = {col: {} for col in numeric_cols}
+    stats: dict[str, dict[str, object]] = {col: {} for col in numeric_cols}
     for row in desc_df.to_dicts():
         # Polars < 0.19 uses "describe", newer versions use "statistic".
         metric = row.get("describe") or row.get("statistic")
@@ -40,10 +40,10 @@ def _extract_polars_numeric_stats(X: Any, numeric_cols: list) -> Dict[str, Dict[
     return stats
 
 
-def _profile_fit_polars(X: Any, _y: Any, _config: Dict[str, Any]) -> DatasetProfileArtifact:
+def _profile_fit_polars(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProfileArtifact:
     import polars as pl
 
-    profile: Dict[str, Any] = {
+    profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),
         "dtypes": {col: str(dtype) for col, dtype in zip(X.columns, X.dtypes)},
@@ -59,8 +59,8 @@ def _profile_fit_polars(X: Any, _y: Any, _config: Dict[str, Any]) -> DatasetProf
     return {"type": "dataset_profile", "profile": profile}
 
 
-def _profile_fit_pandas(X: Any, _y: Any, _config: Dict[str, Any]) -> DatasetProfileArtifact:
-    profile: Dict[str, Any] = {
+def _profile_fit_pandas(X: Any, _y: Any, _config: dict[str, Any]) -> DatasetProfileArtifact:
+    profile: dict[str, Any] = {
         "rows": len(X),
         "columns": len(X.columns),
         "dtypes": X.dtypes.astype(str).to_dict(),
@@ -75,8 +75,8 @@ def _profile_fit_pandas(X: Any, _y: Any, _config: Dict[str, Any]) -> DatasetProf
 class DatasetProfileApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        params: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        params: dict[str, Any],
     ) -> Any:
         # Inspection nodes do not modify data.
         return df
@@ -92,13 +92,13 @@ class DatasetProfileApplier(BaseApplier):
 )
 class DatasetProfileCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Inspection nodes are read-only; schema is unchanged.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DatasetProfileArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> DatasetProfileArtifact:  # pylint: disable=arguments-differ
         return cast(
             DatasetProfileArtifact,
             fit_dual_engine(X, config, _profile_fit_polars, _profile_fit_pandas),
@@ -110,12 +110,12 @@ class DatasetProfileCalculator(BaseCalculator):
 # -----------------------------------------------------------------------------
 
 
-def _snapshot_fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:
+def _snapshot_fit_polars(X: Any, _y: Any, config: dict[str, Any]) -> DataSnapshotArtifact:
     n = config.get("n_rows", 5)
     return {"type": "data_snapshot", "snapshot": X.head(n).to_dicts()}
 
 
-def _snapshot_fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:
+def _snapshot_fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> DataSnapshotArtifact:
     n = config.get("n_rows", 5)
     return {"type": "data_snapshot", "snapshot": X.head(n).to_dict(orient="records")}
 
@@ -123,8 +123,8 @@ def _snapshot_fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapsho
 class DataSnapshotApplier(BaseApplier):
     def apply(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        params: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        params: dict[str, Any],
     ) -> Any:
         return df
 
@@ -139,13 +139,13 @@ class DataSnapshotApplier(BaseApplier):
 )
 class DataSnapshotCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Inspection nodes are read-only; schema is unchanged.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> DataSnapshotArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> DataSnapshotArtifact:  # pylint: disable=arguments-differ
         return cast(
             DataSnapshotArtifact,
             fit_dual_engine(X, config, _snapshot_fit_polars, _snapshot_fit_pandas),

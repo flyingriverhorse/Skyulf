@@ -1,6 +1,6 @@
 """Feature-generation (math) node."""
 
-from typing import Any, Dict, Tuple, Union
+from typing import Any
 
 import pandas as pd
 
@@ -17,7 +17,7 @@ from ._polars_ops import _featgen_apply_polars
 
 class FeatureGenerationApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _featgen_apply_polars, _featgen_apply_pandas)
 
 
@@ -34,8 +34,8 @@ class FeatureGenerationApplier(BaseApplier):
 class FeatureGenerationCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        config: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        config: dict[str, Any],
     ) -> FeatureGenerationArtifact:
         return {
             "type": "feature_generation",

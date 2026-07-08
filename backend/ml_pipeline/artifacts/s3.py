@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Optional
+from typing import Any
 
 import joblib
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class S3ArtifactStore(ArtifactStore):
-    def __init__(self, bucket_name: str, prefix: str = "", storage_options: Optional[dict] = None):
+    def __init__(self, bucket_name: str, prefix: str = "", storage_options: dict | None = None):
         self.bucket_name = bucket_name.strip()
         self.prefix = self._normalize_prefix(prefix)
         self.storage_options = storage_options or {}

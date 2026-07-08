@@ -3,7 +3,7 @@
 import importlib
 import math
 import warnings
-from typing import Any, Dict, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -40,8 +40,8 @@ if _imblearn_metrics is not None:
 
 
 def calculate_classification_metrics(
-    model: Any, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]
-) -> Dict[str, float]:
+    model: Any, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
+) -> dict[str, float]:
     """Compute classification metrics for predictions."""
 
     # Convert to Numpy for compatibility
@@ -57,7 +57,7 @@ def calculate_classification_metrics(
     # For metrics calculation, we might need numpy arrays for y
     y_arr = y_np
 
-    metrics: Dict[str, float] = {
+    metrics: dict[str, float] = {
         "accuracy": float(accuracy_score(y_arr, predictions)),
         "balanced_accuracy": float(balanced_accuracy_score(y_arr, predictions)),
         "precision_weighted": float(
@@ -138,8 +138,8 @@ def calculate_classification_metrics(
 
 
 def calculate_regression_metrics(
-    model: Any, X: Union[pd.DataFrame, SkyulfDataFrame], y: Union[pd.Series, Any]
-) -> Dict[str, float]:
+    model: Any, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
+) -> dict[str, float]:
     """Compute regression metrics for predictions."""
 
     # Convert to Numpy for compatibility
@@ -151,7 +151,7 @@ def calculate_regression_metrics(
     y_arr = y_np
 
     mse_value = mean_squared_error(y_arr, predictions)
-    metrics: Dict[str, float] = {
+    metrics: dict[str, float] = {
         "mae": float(mean_absolute_error(y_arr, predictions)),
         "mse": float(mse_value),
         "rmse": float(math.sqrt(mse_value)),

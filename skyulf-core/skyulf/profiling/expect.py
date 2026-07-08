@@ -13,7 +13,8 @@ Example:
     >>> expect_value_range(df, "age", minimum=0, maximum=120)
 """
 
-from typing import Any, List, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -39,7 +40,7 @@ def _as_pandas(df: Any) -> pd.DataFrame:
     raise TypeError(f"Unsupported frame type for expectations: {type(df)!r}")
 
 
-def _resolve_columns(df: pd.DataFrame, columns: Optional[Sequence[str]]) -> List[str]:
+def _resolve_columns(df: pd.DataFrame, columns: Sequence[str] | None) -> list[str]:
     """Default to all columns; otherwise validate the requested subset exists."""
     if columns is None:
         return list(df.columns)
@@ -55,7 +56,7 @@ def expect_columns_exist(df: Any, columns: Sequence[str]) -> None:
         raise ExpectationError(f"Expected columns are missing: {missing}")
 
 
-def expect_no_nulls(df: Any, columns: Optional[Sequence[str]] = None) -> None:
+def expect_no_nulls(df: Any, columns: Sequence[str] | None = None) -> None:
     """Assert that the given columns (default: all) contain no null values."""
     frame = _as_pandas(df)
     cols = _resolve_columns(frame, columns)
@@ -69,8 +70,8 @@ def expect_value_range(
     df: Any,
     column: str,
     *,
-    minimum: Optional[float] = None,
-    maximum: Optional[float] = None,
+    minimum: float | None = None,
+    maximum: float | None = None,
     inclusive: bool = True,
 ) -> None:
     """Assert that all values in ``column`` fall within ``[minimum, maximum]``.
@@ -85,7 +86,7 @@ def expect_value_range(
     _check_upper_bound(series, column, maximum, inclusive)
 
 
-def _check_lower_bound(series: Any, column: str, minimum: Optional[float], inclusive: bool) -> None:
+def _check_lower_bound(series: Any, column: str, minimum: float | None, inclusive: bool) -> None:
     if minimum is None:
         return
     violates = series < minimum if inclusive else series <= minimum
@@ -97,7 +98,7 @@ def _check_lower_bound(series: Any, column: str, minimum: Optional[float], inclu
         )
 
 
-def _check_upper_bound(series: Any, column: str, maximum: Optional[float], inclusive: bool) -> None:
+def _check_upper_bound(series: Any, column: str, maximum: float | None, inclusive: bool) -> None:
     if maximum is None:
         return
     violates = series > maximum if inclusive else series >= maximum

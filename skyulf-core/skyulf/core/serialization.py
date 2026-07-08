@@ -8,7 +8,7 @@ call sites.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 __all__ = [
     "ModelSerializer",
@@ -17,7 +17,7 @@ __all__ = [
     "set_model_serializer",
 ]
 
-PathLike = Union[str, Path]
+PathLike = str | Path
 
 
 class ModelSerializer(ABC):

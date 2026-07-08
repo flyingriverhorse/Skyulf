@@ -1,6 +1,6 @@
 """Polynomial-features node."""
 
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
@@ -15,8 +15,8 @@ from ..dispatcher import apply_dual_engine
 
 
 def _polynomial_compute(
-    X_subset: pd.DataFrame, valid_cols: List[str], params: Dict[str, Any]
-) -> Optional[Tuple[Any, List[str]]]:
+    X_subset: pd.DataFrame, valid_cols: list[str], params: dict[str, Any]
+) -> tuple[Any, list[str]] | None:
     """Run sklearn PolynomialFeatures + name normalisation; ``None`` ⇒ skip."""
     poly = PolynomialFeatures(
         degree=params.get("degree", 2),
@@ -43,7 +43,7 @@ def _polynomial_compute(
     return transformed, new_names
 
 
-def _polynomial_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _polynomial_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
     valid_cols = [c for c in params.get("columns", []) if c in X.columns]
@@ -58,7 +58,7 @@ def _polynomial_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[A
     return pl.concat([X, df_poly], how="horizontal"), _y
 
 
-def _polynomial_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols = [c for c in params.get("columns", []) if c in X.columns]
     if not valid_cols:
         return X, _y
@@ -73,7 +73,7 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[A
 
 class PolynomialFeaturesApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _polynomial_apply_polars, _polynomial_apply_pandas)
 
 
@@ -88,7 +88,7 @@ class PolynomialFeaturesApplier(BaseApplier):
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> PolynomialFeaturesArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PolynomialFeaturesArtifact:  # pylint: disable=arguments-differ
         X_pd = to_pandas(X)
         cols = list(config.get("columns", []))
         if not cols and config.get("auto_detect", False):

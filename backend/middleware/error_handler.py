@@ -7,7 +7,8 @@ Centralizes error handling and logging for the FastAPI application.
 import logging
 import traceback
 import uuid
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse

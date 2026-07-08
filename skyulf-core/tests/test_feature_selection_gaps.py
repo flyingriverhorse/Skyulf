@@ -6,7 +6,7 @@ Each selector shares the fit->apply Calculator/Applier contract and the
 missing target, and threshold boundaries.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -214,7 +214,7 @@ def test_univariate_selection_allow_missing_target_passthrough() -> None:
 
 
 @pytest.mark.parametrize(*_univariate_empty_cases)
-def test_univariate_selection_returns_empty(df_kind: str, config: Dict[str, Any]) -> None:
+def test_univariate_selection_returns_empty(df_kind: str, config: dict[str, Any]) -> None:
     """Various bad configs/candidate sets must yield an empty artifact."""
     df = _FEATURE_SELECTION_DF_BUILDERS[df_kind]()
     art = UnivariateSelectionCalculator().fit(df, config)
@@ -251,7 +251,7 @@ def test_model_based_selection_apply_drops_unselected() -> None:
 
 
 @pytest.mark.parametrize(*_model_based_empty_cases)
-def test_model_based_selection_returns_empty(df_kind: str, config: Dict[str, Any]) -> None:
+def test_model_based_selection_returns_empty(df_kind: str, config: dict[str, Any]) -> None:
     """Various bad configs/candidate sets must yield an empty artifact."""
     df = _FEATURE_SELECTION_DF_BUILDERS[df_kind]()
     art = ModelBasedSelectionCalculator().fit(df, config)

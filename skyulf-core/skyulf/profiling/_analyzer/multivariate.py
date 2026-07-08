@@ -1,6 +1,6 @@
 """Multivariate analyses: PCA, KMeans clustering, Isolation Forest outliers."""
 
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -22,10 +22,10 @@ class MultivariateMixin(_AnalyzerState):
 
     def _prepare_matrix_sample(
         self,
-        numeric_cols: List[str],
-        target_col: Optional[str] = None,
+        numeric_cols: list[str],
+        target_col: str | None = None,
         limit: int = 5000,
-    ) -> Tuple[Optional[np.ndarray], Optional[pl.DataFrame], Optional[Any]]:
+    ) -> tuple[np.ndarray | None, pl.DataFrame | None, Any | None]:
         """Sample → impute (mean) → scale → return ``(X_scaled, sample_df, scaler)``.
 
         ``seed=42`` is hard-coded so PCA and Clustering see the same subset
@@ -80,8 +80,8 @@ class MultivariateMixin(_AnalyzerState):
             return None, None, None
 
     def _calculate_pca(
-        self, numeric_cols: List[str], target_col: Optional[str] = None
-    ) -> Tuple[Optional[List[PCAPoint]], Optional[List[PCAComponent]]]:
+        self, numeric_cols: list[str], target_col: str | None = None
+    ) -> tuple[list[PCAPoint] | None, list[PCAComponent] | None]:
         """3-component PCA projection + per-component top loadings."""
         try:
             from sklearn.decomposition import PCA
@@ -143,8 +143,8 @@ class MultivariateMixin(_AnalyzerState):
             return None, None
 
     def _perform_clustering(
-        self, numeric_cols: List[str], target_col: Optional[str] = None
-    ) -> Optional[ClusteringAnalysis]:
+        self, numeric_cols: list[str], target_col: str | None = None
+    ) -> ClusteringAnalysis | None:
         """KMeans (k=3) post-hoc segmentation, projected to 2D via PCA for plotting."""
         try:
             from sklearn.cluster import KMeans
@@ -220,7 +220,7 @@ class MultivariateMixin(_AnalyzerState):
             print(f"Error in clustering analysis: {e}")
             return None
 
-    def _detect_outliers(self, numeric_cols: List[str]) -> Optional[OutlierAnalysis]:
+    def _detect_outliers(self, numeric_cols: list[str]) -> OutlierAnalysis | None:
         """Isolation-Forest outlier detection with per-feature deviation explanations."""
         try:
             from sklearn.ensemble import IsolationForest

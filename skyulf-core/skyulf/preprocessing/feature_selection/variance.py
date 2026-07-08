@@ -1,6 +1,6 @@
 """Variance-threshold feature selector."""
 
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from sklearn.feature_selection import VarianceThreshold
 
@@ -17,7 +17,7 @@ from ._common import _drop_selected_pandas, _drop_selected_polars
 
 class VarianceThresholdApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
@@ -31,7 +31,7 @@ class VarianceThresholdApplier(BaseApplier):
 )
 class VarianceThresholdCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> VarianceThresholdArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> VarianceThresholdArtifact:  # pylint: disable=arguments-differ
         threshold = config.get("threshold", 0.0)
         drop_columns = config.get("drop_columns", True)
 

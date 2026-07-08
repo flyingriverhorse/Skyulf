@@ -1,7 +1,6 @@
 """Causal discovery via the PC algorithm (causal-learn)."""
 
 import logging
-from typing import List, Optional
 
 import polars as pl
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 class CausalMixin(_AnalyzerState):
     """Causal-discovery helpers for :class:`EDAAnalyzer`."""
 
-    def _discover_causal_graph(self, numeric_cols: List[str]) -> Optional[CausalGraph]:
+    def _discover_causal_graph(self, numeric_cols: list[str]) -> CausalGraph | None:
         """Run the PC algorithm and return a directed/undirected/bidirected graph.
 
         PC complexity grows exponentially with #variables; we cap at 15. With

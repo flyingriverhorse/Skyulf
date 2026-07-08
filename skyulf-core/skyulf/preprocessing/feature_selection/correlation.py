@@ -1,6 +1,6 @@
 """Correlation-threshold feature selector."""
 
-from typing import Any, Dict, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 
@@ -13,7 +13,7 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 
 
-def _corr_drop_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _corr_drop_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Polars apply path: drop the precomputed ``columns_to_drop`` list."""
     if not params.get("drop_columns", True):
         return X, y
@@ -23,7 +23,7 @@ def _corr_drop_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]
     return X, y
 
 
-def _corr_drop_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _corr_drop_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Pandas apply path: drop the precomputed ``columns_to_drop`` list."""
     if not params.get("drop_columns", True):
         return X, y
@@ -35,7 +35,7 @@ def _corr_drop_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]
 
 class CorrelationThresholdApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _corr_drop_polars, _corr_drop_pandas)
 
 
@@ -49,7 +49,7 @@ class CorrelationThresholdApplier(BaseApplier):
 )
 class CorrelationThresholdCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CorrelationThresholdArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CorrelationThresholdArtifact:  # pylint: disable=arguments-differ
         X_pd = to_pandas(X)
 
         threshold = config.get("threshold", 0.95)

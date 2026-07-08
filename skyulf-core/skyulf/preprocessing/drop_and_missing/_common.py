@@ -1,6 +1,6 @@
 """Shared helpers for drop / missing-value nodes."""
 
-from typing import Any, Optional
+from typing import Any
 
 
 def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
@@ -25,7 +25,7 @@ def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
     return y
 
 
-def _normalize_subset(subset: Any, existing_cols: list) -> Optional[list]:
+def _normalize_subset(subset: Any, existing_cols: list) -> list | None:
     """Filter ``subset`` to columns that actually exist; return ``None`` if empty."""
     if not subset:
         return None

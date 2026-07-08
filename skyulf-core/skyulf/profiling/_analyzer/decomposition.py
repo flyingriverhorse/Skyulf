@@ -1,6 +1,6 @@
 """Decomposition-tree split: filter → group-by → measure aggregation."""
 
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 import polars as pl
 
@@ -12,11 +12,11 @@ class DecompositionMixin(_AnalyzerState):
 
     def get_decomposition_split(  # noqa: C901
         self,
-        measure_col: Optional[str],
+        measure_col: str | None,
         measure_agg: str,
-        split_col: Optional[str],
-        filters: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        split_col: str | None,
+        filters: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Apply ``filters``, then aggregate ``measure_col`` either globally or split by ``split_col``."""
         # 1. Apply filters (with numeric-vs-string coercion since FE serializes everything as strings).
         filtered_df = self.df  # type: ignore[attr-defined]

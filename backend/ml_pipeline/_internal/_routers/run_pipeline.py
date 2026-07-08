@@ -9,7 +9,7 @@ BackgroundTasks fan-out. All ML logic still lives in
 import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Literal, cast
+from typing import Any, Literal, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,7 +39,7 @@ router = APIRouter(tags=["ML Pipeline"])
 
 # Per-key asyncio locks prevent two concurrent requests from racing through
 # the find_active_job + create_job check simultaneously (same event loop).
-_submit_locks: Dict[str, asyncio.Lock] = {}
+_submit_locks: dict[str, asyncio.Lock] = {}
 _submit_locks_guard = asyncio.Lock()
 
 
@@ -129,8 +129,8 @@ async def run_pipeline(  # noqa: C901
             break
 
     settings = get_settings()
-    all_job_ids: List[str] = []
-    task_payloads: List[tuple] = []
+    all_job_ids: list[str] = []
+    task_payloads: list[tuple] = []
 
     for sub in sub_pipelines:
         # Identify the terminal node for this sub-pipeline
@@ -167,7 +167,7 @@ async def run_pipeline(  # noqa: C901
         # whose `inputs` still list every branch's parent and ends up
         # showing both branches' preprocessing chains in every column
         # (reported as "Path A and Path B both show every Encoding").
-        branch_graph: Dict[str, Any] = {
+        branch_graph: dict[str, Any] = {
             "pipeline_id": sub.pipeline_id,
             "nodes": [
                 {
@@ -218,7 +218,7 @@ async def run_pipeline(  # noqa: C901
 
         # Reuse the same dict shape for the Celery payload (storage_options
         # is added below; we don't persist it into the DB graph snapshot).
-        sub_payload: Dict[str, Any] = dict(branch_graph)
+        sub_payload: dict[str, Any] = dict(branch_graph)
         if resolved_s3_options:
             sub_payload["storage_options"] = resolved_s3_options
 
@@ -240,7 +240,7 @@ async def run_pipeline(  # noqa: C901
             background_tasks.add_task(run_pipeline_task, *task_payloads[0])
         else:
 
-            def _run_branches_concurrently(payloads: List[tuple]) -> None:
+            def _run_branches_concurrently(payloads: list[tuple]) -> None:
                 with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
                     futures = [pool.submit(run_pipeline_task, jid, pl) for jid, pl in payloads]
                     for f in futures:

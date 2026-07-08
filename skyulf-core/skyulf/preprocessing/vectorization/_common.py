@@ -11,19 +11,20 @@ Boundary with ``dispatcher.py``:
     * This module owns the *text-specific* single-engine (pandas-only) pattern.
 """
 
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import pandas as pd
 
 from ...utils import pack_pipeline_output, unpack_pipeline_input
 
 # Signature: (X_pandas, y, params) -> (X_out_pandas, y_out)
-TextApplyFn = Callable[[pd.DataFrame, Any, Dict[str, Any]], Tuple[pd.DataFrame, Any]]
+TextApplyFn = Callable[[pd.DataFrame, Any, dict[str, Any]], tuple[pd.DataFrame, Any]]
 
 
 def apply_text_pandas_only(
     df: Any,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     fn: TextApplyFn,
 ) -> Any:
     """Dispatcher for text/vectorization nodes that always use the pandas path.
@@ -65,7 +66,7 @@ def _join_text_columns(X: pd.DataFrame, cols: list) -> pd.Series:
     return series
 
 
-def _warn_large_output(output_cols: int, threshold: int = 10_000) -> Optional[str]:
+def _warn_large_output(output_cols: int, threshold: int = 10_000) -> str | None:
     """Return a warning message if the output column count exceeds *threshold*."""
     if output_cols > threshold:
         return (

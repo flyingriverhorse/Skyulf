@@ -8,7 +8,8 @@ stays at low CCN.
 """
 
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -29,10 +30,10 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-SamplerBuilder = Callable[[str, Dict[str, Any]], Optional[Any]]
+SamplerBuilder = Callable[[str, dict[str, Any]], Any | None]
 
 
-def _extract_y_polars(X: Any, y: Any, target_col: Optional[str]) -> Tuple[Any, Any]:
+def _extract_y_polars(X: Any, y: Any, target_col: str | None) -> tuple[Any, Any]:
     """When ``y`` is missing, lift it out of the Polars frame using ``target_col``."""
     if y is not None:
         return X, y
@@ -41,7 +42,7 @@ def _extract_y_polars(X: Any, y: Any, target_col: Optional[str]) -> Tuple[Any, A
     return X, None
 
 
-def _extract_y_pandas(X: Any, y: Any, target_col: Optional[str]) -> Tuple[Any, Any]:
+def _extract_y_pandas(X: Any, y: Any, target_col: str | None) -> tuple[Any, Any]:
     """When ``y`` is missing, lift it out of the Pandas frame using ``target_col``."""
     if y is not None:
         return X, y
@@ -71,8 +72,8 @@ def _validate_numeric(X_pd: pd.DataFrame) -> None:
 
 
 def _finalize_resampled(
-    X_res: Any, y_res: Any, columns: Any, fallback_name: Optional[str]
-) -> Tuple[pd.DataFrame, pd.Series]:
+    X_res: Any, y_res: Any, columns: Any, fallback_name: str | None
+) -> tuple[pd.DataFrame, pd.Series]:
     """Wrap raw imblearn output back into named DataFrame/Series."""
     if not isinstance(X_res, pd.DataFrame):
         X_res = pd.DataFrame(X_res, columns=columns)
@@ -84,10 +85,10 @@ def _finalize_resampled(
 def _run_sampler(
     X_pd: pd.DataFrame,
     y_pd: Any,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     builder: SamplerBuilder,
     default_method: str,
-) -> Optional[Tuple[pd.DataFrame, pd.Series]]:
+) -> tuple[pd.DataFrame, pd.Series] | None:
     """Run the sampler chosen by ``builder``; return ``None`` if no sampler matches."""
     _validate_numeric(X_pd)
     method = params.get("method", default_method)
@@ -102,10 +103,10 @@ def _run_sampler(
 def _resample_polars(
     X: Any,
     y: Any,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     builder: SamplerBuilder,
     default_method: str,
-) -> Tuple[Any, Any]:
+) -> tuple[Any, Any]:
     """Polars apply path: convert → resample → convert back."""
     target_col = params.get("target_column")
     X, y = _extract_y_polars(X, y, target_col)
@@ -123,10 +124,10 @@ def _resample_polars(
 def _resample_pandas(
     X: Any,
     y: Any,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     builder: SamplerBuilder,
     default_method: str,
-) -> Tuple[Any, Any]:
+) -> tuple[Any, Any]:
     """Pandas apply path: resample in place."""
     target_col = params.get("target_column")
     X, y = _extract_y_pandas(X, y, target_col)
@@ -143,7 +144,7 @@ def _resample_pandas(
 # -----------------------------------------------------------------------------
 
 
-def _import_over_samplers() -> Dict[str, Any]:
+def _import_over_samplers() -> dict[str, Any]:
     """Lazy import of imblearn oversampling classes."""
     try:
         from imblearn.combine import SMOTETomek
@@ -169,7 +170,7 @@ def _import_over_samplers() -> Dict[str, Any]:
     }
 
 
-def _build_oversampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
+def _build_oversampler(method: str, params: dict[str, Any]) -> Any | None:
     """Construct an over-sampler by ``method`` name; return ``None`` if unknown."""
     classes = _import_over_samplers()
     cls = classes.get(method)
@@ -214,7 +215,7 @@ def _build_oversampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
 
 class OversamplingApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -233,13 +234,13 @@ class OversamplingApplier(BaseApplier):
 )
 class OversamplingCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Resampling changes row counts only; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> OversamplingArtifact:  # pylint: disable=arguments-differ
+    def fit(self, _X: Any, _y: Any, config: dict[str, Any]) -> OversamplingArtifact:  # pylint: disable=arguments-differ
         return {
             "type": "oversampling",
             "method": config.get("method", "smote"),
@@ -263,7 +264,7 @@ class OversamplingCalculator(BaseCalculator):
 # -----------------------------------------------------------------------------
 
 
-def _import_under_samplers() -> Dict[str, Any]:
+def _import_under_samplers() -> dict[str, Any]:
     """Lazy import of imblearn undersampling classes."""
     try:
         from imblearn.under_sampling import (
@@ -285,7 +286,7 @@ def _import_under_samplers() -> Dict[str, Any]:
     }
 
 
-def _build_undersampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
+def _build_undersampler(method: str, params: dict[str, Any]) -> Any | None:
     """Construct an under-sampler by ``method`` name; return ``None`` if unknown."""
     classes = _import_under_samplers()
     cls = classes.get(method)
@@ -314,7 +315,7 @@ def _build_undersampler(method: str, params: Dict[str, Any]) -> Optional[Any]:
 
 class UndersamplingApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -341,13 +342,13 @@ class UndersamplingApplier(BaseApplier):
 )
 class UndersamplingCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Resampling changes row counts only; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, _X: Any, _y: Any, config: Dict[str, Any]) -> UndersamplingArtifact:  # pylint: disable=arguments-differ
+    def fit(self, _X: Any, _y: Any, config: dict[str, Any]) -> UndersamplingArtifact:  # pylint: disable=arguments-differ
         return {
             "type": "undersampling",
             "method": config.get("method", "random_under_sampling"),

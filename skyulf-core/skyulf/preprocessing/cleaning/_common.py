@@ -1,10 +1,9 @@
 """Shared constants for cleaning nodes."""
 
 import string
-from typing import Dict
 
 ALIAS_PUNCTUATION_TABLE = str.maketrans("", "", string.punctuation)
-COMMON_BOOLEAN_ALIASES: Dict[str, str] = {
+COMMON_BOOLEAN_ALIASES: dict[str, str] = {
     "y": "Yes",
     "yes": "Yes",
     "true": "Yes",
@@ -20,7 +19,7 @@ COMMON_BOOLEAN_ALIASES: Dict[str, str] = {
     "f": "No",
     "negative": "No",
 }
-COUNTRY_ALIAS_MAP: Dict[str, str] = {
+COUNTRY_ALIAS_MAP: dict[str, str] = {
     "usa": "USA",
     "us": "USA",
     "unitedstates": "USA",
@@ -41,7 +40,7 @@ COUNTRY_ALIAS_MAP: Dict[str, str] = {
 }
 TWO_DIGIT_YEAR_PIVOT = 50
 
-_REMOVE_SPECIAL_PATTERNS: Dict[str, str] = {
+_REMOVE_SPECIAL_PATTERNS: dict[str, str] = {
     "keep_alphanumeric": r"[^a-zA-Z0-9]",
     "keep_alphanumeric_space": r"[^a-zA-Z0-9\s]",
     "letters_only": r"[^a-zA-Z]",

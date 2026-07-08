@@ -5,13 +5,13 @@ optionally sort by a user-supplied ``sort_by`` column before computing lags or
 rolling windows, and (when ``group_by`` is given) compute within each group.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 
 # Supported calendar parts extracted by DateFeatures. Keys are the public
 # feature names; values are the pandas ``.dt`` accessor used to compute them.
-DATE_FEATURE_ACCESSORS: Dict[str, str] = {
+DATE_FEATURE_ACCESSORS: dict[str, str] = {
     "year": "year",
     "month": "month",
     "day": "day",
@@ -28,17 +28,17 @@ DATE_FEATURE_ACCESSORS: Dict[str, str] = {
 
 # Rolling aggregations we expose. Mapped to the pandas ``Rolling`` method name;
 # the polars path maps the same keys onto ``pl.Expr.rolling_*`` builders.
-ROLLING_AGGREGATIONS: List[str] = ["mean", "sum", "min", "max", "std", "median"]
+ROLLING_AGGREGATIONS: list[str] = ["mean", "sum", "min", "max", "std", "median"]
 
 
-def resolve_columns(columns: Any, available: List[str]) -> List[str]:
+def resolve_columns(columns: Any, available: list[str]) -> list[str]:
     """Return configured columns that actually exist, preserving order."""
     if not columns:
         return []
     return [c for c in columns if c in available]
 
 
-def coerce_lags(lags: Any) -> List[int]:
+def coerce_lags(lags: Any) -> list[int]:
     """Normalise the ``lags`` config into a sorted list of positive ints."""
     if isinstance(lags, int):
         lags = [lags]
@@ -46,14 +46,14 @@ def coerce_lags(lags: Any) -> List[int]:
     return out
 
 
-def coerce_aggregations(aggs: Any) -> List[str]:
+def coerce_aggregations(aggs: Any) -> list[str]:
     """Keep only recognised rolling aggregation names, preserving order."""
     if isinstance(aggs, str):
         aggs = [aggs]
     return [a for a in (aggs or []) if a in ROLLING_AGGREGATIONS]
 
 
-def sort_pandas(df: pd.DataFrame, sort_by: Optional[str]) -> pd.DataFrame:
+def sort_pandas(df: pd.DataFrame, sort_by: str | None) -> pd.DataFrame:
     """Stable-sort a pandas frame by ``sort_by`` when present."""
     if sort_by and sort_by in df.columns:
         return df.sort_values(sort_by, kind="mergesort")

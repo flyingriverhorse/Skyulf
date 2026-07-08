@@ -1,7 +1,6 @@
 """Text column profiling: stats, common words, sentiment, PII heuristics."""
 
 import re
-from typing import Dict, Optional
 
 import polars as pl
 
@@ -45,7 +44,7 @@ class TextMixin(_AnalyzerState):
             common_words=common_words,
         )
 
-    def _analyze_sentiment(self, text_series: pl.Series) -> Optional[Dict[str, float]]:
+    def _analyze_sentiment(self, text_series: pl.Series) -> dict[str, float] | None:
         """Return VADER sentiment distribution ratios, or ``None`` if unavailable."""
         if not VADER_AVAILABLE:
             return None

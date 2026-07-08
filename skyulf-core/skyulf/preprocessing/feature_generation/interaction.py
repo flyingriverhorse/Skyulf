@@ -7,7 +7,7 @@ same combination of inputs always produces the same output column name.
 """
 
 from itertools import combinations, combinations_with_replacement
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ _SUPPORTED_DEGREES = (2, 3, 4)
 _BIAS_COLUMN = "interaction_bias"
 
 
-def _interaction_name(columns: Tuple[str, ...]) -> str:
+def _interaction_name(columns: tuple[str, ...]) -> str:
     """Build a deterministic, regularization-friendly interaction column name.
 
     Columns are joined in sorted order with ``_x_`` so the same combination
@@ -44,8 +44,8 @@ def _interaction_name(columns: Tuple[str, ...]) -> str:
 
 
 def _resolve_combinations(
-    columns: List[str], degree: int, interaction_only: bool
-) -> List[Tuple[str, ...]]:
+    columns: list[str], degree: int, interaction_only: bool
+) -> list[tuple[str, ...]]:
     """Resolve the sorted column combinations to multiply for ``degree``.
 
     Args:
@@ -62,7 +62,7 @@ def _resolve_combinations(
     return sorted(combo_fn(sorted_cols, degree))
 
 
-def _multiply_columns_pandas(X: pd.DataFrame, combo: Tuple[str, ...]) -> pd.Series:
+def _multiply_columns_pandas(X: pd.DataFrame, combo: tuple[str, ...]) -> pd.Series:
     """Element-wise product of the columns in ``combo`` (pandas engine)."""
     result = X[combo[0]].astype(float)
     for col in combo[1:]:
@@ -70,10 +70,10 @@ def _multiply_columns_pandas(X: pd.DataFrame, combo: Tuple[str, ...]) -> pd.Seri
     return result
 
 
-def _interaction_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _interaction_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute interaction columns and append them to a pandas DataFrame."""
     combos = [tuple(c) for c in params.get("combinations", [])]
-    new_cols: Dict[str, pd.Series] = {}
+    new_cols: dict[str, pd.Series] = {}
     for combo in combos:
         if not all(col in X.columns for col in combo):
             continue
@@ -87,7 +87,7 @@ def _interaction_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[
     return pd.concat([X, pd.DataFrame(new_cols, index=X.index)], axis=1), _y
 
 
-def _interaction_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute interaction columns and append them to a polars DataFrame."""
     import polars as pl
 
@@ -111,7 +111,7 @@ def _interaction_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[
 
 class FeatureInteractionApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _interaction_apply_polars, _interaction_apply_pandas)
 
 
@@ -128,7 +128,7 @@ class FeatureInteractionApplier(BaseApplier):
 )
 class FeatureInteractionCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> FeatureInteractionArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> FeatureInteractionArtifact:  # pylint: disable=arguments-differ
         X_pd = to_pandas(X)
         cols = list(config.get("columns", []))
 

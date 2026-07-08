@@ -1,6 +1,6 @@
 """Min-max scaler node (scale features into a given range)."""
 
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
@@ -19,11 +19,11 @@ from ._common import _select_subset_pandas, _select_subset_polars
 
 class MinMaxScalerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -39,7 +39,7 @@ class MinMaxScalerApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         min_val = params.get("min")
         scale = params.get("scale")
@@ -65,12 +65,12 @@ class MinMaxScalerApplier(BaseApplier):
 )
 class MinMaxScalerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> MinMaxScalerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> MinMaxScalerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(MinMaxScalerArtifact, {})
         return cast(
@@ -79,21 +79,21 @@ class MinMaxScalerCalculator(BaseCalculator):
         )
 
     @staticmethod
-    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_polars(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_polars(X, config)
         if not cols:
             return {}
         return _fit_minmax(X_subset, cols, config)
 
     @staticmethod
-    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_pandas(X, config)
         if not cols:
             return {}
         return _fit_minmax(X_subset, cols, config)
 
 
-def _fit_minmax(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+def _fit_minmax(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[str, Any]:
     # `feature_range` may arrive as a JSON-loaded list (e.g. ``[0, 1]``) from the
     # frontend or pipeline config; sklearn enforces ``tuple`` via param validation.
     feature_range = tuple(config.get("feature_range", (0, 1)))

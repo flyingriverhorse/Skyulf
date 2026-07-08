@@ -8,7 +8,7 @@ Pure read-side; no engine, no Celery, no locks.
 
 import logging
 from functools import lru_cache
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -40,12 +40,12 @@ router = APIRouter(tags=["ML Pipeline"])
 
 
 @lru_cache(maxsize=1)
-def _build_node_registry() -> List[RegistryItem]:
+def _build_node_registry() -> list[RegistryItem]:
     """Merge the static DATA_LOADER entry with all skyulf-core registered nodes.
 
     Result is cached so the dict scan runs only once per process lifetime.
     """
-    static: List[RegistryItem] = [
+    static: list[RegistryItem] = [
         RegistryItem(
             id=StepType.DATA_LOADER,
             name="Data Loader",
@@ -54,7 +54,7 @@ def _build_node_registry() -> List[RegistryItem]:
             params={"source_id": "string", "date_range": "optional[dict]"},
         ),
     ]
-    dynamic: List[RegistryItem] = []
+    dynamic: list[RegistryItem] = []
     for node_id, meta in SkyulfRegistry.get_all_metadata().items():
         item_data = dict(meta)
         if "id" not in item_data:
@@ -65,7 +65,7 @@ def _build_node_registry() -> List[RegistryItem]:
     return [n for n in static if n.id not in dynamic_ids] + dynamic
 
 
-@router.get("/stats", response_model=Dict[str, int])
+@router.get("/stats", response_model=dict[str, int])
 async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     """Return high-level system statistics for the dashboard."""
     training_count = await session.scalar(select(func.count(BasicTrainingJob.id)))
@@ -85,7 +85,7 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     }
 
 
-@router.get("/registry", response_model=List[RegistryItem])
+@router.get("/registry", response_model=list[RegistryItem])
 def get_node_registry():
     """List available pipeline nodes (transformers, models, etc.)."""
     return _build_node_registry()
@@ -170,7 +170,7 @@ def get_model_default_search_space(model_type: str, strategy: str = "random"):
     return get_default_search_space(model_type, strategy=strategy)
 
 
-@router.get("/datasets/list", response_model=List[Dict[str, Any]])
+@router.get("/datasets/list", response_model=list[dict[str, Any]])
 async def list_datasets(session: AsyncSession = Depends(get_async_session)):
     """Return a simple list of available datasets for filtering."""
     stmt = select(DataSource.source_id, DataSource.name).where(DataSource.is_active)

@@ -12,7 +12,8 @@ helpers never dispatch a whole node.
 """
 
 import logging
-from typing import Any, Callable, Dict, Mapping, Optional, Tuple, Union
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import pandas as pd
 
@@ -24,14 +25,14 @@ logger = logging.getLogger(__name__)
 # Type definitions for the processing functions
 # They receive (X, y, params)
 # Apply returns (X_transformed, y_transformed)
-ApplyFunction = Callable[[Any, Optional[Any], Dict[str, Any]], Tuple[Any, Optional[Any]]]
+ApplyFunction = Callable[[Any, Any | None, dict[str, Any]], tuple[Any, Any | None]]
 # Fit returns a mapping (TypedDicts are accepted via Mapping invariance).
-FitFunction = Callable[[Any, Optional[Any], Dict[str, Any]], Mapping[str, Any]]
+FitFunction = Callable[[Any, Any | None, dict[str, Any]], Mapping[str, Any]]
 
 
 def apply_dual_engine(
-    df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-    params: Dict[str, Any],
+    df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+    params: dict[str, Any],
     polars_func: ApplyFunction,
     pandas_func: ApplyFunction,
 ) -> Any:
@@ -79,11 +80,11 @@ def apply_dual_engine(
 
 
 def fit_dual_engine(
-    df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-    params: Dict[str, Any],
+    df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+    params: dict[str, Any],
     polars_func: FitFunction,
     pandas_func: FitFunction,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Dispatcher to handle boilerplate for dual-engine Calculators.
 

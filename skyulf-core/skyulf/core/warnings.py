@@ -11,7 +11,7 @@ string shape to change at once.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
 
 __all__ = ["WarningCategory", "SkyulfWarning"]
 
@@ -40,9 +40,9 @@ class SkyulfWarning:
     category: WarningCategory
     code: str
     message: str
-    context: Dict[str, Any] = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Return a JSON-friendly representation."""
         return {
             "category": self.category.value,

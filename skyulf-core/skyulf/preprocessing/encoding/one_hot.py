@@ -1,7 +1,8 @@
 """One-Hot Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Mapping, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -26,7 +27,7 @@ _MISSING_TOKEN = "__mlops_missing__"  # nosec B105 - sentinel value, not a crede
 # -----------------------------------------------------------------------------
 
 
-def _validate_apply_params(X: Any, params: Dict[str, Any]) -> Tuple[List[str], Any, Any]:
+def _validate_apply_params(X: Any, params: dict[str, Any]) -> tuple[list[str], Any, Any]:
     """Resolve ``(valid_cols, encoder, feature_names)`` or sentinel values for early-out."""
     if not params or not params.get("columns"):
         return [], None, None
@@ -48,7 +49,7 @@ def _to_dense(encoded_array: Any) -> Any:
     return encoded_array
 
 
-def _onehot_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
     valid_cols, encoder, feature_names = _validate_apply_params(X, params)
@@ -76,7 +77,7 @@ def _onehot_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, A
         return X, y
 
 
-def _onehot_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, encoder, feature_names = _validate_apply_params(X, params)
     if not valid_cols:
         return X, y
@@ -102,7 +103,7 @@ def _onehot_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, A
 
 class OneHotEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -116,7 +117,7 @@ class OneHotEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _resolve_fit_options(config: Dict[str, Any]) -> Dict[str, Any]:
+def _resolve_fit_options(config: dict[str, Any]) -> dict[str, Any]:
     """Pull the per-call options out of ``config`` once, with defaults."""
     return {
         "drop": "first" if config.get("drop_first", False) else None,
@@ -130,7 +131,7 @@ def _resolve_fit_options(config: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _warn_degenerate_categories(encoder: OneHotEncoder, cols: List[str], drop: Any) -> None:
+def _warn_degenerate_categories(encoder: OneHotEncoder, cols: list[str], drop: Any) -> None:
     """Log warnings for empty or single-category columns when relevant."""
     if not hasattr(encoder, "categories_"):
         return
@@ -149,7 +150,7 @@ def _warn_degenerate_categories(encoder: OneHotEncoder, cols: List[str], drop: A
             )
 
 
-def _fit_sklearn_onehot(X_subset: Any, opts: Dict[str, Any], cols: List[str]) -> OneHotEncoder:
+def _fit_sklearn_onehot(X_subset: Any, opts: dict[str, Any], cols: list[str]) -> OneHotEncoder:
     """Run the sklearn ``OneHotEncoder.fit`` step on a prepared subset."""
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     encoder = OneHotEncoder(
@@ -165,7 +166,7 @@ def _fit_sklearn_onehot(X_subset: Any, opts: Dict[str, Any], cols: List[str]) ->
 
 
 def _build_onehot_artifact(
-    encoder: OneHotEncoder, cols: List[str], opts: Dict[str, Any]
+    encoder: OneHotEncoder, cols: list[str], opts: dict[str, Any]
 ) -> Mapping[str, Any]:
     return {
         "type": "onehot",
@@ -178,7 +179,7 @@ def _build_onehot_artifact(
     }
 
 
-def _onehot_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _onehot_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     cols = resolve_columns(X, config, detect_categorical_columns)
     cols = _exclude_target_column(cols, config, "OneHotEncoder", y)
     if not cols:
@@ -193,7 +194,7 @@ def _onehot_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, A
     return _build_onehot_artifact(encoder, cols, opts)
 
 
-def _onehot_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     cols = resolve_columns(X, config, detect_categorical_columns)
     cols = _exclude_target_column(cols, config, "OneHotEncoder", y)
     if not cols:
@@ -224,7 +225,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, A
 )
 class OneHotEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> OneHotArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> OneHotArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         return cast(

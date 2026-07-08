@@ -9,9 +9,10 @@ It provides better concurrency support compared to the Flask implementation.
 
 import logging
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import UTC
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -168,7 +169,7 @@ def _reset_stale_jobs() -> None:
     Celery workers (which survive API restarts) are not incorrectly failed.
     """
     try:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from sqlalchemy import create_engine, text
 
@@ -183,7 +184,7 @@ def _reset_stale_jobs() -> None:
         # Only treat jobs as orphaned if they have been stuck for > 2 hours.
         # This protects Celery-managed jobs that may still be running after
         # the API process restarts.
-        stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2)
+        stale_cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
         with engine.begin() as conn:
             for table in ("basic_training_jobs", "advanced_tuning_jobs"):
                 # `table` is drawn only from the fixed tuple above (never user input),

@@ -11,7 +11,7 @@ import asyncio
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -176,8 +176,8 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def safe_dict_from_dataframe(
-        df: Union[pd.DataFrame, Any], records_format: bool = True, max_rows: Optional[int] = None
-    ) -> Union[List[Dict], Dict]:
+        df: pd.DataFrame | Any, records_format: bool = True, max_rows: int | None = None
+    ) -> list[dict] | dict:
         """
         Convert DataFrame (Pandas or Polars) to JSON-safe dictionary format.
 
@@ -223,21 +223,21 @@ class AsyncJSONSafeSerializer:
         if records_format:
             # Convert to list of records
             records = clean_df.to_dict("records")
-            cleaned_records: List[Any] = []
+            cleaned_records: list[Any] = []
             for record in records:
                 clean_record = await AsyncJSONSafeSerializer.clean_for_json(record)
                 cleaned_records.append(clean_record)
             return cleaned_records
 
         # Convert to dict of columns
-        column_result: Dict[str, Any] = {}
+        column_result: dict[str, Any] = {}
         for col in clean_df.columns:
             column_data = clean_df[col].tolist()
             column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
         return column_result
 
     @staticmethod
-    async def serialize_dataframe_metadata(df: pd.DataFrame) -> Dict[str, Any]:
+    async def serialize_dataframe_metadata(df: pd.DataFrame) -> dict[str, Any]:
         """
         Extract and serialize DataFrame metadata.
 
@@ -257,7 +257,7 @@ class AsyncJSONSafeSerializer:
             }
 
         # Basic info
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "shape": list(df.shape),
             "columns": [str(col) for col in df.columns],
             "memory_usage": int(df.memory_usage(deep=True).sum()),
@@ -291,8 +291,8 @@ class AsyncJSONSafeSerializer:
 
     @staticmethod
     async def serialize_query_result(
-        df: pd.DataFrame, include_metadata: bool = True, max_rows: Optional[int] = None
-    ) -> Dict[str, Any]:
+        df: pd.DataFrame, include_metadata: bool = True, max_rows: int | None = None
+    ) -> dict[str, Any]:
         """
         Serialize a query result DataFrame with optional metadata.
 
@@ -304,7 +304,7 @@ class AsyncJSONSafeSerializer:
         Returns:
             Serialized query result
         """
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "success": True,
             "row_count": len(df),
             "column_count": len(df.columns),
@@ -495,7 +495,7 @@ class JSONSafeSerializer:
             return None
 
     @staticmethod
-    def safe_dict_from_dataframe(df, records_format: bool = True) -> Union[List[Dict], Dict]:
+    def safe_dict_from_dataframe(df, records_format: bool = True) -> list[dict] | dict:
         """Synchronous version of safe_dict_from_dataframe."""
         if df is None or df.empty:
             return [] if records_format else {}
@@ -523,7 +523,7 @@ class DataTypeConverter:
     """Utility class for data type conversions and validations."""
 
     @staticmethod
-    def infer_column_types(df: pd.DataFrame) -> Dict[str, str]:
+    def infer_column_types(df: pd.DataFrame) -> dict[str, str]:
         """
         Infer semantic data types for DataFrame columns.
 
@@ -569,7 +569,7 @@ class DataTypeConverter:
 
     @staticmethod
     async def convert_dataframe_types(
-        df: pd.DataFrame, type_mapping: Dict[str, str]
+        df: pd.DataFrame, type_mapping: dict[str, str]
     ) -> pd.DataFrame:
         """
         Convert DataFrame columns to specified types.
@@ -605,7 +605,7 @@ class DataTypeConverter:
         return result_df
 
     @staticmethod
-    def get_data_quality_report(df: pd.DataFrame) -> Dict[str, Any]:
+    def get_data_quality_report(df: pd.DataFrame) -> dict[str, Any]:
         """
         Generate a data quality report for a DataFrame.
 
@@ -618,8 +618,8 @@ class DataTypeConverter:
         if df.empty:
             return {"error": "DataFrame is empty"}
 
-        columns_report: Dict[str, Dict[str, Any]] = {}
-        report: Dict[str, Any] = {
+        columns_report: dict[str, dict[str, Any]] = {}
+        report: dict[str, Any] = {
             "overview": {
                 "total_rows": len(df),
                 "total_columns": len(df.columns),
@@ -636,7 +636,7 @@ class DataTypeConverter:
             col_str = str(col)
             series = df[col]
 
-            col_report: Dict[str, Any] = {
+            col_report: dict[str, Any] = {
                 "dtype": str(series.dtype),
                 "null_count": int(series.isnull().sum()),
                 "null_percentage": float(series.isnull().sum() / len(series) * 100),
@@ -667,9 +667,9 @@ class DataTypeConverter:
 async def serialize_api_response(
     data: Any,
     success: bool = True,
-    message: Optional[str] = None,
-    metadata: Optional[Dict] = None,
-) -> Dict[str, Any]:
+    message: str | None = None,
+    metadata: dict | None = None,
+) -> dict[str, Any]:
     """
     Serialize data into a standard API response format.
 
@@ -682,7 +682,7 @@ async def serialize_api_response(
     Returns:
         Standardized API response
     """
-    response: Dict[str, Any] = {
+    response: dict[str, Any] = {
         "success": success,
         "timestamp": datetime.now().isoformat(),
     }
@@ -705,8 +705,8 @@ async def serialize_api_response(
 def serialize_api_response_sync(
     data: Any,
     success: bool = True,
-    message: Optional[str] = None,
-    metadata: Optional[Dict] = None,
-) -> Dict[str, Any]:
+    message: str | None = None,
+    metadata: dict | None = None,
+) -> dict[str, Any]:
     """Synchronous version of serialize_api_response."""
     return asyncio.run(serialize_api_response(data, success, message, metadata))

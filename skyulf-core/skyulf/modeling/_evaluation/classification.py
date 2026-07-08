@@ -1,7 +1,7 @@
 """Classification evaluation logic."""
 
 import warnings
-from typing import Any, List, Optional, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -22,10 +22,10 @@ from .schemas import (
 
 def evaluate_classification_model(
     model: Any,
-    X_test: Union[pd.DataFrame, SkyulfDataFrame],
-    y_test: Union[pd.Series, Any],
-    X_train: Optional[Union[pd.DataFrame, SkyulfDataFrame]] = None,
-    y_train: Optional[Union[pd.Series, Any]] = None,
+    X_test: pd.DataFrame | SkyulfDataFrame,
+    y_test: pd.Series | Any,
+    X_train: pd.DataFrame | SkyulfDataFrame | None = None,
+    y_train: pd.Series | Any | None = None,
     dataset_name: str = "test",
 ) -> ModelEvaluationReport:
     """Evaluate a classification model and return a structured report."""
@@ -127,7 +127,7 @@ def evaluate_classification_model(
 
 
 def _compute_confusion_matrix(
-    y_true: Any, y_pred: Any, labels: List[str], label_values: Any = None
+    y_true: Any, y_pred: Any, labels: list[str], label_values: Any = None
 ) -> ConfusionMatrixData:
     """Compute confusion matrix data.
 

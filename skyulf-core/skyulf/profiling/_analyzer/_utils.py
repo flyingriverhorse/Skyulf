@@ -1,6 +1,6 @@
 """Shared utilities for the analyzer mixins."""
 
-from typing import Any, List, Protocol, cast, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 import polars as pl
 
@@ -22,7 +22,7 @@ class _AnalyzerState(Protocol):
     df: pl.DataFrame
     lazy_df: pl.LazyFrame
     row_count: int
-    columns: List[str]
+    columns: list[str]
 
     # Cross-mixin helper signatures (real implementations live in their mixins).
     def _get_semantic_type(self, series: pl.Series) -> str: ...
@@ -44,12 +44,12 @@ class _AnalyzerState(Protocol):
 # instead of re-running the try/except dance.
 
 try:
-    from sklearn.cluster import KMeans  # noqa: F401
-    from sklearn.decomposition import PCA  # noqa: F401
-    from sklearn.ensemble import IsolationForest  # noqa: F401
-    from sklearn.impute import SimpleImputer  # noqa: F401
-    from sklearn.preprocessing import StandardScaler  # noqa: F401
-    from sklearn.tree import (  # noqa: F401
+    from sklearn.cluster import KMeans
+    from sklearn.decomposition import PCA
+    from sklearn.ensemble import IsolationForest
+    from sklearn.impute import SimpleImputer
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.tree import (
         DecisionTreeClassifier,
         DecisionTreeRegressor,
         _tree,  # noqa: F401  # ty: ignore[unresolved-import]
@@ -60,14 +60,14 @@ except ImportError:
     SKLEARN_AVAILABLE = False
 
 try:
-    from scipy.stats import f_oneway, kstest, shapiro  # noqa: F401
+    from scipy.stats import f_oneway, kstest, shapiro
 
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
 
 try:
-    from statsmodels.tsa.stattools import adfuller  # noqa: F401
+    from statsmodels.tsa.stattools import adfuller
 
     STATSMODELS_AVAILABLE = True
 except ImportError:

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional, cast
+from typing import cast
 
 import polars as pl
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class S3Connector(BaseConnector):
-    def __init__(self, path: str, storage_options: Optional[Dict] = None):
+    def __init__(self, path: str, storage_options: dict | None = None):
         self.path = path
         self.storage_options = storage_options or {}
         logger.info(
@@ -26,7 +26,7 @@ class S3Connector(BaseConnector):
                 return "redacted sensitive S3 error"
         return message
 
-    def _get_storage_options(self) -> Dict[str, str]:
+    def _get_storage_options(self) -> dict[str, str]:
         """
         Ensure all storage options are strings for Polars and map common keys.
         """
@@ -58,7 +58,7 @@ class S3Connector(BaseConnector):
             )
             raise ConnectionError(f"Failed to connect to S3 path {self.path}") from e
 
-    async def get_schema(self) -> Dict[str, str]:
+    async def get_schema(self) -> dict[str, str]:
         options = self._get_storage_options()
 
         # Optimization: Check extension first
@@ -93,7 +93,7 @@ class S3Connector(BaseConnector):
                 ) from e
 
     async def fetch_data(
-        self, query: Optional[str] = None, limit: Optional[int] = None
+        self, query: str | None = None, limit: int | None = None
     ) -> pl.DataFrame:
         options = self._get_storage_options()
 

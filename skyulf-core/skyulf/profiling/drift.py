@@ -1,4 +1,3 @@
-from typing import Dict, List, Optional
 
 import numpy as np
 import polars as pl
@@ -27,24 +26,24 @@ class DriftBin(BaseModel):
 
 
 class DriftDistribution(BaseModel):
-    bins: List[DriftBin]
+    bins: list[DriftBin]
 
 
 class ColumnDrift(BaseModel):
     column: str
-    metrics: List[DriftMetric]
+    metrics: list[DriftMetric]
     drift_detected: bool
-    suggestions: List[str] = []
-    distribution: Optional[DriftDistribution] = None
+    suggestions: list[str] = []
+    distribution: DriftDistribution | None = None
 
 
 class DriftReport(BaseModel):
     reference_rows: int
     current_rows: int
     drifted_columns_count: int
-    column_drifts: Dict[str, ColumnDrift]
-    missing_columns: List[str] = []
-    new_columns: List[str] = []
+    column_drifts: dict[str, ColumnDrift]
+    missing_columns: list[str] = []
+    new_columns: list[str] = []
 
 
 class DriftCalculator:
@@ -58,7 +57,7 @@ class DriftCalculator:
         self.current_df = current_df
         self.common_columns = [col for col in reference_df.columns if col in current_df.columns]
 
-    def calculate_drift(self, thresholds: Optional[Dict[str, float]] = None) -> DriftReport:
+    def calculate_drift(self, thresholds: dict[str, float] | None = None) -> DriftReport:
         """
         Calculates drift for all common columns.
         """

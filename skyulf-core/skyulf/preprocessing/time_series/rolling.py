@@ -1,6 +1,6 @@
 """Rolling-window aggregates (mean/sum/min/max/std/median) over time series."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import pandas as pd
 
@@ -32,12 +32,12 @@ def _polars_rolling_expr(col_expr: Any, agg: str, window: int, min_periods: int)
 
 
 def _polars_rolling_exprs(
-    columns: List[str],
-    available: List[str],
-    aggs: List[str],
+    columns: list[str],
+    available: list[str],
+    aggs: list[str],
     window: int,
     min_periods: int,
-    group_by: Optional[List[str]],
+    group_by: list[str] | None,
 ) -> list:
     import polars as pl
 
@@ -53,10 +53,10 @@ def _polars_rolling_exprs(
     return exprs
 
 
-def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
-    columns: List[str] = params.get("columns", [])
-    aggs: List[str] = params.get("aggregations", [])
-    sort_by: Optional[str] = params.get("sort_by")
+def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    columns: list[str] = params.get("columns", [])
+    aggs: list[str] = params.get("aggregations", [])
+    sort_by: str | None = params.get("sort_by")
     if not columns or not aggs:
         return X, _y
 
@@ -82,10 +82,10 @@ def _pandas_rolling(series: Any, agg: str, window: int, min_periods: int) -> Any
 def _pandas_roll_column(
     df: Any,
     col: str,
-    aggs: List[str],
+    aggs: list[str],
     window: int,
     min_periods: int,
-    group_by: Optional[List[str]],
+    group_by: list[str] | None,
 ) -> None:
     numeric = pd.to_numeric(df[col], errors="coerce")
     for agg in aggs:
@@ -97,15 +97,15 @@ def _pandas_roll_column(
         df[_roll_name(col, agg, window)] = rolled
 
 
-def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
-    columns: List[str] = params.get("columns", [])
-    aggs: List[str] = params.get("aggregations", [])
+def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    columns: list[str] = params.get("columns", [])
+    aggs: list[str] = params.get("aggregations", [])
     if not columns or not aggs:
         return X, _y
 
     window = int(params.get("window", 3))
     min_periods = int(params.get("min_periods", 1))
-    group_by: Optional[List[str]] = params.get("group_by") or None
+    group_by: list[str] | None = params.get("group_by") or None
     df = sort_pandas(X.copy(), params.get("sort_by"))
     for col in columns:
         if col in df.columns:
@@ -115,7 +115,7 @@ def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
 
 class RollingAggregateApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _apply_polars, _apply_pandas)
 
 
@@ -138,8 +138,8 @@ class RollingAggregateApplier(BaseApplier):
 class RollingAggregateCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        config: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        config: dict[str, Any],
     ) -> RollingAggregateArtifact:
         return {
             "type": "rolling_aggregate",
@@ -152,8 +152,8 @@ class RollingAggregateCalculator(BaseCalculator):
         }
 
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
-    ) -> Optional[SkyulfSchema]:
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
+    ) -> SkyulfSchema | None:
         # Rolling outputs are float64 regardless of source dtype.
         cols = resolve_columns(config.get("columns", []), input_schema.column_list())
         aggs = coerce_aggregations(config.get("aggregations", ["mean"]))

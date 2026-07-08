@@ -17,7 +17,7 @@ the loader's prediction is ``None`` and downstream predictions follow.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from skyulf.preprocessing import SkyulfSchema
 from skyulf.registry import NodeRegistry
@@ -53,8 +53,8 @@ def _step_type_str(node: NodeConfig) -> str:
 
 def _resolve_input_schema(
     node: NodeConfig,
-    predicted: Dict[str, Optional[SkyulfSchema]],
-) -> Optional[SkyulfSchema]:
+    predicted: dict[str, SkyulfSchema | None],
+) -> SkyulfSchema | None:
     """Pick the upstream schema to feed into ``node``.
 
     For single-input nodes this is just the upstream prediction. For
@@ -78,8 +78,8 @@ def _resolve_input_schema(
 
 def _predict_for_node(
     node: NodeConfig,
-    input_schema: Optional[SkyulfSchema],
-) -> Optional[SkyulfSchema]:
+    input_schema: SkyulfSchema | None,
+) -> SkyulfSchema | None:
     """Predict a single node's output schema. Returns ``None`` on any failure."""
     step = _step_type_str(node)
 
@@ -110,8 +110,8 @@ def _predict_for_node(
 
 def predict_schemas(
     config: PipelineConfig,
-    initial_schemas: Optional[Dict[str, SkyulfSchema]] = None,
-) -> Dict[str, Optional[SkyulfSchema]]:
+    initial_schemas: dict[str, SkyulfSchema] | None = None,
+) -> dict[str, SkyulfSchema | None]:
     """Walk the topology and return a per-node predicted schema map.
 
     Args:
@@ -124,7 +124,7 @@ def predict_schemas(
         ``{node_id: SkyulfSchema | None}`` covering every node in ``config``.
     """
     seeds = dict(initial_schemas or {})
-    predicted: Dict[str, Optional[SkyulfSchema]] = {}
+    predicted: dict[str, SkyulfSchema | None] = {}
 
     for node in config.nodes:
         if node.node_id in seeds:
@@ -136,7 +136,7 @@ def predict_schemas(
     return predicted
 
 
-def schema_to_dict(schema: Optional[SkyulfSchema]) -> Optional[Dict[str, Any]]:
+def schema_to_dict(schema: SkyulfSchema | None) -> dict[str, Any] | None:
     """Serialize a schema for transport (JSON / API responses / DB rows)."""
     if schema is None:
         return None
@@ -144,13 +144,13 @@ def schema_to_dict(schema: Optional[SkyulfSchema]) -> Optional[Dict[str, Any]]:
 
 
 def schemas_to_dict(
-    schemas: Dict[str, Optional[SkyulfSchema]],
-) -> Dict[str, Optional[Dict[str, Any]]]:
+    schemas: dict[str, SkyulfSchema | None],
+) -> dict[str, dict[str, Any] | None]:
     """Serialize an entire predicted-schema map."""
     return {nid: schema_to_dict(s) for nid, s in schemas.items()}
 
 
-__all__: List[str] = [
+__all__: list[str] = [
     "predict_schemas",
     "schema_to_dict",
     "schemas_to_dict",

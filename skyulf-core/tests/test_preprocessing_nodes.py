@@ -5,7 +5,7 @@ Covers: scaling, imputation, encoding, outliers, cleaning, feature_selection,
 feature_generation, drop_and_missing, bucketing, transformations, casting.
 """
 
-from typing import List, cast
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -104,8 +104,8 @@ class TestStandardScaler:
         assert "mean" in params
         assert "scale" in params
         assert "columns" in params
-        assert len(cast(List[float], params["mean"])) == 2
-        assert len(cast(List[float], params["scale"])) == 2
+        assert len(cast(list[float], params["mean"])) == 2
+        assert len(cast(list[float], params["scale"])) == 2
 
     def test_apply_centers_and_scales(self, numeric_df: pd.DataFrame) -> None:
         from skyulf.preprocessing.scaling import StandardScalerApplier, StandardScalerCalculator

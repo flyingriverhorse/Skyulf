@@ -6,7 +6,7 @@ Uses the repository pattern to separate database operations from business logic.
 """
 
 import logging
-from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, cast
+from typing import Any, Generic, TypeVar, cast
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.engine import CursorResult
@@ -30,11 +30,11 @@ class BaseRepository(Generic[ModelType]):
     Provides async equivalents of Flask CRUD operations.
     """
 
-    def __init__(self, session: AsyncSession, model: Type[ModelType]):
+    def __init__(self, session: AsyncSession, model: type[ModelType]):
         self.session = session
         self.model = model
 
-    async def create(self, obj_in: Dict[str, Any]) -> ModelType:
+    async def create(self, obj_in: dict[str, Any]) -> ModelType:
         """
         Create a new record.
 
@@ -52,7 +52,7 @@ class BaseRepository(Generic[ModelType]):
         logger.debug(f"Created {self.model.__name__} with id {db_obj.id}")
         return db_obj
 
-    async def get(self, record_id: int) -> Optional[ModelType]:
+    async def get(self, record_id: int) -> ModelType | None:
         """
         Get a record by ID.
 
@@ -70,9 +70,9 @@ class BaseRepository(Generic[ModelType]):
         *,
         skip: int = 0,
         limit: int = 100,
-        filters: Optional[Dict[str, Any]] = None,
-        order_by: Optional[str] = None,
-    ) -> List[ModelType]:
+        filters: dict[str, Any] | None = None,
+        order_by: str | None = None,
+    ) -> list[ModelType]:
         """
         Get multiple records with pagination and filtering.
 
@@ -104,7 +104,7 @@ class BaseRepository(Generic[ModelType]):
         records = result.scalars().all()
         return list(records)
 
-    async def update(self, record_id: int, obj_in: Dict[str, Any]) -> Optional[ModelType]:
+    async def update(self, record_id: int, obj_in: dict[str, Any]) -> ModelType | None:
         """
         Update a record by ID.
 
@@ -152,7 +152,7 @@ class BaseRepository(Generic[ModelType]):
 
         return False
 
-    async def count(self, filters: Optional[Dict[str, Any]] = None) -> int:
+    async def count(self, filters: dict[str, Any] | None = None) -> int:
         """
         Count records with optional filtering.
 
@@ -196,17 +196,17 @@ class UserRepository(BaseRepository[User]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, User)
 
-    async def get_by_username(self, username: str) -> Optional[User]:
+    async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""
         result = await self.session.execute(select(User).where(User.username == username))
         return result.scalar_one_or_none()
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         """Get user by email."""
         result = await self.session.execute(select(User).where(User.email == email))
         return result.scalar_one_or_none()
 
-    async def get_active_users(self) -> List[User]:
+    async def get_active_users(self) -> list[User]:
         """Get all active users."""
         result = await self.session.execute(select(User).where(User.is_active.is_(True)))
         return list(result.scalars().all())
@@ -233,26 +233,26 @@ class DataSourceRepository(BaseRepository[DataSource]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, DataSource)
 
-    async def get_by_name(self, name: str) -> Optional[DataSource]:
+    async def get_by_name(self, name: str) -> DataSource | None:
         """Get data source by name."""
         result = await self.session.execute(select(DataSource).where(DataSource.name == name))
         return result.scalar_one_or_none()
 
-    async def get_by_type(self, source_type: str) -> List[DataSource]:
+    async def get_by_type(self, source_type: str) -> list[DataSource]:
         """Get data sources by type."""
         result = await self.session.execute(
             select(DataSource).where(DataSource.type == source_type)
         )
         return list(result.scalars().all())
 
-    async def get_active_sources(self) -> List[DataSource]:
+    async def get_active_sources(self) -> list[DataSource]:
         """Get all active data sources."""
         result = await self.session.execute(
             select(DataSource).where(DataSource.is_active.is_(True))
         )
         return list(result.scalars().all())
 
-    async def get_by_file_hash(self, file_hash: str) -> Optional[DataSource]:
+    async def get_by_file_hash(self, file_hash: str) -> DataSource | None:
         """Fetch a data source whose JSON config stores the specified file hash."""
         if not file_hash:
             return None

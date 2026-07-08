@@ -4,7 +4,7 @@ Covers fit_transform roundtrips, transform-after-fit, edge cases, and metrics
 collection.  Every pipeline step uses real DataFrames — no mocking of pandas.
 """
 
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,7 @@ import pytest
 from tests.utils.test_case_loader import TestCaseLoader
 
 # Trigger node registration by importing the package.
-import skyulf.preprocessing  # noqa: F401
+import skyulf.preprocessing
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -73,12 +73,12 @@ def categorical_df() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def _steps(*args: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _steps(*args: dict[str, Any]) -> list[dict[str, Any]]:
     """Wrap step dicts into a steps_config list."""
     return list(args)
 
 
-def _step(name: str, transformer: str, **params: Any) -> Dict[str, Any]:
+def _step(name: str, transformer: str, **params: Any) -> dict[str, Any]:
     return {"name": name, "transformer": transformer, "params": params}
 
 
@@ -393,7 +393,7 @@ def test_collect_step_metrics_swallows_exception_from_fitted_params(
         raise RuntimeError("boom")
 
     monkeypatch.setattr(fe, "_metrics_from_fitted_params", _boom)
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     # Should not raise despite _metrics_from_fitted_params blowing up.
     fe._collect_step_metrics(
         transformer_type="StandardScaler",
@@ -421,7 +421,7 @@ def test_collect_step_metrics_dispatches_resampling_metrics() -> None:
     """Oversampling/Undersampling step types must trigger resampling metrics."""
     fe = FeatureEngineer(steps_config=[])
     df = pd.DataFrame({"f": [1, 2, 3, 4], "label": [0, 0, 1, 1]})
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._collect_step_metrics(
         transformer_type="Oversampling",
         fitted_params={},
@@ -447,17 +447,17 @@ def test_collect_step_metrics_dispatches_resampling_metrics() -> None:
 @pytest.mark.parametrize(*_metrics_from_fitted_params_cases)
 def test_metrics_from_fitted_params_copies_keys(
     transformer_type: str,
-    fitted_params: Dict[str, Any],
-    df_before: Dict[str, Any],
-    df_after: Dict[str, Any],
-    expected_metrics: Dict[str, Any],
+    fitted_params: dict[str, Any],
+    df_before: dict[str, Any],
+    df_after: dict[str, Any],
+    expected_metrics: dict[str, Any],
 ) -> None:
     """_metrics_from_fitted_params must copy the transformer-family-specific keys
     it recognizes (or derive them, e.g. ``generated_features``) into the metrics
     dict, across every transformer family it handles.
     """
     fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_from_fitted_params(
         transformer_type, fitted_params, pd.DataFrame(df_before), pd.DataFrame(df_after), metrics
     )
@@ -528,7 +528,7 @@ def test_metrics_resampling_success_populates_class_counts() -> None:
     fe = FeatureEngineer(steps_config=[])
     X = pd.DataFrame({"f": [1, 2, 3]})
     y = pd.Series([0, 1, 1])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling((X, y), {}, metrics)
     assert metrics["total_samples"] == 3
     assert metrics["class_counts"] == {"0": 1, "1": 2}
@@ -537,7 +537,7 @@ def test_metrics_resampling_success_populates_class_counts() -> None:
 def test_metrics_resampling_returns_early_when_y_is_none() -> None:
     """When y cannot be extracted, no metrics should be added and no error raised."""
     fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling(pd.DataFrame({"f": [1, 2]}), {}, metrics)
     assert metrics == {}
 
@@ -553,7 +553,7 @@ def test_metrics_resampling_converts_polars_like_y_via_to_pandas() -> None:
 
     fe = FeatureEngineer(steps_config=[])
     X = pd.DataFrame({"f": [1, 2, 3]})
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling((X, _FakePolarsSeries()), {}, metrics)
     assert metrics["total_samples"] == 3
     assert metrics["class_counts"] == {"0": 2, "1": 1}
@@ -563,7 +563,7 @@ def test_metrics_resampling_handles_extraction_failure_gracefully() -> None:
     """If y extraction / value_counts blows up, the method must not raise."""
     fe = FeatureEngineer(steps_config=[])
     # y_res will be `5` (an int) -> .value_counts() raises AttributeError internally.
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling((pd.DataFrame({"f": [1]}), 5), {}, metrics)
     assert "class_counts" not in metrics
 
@@ -575,10 +575,10 @@ def test_metrics_resampling_handles_extraction_failure_gracefully() -> None:
 
 @pytest.mark.parametrize(*_count_winsorize_diffs_tuple_cases)
 def test_count_winsorize_diffs_tuple_path(
-    before_x: Dict[str, Any],
-    before_y: List[Any],
-    after_x: Dict[str, Any],
-    after_y: List[Any],
+    before_x: dict[str, Any],
+    before_y: list[Any],
+    after_x: dict[str, Any],
+    after_y: list[Any],
     expected: int,
 ) -> None:
     """Tuple (X, y) diffs must sum differing cells across both X and y."""
@@ -598,7 +598,7 @@ def test_metrics_winsorize_clipped_dataframe_path() -> None:
     fe = FeatureEngineer(steps_config=[])
     before = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     after = pd.DataFrame({"a": [1.0, 2.0, 99.0]})
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_winsorize_clipped(before, after, metrics)
     assert metrics["values_clipped"] == 1
 
@@ -616,7 +616,7 @@ def test_metrics_winsorize_clipped_split_dataset_path() -> None:
         test=pd.DataFrame({"a": [5.0]}),
         validation=pd.DataFrame({"a": [70.0]}),
     )
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_winsorize_clipped(before, after, metrics)
     assert metrics["values_clipped"] == 2
 
@@ -629,7 +629,7 @@ def test_metrics_winsorize_clipped_swallows_exception(monkeypatch: pytest.Monkey
         raise RuntimeError("boom")
 
     monkeypatch.setattr(FeatureEngineer, "_count_winsorize_diffs", staticmethod(_boom))
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_winsorize_clipped(pd.DataFrame({"a": [1.0]}), pd.DataFrame({"a": [2.0]}), metrics)
     assert "values_clipped" not in metrics
 
@@ -643,21 +643,21 @@ def test_metrics_winsorize_clipped_swallows_exception(monkeypatch: pytest.Monkey
 @pytest.mark.parametrize(*_metrics_shape_change_cases)
 def test_metrics_shape_change(
     transformer_type: str,
-    df_before: Dict[str, Any],
-    df_after: Dict[str, Any],
-    params: Dict[str, Any],
+    df_before: dict[str, Any],
+    df_after: dict[str, Any],
+    params: dict[str, Any],
     rows_before: int,
-    cols_before: List[str],
+    cols_before: list[str],
     rows_after: int,
-    cols_after: List[str],
-    expected_metrics: Dict[str, Any],
+    cols_after: list[str],
+    expected_metrics: dict[str, Any],
 ) -> None:
     """_metrics_shape_change must record the transformer-family-specific
     shape-change metrics (rows dropped, new/dropped columns, encoder counts)
     across every transformer family it handles.
     """
     fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_shape_change(
         transformer_type,
         pd.DataFrame(df_before),

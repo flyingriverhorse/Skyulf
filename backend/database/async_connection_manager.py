@@ -8,7 +8,7 @@ import atexit
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 import aiosqlite
 from sqlalchemy import text
@@ -118,7 +118,7 @@ class AsyncSQLiteConnectionManager:
         self,
         query: str,
         params: tuple[Any, ...] | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Execute a SELECT query and return results as list of dicts"""
         async with self.get_connection() as conn:
             if params:
@@ -162,8 +162,8 @@ class AsyncPostgreSQLConnectionManager:
     def __init__(self, connection_string: str, pool_size: int = 10):
         self.connection_string = connection_string
         self.pool_size = pool_size
-        self._engine: Optional[AsyncEngine] = None
-        self._session_maker: Optional[async_sessionmaker[AsyncSession]] = None
+        self._engine: AsyncEngine | None = None
+        self._session_maker: async_sessionmaker[AsyncSession] | None = None
         self._initialized = False
 
     async def initialize(self):
@@ -237,8 +237,8 @@ class AsyncPostgreSQLConnectionManager:
     async def execute_query(
         self,
         query: str,
-        params: Dict[str, Any] | None = None,
-    ) -> List[Dict[str, Any]]:
+        params: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Execute a SELECT query and return results as list of dicts"""
         async with self.get_connection() as conn:
             from sqlalchemy import text
@@ -251,7 +251,7 @@ class AsyncPostgreSQLConnectionManager:
     async def execute_update(
         self,
         query: str,
-        params: Dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> int:
         """Execute an INSERT/UPDATE/DELETE query and return affected rows"""
         async with self.get_connection() as conn:
@@ -275,8 +275,8 @@ class AsyncDatabaseManager:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.sqlite_manager: Optional[AsyncSQLiteConnectionManager] = None
-        self.postgres_manager: Optional[AsyncPostgreSQLConnectionManager] = None
+        self.sqlite_manager: AsyncSQLiteConnectionManager | None = None
+        self.postgres_manager: AsyncPostgreSQLConnectionManager | None = None
         self._initialized = False
 
     async def initialize(self):
@@ -340,7 +340,7 @@ class AsyncDatabaseManager:
 
     async def close_all(self):
         """Close all async database connections"""
-        tasks: List[Any] = []
+        tasks: list[Any] = []
 
         if self.postgres_manager:
             tasks.append(self.postgres_manager.close())
@@ -352,7 +352,7 @@ class AsyncDatabaseManager:
 
 
 # Global async database manager instance
-_async_db_manager: Optional[AsyncDatabaseManager] = None
+_async_db_manager: AsyncDatabaseManager | None = None
 
 
 async def initialize_async_database_manager(settings: Settings):
@@ -363,7 +363,7 @@ async def initialize_async_database_manager(settings: Settings):
     return _async_db_manager
 
 
-def get_async_database_manager() -> Optional[AsyncDatabaseManager]:
+def get_async_database_manager() -> AsyncDatabaseManager | None:
     """Get the global async database manager"""
     return _async_db_manager
 

@@ -1,6 +1,6 @@
 """Robust scaler node (median centering, IQR scaling)."""
 
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 from sklearn.preprocessing import RobustScaler
@@ -19,11 +19,11 @@ from ._common import _select_subset_pandas, _select_subset_polars
 
 class RobustScalerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -49,7 +49,7 @@ class RobustScalerApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         center = params.get("center")
         scale = params.get("scale")
@@ -85,12 +85,12 @@ class RobustScalerApplier(BaseApplier):
 )
 class RobustScalerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> RobustScalerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> RobustScalerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(RobustScalerArtifact, {})
         return cast(
@@ -99,21 +99,21 @@ class RobustScalerCalculator(BaseCalculator):
         )
 
     @staticmethod
-    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_polars(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_polars(X, config)
         if not cols:
             return {}
         return _fit_robust(X_subset, cols, config)
 
     @staticmethod
-    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_pandas(X, config)
         if not cols:
             return {}
         return _fit_robust(X_subset, cols, config)
 
 
-def _fit_robust(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+def _fit_robust(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[str, Any]:
     # Same JSON list -> tuple coercion as MinMaxScaler.
     quantile_range = tuple(config.get("quantile_range", (25.0, 75.0)))
     with_centering = config.get("with_centering", True)

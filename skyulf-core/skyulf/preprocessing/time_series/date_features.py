@@ -1,6 +1,6 @@
 """Calendar feature extraction from datetime columns (year, month, dow, ...)."""
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import pandas as pd
 
@@ -14,14 +14,14 @@ from ..dispatcher import apply_dual_engine
 from ._common import DATE_FEATURE_ACCESSORS, resolve_columns
 
 # Default calendar parts when the user does not specify any.
-DEFAULT_FEATURES: List[str] = ["year", "month", "day", "dayofweek"]
+DEFAULT_FEATURES: list[str] = ["year", "month", "day", "dayofweek"]
 
 
 def _feat_name(col: str, feature: str) -> str:
     return f"{col}_{feature}"
 
 
-def _resolve_features(config: Dict[str, Any]) -> List[str]:
+def _resolve_features(config: dict[str, Any]) -> list[str]:
     requested = config.get("features") or DEFAULT_FEATURES
     return [f for f in requested if f in DATE_FEATURE_ACCESSORS]
 
@@ -36,9 +36,9 @@ def _pandas_feature(dt: Any, feature: str) -> Any:
     return getattr(dt, feature)
 
 
-def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
-    columns: List[str] = params.get("columns", [])
-    features: List[str] = params.get("features", [])
+def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    columns: list[str] = params.get("columns", [])
+    features: list[str] = params.get("features", [])
     drop_original: bool = params.get("drop_original", False)
     if not columns or not features:
         return X, _y
@@ -74,7 +74,7 @@ def _polars_feature(col_expr: Any, feature: str) -> Any:
     return builders[feature]()
 
 
-def _polars_date_exprs(columns: List[str], available: List[str], features: List[str]) -> list:
+def _polars_date_exprs(columns: list[str], available: list[str], features: list[str]) -> list:
     import polars as pl
 
     exprs = []
@@ -87,9 +87,9 @@ def _polars_date_exprs(columns: List[str], available: List[str], features: List[
     return exprs
 
 
-def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
-    columns: List[str] = params.get("columns", [])
-    features: List[str] = params.get("features", [])
+def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    columns: list[str] = params.get("columns", [])
+    features: list[str] = params.get("features", [])
     if not columns or not features:
         return X, _y
 
@@ -106,7 +106,7 @@ def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
 
 class DateFeaturesApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _apply_polars, _apply_pandas)
 
 
@@ -122,8 +122,8 @@ class DateFeaturesApplier(BaseApplier):
 class DateFeaturesCalculator(BaseCalculator):
     def fit(
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        config: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        config: dict[str, Any],
     ) -> DateFeaturesArtifact:
         return {
             "type": "date_features",
@@ -133,8 +133,8 @@ class DateFeaturesCalculator(BaseCalculator):
         }
 
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
-    ) -> Optional[SkyulfSchema]:
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
+    ) -> SkyulfSchema | None:
         # Calendar parts are integers; shape derivable from config alone.
         cols = resolve_columns(config.get("columns", []), input_schema.column_list())
         features = _resolve_features(config)

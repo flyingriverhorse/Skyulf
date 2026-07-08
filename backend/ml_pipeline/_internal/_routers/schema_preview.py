@@ -14,7 +14,7 @@ underlying data.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -48,11 +48,11 @@ class SchemaPreviewResponse(BaseModel):
     # Per-node predicted output schema. Value is `None` when the node's
     # Calculator does not implement `infer_output_schema`, when an
     # upstream prediction was unknown, or when prediction failed.
-    predicted_schemas: Dict[str, Optional[Dict[str, Any]]]
+    predicted_schemas: dict[str, dict[str, Any] | None]
     # Broken column references (typo / deleted upstream column / etc.)
     # detected in node `params`. Each entry: {node_id, field, column,
     # upstream_node_id}. Empty list when nothing to flag.
-    broken_references: List[Dict[str, Any]]
+    broken_references: list[dict[str, Any]]
 
 
 def _to_pipeline_config(model: PipelineConfigModel) -> PipelineConfig:
@@ -76,7 +76,7 @@ def _to_pipeline_config(model: PipelineConfigModel) -> PipelineConfig:
 async def _seed_loader_schemas(
     config: PipelineConfig,
     session: AsyncSession,
-) -> Dict[str, SkyulfSchema]:
+) -> dict[str, SkyulfSchema]:
     """Seed initial schemas for data_loader nodes from the dataset catalog.
 
     Looks up each loader's ``dataset_id`` param in the DataSource table by
@@ -86,7 +86,7 @@ async def _seed_loader_schemas(
     skipped — their schema remains None and prediction cascades to None for
     any downstream node.
     """
-    seeds: Dict[str, SkyulfSchema] = {}
+    seeds: dict[str, SkyulfSchema] = {}
     for node in config.nodes:
         raw = node.step_type
         step = raw.value if hasattr(raw, "value") else str(raw)
@@ -104,7 +104,7 @@ async def _seed_loader_schemas(
             )
         if row is None or not row.source_metadata:
             continue
-        schema_meta: Dict[str, str] = row.source_metadata.get("schema", {})
+        schema_meta: dict[str, str] = row.source_metadata.get("schema", {})
         if not schema_meta:
             continue
         seeds[node.node_id] = SkyulfSchema.from_columns(list(schema_meta.keys()), dict(schema_meta))

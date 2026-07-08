@@ -8,7 +8,7 @@ range) columns, out-of-range values seen only at apply time, and the full
 fit -> apply round trip via the public Calculator/Applier API.
 """
 
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -36,7 +36,7 @@ from skyulf.preprocessing.scaling.standard import (
 
 _validation_cases = TestCaseLoader("preprocessing/scaling").load()
 
-_SCALER_CALCULATORS: Dict[str, Any] = {
+_SCALER_CALCULATORS: dict[str, Any] = {
     "standard": StandardScalerCalculator,
     "minmax": MinMaxScalerCalculator,
     "robust": RobustScalerCalculator,
@@ -44,8 +44,8 @@ _SCALER_CALCULATORS: Dict[str, Any] = {
 
 
 def _fit_apply(
-    calculator: Any, applier: Any, df: pd.DataFrame, config: Dict[str, Any]
-) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    calculator: Any, applier: Any, df: pd.DataFrame, config: dict[str, Any]
+) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Run fit then apply and return (transformed_df, params)."""
     params = calculator.fit(df, config)
     out = applier.apply(df, params)

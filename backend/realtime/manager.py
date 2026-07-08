@@ -7,7 +7,7 @@ subscribes to the Redis pub/sub channel and broadcasts every message.
 
 import asyncio
 import logging
-from typing import Any, Optional, Set
+from typing import Any
 
 import orjson
 from fastapi import WebSocket
@@ -31,9 +31,9 @@ class ConnectionManager:
     """Tracks live WebSocket clients and fans out Redis events to them."""
 
     def __init__(self) -> None:
-        self._clients: Set[WebSocket] = set()
+        self._clients: set[WebSocket] = set()
         self._lock = asyncio.Lock()
-        self._subscriber_task: Optional[asyncio.Task[None]] = None
+        self._subscriber_task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
 
     async def connect(self, ws: WebSocket) -> None:
@@ -132,7 +132,7 @@ class ConnectionManager:
                 logger.warning("Realtime subscriber error: %s (retry in %.1fs)", exc, backoff)
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=backoff)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     pass
                 backoff = min(backoff * 2, 30.0)
 
@@ -146,7 +146,7 @@ class ConnectionManager:
             while not self._stop.is_set():
                 try:
                     raw = await asyncio.wait_for(queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 try:
                     await self.broadcast(_wrap_payload(raw))

@@ -6,8 +6,9 @@ rather than a single ambiguous block. Imported by ``notebook_export`` when
 ``_terminal_models()`` detects more than one model at the graph leaves.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from . import _notebook_builders as nb
 from ._notebook_builders import (
@@ -27,12 +28,12 @@ from ._notebook_builders import (
 )
 
 # (loader, preprocess, feat_target, train_test, model)
-_Classified = Tuple[
-    Optional[_NodeIn],
-    List[_NodeIn],
-    Optional[_NodeIn],
-    Optional[_NodeIn],
-    Optional[_NodeIn],
+_Classified = tuple[
+    _NodeIn | None,
+    list[_NodeIn],
+    _NodeIn | None,
+    _NodeIn | None,
+    _NodeIn | None,
 ]
 
 # ---------------------------------------------------------------------------
@@ -47,7 +48,7 @@ def _branch_letter(idx: int) -> str:
     return _branch_letter(idx // 26 - 1) + _branch_letter(idx % 26)
 
 
-def _shared_preprocess_ids(branches: List[List[_NodeIn]]) -> set:
+def _shared_preprocess_ids(branches: list[list[_NodeIn]]) -> set:
     """Node IDs that appear in every branch — fitted once before per-branch sections."""
     if not branches:
         return set()
@@ -71,8 +72,8 @@ _SPLIT_OR_MODEL = {
 def _branch_sections_md(
     cfg: _PipelineIn,
     dataset_id: str,
-    dataset_name: Optional[str],
-    terminals: List[_NodeIn],
+    dataset_name: str | None,
+    terminals: list[_NodeIn],
 ) -> str:
     items = "\n".join(
         f"- **Branch {_branch_letter(i)}** — `{t.step_type}` "
@@ -90,7 +91,7 @@ def _branch_sections_md(
     )
 
 
-def _shared_preprocess_cells(shared: List[_NodeIn]) -> List[Dict[str, Any]]:
+def _shared_preprocess_cells(shared: list[_NodeIn]) -> list[dict[str, Any]]:
     if not shared:
         return [
             md_cell(
@@ -103,7 +104,7 @@ def _shared_preprocess_cells(shared: List[_NodeIn]) -> List[Dict[str, Any]]:
                 "df_shared = df.copy()\n"
             ),
         ]
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         md_cell(
             "## 4. Shared preprocessing\n\n"
             "These steps are common to every branch. They are fitted once on the "
@@ -121,7 +122,7 @@ def _shared_preprocess_cells(shared: List[_NodeIn]) -> List[Dict[str, Any]]:
     return cells
 
 
-def _branch_persist_cell(letter: str, branch_only: List[_NodeIn]) -> Dict[str, Any]:
+def _branch_persist_cell(letter: str, branch_only: list[_NodeIn]) -> dict[str, Any]:
     artifact_dict = "".join(
         f"    {i:>2}: ({n.step_type!r}, step{i:02d}_artifact),\n"
         for i, n in enumerate(branch_only, start=1)
@@ -136,7 +137,7 @@ def _branch_persist_cell(letter: str, branch_only: List[_NodeIn]) -> Dict[str, A
     )
 
 
-def _branch_topology_md(letter: str, branch_nodes: List[_NodeIn]) -> Dict[str, Any]:
+def _branch_topology_md(letter: str, branch_nodes: list[_NodeIn]) -> dict[str, Any]:
     lines = [f"<details><summary>Branch {letter} nodes (topological order)</summary>\n", "```"]
     for i, n in enumerate(branch_nodes, start=1):
         inputs = ", ".join(n.inputs) if n.inputs else "—"
@@ -148,10 +149,10 @@ def _branch_topology_md(letter: str, branch_nodes: List[_NodeIn]) -> Dict[str, A
 def _full_branch_section(
     letter: str,
     section_no: int,
-    branch_nodes: List[_NodeIn],
+    branch_nodes: list[_NodeIn],
     classified: _Classified,
     shared_ids: set,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Cells for one training branch in the full notebook."""
     _loader, preprocess, feat_target, train_test, model = classified
     branch_only = [n for n in preprocess if n.node_id not in shared_ids]
@@ -159,7 +160,7 @@ def _full_branch_section(
     title = (
         f"## {section_no}. Branch {letter} — {model.step_type if model else 'no model'} (`{algo}`)"
     )
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         md_cell(
             f"{title}\n\n"
             f"Replays branch **{letter}** from the shared snapshot. "
@@ -187,23 +188,23 @@ class _FullBranchCtx:
 
     cfg: _PipelineIn
     dataset_id: str
-    dataset_name: Optional[str]
-    all_nodes: List[_NodeIn]
-    terminals: List[_NodeIn]
-    ancestors_in_topo: Callable[[str, List[_NodeIn]], List[_NodeIn]]
-    classify: Callable[[List[_NodeIn]], _Classified]
-    data_path_resolver: Callable[[Optional[_NodeIn]], str]
+    dataset_name: str | None
+    all_nodes: list[_NodeIn]
+    terminals: list[_NodeIn]
+    ancestors_in_topo: Callable[[str, list[_NodeIn]], list[_NodeIn]]
+    classify: Callable[[list[_NodeIn]], _Classified]
+    data_path_resolver: Callable[[_NodeIn | None], str]
     resolved_from_db: bool
 
 
 def _assemble_full_branch_cells(
-    terminals: List[_NodeIn],
-    branches: List[List[_NodeIn]],
-    classifications: List[_Classified],
+    terminals: list[_NodeIn],
+    branches: list[list[_NodeIn]],
+    classifications: list[_Classified],
     shared_ids: set,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Build per-branch section cells (extracted to reduce CCN of caller)."""
-    cells: List[Dict[str, Any]] = []
+    cells: list[dict[str, Any]] = []
     for i, (_t, branch_nodes, classified) in enumerate(zip(terminals, branches, classifications)):
         cells.extend(
             _full_branch_section(_branch_letter(i), 5 + i, branch_nodes, classified, shared_ids)
@@ -212,8 +213,8 @@ def _assemble_full_branch_cells(
 
 
 def _compute_shared_nodes(
-    all_nodes: List[_NodeIn], branches: List[List[_NodeIn]]
-) -> Tuple[set, List[_NodeIn]]:
+    all_nodes: list[_NodeIn], branches: list[list[_NodeIn]]
+) -> tuple[set, list[_NodeIn]]:
     """Return (shared_ids, shared_node_list) for the given branches."""
     shared_ids = _shared_preprocess_ids(
         [[n for n in b if n.step_type not in _SPLIT_OR_MODEL] for b in branches]
@@ -224,7 +225,7 @@ def _compute_shared_nodes(
     return shared_ids, shared_nodes
 
 
-def build_full_branched(ctx: _FullBranchCtx) -> Dict[str, Any]:
+def build_full_branched(ctx: _FullBranchCtx) -> dict[str, Any]:
     """Full notebook: shared preprocess section + one training section per branch.
 
     Accepts a :class:`_FullBranchCtx` dataclass instead of many positional
@@ -236,7 +237,7 @@ def build_full_branched(ctx: _FullBranchCtx) -> Dict[str, Any]:
     shared_ids, shared_nodes = _compute_shared_nodes(ctx.all_nodes, branches)
     loader = next((n for n in ctx.all_nodes if n.step_type == "data_loader"), None)
     data_path = ctx.data_path_resolver(loader)
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         md_cell(_branch_sections_md(ctx.cfg, ctx.dataset_id, ctx.dataset_name, ctx.terminals)),
     ]
     cells.extend(full_intro_cells(data_path, resolved_from_db=ctx.resolved_from_db))
@@ -249,7 +250,7 @@ def build_full_branched(ctx: _FullBranchCtx) -> Dict[str, Any]:
     return wrap_notebook(cells)
 
 
-def _full_inference_cells(letters: List[str], section_no: int) -> List[Dict[str, Any]]:
+def _full_inference_cells(letters: list[str], section_no: int) -> list[dict[str, Any]]:
     """Predict-on-new-data section appended after all branch sections in full mode."""
     load_lines = "".join(
         f'# branch_{l} = pickle.load(open("skyulf_branch_{l}.pkl", "rb"))\n'
@@ -272,7 +273,7 @@ def _full_inference_cells(letters: List[str], section_no: int) -> List[Dict[str,
     ]
 
 
-def _metrics_helper_cell() -> Dict[str, Any]:
+def _metrics_helper_cell() -> dict[str, Any]:
     """Deprecated alias kept for backwards compatibility; delegates to builders."""
     return nb.metrics_helper_cell()
 
@@ -312,7 +313,7 @@ def _branch_comparison_code(metrics_dict_literal: str) -> str:
     )
 
 
-def _metrics_comparison_cell(letters: List[str], section_no: int) -> List[Dict[str, Any]]:
+def _metrics_comparison_cell(letters: list[str], section_no: int) -> list[dict[str, Any]]:
     """Side-by-side metrics table for all trained branches (full mode)."""
     metrics_vars = ", ".join(f'"Branch {l}": metrics_{l}' for l in letters)  # noqa: E741
     return [
@@ -334,8 +335,8 @@ def _metrics_comparison_cell(letters: List[str], section_no: int) -> List[Dict[s
 def _compact_branch_summary_md(
     cfg: _PipelineIn,
     dataset_id: str,
-    dataset_name: Optional[str],
-    terminals: List[_NodeIn],
+    dataset_name: str | None,
+    terminals: list[_NodeIn],
 ) -> str:
     items = "\n".join(
         f"- **Branch {_branch_letter(i)}** — `{nb._model_algorithm(t)}`"
@@ -353,7 +354,7 @@ def _compact_branch_summary_md(
 
 def _compact_branch_cells(
     letter: str, section_no: int, classified: _Classified
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Fit + persist cells for one compact-mode branch."""
     _loader, preprocess, feat_target, train_test, model = classified
     target_col = feat_target.params.get("target_column", "") if feat_target else ""
@@ -388,7 +389,7 @@ def _compact_branch_cells(
     ]
 
 
-def _inference_snippet(letters: List[str]) -> Dict[str, Any]:
+def _inference_snippet(letters: list[str]) -> dict[str, Any]:
     return code_cell(
         "# Choose the branch with the best metrics and load its artifact:\n"
         "# new_df = pd.read_csv('new_data.csv')\n"
@@ -405,25 +406,25 @@ class _CompactBranchCtx:
 
     cfg: _PipelineIn
     dataset_id: str
-    dataset_name: Optional[str]
-    all_nodes: List[_NodeIn]
-    terminals: List[_NodeIn]
-    ancestors_in_topo: Callable[[str, List[_NodeIn]], List[_NodeIn]]
-    classify: Callable[[List[_NodeIn]], _Classified]
-    data_path_resolver: Callable[[Optional[_NodeIn]], str]
-    target_resolver: Callable[[Optional[_NodeIn], Optional[_NodeIn]], Optional[str]]
+    dataset_name: str | None
+    all_nodes: list[_NodeIn]
+    terminals: list[_NodeIn]
+    ancestors_in_topo: Callable[[str, list[_NodeIn]], list[_NodeIn]]
+    classify: Callable[[list[_NodeIn]], _Classified]
+    data_path_resolver: Callable[[_NodeIn | None], str]
+    target_resolver: Callable[[_NodeIn | None, _NodeIn | None], str | None]
     resolved_from_db: bool
 
 
 def _collect_branches(
-    all_nodes: List[_NodeIn],
-    terminals: List[_NodeIn],
-    ancestors_in_topo: Callable[[str, List[_NodeIn]], List[_NodeIn]],
-    classify: Callable[[List[_NodeIn]], _Classified],
-) -> Tuple[List[List[_NodeIn]], List[_Classified]]:
+    all_nodes: list[_NodeIn],
+    terminals: list[_NodeIn],
+    ancestors_in_topo: Callable[[str, list[_NodeIn]], list[_NodeIn]],
+    classify: Callable[[list[_NodeIn]], _Classified],
+) -> tuple[list[list[_NodeIn]], list[_Classified]]:
     """Build per-branch node lists and classifications in one pass."""
-    branches: List[List[_NodeIn]] = []
-    classifications: List[_Classified] = []
+    branches: list[list[_NodeIn]] = []
+    classifications: list[_Classified] = []
     for t in terminals:
         anc = ancestors_in_topo(t.node_id, all_nodes)
         nodes = anc + [t]
@@ -432,10 +433,10 @@ def _collect_branches(
     return branches, classifications
 
 
-def _compact_compare_predict_cells(letters: List[str], base_section: int) -> List[Dict[str, Any]]:
+def _compact_compare_predict_cells(letters: list[str], base_section: int) -> list[dict[str, Any]]:
     """Metrics comparison + predict-on-new-data tail for compact multi-branch notebooks."""
     compare_vars = ", ".join(f'"Branch {l}": pipeline_{l}_metrics' for l in letters)  # noqa: E741
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         md_cell(
             f"## {base_section}. Metrics comparison\n\n"
             "All branches have now been trained. Each branch's metrics are\n"
@@ -452,7 +453,7 @@ def _compact_compare_predict_cells(letters: List[str], base_section: int) -> Lis
     return cells
 
 
-def build_compact_branched(ctx: _CompactBranchCtx) -> Dict[str, Any]:
+def build_compact_branched(ctx: _CompactBranchCtx) -> dict[str, Any]:
     """Compact notebook: one `SkyulfPipeline` per terminal model.
 
     Accepts a :class:`_CompactBranchCtx` dataclass instead of many positional
@@ -463,14 +464,14 @@ def build_compact_branched(ctx: _CompactBranchCtx) -> Dict[str, Any]:
     )
     loader = next((n for n in ctx.all_nodes if n.step_type == "data_loader"), None)
     data_path = ctx.data_path_resolver(loader)
-    target_col: Optional[str] = None
+    target_col: str | None = None
     for c in classifications:
         target_col = ctx.target_resolver(c[2], c[3])
         if target_col:
             break
     target_col = target_col or "<target_column>"
     letters = [_branch_letter(i) for i in range(len(ctx.terminals))]
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         md_cell(
             _compact_branch_summary_md(ctx.cfg, ctx.dataset_id, ctx.dataset_name, ctx.terminals)
         ),

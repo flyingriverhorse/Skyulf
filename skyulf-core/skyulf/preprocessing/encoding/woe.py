@@ -12,7 +12,8 @@ the caller's engine (pandas in/out, polars in/out).
 
 import logging
 import math
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import numpy as np
 
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-def _resolve_apply_inputs(X: Any, params: Dict[str, Any]) -> Tuple[List[str], Dict[str, Any]]:
+def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], dict[str, Any]]:
     """Return ``(valid_cols, mappings)`` or ``([], {})`` if nothing to do."""
     cols = params.get("columns", [])
     mappings = params.get("mappings", {})
@@ -42,7 +43,7 @@ def _resolve_apply_inputs(X: Any, params: Dict[str, Any]) -> Tuple[List[str], Di
     return valid_cols, mappings
 
 
-def _woe_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
     valid_cols, mappings = _resolve_apply_inputs(X, params)
@@ -60,7 +61,7 @@ def _woe_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]
     return X.with_columns(exprs), y
 
 
-def _woe_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _woe_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, mappings = _resolve_apply_inputs(X, params)
     if not valid_cols:
         return X, y
@@ -75,7 +76,7 @@ def _woe_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]
 
 class WOEEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -89,7 +90,7 @@ class WOEEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _extract_y(X: Any, y: Any, target_col: Optional[str]) -> Any:
+def _extract_y(X: Any, y: Any, target_col: str | None) -> Any:
     """Pull ``y`` out of ``X`` if it was not provided separately."""
     if y is not None or not target_col:
         return y
@@ -99,7 +100,7 @@ def _extract_y(X: Any, y: Any, target_col: Optional[str]) -> Any:
     return y
 
 
-def _binary_target(y: Any) -> Optional[np.ndarray]:
+def _binary_target(y: Any) -> np.ndarray | None:
     """Coerce ``y`` to a 0/1 numpy array, or ``None`` if not binary."""
     arr = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
     classes = np.unique(arr[~_is_null_mask(arr)])
@@ -119,11 +120,11 @@ def _is_null_mask(arr: np.ndarray) -> np.ndarray:
 
 def _column_woe(
     values: np.ndarray, y_bin: np.ndarray, reg: float
-) -> Tuple[Dict[str, float], float]:
+) -> tuple[dict[str, float], float]:
     """Compute the WOE map and IV for a single categorical column."""
     total_pos = float(y_bin.sum())
     total_neg = float(len(y_bin) - total_pos)
-    mapping: Dict[str, float] = {}
+    mapping: dict[str, float] = {}
     iv = 0.0
     for cat in np.unique(values):
         mask = values == cat
@@ -138,11 +139,11 @@ def _column_woe(
 
 
 def _build_woe_artifact(
-    frame: Any, y_bin: np.ndarray, cols: List[str], reg: float
+    frame: Any, y_bin: np.ndarray, cols: list[str], reg: float
 ) -> Mapping[str, Any]:
     """Build the WOE artifact for the given pandas frame + binary target."""
-    mappings: Dict[str, Dict[str, float]] = {}
-    iv_scores: Dict[str, float] = {}
+    mappings: dict[str, dict[str, float]] = {}
+    iv_scores: dict[str, float] = {}
     for col in cols:
         values = frame[col].astype(str).to_numpy()
         mappings[col], iv_scores[col] = _column_woe(values, y_bin, reg)
@@ -156,7 +157,7 @@ def _build_woe_artifact(
 
 
 def _woe_fit_common(
-    frame: Any, y: Any, cols: List[str], config: Dict[str, Any]
+    frame: Any, y: Any, cols: list[str], config: dict[str, Any]
 ) -> Mapping[str, Any]:
     """Shared fit: validate binary target, then build the artifact."""
     y_bin = _binary_target(y)
@@ -167,7 +168,7 @@ def _woe_fit_common(
     return _build_woe_artifact(frame, y_bin, cols, reg)
 
 
-def _woe_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _woe_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     y = _extract_y(X, y, config.get("target_column"))
     if y is None:
         logger.warning("WOEEncoder requires a target variable (y). Skipping.")
@@ -180,7 +181,7 @@ def _woe_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]
     return _woe_fit_common(X.select(cols).to_pandas(), y, cols, config)
 
 
-def _woe_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _woe_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     y = _extract_y(X, y, config.get("target_column"))
     if y is None:
         logger.warning("WOEEncoder requires a target variable (y). Skipping.")
@@ -206,7 +207,7 @@ def _woe_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]
 )
 class WOEEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         return cast(
@@ -222,8 +223,8 @@ class WOEEncoderCalculator(BaseCalculator):
     def infer_output_schema(
         self,
         input_schema: SkyulfSchema,
-        config: Dict[str, Any],
-    ) -> Optional[SkyulfSchema]:
+        config: dict[str, Any],
+    ) -> SkyulfSchema | None:
         # WOE replaces values in source columns in place (now float-valued);
         # column names are unchanged.
         return input_schema

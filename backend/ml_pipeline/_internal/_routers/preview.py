@@ -17,7 +17,7 @@ import json
 import logging
 import shutil
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, Depends
@@ -256,7 +256,7 @@ async def preview_pipeline(  # noqa: C901
                 pass
             return None
 
-        def pick_target_node_id(node_list) -> Optional[str]:
+        def pick_target_node_id(node_list) -> str | None:
             """Pick the last data-bearing node to preview.
 
             Training/tuning nodes are stripped before execution, so the last
@@ -276,7 +276,7 @@ async def preview_pipeline(  # noqa: C901
                     target_id = target.inputs[0]
             return target_id
 
-        def extract_preview(target_node_id: Optional[str]):
+        def extract_preview(target_node_id: str | None):
             """Return (preview_data, totals, df_for_analysis) for a single artifact.
 
             `totals` mirrors the shape of `preview_data`:
@@ -285,7 +285,7 @@ async def preview_pipeline(  # noqa: C901
               is a list (single-frame case).
             """
             preview_data: Any = {}
-            totals: Dict[str, int] = {}
+            totals: dict[str, int] = {}
             df_for_analysis = None
             if not target_node_id or not artifact_store.exists(target_node_id):
                 return preview_data, totals, df_for_analysis
@@ -358,12 +358,12 @@ async def preview_pipeline(  # noqa: C901
 
         # 4. Aggregate per-branch previews
         preview_data: Any = {}
-        preview_totals: Dict[str, int] = {}
-        branch_previews: Optional[Dict[str, Any]] = None
-        branch_preview_totals: Optional[Dict[str, Dict[str, int]]] = None
-        branch_node_ids: Optional[Dict[str, List[str]]] = None
-        recommendations: List[Recommendation] = []
-        combined_node_results: Dict[str, Any] = {}
+        preview_totals: dict[str, int] = {}
+        branch_previews: dict[str, Any] | None = None
+        branch_preview_totals: dict[str, dict[str, int]] | None = None
+        branch_node_ids: dict[str, list[str]] | None = None
+        recommendations: list[Recommendation] = []
+        combined_node_results: dict[str, Any] = {}
         # Aggregate status: failed > running > success
         agg_status = "success"
         first_pdf = None
@@ -383,8 +383,8 @@ async def preview_pipeline(  # noqa: C901
         # branches of the same terminal incorrectly got "#1" / "#2" / "#3"
         # despite originating from the same training node on the canvas.
         # Preview-only branches (no model_type) skip this and stay unsuffixed.
-        terminals_by_model: Dict[str, List[str]] = {}
-        terminal_id_per_branch: Dict[int, str] = {}
+        terminals_by_model: dict[str, list[str]] = {}
+        terminal_id_per_branch: dict[int, str] = {}
         for i, (orig_sub, _runnable, _res) in enumerate(sub_results):
             mt = ""
             term_id = ""
@@ -405,13 +405,13 @@ async def preview_pipeline(  # noqa: C901
                 ids = terminals_by_model.setdefault(mt, [])
                 if term_id not in ids:
                     ids.append(term_id)
-        terminal_suffix: Dict[str, str] = {}
+        terminal_suffix: dict[str, str] = {}
         for _mt, ids in terminals_by_model.items():
             if len(ids) < 2:
                 continue
             for n_, term_id in enumerate(ids, start=1):
                 terminal_suffix[term_id] = f"#{n_}"
-        dup_suffix_by_branch: Dict[int, str] = {
+        dup_suffix_by_branch: dict[int, str] = {
             branch_idx: terminal_suffix[term_id]
             for branch_idx, term_id in terminal_id_per_branch.items()
             if term_id in terminal_suffix
@@ -459,7 +459,7 @@ async def preview_pipeline(  # noqa: C901
             w for _orig, _runnable, res in sub_results for w in getattr(res, "merge_warnings", [])
         ]
         seen_warning_keys: set = set()
-        deduped_warnings: List[Dict[str, Any]] = []
+        deduped_warnings: list[dict[str, Any]] = []
         for w in all_warnings:
             key = (
                 w.get("node_id"),
@@ -482,7 +482,7 @@ async def preview_pipeline(  # noqa: C901
             w for _orig, _runnable, res in sub_results for w in getattr(res, "node_warnings", [])
         ]
         seen_node_warn_keys: set = set()
-        deduped_node_warnings: List[Dict[str, Any]] = []
+        deduped_node_warnings: list[dict[str, Any]] = []
         for w in all_node_warnings:
             key = (w.get("node_id"), w.get("message"))
             if key in seen_node_warn_keys:

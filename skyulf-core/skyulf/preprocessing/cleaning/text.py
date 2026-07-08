@@ -1,6 +1,7 @@
 """Text cleaning node (trim / case / remove-special / regex)."""
 
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 import pandas as pd
 
@@ -39,7 +40,7 @@ def _remove_special_polars(expr: Any, mode: str, replacement: str) -> Any:
     return expr.str.replace_all(pattern, replacement) if pattern else expr
 
 
-def _regex_polars(expr: Any, mode: str, pattern: Optional[str], repl: str) -> Any:
+def _regex_polars(expr: Any, mode: str, pattern: str | None, repl: str) -> Any:
     if mode == "collapse_whitespace":
         return expr.str.replace_all(r"\s+", " ").str.strip_chars()
     if mode == "extract_digits":
@@ -51,7 +52,7 @@ def _regex_polars(expr: Any, mode: str, pattern: Optional[str], repl: str) -> An
     return expr
 
 
-_TEXT_OPS_POLARS: Dict[str, Callable[[Any, Dict[str, Any]], Any]] = {
+_TEXT_OPS_POLARS: dict[str, Callable[[Any, dict[str, Any]], Any]] = {
     "trim": lambda expr, op: _trim_polars(expr, op.get("mode", "both")),
     "case": lambda expr, op: _case_polars(expr, op.get("mode", "lower")),
     "remove_special": lambda expr, op: _remove_special_polars(
@@ -86,7 +87,7 @@ def _remove_special_pandas(series: pd.Series, mode: str, replacement: str) -> pd
     return series.str.replace(pattern, replacement, regex=True) if pattern else series
 
 
-def _regex_pandas(series: pd.Series, mode: str, pattern: Optional[str], repl: str) -> pd.Series:
+def _regex_pandas(series: pd.Series, mode: str, pattern: str | None, repl: str) -> pd.Series:
     if mode == "collapse_whitespace":
         return series.str.replace(r"\s+", " ", regex=True).str.strip()
     if mode == "extract_digits":
@@ -98,7 +99,7 @@ def _regex_pandas(series: pd.Series, mode: str, pattern: Optional[str], repl: st
     return series
 
 
-_TEXT_OPS_PANDAS: Dict[str, Callable[[pd.Series, Dict[str, Any]], pd.Series]] = {
+_TEXT_OPS_PANDAS: dict[str, Callable[[pd.Series, dict[str, Any]], pd.Series]] = {
     "trim": lambda s, op: _trim_pandas(s, op.get("mode", "both")),
     "case": lambda s, op: _case_pandas(s, op.get("mode", "lower")),
     "remove_special": lambda s, op: _remove_special_pandas(
@@ -112,11 +113,11 @@ _TEXT_OPS_PANDAS: Dict[str, Callable[[pd.Series, Dict[str, Any]], pd.Series]] = 
 
 class TextCleaningApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -136,7 +137,7 @@ class TextCleaningApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         operations = params.get("operations", [])
         valid = resolve_valid_columns(X, cols)
@@ -166,13 +167,13 @@ class TextCleaningApplier(BaseApplier):
 )
 class TextCleaningCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Text cleaning rewrites string values in place; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TextCleaningArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TextCleaningArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
         cols = resolve_columns(X, config, _auto_detect_text_columns)

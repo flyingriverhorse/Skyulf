@@ -1,7 +1,7 @@
 """Wrapper for Scikit-Learn models."""
 
 import logging
-from typing import Any, Dict, Optional, Type, Union
+from typing import Any
 
 import pandas as pd
 from sklearn.base import BaseEstimator
@@ -18,8 +18,8 @@ class SklearnCalculator(BaseModelCalculator):
 
     def __init__(
         self,
-        model_class: Type[BaseEstimator],
-        default_params: Dict[str, Any],
+        model_class: type[BaseEstimator],
+        default_params: dict[str, Any],
         problem_type: str,
     ):
         # `Any` because sklearn stubs make BaseEstimator subclasses appear non-callable.
@@ -28,7 +28,7 @@ class SklearnCalculator(BaseModelCalculator):
         self._problem_type = problem_type
 
     @property
-    def default_params(self) -> Dict[str, Any]:
+    def default_params(self) -> dict[str, Any]:
         return self._default_params
 
     @property
@@ -37,9 +37,9 @@ class SklearnCalculator(BaseModelCalculator):
 
     def fit(
         self,
-        X: Union[pd.DataFrame, SkyulfDataFrame],
-        y: Union[pd.Series, Any],
-        config: Dict[str, Any],
+        X: pd.DataFrame | SkyulfDataFrame,
+        y: pd.Series | Any,
+        config: dict[str, Any],
         progress_callback=None,
         log_callback=None,
         validation_data=None,
@@ -117,7 +117,7 @@ class SklearnCalculator(BaseModelCalculator):
 class SklearnApplier(BaseModelApplier):
     """Base applier for Scikit-Learn models."""
 
-    def predict(self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any) -> Any:
+    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any:
         # Convert to Numpy
         X_np, _ = SklearnBridge.to_sklearn(df)
 
@@ -136,8 +136,8 @@ class SklearnApplier(BaseModelApplier):
         return pd.Series(preds, index=index)
 
     def predict_proba(
-        self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
-    ) -> Optional[Any]:
+        self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
+    ) -> Any | None:
         if not hasattr(model_artifact, "predict_proba"):
             return None
 

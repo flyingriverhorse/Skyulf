@@ -9,7 +9,7 @@ call ``execute_pipeline`` directly with a real or mocked session.
 import logging
 import re
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
             return
 
         job.status = "running"
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         job.progress = 0
         session.commit()
         publish_job_event(JobEvent(event="status", job_id=job_id, status="running", progress=0))
@@ -140,7 +140,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
         if result.status == "success":
             job.status = "completed"
             job.progress = 100
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
             job.artifact_uri = base_artifact_uri
             strategy.handle_success(job, result)
         else:

@@ -5,8 +5,8 @@ This is the async equivalent of the Flask db/connections/postgres_db_connection/
 
 import logging
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 from urllib.parse import quote_plus
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

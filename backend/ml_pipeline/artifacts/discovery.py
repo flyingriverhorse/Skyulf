@@ -15,7 +15,6 @@ import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
 
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.store import ArtifactStore
@@ -34,7 +33,7 @@ class ReferenceArtifact:
     job_id: str
     dataset_name: str
     filename: str
-    created_at: Optional[str]
+    created_at: str | None
     folder: str
 
 
@@ -42,7 +41,7 @@ class ArtifactDiscovery(ABC):
     """Root-level discovery of job folders and their reference artifacts."""
 
     @abstractmethod
-    def list_reference_artifacts(self) -> List[ReferenceArtifact]:
+    def list_reference_artifacts(self) -> list[ReferenceArtifact]:
         """List every ``reference_data_*`` artifact across all job folders."""
 
     @abstractmethod
@@ -61,7 +60,7 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
         self.root_path = Path(root_path).expanduser().resolve()
 
     @staticmethod
-    def _parse_created_at(folder_name: str) -> Optional[str]:
+    def _parse_created_at(folder_name: str) -> str | None:
         match = _TIMESTAMP_RE.search(folder_name)
         if not match:
             return None
@@ -73,11 +72,11 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
         except ValueError:
             return None
 
-    def list_reference_artifacts(self) -> List[ReferenceArtifact]:
+    def list_reference_artifacts(self) -> list[ReferenceArtifact]:
         if not self.root_path.exists():
             return []
 
-        artifacts: List[ReferenceArtifact] = []
+        artifacts: list[ReferenceArtifact] = []
         try:
             root_items = list(self.root_path.iterdir())
         except OSError:

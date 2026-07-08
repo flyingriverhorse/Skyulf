@@ -20,7 +20,7 @@ will never work (e.g. `Oversampling` requires imblearn + numeric-only
 features + a binary `y`). Those are covered by their own targeted tests.
 """
 
-from typing import Any, Dict, Set, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -67,7 +67,7 @@ def _make_dataset(n: int = 120, seed: int = 0) -> pd.DataFrame:
 _NUMERIC_COLS = ["num_a", "num_b", "with_outliers", "with_missing"]
 _CATEGORICAL_COLS = ["cat_low", "cat_mid"]
 
-_COLUMN_OVERRIDES: Dict[str, Dict[str, Any]] = {
+_COLUMN_OVERRIDES: dict[str, dict[str, Any]] = {
     # Scalers / transformers — numeric only.
     "MinMaxScaler": {"columns": _NUMERIC_COLS},
     "MaxAbsScaler": {"columns": _NUMERIC_COLS},
@@ -111,7 +111,7 @@ _COLUMN_OVERRIDES: Dict[str, Dict[str, Any]] = {
 # in this smoke test. They have their own dedicated tests.
 # ---------------------------------------------------------------------------
 
-_NEEDS_SPECIAL_INPUT: Set[str] = {
+_NEEDS_SPECIAL_INPUT: set[str] = {
     # Resamplers need imblearn + a binary y as a separate Series.
     "Oversampling",
     "Undersampling",
@@ -119,7 +119,7 @@ _NEEDS_SPECIAL_INPUT: Set[str] = {
 
 # Optional: nodes where we expect fit to silently no-op (return {} or None);
 # we still call them but skip the apply step.
-_FIT_MAY_BE_EMPTY: Set[str] = set()
+_FIT_MAY_BE_EMPTY: set[str] = set()
 
 
 # ---------------------------------------------------------------------------
@@ -127,17 +127,17 @@ _FIT_MAY_BE_EMPTY: Set[str] = set()
 # ---------------------------------------------------------------------------
 
 
-def _build_config(node_id: str, meta: Dict[str, Any]) -> Dict[str, Any]:
+def _build_config(node_id: str, meta: dict[str, Any]) -> dict[str, Any]:
     """Merge the node's declared default params with our column overrides."""
-    config: Dict[str, Any] = dict(meta.get("params") or {})
+    config: dict[str, Any] = dict(meta.get("params") or {})
     if node_id in _COLUMN_OVERRIDES:
         config.update(_COLUMN_OVERRIDES[node_id])
     return config
 
 
 def _maybe_call_apply(
-    applier: Any, X: pd.DataFrame, y: Any, params: Dict[str, Any]
-) -> Tuple[bool, str]:
+    applier: Any, X: pd.DataFrame, y: Any, params: dict[str, Any]
+) -> tuple[bool, str]:
     """Return ``(ok, reason)`` after attempting ``applier.apply``."""
     try:
         # Most nodes use the (X, params) shape; encoders that touch a target

@@ -1,7 +1,7 @@
 """Security, authentication, session, and CORS settings."""
 
 import secrets
-from typing import Annotated, List
+from typing import Annotated
 
 from pydantic_settings import NoDecode
 
@@ -44,11 +44,11 @@ class SecurityMixin:
     # NoDecode: pydantic-settings must not JSON-decode these before the field_validator
     # runs in base.py. Without it, comma-separated env values (e.g. localhost,127.0.0.1)
     # raise a JSONDecodeError before our split() validator ever fires.
-    CORS_ORIGINS: Annotated[List[str], NoDecode] = [
+    CORS_ORIGINS: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://localhost:8080",
     ]
-    ALLOWED_HOSTS: Annotated[List[str], NoDecode] = ["localhost", "127.0.0.1"]
+    ALLOWED_HOSTS: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1"]
 
     # API Docs
     API_DOCS_ENABLED: bool | None = None
@@ -61,7 +61,7 @@ class SecurityMixin:
     API_DOCS_DISPLAY_REQUEST_DURATION: bool = True
     API_DOCS_ENABLE_FILTER: bool = True
     API_DOCS_ENABLE_TRY_IT_OUT: bool = True
-    API_DOCS_SERVERS: List[str] = []
+    API_DOCS_SERVERS: list[str] = []
     API_CONTACT_NAME: str | None = "Skyulf Support"
     API_CONTACT_EMAIL: str | None = None
     API_CONTACT_URL: str | None = None

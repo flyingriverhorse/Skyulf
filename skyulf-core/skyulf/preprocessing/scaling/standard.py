@@ -1,7 +1,7 @@
 """Standard scaler node (zero mean, unit variance)."""
 
 import logging
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 from sklearn.preprocessing import StandardScaler
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _needs_fitted_artifact(
-    valid: List[str], with_mean: bool, mean: Any, with_std: bool, scale: Any
+    valid: list[str], with_mean: bool, mean: Any, with_std: bool, scale: Any
 ) -> bool:
     """True when there's nothing to scale, or a flag's required artifact is missing.
 
@@ -40,11 +40,11 @@ def _needs_fitted_artifact(
 
 class StandardScalerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -73,7 +73,7 @@ class StandardScalerApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         mean = params.get("mean")
         scale = params.get("scale")
@@ -105,13 +105,13 @@ class StandardScalerApplier(BaseApplier):
 )
 class StandardScalerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Scalers preserve column set; values change but names/order do not.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> StandardScalerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> StandardScalerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(StandardScalerArtifact, {})
         return cast(
@@ -120,21 +120,21 @@ class StandardScalerCalculator(BaseCalculator):
         )
 
     @staticmethod
-    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_polars(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_polars(X, config)
         if not cols:
             return {}
         return _fit_standard(X_subset, cols, config)
 
     @staticmethod
-    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_pandas(X, config)
         if not cols:
             return {}
         return _fit_standard(X_subset, cols, config)
 
 
-def _fit_standard(X_subset: Any, cols: List[str], config: Dict[str, Any]) -> Dict[str, Any]:
+def _fit_standard(X_subset: Any, cols: list[str], config: dict[str, Any]) -> dict[str, Any]:
     with_mean = config.get("with_mean", True)
     with_std = config.get("with_std", True)
     scaler = StandardScaler(with_mean=with_mean, with_std=with_std)

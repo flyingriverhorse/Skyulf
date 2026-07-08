@@ -7,7 +7,6 @@ empty data) since ``analyze()`` fans out into nearly every ``_analyzer``
 mixin in one pass.
 """
 
-from typing import List
 
 import numpy as np
 import polars as pl
@@ -179,7 +178,7 @@ def test_analyze_applies_filters_and_exclusions(mixed_df: pl.DataFrame) -> None:
 
 def test_analyze_filters_all_operators(mixed_df: pl.DataFrame) -> None:
     """Each supported filter operator should be applied without raising."""
-    ops: List[dict] = [
+    ops: list[dict] = [
         {"column": "num1", "operator": ">", "value": 0.0},
         {"column": "num1", "operator": "<", "value": 100.0},
         {"column": "num1", "operator": ">=", "value": -100.0},

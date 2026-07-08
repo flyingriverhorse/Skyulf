@@ -28,7 +28,7 @@ graph classification and the HTTP endpoint.
 import json
 import logging
 import re
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -69,11 +69,11 @@ _PREVIEW_STEPS = {"data_preview", "Unknown"}
 
 
 def _build_adjacency(
-    nodes: List[_NodeIn],
-) -> Tuple[Dict[str, _NodeIn], Dict[str, int], Dict[str, List[str]]]:
+    nodes: list[_NodeIn],
+) -> tuple[dict[str, _NodeIn], dict[str, int], dict[str, list[str]]]:
     by_id = {n.node_id: n for n in nodes}
-    indeg: Dict[str, int] = {nid: 0 for nid in by_id}
-    children: Dict[str, List[str]] = {nid: [] for nid in by_id}
+    indeg: dict[str, int] = {nid: 0 for nid in by_id}
+    children: dict[str, list[str]] = {nid: [] for nid in by_id}
     for n in nodes:
         for src in n.inputs:
             if src in by_id:
@@ -83,10 +83,10 @@ def _build_adjacency(
 
 
 def _kahn_walk(
-    by_id: Dict[str, _NodeIn], indeg: Dict[str, int], children: Dict[str, List[str]]
-) -> List[str]:
+    by_id: dict[str, _NodeIn], indeg: dict[str, int], children: dict[str, list[str]]
+) -> list[str]:
     queue = [nid for nid, deg in indeg.items() if deg == 0]
-    ordered: List[str] = []
+    ordered: list[str] = []
     while queue:
         cur = queue.pop(0)
         ordered.append(cur)
@@ -99,30 +99,30 @@ def _kahn_walk(
     return ordered
 
 
-def _topo_sort(nodes: List[_NodeIn]) -> List[_NodeIn]:
+def _topo_sort(nodes: list[_NodeIn]) -> list[_NodeIn]:
     """Kahn's algorithm. Stable: ties resolved by original list order."""
     by_id, indeg, children = _build_adjacency(nodes)
     return [by_id[i] for i in _kahn_walk(by_id, indeg, children)]
 
 
 def _classify(
-    nodes: List[_NodeIn],
-) -> Tuple[
-    Optional[_NodeIn],
-    List[_NodeIn],
-    Optional[_NodeIn],
-    Optional[_NodeIn],
-    Optional[_NodeIn],
+    nodes: list[_NodeIn],
+) -> tuple[
+    _NodeIn | None,
+    list[_NodeIn],
+    _NodeIn | None,
+    _NodeIn | None,
+    _NodeIn | None,
 ]:
     """Bucket the topologically-sorted nodes into the sections of a notebook.
 
     Returns ``(loader, preprocess, feature_target_split, train_test_split, model)``.
     """
-    loader: Optional[_NodeIn] = None
-    feat_target: Optional[_NodeIn] = None
-    train_test: Optional[_NodeIn] = None
-    model: Optional[_NodeIn] = None
-    preprocess: List[_NodeIn] = []
+    loader: _NodeIn | None = None
+    feat_target: _NodeIn | None = None
+    train_test: _NodeIn | None = None
+    model: _NodeIn | None = None
+    preprocess: list[_NodeIn] = []
     for n in nodes:
         st = n.step_type
         if st in _DATA_LOADER_STEPS:
@@ -145,7 +145,7 @@ def _classify(
 # ---------------------------------------------------------------------------
 
 
-def _terminal_models(nodes: List[_NodeIn]) -> List[_NodeIn]:
+def _terminal_models(nodes: list[_NodeIn]) -> list[_NodeIn]:
     """Models with no *runtime* descendants — each defines an independent training branch.
 
     A canvas with two trainers fed by separate splits = two branches; the
@@ -158,7 +158,7 @@ def _terminal_models(nodes: List[_NodeIn]) -> List[_NodeIn]:
     silently strip that whole branch from the exported notebook.
     """
     by_id, _, children = _build_adjacency(nodes)
-    out: List[_NodeIn] = []
+    out: list[_NodeIn] = []
     for n in _topo_sort(nodes):
         if n.step_type not in _MODELING_STEPS:
             continue
@@ -172,9 +172,9 @@ def _terminal_models(nodes: List[_NodeIn]) -> List[_NodeIn]:
     return out
 
 
-def _dedupe_preserve_order(items: List[str]) -> List[str]:
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
     seen: set = set()
-    out: List[str] = []
+    out: list[str] = []
     for x in items:
         if x not in seen:
             seen.add(x)
@@ -182,7 +182,7 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
     return out
 
 
-def _expand_parallel_terminals(nodes: List[_NodeIn]) -> List[_NodeIn]:
+def _expand_parallel_terminals(nodes: list[_NodeIn]) -> list[_NodeIn]:
     """Split multi-input parallel trainers into one virtual terminal per input.
 
     Mirrors the runtime engine rule in
@@ -195,7 +195,7 @@ def _expand_parallel_terminals(nodes: List[_NodeIn]) -> List[_NodeIn]:
     each with ``inputs=[single_root]`` and a unique ``node_id`` suffix, so the
     existing per-branch ancestor walk works unchanged.
     """
-    expanded: List[_NodeIn] = []
+    expanded: list[_NodeIn] = []
     for n in nodes:
         unique_inputs = _dedupe_preserve_order(list(n.inputs))
         is_parallel = (
@@ -220,7 +220,7 @@ def _expand_parallel_terminals(nodes: List[_NodeIn]) -> List[_NodeIn]:
     return expanded
 
 
-def _ancestors_in_topo(target_id: str, all_nodes: List[_NodeIn]) -> List[_NodeIn]:
+def _ancestors_in_topo(target_id: str, all_nodes: list[_NodeIn]) -> list[_NodeIn]:
     """All ancestors of ``target_id`` (excluding self) in topological order."""
     by_id, _, _ = _build_adjacency(all_nodes)
     seen = {target_id}
@@ -239,9 +239,9 @@ def _ancestors_in_topo(target_id: str, all_nodes: List[_NodeIn]) -> List[_NodeIn
 
 
 def _resolve_dataset_path(
-    loader: Optional[_NodeIn],
-    dataset_name: Optional[str],
-    db_file_path: Optional[str] = None,
+    loader: _NodeIn | None,
+    dataset_name: str | None,
+    db_file_path: str | None = None,
 ) -> str:
     """Pick the most useful CSV path for the notebook's `pd.read_csv(...)`.
 
@@ -261,8 +261,8 @@ def _resolve_dataset_path(
 
 
 def _resolve_target_column(
-    feat_target: Optional[_NodeIn], train_test: Optional[_NodeIn]
-) -> Optional[str]:
+    feat_target: _NodeIn | None, train_test: _NodeIn | None
+) -> str | None:
     for src in (feat_target, train_test):
         if src and isinstance(src.params.get("target_column"), str):
             return src.params["target_column"]
@@ -277,9 +277,9 @@ def _resolve_target_column(
 def _build_compact_notebook(
     cfg: _PipelineIn,
     dataset_id: str,
-    dataset_name: Optional[str],
-    db_file_path: Optional[str] = None,
-) -> Dict[str, Any]:
+    dataset_name: str | None,
+    db_file_path: str | None = None,
+) -> dict[str, Any]:
     nodes = _expand_parallel_terminals(_topo_sort(cfg.nodes))
     terminals = _terminal_models(nodes)
     if len(terminals) > 1:
@@ -308,7 +308,7 @@ def _build_compact_notebook(
     data_path = _resolve_dataset_path(loader, dataset_name, db_file_path)
     target_col = _resolve_target_column(feat_target, train_test) or "<target_column>"
     config_json = nb._to_py_literal(skyulf_cfg)
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         nb.md_cell(
             nb.compact_summary_md(
                 cfg, dataset_id, dataset_name, preprocess, feat_target, train_test, model
@@ -326,9 +326,9 @@ def _build_compact_notebook(
 def _build_full_notebook(
     cfg: _PipelineIn,
     dataset_id: str,
-    dataset_name: Optional[str],
-    db_file_path: Optional[str] = None,
-) -> Dict[str, Any]:
+    dataset_name: str | None,
+    db_file_path: str | None = None,
+) -> dict[str, Any]:
     nodes = _expand_parallel_terminals(_topo_sort(cfg.nodes))
     terminals = _terminal_models(nodes)
     if len(terminals) > 1:
@@ -349,7 +349,7 @@ def _build_full_notebook(
         )
     loader, preprocess, feat_target, train_test, model = _classify(nodes)
     data_path = _resolve_dataset_path(loader, dataset_name, db_file_path)
-    cells: List[Dict[str, Any]] = [
+    cells: list[dict[str, Any]] = [
         nb.md_cell(
             nb.full_summary_md(
                 cfg, dataset_id, dataset_name, nodes, preprocess, feat_target, train_test, model
@@ -372,7 +372,7 @@ def _build_full_notebook(
 # ---------------------------------------------------------------------------
 
 
-async def _lookup_dataset_name(dataset_id: str, session: AsyncSession) -> Optional[str]:
+async def _lookup_dataset_name(dataset_id: str, session: AsyncSession) -> str | None:
     """Best-effort dataset display name; failure is non-fatal."""
     stmt = select(FeatureEngineeringPipeline.name).where(
         FeatureEngineeringPipeline.dataset_source_id == dataset_id,
@@ -386,7 +386,7 @@ async def _lookup_dataset_name(dataset_id: str, session: AsyncSession) -> Option
         return None
 
 
-async def _lookup_dataset_file_path(dataset_id: str, session: AsyncSession) -> Optional[str]:
+async def _lookup_dataset_file_path(dataset_id: str, session: AsyncSession) -> str | None:
     """Resolve a `DataSource.source_id` to its on-disk file path.
 
     Returned as a forward-slash POSIX path so notebooks open cleanly on any OS.
@@ -398,7 +398,7 @@ async def _lookup_dataset_file_path(dataset_id: str, session: AsyncSession) -> O
         ds = result.scalar_one_or_none()
         if ds is None:
             return None
-        source_dict: Dict[str, Any] = {
+        source_dict: dict[str, Any] = {
             "file_path": None,
             "connection_info": ds.config if isinstance(ds.config, dict) else {},
             "config": ds.config if isinstance(ds.config, dict) else {},

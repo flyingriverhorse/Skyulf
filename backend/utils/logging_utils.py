@@ -7,13 +7,12 @@ import logging
 import os
 from logging import Handler
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
-from typing import Optional
 
 # Get logger for data actions
 data_logger = logging.getLogger("data_actions")
 
 
-def log_data_action(action: str, success: bool = True, details: Optional[str] = None):
+def log_data_action(action: str, success: bool = True, details: str | None = None):
     """
     Log data-related actions for monitoring and debugging
 
@@ -104,7 +103,7 @@ def setup_universal_logging(
         )
         file_handler.setFormatter(file_formatter)
         root_logger.addHandler(file_handler)
-    except (OSError, IOError) as e:
+    except OSError as e:
         # Fallback if file logging fails — use stderr since logging may not be ready
         import sys
 

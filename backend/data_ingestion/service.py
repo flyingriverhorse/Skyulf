@@ -1,8 +1,9 @@
 import logging
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Union, cast
+from typing import Any, cast
 
 import aiofiles
 from fastapi import BackgroundTasks, HTTPException, UploadFile
@@ -29,7 +30,7 @@ class DataIngestionService:
         self.data_service = DataService()
 
     async def list_sources(
-        self, user_id: Optional[int] = None, limit: int = 50, skip: int = 0
+        self, user_id: int | None = None, limit: int = 50, skip: int = 0
     ) -> Sequence[DataSource]:
         """
         List all data sources.
@@ -45,7 +46,7 @@ class DataIngestionService:
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def list_usable_sources(self, user_id: Optional[int] = None) -> Sequence[DataSource]:
+    async def list_usable_sources(self, user_id: int | None = None) -> Sequence[DataSource]:
         """
         List only successfully ingested data sources.
         """
@@ -56,7 +57,7 @@ class DataIngestionService:
         result = await self.session.execute(query)
         return result.scalars().all()
 
-    async def get_source(self, source_id: Union[int, str]) -> Optional[DataSource]:
+    async def get_source(self, source_id: int | str) -> DataSource | None:
         """
         Get a data source by ID (PK) or source_id (UUID).
         """
@@ -73,11 +74,11 @@ class DataIngestionService:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_data_source_by_id(self, ds_id: int) -> Optional[DataSource]:
+    async def get_data_source_by_id(self, ds_id: int) -> DataSource | None:
         """Alias for get_source with int ID, for backward compatibility if needed."""
         return await self.get_source(ds_id)
 
-    async def delete_source(self, source_id: Union[int, str]) -> bool:
+    async def delete_source(self, source_id: int | str) -> bool:
         """
         Delete a data source and its associated file if applicable.
         """
@@ -101,7 +102,7 @@ class DataIngestionService:
         await self.session.commit()
         return True
 
-    async def cancel_ingestion(self, source_id: Union[int, str]) -> bool:
+    async def cancel_ingestion(self, source_id: int | str) -> bool:
         """
         Cancel an ongoing ingestion job.
 
@@ -126,7 +127,7 @@ class DataIngestionService:
                 "status": "cancelled",
                 "progress": ingestion_status.get("progress", 0.0),
                 "error": "Cancelled by user",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             }
             cast(Any, source).source_metadata = metadata
             await self.session.commit()
@@ -135,7 +136,7 @@ class DataIngestionService:
         # already holds, so the cancel is a successful no-op.
         return True
 
-    async def get_sample(self, source_id: Union[int, str], limit: int = 5) -> list[dict]:
+    async def get_sample(self, source_id: int | str, limit: int = 5) -> list[dict]:
         """
         Get a sample of data from the source.
         """
@@ -146,11 +147,11 @@ class DataIngestionService:
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
 
-        config: Dict[str, Any] = cast(Dict[str, Any], source.config) or {}
+        config: dict[str, Any] = cast(dict[str, Any], source.config) or {}
         # Normalize path retrieval: check 'file_path' then 'path'
         file_path = config.get("file_path") or config.get("path")
 
-        connector: Union[S3Connector, LocalFileConnector]
+        connector: S3Connector | LocalFileConnector
 
         # Check for S3 path first, regardless of source type
         if file_path and str(file_path).startswith("s3://"):
@@ -237,7 +238,7 @@ class DataIngestionService:
         self,
         file: UploadFile,
         user_id: int,
-        background_tasks: Optional[BackgroundTasks] = None,
+        background_tasks: BackgroundTasks | None = None,
     ) -> IngestionJobResponse:
         """
         Handle file upload and create a data source entry.
@@ -317,7 +318,7 @@ class DataIngestionService:
                     "ingestion_status": {
                         "status": "pending",
                         "progress": 0.0,
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now(UTC).isoformat(),
                     },
                     "original_filename": raw_name,
                     "file_size": file_path.stat().st_size,
@@ -361,7 +362,7 @@ class DataIngestionService:
                 file_path.unlink()
             raise SkyulfException(message=f"Database error: {str(e)}")
 
-    async def get_ingestion_status(self, source_id: int) -> Dict[str, Any]:
+    async def get_ingestion_status(self, source_id: int) -> dict[str, Any]:
         """
         Get the status of an ingestion job.
         """
@@ -371,5 +372,5 @@ class DataIngestionService:
         if not source:
             raise HTTPException(status_code=404, detail="DataSource not found")
 
-        metadata: Dict[str, Any] = cast(Dict[str, Any], source.source_metadata) or {}
-        return cast(Dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))
+        metadata: dict[str, Any] = cast(dict[str, Any], source.source_metadata) or {}
+        return cast(dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))

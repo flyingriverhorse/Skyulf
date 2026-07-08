@@ -6,7 +6,7 @@ VADER unavailability, empty/non-string text lists, the ``total == 0``
 short-circuit, and the outer exception fallback.
 """
 
-from typing import Any, List
+from typing import Any
 
 import polars as pl
 import pytest
@@ -25,7 +25,7 @@ class _FakeTextSeries:
     polars Utf8 Series cannot represent.
     """
 
-    def __init__(self, items: List[Any]) -> None:
+    def __init__(self, items: list[Any]) -> None:
         self._items = items
 
     def len(self) -> int:
@@ -37,11 +37,11 @@ class _FakeTextSeries:
     def drop_nulls(self) -> "_FakeTextSeries":
         return _FakeTextSeries([i for i in self._items if i is not None])
 
-    def to_list(self) -> List[Any]:
+    def to_list(self) -> list[Any]:
         return self._items
 
 
-def _text_analyzer(texts: List[str]) -> EDAAnalyzer:
+def _text_analyzer(texts: list[str]) -> EDAAnalyzer:
     df = pl.DataFrame({"t": texts})
     return EDAAnalyzer(df)
 

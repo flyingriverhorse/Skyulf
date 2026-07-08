@@ -1,4 +1,3 @@
-from typing import Optional
 
 import polars as pl
 
@@ -10,7 +9,7 @@ class EDAVisualizer:
     Helper class to visualize Skyulf EDA results using Rich (terminal) and Matplotlib (plots).
     """
 
-    def __init__(self, profile: DatasetProfile, df: Optional[pl.DataFrame] = None):
+    def __init__(self, profile: DatasetProfile, df: pl.DataFrame | None = None):
         self.profile = profile
         self.df = df
 

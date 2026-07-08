@@ -8,7 +8,7 @@ single row, constant column, non-numeric column, too-few-samples).
 """
 
 import typing
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -230,7 +230,7 @@ class TestZScoreApplier:
         because a single 500.0 outlier would otherwise inflate std enough to
         pull its own z-score back under the threshold.
         """
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "stats": {"val": {"mean": 10.0, "std": 0.2}},
             "threshold": 3.0,
         }
@@ -242,7 +242,7 @@ class TestZScoreApplier:
     def test_boundary_within_threshold_kept(self) -> None:
         """A value exactly at the threshold boundary must be kept (<=, not <)."""
         stat_mean, stat_std, threshold = 0.0, 1.0, 3.0
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "stats": {"val": {"mean": stat_mean, "std": stat_std}},
             "threshold": threshold,
         }
