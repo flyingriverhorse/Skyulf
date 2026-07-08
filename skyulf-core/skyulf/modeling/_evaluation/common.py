@@ -70,8 +70,8 @@ def downsample_curve(x: np.ndarray, y: np.ndarray, limit: int = 1000) -> list[Cu
     x_sampled = x[indices]
     y_sampled = y[indices]
 
-    points = []
-    for i in range(len(x_sampled)):
-        points.append(CurvePoint(x=float(x_sampled[i]), y=float(y_sampled[i])))
+    points = [
+        CurvePoint(x=float(x_sampled[i]), y=float(y_sampled[i])) for i in range(len(x_sampled))
+    ]
 
     return points

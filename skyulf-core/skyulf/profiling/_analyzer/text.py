@@ -32,8 +32,10 @@ class TextMixin(_AnalyzerState):
                 .head(10)
             )
 
-            for row in word_counts.iter_rows(named=True):
-                common_words.append({"word": row["word"], "count": row["count"]})
+            common_words.extend(
+                {"word": row["word"], "count": row["count"]}
+                for row in word_counts.iter_rows(named=True)
+            )
         except Exception as e:
             print(f"Error calculating common words for {col}: {e}")
 

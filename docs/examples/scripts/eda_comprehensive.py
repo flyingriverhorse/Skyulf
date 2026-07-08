@@ -157,19 +157,18 @@ def visualize_target_interactions(profile):
         # We have pre-computed stats (min, q1, median, q3, max)
         # Matplotlib's bxp takes a list of dictionaries
 
-        bxp_stats = []
-        for cat_data in interaction.data:
-            bxp_stats.append(
-                {
-                    "label": cat_data.name,
-                    "whislo": cat_data.stats.min,  # Bottom whisker
-                    "q1": cat_data.stats.q1,  # First quartile
-                    "med": cat_data.stats.median,  # Median
-                    "q3": cat_data.stats.q3,  # Third quartile
-                    "whishi": cat_data.stats.max,  # Top whisker
-                    "fliers": [],  # Outliers not stored in this summary
-                }
-            )
+        bxp_stats = [
+            {
+                "label": cat_data.name,
+                "whislo": cat_data.stats.min,  # Bottom whisker
+                "q1": cat_data.stats.q1,  # First quartile
+                "med": cat_data.stats.median,  # Median
+                "q3": cat_data.stats.q3,  # Third quartile
+                "whishi": cat_data.stats.max,  # Top whisker
+                "fliers": [],  # Outliers not stored in this summary
+            }
+            for cat_data in interaction.data
+        ]
 
         plt.bxp(bxp_stats, showfliers=False)
 

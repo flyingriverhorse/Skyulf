@@ -84,10 +84,7 @@ expected_nodes = [
     "random_forest_regressor",
 ]
 
-missing = []
-for node in expected_nodes:
-    if node not in metadata:
-        missing.append(node)
+missing = [node for node in expected_nodes if node not in metadata]
 
 if missing:
     print(f"❌ Missing nodes: {missing}")
