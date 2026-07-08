@@ -86,7 +86,7 @@ class TemporalMixin(_AnalyzerState):
                 if not cols_to_track:
                     trend_df = _collect(
                         ts_df.group_by_dynamic(date_col, every=interval)
-                        .agg(pl.count().alias("count"))
+                        .agg(pl.len().alias("count"))
                         .sort(date_col)
                     )
                 else:

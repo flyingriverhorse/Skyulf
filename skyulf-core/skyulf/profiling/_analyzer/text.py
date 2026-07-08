@@ -27,7 +27,7 @@ class TextMixin(_AnalyzerState):
 
             word_counts = (
                 words.group_by("word")
-                .agg(pl.count().alias("count"))
+                .agg(pl.len().alias("count"))
                 .sort("count", descending=True)
                 .head(10)
             )
