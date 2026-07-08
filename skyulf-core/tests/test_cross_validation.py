@@ -1,6 +1,5 @@
 """Tests for skyulf.modeling.cross_validation."""
 
-from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
@@ -8,8 +7,7 @@ import pytest
 from sklearn.datasets import make_classification, make_regression
 from tests.utils.dataset_loader import load_sample_dataset
 
-from skyulf.modeling._tuning.schemas import TuningConfig
-from skyulf.modeling.base import BaseModelCalculator, StatefulEstimator
+from skyulf.modeling.base import BaseModelCalculator
 from skyulf.modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,

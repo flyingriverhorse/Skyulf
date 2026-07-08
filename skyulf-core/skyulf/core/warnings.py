@@ -10,13 +10,13 @@ string shape to change at once.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 __all__ = ["WarningCategory", "SkyulfWarning"]
 
 
-class WarningCategory(str, Enum):
+class WarningCategory(StrEnum):
     """Coarse buckets for filtering and aggregating node warnings."""
 
     DATA_QUALITY = "data_quality"

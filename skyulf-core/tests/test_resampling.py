@@ -4,7 +4,6 @@ Covers: fit artifact, apply with imbalanced data, helper functions,
 edge cases (balanced input, 1-sample class, non-numeric columns, missing target).
 """
 
-import importlib.util
 from typing import Any
 
 import numpy as np

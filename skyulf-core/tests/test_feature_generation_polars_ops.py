@@ -20,7 +20,6 @@ from skyulf.preprocessing.feature_generation import (
 )
 from skyulf.preprocessing.feature_generation._polars_ops import (
     _POLARS_DT_FEATURES,
-    _build_polars_dt_exprs,
     _polars_arith,
     _polars_arith_terms,
     _polars_datetime_apply,

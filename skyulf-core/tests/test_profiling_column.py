@@ -14,7 +14,7 @@ import polars as pl
 import pytest
 
 from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.schemas import CategoricalStats, NumericStats
+from skyulf.profiling.schemas import CategoricalStats
 
 
 def _basic_analyzer(df: pl.DataFrame) -> EDAAnalyzer:

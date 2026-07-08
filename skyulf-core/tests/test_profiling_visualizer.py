@@ -18,16 +18,13 @@ matplotlib.use("Agg")  # Headless backend so plt.show() never blocks the test ru
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 from skyulf.profiling.schemas import (
-    BoxPlotStats,
     CategoricalStats,
-    CategoryBoxPlot,
     ClusteringAnalysis,
     ClusteringPoint,
     ClusterStats,
     ColumnProfile,
     CorrelationMatrix,
     DatasetProfile,
-    GeoPoint,
     GeospatialStats,
     OutlierAnalysis,
     OutlierPoint,
