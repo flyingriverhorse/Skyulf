@@ -11,6 +11,8 @@ import polars as pl
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_generation import (
     _featgen_apply_pandas,
@@ -34,6 +36,22 @@ from skyulf.preprocessing.feature_generation._polars_ops import (
 # ---------------------------------------------------------------------------
 
 _DF = pl.DataFrame({"a": [1.0, 2.0, 3.0, 4.0], "b": [10.0, 20.0, 0.0, 40.0]})
+
+_arith_value_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="arith_values"
+).load()
+_arith_none_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="arith_none"
+).load()
+_group_agg_value_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="group_agg_values"
+).load()
+_group_agg_none_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="group_agg_none"
+).load()
+_ratio_none_cases = TestCaseLoader(
+    "preprocessing/feature_generation_polars_ops", group="ratio_none"
+).load()
 
 
 def _make_pl() -> pl.DataFrame:
@@ -89,35 +107,15 @@ class TestPolarsArithOps:
         assert expr is not None
         return _make_pl().select(expr.alias("r"))["r"].to_list()
 
-    def test_add_two_columns(self) -> None:
-        """Sum of a+b should equal element-wise addition."""
-        vals = self._eval({"method": "add", "input_columns": ["a", "b"]})
-        assert vals == [11.0, 22.0, 33.0, 44.0]
-
-    def test_add_with_constant(self) -> None:
-        """Adding a constant should shift each element."""
-        vals = self._eval({"method": "add", "input_columns": ["a"], "constants": [100.0]})
-        assert vals == [101.0, 102.0, 103.0, 104.0]
-
-    def test_subtract_two_columns(self) -> None:
-        """a - b element-wise."""
-        vals = self._eval({"method": "subtract", "input_columns": ["a", "b"]})
-        assert vals == [-9.0, -18.0, -27.0, -36.0]
-
-    def test_subtract_with_constant(self) -> None:
-        """Subtracting a constant from a column."""
-        vals = self._eval({"method": "subtract", "input_columns": ["a"], "constants": [1.0]})
-        assert vals == [0.0, 1.0, 2.0, 3.0]
-
-    def test_multiply_two_columns(self) -> None:
-        """a * b element-wise."""
-        vals = self._eval({"method": "multiply", "input_columns": ["a", "b"]})
-        assert vals == [10.0, 40.0, 90.0, 160.0]
-
-    def test_multiply_with_constant(self) -> None:
-        """Multiplying a column by a constant."""
-        vals = self._eval({"method": "multiply", "input_columns": ["a"], "constants": [2.0]})
-        assert vals == [2.0, 4.0, 6.0, 8.0]
+    @pytest.mark.parametrize(*_arith_value_cases)
+    def test_arith_ops_produce_expected_values(
+        self, method: str, input_columns: list[str], constants: list[float], expected: list[float]
+    ) -> None:
+        """Success-path arithmetic ops (add/subtract/multiply, column or constant operands)."""
+        vals = self._eval(
+            {"method": method, "input_columns": input_columns, "constants": constants}
+        )
+        assert vals == expected
 
     def test_divide_two_columns(self) -> None:
         """a / b element-wise (no zero denominators here)."""
@@ -138,22 +136,12 @@ class TestPolarsArithOps:
         # Must not be inf or NaN.
         assert all(abs(v) < 1e18 for v in result)
 
-    def test_unknown_method_returns_none(self) -> None:
-        """An unrecognised method key should return None, not raise."""
-        result = _polars_arith(
-            {"method": "hypercube", "input_columns": ["a"]},
-            ["a", "b"],
-            1e-9,
-        )
-        assert result is None
-
-    def test_no_terms_returns_none(self) -> None:
-        """When there are no valid columns or constants, return None."""
-        result = _polars_arith(
-            {"method": "add", "input_columns": ["nonexistent"]},
-            ["a", "b"],
-            1e-9,
-        )
+    @pytest.mark.parametrize(*_arith_none_cases)
+    def test_arith_returns_none_for_invalid_ops(
+        self, method: str, input_columns: list[str]
+    ) -> None:
+        """Unrecognised method or unresolvable columns must return None, not raise."""
+        result = _polars_arith({"method": method, "input_columns": input_columns}, ["a", "b"], 1e-9)
         assert result is None
 
 
@@ -208,15 +196,12 @@ class TestPolarsRatio:
         result = df.select(expr.alias("r"))["r"].to_list()
         assert all(abs(v) < 1e18 for v in result)
 
-    def test_missing_numerator_returns_none(self) -> None:
-        """A ratio with no valid numerator column should return None."""
-        op = {"input_columns": ["missing"], "secondary_columns": ["b"]}
-        assert _polars_ratio(op, ["b"], 1e-9) is None
-
-    def test_missing_denominator_returns_none(self) -> None:
-        """A ratio with no valid denominator column should return None."""
-        op = {"input_columns": ["a"], "secondary_columns": ["missing"]}
-        assert _polars_ratio(op, ["a"], 1e-9) is None
+    @pytest.mark.parametrize(*_ratio_none_cases)
+    def test_ratio_returns_none_for_unresolvable_columns(
+        self, op: dict, existing: list[str]
+    ) -> None:
+        """A ratio with an unresolvable numerator or denominator column returns None."""
+        assert _polars_ratio(op, existing, 1e-9) is None
 
 
 # ---------------------------------------------------------------------------
@@ -292,49 +277,23 @@ class TestPolarsGroupAgg:
         out, _ = _featgen_apply_polars(df, None, params)
         return out[f"out_{method}"].to_list()
 
-    def test_sum(self) -> None:
-        """Group sum: A rows=300, B rows=1200."""
-        vals = self._run_agg("sum")
-        assert vals == [300.0, 300.0, 1200.0, 1200.0, 1200.0]
-
-    def test_min(self) -> None:
-        """Group min: A rows=100, B rows=300."""
-        vals = self._run_agg("min")
-        assert vals == [100.0, 100.0, 300.0, 300.0, 300.0]
-
-    def test_max(self) -> None:
-        """Group max: A rows=200, B rows=500."""
-        vals = self._run_agg("max")
-        assert vals == [200.0, 200.0, 500.0, 500.0, 500.0]
-
-    def test_median(self) -> None:
-        """Group median: A rows=150, B rows=400."""
-        vals = self._run_agg("median")
-        assert vals == [150.0, 150.0, 400.0, 400.0, 400.0]
+    @pytest.mark.parametrize(*_group_agg_value_cases)
+    def test_group_agg_produces_expected_values(self, method: str, expected: list[float]) -> None:
+        """Group-aggregation methods (sum/min/max/median) must broadcast per-group results."""
+        vals = self._run_agg(method)
+        assert vals == expected
 
     def test_std_returns_floats(self) -> None:
         """Group std must return a float column without raising."""
         vals = self._run_agg("std")
         assert all(isinstance(v, float) for v in vals)
 
-    def test_unknown_method_returns_none(self) -> None:
-        """An unregistered aggregation method must produce None, not raise."""
-        op = {
-            "operation_type": "group_agg",
-            "method": "nonexistent",
-            "input_columns": ["dept"],
-            "secondary_columns": ["salary"],
-        }
-        result = _polars_group_agg(op, ["dept", "salary"], 1e-9)
-        assert result is None
-
-    def test_missing_group_col_returns_none(self) -> None:
-        """Missing group column must return None."""
-        op = {
-            "method": "mean",
-            "input_columns": ["missing"],
-            "secondary_columns": ["salary"],
-        }
+    @pytest.mark.parametrize(*_group_agg_none_cases)
+    def test_group_agg_returns_none_for_invalid_ops(
+        self, method: str, input_columns: list[str]
+    ) -> None:
+        """An unregistered method or unresolvable group column must return None, not raise."""
+        op = {"method": method, "input_columns": input_columns, "secondary_columns": ["salary"]}
         result = _polars_group_agg(op, ["dept", "salary"], 1e-9)
         assert result is None
 
@@ -527,3 +486,38 @@ def test_arith_engine_parity(op_type: str, method: str, df_pd: pd.DataFrame) -> 
     pd_vals = out_pd["result"].to_numpy()
     pl_vals = out_pl["result"].to_numpy()
     np.testing.assert_allclose(pd_vals, pl_vals, rtol=1e-6, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: null handling in polars arithmetic ops
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify that _featgen_apply_polars handles the customers.csv sample,
+    which contains null (NaN) values in age/income, without crashing and
+    preserves row count — nulls must propagate in arithmetic results, not
+    cause silent row removal.
+    """
+
+    def test_add_op_on_null_containing_columns_preserves_all_rows(self) -> None:
+        """An arithmetic add on age+income must not drop rows that have nulls —
+        row count must be identical to the input even when null-filling is applied."""
+        df = load_sample_dataset("customers", engine="polars")
+        params = {
+            "operations": [
+                {
+                    "operation_type": "arithmetic",
+                    "method": "add",
+                    "input_columns": ["age", "income"],
+                    "output_column": "age_plus_income",
+                }
+            ]
+        }
+        out, _ = _featgen_apply_polars(df, None, params)
+        # Row count must be preserved — nulls must not cause row removal.
+        assert out.shape[0] == df.shape[0]
+        assert "age_plus_income" in out.columns
+        # Rows where both age and income have values must produce a non-null result.
+        both_present = df["age"].is_not_null() & df["income"].is_not_null()
+        assert out.filter(both_present)["age_plus_income"].is_not_null().all()

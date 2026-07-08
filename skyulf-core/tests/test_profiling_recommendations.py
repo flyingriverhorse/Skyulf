@@ -7,6 +7,7 @@ covering the skewness "Transform", high-cardinality "Encode", and
 """
 
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 from skyulf.profiling.schemas import CategoricalStats, ColumnProfile, NumericStats
@@ -120,3 +121,29 @@ def test_generate_recommendations_combines_all_branches_for_one_column() -> None
     assert "Transform" in actions
     assert "Encode" in actions
     assert "Drop" in actions
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    run through the full :meth:`EDAAnalyzer.analyze` pipeline so
+    ``_generate_recommendations`` sees real column profiles instead of
+    hand-built ``ColumnProfile`` objects.
+    """
+
+    def test_analyze_flags_missing_value_columns_for_imputation(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        profile = analyzer.analyze(target_col="churned")
+
+        recs_by_column = {r.column: r for r in profile.recommendations}
+
+        # age/income/city/lat/lon each have some missing values (but not more
+        # than 50%) -> every one should be flagged for imputation, not dropped.
+        for col in ("age", "income", "city", "lat", "lon"):
+            assert recs_by_column[col].action == "Impute"
+            assert "Missing values" in recs_by_column[col].reason
+
+        # customer_id is a small (15-row) unique sequence: below the
+        # unique_count > 50 threshold used to flag "likely ID" columns, so it
+        # is not flagged here even though it is a perfect identifier.
+        assert "customer_id" not in recs_by_column

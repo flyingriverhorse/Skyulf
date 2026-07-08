@@ -12,6 +12,8 @@ import pandas as pd
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_generation import (
     FeatureGenerationApplier,
@@ -31,30 +33,33 @@ from skyulf.preprocessing.feature_generation._pandas_ops import _pandas_group_ag
 _APPLIER = FeatureGenerationApplier()
 _CALC = FeatureGenerationCalculator()
 
+_resolve_output_col_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="resolve_output_col"
+).load()
+_coerce_float_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="coerce_float"
+).load()
+_noop_skip_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="noop_skips"
+).load()
+_arith_constant_cases = TestCaseLoader(
+    "preprocessing/feature_generation_gaps", group="arith_constant_ops"
+).load()
+
 
 # ---------------------------------------------------------------------------
 # _common.py helpers
 # ---------------------------------------------------------------------------
 
 
-def test_coerce_float_valid_numeric_string() -> None:
-    """A numeric string coerces to its float value."""
-    assert _coerce_float("3.5") == 3.5
-
-
-def test_coerce_float_none_returns_none() -> None:
-    """``None`` input returns ``None`` without raising."""
-    assert _coerce_float(None) is None
-
-
-def test_coerce_float_nan_returns_none() -> None:
-    """A NaN float value is normalised to ``None``."""
-    assert _coerce_float(float("nan")) is None
-
-
-def test_coerce_float_non_numeric_string_returns_none() -> None:
-    """A non-numeric string is treated as missing."""
-    assert _coerce_float("abc") is None
+@pytest.mark.parametrize(*_coerce_float_cases)
+def test_coerce_float(value: Any, expected: float | None) -> None:
+    """``_coerce_float`` normalises numeric strings/None/NaN/non-numeric input consistently."""
+    result = _coerce_float(value)
+    if expected is None:
+        assert result is None
+    else:
+        assert result == expected
 
 
 def test_safe_divide_handles_zero_denominator() -> None:
@@ -74,36 +79,12 @@ def test_safe_divide_handles_nan_denominator() -> None:
     assert result.notna().all()
 
 
-def test_resolve_output_col_no_collision() -> None:
-    """When the requested name is free, it is returned unchanged."""
-    op = {"output_column": "my_col"}
-    assert _resolve_output_col(op, 0, ["a", "b"], allow_overwrite=False) == "my_col"
-
-
-def test_resolve_output_col_default_name_from_operation_type() -> None:
-    """Without an explicit name, the default is ``<operation_type>_<i>``."""
-    op = {"operation_type": "arithmetic"}
-    assert _resolve_output_col(op, 3, [], allow_overwrite=False) == "arithmetic_3"
-
-
-def test_resolve_output_col_with_prefix() -> None:
-    """An ``output_prefix`` is prepended to the default generated name."""
-    op = {"operation_type": "ratio", "output_prefix": "custom"}
-    assert _resolve_output_col(op, 0, [], allow_overwrite=False) == "custom_ratio_0"
-
-
-def test_resolve_output_col_collision_appends_suffix() -> None:
-    """A colliding name gets a numeric suffix instead of overwriting."""
-    op = {"output_column": "dup"}
-    result = _resolve_output_col(op, 0, ["dup", "dup_1"], allow_overwrite=False)
-    assert result == "dup_2"
-
-
-def test_resolve_output_col_overwrite_allowed_keeps_name() -> None:
-    """When overwrite is allowed, a colliding name is reused as-is."""
-    op = {"output_column": "dup"}
-    result = _resolve_output_col(op, 0, ["dup"], allow_overwrite=True)
-    assert result == "dup"
+@pytest.mark.parametrize(*_resolve_output_col_cases)
+def test_resolve_output_col(
+    op: Dict[str, Any], index: int, existing: list, allow_overwrite: bool, expected: str
+) -> None:
+    """``_resolve_output_col`` picks explicit/default/prefixed names and dedupes collisions."""
+    assert _resolve_output_col(op, index, existing, allow_overwrite=allow_overwrite) == expected
 
 
 def test_resolve_similarity_pair_missing_columns_returns_none() -> None:
@@ -411,44 +392,27 @@ def test_rapidfuzz_import_error_sets_has_rapidfuzz_false(monkeypatch: pytest.Mon
 # ---------------------------------------------------------------------------
 
 
-def test_arithmetic_subtract_with_constant_value() -> None:
-    """A constant operand is subtracted from the running column total."""
-    df = pd.DataFrame({"a": [10.0, 20.0]})
+@pytest.mark.parametrize(*_arith_constant_cases)
+def test_arithmetic_op_with_constant_value(
+    method: str, input_values: list, input_column: str, constant: float, expected: list
+) -> None:
+    """A constant operand combines with a single column total (subtract/multiply)."""
+    df = pd.DataFrame({input_column: input_values})
     params = _CALC.fit(
         df,
         {
             "operations": [
                 {
                     "operation_type": "arithmetic",
-                    "method": "subtract",
-                    "input_columns": ["a"],
-                    "constants": [3.0],
+                    "method": method,
+                    "input_columns": [input_column],
+                    "constants": [constant],
                 }
             ]
         },
     )
     out = _APPLIER.apply(df, params)
-    assert out["arithmetic_0"].tolist() == [7.0, 17.0]
-
-
-def test_arithmetic_multiply_with_constant_value() -> None:
-    """A constant operand scales the running column product."""
-    df = pd.DataFrame({"a": [2.0, 3.0]})
-    params = _CALC.fit(
-        df,
-        {
-            "operations": [
-                {
-                    "operation_type": "arithmetic",
-                    "method": "multiply",
-                    "input_columns": ["a"],
-                    "constants": [5.0],
-                }
-            ]
-        },
-    )
-    out = _APPLIER.apply(df, params)
-    assert out["arithmetic_0"].tolist() == [10.0, 15.0]
+    assert out["arithmetic_0"].tolist() == expected
 
 
 def test_arithmetic_divide_by_only_constants() -> None:
@@ -471,82 +435,24 @@ def test_arithmetic_divide_by_only_constants() -> None:
     assert out["arithmetic_0"].tolist() == [5.0, 5.0]
 
 
-def test_arithmetic_divide_no_columns_no_constants_skips() -> None:
-    """With neither input columns nor constants, the op produces no column."""
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    params = _CALC.fit(
-        df,
-        {"operations": [{"operation_type": "arithmetic", "method": "divide", "input_columns": []}]},
-    )
+@pytest.mark.parametrize(*_noop_skip_cases)
+def test_feature_generation_noop_skips(
+    engine: str, data: Dict[str, list], operation: Dict[str, Any], expected_columns: list
+) -> None:
+    """Unresolvable/unknown/malformed ops must be skipped silently (no-op), on both engines.
+
+    Covers: no columns/constants, unresolvable ratio/similarity pairs, unknown
+    operation types, and malformed ops (e.g. bad ``round_digits``) — none of
+    these should raise, and none should add an output column.
+    """
+    df = pd.DataFrame(data)
+    if engine == "polars":
+        import polars as pl
+
+        df = pl.from_pandas(df)
+    params = _CALC.fit(df, {"operations": [operation]})
     out = _APPLIER.apply(df, params)
-    assert "arithmetic_0" not in out.columns
-
-
-def test_ratio_missing_denominator_columns_skips() -> None:
-    """A ratio op with no resolvable denominator columns produces no output."""
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    params = _CALC.fit(
-        df,
-        {
-            "operations": [
-                {
-                    "operation_type": "ratio",
-                    "input_columns": ["a"],
-                    "secondary_columns": ["missing"],
-                }
-            ]
-        },
-    )
-    out = _APPLIER.apply(df, params)
-    assert "ratio_0" not in out.columns
-
-
-def test_similarity_unresolvable_pair_skips() -> None:
-    """A similarity op that cannot resolve a column pair produces no output."""
-    df = pd.DataFrame({"a": ["x", "y"]})
-    params = _CALC.fit(
-        df,
-        {
-            "operations": [
-                {
-                    "operation_type": "similarity",
-                    "input_columns": ["a"],
-                    "secondary_columns": ["missing"],
-                }
-            ]
-        },
-    )
-    out = _APPLIER.apply(df, params)
-    assert "similarity_0" not in out.columns
-
-
-def test_unknown_operation_type_is_skipped() -> None:
-    """An unrecognized ``operation_type`` is silently ignored, not an error."""
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    params = _CALC.fit(df, {"operations": [{"operation_type": "not_a_real_op"}]})
-    out = _APPLIER.apply(df, params)
-    assert list(out.columns) == ["a"]
-
-
-def test_malformed_operation_is_swallowed_without_raising() -> None:
-    """A malformed op (e.g. bad round_digits) is caught and skipped, not raised."""
-    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
-    params = _CALC.fit(
-        df,
-        {
-            "operations": [
-                {
-                    "operation_type": "arithmetic",
-                    "method": "add",
-                    "input_columns": ["a", "b"],
-                    "round_digits": "not-a-number",
-                }
-            ]
-        },
-    )
-    out = _APPLIER.apply(df, params)
-    # The malformed op is skipped entirely; no output column and no crash.
-    assert "arithmetic_0" not in out.columns
+    assert list(out.columns) == expected_columns
 
 
 def test_polynomial_features_empty_columns_returns_empty_artifact() -> None:
@@ -554,55 +460,6 @@ def test_polynomial_features_empty_columns_returns_empty_artifact() -> None:
     df = pd.DataFrame({"a": [1.0, 2.0]})
     art = PolynomialFeaturesCalculator().fit(df, {"columns": []})
     assert art == {}
-
-
-# ---------------------------------------------------------------------------
-# _polars_ops.py: handler-returns-None continue (line 253) and
-# exception-swallow (lines 259-260) via the full polars apply pipeline.
-# ---------------------------------------------------------------------------
-
-
-def test_polars_ratio_missing_denominator_columns_skips() -> None:
-    """A ratio op with unresolvable denominator columns must be skipped (line 253)."""
-    import polars as pl
-
-    df = pd.DataFrame({"a": [1.0, 2.0]})
-    params = _CALC.fit(
-        df,
-        {
-            "operations": [
-                {
-                    "operation_type": "ratio",
-                    "input_columns": ["a"],
-                    "secondary_columns": ["missing"],
-                }
-            ]
-        },
-    )
-    out = _APPLIER.apply(pl.from_pandas(df), params)
-    assert "ratio_0" not in out.columns
-
-
-def test_polars_malformed_operation_is_swallowed_without_raising() -> None:
-    """A malformed op (bad round_digits) must be caught, not raised (lines 259-260)."""
-    import polars as pl
-
-    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
-    params = _CALC.fit(
-        df,
-        {
-            "operations": [
-                {
-                    "operation_type": "arithmetic",
-                    "method": "add",
-                    "input_columns": ["a", "b"],
-                    "round_digits": "not-a-number",
-                }
-            ]
-        },
-    )
-    out = _APPLIER.apply(pl.from_pandas(df), params)
-    assert "arithmetic_0" not in out.columns
 
 
 def test_polynomial_features_auto_detect_columns() -> None:
@@ -634,3 +491,45 @@ def test_safe_divide_never_raises_or_produces_inf(a: list, b: list) -> None:
     result = _safe_divide(num, den, epsilon=1e-9)
     assert result.notna().all()
     assert not result.isin([float("inf"), float("-inf")]).any()
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``income`` has missing values — exercises group_agg NaN handling on
+    production-like data: rows with missing income must receive the group mean,
+    not NaN, because pandas ``groupby.transform("mean")`` excludes NaN from the
+    mean computation but still broadcasts the result to every row in the group.
+    """
+
+    def test_group_agg_income_by_plan_type_fills_nan_rows_with_group_mean(self) -> None:
+        """Group-mean of ``income`` by ``plan_type`` fills NaN-income rows with the group mean.
+
+        Verifies that missing ``income`` values do not propagate as NaN in the
+        aggregated column, and that all rows sharing a ``plan_type`` receive the
+        same aggregated value.
+        """
+        df = load_sample_dataset("customers")
+        params = _CALC.fit(
+            df,
+            {
+                "operations": [
+                    {
+                        "operation_type": "group_agg",
+                        "method": "mean",
+                        "input_columns": ["plan_type"],
+                        "secondary_columns": ["income"],
+                        "output_column": "plan_mean_income",
+                    }
+                ]
+            },
+        )
+        out = _APPLIER.apply(df, params)
+
+        assert "plan_mean_income" in out.columns
+        # NaN-income rows must receive the group mean, not propagate NaN.
+        nan_income_mask = df["income"].isna()
+        assert out.loc[nan_income_mask, "plan_mean_income"].notna().all()
+        # All rows in the same plan_type group share the same aggregated value.
+        for plan in df["plan_type"].unique():
+            group_vals = out.loc[df["plan_type"] == plan, "plan_mean_income"]
+            assert group_vals.nunique() == 1

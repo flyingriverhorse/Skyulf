@@ -1,0 +1,17 @@
+{
+  "params": "base_estimator, method, expected_estimator_path, expected_method",
+  "test_cases": {
+    "random_forest_isotonic": {
+      "base_estimator": "random_forest",
+      "method": "isotonic",
+      "expected_estimator_path": "sklearn.ensemble.RandomForestClassifier",
+      "expected_method": "isotonic"
+    },
+    "unknown_estimator_falls_back_to_logistic": {
+      "base_estimator": "does_not_exist",
+      "method": null,
+      "expected_estimator_path": "sklearn.linear_model.LogisticRegression",
+      "expected_method": null
+    }
+  }
+}

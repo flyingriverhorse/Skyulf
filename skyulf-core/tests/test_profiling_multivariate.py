@@ -5,6 +5,7 @@ from typing import Any, Optional, Tuple
 import numpy as np
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling._analyzer import multivariate as multivariate_mod
 from skyulf.profiling.analyzer import EDAAnalyzer
@@ -269,3 +270,22 @@ def test_detect_outliers_outer_exception(monkeypatch) -> None:
     monkeypatch.setattr(IsolationForest, "fit", _boom)
     result = analyzer._detect_outliers(["a", "b", "c"])
     assert result is None
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing ``age``/``income``/``lat``/``lon`` values — closer to
+    production data than the small synthetic ``_multivariate_df()`` frame used
+    elsewhere in this file.
+    """
+
+    def test_calculate_pca_handles_missing_numeric_values(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        points, components = analyzer._calculate_pca(["age", "income", "lat", "lon"])
+
+        # 15 rows is enough to clear the >= 5 row floor even after mean-imputation.
+        assert points is not None
+        assert components is not None
+        assert len(points) == df.height
+        assert all(p.z is not None for p in points)

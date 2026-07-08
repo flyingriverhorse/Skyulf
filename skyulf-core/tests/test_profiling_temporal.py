@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import polars as pl
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 
@@ -266,3 +267,21 @@ def test_analyze_timeseries_outer_exception_returns_none(monkeypatch) -> None:
     monkeypatch.setattr(analyzer.lazy_df, "sort", _boom)
     result = analyzer._analyze_timeseries(["value"], date_col="date")
     assert result is None
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has a real ``signup_date`` string column plus missing ``age``/
+    ``income`` rows — closer to production data than the small synthetic
+    frames used elsewhere in this file.
+    """
+
+    def test_analyze_timeseries_on_signup_date_handles_missing_values(self) -> None:
+        df = load_sample_dataset("customers", engine="polars")
+        analyzer = EDAAnalyzer(df)
+        # signup_date is auto-cast from a string column by EDAAnalyzer.__init__.
+        result = analyzer._analyze_timeseries(["age", "income"], date_col="signup_date")
+
+        assert result is not None
+        assert result.date_col == "signup_date"
+        assert len(result.trend) > 0

@@ -90,6 +90,9 @@ desktop.ini
 *.parquet
 *.arrow
 *.feather
+# Small, hand-built/generated fixture datasets checked in for skyulf-core
+# tests are the exception — they're tiny, synthetic, and non-sensitive.
+!skyulf-core/tests/data/*.csv
 
 # === Application Data & Uploads ===
 cache/

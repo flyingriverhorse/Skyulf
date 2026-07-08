@@ -4,10 +4,13 @@ import typing
 
 import pandas as pd
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.core.schema import SkyulfSchema
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.base import BaseApplier, BaseCalculator, StatefulTransformer
+
+_split_dataset_guard_cases = TestCaseLoader("preprocessing/preprocessing_base").load()
 
 
 class _AddOneCalculator(BaseCalculator):
@@ -31,14 +34,6 @@ class _AddOneApplier(BaseApplier):
         df = df.copy()
         df["a"] = df["a"] + params["increment"]
         return df
-
-
-class _SplitReturningApplier(BaseApplier):
-    """Applier that (incorrectly) returns a SplitDataset to trigger the guard error."""
-
-    def apply(self, df, params):
-        """Return a SplitDataset regardless of input, to test the error guard."""
-        return SplitDataset(train=df, test=df)
 
 
 class _CountingSplitReturningApplier(BaseApplier):
@@ -131,16 +126,6 @@ def test_fit_transform_records_profiling_metrics():
     assert transformer.rows_out == 4
 
 
-def test_fit_transform_raises_when_applier_returns_split_dataset_on_train():
-    """If the Applier illegally returns a SplitDataset for train, a TypeError should be raised."""
-    train = pd.DataFrame({"a": [1, 2]})
-    test = pd.DataFrame({"a": [10, 20]})
-    dataset = SplitDataset(train=train, test=test, validation=None)
-    transformer = StatefulTransformer(_AddOneCalculator(), _SplitReturningApplier(), node_id="bad")
-    with pytest.raises(TypeError, match="not supported"):
-        transformer.fit_transform(dataset, {})
-
-
 def test_transform_on_plain_dataframe_reuses_stored_params():
     """transform() on a bare DataFrame should reuse previously fitted params."""
     train_df = pd.DataFrame({"a": [1, 2, 3]})
@@ -197,70 +182,33 @@ def test_transform_skips_test_when_disabled():
     assert list(result.test["a"]) == [10, 20]
 
 
-def test_transform_raises_when_applier_returns_split_dataset():
-    """transform() must guard against an Applier illegally returning a SplitDataset."""
-    train = pd.DataFrame({"a": [1, 2]})
-    test = pd.DataFrame({"a": [10, 20]})
-    dataset = SplitDataset(train=train, test=test, validation=None)
-    transformer = StatefulTransformer(_AddOneCalculator(), _SplitReturningApplier(), node_id="bad")
-    transformer.params = {}
-    with pytest.raises(TypeError, match="not supported"):
-        transformer.transform(dataset)
-
-
 def test_base_calculator_infer_output_schema_defaults_to_none():
     """The default infer_output_schema on BaseCalculator should return None."""
     calc = _AddOneCalculator()
     assert calc.infer_output_schema(typing.cast(SkyulfSchema, None), {}) is None
 
 
-def test_fit_transform_raises_when_applier_returns_split_dataset_on_test():
-    """If the Applier illegally returns a SplitDataset for test, a TypeError should be raised."""
-    train = pd.DataFrame({"a": [1, 2]})
-    test = pd.DataFrame({"a": [10, 20]})
-    dataset = SplitDataset(train=train, test=test, validation=None)
-    # trigger_after=1: 1st call (train) passes through fine, 2nd call (test) triggers.
-    transformer = StatefulTransformer(
-        _AddOneCalculator(), _CountingSplitReturningApplier(trigger_after=1), node_id="bad"
-    )
-    with pytest.raises(TypeError, match="not supported"):
-        transformer.fit_transform(dataset, {})
+class TestSplitDatasetGuard:
+    """fit_transform() and transform() must both guard against an Applier illegally
+    returning a SplitDataset for any split (train/test/validation) — scenarios loaded
+    from ``tests/test_cases/preprocessing/preprocessing_base.json``.
+    """
 
+    @pytest.mark.parametrize(*_split_dataset_guard_cases)
+    def test_raises_type_error(
+        self, method: str, trigger_after: int, include_validation: bool
+    ) -> None:
+        train = pd.DataFrame({"a": [1, 2]})
+        test = pd.DataFrame({"a": [10, 20]})
+        validation = pd.DataFrame({"a": [100, 200]}) if include_validation else None
+        dataset = SplitDataset(train=train, test=test, validation=validation)
+        applier = _CountingSplitReturningApplier(trigger_after=trigger_after)
+        transformer = StatefulTransformer(_AddOneCalculator(), applier, node_id="bad")
 
-def test_fit_transform_raises_when_applier_returns_split_dataset_on_validation():
-    """If the Applier illegally returns a SplitDataset for validation, a TypeError is raised."""
-    train = pd.DataFrame({"a": [1, 2]})
-    test = pd.DataFrame({"a": [10, 20]})
-    val = pd.DataFrame({"a": [100, 200]})
-    dataset = SplitDataset(train=train, test=test, validation=val)
-    # trigger_after=2: train + test pass through fine, 3rd call (validation) triggers.
-    transformer = StatefulTransformer(
-        _AddOneCalculator(), _CountingSplitReturningApplier(trigger_after=2), node_id="bad"
-    )
-    with pytest.raises(TypeError, match="not supported"):
-        transformer.fit_transform(dataset, {})
-
-
-def test_transform_raises_when_applier_returns_split_dataset_on_test():
-    """transform() must guard against an Applier illegally returning SplitDataset for test."""
-    train = pd.DataFrame({"a": [1, 2]})
-    test = pd.DataFrame({"a": [10, 20]})
-    dataset = SplitDataset(train=train, test=test, validation=None)
-    applier = _CountingSplitReturningApplier(trigger_after=1)
-    transformer = StatefulTransformer(_AddOneCalculator(), applier, node_id="bad")
-    transformer.params = {}
-    with pytest.raises(TypeError, match="not supported"):
-        transformer.transform(dataset)
-
-
-def test_transform_raises_when_applier_returns_split_dataset_on_validation():
-    """transform() must guard against an Applier illegally returning SplitDataset for validation."""
-    train = pd.DataFrame({"a": [1, 2]})
-    test = pd.DataFrame({"a": [10, 20]})
-    val = pd.DataFrame({"a": [100, 200]})
-    dataset = SplitDataset(train=train, test=test, validation=val)
-    applier = _CountingSplitReturningApplier(trigger_after=2)
-    transformer = StatefulTransformer(_AddOneCalculator(), applier, node_id="bad")
-    transformer.params = {}
-    with pytest.raises(TypeError, match="not supported"):
-        transformer.transform(dataset)
+        if method == "transform":
+            transformer.params = {}
+            with pytest.raises(TypeError, match="not supported"):
+                transformer.transform(dataset)
+        else:
+            with pytest.raises(TypeError, match="not supported"):
+                transformer.fit_transform(dataset, {})

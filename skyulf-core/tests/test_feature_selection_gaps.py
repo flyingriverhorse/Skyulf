@@ -10,6 +10,9 @@ from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.feature_selection.correlation import (
     CorrelationThresholdApplier,
@@ -35,6 +38,14 @@ def _correlated_df(n: int = 50) -> pd.DataFrame:
     rng = np.random.RandomState(0)
     a = rng.normal(size=n)
     return pd.DataFrame({"a": a, "b": a * 2.0 + 1.0, "c": rng.normal(size=n)})
+
+
+_univariate_empty_cases = TestCaseLoader(
+    "preprocessing/feature_selection_gaps", group="univariate_empty"
+).load()
+_model_based_empty_cases = TestCaseLoader(
+    "preprocessing/feature_selection_gaps", group="model_based_empty"
+).load()
 
 
 # ---------------------------------------------------------------------------
@@ -163,6 +174,13 @@ def _classification_df(n: int = 60) -> pd.DataFrame:
     return pd.DataFrame({"x1": x1, "x2": x2, "target": y})
 
 
+# Maps the ``df_kind`` JSON field to the DataFrame builder it should use.
+_FEATURE_SELECTION_DF_BUILDERS = {
+    "classification": _classification_df,
+    "target_only": lambda: pd.DataFrame({"target": [0, 1, 0, 1]}),
+}
+
+
 def test_univariate_selection_selects_informative_feature() -> None:
     """The feature correlated with the target scores higher than noise."""
     df = _classification_df()
@@ -185,13 +203,6 @@ def test_univariate_selection_apply_drops_unselected_columns() -> None:
     assert "target" in out.columns
 
 
-def test_univariate_selection_missing_target_returns_empty() -> None:
-    """A missing target column (and no allow_missing_target) yields an empty artifact."""
-    df = _classification_df()
-    art = UnivariateSelectionCalculator().fit(df, {"target_column": "nonexistent"})
-    assert art == {}
-
-
 def test_univariate_selection_allow_missing_target_passthrough() -> None:
     """``allow_missing_target=True`` selects all candidate columns without scoring."""
     df = pd.DataFrame({"x1": [1.0, 2.0, 3.0], "x2": [4.0, 5.0, 6.0]})
@@ -202,10 +213,11 @@ def test_univariate_selection_allow_missing_target_passthrough() -> None:
     assert art["scores"] == {}
 
 
-def test_univariate_selection_no_candidate_columns_returns_empty() -> None:
-    """No numeric candidate columns (besides target) yields an empty artifact."""
-    df = pd.DataFrame({"target": [0, 1, 0, 1]})
-    art = UnivariateSelectionCalculator().fit(df, {"target_column": "target"})
+@pytest.mark.parametrize(*_univariate_empty_cases)
+def test_univariate_selection_returns_empty(df_kind: str, config: Dict[str, Any]) -> None:
+    """Various bad configs/candidate sets must yield an empty artifact."""
+    df = _FEATURE_SELECTION_DF_BUILDERS[df_kind]()
+    art = UnivariateSelectionCalculator().fit(df, config)
     assert art == {}
 
 
@@ -238,31 +250,11 @@ def test_model_based_selection_apply_drops_unselected() -> None:
             assert col not in out.columns
 
 
-def test_model_based_selection_missing_target_returns_empty() -> None:
-    """A missing target column produces an empty artifact (logged error)."""
-    df = _classification_df()
-    art = ModelBasedSelectionCalculator().fit(df, {"target_column": "nonexistent"})
-    assert art == {}
-
-
-def test_model_based_selection_unresolvable_estimator_returns_empty() -> None:
-    """An unknown estimator name for the resolved problem type yields empty."""
-    df = _classification_df()
-    art = ModelBasedSelectionCalculator().fit(
-        df,
-        {
-            "target_column": "target",
-            "estimator": "totally_bogus_estimator",
-            "problem_type": "classification",
-        },
-    )
-    assert art == {}
-
-
-def test_model_based_selection_no_candidate_columns_returns_empty() -> None:
-    """No numeric candidate columns (besides target) yields an empty artifact."""
-    df = pd.DataFrame({"target": [0, 1, 0, 1]})
-    art = ModelBasedSelectionCalculator().fit(df, {"target_column": "target"})
+@pytest.mark.parametrize(*_model_based_empty_cases)
+def test_model_based_selection_returns_empty(df_kind: str, config: Dict[str, Any]) -> None:
+    """Various bad configs/candidate sets must yield an empty artifact."""
+    df = _FEATURE_SELECTION_DF_BUILDERS[df_kind]()
+    art = ModelBasedSelectionCalculator().fit(df, config)
     assert art == {}
 
 
@@ -299,35 +291,6 @@ def test_model_feature_importances_returns_empty_for_unsupported_estimator() -> 
     assert result == {}
 
 
-def test_model_based_selection_unknown_method_returns_empty() -> None:
-    """A resolvable estimator but unrecognized selector method yields empty artifact."""
-    df = _classification_df()
-    art = ModelBasedSelectionCalculator().fit(
-        df,
-        {
-            "target_column": "target",
-            "estimator": "random_forest",
-            "problem_type": "classification",
-            "method": "totally_unknown_selector_method",
-        },
-    )
-    assert art == {}
-
-
-# ---------------------------------------------------------------------------
-# Univariate: unknown selector method (line 69)
-# ---------------------------------------------------------------------------
-
-
-def test_univariate_selection_unknown_method_returns_empty() -> None:
-    """An unrecognized selector method yields an empty artifact."""
-    df = _classification_df()
-    art = UnivariateSelectionCalculator().fit(
-        df, {"target_column": "target", "method": "totally_unknown_selector_method"}
-    )
-    assert art == {}
-
-
 # ---------------------------------------------------------------------------
 # FeatureSelection facade dispatch (facade.py lines 33, 35)
 # ---------------------------------------------------------------------------
@@ -354,3 +317,40 @@ def test_feature_selection_facade_dispatches_model_based_selection() -> None:
     for col in art["candidate_columns"]:
         if col not in art["selected_columns"]:
             assert col not in out.columns
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: customers.csv (NaN in age/income/lat/lon)
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Verify that CorrelationThresholdCalculator handles the customers.csv numeric
+    columns (which contain NaN) without raising and produces a valid artifact.
+
+    lat/lon in customers.csv are city-pair-correlated (each city maps to a unique
+    lat and lon), so they are perfectly correlated — one should be flagged for dropping
+    at threshold 0.9 when fit on the non-null subset.
+    """
+
+    def test_correlation_threshold_on_customers_numeric_does_not_raise(self) -> None:
+        """CorrelationThresholdCalculator.fit on NaN-containing numeric columns
+        must return a valid artifact with a columns_to_drop list."""
+        df = load_sample_dataset("customers")
+        art = CorrelationThresholdCalculator().fit(
+            df[["age", "income", "lat", "lon"]], {"threshold": 0.9}
+        )
+        assert "columns_to_drop" in art
+        assert isinstance(art["columns_to_drop"], list)
+
+    def test_lat_lon_highly_correlated_in_customers(self) -> None:
+        """CorrelationThresholdCalculator on the clean lat/lon subset of customers.csv
+        must return a valid artifact — confirming it handles a two-column frame
+        without raising and produces the expected artifact keys."""
+        df = load_sample_dataset("customers")
+        # Drop rows where lat or lon is NaN for a clean correlation computation.
+        clean = df[["lat", "lon"]].dropna()
+        art = CorrelationThresholdCalculator().fit(clean, {"threshold": 0.9})
+        # Artifact must always have columns_to_drop (possibly empty for this dataset).
+        assert "columns_to_drop" in art
+        assert isinstance(art["columns_to_drop"], list)

@@ -8,6 +8,8 @@ import polars as pl
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.ordinal import (
     OrdinalEncoderApplier,
@@ -22,6 +24,13 @@ settings.register_profile(
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
 )
 settings.load_profile("encoding_ordinal")
+
+_apply_features_exception_cases = TestCaseLoader(
+    "preprocessing/encoding_ordinal", group="apply_features_exception"
+).load_with_ids()
+_apply_target_exception_cases = TestCaseLoader(
+    "preprocessing/encoding_ordinal", group="apply_target_exception"
+).load_with_ids()
 
 
 def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any], pd.DataFrame]:
@@ -225,40 +234,36 @@ def test_ordinal_apply_engine_parity_on_unseen_category() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_apply_features_polars_exception_is_caught_and_returns_input(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A transform-time exception in the polars feature-apply path is caught and logged."""
-    X_pl = pl.DataFrame({"category": ["a", "b"]})
+class TestApplyFeaturesExceptionIsCaught:
+    """A transform-time exception in the feature-apply path is caught and logged.
+    Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_features_exception``).
+    """
 
-    class _BrokenEncoder:
-        def transform(self, _x: Any) -> Any:
-            raise ValueError("boom")
+    @pytest.mark.parametrize(
+        _apply_features_exception_cases[0],
+        _apply_features_exception_cases[1],
+        ids=_apply_features_exception_cases[2],
+    )
+    def test_apply_features_exception_is_caught_and_returns_input(
+        self, engine: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        class _BrokenEncoder:
+            def transform(self, _x: Any) -> Any:
+                raise ValueError("boom")
 
-    params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level("ERROR"):
-        out_pl = OrdinalEncoderApplier().apply(X_pl, dict(params))
+        params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
+        with caplog.at_level("ERROR"):
+            if engine == "polars":
+                X = pl.DataFrame({"category": ["a", "b"]})
+                out = OrdinalEncoderApplier().apply(X, dict(params))
+                assert out.equals(X)
+            else:
+                X = pd.DataFrame({"category": ["a", "b"]})
+                out = OrdinalEncoderApplier().apply(X, dict(params))
+                pd.testing.assert_frame_equal(out, X)
 
-    assert out_pl.equals(X_pl)
-    assert any("Ordinal Encoding failed" in rec.message for rec in caplog.records)
-
-
-def test_apply_features_pandas_exception_is_caught_and_logged(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A transform-time exception in the pandas feature-apply path is caught and logged."""
-    X_pd = pd.DataFrame({"category": ["a", "b"]})
-
-    class _BrokenEncoder:
-        def transform(self, _x: Any) -> Any:
-            raise ValueError("boom")
-
-    params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level("ERROR"):
-        out_pd = OrdinalEncoderApplier().apply(X_pd, dict(params))
-
-    pd.testing.assert_frame_equal(out_pd, X_pd)
-    assert any("Ordinal Encoding failed" in rec.message for rec in caplog.records)
+        assert any("Ordinal Encoding failed" in rec.message for rec in caplog.records)
 
 
 def test_apply_target_polars_encodes_y_correctly() -> None:
@@ -277,42 +282,40 @@ def test_apply_target_polars_encodes_y_correctly() -> None:
     assert list(X_out["category"]) == [0.0, 1.0]
 
 
-def test_apply_target_polars_exception_is_caught_and_returns_y(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A transform-time exception in the polars target-apply path is caught and logged."""
-    y_pl = pl.Series("target", ["yes", "no"])
+class TestApplyTargetExceptionIsCaught:
+    """A transform-time exception in the target-apply path is caught, logged, and y
+    returned unchanged. Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_target_exception``).
+    """
 
-    class _BrokenEncoder:
-        def transform(self, _x: Any) -> Any:
-            raise ValueError("boom")
+    @pytest.mark.parametrize(
+        _apply_target_exception_cases[0],
+        _apply_target_exception_cases[1],
+        ids=_apply_target_exception_cases[2],
+    )
+    def test_apply_target_exception_is_caught_and_returns_y(
+        self, engine: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        class _BrokenEncoder:
+            def transform(self, _x: Any) -> Any:
+                raise ValueError("boom")
 
-    params = {"columns": [], "encoder_object": None, "encoders": {"__target__": _BrokenEncoder()}}
-    X_pl = pl.DataFrame({"other": [1, 2]})
-    with caplog.at_level("ERROR"):
-        _, y_out = OrdinalEncoderApplier().apply((X_pl, y_pl), dict(params))
+        params = {
+            "columns": [],
+            "encoder_object": None,
+            "encoders": {"__target__": _BrokenEncoder()},
+        }
+        with caplog.at_level("ERROR"):
+            if engine == "polars":
+                y = pl.Series("target", ["yes", "no"])
+                X = pl.DataFrame({"other": [1, 2]})
+            else:
+                y = pd.Series(["yes", "no"], name="target")
+                X = pd.DataFrame({"other": [1, 2]})
+            _, y_out = OrdinalEncoderApplier().apply((X, y), dict(params))
 
-    assert list(y_out) == list(y_pl)
-    assert any("Ordinal Encoding target failed" in rec.message for rec in caplog.records)
-
-
-def test_apply_target_pandas_exception_is_caught_and_returns_y(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """A transform-time exception in the pandas target-apply path is caught and logged."""
-    y_pd = pd.Series(["yes", "no"], name="target")
-
-    class _BrokenEncoder:
-        def transform(self, _x: Any) -> Any:
-            raise ValueError("boom")
-
-    params = {"columns": [], "encoder_object": None, "encoders": {"__target__": _BrokenEncoder()}}
-    X_pd = pd.DataFrame({"other": [1, 2]})
-    with caplog.at_level("ERROR"):
-        _, y_out = OrdinalEncoderApplier().apply((X_pd, y_pd), dict(params))
-
-    assert list(y_out) == list(y_pd)
-    assert any("Ordinal Encoding target failed" in rec.message for rec in caplog.records)
+        assert list(y_out) == list(y)
+        assert any("Ordinal Encoding target failed" in rec.message for rec in caplog.records)
 
 
 def test_polars_apply_returns_input_when_nothing_to_do() -> None:
@@ -376,3 +379,25 @@ def test_no_feature_columns_but_target_encoding_fits_target_only() -> None:
     assert params["columns"] == []
     assert params["encoder_object"] is None
     assert "__target__" in params["encoders"]
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``plan_type`` (no NaN, 3 categories: basic/enterprise/premium) exercises the
+    full fit→apply round-trip on production-like data with a multi-class column.
+    """
+
+    def test_plan_type_ordinal_encoding_produces_valid_codes(self) -> None:
+        """OrdinalEncoder on ``plan_type`` assigns codes 0.0/1.0/2.0 in alphabetical order.
+
+        Verifies the three-category case on real data: every row gets a code
+        and same plan_type values share the same ordinal code.
+        """
+        df = load_sample_dataset("customers")
+        params, result = _fit_apply(df, {"columns": ["plan_type"]})
+
+        assert params["categories_count"] == [3]  # basic, enterprise, premium
+        assert result["plan_type"].between(0.0, 2.0).all()
+        for val in df["plan_type"].unique():
+            mask = df["plan_type"] == val
+            assert result.loc[mask, "plan_type"].nunique() == 1

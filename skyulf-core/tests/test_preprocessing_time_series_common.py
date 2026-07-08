@@ -1,6 +1,9 @@
 """Tests for skyulf.preprocessing.time_series._common helper functions."""
 
 import pandas as pd
+import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.time_series._common import (
     coerce_aggregations,
@@ -9,74 +12,75 @@ from skyulf.preprocessing.time_series._common import (
     sort_pandas,
 )
 
-
-def test_resolve_columns_filters_to_available():
-    """Only columns present in `available` should be kept, preserving order."""
-    result = resolve_columns(["a", "z", "b"], ["a", "b", "c"])
-    assert result == ["a", "b"]
-
-
-def test_resolve_columns_empty_input_returns_empty_list():
-    """A falsy `columns` argument should short-circuit to an empty list."""
-    assert resolve_columns(None, ["a", "b"]) == []
-    assert resolve_columns([], ["a", "b"]) == []
+_resolve_columns_cases = TestCaseLoader(
+    "preprocessing/time_series_common", group="resolve_columns"
+).load()
+_coerce_lags_cases = TestCaseLoader("preprocessing/time_series_common", group="coerce_lags").load()
+_coerce_aggregations_cases = TestCaseLoader(
+    "preprocessing/time_series_common", group="coerce_aggregations"
+).load()
+_sort_pandas_cases = TestCaseLoader("preprocessing/time_series_common", group="sort_pandas").load()
 
 
-def test_coerce_lags_accepts_single_int():
-    """A bare int should be normalised into a single-element sorted list."""
-    assert coerce_lags(3) == [3]
+@pytest.mark.parametrize(*_resolve_columns_cases)
+def test_resolve_columns(
+    columns: list[str] | None, available: list[str], expected: list[str]
+) -> None:
+    """``resolve_columns`` keeps only available columns, preserving order.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``resolve_columns``).
+    """
+    assert resolve_columns(columns, available) == expected
 
 
-def test_coerce_lags_dedups_and_sorts():
-    """Duplicate and unordered lag values should be deduplicated and sorted."""
-    assert coerce_lags([3, 1, 3, 2]) == [1, 2, 3]
+@pytest.mark.parametrize(*_coerce_lags_cases)
+def test_coerce_lags(lags_input: int | list[int] | None, expected: list[int]) -> None:
+    """``coerce_lags`` normalises int/list/None input into a sorted, deduped, positive list.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``coerce_lags``).
+    """
+    assert coerce_lags(lags_input) == expected
 
 
-def test_coerce_lags_drops_non_positive_values():
-    """Zero and negative lag values should be dropped."""
-    assert coerce_lags([0, -1, 2]) == [2]
+@pytest.mark.parametrize(*_coerce_aggregations_cases)
+def test_coerce_aggregations(
+    aggregations_input: str | list[str] | None, expected: list[str]
+) -> None:
+    """``coerce_aggregations`` normalises string/list/None input, filtering unknown names.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``coerce_aggregations``).
+    """
+    assert coerce_aggregations(aggregations_input) == expected
 
 
-def test_coerce_lags_empty_or_none_returns_empty_list():
-    """None/empty input should return an empty list, not raise."""
-    assert coerce_lags(None) == []
-    assert coerce_lags([]) == []
+@pytest.mark.parametrize(*_sort_pandas_cases)
+def test_sort_pandas(df_data: dict, sort_by: str | None, expected_cols: dict) -> None:
+    """``sort_pandas`` stable-sorts by ``sort_by`` when present, and is a no-op otherwise.
+
+    Loaded from ``tests/test_cases/preprocessing/time_series_common.json`` (group ``sort_pandas``).
+    """
+    df = pd.DataFrame(df_data)
+    result = sort_pandas(df, sort_by)
+    for col, expected in expected_cols.items():
+        assert list(result[col]) == expected
 
 
-def test_coerce_aggregations_accepts_single_string():
-    """A bare string should be normalised into a single-element list."""
-    assert coerce_aggregations("mean") == ["mean"]
+# ---------------------------------------------------------------------------
+# Real-shaped dataset: customers.csv (string-typed ISO date column)
+# ---------------------------------------------------------------------------
 
 
-def test_coerce_aggregations_filters_unknown_names():
-    """Only recognised rolling aggregation names should be kept, order preserved."""
-    result = coerce_aggregations(["mean", "bogus", "sum"])
-    assert result == ["mean", "sum"]
+class TestRealShapedDataset:
+    """Verify sort_pandas behavior on customers.csv's signup_date column — a
+    real-shaped string-typed ISO date column that must sort correctly using
+    lexicographic order (ISO dates sort the same as alphabetic order).
+    """
 
-
-def test_coerce_aggregations_empty_or_none_returns_empty_list():
-    """None/empty input should return an empty list, not raise."""
-    assert coerce_aggregations(None) == []
-    assert coerce_aggregations([]) == []
-
-
-def test_sort_pandas_sorts_by_given_column():
-    """sort_by column present in the frame should trigger a stable mergesort."""
-    df = pd.DataFrame({"t": [3, 1, 2], "v": ["c", "a", "b"]})
-    result = sort_pandas(df, "t")
-    assert list(result["t"]) == [1, 2, 3]
-    assert list(result["v"]) == ["a", "b", "c"]
-
-
-def test_sort_pandas_passthrough_when_column_missing():
-    """When sort_by is absent from the frame, the original frame should be returned unsorted."""
-    df = pd.DataFrame({"t": [3, 1, 2]})
-    result = sort_pandas(df, "nonexistent")
-    assert list(result["t"]) == [3, 1, 2]
-
-
-def test_sort_pandas_passthrough_when_sort_by_none():
-    """A None sort_by should be a no-op passthrough."""
-    df = pd.DataFrame({"t": [3, 1, 2]})
-    result = sort_pandas(df, None)
-    assert list(result["t"]) == [3, 1, 2]
+    def test_sort_pandas_by_signup_date_produces_ascending_order(self) -> None:
+        """sort_pandas on signup_date must return all rows in ISO-date ascending
+        order without dropping any rows or raising."""
+        df = load_sample_dataset("customers")
+        sorted_df = sort_pandas(df, "signup_date")
+        assert len(sorted_df) == len(df)
+        dates = sorted_df["signup_date"].tolist()
+        assert dates == sorted(dates)

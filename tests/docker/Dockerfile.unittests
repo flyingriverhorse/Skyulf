@@ -37,8 +37,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # something else.
 ENV DATABASE_URL=sqlite+aiosqlite:///./mlops_database.db
 
-# --import-mode=importlib avoids pytest's default rootdir-relative module
-# naming, which collides here: tests/ and skyulf-core/tests/ both contain
-# same-named files (e.g. test_split.py) with no __init__.py packages.
-CMD ["python", "-m", "pytest", "-q", "--disable-warnings", "--import-mode=importlib", \
-     "--cov", "--cov-branch", "--cov-report=term-missing", "--cov-report=html"]
+# Scope testing exclusively to tests/ (the backend integration & API suite),
+# matching backend-tests.yml. Running pytest without target directories auto-discovers
+# skyulf-core/tests/, which is already covered in complete, isolated Docker conditions
+# by skyulf-core-tests.yml's own standalone Docker runner.
+CMD ["python", "-m", "pytest", "tests", "-q", "--disable-warnings", "--import-mode=importlib", \
+     "--cov=backend", "--cov-branch", "--cov-report=term-missing", "--cov-report=html"]

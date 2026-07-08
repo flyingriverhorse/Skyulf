@@ -4,13 +4,18 @@ from typing import Any
 
 import pandas as pd
 import polars as pl
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.hash import (
     HashEncoderApplier,
     HashEncoderCalculator,
 )
+
+_n_features_cases = TestCaseLoader("preprocessing/encoding_hash").load_with_ids()
 
 
 def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any], pd.DataFrame]:
@@ -20,20 +25,25 @@ def _fit_apply(df: pd.DataFrame, config: dict[str, Any]) -> tuple[dict[str, Any]
     return dict(params), result
 
 
-def test_fit_records_columns_and_n_features() -> None:
-    """fit() stores the resolved columns and configured (or default) n_features."""
-    df = pd.DataFrame({"city": ["ny", "la", "sf"]})
-    params = HashEncoderCalculator().fit(df, {"columns": ["city"], "n_features": 4})
-    assert params["columns"] == ["city"]
-    assert params["n_features"] == 4
-    assert params["type"] == "hash_encoder"
+class TestFitRecordsColumnsAndNFeatures:
+    """fit() stores the resolved columns and configured (or default) n_features.
+    Scenarios loaded from
+    ``tests/test_cases/preprocessing/encoding_hash.json``.
+    """
 
+    @pytest.mark.parametrize(_n_features_cases[0], _n_features_cases[1], ids=_n_features_cases[2])
+    def test_fit_records_columns_and_n_features(
+        self, config_n_features: int | None, expected_n_features: int
+    ) -> None:
+        df = pd.DataFrame({"city": ["ny", "la", "sf"]})
+        config: dict[str, Any] = {"columns": ["city"]}
+        if config_n_features is not None:
+            config["n_features"] = config_n_features
 
-def test_fit_default_n_features_is_ten() -> None:
-    """When n_features is omitted from config, fit() falls back to 10."""
-    df = pd.DataFrame({"city": ["ny", "la"]})
-    params = HashEncoderCalculator().fit(df, {"columns": ["city"]})
-    assert params["n_features"] == 10
+        params = HashEncoderCalculator().fit(df, config)
+        assert params["columns"] == ["city"]
+        assert params["n_features"] == expected_n_features
+        assert params["type"] == "hash_encoder"
 
 
 def test_apply_buckets_are_within_valid_range() -> None:
@@ -164,3 +174,26 @@ def test_fit_engine_parity_pandas_vs_polars(cats: list[str]) -> None:
     pl_params = HashEncoderCalculator().fit(df_pl, dict(config))
 
     assert pd_params == pl_params
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has categorical columns ``city``/``plan_type`` — closer to production
+    data than the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_plan_type_hash_encoding_stays_within_bucket_range(self) -> None:
+        """HashEncoder on ``plan_type`` (no NaN) maps every row to a valid bucket in [0, n_features).
+
+        Verifies the deterministic-hashing guarantee on a multi-category real column:
+        same plan_type value must always hash to the same bucket.
+        """
+        df = load_sample_dataset("customers")
+        n_features = 6
+        params, out = _fit_apply(df, {"columns": ["plan_type"], "n_features": n_features})
+
+        assert out["plan_type"].between(0, n_features - 1).all()
+        # Same plan_type value must hash to exactly one bucket every time.
+        for val in df["plan_type"].unique():
+            mask = df["plan_type"] == val
+            assert out.loc[mask, "plan_type"].nunique() == 1

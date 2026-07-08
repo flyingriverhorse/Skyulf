@@ -7,6 +7,7 @@ import pandas as pd
 import polars as pl
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.preprocessing.encoding.dummy import (
     DummyEncoderApplier,
@@ -166,3 +167,30 @@ def test_fit_engine_parity_pandas_vs_polars(cats: list[str]) -> None:
 
     assert pd_params["categories"]["color"] == pl_params["categories"]["color"]
     assert pd_params["columns"] == pl_params["columns"]
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has ``plan_type`` (3 categories: basic, premium, enterprise) with no
+    missing values — verifying correct dummy encoding on real-world cardinality.
+    """
+
+    def test_dummy_encode_plan_type_produces_three_indicator_columns(self) -> None:
+        """Dummy-encoding ``plan_type`` must produce exactly three indicator columns
+        (one per category) and drop the original column from the output.
+        """
+        df = load_sample_dataset("customers")
+        params = DummyEncoderCalculator().fit(df, {"columns": ["plan_type"]})
+        result = DummyEncoderApplier().apply(df, dict(params))
+
+        assert "plan_type" not in result.columns
+        expected_cols = {"plan_type_basic", "plan_type_enterprise", "plan_type_premium"}
+        assert expected_cols.issubset(set(result.columns))
+        # Each row must have exactly one indicator set to 1.
+        indicator_sum = result[list(expected_cols)].sum(axis=1)
+        assert (indicator_sum == 1).all()

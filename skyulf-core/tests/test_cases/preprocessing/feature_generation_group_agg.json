@@ -1,0 +1,15 @@
+{
+  "params": "method, output_column, expected",
+  "test_cases": {
+    "mean": {
+      "method": "mean",
+      "output_column": "dept_mean_salary",
+      "expected": [150.0, 150.0, 400.0, 400.0, 400.0]
+    },
+    "count": {
+      "method": "count",
+      "output_column": "dept_n",
+      "expected": [2, 2, 3, 3, 3]
+    }
+  }
+}

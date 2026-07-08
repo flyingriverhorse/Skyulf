@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.modeling._evaluation.regression import evaluate_regression_model
 from skyulf.modeling._evaluation.schemas import ModelEvaluationReport
@@ -79,3 +80,26 @@ def test_evaluate_regression_metrics_include_r2(regression_fitted):
     report = evaluate_regression_model(model, X, y)
     assert "r2" in report.metrics
     assert report.metrics["r2"] <= 1.0
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values — closer to production data than the small
+    synthetic fixtures used elsewhere in this file.
+    """
+
+    def test_evaluate_income_regression_on_customers_data(self) -> None:
+        df = load_sample_dataset("customers")
+        # LinearRegression can't handle NaN, so rows with missing age/income
+        # are dropped rather than assumed clean.
+        df = df.dropna(subset=["age", "income"])
+        X = df[["age"]]
+        y = df["income"]
+        model = LinearRegression().fit(X, y)
+
+        report = evaluate_regression_model(model, X, y, dataset_name="customers")
+        assert isinstance(report, ModelEvaluationReport)
+        assert report.regression is not None
+        assert report.regression.residuals is not None
+        assert len(report.regression.residuals.predicted) == len(y)
+        assert "r2" in report.metrics

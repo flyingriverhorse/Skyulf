@@ -73,6 +73,43 @@ See `skyulf/preprocessing/encoding/one_hot.py` for the `OneHotEncoder` implement
 
 The model key can then be used as `"type": "my_model_key"` in the modeling config.
 
+## Advanced: duck-typed steps without subclassing
+
+Registering a node with `@NodeRegistry.register(...)` (so it's usable from a
+JSON pipeline config / the frontend palette) still requires subclassing
+`BaseCalculator`/`BaseApplier` as shown above — the registry and `@node_meta`
+decorator are built around those ABCs.
+
+If you're calling `StatefulTransformer` directly in Python (not going through
+the registry — e.g. scripting an ad-hoc pipeline step, or wrapping a
+third-party object), you don't need to subclass anything. `skyulf.core.protocols`
+defines `CalculatorProtocol`/`ApplierProtocol` as structural (`typing.Protocol`)
+types — any object with matching `fit`/`apply` methods satisfies them:
+
+```python
+from skyulf.preprocessing.base import StatefulTransformer
+
+
+class MeanCenterer:
+    """Plain class — no BaseCalculator/BaseApplier inheritance."""
+
+    def fit(self, df, config):
+        return {"mean": df["x"].mean()}
+
+    def apply(self, df, params):
+        out = df.copy()
+        out["x"] = out["x"] - params["mean"]
+        return out
+
+
+centerer = MeanCenterer()
+step = StatefulTransformer(calculator=centerer, applier=centerer, node_id="center_x")
+```
+
+This is useful for quick experiments or wrapping existing objects (e.g. an
+sklearn-like class that already has compatible methods) without writing an
+ABC subclass just to satisfy a type check.
+
 ## Testing guidance
 
 Write integration tests that run the full cycle:

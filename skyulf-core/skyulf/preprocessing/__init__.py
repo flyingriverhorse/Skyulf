@@ -38,6 +38,8 @@ from .encoding import (
 from .feature_generation import (
     FeatureGenerationApplier,
     FeatureGenerationCalculator,
+    FeatureInteractionApplier,
+    FeatureInteractionCalculator,
     PolynomialFeaturesApplier,
     PolynomialFeaturesCalculator,
 )
@@ -50,6 +52,12 @@ from .feature_selection import (
     UnivariateSelectionCalculator,
     VarianceThresholdApplier,
     VarianceThresholdCalculator,
+)
+from .geo import (
+    GeoDistanceApplier,
+    GeoDistanceCalculator,
+    H3IndexApplier,
+    H3IndexCalculator,
 )
 from .imputation import (
     IterativeImputerApplier,
@@ -186,8 +194,14 @@ __all__ = [
     "CastingApplier",
     "FeatureGenerationCalculator",
     "FeatureGenerationApplier",
+    "FeatureInteractionCalculator",
+    "FeatureInteractionApplier",
     "PolynomialFeaturesCalculator",
     "PolynomialFeaturesApplier",
+    "GeoDistanceCalculator",
+    "GeoDistanceApplier",
+    "H3IndexCalculator",
+    "H3IndexApplier",
     "VarianceThresholdCalculator",
     "VarianceThresholdApplier",
     "CorrelationThresholdCalculator",

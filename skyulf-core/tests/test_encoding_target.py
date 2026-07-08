@@ -10,6 +10,8 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 from sklearn.preprocessing import LabelEncoder, TargetEncoder
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.encoding.target import (
     TargetEncoderApplier,
@@ -23,6 +25,13 @@ settings.register_profile(
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
 )
 settings.load_profile("encoding_target")
+
+_no_target_cases = TestCaseLoader(
+    "preprocessing/encoding_target", group="no_target_returns_empty"
+).load_with_ids()
+_no_resolvable_columns_cases = TestCaseLoader(
+    "preprocessing/encoding_target", group="no_resolvable_columns"
+).load_with_ids()
 
 
 def test_binary_target_encoding_matches_raw_sklearn() -> None:
@@ -44,16 +53,28 @@ def test_binary_target_encoding_matches_raw_sklearn() -> None:
     assert list(y_out) == list(y)
 
 
-def test_no_target_returns_empty_params_and_warns(caplog: pytest.LogCaptureFixture) -> None:
-    """Fitting without a y and without a resolvable target_column is a documented no-op."""
-    X = pd.DataFrame({"city": ["a", "b", "a"]})
-    calc = TargetEncoderCalculator()
+class TestNoTargetReturnsEmptyAndWarns:
+    """Fitting without a resolvable target logs a warning and returns {}.
+    Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_target_returns_empty``).
+    """
 
-    with caplog.at_level(logging.WARNING):
-        params = calc.fit(X, {"columns": ["city"]})
+    @pytest.mark.parametrize(_no_target_cases[0], _no_target_cases[1], ids=_no_target_cases[2])
+    def test_no_target_returns_empty_params_and_warns(
+        self, engine: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        X = (
+            pl.DataFrame({"city": ["a", "b", "a"]})
+            if engine == "polars"
+            else pd.DataFrame({"city": ["a", "b", "a"]})
+        )
+        calc = TargetEncoderCalculator()
 
-    assert params == {}
-    assert any("requires a target variable" in rec.message for rec in caplog.records)
+        with caplog.at_level(logging.WARNING):
+            params = calc.fit(X, {"columns": ["city"]})
+
+        assert params == {}
+        assert any("requires a target variable" in rec.message for rec in caplog.records)
 
 
 def test_user_picked_no_columns_short_circuits() -> None:
@@ -302,30 +323,26 @@ def test_polars_fit_extracts_y_from_target_column() -> None:
     assert params["encoder_object"] is not None
 
 
-def test_polars_fit_no_target_returns_empty_and_warns(caplog: pytest.LogCaptureFixture) -> None:
-    """Polars fit without a resolvable target logs a warning and returns {}."""
-    df = pl.DataFrame({"city": ["a", "b", "a"]})
-    with caplog.at_level(logging.WARNING):
-        params = TargetEncoderCalculator().fit(df, {"columns": ["city"]})
+class TestFitNoResolvableColumnsReturnsEmpty:
+    """A purely-numeric frame yields no encodable columns, so fit() returns {}.
+    Scenarios (pandas/polars) loaded from
+    ``tests/test_cases/preprocessing/encoding_target.json`` (group ``no_resolvable_columns``).
+    """
 
-    assert params == {}
-    assert any("requires a target variable" in rec.message for rec in caplog.records)
-
-
-def test_polars_fit_no_resolvable_columns_returns_empty() -> None:
-    """Polars fit falls back to auto-detection; a purely-numeric frame yields no columns."""
-    df = pl.DataFrame({"amount": [1, 2, 3]})
-    y = pl.Series("target", [1, 0, 1])
-    params = TargetEncoderCalculator().fit((df, y), {})
-    assert params == {}
-
-
-def test_pandas_fit_no_resolvable_columns_returns_empty() -> None:
-    """Pandas fit falls back to auto-detection; a purely-numeric frame yields no columns."""
-    df = pd.DataFrame({"amount": [1, 2, 3]})
-    y = pd.Series([1, 0, 1], name="target")
-    params = TargetEncoderCalculator().fit((df, y), {})
-    assert params == {}
+    @pytest.mark.parametrize(
+        _no_resolvable_columns_cases[0],
+        _no_resolvable_columns_cases[1],
+        ids=_no_resolvable_columns_cases[2],
+    )
+    def test_fit_no_resolvable_columns_returns_empty(self, engine: str) -> None:
+        if engine == "polars":
+            df = pl.DataFrame({"amount": [1, 2, 3]})
+            y = pl.Series("target", [1, 0, 1])
+        else:
+            df = pd.DataFrame({"amount": [1, 2, 3]})
+            y = pd.Series([1, 0, 1], name="target")
+        params = TargetEncoderCalculator().fit((df, y), {})
+        assert params == {}
 
 
 def test_unknown_label_type_error_is_translated_to_actionable_message() -> None:
@@ -375,3 +392,31 @@ def test_fit_target_encoder_reraises_unrelated_value_error() -> None:
     with pytest.raises(ValueError) as exc_info:
         _fit_target_encoder(X, y, config)
     assert "TargetEncoder failed" not in str(exc_info.value)
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+    ``plan_type`` (no NaN, 3 categories) + binary ``churned`` target exercises the
+    TargetEncoder on production-like data: each plan group gets its own smoothed
+    target statistic, and the result is a numeric column of the same length.
+    """
+
+    def test_plan_type_target_encoding_with_binary_churn_target(self) -> None:
+        """TargetEncoder on ``plan_type`` with binary ``churned`` produces a numeric column.
+
+        Each distinct plan_type value maps to a different smoothed mean of the
+        binary churn target — verifies real-data fit→apply cycle without leakage.
+        """
+        df = load_sample_dataset("customers")
+        X = df[["plan_type"]].copy()
+        y = df["churned"]
+        config: dict[str, Any] = {"columns": ["plan_type"], "target_type": "binary"}
+
+        params = TargetEncoderCalculator().fit((X, y), config)
+        X_out, y_out = TargetEncoderApplier().apply((X, y), dict(params))
+
+        assert len(X_out) == len(df)
+        assert pd.api.types.is_float_dtype(X_out["plan_type"])
+        # Binary target encoding produces values in (0, 1) representing the smoothed churn rate.
+        assert X_out["plan_type"].between(0.0, 1.0).all()
+        assert list(y_out) == list(y)

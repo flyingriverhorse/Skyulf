@@ -1,0 +1,35 @@
+{
+  "params": "exception_type, exception_message, exception_field, error_match",
+  "test_cases": {
+    "no_trials_completed_via_fit": {
+      "exception_type": "ValueError",
+      "exception_message": "No trials are completed yet somehow",
+      "exception_field": "fit_exception",
+      "error_match": "No trials completed successfully"
+    },
+    "halving_dataset_too_small": {
+      "exception_type": "ValueError",
+      "exception_message": "n_samples=10 ... cannot resample ... Got 0 candidates",
+      "exception_field": "fit_exception",
+      "error_match": "dataset is too small"
+    },
+    "generic_fit_exception_reraised": {
+      "exception_type": "RuntimeError",
+      "exception_message": "totally unrelated failure",
+      "exception_field": "fit_exception",
+      "error_match": "totally unrelated failure"
+    },
+    "best_params_no_trials_completed": {
+      "exception_type": "ValueError",
+      "exception_message": "No trials are completed yet.",
+      "exception_field": "best_params_exception",
+      "error_match": "All trials failed"
+    },
+    "best_params_generic_value_error_reraised": {
+      "exception_type": "ValueError",
+      "exception_message": "some other unrelated issue",
+      "exception_field": "best_params_exception",
+      "error_match": "some other unrelated issue"
+    }
+  }
+}

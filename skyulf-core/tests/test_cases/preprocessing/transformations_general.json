@@ -1,0 +1,46 @@
+{
+  "groups": {
+    "simple_ops": {
+      "params": "method",
+      "test_cases": {
+        "log": {"method": "log"},
+        "sqrt": {"method": "sqrt"},
+        "square": {"method": "square"},
+        "cube_root": {"method": "cube_root"}
+      }
+    },
+    "polars_simple_ops": {
+      "params": "method",
+      "test_cases": {
+        "log": {"method": "log"},
+        "sqrt": {"method": "sqrt"},
+        "square": {"method": "square"},
+        "exp": {"method": "exp"},
+        "cube_root": {"method": "cube_root"},
+        "reciprocal": {"method": "reciprocal"}
+      }
+    },
+    "edge_case_values": {
+      "params": "column_values, method, expected_values",
+      "test_cases": {
+        "single_row_sqrt": {
+          "column_values": [4.0],
+          "method": "sqrt",
+          "expected_values": [2.0]
+        },
+        "constant_column_square": {
+          "column_values": [3.0, 3.0, 3.0, 3.0],
+          "method": "square",
+          "expected_values": [9.0, 9.0, 9.0, 9.0]
+        }
+      }
+    },
+    "fit_power_engine": {
+      "params": "is_polars",
+      "test_cases": {
+        "pandas": {"is_polars": false},
+        "polars": {"is_polars": true}
+      }
+    }
+  }
+}

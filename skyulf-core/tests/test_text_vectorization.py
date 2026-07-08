@@ -6,6 +6,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.vectorization import (
     CountVectorizerApplier,
@@ -30,6 +31,35 @@ CORPUS = [
 
 CONFIG_COL = "text"
 
+# Registry mapping a node name (as used in JSON fixtures) to its
+# Calculator/Applier pair, so parametrized tests can look up the right
+# classes for a given scenario without encoding class objects in JSON.
+_VECTORIZER_NODES: dict[str, tuple[type, type]] = {
+    "count_vectorizer": (CountVectorizerCalculator, CountVectorizerApplier),
+    "tfidf_vectorizer": (TfidfVectorizerCalculator, TfidfVectorizerApplier),
+    "hashing_vectorizer": (HashingVectorizerCalculator, HashingVectorizerApplier),
+    "tokenizer": (TokenizerCalculator, TokenizerApplier),
+}
+
+
+def _load_single_param(source_path: str, group: str | None = None) -> list[Any]:
+    """Load a JSON fixture with exactly one param, unwrapping 1-tuples.
+
+    ``pytest.mark.parametrize`` treats a single (comma-less) param name
+    specially: argvalues must be bare scalars, not 1-tuples, or the whole
+    tuple gets bound to the parameter instead of its single element.
+    """
+    params_string, scenarios = TestCaseLoader(source_path, group=group).load()
+    return [params_string, [scenario[0] for scenario in scenarios]]
+
+
+_empty_columns_noop_cases = _load_single_param(
+    "preprocessing/text_vectorization", group="empty_columns_noop"
+)
+_polars_roundtrip_cases = TestCaseLoader(
+    "preprocessing/text_vectorization", group="apply_polars_roundtrip"
+).load()
+
 
 @pytest.fixture
 def df_pandas() -> pd.DataFrame:
@@ -39,6 +69,29 @@ def df_pandas() -> pd.DataFrame:
 @pytest.fixture
 def df_polars() -> Any:
     return pl.DataFrame({CONFIG_COL: CORPUS})
+
+
+@pytest.mark.parametrize(*_empty_columns_noop_cases)
+def test_empty_columns_config_returns_empty_artifact(node: str, df_pandas: pd.DataFrame) -> None:
+    """No configured columns yields an empty artifact, regardless of node type."""
+    calculator_cls = _VECTORIZER_NODES[node][0]
+    art = calculator_cls().fit(df_pandas, {"columns": []})
+    assert art == {}
+
+
+@pytest.mark.parametrize(*_polars_roundtrip_cases)
+def test_apply_polars_roundtrip(
+    node: str, fit_extra: dict[str, Any], check_columns: bool, df_polars: Any
+) -> None:
+    """Fitting on pandas and applying to a polars frame must round trip cleanly."""
+    calculator_cls, applier_cls = _VECTORIZER_NODES[node]
+    df_pd = df_polars.to_pandas()
+    art = calculator_cls().fit(df_pd, {"columns": [CONFIG_COL], **fit_extra})
+    result = applier_cls().apply(df_polars, art)
+    assert isinstance(result, pl.DataFrame)
+    if check_columns:
+        for col in art["output_columns"]:
+            assert col in result.columns
 
 
 # ── CountVectorizer ───────────────────────────────────────────────────────────
@@ -75,16 +128,6 @@ class TestCountVectorizer:
         result = appl.apply(df_pandas, art)
         assert CONFIG_COL not in result.columns
 
-    def test_apply_polars_roundtrip(self, df_polars: Any) -> None:
-        df_pd = df_polars.to_pandas()
-        calc = CountVectorizerCalculator()
-        art = calc.fit(df_pd, {"columns": [CONFIG_COL], "max_features": 8})
-        appl = CountVectorizerApplier()
-        result = appl.apply(df_polars, art)
-        assert isinstance(result, pl.DataFrame)
-        for col in art["output_columns"]:
-            assert col in result.columns
-
     def test_output_values_non_negative(self, df_pandas: pd.DataFrame) -> None:
         calc = CountVectorizerCalculator()
         art = calc.fit(df_pandas, {"columns": [CONFIG_COL], "max_features": 10})
@@ -92,11 +135,6 @@ class TestCountVectorizer:
         result = appl.apply(df_pandas, art)
         numeric_cols = art["output_columns"]
         assert (result[numeric_cols] >= 0).all().all()
-
-    def test_empty_columns_config_returns_unchanged(self, df_pandas: pd.DataFrame) -> None:
-        calc = CountVectorizerCalculator()
-        art = calc.fit(df_pandas, {"columns": []})
-        assert art == {}
 
 
 # ── TfidfVectorizer ───────────────────────────────────────────────────────────
@@ -118,14 +156,6 @@ class TestTfidfVectorizer:
         numeric_cols = art["output_columns"]
         assert (result[numeric_cols] >= 0).all().all()
         assert (result[numeric_cols] <= 1.01).all().all()  # TF-IDF normalised to ≤1
-
-    def test_apply_polars_roundtrip(self, df_polars: Any) -> None:
-        df_pd = df_polars.to_pandas()
-        calc = TfidfVectorizerCalculator()
-        art = calc.fit(df_pd, {"columns": [CONFIG_COL], "max_features": 8})
-        appl = TfidfVectorizerApplier()
-        result = appl.apply(df_polars, art)
-        assert isinstance(result, pl.DataFrame)
 
     def test_ngram_range(self, df_pandas: pd.DataFrame) -> None:
         calc = TfidfVectorizerCalculator()
@@ -156,14 +186,6 @@ class TestHashingVectorizer:
         appl = HashingVectorizerApplier()
         result = appl.apply(df_pandas, art)
         assert len([c for c in result.columns if c.startswith(f"{CONFIG_COL}__hash__")]) == 32
-
-    def test_apply_polars_roundtrip(self, df_polars: Any) -> None:
-        df_pd = df_polars.to_pandas()
-        calc = HashingVectorizerCalculator()
-        art = calc.fit(df_pd, {"columns": [CONFIG_COL], "n_features": 16})
-        appl = HashingVectorizerApplier()
-        result = appl.apply(df_polars, art)
-        assert isinstance(result, pl.DataFrame)
 
     def test_stateless_same_result_on_new_data(self, df_pandas: pd.DataFrame) -> None:
         """HashingVectorizer gives identical results regardless of training data."""
@@ -289,11 +311,6 @@ class TestTokenizer:
         result = appl.apply(df_polars, art)
         assert isinstance(result, pl.DataFrame)
         assert f"{CONFIG_COL}__tokens" in result.columns
-
-    def test_empty_columns_noop(self, df_pandas: pd.DataFrame) -> None:
-        calc = TokenizerCalculator()
-        art = calc.fit(df_pandas, {"columns": []})
-        assert art == {}
 
 
 # ── SentenceEmbedder (optional dependency) ────────────────────────────────────

@@ -1,0 +1,7 @@
+{
+  "params": "engine",
+  "test_cases": {
+    "polars": {"engine": "polars"},
+    "pandas": {"engine": "pandas"}
+  }
+}

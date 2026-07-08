@@ -251,6 +251,38 @@ class FeatureGenerationArtifact(TypedDict, total=False):
     allow_overwrite: bool
 
 
+class FeatureInteractionArtifact(TypedDict, total=False):
+    type: str
+    columns: List[str]
+    degree: int
+    interaction_only: bool
+    include_bias: bool
+    combinations: List[List[str]]
+    feature_names: List[str]
+
+
+# ── Geo ───────────────────────────────────────────────────────────────────────
+
+
+class GeoDistanceArtifact(TypedDict, total=False):
+    type: str
+    lat1_col: str
+    lon1_col: str
+    lat2_col: str
+    lon2_col: str
+    method: str
+    unit: str
+    output_column: str
+
+
+class H3IndexArtifact(TypedDict, total=False):
+    type: str
+    lat_col: str
+    lon_col: str
+    resolution: int
+    output_column: str
+
+
 # ── Feature selection ────────────────────────────────────────────────────────
 
 

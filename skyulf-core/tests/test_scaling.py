@@ -14,6 +14,8 @@ import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.scaling.maxabs import (
     MaxAbsScalerApplier,
@@ -31,6 +33,14 @@ from skyulf.preprocessing.scaling.standard import (
     StandardScalerApplier,
     StandardScalerCalculator,
 )
+
+_validation_cases = TestCaseLoader("preprocessing/scaling").load()
+
+_SCALER_CALCULATORS: Dict[str, Any] = {
+    "standard": StandardScalerCalculator,
+    "minmax": MinMaxScalerCalculator,
+    "robust": RobustScalerCalculator,
+}
 
 
 def _fit_apply(
@@ -123,13 +133,6 @@ def test_standard_scaler_all_nan_column_propagates_nan() -> None:
 
     assert np.isnan(params["mean"][0])
     assert np.isnan(out["a"].to_numpy()).all()
-
-
-def test_standard_scaler_empty_dataframe_raises() -> None:
-    """Fitting on zero rows raises, matching sklearn's own minimum-sample check."""
-    df = pd.DataFrame({"a": pd.Series([], dtype=float)})
-    with pytest.raises(ValueError):
-        StandardScalerCalculator().fit(df, {"columns": ["a"]})
 
 
 def test_standard_scaler_out_of_range_values_at_apply_time() -> None:
@@ -239,13 +242,6 @@ def test_minmax_scaler_single_row() -> None:
         MinMaxScalerCalculator(), MinMaxScalerApplier(), df, {"columns": ["a"]}
     )
     np.testing.assert_allclose(out["a"].to_numpy(), [0.0])
-
-
-def test_minmax_scaler_empty_dataframe_raises() -> None:
-    """Fitting on zero rows raises, matching sklearn's own minimum-sample check."""
-    df = pd.DataFrame({"a": pd.Series([], dtype=float)})
-    with pytest.raises(ValueError):
-        MinMaxScalerCalculator().fit(df, {"columns": ["a"]})
 
 
 def test_minmax_scaler_no_columns_selected_is_noop() -> None:
@@ -452,13 +448,6 @@ def test_robust_scaler_out_of_range_values_at_apply_time() -> None:
     iqr = q3 - q1
     expected = (apply_df["a"].to_numpy() - median) / iqr
     np.testing.assert_allclose(out["a"].to_numpy(), expected, rtol=1e-9, atol=1e-9)
-
-
-def test_robust_scaler_empty_dataframe_raises() -> None:
-    """Fitting on zero rows raises, matching sklearn's own minimum-sample check."""
-    df = pd.DataFrame({"a": pd.Series([], dtype=float)})
-    with pytest.raises(ValueError):
-        RobustScalerCalculator().fit(df, {"columns": ["a"]})
 
 
 def test_robust_scaler_all_nan_column_propagates_nan() -> None:
@@ -670,3 +659,39 @@ def test_minmax_scaler_polars_apply_noop_when_missing_artifact() -> None:
     df = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
     out = MinMaxScalerApplier().apply(df, {"columns": ["a"]})
     assert out["a"].to_list() == [1.0, 2.0, 3.0]
+
+
+class TestValidation:
+    """Config validation errors — scenarios loaded from
+    ``tests/test_cases/preprocessing/scaling.json``.
+    """
+
+    @pytest.mark.parametrize(*_validation_cases)
+    def test_invalid_config_raises(self, scaler_name: str, error_match: str) -> None:
+        df = pd.DataFrame({"a": pd.Series([], dtype=float)})
+        calc = _SCALER_CALCULATORS[scaler_name]()
+        with pytest.raises(ValueError, match=error_match):
+            calc.fit(df, {"columns": ["a"]})
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values in ``age``/``income`` — closer to production data
+    than the small synthetic frames used elsewhere in this file.
+    """
+
+    def test_standard_scaler_scales_age_and_income_and_preserves_missing(self) -> None:
+        df = load_sample_dataset("customers")
+        out, params = _fit_apply(
+            StandardScalerCalculator(), StandardScalerApplier(), df, {"columns": ["age", "income"]}
+        )
+
+        # Missing values must remain missing, not be silently filled.
+        assert out.loc[df["age"].isna(), "age"].isna().all()
+        assert out.loc[df["income"].isna(), "income"].isna().all()
+
+        mean = np.array(params["mean"])
+        scale = np.array(params["scale"])
+        non_missing = ~df["age"].isna()
+        expected_age = (df.loc[non_missing, "age"].to_numpy() - mean[0]) / scale[0]
+        np.testing.assert_allclose(out.loc[non_missing, "age"].to_numpy(), expected_age, rtol=1e-9)

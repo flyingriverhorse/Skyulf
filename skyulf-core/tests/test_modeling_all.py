@@ -9,6 +9,7 @@ from typing import Any, cast
 import pandas as pd
 import pytest
 from sklearn.datasets import make_classification, make_regression
+from tests.utils.dataset_loader import load_sample_dataset
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.base import StatefulEstimator
@@ -660,3 +661,44 @@ class TestHyperparameterRegistry:
         for key in self.NEW_MODELS:
             space = get_default_search_space(key)
             assert len(space) > 0, f"No search space defined for {key!r}"
+
+
+# ===========================================================================
+# Real-shaped dataset — integration check against customers.csv
+# ===========================================================================
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values and mixed dtypes — closer to production data than
+    the synthetic ``make_classification``/``make_regression`` fixtures used
+    elsewhere in this file.
+    """
+
+    def test_random_forest_classifier_predicts_churn(self) -> None:
+        from skyulf.modeling.classification import (
+            RandomForestClassifierApplier,
+            RandomForestClassifierCalculator,
+        )
+
+        df = load_sample_dataset("customers")
+        # RandomForestClassifier can't handle NaN directly, so rows with
+        # missing age/income are dropped rather than assumed clean.
+        df = df.dropna(subset=["age", "income"])
+        data = df[["age", "income", "churned"]].rename(columns={"churned": "target"})
+        split = len(data) - 3
+        dataset = SplitDataset(train=data.iloc[:split], test=data.iloc[split:], validation=None)
+
+        estimator = StatefulEstimator(
+            node_id="rfc_real",
+            calculator=RandomForestClassifierCalculator(),
+            applier=RandomForestClassifierApplier(),
+        )
+        preds = estimator.fit_predict(
+            dataset, target_column="target", config={"params": {"n_estimators": 10}}
+        )
+        assert len(preds["test"]) == len(dataset.test)
+
+        report = estimator.evaluate(dataset, target_column="target")
+        assert report["problem_type"] == "classification"
+        assert "accuracy" in report["splits"]["test"].metrics

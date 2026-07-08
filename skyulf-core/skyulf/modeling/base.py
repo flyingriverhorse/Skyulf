@@ -58,8 +58,19 @@ class BaseModelCalculator(ABC):
             tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]
         ] = None,
     ) -> Any:
-        """
-        Trains the model. Returns the model object (serializable).
+        """Trains the model and returns the fitted model artifact.
+
+        The return type is intentionally `Any` rather than a narrower
+        TypeVar/Protocol: most calculators (see `sklearn_wrapper.py`) return a
+        single fitted estimator, but `TuningCalculator`
+        (`_tuning/engine.py::fit`) returns a `(model, tuning_result)` tuple
+        instead — the artifact shape is model-family-dependent, not just
+        heterogeneous across libraries (sklearn estimator, xgboost booster,
+        custom wrapper) but also heterogeneous *within* a single calculator
+        depending on whether tuning was applied. Consumers already
+        `isinstance(self.model, tuple)`-narrow where needed (see
+        `StatefulEstimator.evaluate`); a forced union type here wouldn't
+        remove that narrowing, so `Any` is the honest, pragmatic choice.
         """
 
 

@@ -1,0 +1,105 @@
+{
+  "groups": {
+    "arith_values": {
+      "params": "method, input_columns, constants, expected",
+      "test_cases": {
+        "add_two_columns": {
+          "method": "add",
+          "input_columns": ["a", "b"],
+          "constants": [],
+          "expected": [11.0, 22.0, 33.0, 44.0]
+        },
+        "add_with_constant": {
+          "method": "add",
+          "input_columns": ["a"],
+          "constants": [100.0],
+          "expected": [101.0, 102.0, 103.0, 104.0]
+        },
+        "subtract_two_columns": {
+          "method": "subtract",
+          "input_columns": ["a", "b"],
+          "constants": [],
+          "expected": [-9.0, -18.0, -27.0, -36.0]
+        },
+        "subtract_with_constant": {
+          "method": "subtract",
+          "input_columns": ["a"],
+          "constants": [1.0],
+          "expected": [0.0, 1.0, 2.0, 3.0]
+        },
+        "multiply_two_columns": {
+          "method": "multiply",
+          "input_columns": ["a", "b"],
+          "constants": [],
+          "expected": [10.0, 40.0, 90.0, 160.0]
+        },
+        "multiply_with_constant": {
+          "method": "multiply",
+          "input_columns": ["a"],
+          "constants": [2.0],
+          "expected": [2.0, 4.0, 6.0, 8.0]
+        }
+      }
+    },
+    "arith_none": {
+      "params": "method, input_columns",
+      "test_cases": {
+        "unknown_method_returns_none": {
+          "method": "hypercube",
+          "input_columns": ["a"]
+        },
+        "no_terms_returns_none": {
+          "method": "add",
+          "input_columns": ["nonexistent"]
+        }
+      }
+    },
+    "group_agg_values": {
+      "params": "method, expected",
+      "test_cases": {
+        "sum": {
+          "method": "sum",
+          "expected": [300.0, 300.0, 1200.0, 1200.0, 1200.0]
+        },
+        "min": {
+          "method": "min",
+          "expected": [100.0, 100.0, 300.0, 300.0, 300.0]
+        },
+        "max": {
+          "method": "max",
+          "expected": [200.0, 200.0, 500.0, 500.0, 500.0]
+        },
+        "median": {
+          "method": "median",
+          "expected": [150.0, 150.0, 400.0, 400.0, 400.0]
+        }
+      }
+    },
+    "group_agg_none": {
+      "params": "method, input_columns",
+      "test_cases": {
+        "unknown_method_returns_none": {
+          "method": "nonexistent",
+          "input_columns": ["dept"]
+        },
+        "missing_group_col_returns_none": {
+          "method": "mean",
+          "input_columns": ["missing"]
+        }
+      }
+    },
+    "ratio_none": {
+      "params": "op, existing",
+      "test_cases": {
+        "missing_numerator_returns_none": {
+          "op": {"input_columns": ["missing"], "secondary_columns": ["b"]},
+          "existing": ["b"]
+        },
+        "missing_denominator_returns_none": {
+          "op": {"input_columns": ["a"], "secondary_columns": ["missing"]},
+          "existing": ["a"]
+        }
+      }
+    }
+  }
+}

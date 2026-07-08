@@ -6,6 +6,9 @@ Targets the pandas+polars fit/apply branches, threshold parsing, and
 
 import pandas as pd
 import polars as pl
+import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing._schema import SkyulfSchema
 from skyulf.preprocessing.drop_and_missing._common import (
@@ -24,6 +27,13 @@ from skyulf.preprocessing.drop_and_missing.missing_indicator import (
     MissingIndicatorApplier,
     MissingIndicatorCalculator,
 )
+
+_threshold_ignored_cases = TestCaseLoader(
+    "preprocessing/drop_and_missing_gaps", group="threshold_ignored"
+).load()
+_normalize_subset_cases = TestCaseLoader(
+    "preprocessing/drop_and_missing_gaps", group="normalize_subset"
+).load()
 
 
 def _missing_df() -> pd.DataFrame:
@@ -209,20 +219,17 @@ def test_drop_missing_columns_by_threshold_polars() -> None:
     assert "b" in out.columns
 
 
-def test_drop_missing_columns_threshold_non_numeric_ignored() -> None:
-    """A non-numeric threshold is treated as absent (resolves to None)."""
-    df = _missing_df()
-    art = DropMissingColumnsCalculator().fit(df, {"missing_threshold": "not-a-number"})
-    assert art["columns_to_drop"] == []
+class TestDropMissingColumnsThresholdIgnored:
+    """A non-numeric or non-positive threshold is treated as "no threshold
+    configured" — scenarios loaded from
+    ``tests/test_cases/preprocessing/drop_and_missing_gaps.json`` (group ``threshold_ignored``).
+    """
 
-
-def test_drop_missing_columns_threshold_zero_or_negative_ignored() -> None:
-    """A threshold of 0 or negative is treated as "no threshold configured"."""
-    df = _missing_df()
-    art = DropMissingColumnsCalculator().fit(df, {"missing_threshold": 0})
-    assert art["columns_to_drop"] == []
-    art_neg = DropMissingColumnsCalculator().fit(df, {"missing_threshold": -5})
-    assert art_neg["columns_to_drop"] == []
+    @pytest.mark.parametrize(*_threshold_ignored_cases)
+    def test_drop_missing_columns_threshold_ignored(self, missing_threshold: object) -> None:
+        df = _missing_df()
+        art = DropMissingColumnsCalculator().fit(df, {"missing_threshold": missing_threshold})
+        assert art["columns_to_drop"] == []
 
 
 def test_drop_missing_columns_apply_noop_without_matching_columns() -> None:
@@ -291,17 +298,31 @@ def test_polars_filter_y_by_kept_indices_non_polars_y_passthrough() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_normalize_subset_empty_input_returns_none() -> None:
-    """An empty/falsy subset must resolve to None (no restriction)."""
-    assert _normalize_subset(None, ["a", "b"]) is None
-    assert _normalize_subset([], ["a", "b"]) is None
+class TestNormalizeSubset:
+    """``_normalize_subset`` column-filtering behavior — scenarios loaded from
+    ``tests/test_cases/preprocessing/drop_and_missing_gaps.json`` (group ``normalize_subset``).
+    """
+
+    @pytest.mark.parametrize(*_normalize_subset_cases)
+    def test_normalize_subset(
+        self, subset: list[str] | None, existing_cols: list[str], expected: list[str] | None
+    ) -> None:
+        assert _normalize_subset(subset, existing_cols) == expected
 
 
-def test_normalize_subset_filters_to_existing_columns() -> None:
-    """Subset entries absent from existing_cols must be dropped, keeping the rest."""
-    assert _normalize_subset(["a", "nonexistent"], ["a", "b"]) == ["a"]
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample,
+    which has missing values in ``age``/``income``/``city``/``lat``/``lon`` —
+    closer to production data than the small synthetic frame used elsewhere
+    in this file.
+    """
 
+    def test_missing_indicator_flags_columns_with_real_gaps(self) -> None:
+        df = load_sample_dataset("customers")
+        params = MissingIndicatorCalculator().fit(df, {})
+        assert set(params["columns"]) == {"age", "income", "city", "lat", "lon"}
 
-def test_normalize_subset_all_missing_returns_none() -> None:
-    """A subset where none of the entries exist must resolve to None."""
-    assert _normalize_subset(["nonexistent"], ["a", "b"]) is None
+        out = MissingIndicatorApplier().apply(df, params)
+        for col in params["columns"]:
+            expected = df[col].isna().astype(int)
+            pd.testing.assert_series_equal(out[f"{col}_missing"], expected, check_names=False)

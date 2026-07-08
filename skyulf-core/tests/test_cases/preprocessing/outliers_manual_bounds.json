@@ -1,0 +1,42 @@
+{
+  "groups": {
+    "col_mask_pandas": {
+      "params": "values, bounds, expected",
+      "test_cases": {
+        "lower_bound_only": {"values": [-1.0, 0.0, 1.0, 5.0], "bounds": {"lower": 0.0}, "expected": [false, true, true, true]},
+        "upper_bound_only": {"values": [0.0, 5.0, 10.0, 11.0], "bounds": {"upper": 10.0}, "expected": [true, true, true, false]},
+        "lower_and_upper": {"values": [-1.0, 0.0, 5.0, 10.0, 11.0], "bounds": {"lower": 0.0, "upper": 10.0}, "expected": [false, true, true, true, false]},
+        "no_bounds_all_true": {"values": [-1000.0, 0.0, 1000.0], "bounds": {}, "expected": [true, true, true]}
+      }
+    },
+    "col_mask_polars": {
+      "params": "values, bounds, expected",
+      "test_cases": {
+        "lower_bound_only": {"values": [-1.0, 0.0, 1.0], "bounds": {"lower": 0.0}, "expected": [false, true, true]},
+        "boundary_value_included": {"values": [9.9, 10.0, 10.1], "bounds": {"upper": 10.0}, "expected": [true, true, false]},
+        "null_always_inlier": {"values": [null, 0.0, 999.0], "bounds": {"lower": 0.0, "upper": 10.0}, "expected": [true, true, false]}
+      }
+    },
+    "applier_pandas_passthrough": {
+      "params": "config",
+      "test_cases": {
+        "no_bounds": {"config": {}},
+        "unknown_column_in_bounds": {"config": {"bounds": {"nonexistent": {"lower": 0.0}}}}
+      }
+    },
+    "applier_polars_passthrough": {
+      "params": "config",
+      "test_cases": {
+        "no_bounds": {"config": {}},
+        "unknown_column_in_bounds": {"config": {"bounds": {"nonexistent": {"lower": 0.0}}}}
+      }
+    },
+    "applier_polars_boundary_kept": {
+      "params": "config, expected_value",
+      "test_cases": {
+        "boundary_equality_lower": {"config": {"bounds": {"val": {"lower": 0.0}}}, "expected_value": 0.0},
+        "boundary_equality_upper": {"config": {"bounds": {"val": {"upper": 100.0}}}, "expected_value": 100.0}
+      }
+    }
+  }
+}

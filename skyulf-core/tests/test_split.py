@@ -13,6 +13,8 @@ from typing import Any, Dict
 import pandas as pd
 import polars as pl
 import pytest
+from tests.utils.dataset_loader import load_sample_dataset
+from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.split import (
@@ -30,6 +32,9 @@ from skyulf.preprocessing.split import (
 def _frame(n: int = 100) -> pd.DataFrame:
     """Build a simple 100-row DataFrame with a numeric feature and a target."""
     return pd.DataFrame({"feature": range(n), "target": [i % 2 for i in range(n)]})
+
+
+_validation_cases = TestCaseLoader("preprocessing/feature_target_split_validation").load()
 
 
 # ---------------------------------------------------------------------------
@@ -261,17 +266,16 @@ def test_feature_target_split_applier_splits_single_frame() -> None:
     assert list(y) == [i % 2 for i in range(10)]
 
 
-def test_feature_target_split_applier_raises_without_target_column() -> None:
-    """Missing target_column config must raise a ValueError."""
-    with pytest.raises(ValueError):
-        FeatureTargetSplitApplier().apply(_frame(5), {})
+class TestValidation:
+    """Config validation errors — scenarios loaded from
+    ``tests/test_cases/preprocessing/feature_target_split_validation.json``.
+    """
 
-
-def test_feature_target_split_applier_raises_when_column_missing_from_frame() -> None:
-    """A target_column absent from the frame must raise a ValueError."""
-    df = pd.DataFrame({"feature": [1, 2, 3]})
-    with pytest.raises(ValueError):
-        FeatureTargetSplitApplier().apply(df, {"target_column": "does_not_exist"})
+    @pytest.mark.parametrize(*_validation_cases)
+    def test_invalid_config_raises(self, target_column: str | None, error_match: str) -> None:
+        config: Dict[str, Any] = {} if target_column is None else {"target_column": target_column}
+        with pytest.raises(ValueError, match=error_match):
+            FeatureTargetSplitApplier().apply(_frame(), config)
 
 
 def test_feature_target_split_applier_handles_split_dataset_input() -> None:
@@ -479,3 +483,30 @@ def test_back_to_engine_not_was_polars_returns_data_unchanged() -> None:
 def test_back_to_engine_non_frame_data_with_was_polars_passthrough() -> None:
     """A was_polars=True conversion must fall through unchanged for non pandas types."""
     assert _back_to_engine(42, True) == 42
+
+
+# ---------------------------------------------------------------------------
+# Real-shaped dataset integration check
+# ---------------------------------------------------------------------------
+
+
+class TestRealShapedDataset:
+    """Integration-style check against the checked-in ``customers.csv`` sample.
+
+    Verifies that SplitCalculator / SplitApplier handles a real-shaped dataset
+    with missing values and mixed dtypes: row counts add up and the train/test
+    index sets are disjoint and cover the entire dataset.
+    """
+
+    def test_split_on_customers_preserves_all_rows(self) -> None:
+        df = load_sample_dataset("customers")
+        params: Dict[str, Any] = {"test_size": 0.2, "random_state": 42}
+        result = SplitApplier().apply(df, params)
+        assert isinstance(result, SplitDataset)
+        assert isinstance(result.train, pd.DataFrame)
+        assert isinstance(result.test, pd.DataFrame)
+        train_idx = set(result.train.index)
+        test_idx = set(result.test.index)
+        assert train_idx.isdisjoint(test_idx)
+        assert train_idx | test_idx == set(df.index)
+        assert len(result.train) + len(result.test) == len(df)

@@ -1,0 +1,144 @@
+{
+  "groups": {
+    "resolve_valid_columns": {
+      "params": "frame_type, frame_columns, requested, expected",
+      "test_cases": {
+        "filters_missing": {
+          "frame_type": "pandas",
+          "frame_columns": {"a": [1], "b": [2]},
+          "requested": ["a", "c", "b"],
+          "expected": ["a", "b"]
+        },
+        "preserves_requested_order": {
+          "frame_type": "pandas",
+          "frame_columns": {"a": [1], "b": [2], "c": [3]},
+          "requested": ["c", "a"],
+          "expected": ["c", "a"]
+        },
+        "empty_requested_returns_empty": {
+          "frame_type": "pandas",
+          "frame_columns": {"a": [1]},
+          "requested": [],
+          "expected": []
+        },
+        "none_present_returns_empty": {
+          "frame_type": "pandas",
+          "frame_columns": {"a": [1]},
+          "requested": ["x", "y"],
+          "expected": []
+        },
+        "works_with_polars_frame": {
+          "frame_type": "polars",
+          "frame_columns": {"a": [1], "b": [2]},
+          "requested": ["b", "z"],
+          "expected": ["b"]
+        }
+      }
+    },
+    "safe_scale": {
+      "params": "input_values, expected",
+      "test_cases": {
+        "replaces_zeros_with_one": {
+          "input_values": [0.0, 2.0, 0.0, 5.0],
+          "expected": [1.0, 2.0, 1.0, 5.0]
+        },
+        "mutates_input_array": {
+          "input_values": [0.0, 3.0],
+          "expected": [1.0, 3.0]
+        },
+        "no_zeros_is_noop": {
+          "input_values": [2.0, 4.0, 8.0],
+          "expected": [2.0, 4.0, 8.0]
+        }
+      }
+    },
+    "is_polars": {
+      "params": "frame_type, expected",
+      "test_cases": {
+        "polars_frame": {
+          "frame_type": "polars",
+          "expected": true
+        },
+        "pandas_frame": {
+          "frame_type": "pandas",
+          "expected": false
+        }
+      }
+    },
+    "auto_detect_text_columns": {
+      "params": "frame_type, columns, category_columns, expected",
+      "test_cases": {
+        "pandas_object_dtype": {
+          "frame_type": "pandas",
+          "columns": {"name": ["a", "b"], "amount": [1.0, 2.0]},
+          "category_columns": [],
+          "expected": ["name"]
+        },
+        "pandas_category_dtype": {
+          "frame_type": "pandas",
+          "columns": {"cat": ["x", "y"], "num": [1, 2]},
+          "category_columns": ["cat"],
+          "expected": ["cat"]
+        },
+        "pandas_none_present": {
+          "frame_type": "pandas",
+          "columns": {"num": [1, 2, 3]},
+          "category_columns": [],
+          "expected": []
+        },
+        "polars_utf8": {
+          "frame_type": "polars",
+          "columns": {"name": ["a", "b"], "amount": [1.0, 2.0]},
+          "category_columns": [],
+          "expected": ["name"]
+        }
+      }
+    },
+    "auto_detect_numeric_columns": {
+      "params": "frame_type, columns, expected",
+      "test_cases": {
+        "pandas": {
+          "frame_type": "pandas",
+          "columns": {"num": [1, 2], "flt": [1.5, 2.5], "txt": ["a", "b"]},
+          "expected": ["num", "flt"]
+        },
+        "polars": {
+          "frame_type": "polars",
+          "columns": {"num": [1, 2], "flt": [1.5, 2.5], "txt": ["a", "b"]},
+          "expected": ["num", "flt"]
+        },
+        "pandas_none_present": {
+          "frame_type": "pandas",
+          "columns": {"txt": ["a", "b"]},
+          "expected": []
+        }
+      }
+    },
+    "auto_detect_datetime_columns": {
+      "params": "frame_type, datetime_columns, other_columns, expected",
+      "test_cases": {
+        "pandas_datetime64": {
+          "frame_type": "pandas",
+          "datetime_columns": {"when": ["2020-01-01", "2020-01-02"]},
+          "other_columns": {"num": [1, 2]},
+          "expected": ["when"]
+        },
+        "pandas_none_present": {
+          "frame_type": "pandas",
+          "datetime_columns": {},
+          "other_columns": {"num": [1, 2]},
+          "expected": []
+        },
+        "polars_date_and_datetime": {
+          "frame_type": "polars",
+          "datetime_columns": {
+            "d": ["2020-01-01", "2020-01-02"],
+            "dt": ["2020-01-01T01:00:00", "2020-01-02T02:00:00"]
+          },
+          "other_columns": {"num": [1, 2]},
+          "expected": ["d", "dt"]
+        }
+      }
+    }
+  }
+}
