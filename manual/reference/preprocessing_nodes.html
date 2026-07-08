@@ -806,6 +806,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/profiling_comparison.html" class="md-nav__link">
         
   
@@ -2402,10 +2430,60 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#featureinteraction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FeatureInteraction
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#featuregeneration" class="md-nav__link">
     <span class="md-ellipsis">
       
         FeatureGeneration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#geo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Geo
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Geo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#geodistance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GeoDistance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#h3index" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        H3Index
       
     </span>
   </a>
@@ -4146,6 +4224,24 @@
 <ul>
 <li><code>columns</code>, <code>degree</code>, <code>interaction_only</code>, <code>include_bias</code>, <code>include_input_features</code>, <code>output_prefix</code>, <code>feature_names</code></li>
 </ul>
+<h3 id="featureinteraction">FeatureInteraction</h3>
+<p>(Alias: <code>FeatureInteractionNode</code>)</p>
+<p>Generates 2-way/3-way/4-way multiplicative interaction columns between numeric
+columns. Interaction column names are deterministic and regularization-friendly:
+sorted column names joined with <code>_x_</code> (e.g. <code>x1_x_x2</code>, <code>x1_x_x2_x_x3</code>, <code>x1_x_x2_x_x3_x_x4</code>), so the
+same combination of inputs always produces the same output name regardless of
+input column order.</p>
+<p>Config:</p>
+<ul>
+<li><code>columns</code>: list[str]</li>
+<li><code>degree</code>: int (2, 3, or 4, default 2)</li>
+<li><code>interaction_only</code>: bool (default True; skips self-products like <code>x1 * x1</code>)</li>
+<li><code>include_bias</code>: bool (default False; adds a constant <code>interaction_bias</code> column of 1.0)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>columns</code>, <code>degree</code>, <code>interaction_only</code>, <code>include_bias</code>, <code>combinations</code>, <code>feature_names</code></li>
+</ul>
 <h3 id="featuregeneration">FeatureGeneration</h3>
 <p>(Aliases: <code>FeatureMath</code>, <code>FeatureGenerationNode</code>)</p>
 <p>Config:</p>
@@ -4157,6 +4253,44 @@
 <p>Learned params:</p>
 <ul>
 <li><code>operations</code>, <code>epsilon</code>, <code>allow_overwrite</code></li>
+</ul>
+<h2 id="geo">Geo</h2>
+<h3 id="geodistance">GeoDistance</h3>
+<p>Computes the great-circle (<code>haversine</code>) or flat-plane (<code>euclidean</code>) distance
+between two lat/lon coordinate pairs and appends it as a new numeric column.
+Pure math — no optional geospatial dependency required, and runs natively on
+both the pandas and polars engines.</p>
+<p>Config:</p>
+<ul>
+<li><code>lat1_col</code>: str</li>
+<li><code>lon1_col</code>: str</li>
+<li><code>lat2_col</code>: str</li>
+<li><code>lon2_col</code>: str</li>
+<li><code>method</code>: str (<code>"haversine"</code> default, or <code>"euclidean"</code> for a cheap flat-plane approximation)</li>
+<li><code>unit</code>: str (<code>"km"</code> default, or <code>"mi"</code>)</li>
+<li><code>output_column</code>: str (default <code>"geo_distance_km"</code>)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>lat1_col</code>, <code>lon1_col</code>, <code>lat2_col</code>, <code>lon2_col</code>, <code>method</code>, <code>unit</code>, <code>output_column</code></li>
+</ul>
+<h3 id="h3index">H3Index</h3>
+<p>Computes the Uber H3 hierarchical hexagonal grid cell index for each lat/lon
+pair and appends it as a new string column, using <code>h3.latlng_to_cell</code>.
+Requires the optional <code>h3</code> package (<code>pip install skyulf-core[geo]</code> or
+<code>pip install h3</code>); <code>Calculator.fit()</code> raises a clear <code>ImportError</code> if it isn't
+installed. The pandas engine computes row-wise (h3 has no vectorized API);
+the polars engine converts to pandas internally and back.</p>
+<p>Config:</p>
+<ul>
+<li><code>lat_col</code>: str</li>
+<li><code>lon_col</code>: str</li>
+<li><code>resolution</code>: int (0-15, H3 grid resolution, default 9)</li>
+<li><code>output_column</code>: str (default <code>"h3_index"</code>)</li>
+</ul>
+<p>Learned params:</p>
+<ul>
+<li><code>lat_col</code>, <code>lon_col</code>, <code>resolution</code>, <code>output_column</code></li>
 </ul>
 <h2 id="feature-selection">Feature Selection</h2>
 <h3 id="variancethreshold">VarianceThreshold</h3>

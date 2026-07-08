@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/troubleshooting.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/sklearn_migration.html">
       
       
-        <link rel="prev" href="extending_custom_nodes.html">
+        <link rel="prev" href="recipes.html">
       
       
-        <link rel="next" href="../reference/preprocessing_nodes.html">
+        <link rel="next" href="profiling_comparison.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Troubleshooting - Skyulf</title>
+        <title>Migrating from scikit-learn - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#troubleshooting" class="md-skip">
+        <a href="#migrating-from-scikit-learn-pipeline" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Troubleshooting
+              Migrating from scikit-learn
             
           </span>
         </div>
@@ -244,7 +244,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../guides/platform_setup.html" class="md-tabs__link">
+        <a href="platform_setup.html" class="md-tabs__link">
           
   
   
@@ -260,11 +260,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../guides/getting_started.html" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="getting_started.html" class="md-tabs__link">
           
   
   
@@ -320,13 +322,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="overview.html" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
           
   
   
@@ -493,7 +493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/platform_setup.html" class="md-nav__link">
+      <a href="platform_setup.html" class="md-nav__link">
         
   
   
@@ -521,7 +521,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/platform_walkthrough.html" class="md-nav__link">
+      <a href="platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -549,7 +549,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/backend_api.html" class="md-nav__link">
+      <a href="backend_api.html" class="md-nav__link">
         
   
   
@@ -577,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/backend_configuration.html" class="md-nav__link">
+      <a href="backend_configuration.html" class="md-nav__link">
         
   
   
@@ -605,7 +605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/job_idempotency.html" class="md-nav__link">
+      <a href="job_idempotency.html" class="md-nav__link">
         
   
   
@@ -637,28 +637,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -676,7 +679,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -694,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/getting_started.html" class="md-nav__link">
+      <a href="getting_started.html" class="md-nav__link">
         
   
   
@@ -722,7 +725,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
+      <a href="multi_path_pipelines.html" class="md-nav__link">
         
   
   
@@ -750,7 +753,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/faq.html" class="md-nav__link">
+      <a href="faq.html" class="md-nav__link">
         
   
   
@@ -778,7 +781,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/recipes.html" class="md-nav__link">
+      <a href="recipes.html" class="md-nav__link">
         
   
   
@@ -803,10 +806,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../guides/sklearn_migration.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="sklearn_migration.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -822,6 +852,103 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-core-mental-model-shift" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The core mental-model shift
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#side-by-side-impute-encode-scale-train" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Side-by-side: impute → encode → scale → train
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#inspecting-a-fitted-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inspecting a fitted pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#column-selection-columntransformer-remainder-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Column selection: ColumnTransformer remainder handling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#custom-transformers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Custom transformers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-get-that-plain-sklearn-doesnt-have" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you get that plain sklearn doesn't have
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whats-not-yet-a-drop-in-replacement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What's not (yet) a drop-in replacement
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -834,7 +961,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/profiling_comparison.html" class="md-nav__link">
+      <a href="profiling_comparison.html" class="md-nav__link">
         
   
   
@@ -946,7 +1073,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/adding_new_engine.html" class="md-nav__link">
+      <a href="adding_new_engine.html" class="md-nav__link">
         
   
   
@@ -974,7 +1101,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/engine_mechanics.html" class="md-nav__link">
+      <a href="engine_mechanics.html" class="md-nav__link">
         
   
   
@@ -1002,7 +1129,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../guides/data_drift_roadmap.html" class="md-nav__link">
+      <a href="data_drift_roadmap.html" class="md-nav__link">
         
   
   
@@ -1240,31 +1367,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
             
   
   
@@ -1282,7 +1406,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1300,7 +1424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="overview.html" class="md-nav__link">
+      <a href="../user_guide/overview.html" class="md-nav__link">
         
   
   
@@ -1328,7 +1452,7 @@
   
   
     <li class="md-nav__item">
-      <a href="installation.html" class="md-nav__link">
+      <a href="../user_guide/installation.html" class="md-nav__link">
         
   
   
@@ -1356,7 +1480,7 @@
   
   
     <li class="md-nav__item">
-      <a href="pipeline_quickstart.html" class="md-nav__link">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
         
   
   
@@ -1384,7 +1508,7 @@
   
   
     <li class="md-nav__item">
-      <a href="step_by_step_no_config.html" class="md-nav__link">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
         
   
   
@@ -1412,7 +1536,7 @@
   
   
     <li class="md-nav__item">
-      <a href="eda_profiling.html" class="md-nav__link">
+      <a href="../user_guide/eda_profiling.html" class="md-nav__link">
         
   
   
@@ -1440,7 +1564,7 @@
   
   
     <li class="md-nav__item">
-      <a href="text_nlp.html" class="md-nav__link">
+      <a href="../user_guide/text_nlp.html" class="md-nav__link">
         
   
   
@@ -1468,7 +1592,7 @@
   
   
     <li class="md-nav__item">
-      <a href="validation_vs_sklearn.html" class="md-nav__link">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
         
   
   
@@ -1496,7 +1620,7 @@
   
   
     <li class="md-nav__item">
-      <a href="configuration.html" class="md-nav__link">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
         
   
   
@@ -1524,7 +1648,7 @@
   
   
     <li class="md-nav__item">
-      <a href="hyperparameter_tuning.html" class="md-nav__link">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
         
   
   
@@ -1552,7 +1676,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cross_validation.html" class="md-nav__link">
+      <a href="../user_guide/cross_validation.html" class="md-nav__link">
         
   
   
@@ -1580,7 +1704,7 @@
   
   
     <li class="md-nav__item">
-      <a href="splitdataset_and_leakage.html" class="md-nav__link">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
         
   
   
@@ -1608,7 +1732,7 @@
   
   
     <li class="md-nav__item">
-      <a href="drift_monitoring.html" class="md-nav__link">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
         
   
   
@@ -1636,7 +1760,7 @@
   
   
     <li class="md-nav__item">
-      <a href="serialization.html" class="md-nav__link">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
         
   
   
@@ -1664,7 +1788,7 @@
   
   
     <li class="md-nav__item">
-      <a href="extending_custom_nodes.html" class="md-nav__link">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
         
   
   
@@ -1689,37 +1813,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="troubleshooting.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
         
   
   
@@ -1735,219 +1832,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#unknown-transformer-type" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Unknown transformer type"
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#unknown-model-type" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "Unknown model type: ..."
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#resampling-errors-about-non-numeric-columns" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resampling errors about non-numeric columns
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#smote-not-found-importerror" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        SMOTE not found / ImportError
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#xgboost-importerror" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        XGBoost ImportError
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optuna-tuningcalculator-importerror" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optuna / TuningCalculator ImportError
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#x-merges-n-parallel-branches-merge-advisory-banner" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "X merges N parallel branches…" (merge advisory banner)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="&#34;X merges N parallel branches…&#34; (merge advisory banner)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-it-means" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What it means
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#why-its-usually-a-bug" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Why it's usually a bug
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#how-to-entirely-fix-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        How to entirely fix it
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#when-fan-in-is-fine" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        When fan-in is fine
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#what-the-engine-guarantees" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the engine guarantees
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#target-column-not-found-after-encoding" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Target column not found after encoding
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pickle-loading-errors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Pickle loading errors
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#polars-version-mismatch" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Polars version mismatch
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#celery-redis-connection-refused-full-platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Celery / Redis connection refused (full platform)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#feature-scaling-produces-nan" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Feature scaling produces NaN
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3129,137 +3013,191 @@
   
 
 
-<h1 id="troubleshooting">Troubleshooting</h1>
-<p>Common issues and solutions when using Skyulf.</p>
-<hr />
-<h2 id="unknown-transformer-type">"Unknown transformer type"</h2>
-<p>Your step's <code>transformer</code> string does not match any registered node in the <code>NodeRegistry</code>.</p>
-<p><strong>Fix:</strong> Check spelling and casing. Use the exact key from the <a href="configuration.html">Configuration</a> page (e.g., <code>OneHotEncoder</code>, not <code>one_hot_encoder</code>).</p>
-<hr />
-<h2 id="unknown-model-type">"Unknown model type: ..."</h2>
-<p>The <code>type</code> value in your modeling config is not registered.</p>
-<p><strong>Fix:</strong> Ensure you are using one of the 20 supported model keys listed in <a href="configuration.html#modeling-config">Configuration - Modeling config</a>. If using XGBoost, install the extra: <code>pip install skyulf-core[modeling-xgboost]</code>.</p>
-<hr />
-<h2 id="resampling-errors-about-non-numeric-columns">Resampling errors about non-numeric columns</h2>
-<p>Oversampling / undersampling (SMOTE, RandomOverSampler, etc.) require all features to be numeric.</p>
-<p><strong>Fix:</strong> Apply an encoder (e.g., <code>OneHotEncoder</code> or <code>OrdinalEncoder</code>) <strong>before</strong> any resampling step in your preprocessing config.</p>
-<hr />
-<h2 id="smote-not-found-importerror">SMOTE not found / ImportError</h2>
-<p>The <code>imbalanced-learn</code> package is an optional dependency.</p>
-<p><strong>Fix:</strong></p>
-<pre><code class="language-bash">pip install skyulf-core[preprocessing-imbalanced]
-</code></pre>
-<hr />
-<h2 id="xgboost-importerror">XGBoost ImportError</h2>
-<p>XGBoost estimators are optional and not installed by default.</p>
-<p><strong>Fix:</strong></p>
-<pre><code class="language-bash">pip install skyulf-core[modeling-xgboost]
-</code></pre>
-<hr />
-<h2 id="optuna-tuningcalculator-importerror">Optuna / TuningCalculator ImportError</h2>
-<p>Hyperparameter tuning with Optuna requires the tuning extra.</p>
-<p><strong>Fix:</strong></p>
-<pre><code class="language-bash">pip install skyulf-core[tuning]
-</code></pre>
-<hr />
-<h2 id="x-merges-n-parallel-branches-merge-advisory-banner">"X merges N parallel branches…" (merge advisory banner)</h2>
-<p>You see an amber banner in the Results panel like:</p>
-<blockquote>
-<p><em>Drop Missing Columns merges 2 parallel branches: TransformationNode + MissingIndicator. 6 overlapping columns take values from MissingIndicator; unique columns from the others are kept as-is. For sequential application, chain them instead.</em></p>
-</blockquote>
-<h3 id="what-it-means">What it means</h3>
-<p>A node has <strong>two or more incoming edges</strong> that trace back to a common ancestor (sibling fan-in). The engine merges them with two rules:</p>
-<ol>
-<li><strong>Union of columns</strong> — any column unique to one branch is kept as-is.</li>
-<li><strong>Last-wins on overlap</strong> — for columns present in two or more branches, the <strong>last input</strong> in the node's input list overwrites the earlier ones. Earlier branches' modifications to those columns are silently dropped.</li>
-</ol>
-<h3 id="why-its-usually-a-bug">Why it's usually a bug</h3>
-<p>If both branches modify the same columns (e.g. <code>TransformationNode</code> rescales <code>SepalLengthCm</code> and <code>MissingIndicator</code> outputs the original <code>SepalLengthCm</code> plus <code>*_missing</code> flags), only the last branch's values survive. You lose the work the other branch did.</p>
-<h3 id="how-to-entirely-fix-it">How to entirely fix it</h3>
-<p><strong>Chain the nodes instead of fanning them out.</strong> Instead of:</p>
-<pre><code>Dataset ──&gt; TransformationNode ──┐
-        ──&gt; MissingIndicator ────┴──&gt; DropMissingColumns
-</code></pre>
-<p>wire:</p>
-<pre><code>Dataset ──&gt; TransformationNode ──&gt; MissingIndicator ──&gt; DropMissingColumns
-</code></pre>
-<p>Now <code>MissingIndicator</code> reads <code>TransformationNode</code>'s output, adds <code>*_missing</code> flags on top, and passes the combined frame downstream. No fan-in, no warning, all changes preserved.</p>
-<p>In the canvas:</p>
-<ol>
-<li>Delete the <code>Dataset → MissingIndicator</code> edge.</li>
-<li>Drag a new edge from <code>TransformationNode</code> → <code>MissingIndicator</code>.</li>
-<li>Re-run preview — the banner will disappear.</li>
-</ol>
-<h3 id="when-fan-in-is-fine">When fan-in is fine</h3>
-<ul>
-<li><strong>Disjoint columns</strong> — branches output non-overlapping columns. The banner says <em>"No column overlap — all columns from all branches are kept."</em> You can ignore it.</li>
-<li><strong>Redundant edge</strong> (e.g. <code>Splitter → Scaler</code> plus a direct <code>Splitter → Encoder</code> while <code>Scaler → Encoder</code> also exists) — the engine detects this and <strong>suppresses the warning entirely</strong> because the descendant supersedes the ancestor under last-wins.</li>
-</ul>
-<h3 id="what-the-engine-guarantees">What the engine guarantees</h3>
+<h1 id="migrating-from-scikit-learn-pipeline">Migrating from scikit-learn <code>Pipeline</code></h1>
+<p>This guide is for developers already comfortable with scikit-learn's
+<code>Pipeline</code> / <code>ColumnTransformer</code> who want to bring that experience to
+Skyulf. Each section shows the sklearn code next to the equivalent Skyulf
+config, followed by what changes conceptually.</p>
+<h2 id="the-core-mental-model-shift">The core mental-model shift</h2>
 <table>
 <thead>
 <tr>
-<th>Pattern</th>
-<th>Behavior</th>
+<th>scikit-learn</th>
+<th>Skyulf</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Linear chain <code>A → B → C</code></td>
-<td>No warning, full data flow</td>
+<td>Pipeline = Python objects composed in code (<code>Pipeline([...])</code>)</td>
+<td>Pipeline = a JSON-serializable <code>dict</code> (<code>{"preprocessing": [...], "modeling": {...}}</code>)</td>
 </tr>
 <tr>
-<td>Redundant ancestor edge</td>
-<td>Suppressed silently</td>
+<td><code>ColumnTransformer</code> for per-column branching</td>
+<td>Each step's <code>params.columns</code> list scopes it to specific columns — no separate transformer needed</td>
 </tr>
 <tr>
-<td>Disjoint-column fan-in</td>
-<td>Advisory only, all columns kept</td>
+<td>One engine: pandas/NumPy only</td>
+<td>Dual-engine: the same config runs on pandas <strong>or</strong> Polars (see <a href="engine_mechanics.html">Engine Mechanics</a>)</td>
 </tr>
 <tr>
-<td><strong>Overlapping-column fan-in</strong></td>
-<td><strong>Last input wins — chain instead</strong></td>
+<td><code>fit</code>/<code>transform</code> return arrays or DataFrames</td>
+<td><code>fit</code>/<code>predict</code> return dicts of metrics / predictions; the fitted pipeline itself is inspectable (<code>describe()</code>, <code>to_mermaid()</code>, <code>fingerprint()</code>)</td>
 </tr>
 <tr>
-<td>Cycles</td>
-<td>Engine rejects</td>
+<td>Persisted via <code>joblib.dump</code></td>
+<td>Persisted via <code>pipeline.save(path)</code> / <code>SkyulfPipeline.load(path)</code> (pickle under the hood)</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Rule of thumb:</strong> if two branches touch the same columns, chain them; if they touch different columns, fanning in is fine.</p>
-<hr />
-<h2 id="target-column-not-found-after-encoding">Target column not found after encoding</h2>
-<p>If your target column is categorical and you apply <code>OneHotEncoder</code> with <code>drop_original=True</code>, the target column may be dropped or expanded.</p>
-<p><strong>Fix:</strong> Always run <code>TrainTestSplitter</code> (which separates <code>X</code> and <code>y</code>) <strong>before</strong> encoding. This ensures the target is safely stored in <code>y</code> and never touched by the encoder.</p>
-<hr />
-<h2 id="pickle-loading-errors">Pickle loading errors</h2>
-<p>If <code>SkyulfPipeline.load()</code> fails, the saved model was pickled with a different library version.</p>
-<p><strong>Fix:</strong> Ensure compatible versions of:</p>
-<ul>
-<li>Python (same minor version, e.g., 3.10.x)</li>
-<li>scikit-learn (same minor version)</li>
-<li>pandas (same major version)</li>
-</ul>
-<p>Pin versions in <code>requirements.txt</code> for reproducibility across environments.</p>
-<hr />
-<h2 id="polars-version-mismatch">Polars version mismatch</h2>
-<p>Skyulf requires <code>polars &gt;= 1.36</code>. Older versions may cause schema or type errors during data ingestion.</p>
-<p><strong>Fix:</strong></p>
-<pre><code class="language-bash">pip install --upgrade polars
+<p>Because the config is plain JSON, a Skyulf pipeline can be built, stored,
+diffed, and re-run without executing any Python — a canvas UI, a database
+row, or a REST payload can all produce the same <code>config</code> dict that
+<code>SkyulfPipeline(config)</code> consumes.</p>
+<h2 id="side-by-side-impute-encode-scale-train">Side-by-side: impute → encode → scale → train</h2>
+<p><strong>scikit-learn</strong></p>
+<pre><code class="language-python">from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+numeric_features = [&quot;age&quot;, &quot;income&quot;]
+categorical_features = [&quot;city&quot;]
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        (&quot;num&quot;, Pipeline([
+            (&quot;impute&quot;, SimpleImputer(strategy=&quot;mean&quot;)),
+            (&quot;scale&quot;, StandardScaler()),
+        ]), numeric_features),
+        (&quot;cat&quot;, OneHotEncoder(), categorical_features),
+    ]
+)
+
+model = Pipeline([
+    (&quot;preprocess&quot;, preprocessor),
+    (&quot;clf&quot;, RandomForestClassifier(n_estimators=50, max_depth=5)),
+])
+
+X_train, X_test, y_train, y_test = train_test_split(
+    data.drop(columns=[&quot;is_customer&quot;]), data[&quot;is_customer&quot;], test_size=0.2
+)
+model.fit(X_train, y_train)
+predictions = model.predict(X_test)
 </code></pre>
-<hr />
-<h2 id="celery-redis-connection-refused-full-platform">Celery / Redis connection refused (full platform)</h2>
-<p>The backend's async task queue requires a running Redis instance.</p>
-<p><strong>Fix:</strong></p>
-<ol>
-<li>Ensure Redis is running: <code>redis-cli ping</code> should return <code>PONG</code>.</li>
-<li>Check <code>CELERY_BROKER_URL</code> in your <code>.env</code> file (default: <code>redis://localhost:6379/0</code>).</li>
-<li>If using Docker: <code>docker-compose up redis</code>.</li>
-</ol>
-<hr />
-<h2 id="feature-scaling-produces-nan">Feature scaling produces NaN</h2>
-<p>Standard scaling can produce NaN or Inf if a column has zero variance (all identical values).</p>
-<p><strong>Fix:</strong> Remove constant columns before scaling, or use <code>auto_detect: True</code> in the <code>StandardScaler</code> params - it automatically skips non-numeric and constant columns.</p>
+<p><strong>Skyulf</strong></p>
+<pre><code class="language-python">from skyulf import SkyulfPipeline
+
+config = {
+    &quot;preprocessing&quot;: [
+        {
+            &quot;name&quot;: &quot;split_data&quot;,
+            &quot;transformer&quot;: &quot;TrainTestSplitter&quot;,
+            &quot;params&quot;: {&quot;test_size&quot;: 0.2, &quot;target_column&quot;: &quot;is_customer&quot;},
+        },
+        {
+            &quot;name&quot;: &quot;impute_income&quot;,
+            &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: [&quot;income&quot;], &quot;strategy&quot;: &quot;mean&quot;},
+        },
+        {
+            &quot;name&quot;: &quot;encode_city&quot;,
+            &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: [&quot;city&quot;]},
+        },
+        {
+            &quot;name&quot;: &quot;scale_features&quot;,
+            &quot;transformer&quot;: &quot;StandardScaler&quot;,
+            &quot;params&quot;: {&quot;columns&quot;: [&quot;age&quot;, &quot;income&quot;]},
+        },
+    ],
+    &quot;modeling&quot;: {
+        &quot;type&quot;: &quot;random_forest_classifier&quot;,
+        &quot;params&quot;: {&quot;n_estimators&quot;: 50, &quot;max_depth&quot;: 5},
+    },
+}
+
+pipeline = SkyulfPipeline(config)
+metrics = pipeline.fit(data, target_column=&quot;is_customer&quot;)   # split + fit + evaluate
+predictions = pipeline.predict(new_data)                    # transform + predict
+</code></pre>
+<p>Key differences to notice:</p>
+<ul>
+<li><strong>The split is a pipeline step, not a separate call.</strong> <code>TrainTestSplitter</code>
+  runs first in <code>preprocessing</code>, so <code>fit()</code> handles splitting, transforming,
+  training, <em>and</em> evaluating test-set metrics in one call — no manual
+  <code>train_test_split</code> + separate <code>.score()</code>.</li>
+<li><strong>No <code>ColumnTransformer</code> nesting.</strong> Every step already scopes itself to
+  <code>params.columns</code>; there's no need for a wrapper object to route columns to
+  sub-pipelines.</li>
+<li><strong><code>metrics</code> comes back structured</strong>, not just an accuracy float — see
+  <code>docs/examples/quickstart.md</code> for the full shape (<code>preprocessing</code> +
+  <code>modeling</code> sections, per-metric breakdown).</li>
+</ul>
+<h2 id="inspecting-a-fitted-pipeline">Inspecting a fitted pipeline</h2>
+<p>scikit-learn pipelines are inspected by walking <code>.named_steps</code> / <code>.steps</code> in
+Python. Skyulf gives you the same information without touching internals:</p>
+<pre><code class="language-python">print(pipeline.describe())      # human-readable step-by-step summary
+print(pipeline.to_mermaid())    # Mermaid flowchart string (paste into docs/PRs)
+print(pipeline.fingerprint())   # deterministic SHA-256 over topology + fitted artifacts
+print(pipeline.export_model_card())  # structured dict: lineage, params, metrics, fingerprint
+</code></pre>
+<p><code>fingerprint()</code> in particular has no direct sklearn equivalent — it's a
+single hash that changes if <em>either</em> the config <em>or</em> any fitted artifact
+changes, so two pipelines with the same fingerprint are guaranteed to
+produce the same predictions. Use it to prove which exact pipeline produced
+a given prediction in an audit log.</p>
+<h2 id="column-selection-columntransformer-remainder-handling">Column selection: <code>ColumnTransformer</code> remainder handling</h2>
+<p><code>ColumnTransformer(..., remainder="passthrough")</code> is the sklearn way to say
+"leave every other column untouched." In Skyulf, any column not named in a
+step's <code>params.columns</code> is left untouched by that step automatically —
+there's no <code>remainder</code> argument because steps never touch unlisted columns
+in the first place.</p>
+<h2 id="custom-transformers">Custom transformers</h2>
+<p><strong>scikit-learn</strong> — subclass <code>BaseEstimator</code>/<code>TransformerMixin</code>:</p>
+<pre><code class="language-python">from sklearn.base import BaseEstimator, TransformerMixin
+
+class MyTransformer(BaseEstimator, TransformerMixin):
+    def fit(self, X, y=None):
+        self.medians_ = X.median()
+        return self
+
+    def transform(self, X):
+        return X.fillna(self.medians_)
+</code></pre>
+<p><strong>Skyulf</strong> — a <code>Calculator</code> (fit) / <code>Applier</code> (transform) pair registered
+under a name your config can reference. See
+<a href="../user_guide/extending_custom_nodes.html">Write your own node</a> for the full
+walkthrough (artifact shape, registration, tests). The split mirrors
+sklearn's <code>fit</code>/<code>transform</code> split, but the fitted artifact is an explicit,
+serializable object (usually a <code>TypedDict</code>) rather than instance attributes
+set with a trailing underscore.</p>
+<h2 id="what-you-get-that-plain-sklearn-doesnt-have">What you get that plain sklearn doesn't have</h2>
+<ul>
+<li><strong>Dual-engine execution</strong> — the exact same config runs against a Polars
+  <code>LazyFrame</code>/<code>DataFrame</code> with no code changes (see
+  <a href="engine_mechanics.html">Engine Mechanics</a>).</li>
+<li><strong>Schema inference before running</strong> — <code>Calculator.infer_output_schema()</code>
+  predicts output columns/dtypes from config alone, useful for canvas UIs
+  that need to validate a pipeline before any data flows through it.</li>
+<li><strong>Drift &amp; data-quality primitives</strong> — <code>skyulf.profiling.drift</code> (PSI/KS/
+  Wasserstein) and <code>skyulf.profiling.expect</code> (<code>expect_no_nulls</code>,
+  <code>expect_value_range</code>, ...) ship in the same package, no extra
+  Great-Expectations-style dependency.</li>
+<li><strong>Reproducibility built in</strong> — <code>fingerprint()</code> and <code>export_model_card()</code>
+  (see above) rather than hand-rolled joblib hash tracking.</li>
+</ul>
+<h2 id="whats-not-yet-a-drop-in-replacement">What's not (yet) a drop-in replacement</h2>
+<ul>
+<li>No <code>Pipeline.set_params(**kwargs)</code>-style grid-search integration — use the
+  built-in <code>hyperparameter_tuner</code> modeling type instead (random / grid /
+  Optuna strategies under <code>modeling._tuning</code>).</li>
+<li>Custom sklearn transformers aren't auto-wrapped; you write a thin
+  Calculator/Applier pair (see above) — usually a few lines more than a bare
+  <code>TransformerMixin</code> subclass, in exchange for dual-engine support and JSON
+  serializability.</li>
+</ul>
 
 
 
