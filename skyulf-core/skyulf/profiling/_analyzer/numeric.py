@@ -53,7 +53,7 @@ class NumericMixin(_AnalyzerState):
                 inv_corr = np.linalg.inv(corr_matrix)
             except np.linalg.LinAlgError:
                 # Singular matrix = perfect multicollinearity; flag everything.
-                return {col: 999.0 for col in numeric_cols}
+                return dict.fromkeys(numeric_cols, 999.0)
 
             return {col: max(1.0, float(inv_corr[i, i])) for i, col in enumerate(numeric_cols)}
         except Exception as e:

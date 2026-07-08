@@ -282,9 +282,7 @@ class EDAAnalyzer(
                 pl.UInt32,
                 pl.UInt64,
             ]
-            if profile.dtype == "Numeric":
-                numeric_cols.append(col)
-            elif profile.dtype == "Categorical" and is_numeric_type:
+            if profile.dtype == "Numeric" or profile.dtype == "Categorical" and is_numeric_type:
                 numeric_cols.append(col)
 
         # Encode string targets so they appear in causal graphs.

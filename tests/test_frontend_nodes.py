@@ -60,7 +60,7 @@ async def test_all_transformers(sample_data, tmp_path):
     except ImportError:
         has_h3 = False
 
-    transformers = [nid for nid in ALL_NODES.keys() if nid not in excluded]
+    transformers = [nid for nid in ALL_NODES if nid not in excluded]
     if not has_h3:
         transformers = [nid for nid in transformers if nid != "H3Index"]
 

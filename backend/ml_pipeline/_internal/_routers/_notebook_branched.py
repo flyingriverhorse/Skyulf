@@ -52,7 +52,7 @@ def _shared_preprocess_ids(branches: list[list[_NodeIn]]) -> set:
     """Node IDs that appear in every branch — fitted once before per-branch sections."""
     if not branches:
         return set()
-    sets = [set(n.node_id for n in b) for b in branches]
+    sets = [{n.node_id for n in b} for b in branches]
     return set.intersection(*sets)
 
 

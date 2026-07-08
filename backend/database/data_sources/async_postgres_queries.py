@@ -22,7 +22,7 @@ async def insert_data_source(settings: Settings, row: dict[str, Any]) -> dict[st
     """Insert a row into the PostgreSQL data_sources table. Returns the inserted row dict."""
     async with async_session_or_connection(settings) as session:
         try:
-            tbl = table(TABLE, *[column(c) for c in row.keys()])
+            tbl = table(TABLE, *[column(c) for c in row])
             stmt: Any = tbl.insert().values(**row).returning(literal_column("*"))
             result = await session.execute(stmt)
             # Fetch BEFORE commit — asyncpg closes the server-side cursor on commit.
@@ -82,7 +82,7 @@ async def update_data_source(
             # Use SQLAlchemy Core for UPDATE
             tbl = table(
                 TABLE,
-                *[column(c) for c in update_data.keys()] + [column(c) for c in filter_dict.keys()],
+                *[column(c) for c in update_data] + [column(c) for c in filter_dict],
             )
 
             stmt = update(tbl).values(**update_data)
@@ -105,7 +105,7 @@ async def delete_data_source(settings: Settings, filter_dict: dict[str, Any]):
     """Delete data source records."""
     async with async_session_or_connection(settings) as session:
         try:
-            tbl = table(TABLE, *[column(c) for c in filter_dict.keys()])
+            tbl = table(TABLE, *[column(c) for c in filter_dict])
             stmt = delete(tbl)
             for k, v in filter_dict.items():
                 stmt = stmt.where(column(k) == v)

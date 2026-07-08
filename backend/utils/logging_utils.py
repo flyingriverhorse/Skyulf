@@ -7,6 +7,7 @@ import logging
 import os
 from logging import Handler
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
+from pathlib import Path
 
 # Get logger for data actions
 data_logger = logging.getLogger("data_actions")
@@ -55,9 +56,9 @@ def setup_universal_logging(
         console_log_level: Logging level for console output
     """
     # Create log directory with better error handling
-    log_dir = os.path.dirname(log_file)
-    if log_dir:  # Only create if there's actually a directory path
-        os.makedirs(log_dir, exist_ok=True)
+    log_dir = Path(log_file).parent
+    if str(log_dir) != ".":  # Only create if there's actually a directory path
+        log_dir.mkdir(parents=True, exist_ok=True)
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))

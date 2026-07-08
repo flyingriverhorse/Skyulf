@@ -11,7 +11,7 @@ from skyulf.registry import NodeRegistry as SkyulfRegistry
 dynamic_ids = set(SkyulfRegistry.get_all_metadata().keys())
 
 print(f"Dynamic Nodes Found: {len(dynamic_ids)}")
-print(f"Dynamic IDs: {sorted(list(dynamic_ids))}")
+print(f"Dynamic IDs: {sorted(dynamic_ids)}")
 
 # I will recreate the list of static IDs based on the user's file content provided in context
 # to verify exactly which ones can be deleted.

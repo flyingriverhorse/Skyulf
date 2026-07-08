@@ -685,7 +685,7 @@ class EDAVisualizer:
 
         # Initialize lists for each column found in the first point
         first_point = self.profile.timeseries.trend[0]
-        for col in first_point.values.keys():
+        for col in first_point.values:
             values_map[col] = []
 
         for point in self.profile.timeseries.trend:

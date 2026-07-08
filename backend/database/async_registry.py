@@ -8,7 +8,7 @@ duplicate DDL logic.
 """
 
 import logging
-import os
+from pathlib import Path
 
 import aiosqlite
 from sqlalchemy import Column, MetaData, String, Table, Text
@@ -62,16 +62,16 @@ async def ensure_registry_tables(settings: Settings) -> None:
             try:
                 # Use DB_PATH from settings, fallback to default location
                 db_filename = getattr(settings, "DB_PATH", "mlops_database.db")
-                if os.path.isabs(db_filename):
-                    dbpath = db_filename
+                if Path(db_filename).is_absolute():
+                    dbpath = Path(db_filename)
                 else:
                     # For FastAPI, use current working directory as base
-                    dbpath = os.path.join(os.getcwd(), db_filename)
+                    dbpath = Path.cwd() / db_filename
 
-                d = os.path.dirname(dbpath)
-                if d and not os.path.exists(d):
+                d = dbpath.parent
+                if d and not d.exists():
                     try:
-                        os.makedirs(d, exist_ok=True)
+                        d.mkdir(parents=True, exist_ok=True)
                     except Exception:
                         logger.warning(f"Could not create directory {d}")
 

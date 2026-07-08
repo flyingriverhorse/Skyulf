@@ -117,7 +117,7 @@ def _record_run(
             nid: {
                 "status": nr.status,
                 "error": nr.error,
-                "metrics_keys": sorted(list((nr.metrics or {}).keys())),
+                "metrics_keys": sorted((nr.metrics or {}).keys()),
             }
             for nid, nr in result.node_results.items()
         },

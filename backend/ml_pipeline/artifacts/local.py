@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import joblib
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 class LocalArtifactStore(ArtifactStore):
     def __init__(self, base_path: str):
         self.base_path = base_path
-        os.makedirs(self.base_path, exist_ok=True)
+        Path(self.base_path).mkdir(parents=True, exist_ok=True)
 
     def _get_path(self, key: str) -> str:
         # Ensure key is safe and ends with .joblib if not present
@@ -37,22 +38,22 @@ class LocalArtifactStore(ArtifactStore):
             Only load artifacts that were saved by this application.
         """
         path = self._get_path(key)
-        if not os.path.exists(path):
+        if not Path(path).exists():
             raise FileNotFoundError(f"Artifact not found: {key}")
         logger.debug("Loading artifact from %s", path)
         return joblib.load(path)
 
     def exists(self, key: str) -> bool:
         path = self._get_path(key)
-        return os.path.exists(path)
+        return Path(path).exists()
 
     def list_artifacts(self) -> list[str]:
         """List all artifacts in the store."""
-        if not os.path.exists(self.base_path):
+        if not Path(self.base_path).exists():
             return []
         # Return keys (filenames without extension if possible, or just filenames)
         # We appended .joblib in _get_path, so we should strip it if present
-        files = os.listdir(self.base_path)
+        files = [f.name for f in Path(self.base_path).iterdir()]
         keys = []
         for f in files:
             if f.endswith(".joblib"):

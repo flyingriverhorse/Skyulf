@@ -98,7 +98,7 @@ def _iter_dict_key_refs(params: dict[str, Any]) -> Iterable[tuple[str, str]]:
         val = params.get(key)
         if not isinstance(val, dict):
             continue
-        for col in val.keys():
+        for col in val:
             if isinstance(col, str) and col:
                 yield key, col
 

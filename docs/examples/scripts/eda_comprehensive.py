@@ -39,7 +39,7 @@ def visualize_pca(profile):
         c_values = [float(l) for l in labels]
     except (ValueError, TypeError):
         # If labels are text (e.g. "setosa") or None, map them to numbers
-        unique_labels = list(set([l for l in labels if l is not None]))
+        unique_labels = list({l for l in labels if l is not None})
         label_map = {l: i for i, l in enumerate(unique_labels)}
         c_values = [label_map.get(l, -1) for l in labels]
 

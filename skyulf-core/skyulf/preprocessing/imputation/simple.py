@@ -88,7 +88,7 @@ class SimpleImputerCalculator(BaseCalculator):
         strategy = config.get("strategy", "mean")
         if strategy == "mode":
             strategy = "most_frequent"
-        fill_value = config.get("fill_value", None)
+        fill_value = config.get("fill_value")
 
         cols = _resolve_simple_columns(X, config, strategy)
         if not cols:

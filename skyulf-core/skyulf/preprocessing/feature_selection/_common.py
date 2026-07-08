@@ -192,12 +192,12 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
         return SelectFromModel(
             estimator=estimator,
             threshold=threshold,
-            max_features=config.get("max_features", None),
+            max_features=config.get("max_features"),
         )
     if method == "rfe":
         return RFE(
             estimator=estimator,
-            n_features_to_select=config.get("n_features_to_select", None),
+            n_features_to_select=config.get("n_features_to_select"),
             step=config.get("step", 1),
         )
     return None
