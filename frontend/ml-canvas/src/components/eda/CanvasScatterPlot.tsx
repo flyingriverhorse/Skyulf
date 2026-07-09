@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Chart as ChartJS,
   LinearScale,
@@ -49,36 +49,40 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
 }) => {
 
   // Prepare datasets
-  const datasets: ChartDataset[] = [];
+  const datasets: ChartDataset[] = useMemo(() => {
+    const result: ChartDataset[] = [];
 
-  if (labelKey) {
-    // Group by label
-    const groups: { [key: string]: ChartPoint[] } = {};
-    data.forEach((d) => {
-      const label = String(d[labelKey] ?? 'Other');
-      if (!groups[label]) groups[label] = [];
-      groups[label].push({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d });
-    });
+    if (labelKey) {
+      // Group by label
+      const groups: { [key: string]: ChartPoint[] } = {};
+      data.forEach((d) => {
+        const label = String(d[labelKey] ?? 'Other');
+        if (!groups[label]) groups[label] = [];
+        groups[label].push({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d });
+      });
 
-    Object.keys(groups).forEach((label, idx) => {
-      datasets.push({
-        label: label,
-        data: groups[label]!,
-        backgroundColor: COLORS[idx % COLORS.length]!,
+      Object.keys(groups).forEach((label, idx) => {
+        result.push({
+          label: label,
+          data: groups[label]!,
+          backgroundColor: COLORS[idx % COLORS.length]!,
+          pointRadius: 3,
+          pointHoverRadius: 5
+        });
+      });
+    } else {
+      // Single dataset
+      result.push({
+        label: 'Data Points',
+        data: data.map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d })),
+        backgroundColor: '#8884d8',
         pointRadius: 3,
         pointHoverRadius: 5
       });
-    });
-  } else {
-    // Single dataset
-    datasets.push({
-      label: 'Data Points',
-      data: data.map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d })),
-      backgroundColor: '#8884d8',
-      pointRadius: 3,
-      pointHoverRadius: 5
-    });
-  }
+    }
+
+    return result;
+  }, [data, xKey, yKey, labelKey]);
 
   const theme = getChartTheme();
 

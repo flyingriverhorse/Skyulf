@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
 import { useCancelEdaJob } from '../../core/hooks/useEdaJobs';
 import { ModalShell, useConfirm } from '../shared';
@@ -38,6 +38,9 @@ interface JobsHistoryModalProps {
 export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, datasetId, onSelect, onFetchReport, onRefresh }) => {
   const [selectedJob, setSelectedJob] = useState<EdaHistoryJob | null>(null);
   const [loading, setLoading] = useState(false);
+  // Track in-flight request id so a slow response to an older click can't
+  // overwrite the state set by a newer click (rapid clicks on multiple jobs).
+  const requestIdRef = useRef(0);
   const cancelMutation = useCancelEdaJob(datasetId);
   const cancelling = cancelMutation.isPending ? cancelMutation.variables ?? null : null;
   const confirm = useConfirm();
@@ -68,14 +71,22 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   };
 
   const handleJobClick = async (job: EdaHistoryJob) => {
+    const myRequestId = ++requestIdRef.current;
     setLoading(true);
     try {
         const fullReport = await onFetchReport(job.id);
+        // Drop stale responses (a newer click has since been issued).
+        if (myRequestId !== requestIdRef.current) return;
         setSelectedJob(fullReport);
     } catch (err) {
         console.error("Failed to load report details", err);
+        if (myRequestId === requestIdRef.current) {
+          toast.error('Failed to load job details', 'Please try again.');
+        }
     } finally {
-        setLoading(false);
+        if (myRequestId === requestIdRef.current) {
+          setLoading(false);
+        }
     }
   };
 

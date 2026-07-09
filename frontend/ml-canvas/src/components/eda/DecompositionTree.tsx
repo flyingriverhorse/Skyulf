@@ -25,8 +25,21 @@ interface DecompositionTreeProps {
     initialFilters: Filter[];
 }
 
-// Module-level cache to persist state across tab switches
-const treeCache: Record<string, { levels: TreeLevel[], splitPath: (string|null)[] }> = {};
+// Module-level cache to persist state across tab switches. Capped at a
+// small LRU size so long sessions switching between many datasets/measures
+// don't retain every tree ever viewed for the lifetime of the page.
+const TREE_CACHE_MAX_ENTRIES = 20;
+const treeCache = new Map<string, { levels: TreeLevel[], splitPath: (string|null)[] }>();
+
+function setTreeCache(key: string, value: { levels: TreeLevel[], splitPath: (string|null)[] }): void {
+    // Re-inserting moves the key to the "most recently used" end.
+    treeCache.delete(key);
+    treeCache.set(key, value);
+    if (treeCache.size > TREE_CACHE_MAX_ENTRIES) {
+        const oldestKey = treeCache.keys().next().value;
+        if (oldestKey !== undefined) treeCache.delete(oldestKey);
+    }
+}
 
 export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     datasetId,
@@ -45,6 +58,11 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
     const containerRef = useRef<HTMLDivElement>(null);
     const innerRef = useRef<HTMLDivElement>(null);
+    // Guards against a slower, older fetch (from `loadRoot`, `handleItemClick`,
+    // or `handleSplit`) overwriting state after a newer one has already
+    // resolved — e.g. rapidly clicking through tree items or switching
+    // datasets before the previous request finishes.
+    const requestIdRef = useRef(0);
     const [paths, setPaths] = useState<{ d: string }[]>([]);
 
     // Auto-scroll to right when levels change
@@ -134,16 +152,17 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     useEffect(() => {
         if (levels.length > 0) {
             const cacheKey = `${datasetId}-${measureCol}-${measureAgg}`;
-            treeCache[cacheKey] = { levels, splitPath };
+            setTreeCache(cacheKey, { levels, splitPath });
         }
     }, [levels, splitPath, datasetId, measureCol, measureAgg]);
 
     // Initialize Root or Load from Cache
     useEffect(() => {
         const cacheKey = `${datasetId}-${measureCol}-${measureAgg}`;
-        if (treeCache[cacheKey]) {
-            setLevels(treeCache[cacheKey].levels);
-            setSplitPath(treeCache[cacheKey].splitPath);
+        const cached = treeCache.get(cacheKey);
+        if (cached) {
+            setLevels(cached.levels);
+            setSplitPath(cached.splitPath);
         } else {
             loadRoot();
         }
@@ -151,6 +170,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     }, [datasetId, measureCol, measureAgg]);
 
     const loadRoot = async () => {
+        const myRequestId = ++requestIdRef.current;
         setLoading(true);
         try {
             const res = await EDAService.getDecomposition(
@@ -160,6 +180,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 '',
                 initialFilters
             );
+
+            // Drop stale responses — a newer request has since been issued
+            // (e.g. the user switched datasets/measures before this resolved).
+            if (myRequestId !== requestIdRef.current) return;
 
             const rootLevel: TreeLevel = {
                 id: 'root',
@@ -172,9 +196,13 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             setLevels([rootLevel]);
             setSplitPath([null]);
         } catch (err) {
-            console.error(err);
+            if (myRequestId === requestIdRef.current) {
+                console.error(err);
+            }
         } finally {
-            setLoading(false);
+            if (myRequestId === requestIdRef.current) {
+                setLoading(false);
+            }
         }
     };
 
@@ -232,6 +260,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
         if (nextSplitCol) {
             // AUTOMATIC UPDATE: If next level exists, refresh it instead of opening menu
+            const myRequestId = ++requestIdRef.current;
             setLoading(true);
             try {
                 // Construct filters for the next level
@@ -255,6 +284,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                     newFilters
                 );
 
+                // Drop stale responses — the user has since clicked another
+                // item or switched datasets before this one resolved.
+                if (myRequestId !== requestIdRef.current) return;
+
                 // Update next level
                 const nextLevel: TreeLevel = {
                     id: `level-${levelIndex + 1}`,
@@ -275,11 +308,15 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 setSplitPath(splitPath.slice(0, levelIndex + 2));
 
             } catch (err) {
-                console.error(err);
-                // Fetch failed — do not apply the optimistic selection change,
-                // since no next-level data actually loaded for it.
+                if (myRequestId === requestIdRef.current) {
+                    console.error(err);
+                    // Fetch failed — do not apply the optimistic selection change,
+                    // since no next-level data actually loaded for it.
+                }
             } finally {
-                setLoading(false);
+                if (myRequestId === requestIdRef.current) {
+                    setLoading(false);
+                }
             }
         } else {
             // No next level defined, just update selection
@@ -293,6 +330,7 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
         const { levelIndex, item } = splitMenuOpen;
         setSplitMenuOpen(null);
+        const myRequestId = ++requestIdRef.current;
         setLoading(true);
 
         try {
@@ -315,6 +353,9 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
                 newFilters
             );
 
+            // Drop stale responses — a newer request has since been issued.
+            if (myRequestId !== requestIdRef.current) return;
+
             const newLevel: TreeLevel = {
                 id: `level-${levelIndex + 1}`,
                 splitColumn: column,
@@ -331,9 +372,13 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             setSplitPath(newSplitPath);
 
         } catch (err) {
-            console.error(err);
+            if (myRequestId === requestIdRef.current) {
+                console.error(err);
+            }
         } finally {
-            setLoading(false);
+            if (myRequestId === requestIdRef.current) {
+                setLoading(false);
+            }
         }
     };
 
