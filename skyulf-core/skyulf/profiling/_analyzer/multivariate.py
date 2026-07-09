@@ -93,7 +93,10 @@ class MultivariateMixin(_AnalyzerState):
             if X_scaled is None or sample_df is None:
                 return None, None
 
-            pca = PCA(n_components=3)
+            n_components = min(3, X_scaled.shape[0], X_scaled.shape[1])
+            if n_components < 1:
+                return None, None
+            pca = PCA(n_components=n_components)
             X_pca = pca.fit_transform(X_scaled)
 
             components_list = []
@@ -183,7 +186,7 @@ class MultivariateMixin(_AnalyzerState):
                     )
                 )
 
-            pca = PCA(n_components=2)
+            pca = PCA(n_components=min(2, X_scaled.shape[0], X_scaled.shape[1]))
             X_pca = pca.fit_transform(X_scaled)
             X_pca = np.asarray(X_pca)
             if len(X_pca.shape) == 1:
