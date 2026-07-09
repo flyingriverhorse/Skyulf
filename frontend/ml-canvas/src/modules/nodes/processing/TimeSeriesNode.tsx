@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Clock, Search, Info } from 'lucide-react';
+import { Clock, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { clickableProps } from '../../../core/utils/a11y';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 type TimeSeriesMethod = 'lag' | 'rolling' | 'date';
 
@@ -31,60 +30,6 @@ const DATE_FEATURES = [
   'year', 'month', 'day', 'dayofweek', 'dayofyear', 'quarter',
   'weekofyear', 'hour', 'minute', 'is_weekend', 'is_month_start', 'is_month_end',
 ];
-
-function ColumnSelector({ columns, selected, onChange, label }: {
-  columns: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-  label?: string;
-}) {
-  const [search, setSearch] = useState('');
-  const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
-
-  const toggle = (col: string) => {
-    if (selected.includes(col)) onChange(selected.filter(c => c !== col));
-    else onChange([...selected, col]);
-  };
-
-  return (
-    <div className="space-y-1.5">
-      {label && <span className="block text-xs font-medium text-muted-foreground">{label}</span>}
-      <div className="border rounded bg-background overflow-hidden flex flex-col">
-        <div className="flex items-center px-2 py-1.5 border-b bg-muted/20">
-          <Search size={12} className="text-muted-foreground mr-1.5" />
-          <input
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
-            placeholder="Search columns..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); }}
-          />
-        </div>
-        <div className="max-h-32 overflow-y-auto p-1 space-y-0.5">
-          {filtered.length > 0 ? (
-            filtered.map(col => {
-              const isSelected = selected.includes(col);
-              return (
-                <div
-                  key={col}
-                  {...clickableProps(() => { toggle(col); })}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent text-foreground'}`}
-                >
-                  <div className={`w-3 h-3 rounded border flex items-center justify-center ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'}`}>
-                    {isSelected && <div className="w-1.5 h-1.5 bg-current rounded-sm" />}
-                  </div>
-                  <span className="truncate">{col}</span>
-                </div>
-              );
-            })
-          ) : (
-            <div className="p-2 text-xs text-muted-foreground text-center">No columns found</div>
-          )}
-        </div>
-      </div>
-      <div className="text-[10px] text-muted-foreground text-right">{selected.length} selected</div>
-    </div>
-  );
-}
 
 function ChipMultiSelect({ options, selected, onChange }: {
   options: string[];
@@ -281,7 +226,9 @@ function TimeSeriesSettings({ config, onChange, nodeId }: {
         <p className="text-xs text-muted-foreground">{METHOD_DESCRIPTIONS[config.method]}</p>
       </div>
 
-      <ColumnSelector
+      <ColumnMultiSelect
+        variant="compact"
+        showFooterCount
         columns={allColumns}
         selected={config.columns ?? []}
         onChange={cols => { update({ columns: cols }); }}

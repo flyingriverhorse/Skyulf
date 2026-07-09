@@ -1,10 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Flag, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 interface MissingIndicatorConfig {
   columns: string[];
@@ -30,21 +31,6 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
   const metrics = (nodeResult?.metrics && typeof nodeResult.metrics === 'object')
     ? (nodeResult.metrics as Record<string, unknown>)
     : null;
-
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredColumns = useMemo(() => {
-    return availableColumns.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [availableColumns, searchTerm]);
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: filteredColumns });
-  };
-
-  const handleDeselectAll = () => {
-    const newCols = config.columns.filter(c => !filteredColumns.includes(c));
-    onChange({ ...config, columns: newCols });
-  };
 
   return (
     <div className="p-4 space-y-4">
@@ -75,61 +61,19 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="block text-sm font-medium">Target Columns (Optional)</span>
-          <span className="text-xs text-muted-foreground">
-            {config.columns.length} selected
-          </span>
-        </div>
         <p className="text-xs text-muted-foreground mb-2">
           Create indicators for these columns. If empty, all columns with missing values are used.
         </p>
 
-        {/* Search & Actions */}
-        <div className="space-y-2 mb-2">
-          <input
-            type="text"
-            placeholder="Search columns..."
-            className="block w-full px-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary outline-none"
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); }}
-          />
-          <div className="flex gap-2 text-xs justify-end">
-            <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
-            <span className="text-border">|</span>
-            <button onClick={handleDeselectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Deselect All</button>
-          </div>
-        </div>
-
-        {availableColumns.length > 0 ? (
-          <div className="space-y-1 max-h-40 overflow-y-auto border rounded p-2 bg-background">
-            {filteredColumns.map(col => (
-              <label key={col} className="flex items-center gap-2 text-sm hover:bg-accent/50 p-1 rounded cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                  checked={config.columns.includes(col)}
-                  onChange={(e) => {
-                    const newCols = e.target.checked
-                      ? [...config.columns, col]
-                      : config.columns.filter(c => c !== col);
-                    onChange({ ...config, columns: newCols });
-                  }}
-                />
-                {col}
-              </label>
-            ))}
-            {filteredColumns.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match &quot;{searchTerm}&quot;
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-xs text-muted-foreground italic border rounded p-4 text-center">
-            No columns available
-          </div>
-        )}
+        <ColumnMultiSelect
+          columns={availableColumns}
+          selected={config.columns}
+          onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+          label="Target Columns (Optional)"
+          variant="panel"
+          isLoading={isLoading}
+          fillHeight={false}
+        />
       </div>
 
       {/* Feedback Section */}

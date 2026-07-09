@@ -24,9 +24,21 @@ export const PropertiesPanel: React.FC = () => {
     if (!selectedNode) setPropertiesPanelExpanded(false);
   }, [selectedNode, setPropertiesPanelExpanded]);
 
-  // Calculate width based on sidebar state
-  // Sidebar is w-64 (256px). We leave some buffer.
-  const expandedWidth = isSidebarOpen ? 'w-[calc(100vw-300px)]' : 'w-[calc(100vw-50px)]';
+  // Calculate width based on sidebar state.
+  // Chrome consumed to the left of this panel on /canvas:
+  //   - global app nav (`components/Layout.tsx`'s `<aside>`) is always
+  //     `w-16` (64px) here — `isCollapsed` there is driven purely by
+  //     `location.pathname === '/canvas'`, not a user toggle, so this
+  //     never changes while this panel is visible.
+  //   - the Components drag-and-drop `Sidebar` is `w-64` (256px) when open,
+  //     or a floating overlay button (0px in the flex flow) when closed.
+  // These must stay in sync with those two components' width classes —
+  // a mismatch here causes this panel to overflow the viewport (verified:
+  // the previous 300/50 constants were 20px/14px short, clipping the
+  // right edge of wide layouts, e.g. BasicTrainingSettings' "Customize"
+  // checkbox). +8px extra buffer beyond the exact 320/64 chrome width
+  // guards against a stray scrollbar/border consuming a few more px.
+  const expandedWidth = isSidebarOpen ? 'w-[calc(100vw-328px)]' : 'w-[calc(100vw-72px)]';
 
   return (
     <aside

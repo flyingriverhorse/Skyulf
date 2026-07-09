@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { FunctionSquare, Plus, Trash2, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { FunctionSquare, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { clickableProps } from '../../../core/utils/a11y';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 interface TransformationRule {
   columns: string[];
@@ -45,75 +46,6 @@ const TRANSFORMATION_TYPES = {
 const getMethodType = (method: string): 'power' | 'simple' => {
   if (['yeo-johnson', 'box-cox'].includes(method)) return 'power';
   return 'simple';
-};
-
-const ColumnSelector: React.FC<{
-  allColumns: string[];
-  selectedColumns: string[];
-  onChange: (cols: string[]) => void;
-}> = ({ allColumns, selectedColumns, onChange }) => {
-  const [search, setSearch] = useState("");
-
-  const filteredColumns = useMemo(() =>
-    allColumns.filter(c => c.toLowerCase().includes(search.toLowerCase())),
-  [allColumns, search]);
-
-  const handleSelectAll = () => {
-    const newSelection = Array.from(new Set([...selectedColumns, ...filteredColumns]));
-    onChange(newSelection);
-  };
-
-  const handleDeselectAll = () => {
-    const newSelection = selectedColumns.filter(c => !filteredColumns.includes(c));
-    onChange(newSelection);
-  };
-
-  const toggleColumn = (col: string) => {
-    if (selectedColumns.includes(col)) {
-      onChange(selectedColumns.filter(c => c !== col));
-    } else {
-      onChange([...selectedColumns, col]);
-    }
-  };
-
-  return (
-    <div className="space-y-2 border rounded p-2 bg-background">
-      <div className="flex gap-2 items-center">
-        <div className="relative flex-1">
-           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none z-10" />
-           <input
-             className="w-full pl-7 pr-2 py-1 text-xs border rounded bg-background"
-             placeholder="Search columns..."
-             value={search}
-             onChange={e => { setSearch(e.target.value); }}
-           />
-        </div>
-      </div>
-      <div className="flex gap-2 text-xs border-b pb-2">
-        <button onClick={handleSelectAll} className="text-primary hover:underline font-medium">Select All</button>
-        <span className="text-muted-foreground">|</span>
-        <button onClick={handleDeselectAll} className="text-muted-foreground hover:underline">None</button>
-        <span className="ml-auto text-muted-foreground">{selectedColumns.length} selected</span>
-      </div>
-      <div className="max-h-32 overflow-y-auto space-y-1 pt-1">
-         {filteredColumns.length === 0 ? (
-            <div className="text-xs text-muted-foreground p-2 text-center">No columns match &quot;{search}&quot;</div>
-         ) : (
-            filteredColumns.map(col => (
-              <label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-accent/50 p-1 rounded">
-                <input
-                  type="checkbox"
-                  checked={selectedColumns.includes(col)}
-                  onChange={() => { toggleColumn(col); }}
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <span className="truncate" title={col}>{col}</span>
-              </label>
-            ))
-         )}
-      </div>
-    </div>
-  );
 };
 
 const TransformationSettings: React.FC<{ config: TransformationConfig; onChange: (c: TransformationConfig) => void; nodeId?: string }> = ({
@@ -299,10 +231,12 @@ const TransformationSettings: React.FC<{ config: TransformationConfig; onChange:
                   {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- stopPropagation wrapper, child controls handle their own keyboard input */}
                   <div className="space-y-1 min-w-0" onClick={(e) => { e.stopPropagation(); }}>
                     <span className="text-xs font-medium text-muted-foreground">Target Columns</span>
-                    <ColumnSelector
-                      allColumns={columns}
-                      selectedColumns={rule.columns}
+                    <ColumnMultiSelect
+                      columns={columns}
+                      selected={rule.columns}
                       onChange={(newCols) => { updateRule(idx, { columns: newCols }); }}
+                      variant="panel"
+                      fillHeight={false}
                     />
                   </div>
                 </div>

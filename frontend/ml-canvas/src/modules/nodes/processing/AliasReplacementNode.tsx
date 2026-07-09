@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { ArrowLeftRight, Plus, Trash2, Search, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeftRight, Plus, Trash2, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { clickableProps } from '../../../core/utils/a11y';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 // --- Types ---
 
@@ -15,65 +15,6 @@ interface AliasReplacementConfig {
 }
 
 // --- Components ---
-
-const ColumnSelector: React.FC<{
-  columns: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-}> = ({ columns, selected, onChange }) => {
-  const [search, setSearch] = useState('');
-
-  const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
-
-  const toggle = (col: string) => {
-    if (selected.includes(col)) {
-      onChange(selected.filter(c => c !== col));
-    } else {
-      onChange([...selected, col]);
-    }
-  };
-
-  return (
-    <div className="border rounded bg-background overflow-hidden flex flex-col max-h-40">
-      <div className="flex items-center px-2 py-1.5 border-b bg-muted/20">
-        <Search size={12} className="text-muted-foreground mr-1.5" />
-        <input
-          className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
-          placeholder="Search columns..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); }}
-        />
-      </div>
-      <div className="overflow-y-auto p-1 space-y-0.5">
-        {filtered.length > 0 ? (
-          filtered.map(col => {
-            const isSelected = selected.includes(col);
-            return (
-              <div
-                key={col}
-                {...clickableProps(() => { toggle(col); })}
-                className={`
-                  flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
-                  ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
-                `}
-              >
-                <div className={`
-                  w-3 h-3 rounded border flex items-center justify-center
-                  ${isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-400 dark:border-gray-600'}
-                `}>
-                  {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                </div>
-                <span className="truncate">{col}</span>
-              </div>
-            );
-          })
-        ) : (
-          <div className="p-2 text-xs text-gray-500 text-center italic">No columns found</div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const CustomPairEditor: React.FC<{
   pairs: Record<string, string>;
@@ -195,7 +136,8 @@ const AliasReplacementSettings: React.FC<{ config: AliasReplacementConfig; onCha
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
               Target Columns ({config.columns.length})
             </label>
-            <ColumnSelector
+            <ColumnMultiSelect
+              variant="compact"
               columns={textColumns}
               selected={config.columns}
               onChange={(cols) => onChange({ ...config, columns: cols })}

@@ -6,6 +6,7 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 interface EncodingConfig {
   method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe';
@@ -40,7 +41,6 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const [isWide, setIsWide] = useState(false);
 
@@ -82,18 +82,6 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   const categoricalColumns = schema
     ? Object.values(schema.columns).map(c => c.name).filter(name => !droppedUpstream.has(name))
     : [];
-
-  const filteredColumns = categoricalColumns.filter(c =>
-    c.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: [...categoricalColumns] });
-  };
-
-  const handleDeselectAll = () => {
-    onChange({ ...config, columns: [] });
-  };
 
   return (
     <div ref={containerRef} className="p-4 space-y-4">
@@ -419,59 +407,16 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       </div>
 
       {/* Column Selection */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="block text-sm font-medium">Columns to Encode</span>
-          <span className="text-xs text-muted-foreground">
-            {config.columns.length} selected
-          </span>
-        </div>
-
-        <div className="space-y-2 mb-2">
-          <input
-            type="text"
-            placeholder="Search columns..."
-            className="block w-full px-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary outline-none"
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); }}
-          />
-          <div className="flex gap-2 text-xs justify-end">
-            <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
-            <span className="text-border">|</span>
-            <button onClick={handleDeselectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Deselect All</button>
-          </div>
-        </div>
-
-        {categoricalColumns.length > 0 ? (
-          <div className="space-y-1 max-h-40 overflow-y-auto border rounded p-2 bg-background">
-            {filteredColumns.map(col => (
-              <label key={col} className="flex items-center gap-2 text-sm hover:bg-accent/50 p-1 rounded cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                  checked={config.columns.includes(col)}
-                  onChange={(e) => {
-                    const newCols = e.target.checked
-                      ? [...config.columns, col]
-                      : config.columns.filter(c => c !== col);
-                    onChange({ ...config, columns: newCols });
-                  }}
-                />
-                {col}
-              </label>
-            ))}
-            {filteredColumns.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match &quot;{searchTerm}&quot;
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-xs text-muted-foreground italic border rounded p-4 text-center">
-            No columns found — connect an upstream dataset node.
-          </div>
-        )}
-      </div>
+      <ColumnMultiSelect
+        columns={categoricalColumns}
+        selected={config.columns}
+        onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+        label="Columns to Encode"
+        variant="panel"
+        isLoading={isLoading}
+        emptyMessage="No columns found — connect an upstream dataset node."
+        fillHeight={false}
+      />
 
       {/* Recommendations Section */}
       {filteredRecommendations.length > 0 && (

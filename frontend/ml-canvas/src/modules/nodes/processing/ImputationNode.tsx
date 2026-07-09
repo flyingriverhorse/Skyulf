@@ -8,6 +8,7 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 interface ImputationConfig {
   columns: string[];
@@ -84,21 +85,6 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
       // For now just columns
       onChange({ ...config, columns: newCols });
     }
-  };
-
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredColumns = useMemo(() => {
-    return availableColumns.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [availableColumns, searchTerm]);
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: filteredColumns });
-  };
-
-  const handleDeselectAll = () => {
-    const newCols = config.columns.filter(c => !filteredColumns.includes(c));
-    onChange({ ...config, columns: newCols });
   };
 
   const renderFeedback = () => (
@@ -307,58 +293,26 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
         </div>
 
         {/* Right Column (Column Selection) */}
-        <div className={`flex flex-col h-full min-h-[200px] border rounded-md overflow-hidden ${isWide ? '' : 'shrink-0'}`}>
-          <div className="p-2 border-b bg-muted/30 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">Target Columns ({config.columns.length})</span>
-              <div className="flex gap-1">
-                <button onClick={handleSelectAll} className="text-[10px] px-2 py-1 hover:bg-accent rounded">All</button>
-                <button onClick={handleDeselectAll} className="text-[10px] px-2 py-1 hover:bg-accent rounded">None</button>
-              </div>
-            </div>
-            <input
-              type="text"
-              placeholder="Search columns..."
-              className="w-full text-xs p-1.5 border rounded bg-background"
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); }}
-            />
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {filteredColumns.length > 0 ? (
-              filteredColumns.map(col => (
-                <label key={col} className="flex items-center justify-between gap-2 text-sm hover:bg-accent/50 p-1.5 rounded cursor-pointer select-none">
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    <input
-                      type="checkbox"
-                      checked={config.columns.includes(col)}
-                      onChange={(e) => {
-                        const newCols = e.target.checked
-                          ? [...config.columns, col]
-                          : config.columns.filter(c => c !== col);
-                        onChange({ ...config, columns: newCols });
-                      }}
-                      className="rounded border-gray-300 text-primary focus:ring-primary shrink-0"
-                    />
-                    <span className="truncate" title={col}>{col}</span>
-                  </div>
-                  {missingCounts && missingCounts[col] !== undefined && (
-                    <span
-                      className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded"
-                      title={`${String(missingCounts[col])} missing values filled`}
-                    >
-                      {String(missingCounts[col])}
-                    </span>
-                  )}
-                </label>
-              ))
-            ) : (
-              <div className="p-4 text-center text-xs text-muted-foreground">
-                {availableColumns.length === 0 ? 'No columns available' : 'No matches found'}
-              </div>
-            )}
-          </div>
+        <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+          <ColumnMultiSelect
+            columns={availableColumns}
+            selected={config.columns}
+            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+            label="Target Columns"
+            variant="panel"
+            isLoading={isLoading}
+            fillHeight={isWide}
+            renderItemBadge={(col) =>
+              missingCounts && missingCounts[col] !== undefined ? (
+                <span
+                  className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted px-1.5 py-0.5 rounded"
+                  title={`${String(missingCounts[col])} missing values filled`}
+                >
+                  {String(missingCounts[col])}
+                </span>
+              ) : null
+            }
+          />
         </div>
 
         {/* Feedback Section - Show here if NOT wide (mobile/narrow) */}

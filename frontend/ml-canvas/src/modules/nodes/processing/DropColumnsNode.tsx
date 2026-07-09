@@ -8,6 +8,7 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 interface DropColumnsConfig {
   columns: string[];
@@ -61,21 +62,6 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
       const newCols = Array.from(new Set([...config.columns, ...rec.target_columns]));
       onChange({ ...config, columns: newCols });
     }
-  };
-
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredColumns = useMemo(() => {
-    return availableColumns.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [availableColumns, searchTerm]);
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: filteredColumns });
-  };
-
-  const handleDeselectAll = () => {
-    const newCols = config.columns.filter(c => !filteredColumns.includes(c));
-    onChange({ ...config, columns: newCols });
   };
 
   return (
@@ -167,66 +153,16 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
         </div>
 
         {/* Right Column (Column List) */}
-        <div className={`flex flex-col border rounded-md bg-background shadow-sm overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'h-96 shrink-0'}`}>
-          <div className="p-3 border-b bg-muted/5 space-y-3 shrink-0">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Explicitly Drop Columns</span>
-                <span className="text-xs text-muted-foreground">
-                  {config.columns.length} selected
-                </span>
-            </div>
-
-            {/* Search */}
-            <div className="relative group">
-              <input
-                type="text"
-                placeholder="Search columns..."
-                className="block w-full pl-9 pr-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); }}
-              />
-            </div>
-
-            <div className="flex gap-2 text-xs justify-end">
-                <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
-                <span className="text-border">|</span>
-                <button onClick={handleDeselectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Deselect All</button>
-            </div>
-          </div>
-
-          {/* Scrollable List */}
-          <div className="flex-1 overflow-y-auto p-1">
-            {availableColumns.length > 0 ? (
-              filteredColumns.length > 0 ? (
-                <div className="space-y-0.5">
-                  {filteredColumns.map(col => (
-                    <label key={col} className="flex items-center gap-2 text-sm hover:bg-accent/50 p-2 rounded cursor-pointer transition-colors select-none">
-                      <input
-                        type="checkbox"
-                        checked={config.columns.includes(col)}
-                        onChange={(e) => {
-                          const newCols = e.target.checked
-                            ? [...config.columns, col]
-                            : config.columns.filter(c => c !== col);
-                          onChange({ ...config, columns: newCols });
-                        }}
-                        className="rounded border-gray-300 text-primary focus:ring-primary w-4 h-4"
-                      />
-                      <span className="truncate font-mono text-xs" title={col}>{col}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground text-center py-8">
-                  No columns match &quot;{searchTerm}&quot;
-                </div>
-              )
-            ) : (
-              <div className="text-xs text-muted-foreground italic p-8 text-center">
-                No columns available
-              </div>
-            )}
-          </div>
+        <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+          <ColumnMultiSelect
+            columns={availableColumns}
+            selected={config.columns}
+            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+            label="Explicitly Drop Columns"
+            variant="panel"
+            isLoading={isLoading}
+            fillHeight={isWide}
+          />
         </div>
       </div>
     </div>
