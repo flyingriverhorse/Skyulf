@@ -48,17 +48,23 @@ class TargetMixin(_AnalyzerState):
         η² = SS_between / SS_total. We return η so the magnitude is comparable
         to a Pearson |r|.
         """
-        try:
-            associations = {}
-            features = [c for c in numeric_cols if c != target_col]
+        associations = {}
+        features = [c for c in numeric_cols if c != target_col]
 
-            for col in features:
+        for col in features:
+            # Each feature is evaluated independently so a single degenerate
+            # column (e.g. all-null, raising on the `- global_mean` arithmetic)
+            # can't wipe out the associations already computed for the rest.
+            try:
                 global_mean = self.df[col].mean()  # type: ignore[attr-defined]
+                if global_mean is None:
+                    continue
+
                 ss_total = self.df.select(  # type: ignore[attr-defined]
                     ((pl.col(col) - global_mean) ** 2).sum()
                 ).item()
 
-                if ss_total == 0:
+                if not ss_total:
                     associations[col] = 0.0
                     continue
 
@@ -75,12 +81,11 @@ class TargetMixin(_AnalyzerState):
 
                 eta_squared = ss_between / ss_total
                 associations[col] = float(np.sqrt(eta_squared))
+            except Exception as e:
+                print(f"Error calculating categorical target association for '{col}': {e}")
+                continue
 
-            return dict(sorted(associations.items(), key=lambda item: item[1], reverse=True))
-
-        except Exception as e:
-            print(f"Error calculating categorical target associations: {e}")
-            return {}
+        return dict(sorted(associations.items(), key=lambda item: item[1], reverse=True))
 
     def _calculate_target_interactions(
         self, target_col: str, features: list[str], is_target_numeric: bool

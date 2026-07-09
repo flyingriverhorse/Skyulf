@@ -125,7 +125,10 @@ def ingest_data_task(source_id: int):
     except Exception as e:
         logger.error(f"Ingestion failed for source {source_id}: {str(e)}")
         if session:
-            # Re-query to ensure session is valid
+            # Roll back first: if the exception came from a DB error (e.g. a
+            # failed commit above), the session is left in a rolled-back/
+            # invalid state and the re-query below would itself raise.
+            session.rollback()
             data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
             if data_source:
                 metadata = dict(data_source.source_metadata or {})
