@@ -3,6 +3,7 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 interface TrainTestSplitConfig {
   test_size: number;
@@ -133,7 +134,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
               type="number"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.random_state}
-              onChange={(e) => onChange({ ...config, random_state: parseInt(e.target.value) })}
+              onChange={(e) => onChange({ ...config, random_state: parseIntSafe(e.target.value, config.random_state) })}
             />
           </div>
         </div>

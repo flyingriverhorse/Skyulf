@@ -2,6 +2,7 @@ import React from 'react';
 import { ModalShell } from '../shared/ModalShell';
 import { PIPELINE_TEMPLATES, buildGraphFromTemplate, type PipelineTemplate } from '../../core/templates/pipelineTemplates';
 import { useGraphStore } from '../../core/store/useGraphStore';
+import { useConfirm } from '../shared';
 import { toast } from '../../core/toast';
 
 interface Props {
@@ -18,14 +19,18 @@ interface Props {
 export const TemplatesGalleryModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const setGraph = useGraphStore((s) => s.setGraph);
   const currentNodeCount = useGraphStore((s) => s.nodes.length);
+  const confirm = useConfirm();
 
-  const handlePick = (template: PipelineTemplate): void => {
+  const handlePick = async (template: PipelineTemplate): Promise<void> => {
     if (currentNodeCount > 0) {
       // Don't silently nuke in-progress work. The empty-state entry
       // path can never trigger this, but the Toolbar entry can.
-      const ok = window.confirm(
-        `Loading "${template.name}" will replace your current canvas. Continue?`,
-      );
+      const ok = await confirm({
+        title: 'Replace current canvas?',
+        message: `Loading "${template.name}" will replace your current canvas. Continue?`,
+        confirmLabel: 'Load template',
+        variant: 'danger',
+      });
       if (!ok) return;
     }
     const { nodes, edges } = buildGraphFromTemplate(template);
@@ -52,7 +57,7 @@ export const TemplatesGalleryModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <button
               key={tpl.id}
               type="button"
-              onClick={() => handlePick(tpl)}
+              onClick={() => { void handlePick(tpl); }}
               data-testid={`template-card-${tpl.id}`}
               className="text-left rounded-lg border border-border bg-card hover:bg-accent/40 hover:border-primary/40 transition-colors p-4 flex flex-col gap-2 focus:outline-none focus:ring-2 focus:ring-primary"
             >

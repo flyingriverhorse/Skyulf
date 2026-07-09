@@ -6,6 +6,7 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 interface FeatureSelectionConfig {
   method:
@@ -406,7 +407,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.k ?? 10}
-                onChange={(e) => onChange({ ...config, k: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, k: parseIntSafe(e.target.value, config.k) })}
               />
             </div>
           )}
@@ -419,7 +420,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.percentile ?? 10}
-                onChange={(e) => onChange({ ...config, percentile: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, percentile: parseIntSafe(e.target.value, config.percentile) })}
               />
             </div>
           )}
@@ -510,7 +511,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 min="1"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.step ?? 1}
-                onChange={(e) => onChange({ ...config, step: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, step: parseIntSafe(e.target.value, config.step) })}
               />
               <p className="text-xs text-muted-foreground">Features to remove at each iteration.</p>
             </div>

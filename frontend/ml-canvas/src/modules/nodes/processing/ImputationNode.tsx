@@ -9,6 +9,7 @@ import { RecommendationsPanel } from '../../../components/panels/Recommendations
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 interface ImputationConfig {
   columns: string[];
@@ -226,7 +227,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                   min="1"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.n_neighbors || 5}
-                  onChange={(e) => onChange({ ...config, n_neighbors: parseInt(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, n_neighbors: parseIntSafe(e.target.value, config.n_neighbors) })}
                 />
               </div>
               <div>
@@ -257,7 +258,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                   min="1"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.max_iter || 10}
-                  onChange={(e) => onChange({ ...config, max_iter: parseInt(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, max_iter: parseIntSafe(e.target.value, config.max_iter) })}
                 />
               </div>
               <div>
@@ -282,7 +283,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
                   type="number"
                   className="w-full p-2 border rounded bg-background text-sm"
                   value={config.random_state ?? 0}
-                  onChange={(e) => onChange({ ...config, random_state: parseInt(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, random_state: parseIntSafe(e.target.value, config.random_state) })}
                 />
               </div>
             </>

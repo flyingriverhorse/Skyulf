@@ -8,6 +8,7 @@ import { Recommendation, ColumnProfile } from '../../../core/api/client';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 // --- Types ---
 
@@ -284,7 +285,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     type="number"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.random_state}
-                    onChange={(e) => { handleChange('random_state', parseInt(e.target.value)); }}
+                    onChange={(e) => { handleChange('random_state', parseIntSafe(e.target.value, config.random_state)); }}
                 />
             </div>
 
@@ -303,7 +304,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.k_neighbors ?? 5}
-                                onChange={(e) => { handleChange('k_neighbors', parseInt(e.target.value)); }}
+                                onChange={(e) => { handleChange('k_neighbors', parseIntSafe(e.target.value, config.k_neighbors)); }}
                             />
                         </div>
                     )}
@@ -315,7 +316,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.m_neighbors ?? 10}
-                                onChange={(e) => { handleChange('m_neighbors', parseInt(e.target.value)); }}
+                                onChange={(e) => { handleChange('m_neighbors', parseIntSafe(e.target.value, config.m_neighbors)); }}
                             />
                         </div>
                     )}
@@ -394,7 +395,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     <select
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         value={config.version ?? 1}
-                        onChange={(e) => { handleChange('version', parseInt(e.target.value)); }}
+                        onChange={(e) => { handleChange('version', parseIntSafe(e.target.value, config.version)); }}
                     >
                         <option value="1">1</option>
                         <option value="2">2</option>
@@ -411,7 +412,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             type="number"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.n_neighbors ?? 3}
-                            onChange={(e) => { handleChange('n_neighbors', parseInt(e.target.value)); }}
+                            onChange={(e) => { handleChange('n_neighbors', parseIntSafe(e.target.value, config.n_neighbors)); }}
                         />
                     </div>
                     <div className="space-y-2">

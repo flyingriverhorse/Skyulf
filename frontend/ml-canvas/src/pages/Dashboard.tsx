@@ -7,11 +7,11 @@ import {
 import {
   Activity, Database, Play, Server,
   Plus, ExternalLink,
-  CheckCircle, XCircle, Clock, Settings
+  CheckCircle
 } from 'lucide-react';
 import { apiClient } from '../core/api/client';
 import { jobsApi } from '../core/api/jobs';
-import { LoadingState, EmptyState } from '../components/shared';
+import { LoadingState, EmptyState, ErrorState, StatusBadge } from '../components/shared';
 
 interface SystemStats {
   total_jobs: number;
@@ -39,13 +39,16 @@ export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [jobs, setJobs] = useState<TrainingJobSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [chartData, setChartData] = useState<{
     statusDist: { name: string; value: number }[];
     dailyActivity: { date: string; count: number }[];
   }>({ statusDist: [], dailyActivity: [] });
 
-  useEffect(() => {
+  const fetchDashboardData = React.useCallback(() => {
     const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       try {
         // Fetch more jobs for charts (50), but we'll only show 5 in the table
         const [statsRes, recentJobs] = await Promise.all([
@@ -90,8 +93,9 @@ export const Dashboard: React.FC = () => {
 
         setChartData({ statusDist, dailyActivity: dailyCounts });
 
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError('Failed to load dashboard data. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -99,6 +103,10 @@ export const Dashboard: React.FC = () => {
 
     void fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
@@ -170,7 +178,7 @@ export const Dashboard: React.FC = () => {
                   allowDecimals={false}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }}
+                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }}
                   cursor={{ fill: '#f1f5f9' }}
                 />
                 <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={30} />
@@ -202,7 +210,7 @@ export const Dashboard: React.FC = () => {
                     } />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }} />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>
@@ -222,6 +230,8 @@ export const Dashboard: React.FC = () => {
 
           {loading ? (
              <LoadingState message="Loading recent jobs..." />
+          ) : error ? (
+            <ErrorState error={error} onRetry={fetchDashboardData} />
           ) : jobs.length === 0 ? (
             <EmptyState title="No recent jobs found." />
           ) : (
@@ -282,12 +292,6 @@ export const Dashboard: React.FC = () => {
               title="View Deployments"
               desc="Monitor active model endpoints"
             />
-            <QuickActionButton
-              to="/settings"
-              icon={<Settings size={18} className="text-slate-500" />}
-              title="Settings"
-              desc="Configure system preferences"
-            />
           </div>
         </div>
       </div>
@@ -311,35 +315,6 @@ const StatCard = ({ title, value, icon, subtext, color = "text-slate-900 dark:te
     </div>}
   </div>
 );
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const styles = {
-    succeeded: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    completed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-    running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  };
-
-  const icons = {
-    succeeded: <CheckCircle size={14} />,
-    completed: <CheckCircle size={14} />,
-    failed: <XCircle size={14} />,
-    running: <Activity size={14} className="animate-pulse" />,
-    pending: <Clock size={14} />,
-  };
-
-  const key = status.toLowerCase() as keyof typeof styles;
-  const style = styles[key] || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-400';
-  const icon = icons[key] || <Clock size={14} />;
-
-  return (
-    <span className={`px-2.5 py-1 inline-flex items-center gap-1.5 text-xs font-medium rounded-full ${style}`}>
-      {icon}
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  );
-};
 
 const QuickActionButton = ({ to, icon, title, desc }: { to: string; icon: React.ReactNode; title: string; desc: string }) => (
   <Link to={to} className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-600 group">

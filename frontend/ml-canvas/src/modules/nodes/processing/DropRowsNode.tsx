@@ -4,6 +4,7 @@ import { FilterX, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 interface DropRowsConfig {
   drop_if_any_missing: boolean;
@@ -65,7 +66,7 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
             min="0"
             max="100"
             value={config.missing_threshold || 0}
-            onChange={(e) => onChange({ ...config, missing_threshold: parseInt(e.target.value) })}
+            onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
             className="flex-1"
           />
           <span className="text-sm w-12 text-right">{config.missing_threshold || 0}%</span>
