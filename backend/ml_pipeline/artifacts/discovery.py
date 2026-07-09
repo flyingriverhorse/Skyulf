@@ -89,7 +89,7 @@ class LocalArtifactDiscovery(ArtifactDiscovery):
             created_at = self._parse_created_at(item_path.name)
             try:
                 for file_path in item_path.glob(f"{_REFERENCE_PREFIX}*.joblib"):
-                    remainder = file_path.stem[len(_REFERENCE_PREFIX) :]
+                    remainder = file_path.stem.removeprefix(_REFERENCE_PREFIX)
                     parts = remainder.rsplit("_", 1)
                     if len(parts) != 2:
                         continue
