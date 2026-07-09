@@ -10,9 +10,7 @@ All fields are optional (``total=False``) so that the early-return
 call sites that collect params.
 """
 
-from typing import Any
-
-from typing_extensions import TypedDict
+from typing import Any, TypedDict
 
 # ── Scalers ───────────────────────────────────────────────────────────────────
 
