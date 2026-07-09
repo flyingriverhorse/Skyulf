@@ -24,6 +24,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ file, onFileChange }
                 className="hidden"
                 onChange={handleChange}
                 accept=".csv,.parquet"
+                aria-label="Upload current data file (CSV or Parquet)"
             />
             {file ? (
                 <div className="flex items-center gap-1.5 px-3 py-2.5 border border-gray-200 dark:border-slate-600 rounded-md text-sm bg-gray-50 dark:bg-slate-900">
@@ -32,6 +33,7 @@ export const FileUploader: React.FC<FileUploaderProps> = ({ file, onFileChange }
                     <button
                         type="button"
                         onClick={() => onFileChange(null)}
+                        aria-label={`Remove ${file.name}`}
                         className="text-gray-400 hover:text-red-500 transition-colors ml-1"
                     >
                         <X size={14} />
