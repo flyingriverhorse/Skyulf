@@ -43,6 +43,16 @@ export default defineConfig({
       '/ml-workflow': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+      },
+      // Realtime job-event invalidator socket (`jobEventsSocket.ts`) connects
+      // to `ws://<origin>/ws/jobs`; without `ws: true` here, Vite's dev
+      // server proxy never forwards the upgrade request to the backend, so
+      // the socket fails immediately with "closed before the connection is
+      // established" on every page load in local dev.
+      '/ws': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
       }
     }
   }

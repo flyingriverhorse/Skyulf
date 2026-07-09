@@ -25,6 +25,7 @@ import { PolynomialFeaturesNode } from './processing/PolynomialFeaturesNode';
 import { TrainTestSplitNode } from './modeling/TrainTestSplitNode';
 import { FeatureTargetSplitNode } from './modeling/FeatureTargetSplitNode';
 import { BasicTrainingNode } from './modeling/BasicTrainingNode';
+import type { ModelTrainingConfig } from './modeling/BasicTrainingSettings';
 
 describe('bodyPreview functions', () => {
   it('DropColumnsNode shows count and threshold', () => {
@@ -160,12 +161,15 @@ describe('bodyPreview functions', () => {
   });
 
   it('createModelingNode default preview shows model and target', () => {
-    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier', target_column: 'y' })).toBe(
+    // bodyPreview's default fallback only ever reads model_type/target_column,
+    // so these deliberately test with partial configs — cast since the
+    // node's real config type (ModelTrainingConfig) requires more fields.
+    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier', target_column: 'y' } as ModelTrainingConfig)).toBe(
       'random_forest_classifier → y'
     );
-    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier' })).toBe(
+    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier' } as ModelTrainingConfig)).toBe(
       'random_forest_classifier'
     );
-    expect(BasicTrainingNode.bodyPreview!({})).toBeNull();
+    expect(BasicTrainingNode.bodyPreview!({} as ModelTrainingConfig)).toBeNull();
   });
 });

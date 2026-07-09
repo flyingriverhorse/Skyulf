@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo } from '../../core/api/jobs';
@@ -27,6 +27,10 @@ export const JobsDrawer: React.FC = () => {
   const [modelFilter, setModelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
 
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const titleId = 'jobs-drawer-title';
+
   useEscapeKey(toggleDrawer, isDrawerOpen);
 
   // Reset to list view whenever the drawer re-opens
@@ -34,14 +38,54 @@ export const JobsDrawer: React.FC = () => {
     if (isDrawerOpen) setSelectedJob(null);
   }, [isDrawerOpen]);
 
+  // Focus management: move focus into the panel when the drawer opens so
+  // keyboard/screen-reader users land inside it, and restore focus to
+  // whatever triggered it on close. Kept minimal (no full focus trap).
+  useEffect(() => {
+    if (!isDrawerOpen) return;
+    previouslyFocusedRef.current = (document.activeElement as HTMLElement | null) ?? null;
+    const raf = window.requestAnimationFrame(() => {
+      panelRef.current?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(raf);
+      const prev = previouslyFocusedRef.current;
+      if (prev && document.contains(prev)) {
+        try {
+          prev.focus();
+        } catch {
+          // Ignore: element may have become un-focusable mid-flight.
+        }
+      }
+    };
+  }, [isDrawerOpen]);
+
   // Auto-load more when the current tab shows fewer than 5 jobs but the
   // server still has more.  The store fetches all job types together, so
   // a tab that is sparse (e.g. 2 advanced-tuning among 50 basic-training)
   // keeps fetching until it reaches the threshold or exhausts the server.
+  //
+  // Cap the number of consecutive auto-triggered page fetches: if the
+  // active tab's job type is very rare relative to total volume, this
+  // effect would otherwise re-fire on every `jobs` update and hammer the
+  // API fetching dozens of pages back-to-back trying to reach the
+  // threshold. Once the cap is hit we stop auto-loading for this tab —
+  // the user can still click "Load More History" manually. The counter
+  // resets whenever the user switches tabs or reopens the drawer, so a
+  // legitimate tab switch isn't permanently blocked by an earlier cap-out.
+  const MAX_AUTO_LOAD_ATTEMPTS = 5;
+  const autoLoadAttemptsRef = useRef(0);
+
+  useEffect(() => {
+    autoLoadAttemptsRef.current = 0;
+  }, [isDrawerOpen, activeTab]);
+
   useEffect(() => {
     if (!isDrawerOpen || isLoading || !hasMore) return;
+    if (autoLoadAttemptsRef.current >= MAX_AUTO_LOAD_ATTEMPTS) return;
     const tabCount = jobs.filter(j => j.job_type === activeTab).length;
     if (tabCount < 5) {
+      autoLoadAttemptsRef.current += 1;
       void loadMoreJobs();
     }
   }, [isDrawerOpen, activeTab, jobs, hasMore, isLoading, loadMoreJobs]);
@@ -77,7 +121,14 @@ export const JobsDrawer: React.FC = () => {
       />
 
       {/* Modal Content */}
-      <div className="relative w-[1200px] max-w-[95vw] h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-lg flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden transition-all">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+        className="relative w-[1200px] max-w-[95vw] h-[85vh] bg-white dark:bg-gray-800 shadow-2xl rounded-lg flex flex-col border border-gray-200 dark:border-gray-700 overflow-hidden transition-all outline-none"
+      >
 
         {selectedJob ? (
             <JobDetailsView job={selectedJob} onBack={() => { setSelectedJob(null); }} onClose={() => toggleDrawer(false)} />
@@ -85,7 +136,7 @@ export const JobsDrawer: React.FC = () => {
             <>
                 {/* Header */}
                 <div className="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
-                <h2 className="font-semibold text-gray-800 dark:text-gray-100">Job History</h2>
+                <h2 id={titleId} className="font-semibold text-gray-800 dark:text-gray-100">Job History</h2>
                 <div className="flex items-center gap-2">
                     <button
                     onClick={() => fetchJobs()}

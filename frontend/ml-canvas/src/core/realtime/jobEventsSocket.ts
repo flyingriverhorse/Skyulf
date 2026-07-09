@@ -94,12 +94,15 @@ class JobEventsSocket {
 
     private scheduleReconnect(): void {
         if (this.retryTimer || this.explicitlyClosed) return;
-        const delay = this.retryDelay;
+        // Jitter (+/-50%) avoids a thundering herd: without it, every open
+        // tab/client reconnects at exactly the same doubling intervals after
+        // a server restart, all hammering it back at once.
+        const jitteredDelay = this.retryDelay * (0.5 + Math.random());
         this.retryDelay = Math.min(this.retryDelay * 2, 30_000);
         this.retryTimer = setTimeout(() => {
             this.retryTimer = null;
             this.connect();
-        }, delay);
+        }, jitteredDelay);
     }
 
     /** Subscribe to job events. Returns an unsubscribe function. */
