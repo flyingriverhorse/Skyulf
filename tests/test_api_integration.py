@@ -311,3 +311,13 @@ def test_run_pipeline_submission(client):
     data = response.json()
     assert data["message"] == "Pipeline execution started"
     assert data["pipeline_id"] == "test_run_001"
+
+
+def test_run_pipeline_rejects_empty_nodes(client):
+    """An empty node list used to fall through to `all_job_ids[0]` and raise
+    an unhandled IndexError (opaque 500) instead of a proper 400."""
+    payload = {"pipeline_id": "test_run_empty", "nodes": []}
+    response = client.post("/api/pipeline/run", json=payload)
+    assert response.status_code == 400
+    assert "no nodes" in response.json()["message"].lower()
+

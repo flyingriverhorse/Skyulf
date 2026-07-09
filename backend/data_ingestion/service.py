@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.data_ingestion.schemas.ingestion import (
+    DataSourceCreate,
     IngestionJobResponse,
 )
 from backend.data_ingestion.tasks import ingest_data_task
@@ -233,6 +234,99 @@ class DataIngestionService:
 
         # TODO: Handle other source types (SQL, etc.)
         return []
+
+    # Source types created via `handle_create_source` (inline config, no file
+    # upload). "file" sources go through `handle_file_upload` instead.
+    _INLINE_SOURCE_TYPES = frozenset({"s3"})
+
+    async def handle_create_source(
+        self,
+        payload: DataSourceCreate,
+        user_id: int,
+        background_tasks: BackgroundTasks | None = None,
+    ) -> IngestionJobResponse:
+        """
+        Create a data source from an inline config (e.g. S3) and start ingestion.
+        """
+        if payload.type not in self._INLINE_SOURCE_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Unsupported source type '{payload.type}'. Supported: "
+                    f"{', '.join(sorted(self._INLINE_SOURCE_TYPES))}"
+                ),
+            )
+        if payload.type == "s3":
+            path = payload.config.get("path")
+            if not path:
+                raise HTTPException(
+                    status_code=400, detail="Missing 'path' in config for s3 source"
+                )
+            # `get_source_sample`/connectors treat any non-`s3://` path for a
+            # type="s3" source as a *local filesystem path* (no traversal or
+            # extension checks, unlike /upload). Without this guard, this
+            # endpoint would let any caller register an arbitrary server-local
+            # file as a "s3" source and read it back via ingestion/sampling.
+            if not str(path).startswith("s3://"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="'path' must be an s3:// URI for s3 sources",
+                )
+
+        source_id = str(uuid.uuid4())
+        try:
+            new_source = DataSource(
+                source_id=source_id,
+                name=payload.name,
+                type=payload.type,
+                config=payload.config,
+                created_by=user_id,
+                is_active=True,
+                test_status="untested",
+                source_metadata={
+                    "ingestion_status": {
+                        "status": "pending",
+                        "progress": 0.0,
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    },
+                    "description": payload.description,
+                },
+            )
+            self.session.add(new_source)
+            await self.session.commit()
+            await self.session.refresh(new_source)
+
+            settings = get_settings()
+            if settings.USE_CELERY:
+                ingest_data_task.delay(new_source.id)
+            elif background_tasks:
+                background_tasks.add_task(ingest_data_task, new_source.id)
+            else:
+                # Fallback: Run in thread — retain a strong reference so the
+                # task is not garbage-collected before it finishes.
+                import asyncio
+
+                _task = asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
+                _source_id = new_source.id
+
+                def _on_done(t: asyncio.Task) -> None:
+                    exc = t.exception() if not t.cancelled() else None
+                    if exc:
+                        logger.error("Ingestion task failed for source %s: %s", _source_id, exc)
+
+                _task.add_done_callback(_on_done)
+
+            return IngestionJobResponse(
+                job_id=str(new_source.id),
+                status="pending",
+                message=f"'{payload.type}' source created and ingestion started",
+                file_id=source_id,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Database error: {e}")
+            raise SkyulfException(message=f"Database error: {str(e)}") from e
 
     async def handle_file_upload(
         self,
