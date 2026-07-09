@@ -5,7 +5,8 @@ import {
   ChevronDown, ChevronRight, X, Clock, Route, Server, Download,
 } from 'lucide-react';
 import { monitoringApi, ErrorEvent, GroupedIssue, PipelineRunLog } from '../core/api/monitoring';
-import { LoadingState, EmptyState } from '../components/shared';
+import { LoadingState, EmptyState, useConfirm } from '../components/shared';
+import { toast } from '../core/toast';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -351,8 +352,9 @@ export const ErrorLogPage: React.FC = () => {
     try {
       const logs = await monitoringApi.getPipelineLogs(200);
       setPipelineLogs(logs);
-    } catch {
-      // backend may be unavailable; silently skip
+    } catch (err) {
+      // backend may be unavailable; log for diagnostics but don't block the page
+      console.debug('[error-log] failed to fetch pipeline logs', err);
     }
   }, []);
 
@@ -360,7 +362,10 @@ export const ErrorLogPage: React.FC = () => {
     try {
       await monitoringApi.clearPipelineLogs();
       setPipelineLogs([]);
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.error('Failed to clear pipeline logs', err);
+      toast.error('Failed to clear pipeline logs', 'Please try again.');
+    }
   }, []);
 
   const load = useCallback(async () => {
@@ -386,8 +391,16 @@ export const ErrorLogPage: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const confirm = useConfirm();
+
   const handleClear = async () => {
-    if (!window.confirm(`Delete all ${events.length} error events? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: 'Delete all error events?',
+      message: `Delete all ${events.length} error events? This cannot be undone.`,
+      confirmLabel: 'Delete all',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setClearing(true);
     try {
       await monitoringApi.clearErrors();
@@ -401,7 +414,10 @@ export const ErrorLogPage: React.FC = () => {
     try {
       const ev = await monitoringApi.getError(id);
       setModal(ev);
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error('Failed to load error sample', err);
+      toast.error('Failed to load error sample', 'Please try again.');
+    }
   };
 
   const handleResolve = async (ev: ErrorEvent) => {

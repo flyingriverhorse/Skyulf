@@ -39,6 +39,46 @@ export const DatasetService = {
     return await response.json();
   },
 
+  /**
+   * Same as `upload`, but reports real upload progress (0-100) via
+   * `onProgress`. Uses XHR because `fetch` has no upload-progress API.
+   */
+  uploadWithProgress: (file: File, onProgress: (percent: number) => void): Promise<IngestionJobResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return new Promise<IngestionJobResponse>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${INGESTION_BASE}/upload`);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        let payload: unknown;
+        try {
+          payload = JSON.parse(xhr.responseText);
+        } catch {
+          payload = undefined;
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload as IngestionJobResponse);
+        } else {
+          const detail = (payload as { detail?: string } | undefined)?.detail;
+          reject(new Error(detail || 'Failed to upload file'));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Failed to upload file'));
+      xhr.onabort = () => reject(new Error('Upload cancelled'));
+
+      xhr.send(formData);
+    });
+  },
+
   createSource: async (data: DataSourceCreate): Promise<IngestionJobResponse> => {
     const response = await fetch(`${INGESTION_BASE}/database`, {
       method: 'POST',

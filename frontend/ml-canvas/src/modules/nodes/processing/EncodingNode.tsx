@@ -7,6 +7,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 interface EncodingConfig {
   method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe';
@@ -212,7 +213,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   max="200"
                   className="w-full p-1 text-sm border rounded"
                   value={config.max_categories ?? 20}
-                  onChange={(e) => onChange({ ...config, max_categories: parseInt(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, max_categories: parseIntSafe(e.target.value, config.max_categories) })}
                   title="Caps the number of one-hot columns per feature."
                 />
                 <p className="text-[10px] text-muted-foreground">Caps columns per feature (default 20).</p>
@@ -334,7 +335,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                 min="1"
                 className="w-full p-2 border rounded"
                 value={config.n_features ?? 8}
-                onChange={(e) => onChange({ ...config, n_features: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, n_features: parseIntSafe(e.target.value, config.n_features) })}
                 title="Number of hash buckets."
               />
               <p className="text-[10px] text-muted-foreground">Buckets to hash categories into (default 8).</p>
@@ -365,7 +366,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                   className="w-full p-2 border rounded"
                   value={config.unknown_value ?? -1}
                   disabled={config.handle_unknown === 'error'}
-                  onChange={(e) => onChange({ ...config, unknown_value: parseInt(e.target.value) })}
+                  onChange={(e) => onChange({ ...config, unknown_value: parseIntSafe(e.target.value, config.unknown_value) })}
                   title="Integer to assign for unknown categories."
                 />
               </div>
@@ -395,7 +396,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
                 type="number"
                 className="w-full p-2 border rounded"
                 value={config.missing_code ?? -1}
-                onChange={(e) => onChange({ ...config, missing_code: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, missing_code: parseIntSafe(e.target.value, config.missing_code) })}
                 title="Integer to assign for missing or unknown categories."
               />
               <p className="text-xs text-muted-foreground">

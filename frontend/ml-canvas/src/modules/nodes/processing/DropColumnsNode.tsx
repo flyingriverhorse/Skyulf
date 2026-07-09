@@ -9,6 +9,7 @@ import { RecommendationsPanel } from '../../../components/panels/Recommendations
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { parseIntSafe } from '../../../core/utils/numberInput';
 
 interface DropColumnsConfig {
   columns: string[];
@@ -115,7 +116,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
               max="100"
               step="5"
               value={config.missing_threshold ?? 0}
-              onChange={(e) => onChange({ ...config, missing_threshold: parseInt(e.target.value) })}
+              onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
               className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
             />
           </div>

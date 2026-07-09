@@ -36,15 +36,14 @@ export const useSchemaPreview = (): void => {
 
     const handle = window.setTimeout(() => {
       const myRequestId = ++requestIdRef.current;
-      let cancelled = false;
 
       void (async () => {
         try {
           const config = convertGraphToPipelineConfig(nodes, edges);
           const response = await previewPipelineSchema(config);
 
-          // Drop stale responses.
-          if (cancelled || myRequestId !== requestIdRef.current) return;
+          // Drop stale responses (a newer request has since been issued).
+          if (myRequestId !== requestIdRef.current) return;
 
           setPredictedSchemas(response.predicted_schemas);
 
@@ -64,15 +63,11 @@ export const useSchemaPreview = (): void => {
           setBrokenSchemaRefs(grouped);
         } catch (err) {
           // Schema preview is best-effort — never noisy in the UI.
-          if (!cancelled) {
+          if (myRequestId === requestIdRef.current) {
             console.debug('[schema-preview] API call failed', err);
           }
         }
       })();
-
-      return () => {
-        cancelled = true;
-      };
     }, DEBOUNCE_MS);
 
     return () => window.clearTimeout(handle);

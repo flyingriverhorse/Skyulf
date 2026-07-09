@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, XCircle, Merge, GitFork } from 'lucide-react';
@@ -7,7 +7,6 @@ import { useJobStore } from '../../core/store/useJobStore';
 import { useViewStore } from '../../core/store/useViewStore';
 import { bucketDuration, getPerfFamily } from '../../core/perf/perfThresholds';
 import { useReadOnlyMode } from '../../core/hooks/useReadOnlyMode';
-import type { NodeExecutionResult } from '../../core/api/client';
 import {
   isAutoParallelType,
   supportsExecutionModeToggle,
@@ -22,8 +21,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   // editor affordances (Backspace, sidebars, undo/redo, palette).
   const readOnly = useReadOnlyMode();
 
-  const executionResult = useGraphStore((state) => state.executionResult);
-  const nodeResult: NodeExecutionResult | undefined = executionResult?.node_results?.[id];
+  const nodeResult = useGraphStore((state) => state.executionResult?.node_results?.[id]);
   // Fallback summary entries for trainer/tuner nodes whose jobs run
   // via Celery — they never populate `executionResult.node_results`.
   // The `useNodeJobSummaries` hook keeps this map fresh from
@@ -41,10 +39,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
       (j) => j.node_id === id && (j.status === 'running' || j.status === 'queued'),
     ),
   );
-  const incomingSourceCount = useGraphStore(
-    (state) => new Set(state.edges.filter((e) => e.target === id).map((e) => e.source)).size,
-    (a, b) => a === b
-  );
+  const incomingSourceCount = useGraphStore((state) => state.incomingSourceCounts[id] ?? 0);
 
   // C7: pre-execution schema prediction.
   // - `predictedSchema` powers the `↳ N cols` badge in the header.
@@ -144,12 +139,12 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   // Has this node received an active sibling-fan-in advisory with real
   // overlap (i.e. last-wins overwrite is happening)? If so, color the
   // merge badge amber so the canvas itself flags the risk.
-  const mergeWarningSeverity: 'risk' | 'safe' | null = (() => {
-    const warnings = executionResult?.merge_warnings ?? [];
+  const mergeWarningSeverity: 'risk' | 'safe' | null = useGraphStore((state) => {
+    const warnings = state.executionResult?.merge_warnings ?? [];
     const w = warnings.find((mw) => mw.node_id === id);
     if (!w) return null;
     return (w.overlap_columns?.length ?? 0) > 0 ? 'risk' : 'safe';
-  })();
+  });
 
   // Parallel badge: training nodes when user explicitly chose parallel mode,
   // OR auto-parallel terminals (data_preview) wired to 2+ sources.
@@ -173,16 +168,17 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   // some metadata; validators only read the config keys). Wrapped in
   // try/catch because a buggy validator must not crash the canvas.
   let validationMessage: string | null = null;
-  if (definition) {
+  const validationResult = useMemo(() => {
+    if (!definition) return null;
     try {
-      const result = definition.validate(data as never);
-      if (!result.isValid) {
-        validationMessage = result.message ?? 'Configuration incomplete.';
-      }
+      return definition.validate(data as never);
     } catch {
       // Validator threw — treat as a soft warning, don't block rendering.
-      validationMessage = null;
+      return null;
     }
+  }, [definition, data]);
+  if (validationResult && !validationResult.isValid) {
+    validationMessage = validationResult.message ?? 'Configuration incomplete.';
   }
 
   // One-shot pulse animation: when a node transitions from valid →
