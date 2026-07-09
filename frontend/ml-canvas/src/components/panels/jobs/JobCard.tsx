@@ -2,7 +2,7 @@ import React from 'react';
 import { Database } from 'lucide-react';
 import { JobInfo } from '../../../core/api/jobs';
 import { clickableProps } from '../../../core/utils/a11y';
-import { formatMetricName } from '../../../core/utils/format';
+import { formatMetricName, formatDuration } from '../../../core/utils/format';
 import { StatusBadge } from '../../shared/StatusBadge';
 
 /** Extract the scoring metric name from a job's result or config. */
@@ -35,15 +35,6 @@ const formatDate = (dateStr: string | null): string => {
     hour: '2-digit',
     minute: '2-digit',
   });
-};
-
-const getDuration = (start: string | null, end: string | null): string => {
-  if (!start || !end) return '-';
-  const diff = new Date(end).getTime() - new Date(start).getTime();
-  const seconds = Math.floor(diff / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}m ${seconds % 60}s`;
 };
 
 interface JobCardProps {
@@ -87,7 +78,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => (
 
     {/* Duration */}
     <div className="col-span-1 text-gray-600 dark:text-gray-400 text-xs font-mono">
-      {getDuration(job.start_time, job.end_time)}
+      {formatDuration(job.start_time, job.end_time)}
     </div>
 
     {/* Score */}

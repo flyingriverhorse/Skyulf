@@ -18,8 +18,8 @@ export const RecommendationsPanel: React.FC<RecommendationsPanelProps> = ({
   }
 
   return (
-    <div className={`bg-blue-50 border border-blue-100 rounded-md p-3 ${className}`}>
-      <div className="flex items-center gap-2 mb-2 text-blue-800 font-medium text-sm">
+    <div className={`bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-md p-3 ${className}`}>
+      <div className="flex items-center gap-2 mb-2 text-blue-800 dark:text-blue-300 font-medium text-sm">
         <Lightbulb className="w-4 h-4" />
         <span>Recommendations</span>
       </div>
@@ -27,18 +27,18 @@ export const RecommendationsPanel: React.FC<RecommendationsPanelProps> = ({
         {recommendations.map((rec) => (
           <div
             key={rec.rule_id}
-            className="bg-white border border-blue-100 rounded p-2 text-sm shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white dark:bg-slate-800 border border-blue-100 dark:border-blue-800/60 rounded p-2 text-sm shadow-sm hover:shadow-md transition-shadow"
           >
             <div className="flex justify-between items-start gap-2">
               <div className="flex-1">
-                <p className="text-gray-800 font-medium text-xs mb-1">
+                <p className="text-gray-800 dark:text-slate-200 font-medium text-xs mb-1">
                   {rec.type.replace('_', ' ').toUpperCase()}
                 </p>
-                <p className="text-gray-600 text-xs leading-relaxed">
+                <p className="text-gray-600 dark:text-slate-400 text-xs leading-relaxed">
                   {rec.description}
                 </p>
                 {rec.reasoning && (
-                  <p className="text-gray-400 text-[10px] mt-1 italic">
+                  <p className="text-gray-400 dark:text-slate-500 text-[10px] mt-1 italic">
                     Why: {rec.reasoning}
                   </p>
                 )}
@@ -46,7 +46,7 @@ export const RecommendationsPanel: React.FC<RecommendationsPanelProps> = ({
               {onApply && (
                 <button
                   onClick={() => onApply(rec)}
-                  className="text-blue-600 hover:text-blue-800 p-1 rounded hover:bg-blue-50"
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
                   title="Apply Recommendation"
                 >
                   <CheckCircle className="w-5 h-5" />
