@@ -153,6 +153,8 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
         catalog = FileSystemCatalog()
         df = catalog.load(str(path), limit=1000)
         return DataProfiler.generate_profile(df)
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Failed to profile dataset %s", dataset_id)
         raise SkyulfException(message="Failed to profile dataset") from None

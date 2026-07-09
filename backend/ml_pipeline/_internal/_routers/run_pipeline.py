@@ -11,7 +11,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal, cast
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
@@ -81,6 +81,9 @@ async def run_pipeline(  # noqa: C901
     )
 
     pipeline_id = config.pipeline_id
+
+    if not config.nodes:
+        raise HTTPException(status_code=400, detail="Pipeline has no nodes")
 
     # --- Path Resolution Logic ---
     ingestion_service = DataIngestionService(db)
@@ -254,6 +257,9 @@ async def run_pipeline(  # noqa: C901
         if is_parallel
         else "Pipeline execution started"
     )
+
+    if not all_job_ids:
+        raise HTTPException(status_code=400, detail="Pipeline produced no runnable sub-pipelines")
 
     return RunPipelineResponse(
         message=message,
