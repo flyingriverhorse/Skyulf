@@ -63,7 +63,7 @@ class WinsorizeApplier(BaseApplier):
     name="Winsorization",
     category="Preprocessing",
     description="Limit extreme values in the data.",
-    params={"limits": [0.05, 0.05], "columns": []},
+    params={"lower_percentile": 5.0, "upper_percentile": 95.0, "columns": []},
 )
 class WinsorizeCalculator(BaseCalculator):
     def infer_output_schema(

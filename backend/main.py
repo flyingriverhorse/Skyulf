@@ -36,6 +36,7 @@ from backend.exceptions.handlers import (
     method_not_allowed_exception_handler,
     not_found_exception_handler,
     skyulf_exception_handler,
+    unauthorized_exception_handler,
     validation_exception_handler,
 )
 from backend.health.routes import router as health_router
@@ -427,6 +428,10 @@ def _add_exception_handlers(app: FastAPI) -> None:
 
     # Handle 404 Not Found
     app.add_exception_handler(404, not_found_exception_handler)
+
+    # Handle 401 Unauthorized / 403 Forbidden
+    app.add_exception_handler(401, unauthorized_exception_handler)
+    app.add_exception_handler(403, unauthorized_exception_handler)
 
     # Handle 405 Method Not Allowed
     app.add_exception_handler(405, method_not_allowed_exception_handler)
