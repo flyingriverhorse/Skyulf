@@ -158,18 +158,17 @@ class S3ArtifactStore(ArtifactStore):
             for f in files:
                 normalized = str(f).replace("s3://", "")
                 bucket_prefix = f"{self.bucket_name}/"
-                if normalized.startswith(bucket_prefix):
-                    normalized = normalized[len(bucket_prefix) :]
+                normalized = normalized.removeprefix(bucket_prefix)
                 if self.prefix:
                     prefix = f"{self.prefix}/"
                     if not normalized.startswith(prefix):
                         continue
-                    normalized = normalized[len(prefix) :]
+                    normalized = normalized.removeprefix(prefix)
                 if "/" in normalized.strip("/"):
                     continue
                 filename = Path(normalized).name
                 if filename.endswith(".joblib"):
-                    keys.append(filename[:-7])
+                    keys.append(filename.removesuffix(".joblib"))
                 else:
                     keys.append(filename)
             return keys
