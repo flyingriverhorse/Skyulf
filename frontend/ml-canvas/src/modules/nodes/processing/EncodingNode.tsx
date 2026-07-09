@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Hash, Activity, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -8,6 +8,7 @@ import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppe
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface EncodingConfig {
   method: 'onehot' | 'ordinal' | 'label' | 'target' | 'hash' | 'dummy' | 'woe';
@@ -42,8 +43,8 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 400px.
+  const [containerRef, isWide] = useIsWideContainer(400);
 
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const executionResult = useGraphStore((state) => state.executionResult);
@@ -67,18 +68,6 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
     rec.type.includes('encoding') ||
     rec.type.includes('cardinality')
   );
-
-  // Responsive layout logic
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 400);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
 
   const categoricalColumns = schema
     ? Object.values(schema.columns).map(c => c.name).filter(name => !droppedUpstream.has(name))

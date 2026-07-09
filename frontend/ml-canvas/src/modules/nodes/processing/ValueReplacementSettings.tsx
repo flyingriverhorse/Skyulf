@@ -4,6 +4,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 export interface ReplacementItem {
   old: unknown;
@@ -163,8 +164,11 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
     onChange({ ...config, replacements: newReplacements });
   };
 
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
+
   return (
-    <div className="space-y-4 p-1">
+    <div ref={containerRef} className={`p-1 gap-4 ${isWide ? 'grid grid-cols-2 items-start' : 'space-y-4'}`}>
       <div className="space-y-2">
         <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Columns</span>
         <ColumnMultiSelect

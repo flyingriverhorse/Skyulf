@@ -5,6 +5,7 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { clickableProps } from '../../../core/utils/a11y';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface FeatureInteractionConfig {
   columns: string[];
@@ -58,8 +59,11 @@ export const FeatureInteractionNode: NodeDefinition = {
       updateConfig({ isExpanded: !config.isExpanded });
     };
 
+    // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+    const [containerRef, isWide] = useIsWideContainer();
+
     return (
-      <div className="space-y-2 min-w-[280px]">
+      <div ref={containerRef} className="space-y-2 w-full">
         <div className="border rounded-md bg-card">
           <div
             className="flex items-center justify-between p-2 cursor-pointer hover:bg-accent/50 transition-colors"
@@ -73,7 +77,7 @@ export const FeatureInteractionNode: NodeDefinition = {
           </div>
 
           {config.isExpanded && (
-            <div className="p-3 space-y-4 border-t">
+            <div className={`p-3 border-t gap-4 ${isWide ? 'grid grid-cols-2 items-start' : 'space-y-4'}`}>
 
               <ColumnMultiSelect
                 label="Input Columns (Numeric)"

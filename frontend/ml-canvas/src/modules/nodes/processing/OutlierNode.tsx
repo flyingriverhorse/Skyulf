@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Scissors } from 'lucide-react';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
@@ -9,6 +9,7 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface OutlierConfig {
   method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope';
@@ -76,20 +77,8 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
 
-  // Responsive Layout
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   // Filter for numeric columns only
   const numericColumns = schema

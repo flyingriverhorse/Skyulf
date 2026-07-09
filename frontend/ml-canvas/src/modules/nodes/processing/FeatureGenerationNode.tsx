@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Calculator, Trash2, Calendar, Percent, GitCompare, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -10,6 +10,7 @@ import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { clickableProps } from '../../../core/utils/a11y';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface MathOperation {
   operation_type: 'arithmetic' | 'datetime_extract' | 'ratio' | 'similarity' | 'group_agg';
@@ -79,18 +80,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       : [];
 
   const [showRecommendations, setShowRecommendations] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 380);
-      }
-    });
-    ro.observe(containerRef.current);
-    return () => { ro.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 380px.
+  const [containerRef, isWide] = useIsWideContainer(380);
 
 
 

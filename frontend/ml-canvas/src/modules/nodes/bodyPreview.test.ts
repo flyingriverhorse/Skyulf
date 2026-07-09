@@ -20,7 +20,6 @@ import { TextCleaningNode } from './processing/TextCleaningNode';
 import { ValueReplacementNode } from './processing/ValueReplacementNode';
 import { AliasReplacementNode } from './processing/AliasReplacementNode';
 import { InvalidValueReplacementNode } from './processing/InvalidValueReplacementNode';
-import { DataCleaningNode } from './processing/DataCleaningNode';
 import { MissingIndicatorNode } from './processing/MissingIndicatorNode';
 import { PolynomialFeaturesNode } from './processing/PolynomialFeaturesNode';
 import { TrainTestSplitNode } from './modeling/TrainTestSplitNode';
@@ -134,11 +133,7 @@ describe('bodyPreview functions', () => {
     ).toBe('negative_to_nan · 2 cols');
   });
 
-  it('DataCleaningNode and MissingIndicatorNode show counts', () => {
-    expect(DataCleaningNode.bodyPreview!({ dropColumns: [], fillStrategy: 'mean' })).toBe('Fill missing: mean');
-    expect(DataCleaningNode.bodyPreview!({ dropColumns: ['a', 'b'], fillStrategy: 'median' })).toBe(
-      'Drop 2 cols · fill median'
-    );
+  it('MissingIndicatorNode shows counts', () => {
     expect(MissingIndicatorNode.bodyPreview!({ columns: [], flag_suffix: '_was_missing' })).toBeNull();
     expect(MissingIndicatorNode.bodyPreview!({ columns: ['a'], flag_suffix: '_was_missing' })).toBe(
       '1 col → flags'

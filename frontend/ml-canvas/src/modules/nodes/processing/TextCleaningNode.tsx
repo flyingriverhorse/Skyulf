@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Eraser, Plus, Trash2, Wand2, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 // --- Types ---
 
@@ -159,8 +160,8 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
   onChange,
   nodeId,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 400px.
+  const [containerRef, isWide] = useIsWideContainer(400);
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
@@ -178,17 +179,6 @@ const TextCleaningSettings: React.FC<{ config: TextCleaningConfig; onChange: (c:
       .filter((c) => !droppedUpstream.has(c.name))
       .map((c) => c.name)
     : [];
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 400);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
 
   const addOperation = () => {
     onChange({

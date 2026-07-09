@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import {
   Play, Boxes, ChevronRight, BarChart3, AlertTriangle, Info, X, Sparkles,
 } from 'lucide-react';
-import { useElementSize } from '../../../core/hooks/useElementSize';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useTrainingNodeContext } from '../../../core/hooks/useTrainingNodeContext';
 import { MultiSelectChips } from './components/MultiSelectChips';
 import { BaseModelParamsEditor } from './components/BaseModelParamsEditor';
@@ -723,10 +723,9 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
   onChange: (c: EnsembleConfig) => void;
   nodeId?: string;
 }) {
-  const [containerRef, { width }] = useElementSize();
   // Wide enough (expanded node view) to split the form into two side-by-side
   // columns instead of one long scroll; the sidebar stays single-column.
-  const isWide = width >= 560;
+  const [containerRef, isWide] = useIsWideContainer(560);
   const [showCV, setShowCV] = useState(false);
   const [showBaseParams, setShowBaseParams] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_ensemble'));
