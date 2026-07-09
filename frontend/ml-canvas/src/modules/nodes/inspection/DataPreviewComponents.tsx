@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { Activity, CheckCircle, AlertCircle, Play, GitBranch } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
@@ -80,7 +81,9 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
   onChange,
   nodeId
 }) => {
-  const { nodes, edges } = useGraphStore();
+  const { nodes, edges } = useGraphStore(
+    useShallow((state) => ({ nodes: state.nodes, edges: state.edges }))
+  );
   const [isRunning, setIsRunning] = useState(false);
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
