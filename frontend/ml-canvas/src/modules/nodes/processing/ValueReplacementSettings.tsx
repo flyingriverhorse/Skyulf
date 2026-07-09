@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Plus, Trash2, Search, ArrowRight } from 'lucide-react';
+import React from 'react';
+import { Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { clickableProps } from '../../../core/utils/a11y';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 
 export interface ReplacementItem {
   old: unknown;
@@ -18,65 +18,6 @@ export interface ValueReplacementConfig {
 }
 
 type ValueReplacementValueType = ReplacementItem['oldType'];
-
-const ColumnSelector: React.FC<{
-  columns: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-}> = ({ columns, selected, onChange }) => {
-  const [search, setSearch] = useState('');
-
-  const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
-
-  const toggle = (col: string) => {
-    if (selected.includes(col)) {
-      onChange(selected.filter(c => c !== col));
-    } else {
-      onChange([...selected, col]);
-    }
-  };
-
-  return (
-    <div className="border rounded bg-background overflow-hidden flex flex-col max-h-40">
-      <div className="flex items-center px-2 py-1.5 border-b bg-muted/20">
-        <Search size={12} className="text-muted-foreground mr-1.5" />
-        <input
-          className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
-          placeholder="Search columns..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); }}
-        />
-      </div>
-      <div className="overflow-y-auto p-1 space-y-0.5">
-        {filtered.length > 0 ? (
-          filtered.map(col => {
-            const isSelected = selected.includes(col);
-            return (
-              <div
-                key={col}
-                {...clickableProps(() => { toggle(col); })}
-                className={`
-                  flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
-                  ${isSelected ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'}
-                `}
-              >
-                <div className={`
-                  w-3 h-3 rounded border flex items-center justify-center
-                  ${isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-gray-400 dark:border-gray-600'}
-                `}>
-                  {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
-                </div>
-                <span className="truncate">{col}</span>
-              </div>
-            );
-          })
-        ) : (
-          <div className="p-2 text-xs text-gray-500 text-center italic">No columns found</div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 const TypedInput: React.FC<{
   value: unknown;
@@ -226,7 +167,8 @@ export const ValueReplacementSettings: React.FC<{ config: ValueReplacementConfig
     <div className="space-y-4 p-1">
       <div className="space-y-2">
         <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Target Columns</span>
-        <ColumnSelector
+        <ColumnMultiSelect
+          variant="compact"
           columns={availableColumns}
           selected={config.columns}
           onChange={(cols) => onChange({ ...config, columns: cols })}
