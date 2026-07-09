@@ -264,6 +264,10 @@ def _build_splitter(
     random_state: int = 42,
 ) -> Any:
     """Build a sklearn CV splitter from cv_type string."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     if cv_type == "time_series_split":
         return TimeSeriesSplit(n_splits=n_folds)
     elif cv_type == "shuffle_split":
@@ -275,6 +279,14 @@ def _build_splitter(
             random_state=random_state if shuffle else None,
         )
     else:
+        if cv_type == "stratified_k_fold":
+            logger.warning(
+                "stratified_k_fold requested for problem_type='%s' (not classification); "
+                "falling back to plain KFold.",
+                problem_type,
+            )
+        elif cv_type not in ("k_fold", "time_series_split", "shuffle_split", "stratified_k_fold"):
+            logger.warning("Unknown cv_type '%s'; falling back to plain KFold.", cv_type)
         return KFold(
             n_splits=n_folds,
             shuffle=shuffle,

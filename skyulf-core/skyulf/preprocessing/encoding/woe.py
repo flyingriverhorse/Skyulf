@@ -51,9 +51,14 @@ def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
         return X, y
 
     default = float(params.get("default", 0.0))
+    # `astype(str)` on the pandas side turns NaN into the literal "nan" string
+    # (and the fit step learns a WOE for that category the same way). Mirror
+    # that here so nulls hit the learned mapping instead of always falling
+    # back to `default` on the polars path.
     exprs = [
         pl.col(col)
         .cast(pl.Utf8)
+        .fill_null("nan")
         .replace_strict(mappings[col], default=default, return_dtype=pl.Float64)
         .alias(col)
         for col in valid_cols
