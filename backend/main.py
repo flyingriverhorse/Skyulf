@@ -370,7 +370,6 @@ def _include_routers(app: FastAPI) -> None:
 
     # ML Pipeline — canonical path is /api/pipeline.
     app.include_router(ml_pipeline_router, prefix="/api/pipeline")
-    app.include_router(model_registry_router, prefix="/api/ml", tags=["Model Registry"])
 
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
     app.include_router(model_registry_router, prefix="/api", tags=["Model Registry"])
