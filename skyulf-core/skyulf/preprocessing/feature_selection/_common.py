@@ -262,15 +262,21 @@ def _model_feature_importances(selector: Any, cols: list[str]) -> dict[str, floa
     estimator = getattr(selector, "estimator_", None)
     if estimator is None:
         return {}
-    # strict=False: for RFE, `estimator_` is refit on only the surviving
-    # feature subset, so its length can be shorter than `cols` (the full
-    # candidate list); for SelectFromModel it matches `cols`. Not fixing the
-    # underlying RFE name/value pairing here — out of scope for this pass.
+    # For RFE, `estimator_` is refit on only the surviving feature subset, so
+    # its importances/coefs align with `support_`-selected columns, not the
+    # full candidate list. For SelectFromModel (and anything else exposing
+    # `support_`), the estimator is fit on the full candidate set, so no
+    # narrowing is needed.
+    names = cols
+    if isinstance(selector, RFE):
+        support = getattr(selector, "support_", None)
+        if support is not None:
+            names = [c for c, s in zip(cols, support, strict=True) if s]
     if hasattr(estimator, "feature_importances_"):
-        return dict(zip(cols, estimator.feature_importances_.tolist(), strict=False))
+        return dict(zip(names, estimator.feature_importances_.tolist(), strict=True))
     if hasattr(estimator, "coef_"):
         coef = estimator.coef_
         if coef.ndim > 1:
             coef = coef[0]
-        return dict(zip(cols, np.abs(coef).tolist(), strict=False))
+        return dict(zip(names, np.abs(coef).tolist(), strict=True))
     return {}

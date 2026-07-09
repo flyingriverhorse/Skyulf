@@ -281,6 +281,11 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             estimators.append((key, self._maybe_calibrate(est, calibration)))
             seen.add(key)
         if not estimators:
+            logger.warning(
+                "No valid base estimators resolved from %s; falling back to defaults %s.",
+                keys,
+                self.DEFAULT_KEYS,
+            )
             estimators = [(k, self.BASE_ESTIMATORS[k]()) for k in self.DEFAULT_KEYS]
         return estimators
 

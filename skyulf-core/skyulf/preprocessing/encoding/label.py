@@ -37,6 +37,10 @@ def _build_polars_feature_exprs(
 ) -> list[Any]:
     import polars as pl
 
+    # `fill_null("nan")` mirrors the pandas path's `.astype(str)`, which turns
+    # NaN into the literal "nan" string that the fitted LabelEncoder learned a
+    # class for. Without this, polars nulls would always fall back to
+    # `missing_code` instead of the trained "nan" class id.
     exprs: list[Any] = []
     for col in cols:
         if col in X.columns and col in encoders:
@@ -44,6 +48,7 @@ def _build_polars_feature_exprs(
             exprs.append(
                 pl.col(col)
                 .cast(pl.Utf8)
+                .fill_null("nan")
                 .replace_strict(mapping, default=missing_code)
                 .cast(pl.Int64)
                 .alias(col)
@@ -68,7 +73,9 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
 
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping_str(encoders["__target__"])
-        y_out = y_out.cast(pl.Utf8).replace_strict(mapping, default=missing_code).cast(pl.Int64)
+        y_out = (
+            y_out.cast(pl.Utf8).fill_null("nan").replace_strict(mapping, default=missing_code).cast(pl.Int64)
+        )
 
     return X_out, y_out
 

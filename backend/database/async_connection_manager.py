@@ -147,8 +147,13 @@ class AsyncSQLiteConnectionManager:
             return cast(int, rowcount)
 
     def _sync_close_all(self):
-        """Synchronous close for atexit handler"""
-        logger.info("[OK] Async SQLite manager cleanup registered")
+        """Synchronous atexit handler.
+
+        No-op: each `get_connection()` call opens and closes its own
+        short-lived `aiosqlite` connection via `async with`, so there is no
+        persistent connection/pool for this manager to tear down here.
+        """
+        logger.info("[OK] Async SQLite manager shutdown (no persistent connections to close)")
 
 
 class AsyncPostgreSQLConnectionManager:
