@@ -15,6 +15,9 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   const [name, setName] = useState('');
   const [s3Path, setS3Path] = useState('');
   const [showCredentials, setShowCredentials] = useState(false);
+  const [accessKeyId, setAccessKeyId] = useState('');
+  const [secretAccessKey, setSecretAccessKey] = useState('');
+  const [regionName, setRegionName] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Mutation owns the loading state + invalidates the dataset list cache on success.
@@ -30,17 +33,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
       if (type === 's3') {
         config.path = s3Path;
 
-        // Extract credentials from form
-        const form = e.target as HTMLFormElement;
-        const accessKey = (form.elements.namedItem('aws_access_key_id') as HTMLInputElement)?.value;
-        const secretKey = (form.elements.namedItem('aws_secret_access_key') as HTMLInputElement)?.value;
-        const region = (form.elements.namedItem('region_name') as HTMLInputElement)?.value;
-
-        if (accessKey && secretKey) {
+        if (accessKeyId && secretAccessKey) {
           config.storage_options = {
-            aws_access_key_id: accessKey,
-            aws_secret_access_key: secretKey,
-            region: region || undefined
+            aws_access_key_id: accessKeyId,
+            aws_secret_access_key: secretAccessKey,
+            region: regionName || undefined
           };
         }
       }
@@ -128,6 +125,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           <input
                             type="text"
                             name="aws_access_key_id"
+                            value={accessKeyId}
+                            onChange={(e) => { setAccessKeyId(e.target.value); }}
                             className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             placeholder="AKIA..."
                           />
@@ -137,6 +136,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           <input
                             type="password"
                             name="aws_secret_access_key"
+                            value={secretAccessKey}
+                            onChange={(e) => { setSecretAccessKey(e.target.value); }}
                             className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             placeholder="Secret..."
                           />
@@ -146,6 +147,8 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           <input
                             type="text"
                             name="region_name"
+                            value={regionName}
+                            onChange={(e) => { setRegionName(e.target.value); }}
                             className="w-full px-2 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
                             placeholder="us-east-1"
                           />
