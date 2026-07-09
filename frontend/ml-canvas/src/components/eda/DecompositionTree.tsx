@@ -217,11 +217,15 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
     };
 
     const handleItemClick = async (levelIndex: number, item: TreeItem) => {
-        // 1. Update selection in current level
-        const newLevels = [...levels];
-        const currentLevel = newLevels[levelIndex];
+        // 1. Compute the updated current level immutably — mutating the level
+        // object in place would poison both React state (before any setLevels
+        // call) and the module-level treeCache, which stores these objects by
+        // reference, leaving a "selected" item visible even if the subsequent
+        // fetch below fails.
+        const currentLevel = levels[levelIndex];
         if (!currentLevel) return;
-        currentLevel.selectedItemName = item.name;
+        const updatedCurrentLevel = { ...currentLevel, selectedItemName: item.name };
+        const newLevels = levels.map((l, i) => (i === levelIndex ? updatedCurrentLevel : l));
 
         // Check if we have a next level defined in our split path
         const nextSplitCol = splitPath[levelIndex + 1];
@@ -231,10 +235,10 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
             setLoading(true);
             try {
                 // Construct filters for the next level
-                const newFilters = [...currentLevel.filters];
-                if (currentLevel.splitColumn) {
+                const newFilters = [...updatedCurrentLevel.filters];
+                if (updatedCurrentLevel.splitColumn) {
                     newFilters.push({
-                        column: currentLevel.splitColumn,
+                        column: updatedCurrentLevel.splitColumn,
                         operator: '==',
                         value: item.name
                     });
@@ -272,6 +276,8 @@ export const DecompositionTree: React.FC<DecompositionTreeProps> = ({
 
             } catch (err) {
                 console.error(err);
+                // Fetch failed — do not apply the optimistic selection change,
+                // since no next-level data actually loaded for it.
             } finally {
                 setLoading(false);
             }

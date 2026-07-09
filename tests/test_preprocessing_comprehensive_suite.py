@@ -445,10 +445,20 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         # 1. IQR
         # G_outlier has one 1000.0 vs 10,12,11
         res, _ = self._apply_calc_applier(
-            IQRCalculator, IQRApplier, self.df, {"columns": ["G_outlier"], "factor": 1.5}
+            IQRCalculator, IQRApplier, self.df, {"columns": ["G_outlier"], "multiplier": 1.5}
         )
         # 1000.0 should be removed (row dropped or masked? IQR node usually filters rows)
         self.assertTrue(len(res) < len(self.df))
+
+        # Regression: `multiplier` must actually be honored by fit() (it was
+        # previously shadowed by a `node_meta` declaring a "factor" key that
+        # fit() never read, so any config built from those declared defaults
+        # silently always used the hardcoded 1.5 default regardless of the
+        # value passed in).
+        res_tight, _ = self._apply_calc_applier(
+            IQRCalculator, IQRApplier, self.df, {"columns": ["G_outlier"], "multiplier": 0.01}
+        )
+        self.assertTrue(len(res_tight) <= len(res))
 
     def test_more_outlier_nodes(self):
         print("\n--- Advanced Outlier Nodes ---")
@@ -466,10 +476,21 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
             WinsorizeCalculator,
             WinsorizeApplier,
             self.df,
-            {"columns": ["G_outlier"], "limits": [0.05, 0.05]},
+            {"columns": ["G_outlier"], "lower_percentile": 5.0, "upper_percentile": 95.0},
         )
         self.assertEqual(len(res), len(self.df))
         self.assertTrue(res["G_outlier"].max() < 1000.0)
+
+        # Regression: `lower_percentile`/`upper_percentile` must actually be
+        # honored by fit() (previously shadowed by a `node_meta` declaring a
+        # "limits" key that fit() never read).
+        res_wide, _ = self._apply_calc_applier(
+            WinsorizeCalculator,
+            WinsorizeApplier,
+            self.df,
+            {"columns": ["G_outlier"], "lower_percentile": 0.0, "upper_percentile": 100.0},
+        )
+        self.assertEqual(res_wide["G_outlier"].max(), self.df["G_outlier"].max())
 
         # 3. Manual
         res, _ = self._apply_calc_applier(

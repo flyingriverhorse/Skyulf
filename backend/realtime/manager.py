@@ -112,6 +112,8 @@ class ConnectionManager:
         """
         backoff = 1.0
         while not self._stop.is_set():
+            client: Any = None
+            pubsub: Any = None
             try:
                 # Imported lazily — we don't want to fail app startup
                 # just because the optional realtime layer can't reach
@@ -132,6 +134,16 @@ class ConnectionManager:
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._stop.wait(), timeout=backoff)
                 backoff = min(backoff * 2, 30.0)
+            finally:
+                # Always release the pubsub/connection before reconnecting or
+                # exiting the loop — otherwise every retry (or shutdown) leaks
+                # a Redis connection.
+                if pubsub is not None:
+                    with contextlib.suppress(Exception):
+                        await pubsub.close()
+                if client is not None:
+                    with contextlib.suppress(Exception):
+                        await client.aclose()
 
     async def _local_loop(self) -> None:
         """Drain the in-process bus and broadcast (no-Celery mode)."""
