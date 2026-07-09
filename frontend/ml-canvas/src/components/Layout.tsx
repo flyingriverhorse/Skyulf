@@ -73,7 +73,7 @@ export const Layout: React.FC = () => {
           )}
         </div>
 
-        <nav className="flex-1 p-2 space-y-2">
+        <nav className="flex-1 overflow-y-auto p-2 space-y-2">
           <NavLink to="/" active={isActive('/')} icon={<LayoutDashboard size={20} />} collapsed={isCollapsed}>
             Dashboard
           </NavLink>

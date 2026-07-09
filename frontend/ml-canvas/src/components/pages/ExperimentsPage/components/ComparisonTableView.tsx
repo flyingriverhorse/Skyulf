@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ChevronDown, ChevronRight, GitBranch, Trophy } from 'lucide-react';
 import type { JobInfo } from '../../../../core/api/jobs';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
@@ -18,6 +18,23 @@ type GraphNode = {
   step_type?: string;
   params?: Record<string, unknown>;
   inputs?: string[];
+};
+
+// Extracts actual model hyperparameters: best_params for advanced tuning,
+// nested hyperparameters dict for basic training. Pure function of the job.
+const getModelParams = (job: { job_type?: string; hyperparameters?: unknown }): Record<string, unknown> => {
+  const hp = job.hyperparameters as Record<string, unknown> | undefined;
+  if (!hp) return {};
+  if (job.job_type === 'advanced_tuning') {
+    // For advanced tuning, hyperparameters IS the best_params (or search_space) directly
+    return hp;
+  }
+  // Basic training: extract the nested 'hyperparameters' dict (actual model params)
+  const nested = hp.hyperparameters;
+  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+    return nested as Record<string, unknown>;
+  }
+  return {};
 };
 
 interface Props {
@@ -45,6 +62,175 @@ export const ComparisonTableView: React.FC<Props> = ({
   isTuningExpanded,
   setIsTuningExpanded,
 }) => {
+  // Ensemble base-model/final-estimator summary per selected job. Only
+  // relevant when at least one selected run is an ensemble; recomputed
+  // solely when the selected jobs change (not on every expand/collapse
+  // toggle elsewhere in this table).
+  const ensembleData = useMemo(() => {
+    if (!selectedJobs.some(job => isEnsembleModelType(job.model_type))) return null;
+    const summaryFor = (job: JobInfo) => {
+      if (!isEnsembleModelType(job.model_type)) return null;
+      let bucket: Record<string, unknown> | undefined;
+      if (job.job_type === 'advanced_tuning') {
+        const cfg = (job.config as Record<string, unknown>) ||
+          (job.graph?.nodes as GraphNode[] | undefined)?.find(n => n.node_id === job.node_id)?.params;
+        bucket = cfg?.tuning_config as Record<string, unknown> | undefined;
+      } else {
+        const hp = job.hyperparameters as Record<string, unknown> | undefined;
+        const nested = hp?.hyperparameters;
+        bucket = (nested && typeof nested === 'object' && !Array.isArray(nested))
+          ? nested as Record<string, unknown>
+          : hp;
+      }
+      return extractEnsembleSummary(job.model_type, bucket);
+    };
+    const summaries = selectedJobs.map(summaryFor);
+    const anyStacking = summaries.some(s => s?.isStacking);
+    return { summaries, anyStacking };
+  }, [selectedJobs]);
+
+  // Pipeline ancestor chain per selected job, merged into a single
+  // aligned row order (shared trunk vs. branch-only steps). Expensive
+  // graph-walking, so only recompute when the selected jobs change.
+  const pipelineData = useMemo(() => {
+    const friendlyStep = (st: string): string => {
+      if (!st) return '';
+      if (st.includes('_')) {
+        return st.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      }
+      return st.replace(/(?<!^)(?=[A-Z])/g, ' ').trim();
+    };
+    const collectChain = (job: JobInfo): GraphNode[] => {
+      const graphNodes = (job.graph?.nodes as GraphNode[] | undefined) || [];
+      if (graphNodes.length === 0 || !job.node_id) return [];
+      const map = new Map(graphNodes.map(n => [n.node_id, n]));
+      // BFS backwards from the terminal, then return in
+      // root → terminal order (excluding the terminal).
+      const seen = new Set<string>();
+      const order: GraphNode[] = [];
+      const walk = (id: string): void => {
+        if (seen.has(id)) return;
+        seen.add(id);
+        const n = map.get(id);
+        if (!n) return;
+        for (const parent of n.inputs || []) walk(parent);
+        order.push(n);
+      };
+      walk(job.node_id);
+      return order.filter(n => n.node_id !== job.node_id);
+    };
+    const summarizeStep = (n: GraphNode): string => {
+      const display = (n.params?._display_name as string | undefined) || friendlyStep(String(n.step_type || ''));
+      const interestingKeys = ['method', 'strategy', 'columns', 'target_column', 'test_size', 'val_size', 'random_state', 'n_neighbors'];
+      const detail: string[] = [];
+      for (const k of interestingKeys) {
+        const v = n.params?.[k];
+        if (v === undefined || v === null || v === '') continue;
+        if (Array.isArray(v) && v.length === 0) continue;
+        let rendered: string;
+        if (Array.isArray(v)) {
+          // Show real column names; truncate long lists so
+          // the cell stays readable.
+          const items = v.map(x => String(x));
+          rendered = items.length > 4
+            ? `[${items.slice(0, 4).join(', ')}, +${items.length - 4} more]`
+            : `[${items.join(', ')}]`;
+        } else if (typeof v === 'object') {
+          rendered = JSON.stringify(v);
+        } else {
+          rendered = String(v);
+        }
+        detail.push(`${k}=${rendered}`);
+      }
+      // Special-case Feature Generation: its config lives
+      // under `operations: MathOperation[]`, not the
+      // generic keys above. Render the per-op summary
+      // (e.g. `multiply(a, b)`, `month(date)`) so the
+      // comparison row carries real signal instead of
+      // just "Feature Generation".
+      const ops = n.params?.['operations'];
+      if (Array.isArray(ops) && ops.length > 0) {
+        const formatted = ops.slice(0, 3).map((raw) => {
+          const op = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+          const method = String(op['method'] ?? op['operation_type'] ?? 'op');
+          const inputs = Array.isArray(op['input_columns']) ? op['input_columns'] as unknown[] : [];
+          const secondary = Array.isArray(op['secondary_columns']) ? op['secondary_columns'] as unknown[] : [];
+          const operands = [...inputs, ...secondary].map(String);
+          const args = operands.length > 2
+            ? `${operands.slice(0, 2).join(', ')}, +${operands.length - 2}`
+            : operands.join(', ');
+          return args ? `${method}(${args})` : method;
+        });
+        const tail = ops.length > 3 ? `, +${ops.length - 3} more` : '';
+        detail.push(`ops=[${formatted.join(', ')}${tail}]`);
+      }
+      return detail.length > 0 ? `${display} (${detail.join(', ')})` : display;
+    };
+    const chainsByJob = new Map(selectedJobs.map(j => [j.job_id, collectChain(j)]));
+    const allChains = Array.from(chainsByJob.values());
+    if (allChains.every(c => c.length === 0)) {
+      return { hasSteps: false, rows: [] as { nid: string; idx: number; cells: (string | null)[]; allSame: boolean }[] };
+    }
+    // L6 — Align rows by node_id rather than by raw
+    // chain index. When the trunk is shared (the
+    // common case after the per-branch graph snapshot
+    // fix), shared nodes occupy a single row across
+    // all columns. Branch-only steps land on their
+    // own rows with em-dashes in the other columns.
+    // Algorithm: walk every chain in lockstep,
+    // emitting the next un-emitted node id in chain
+    // order. A node id appears in the merged order
+    // the first time any chain references it.
+    const mergedOrder: string[] = [];
+    const emitted = new Set<string>();
+    const cursors = allChains.map(() => 0);
+    // Bound the loop to the sum of chain lengths to
+    // guarantee termination on pathological inputs.
+    const safety = allChains.reduce((s, c) => s + c.length, 0) + 1;
+    for (let guard = 0; guard < safety; guard++) {
+      let advanced = false;
+      for (let ci = 0; ci < allChains.length; ci++) {
+        const chain = allChains[ci];
+        if (!chain) continue;
+        // Skip past nodes we've already emitted.
+        while (cursors[ci]! < chain.length && emitted.has(chain[cursors[ci]!]!.node_id)) {
+          cursors[ci] = cursors[ci]! + 1;
+        }
+        if (cursors[ci]! < chain.length) {
+          const candidate = chain[cursors[ci]!]!;
+          if (!emitted.has(candidate.node_id)) {
+            mergedOrder.push(candidate.node_id);
+            emitted.add(candidate.node_id);
+            advanced = true;
+            break; // restart sweep so other chains catch up
+          }
+        }
+      }
+      if (!advanced) break;
+    }
+    const rows = mergedOrder.map((nid, idx) => {
+      // Per-row cell strings, plus a sameness flag
+      // for shared trunk highlighting.
+      const cells = selectedJobs.map(job => {
+        const chain = chainsByJob.get(job.job_id) || [];
+        const step = chain.find(n => n.node_id === nid);
+        return step ? summarizeStep(step) : null;
+      });
+      const presentCells = cells.filter((c): c is string => c !== null);
+      const allPresent = presentCells.length === cells.length;
+      const allSame = allPresent && presentCells.every(c => c === presentCells[0]);
+      return { nid, idx, cells, allSame };
+    });
+    return { hasSteps: true, rows };
+  }, [selectedJobs]);
+
+  // Union of hyperparameter keys across selected jobs. Also expensive
+  // (iterates every job), so only recompute when selection changes.
+  const paramsAllKeys = useMemo(
+    () => Array.from(new Set(selectedJobs.flatMap(job => Object.keys(getModelParams(job))))),
+    [selectedJobs]
+  );
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -88,48 +274,28 @@ export const ComparisonTableView: React.FC<Props> = ({
                 Resolves the structural selection from best_params is impossible
                 (it's structural, not tuned), so we read the nested hyperparameters
                 for basic runs and the tuning_config for advanced runs. */}
-            {selectedJobs.some(job => isEnsembleModelType(job.model_type)) && (() => {
-              const summaryFor = (job: JobInfo) => {
-                if (!isEnsembleModelType(job.model_type)) return null;
-                let bucket: Record<string, unknown> | undefined;
-                if (job.job_type === 'advanced_tuning') {
-                  const cfg = (job.config as Record<string, unknown>) ||
-                    (job.graph?.nodes as GraphNode[] | undefined)?.find(n => n.node_id === job.node_id)?.params;
-                  bucket = cfg?.tuning_config as Record<string, unknown> | undefined;
-                } else {
-                  const hp = job.hyperparameters as Record<string, unknown> | undefined;
-                  const nested = hp?.hyperparameters;
-                  bucket = (nested && typeof nested === 'object' && !Array.isArray(nested))
-                    ? nested as Record<string, unknown>
-                    : hp;
-                }
-                return extractEnsembleSummary(job.model_type, bucket);
-              };
-              const summaries = selectedJobs.map(summaryFor);
-              const anyStacking = summaries.some(s => s?.isStacking);
-              return (
-                <>
+            {ensembleData && (
+              <>
+                <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Base Models</td>
+                  {ensembleData.summaries.map((s, ci) => (
+                    <td key={selectedJobs[ci]?.job_id ?? ci} className="px-4 py-2 text-gray-600 dark:text-gray-300">
+                      {s ? (s.baseEstimators.length > 0 ? s.baseEstimators.map(formatBaseEstimator).join(', ') : '—') : '—'}
+                    </td>
+                  ))}
+                </tr>
+                {ensembleData.anyStacking && (
                   <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Base Models</td>
-                    {summaries.map((s, ci) => (
+                    <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Final Estimator</td>
+                    {ensembleData.summaries.map((s, ci) => (
                       <td key={selectedJobs[ci]?.job_id ?? ci} className="px-4 py-2 text-gray-600 dark:text-gray-300">
-                        {s ? (s.baseEstimators.length > 0 ? s.baseEstimators.map(formatBaseEstimator).join(', ') : '—') : '—'}
+                        {s?.isStacking ? (s.finalEstimator ? formatBaseEstimator(s.finalEstimator) : '—') : '—'}
                       </td>
                     ))}
                   </tr>
-                  {anyStacking && (
-                    <tr className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 py-2 font-medium text-gray-900 dark:text-gray-100">Final Estimator</td>
-                      {summaries.map((s, ci) => (
-                        <td key={selectedJobs[ci]?.job_id ?? ci} className="px-4 py-2 text-gray-600 dark:text-gray-300">
-                          {s?.isStacking ? (s.finalEstimator ? formatBaseEstimator(s.finalEstimator) : '—') : '—'}
-                        </td>
-                      ))}
-                    </tr>
-                  )}
-                </>
-              );
-            })()}
+                )}
+              </>
+            )}
             {/* Pipeline Steps — preprocessing/splits/etc that fed each terminal */}
             <tr
               className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
@@ -140,144 +306,8 @@ export const ComparisonTableView: React.FC<Props> = ({
                 Pipeline Steps
               </td>
             </tr>
-            {isPipelineExpanded && (() => {
-              // Walk each job's graph backwards from the training
-              // terminal to collect preprocessing / split / encoding
-              // ancestors. Each row in the table is one position in
-              // the chain (Step 1, Step 2, …) so users can compare
-              // what came before each model side-by-side.
-              const friendlyStep = (st: string): string => {
-                if (!st) return '';
-                if (st.includes('_')) {
-                  return st.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                }
-                return st.replace(/(?<!^)(?=[A-Z])/g, ' ').trim();
-              };
-              const collectChain = (job: typeof selectedJobs[number]): GraphNode[] => {
-                const graphNodes = (job.graph?.nodes as GraphNode[] | undefined) || [];
-                if (graphNodes.length === 0 || !job.node_id) return [];
-                const map = new Map(graphNodes.map(n => [n.node_id, n]));
-                // BFS backwards from the terminal, then return in
-                // root → terminal order (excluding the terminal).
-                const seen = new Set<string>();
-                const order: GraphNode[] = [];
-                const walk = (id: string): void => {
-                  if (seen.has(id)) return;
-                  seen.add(id);
-                  const n = map.get(id);
-                  if (!n) return;
-                  for (const parent of n.inputs || []) walk(parent);
-                  order.push(n);
-                };
-                walk(job.node_id);
-                return order.filter(n => n.node_id !== job.node_id);
-              };
-              const summarizeStep = (n: GraphNode): string => {
-                const display = (n.params?._display_name as string | undefined) || friendlyStep(String(n.step_type || ''));
-                const interestingKeys = ['method', 'strategy', 'columns', 'target_column', 'test_size', 'val_size', 'random_state', 'n_neighbors'];
-                const detail: string[] = [];
-                for (const k of interestingKeys) {
-                  const v = n.params?.[k];
-                  if (v === undefined || v === null || v === '') continue;
-                  if (Array.isArray(v) && v.length === 0) continue;
-                  let rendered: string;
-                  if (Array.isArray(v)) {
-                    // Show real column names; truncate long lists so
-                    // the cell stays readable.
-                    const items = v.map(x => String(x));
-                    rendered = items.length > 4
-                      ? `[${items.slice(0, 4).join(', ')}, +${items.length - 4} more]`
-                      : `[${items.join(', ')}]`;
-                  } else if (typeof v === 'object') {
-                    rendered = JSON.stringify(v);
-                  } else {
-                    rendered = String(v);
-                  }
-                  detail.push(`${k}=${rendered}`);
-                }
-                // Special-case Feature Generation: its config lives
-                // under `operations: MathOperation[]`, not the
-                // generic keys above. Render the per-op summary
-                // (e.g. `multiply(a, b)`, `month(date)`) so the
-                // comparison row carries real signal instead of
-                // just "Feature Generation".
-                const ops = n.params?.['operations'];
-                if (Array.isArray(ops) && ops.length > 0) {
-                  const formatted = ops.slice(0, 3).map((raw) => {
-                    const op = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-                    const method = String(op['method'] ?? op['operation_type'] ?? 'op');
-                    const inputs = Array.isArray(op['input_columns']) ? op['input_columns'] as unknown[] : [];
-                    const secondary = Array.isArray(op['secondary_columns']) ? op['secondary_columns'] as unknown[] : [];
-                    const operands = [...inputs, ...secondary].map(String);
-                    const args = operands.length > 2
-                      ? `${operands.slice(0, 2).join(', ')}, +${operands.length - 2}`
-                      : operands.join(', ');
-                    return args ? `${method}(${args})` : method;
-                  });
-                  const tail = ops.length > 3 ? `, +${ops.length - 3} more` : '';
-                  detail.push(`ops=[${formatted.join(', ')}${tail}]`);
-                }
-                return detail.length > 0 ? `${display} (${detail.join(', ')})` : display;
-              };
-              const chainsByJob = new Map(selectedJobs.map(j => [j.job_id, collectChain(j)]));
-              const allChains = Array.from(chainsByJob.values());
-              if (allChains.every(c => c.length === 0)) {
-                return (
-                  <tr className="bg-white dark:bg-gray-800">
-                    <td className="px-4 py-1.5 text-gray-400 italic pl-8" colSpan={selectedJobs.length + 1}>
-                      No upstream pipeline steps captured for these runs.
-                    </td>
-                  </tr>
-                );
-              }
-              // L6 — Align rows by node_id rather than by raw
-              // chain index. When the trunk is shared (the
-              // common case after the per-branch graph snapshot
-              // fix), shared nodes occupy a single row across
-              // all columns. Branch-only steps land on their
-              // own rows with em-dashes in the other columns.
-              // Algorithm: walk every chain in lockstep,
-              // emitting the next un-emitted node id in chain
-              // order. A node id appears in the merged order
-              // the first time any chain references it.
-              const mergedOrder: string[] = [];
-              const emitted = new Set<string>();
-              const cursors = allChains.map(() => 0);
-              // Bound the loop to the sum of chain lengths to
-              // guarantee termination on pathological inputs.
-              const safety = allChains.reduce((s, c) => s + c.length, 0) + 1;
-              for (let guard = 0; guard < safety; guard++) {
-                let advanced = false;
-                for (let ci = 0; ci < allChains.length; ci++) {
-                  const chain = allChains[ci];
-                  if (!chain) continue;
-                  // Skip past nodes we've already emitted.
-                  while (cursors[ci]! < chain.length && emitted.has(chain[cursors[ci]!]!.node_id)) {
-                    cursors[ci] = cursors[ci]! + 1;
-                  }
-                  if (cursors[ci]! < chain.length) {
-                    const candidate = chain[cursors[ci]!]!;
-                    if (!emitted.has(candidate.node_id)) {
-                      mergedOrder.push(candidate.node_id);
-                      emitted.add(candidate.node_id);
-                      advanced = true;
-                      break; // restart sweep so other chains catch up
-                    }
-                  }
-                }
-                if (!advanced) break;
-              }
-              return mergedOrder.map((nid, idx) => {
-                // Per-row cell strings, plus a sameness flag
-                // for shared trunk highlighting.
-                const cells = selectedJobs.map(job => {
-                  const chain = chainsByJob.get(job.job_id) || [];
-                  const step = chain.find(n => n.node_id === nid);
-                  return step ? summarizeStep(step) : null;
-                });
-                const presentCells = cells.filter((c): c is string => c !== null);
-                const allPresent = presentCells.length === cells.length;
-                const allSame = allPresent && presentCells.every(c => c === presentCells[0]);
+            {isPipelineExpanded && (
+              pipelineData.hasSteps ? pipelineData.rows.map(({ nid, idx, cells, allSame }) => {
                 // Shared trunk row → muted background; divergent
                 // row (some columns dash, others differ) →
                 // amber accent so the diff jumps out.
@@ -303,8 +333,14 @@ export const ComparisonTableView: React.FC<Props> = ({
                     ))}
                   </tr>
                 );
-              });
-            })()}
+              }) : (
+                <tr className="bg-white dark:bg-gray-800">
+                  <td className="px-4 py-1.5 text-gray-400 italic pl-8" colSpan={selectedJobs.length + 1}>
+                    No upstream pipeline steps captured for these runs.
+                  </td>
+                </tr>
+              )
+            )}
             {/* Metrics Section in Table */}
             <tr
               className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"
@@ -347,32 +383,14 @@ export const ComparisonTableView: React.FC<Props> = ({
               </td>
             </tr>
             {/* Extract actual model hyperparameters: best_params for advanced, nested hyperparameters for basic */}
-            {isParamsExpanded && (() => {
-              const getModelParams = (job: { job_type?: string; hyperparameters?: unknown }): Record<string, unknown> => {
-                const hp = job.hyperparameters as Record<string, unknown> | undefined;
-                if (!hp) return {};
-                if (job.job_type === 'advanced_tuning') {
-                  // For advanced tuning, hyperparameters IS the best_params (or search_space) directly
-                  return hp;
-                }
-                // Basic training: extract the nested 'hyperparameters' dict (actual model params)
-                const nested = hp.hyperparameters;
-                if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-                  return nested as Record<string, unknown>;
-                }
-                return {};
-              };
-              const allKeys = Array.from(new Set(selectedJobs.flatMap(job => Object.keys(getModelParams(job)))));
-              if (allKeys.length === 0) {
-                return (
-                  <tr className="bg-white dark:bg-gray-800">
-                    <td className="px-4 py-1.5 text-gray-400 dark:text-gray-500 pl-8 italic" colSpan={selectedJobs.length + 1}>
-                      Default parameters (none customized)
-                    </td>
-                  </tr>
-                );
-              }
-              return allKeys.map(paramKey => (
+            {isParamsExpanded && (
+              paramsAllKeys.length === 0 ? (
+                <tr className="bg-white dark:bg-gray-800">
+                  <td className="px-4 py-1.5 text-gray-400 dark:text-gray-500 pl-8 italic" colSpan={selectedJobs.length + 1}>
+                    Default parameters (none customized)
+                  </td>
+                </tr>
+              ) : paramsAllKeys.map(paramKey => (
                 <tr key={paramKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                   <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
                     <div className="flex items-center gap-1">
@@ -390,8 +408,8 @@ export const ComparisonTableView: React.FC<Props> = ({
                     );
                   })}
                 </tr>
-              ));
-            })()}
+              ))
+            )}
 
             {/* Training Configuration */}
             <tr

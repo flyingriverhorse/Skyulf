@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
 import { LoadingState, EmptyState } from '../components/shared';
+import { formatDuration } from '../core/utils/format';
 
 type TabType = 'training' | 'tuning' | 'eda' | 'ingestion';
 
@@ -110,24 +111,6 @@ export const JobsPage: React.FC = () => {
   });
 
   const activeFilterCount = (statusFilter !== 'all' ? 1 : 0);
-
-  const getDuration = (start: string | null, end: string | null) => {
-    if (!start || !end) return '-';
-    const startTime = new Date(start).getTime();
-    const endTime = new Date(end).getTime();
-    const diff = endTime - startTime;
-
-    if (diff < 1000) return '< 1s';
-
-    const seconds = Math.floor(diff / 1000);
-    if (seconds < 60) return `${seconds}s`;
-
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ${minutes % 60}m`;
-  };
 
   return (
     <div className="p-8 space-y-6 animate-in fade-in duration-500">
@@ -243,7 +226,7 @@ export const JobsPage: React.FC = () => {
                       {job.model_type || job.dataset_name || job.target_column || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-mono">
-                      {getDuration(job.start_time, job.end_time)}
+                      {formatDuration(job.start_time, job.end_time)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                       {new Date(job.created_at).toLocaleDateString()} <span className="text-xs opacity-70">{new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
