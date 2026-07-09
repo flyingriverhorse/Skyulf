@@ -4,6 +4,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 type TimeSeriesMethod = 'lag' | 'rolling' | 'date';
 
@@ -210,41 +211,48 @@ function TimeSeriesSettings({ config, onChange, nodeId }: {
 
   const update: UpdateFn = (updates) => { onChange({ ...config, ...updates }); };
 
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
+
   return (
-    <div className="space-y-3 text-sm">
-      <div className="space-y-1.5">
-        <span className="block text-xs font-medium text-muted-foreground">Method</span>
-        <select
-          className="w-full p-2 border rounded bg-background text-sm"
-          value={config.method}
-          onChange={e => { update({ method: e.target.value as TimeSeriesMethod }); }}
-        >
-          <option value="lag">Lag Features</option>
-          <option value="rolling">Rolling Aggregate</option>
-          <option value="date">Date Features</option>
-        </select>
-        <p className="text-xs text-muted-foreground">{METHOD_DESCRIPTIONS[config.method]}</p>
+    <div ref={containerRef} className={`text-sm gap-4 ${isWide ? 'grid grid-cols-2 items-start' : 'space-y-3'}`}>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <span className="block text-xs font-medium text-muted-foreground">Method</span>
+          <select
+            className="w-full p-2 border rounded bg-background text-sm"
+            value={config.method}
+            onChange={e => { update({ method: e.target.value as TimeSeriesMethod }); }}
+          >
+            <option value="lag">Lag Features</option>
+            <option value="rolling">Rolling Aggregate</option>
+            <option value="date">Date Features</option>
+          </select>
+          <p className="text-xs text-muted-foreground">{METHOD_DESCRIPTIONS[config.method]}</p>
+        </div>
+
+        <ColumnMultiSelect
+          variant="compact"
+          showFooterCount
+          columns={allColumns}
+          selected={config.columns ?? []}
+          onChange={cols => { update({ columns: cols }); }}
+          label={config.method === 'date' ? 'Datetime Columns' : 'Numeric Columns'}
+        />
       </div>
 
-      <ColumnMultiSelect
-        variant="compact"
-        showFooterCount
-        columns={allColumns}
-        selected={config.columns ?? []}
-        onChange={cols => { update({ columns: cols }); }}
-        label={config.method === 'date' ? 'Datetime Columns' : 'Numeric Columns'}
-      />
+      <div className="space-y-3">
+        {config.method !== 'date' && (
+          <OrderingSelectors config={config} allColumns={allColumns} update={update} />
+        )}
+        {config.method === 'lag' && <LagSettings config={config} update={update} />}
+        {config.method === 'rolling' && <RollingSettings config={config} update={update} />}
+        {config.method === 'date' && <DateSettings config={config} update={update} />}
 
-      {config.method !== 'date' && (
-        <OrderingSelectors config={config} allColumns={allColumns} update={update} />
-      )}
-      {config.method === 'lag' && <LagSettings config={config} update={update} />}
-      {config.method === 'rolling' && <RollingSettings config={config} update={update} />}
-      {config.method === 'date' && <DateSettings config={config} update={update} />}
-
-      <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground bg-muted/20 border rounded px-2 py-1.5">
-        <Info size={11} className="shrink-0 mt-0.5" />
-        <span>Time-series transforms assume rows are ordered. Use <strong>Sort By</strong> to enforce temporal order, and <strong>Group By</strong> to keep entities (e.g. per-store) independent.</span>
+        <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground bg-muted/20 border rounded px-2 py-1.5">
+          <Info size={11} className="shrink-0 mt-0.5" />
+          <span>Time-series transforms assume rows are ordered. Use <strong>Sort By</strong> to enforce temporal order, and <strong>Group By</strong> to keep entities (e.g. per-store) independent.</span>
+        </div>
       </div>
     </div>
   );

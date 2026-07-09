@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { PaintBucket } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -10,6 +10,7 @@ import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface ImputationConfig {
   columns: string[];
@@ -58,20 +59,8 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
       ? (metrics.missing_counts as Record<string, unknown>)
       : null;
 
-  // Responsive Layout Logic
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   const recommendations = useRecommendations(nodeId || '', {
     types: ['imputation'],

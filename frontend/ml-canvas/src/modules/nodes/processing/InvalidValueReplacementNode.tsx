@@ -1,12 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { AlertTriangle, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
-
-// --- Types ---
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface InvalidValueReplacementConfig {
   columns: string[];
@@ -22,8 +21,8 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
   onChange,
   nodeId,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 400px.
+  const [containerRef, isWide] = useIsWideContainer(400);
   const [showInfo, setShowInfo] = useState(true);
 
   const upstreamData = useUpstreamData(nodeId || '');
@@ -38,17 +37,6 @@ const InvalidValueSettings: React.FC<{ config: InvalidValueReplacementConfig; on
         .filter((c: unknown) => !droppedUpstream.has(String((c as Record<string, unknown>).name)))
         .map((c: unknown) => String((c as Record<string, unknown>).name))
     : [];
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 400);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
 
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-white dark:bg-gray-900 ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>

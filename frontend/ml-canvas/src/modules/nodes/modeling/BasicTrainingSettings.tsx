@@ -7,7 +7,7 @@ import { jobsApi } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useElementSize } from '../../../core/hooks/useElementSize';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
@@ -96,8 +96,8 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
   const { data: schema } = useDatasetSchema(datasetId);
   const availableColumns = schema ? Object.values(schema.columns) : [];
 
-  const [containerRef, { width }] = useElementSize();
-  const isWide = width > 450;
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
   const [showCV, setShowCV] = useState(false);
   const [availableModels, setAvailableModels] = useState<RegistryItem[]>([]);

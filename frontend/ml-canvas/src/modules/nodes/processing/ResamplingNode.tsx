@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NodeDefinition, ValidationResult } from '../../../core/types/nodes';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGraphStore } from '../../../core/store/useGraphStore';
@@ -9,6 +9,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 // --- Types ---
 
@@ -102,9 +103,8 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   onChange,
   nodeId,
 }) => {
-  // Responsive Layout Logic
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 400px.
+  const [containerRef, isWide] = useIsWideContainer(400);
   const [showRecommendations, setShowRecommendations] = useState(true);
 
   // Upstream Data for Target Column Suggestion
@@ -148,17 +148,6 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
           }
       }
     }, [schema, upstreamTarget, targetColumn, config.target_column, config, onChange]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 400);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
 
   // Recommendations
   const recommendations = useRecommendations(nodeId || '', {

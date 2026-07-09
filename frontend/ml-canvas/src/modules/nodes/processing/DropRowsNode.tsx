@@ -5,6 +5,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface DropRowsConfig {
   drop_if_any_missing: boolean;
@@ -27,8 +28,34 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
       ? (nodeResult.metrics as Record<string, unknown>)
       : null;
 
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
+
+  const feedback = metrics && (metrics.DropMissingRows_rows_removed !== undefined) && (
+    <div className="p-3 bg-muted/30 rounded-md border border-border">
+      <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+        <Activity size={14} />
+        <span>Last Run Results</span>
+      </div>
+      <div className="space-y-1 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Rows Removed:</span>
+          <span className="font-medium text-destructive">{String(metrics.DropMissingRows_rows_removed)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Rows Remaining:</span>
+          <span className="font-medium">{String(metrics.DropMissingRows_rows_remaining)}</span>
+        </div>
+        <div className="flex justify-between pt-1 border-t">
+          <span className="text-muted-foreground">Total Rows:</span>
+          <span className="font-medium">{String(metrics.DropMissingRows_rows_total)}</span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="p-4 space-y-4">
+    <div ref={containerRef} className="p-4 space-y-4 h-full overflow-y-auto">
       {!datasetId && (
         <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
           Connect a dataset node to see available columns.
@@ -41,64 +68,47 @@ const DropRowsSettings: React.FC<{ config: DropRowsConfig; onChange: (c: DropRow
         </div>
       )}
 
-      <div className="space-y-2">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={config.drop_if_any_missing}
-            onChange={(e) => onChange({ ...config, drop_if_any_missing: e.target.checked })}
-            className="rounded border-gray-300"
-          />
-          Drop rows with ANY missing values
-        </label>
-        <p className="text-xs text-muted-foreground">
-          If checked, any row containing at least one missing value will be removed.
-        </p>
-      </div>
-
-      <div className={`space-y-2 ${config.drop_if_any_missing ? 'opacity-50 pointer-events-none' : ''}`}>
-        <span className="block text-sm font-medium">
-          Missing Value Threshold (%)
-        </span>
-        <div className="flex items-center gap-2">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={config.missing_threshold || 0}
-            onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
-            className="flex-1"
-          />
-          <span className="text-sm w-12 text-right">{config.missing_threshold || 0}%</span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Drop rows that have more than this percentage of missing values.
-        </p>
-      </div>
-
-      {/* Feedback Section */}
-      {metrics && (metrics.DropMissingRows_rows_removed !== undefined) && (
-        <div className="mt-4 p-3 bg-muted/30 rounded-md border border-border">
-          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
-            <Activity size={14} />
-            <span>Last Run Results</span>
+      <div className={isWide ? 'grid grid-cols-2 gap-6 items-start' : 'space-y-4'}>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={config.drop_if_any_missing}
+                onChange={(e) => onChange({ ...config, drop_if_any_missing: e.target.checked })}
+                className="rounded border-gray-300"
+              />
+              Drop rows with ANY missing values
+            </label>
+            <p className="text-xs text-muted-foreground">
+              If checked, any row containing at least one missing value will be removed.
+            </p>
           </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Rows Removed:</span>
-              <span className="font-medium text-destructive">{String(metrics.DropMissingRows_rows_removed)}</span>
+
+          <div className={`space-y-2 ${config.drop_if_any_missing ? 'opacity-50 pointer-events-none' : ''}`}>
+            <span className="block text-sm font-medium">
+              Missing Value Threshold (%)
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={config.missing_threshold || 0}
+                onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
+                className="flex-1"
+              />
+              <span className="text-sm w-12 text-right">{config.missing_threshold || 0}%</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Rows Remaining:</span>
-              <span className="font-medium">{String(metrics.DropMissingRows_rows_remaining)}</span>
-            </div>
-            <div className="flex justify-between pt-1 border-t">
-              <span className="text-muted-foreground">Total Rows:</span>
-              <span className="font-medium">{String(metrics.DropMissingRows_rows_total)}</span>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              Drop rows that have more than this percentage of missing values.
+            </p>
           </div>
         </div>
-      )}
+
+        {/* Feedback Section */}
+        {feedback}
+      </div>
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { Split } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface TrainTestSplitConfig {
   test_size: number;
@@ -57,20 +58,8 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   const valSize = config.validation_size || 0;
   const trainSize = 1 - config.test_size - valSize;
 
-  // Responsive Layout Logic
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450); // Switch to 2-column layout if wider than 450px
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
