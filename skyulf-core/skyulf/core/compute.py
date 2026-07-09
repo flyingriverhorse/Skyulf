@@ -9,9 +9,7 @@ so behaviour is unchanged until a backend is explicitly installed.
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from typing import Any, TypeVar
-
-R = TypeVar("R")
+from typing import Any
 
 __all__ = [
     "ComputeBackend",
@@ -27,7 +25,7 @@ class ComputeBackend(ABC):
     name: str = "abstract"
 
     @abstractmethod
-    def execute(self, func: Callable[..., R], *args: Any, **kwargs: Any) -> R:
+    def execute[R](self, func: Callable[..., R], *args: Any, **kwargs: Any) -> R:
         """Run ``func(*args, **kwargs)`` on this backend and return the result."""
         raise NotImplementedError
 
@@ -37,7 +35,7 @@ class LocalComputeBackend(ComputeBackend):
 
     name = "local"
 
-    def execute(self, func: Callable[..., R], *args: Any, **kwargs: Any) -> R:
+    def execute[R](self, func: Callable[..., R], *args: Any, **kwargs: Any) -> R:
         return func(*args, **kwargs)
 
 

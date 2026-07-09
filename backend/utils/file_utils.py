@@ -6,7 +6,6 @@ plus file cleanup and maintenance utilities.
 """
 
 import logging
-import os
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -119,9 +118,7 @@ def cleanup_empty_directories(base_path: str | Path) -> int:
 
     try:
         # Walk bottom-up to remove empty directories
-        for dirpath, _dirnames, _filenames in os.walk(base_path, topdown=False):
-            dir_path = Path(dirpath)
-
+        for dir_path, _dirnames, _filenames in base_path.walk(top_down=False):
             # Skip the base directory itself
             if dir_path == base_path:
                 continue
