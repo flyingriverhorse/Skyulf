@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosError } from 'axios';
 
 // --- API Client ---
 const API_BASE = '/api';
@@ -9,6 +9,25 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Normalize error messages so call sites can rely on `error.message` instead
+// of manually reaching into `error.response.data.detail`. The original axios
+// error object is preserved and rethrown unchanged aside from `.message`.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError<{ detail?: string; message?: string }>) => {
+    const detail = error.response?.data?.detail;
+    const message = error.response?.data?.message;
+    if (detail) {
+      error.message = detail;
+    } else if (message) {
+      error.message = message;
+    } else if (!error.response) {
+      error.message = 'Network error — please check your connection and try again.';
+    }
+    return Promise.reject(error);
+  },
+);
 
 // --- Interfaces ---
 export interface NodeConfigModel {

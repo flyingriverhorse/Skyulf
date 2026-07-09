@@ -6,6 +6,8 @@ interface JobSelectorProps {
     jobs: DriftJobOption[];
     selectedJob: string;
     onSelect: (jobId: string) => void;
+    /** Shows a red outline + helper text when a reference job is required but missing. */
+    invalid?: boolean;
 }
 
 /**
@@ -13,7 +15,7 @@ interface JobSelectorProps {
  * model" picker for drift comparison. Self-contained: owns its own search
  * input, open/close state, and outside-click handler.
  */
-export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onSelect }) => {
+export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onSelect, invalid }) => {
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -86,10 +88,13 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                     setSearchTerm('');
                 }}
                 className={`w-full flex items-center gap-2 px-3 py-2.5 border rounded-md text-sm transition-colors ${
-                    selectedJob
-                        ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
+                    invalid
+                        ? 'border-red-400 dark:border-red-500 hover:border-red-500'
+                        : selectedJob
+                            ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
+                            : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
                 }`}
+                aria-describedby={invalid ? 'job-selector-error' : undefined}
             >
                 <Database size={15} className="shrink-0 text-gray-400" />
                 <span className={`truncate ${selectedJob ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}`}>
@@ -125,6 +130,10 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                     className={`${selectedJob ? '' : 'ml-auto'} shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
                 />
             </button>
+
+            {invalid && !selectedJob && (
+                <span id="job-selector-error" className="block mt-1 text-[11px] text-red-600 dark:text-red-400">Reference job is required.</span>
+            )}
 
             {open && (
                 <div

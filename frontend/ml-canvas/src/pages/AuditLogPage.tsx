@@ -13,7 +13,7 @@
  *   • Trace lineage of a specific node back to the save that added it.
  *   • Lightweight "git log" for the canvas in multi-user setups.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertCircle,
     ChevronDown,
@@ -233,19 +233,26 @@ export const AuditLogPage: React.FC = () => {
         }
     }, [datasets, datasetId]);
 
+    // Track in-flight request id so a slow response doesn't clobber the
+    // state set by a more recent one (e.g. rapid `datasetId`/`limit` toggles).
+    const requestIdRef = useRef(0);
+
     const load = useCallback(async () => {
         if (!datasetId) return;
+        const myRequestId = ++requestIdRef.current;
         setIsLoading(true);
         setError(null);
         try {
             const resp = await pipelineVersionsApi.audit(datasetId, limit);
+            if (myRequestId !== requestIdRef.current) return;
             setData(resp);
         } catch (e) {
+            if (myRequestId !== requestIdRef.current) return;
             const msg = (e as Error).message || 'Failed to load audit trail';
             setError(msg);
             toast.error(msg);
         } finally {
-            setIsLoading(false);
+            if (myRequestId === requestIdRef.current) setIsLoading(false);
         }
     }, [datasetId, limit]);
 
