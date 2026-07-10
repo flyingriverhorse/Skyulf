@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
 import { Rocket, Power, Clock, CheckCircle, RefreshCw, Box } from 'lucide-react';
-import { ErrorState, EmptyState, useConfirm } from '../shared';
+import { ErrorState, EmptyState, LoadingState, useConfirm } from '../shared';
 import { toast } from '../../core/toast';
 
 export const DeploymentsPage: React.FC = () => {
@@ -9,6 +9,8 @@ export const DeploymentsPage: React.FC = () => {
   const [history, setHistory] = useState<DeploymentInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [redeployingJobId, setRedeployingJobId] = useState<string | null>(null);
   const confirm = useConfirm();
 
   const loadData = async () => {
@@ -41,12 +43,16 @@ export const DeploymentsPage: React.FC = () => {
       variant: 'danger',
     });
     if (!ok) return;
+    setIsDeactivating(true);
     try {
       await deploymentApi.deactivate();
       await loadData();
+      toast.success('Deployment deactivated');
     } catch (e) {
       console.error("Failed to deactivate", e);
       toast.error('Failed to deactivate deployment');
+    } finally {
+      setIsDeactivating(false);
     }
   };
 
@@ -57,12 +63,16 @@ export const DeploymentsPage: React.FC = () => {
       confirmLabel: 'Redeploy',
     });
     if (!ok) return;
+    setRedeployingJobId(jobId);
     try {
       await deploymentApi.deployModel(jobId);
       await loadData();
+      toast.success('Model redeployed');
     } catch (e) {
       console.error("Failed to redeploy", e);
       toast.error('Failed to redeploy model');
+    } finally {
+      setRedeployingJobId(null);
     }
   };
 
@@ -122,9 +132,14 @@ export const DeploymentsPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => { void handleDeactivate(); }}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 rounded-lg transition-colors text-sm font-medium"
+                  disabled={isDeactivating}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-400 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
                 >
-                  <Power className="w-4 h-4" />
+                  {isDeactivating ? (
+                    <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Power className="w-4 h-4" />
+                  )}
                   Deactivate
                 </button>
               </div>
@@ -132,6 +147,8 @@ export const DeploymentsPage: React.FC = () => {
                 Artifact URI: {activeDeployment.artifact_uri}
               </div>
             </div>
+          ) : isLoading ? (
+            <LoadingState message="Loading active deployment..." />
           ) : (
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
               <div className="w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -168,7 +185,11 @@ export const DeploymentsPage: React.FC = () => {
                   {history.length === 0 ? (
                     <tr>
                       <td colSpan={5}>
-                        <EmptyState title="No deployment history found." />
+                        {isLoading ? (
+                          <LoadingState message="Loading deployment history..." />
+                        ) : (
+                          <EmptyState title="No deployment history found." />
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -200,9 +221,10 @@ export const DeploymentsPage: React.FC = () => {
                           {!deployment.is_active && (
                             <button
                               onClick={() => { void handleRedeploy(deployment.job_id); }}
-                              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-xs"
+                              disabled={redeployingJobId === deployment.job_id}
+                              className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium text-xs disabled:opacity-50"
                             >
-                              Redeploy
+                              {redeployingJobId === deployment.job_id ? 'Redeploying...' : 'Redeploy'}
                             </button>
                           )}
                         </td>

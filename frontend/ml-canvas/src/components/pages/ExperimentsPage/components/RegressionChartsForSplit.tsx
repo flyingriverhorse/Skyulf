@@ -7,7 +7,7 @@
  * Residual Lag Plot — plus the absolute-error percentile chips strip.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   ScatterChart, Scatter, Line, ReferenceLine, ComposedChart,
@@ -43,20 +43,44 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
   const data = splitData.y_true.map((y, i) => ({ x: y, y: splitData.y_pred[i] }));
 
   // Derived datasets for the percentile chips + secondary charts.
-  const hist = getResidualHistogram(splitData.y_true as number[], splitData.y_pred as number[]);
+  // These only depend on splitData.y_true/y_pred, not on any other component
+  // state (e.g. hover state on download buttons), so memoise them on those
+  // two arrays to avoid recomputing on every unrelated re-render.
+  const hist = useMemo(
+    () => getResidualHistogram(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
   const meanBinLabel = hist
     ? hist.bins.reduce((best, b, i) => (
         Math.abs(parseFloat(b.label) - hist.mean) < Math.abs(parseFloat(hist.bins[best]!.label) - hist.mean) ? i : best
       ), 0)
     : 0;
-  const pct = getErrorPercentiles(splitData.y_true as number[], splitData.y_pred as number[]);
-  const relHist = getRelativeErrorHist(splitData.y_true as number[], splitData.y_pred as number[]);
-  const qqData = getQQData(splitData.y_true as number[], splitData.y_pred as number[]);
+  const pct = useMemo(
+    () => getErrorPercentiles(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
+  const relHist = useMemo(
+    () => getRelativeErrorHist(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
+  const qqData = useMemo(
+    () => getQQData(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
   const qqMin = qqData.length ? Math.min(...qqData.map(d => Math.min(d.theoretical, d.sample))) : 0;
   const qqMax = qqData.length ? Math.max(...qqData.map(d => Math.max(d.theoretical, d.sample))) : 1;
-  const slData = getScaleLocationData(splitData.y_true as number[], splitData.y_pred as number[]);
-  const sortedData = getSortedActualPred(splitData.y_true as number[], splitData.y_pred as number[]);
-  const lagData = getResidualLagData(splitData.y_true as number[], splitData.y_pred as number[]);
+  const slData = useMemo(
+    () => getScaleLocationData(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
+  const sortedData = useMemo(
+    () => getSortedActualPred(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
+  const lagData = useMemo(
+    () => getResidualLagData(splitData.y_true as number[], splitData.y_pred as number[]),
+    [splitData.y_true, splitData.y_pred],
+  );
 
   /** Tiny renderer for the per-chart download button — one place, no copy/paste. */
   const downloadBtn = (id: string, fileName: string) => (

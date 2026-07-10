@@ -49,6 +49,8 @@ export const DataSources: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterFormat, setFilterFormat] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  // Track per-row export-in-flight state (no mutation hook backs this call).
+  const [exportingIds, setExportingIds] = useState<Set<string>>(new Set());
 
   const filteredDatasets = datasets.filter(d => {
     const status = d.source_metadata?.ingestion_status?.status || 'completed';
@@ -80,6 +82,21 @@ export const DataSources: React.FC = () => {
       await deleteMutation.mutateAsync(id);
     } catch {
       toast.error('Failed to delete dataset');
+    }
+  };
+
+  const handleExport = async (id: string) => {
+    setExportingIds(prev => new Set(prev).add(id));
+    try {
+      await DatasetService.exportData(id, 'csv');
+    } catch {
+      toast.error('Export failed', 'Could not export the dataset. Please try again.');
+    } finally {
+      setExportingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -410,11 +427,16 @@ export const DataSources: React.FC = () => {
                               EDA
                             </button>
                             <button
-                              onClick={() => { void DatasetService.exportData(d.id, 'csv'); }}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors"
+                              onClick={() => { void handleExport(d.id); }}
+                              disabled={exportingIds.has(d.id)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-md transition-colors disabled:opacity-50"
                               title="Download CSV"
                             >
-                              <Download size={16} />
+                              {exportingIds.has(d.id) ? (
+                                <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Download size={16} />
+                              )}
                               CSV
                             </button>
                             <button

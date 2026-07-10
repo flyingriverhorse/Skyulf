@@ -56,7 +56,7 @@ const TAB_BASE = 'px-4 py-2 text-sm font-medium border-b-2 transition-colors';
 const tabClass = (active: boolean) => `${TAB_BASE} ${
   active
     ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700'
+    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
 }`;
 
 export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFeatureImportances }) => (

@@ -40,6 +40,7 @@ export const SampleDataTab: React.FC<SampleDataTabProps> = ({
                                         }}
                                         className="p-1 rounded transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100 hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30"
                                         title="Exclude from analysis"
+                                        aria-label="Exclude from analysis"
                                     >
                                         <EyeOff className="w-3 h-3" />
                                     </button>

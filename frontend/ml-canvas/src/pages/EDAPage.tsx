@@ -25,6 +25,7 @@ import { LoadingState, ErrorState } from '../components/shared';
 import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
 import type { ColumnProfile } from '../core/types/edaProfile';
 import { edaKeys } from '../core/hooks/useEdaJobs';
+import { toast } from '../core/toast';
 
 export const EDAPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -32,6 +33,7 @@ export const EDAPage: React.FC = () => {
 
   // Only UI-toggle state remains local; server data lives in React Query, view state in the slice.
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
 
   // ── View + analysis-input state lives in the EDA zustand slice ──
   const activeTab = useEDAStore((s) => s.activeTab);
@@ -159,11 +161,18 @@ export const EDAPage: React.FC = () => {
   // Load a non-latest report into the latest-cache slot so the existing UI renders it.
   const loadSpecificReport = async (reportId: number) => {
     if (!selectedDataset) return;
-    const data = await queryClient.fetchQuery({
-      queryKey: edaKeys.reportById(reportId),
-      queryFn: () => EDAService.getReport(reportId),
-    });
-    queryClient.setQueryData(edaKeys.report(selectedDataset), data);
+    setIsLoadingReport(true);
+    try {
+      const data = await queryClient.fetchQuery({
+        queryKey: edaKeys.reportById(reportId),
+        queryFn: () => EDAService.getReport(reportId),
+      });
+      queryClient.setQueryData(edaKeys.report(selectedDataset), data);
+    } catch (error) {
+      toast.error('Failed to load report', String(error));
+    } finally {
+      setIsLoadingReport(false);
+    }
   };
 
   const handleAddFilter = (column: string, value: string | number | boolean | Array<string | number>, operator: string) => {
@@ -259,9 +268,10 @@ export const EDAPage: React.FC = () => {
                 {existingReport && (
                     <button
                         onClick={() => loadSpecificReport(existingReport.id)}
-                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                        disabled={isLoadingReport}
+                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        <RefreshCw className="w-4 h-4 mr-2" />
+                        {isLoadingReport ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                         Load Existing ({new Date(existingReport.created_at).toLocaleDateString()})
                     </button>
                 )}
@@ -531,10 +541,11 @@ export const EDAPage: React.FC = () => {
              {existingReport && report && report.id !== existingReport.id && (
                 <button
                     onClick={() => loadSpecificReport(existingReport.id)}
-                    className="flex items-center px-3 py-1.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition-colors"
+                    disabled={isLoadingReport}
+                    className="flex items-center px-3 py-1.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title={`Load existing from ${new Date(existingReport.created_at).toLocaleString()}`}
                 >
-                    <RefreshCw className="w-3 h-3 mr-1" />
+                    {isLoadingReport ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
                     Load Saved
                 </button>
             )}
@@ -561,7 +572,8 @@ export const EDAPage: React.FC = () => {
                             const match = history.find(h => h.target_col === target && h.status === 'COMPLETED');
                             if (match) loadSpecificReport(match.id);
                         }}
-                        className={`px-2 py-0.5 text-xs rounded-full border transition-colors flex items-center ${
+                        disabled={isLoadingReport}
+                        className={`px-2 py-0.5 text-xs rounded-full border transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed ${
                             report?.profile_data?.target_col === target
                             ? 'bg-blue-50 text-blue-600 border-blue-200 font-medium'
                             : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'

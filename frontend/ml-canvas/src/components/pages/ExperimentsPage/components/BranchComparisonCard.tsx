@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { GitBranch, Trophy } from 'lucide-react';
 import type { JobInfo } from '../../../../core/api/jobs';
 import { formatMetricName } from '../../../../core/utils/format';
@@ -9,30 +9,70 @@ interface Props {
   getDuration: (start: string | null, end: string | null) => string;
 }
 
-export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuration }) => {
-  const branchJobs = selectedJobs.filter(j => j.parent_pipeline_id != null);
-  // Group by parent_pipeline_id
-  const groups = new Map<string, JobInfo[]>();
-  branchJobs.forEach(j => {
-    const key = j.parent_pipeline_id!;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(j);
-  });
-  // Only show groups with 2+ branches
-  const multiGroups = Array.from(groups.entries()).filter(([, jobs]) => jobs.length >= 2);
-  if (multiGroups.length === 0) return null;
+interface MetricRow {
+  key: string;
+  values: (number | undefined)[];
+  bestVal: number | null;
+}
 
-  // Collect all metric keys across branch jobs (test + best_score only)
-  const allBranchMetricKeys = Array.from(new Set(
-    branchJobs.flatMap(j => {
-      const m = (j.metrics || j.result?.metrics || {}) as Record<string, unknown>;
-      return Object.keys(m).filter(k => typeof m[k] === 'number');
-    })
-  )).filter(k => k.startsWith('test_') || k === 'best_score').sort();
+interface GroupRow {
+  parentId: string;
+  groupJobs: JobInfo[];
+  metricRows: MetricRow[];
+}
+
+export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuration }) => {
+  // All of the grouping/sorting/best-value work below scans every selected
+  // job and metric, so it's memoised on selectedJobs to avoid recomputing on
+  // every unrelated re-render.
+  const multiGroups: GroupRow[] = useMemo(() => {
+    const branchJobs = selectedJobs.filter(j => j.parent_pipeline_id != null);
+    // Group by parent_pipeline_id
+    const groups = new Map<string, JobInfo[]>();
+    branchJobs.forEach(j => {
+      const key = j.parent_pipeline_id!;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(j);
+    });
+    // Only show groups with 2+ branches
+    const rawMultiGroups = Array.from(groups.entries()).filter(([, jobs]) => jobs.length >= 2);
+
+    // Collect all metric keys across branch jobs (test + best_score only)
+    const allBranchMetricKeys = Array.from(new Set(
+      branchJobs.flatMap(j => {
+        const m = (j.metrics || j.result?.metrics || {}) as Record<string, unknown>;
+        return Object.keys(m).filter(k => typeof m[k] === 'number');
+      })
+    )).filter(k => k.startsWith('test_') || k === 'best_score').sort();
+
+    return rawMultiGroups.map(([parentId, groupJobsRaw]) => {
+      const groupJobs = [...groupJobsRaw].sort((a, b) => (a.branch_index ?? 0) - (b.branch_index ?? 0));
+      const metricRows = allBranchMetricKeys.map(key => {
+        // Find best value for highlighting
+        const values = groupJobs.map(j => {
+          const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
+          return m[key];
+        });
+        const isLowerBetter = key.includes('loss') || key.includes('error') || key.includes('mse') || key.includes('mae');
+        const filtered = values.filter((v): v is number => v != null);
+        // If every branch is missing this metric, there's nothing to compare.
+        // Math.min/max on an empty array silently returns Infinity/-Infinity,
+        // which never `=== val` for any real value, so no "best" would ever
+        // be highlighted anyway — guard explicitly instead of relying on that.
+        const bestVal = filtered.length > 0
+          ? (isLowerBetter ? Math.min(...filtered) : Math.max(...filtered))
+          : null;
+        return { key, values, bestVal };
+      });
+      return { parentId, groupJobs, metricRows };
+    });
+  }, [selectedJobs]);
+
+  if (multiGroups.length === 0) return null;
 
   return (
     <>
-      {multiGroups.map(([parentId, groupJobs]) => (
+      {multiGroups.map(({ parentId, groupJobs, metricRows }) => (
         <div key={parentId} className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/10 dark:to-blue-900/10 rounded-lg border border-purple-200 dark:border-purple-800 p-4">
           <div className="flex items-center gap-2 mb-3">
             <GitBranch className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -48,7 +88,7 @@ export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuratio
               <thead>
                 <tr className="border-b border-purple-200 dark:border-purple-700">
                   <th className="px-3 py-1.5 text-gray-600 dark:text-gray-400 font-medium">Metric</th>
-                  {groupJobs.sort((a, b) => (a.branch_index ?? 0) - (b.branch_index ?? 0)).map(j => (
+                  {groupJobs.map(j => (
                     <th key={j.job_id} className="px-3 py-1.5 font-medium text-gray-700 dark:text-gray-300">
                       <div className="flex items-center gap-1">
                         <span className="inline-block w-2 h-2 rounded-full" style={{ backgroundColor: `hsl(${(j.branch_index ?? 0) * 120}, 70%, 50%)` }} />
@@ -60,38 +100,25 @@ export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuratio
                 </tr>
               </thead>
               <tbody>
-                {allBranchMetricKeys.map(key => {
-                  // Find best value for highlighting
-                  const values = groupJobs.map(j => {
-                    const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
-                    return m[key];
-                  });
-                  const isLowerBetter = key.includes('loss') || key.includes('error') || key.includes('mse') || key.includes('mae');
-                  const bestVal = isLowerBetter
-                    ? Math.min(...values.filter(v => v != null))
-                    : Math.max(...values.filter(v => v != null));
-
-                  return (
-                    <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
-                      <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
-                        {key === 'best_score'
-                          ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0] ?? {} as JobInfo)) || 'CV'})`
-                          : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                      </td>
-                      {groupJobs.map(j => {
-                        const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
-                        const val = m[key];
-                        const isBest = val != null && val === bestVal;
-                        return (
-                          <td key={j.job_id} className={`px-3 py-1.5 font-mono ${isBest ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-600 dark:text-gray-300'}`}>
-                            {val != null ? val.toFixed(4) : '-'}
-                            {isBest && ' ★'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
+                {metricRows.map(({ key, values, bestVal }) => (
+                  <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
+                    <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
+                      {key === 'best_score'
+                        ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0] ?? {} as JobInfo)) || 'CV'})`
+                        : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </td>
+                    {groupJobs.map((j, i) => {
+                      const val = values[i];
+                      const isBest = val != null && bestVal != null && val === bestVal;
+                      return (
+                        <td key={j.job_id} className={`px-3 py-1.5 font-mono ${isBest ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-600 dark:text-gray-300'}`}>
+                          {val != null ? val.toFixed(4) : '-'}
+                          {isBest && ' ★'}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
                 <tr className="border-b border-purple-100 dark:border-purple-800/50">
                   <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">Duration</td>
                   {groupJobs.map(j => (

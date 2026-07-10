@@ -55,6 +55,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     onClick={() => downloadChart('bivariate-chart', 'bivariate-analysis', 'Bivariate Analysis', `${scatterX} vs ${scatterY}`)}
                     className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                     title="Download Chart"
+                    aria-label="Download Chart"
                 >
                     <Download className="w-4 h-4" />
                 </button>
@@ -66,7 +67,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <select
                         value={scatterX}
                         onChange={(e) => setScatterX(e.target.value)}
-                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                     >
                         <option value="">Select Variable</option>
                         {(Object.values(profile.columns) as ColumnProfile[])
@@ -82,7 +83,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <select
                         value={scatterY}
                         onChange={(e) => setScatterY(e.target.value)}
-                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                     >
                         <option value="">Select Variable</option>
                         {(Object.values(profile.columns) as ColumnProfile[])
@@ -100,7 +101,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                         <select
                             value={scatterZ}
                             onChange={(e) => setScatterZ(e.target.value)}
-                            className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                            className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                         >
                             <option value="">Select Variable</option>
                             {(Object.values(profile.columns) as ColumnProfile[])
@@ -118,7 +119,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <select
                         value={scatterColor}
                         onChange={(e) => setScatterColor(e.target.value)}
-                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border"
+                        className="block w-full sm:w-48 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm p-2 border dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                     >
                         <option value="">None</option>
                         {(Object.values(profile.columns) as ColumnProfile[])
@@ -137,6 +138,7 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                             : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
                     }`}
                     title="Toggle 3D View"
+                    aria-label="Toggle 3D View"
                 >
                     <Box className="w-5 h-5" />
                 </button>

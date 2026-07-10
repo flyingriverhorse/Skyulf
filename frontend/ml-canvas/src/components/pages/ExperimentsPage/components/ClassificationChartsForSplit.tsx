@@ -7,7 +7,7 @@
  *   4. Calibration / Cumulative Gains / MCC vs Threshold (3-up grid)
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Line, ReferenceLine, ReferenceDot, ComposedChart, Area,
@@ -16,7 +16,7 @@ import { Loader2, Check, Download } from 'lucide-react';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationSplit } from '../types';
 import {
-  calculateConfusionMatrix,
+  applyThreshold,
   calculateROC,
   calculatePR,
   getScoreDistribution,
@@ -44,6 +44,14 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
   downloadingChart,
   doneChart,
 }) => {
+  // Reassigning predictions via OvR threshold scans the full sample array,
+  // so it's memoised on splitData/selectedRocClass/threshold to avoid
+  // recomputing on every unrelated re-render (e.g. every pixel of drag on
+  // the threshold slider in the parent EvaluationView).
+  const { classes: thresholdClasses, matrix: thresholdMatrix } = useMemo(
+    () => applyThreshold(splitData, selectedRocClass, threshold),
+    [splitData, selectedRocClass, threshold],
+  );
   return (
     <>
                                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -61,41 +69,8 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                     </div>
                                                     {(() => {
                                                         const proba = splitData.y_proba;
-                                                        const classOrder = proba?.classes;
-                                                        let yTrueForCm: (string | number)[] = splitData.y_true;
-                                                        let yPredForCm: (string | number)[] = splitData.y_pred;
-                                                        if (proba?.labels && proba.labels.length === proba.classes.length) {
-                                                            const labelToClass = new Map<string, string | number>();
-                                                            proba.labels.forEach((label, idx) => {
-                                                                const cls = proba.classes[idx];
-                                                                if (cls !== undefined) labelToClass.set(String(label), cls);
-                                                            });
-                                                            yTrueForCm = splitData.y_true.map(y => labelToClass.get(String(y)) ?? y);
-                                                            yPredForCm = splitData.y_pred.map(y => labelToClass.get(String(y)) ?? y);
-                                                        }
-
-                                                        // Apply OvR threshold for the selected class (works for binary and multiclass)
-                                                        if (proba && selectedRocClass) {
-                                                            const labelList = proba.labels && proba.labels.length === proba.classes.length ? proba.labels : undefined;
-                                                            const posIdx = (labelList ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
-                                                            if (posIdx !== -1) {
-                                                                const posVal = proba.classes[posIdx];
-                                                                const origPred = [...yPredForCm];
-                                                                if (posVal !== undefined) {
-                                                                    yPredForCm = proba.values.map((v, i) => {
-                                                                        if ((v[posIdx] ?? 0) >= threshold) return posVal;
-                                                                        // Argmax of all other classes
-                                                                        let bestIdx = -1, bestProb = -Infinity;
-                                                                        v.forEach((p, idx) => {
-                                                                            if (idx !== posIdx && p > bestProb) { bestProb = p; bestIdx = idx; }
-                                                                        });
-                                                                        return bestIdx >= 0 ? (proba.classes[bestIdx] ?? origPred[i]!) : (origPred[i]!);
-                                                                    });
-                                                                }
-                                                            }
-                                                        }
-
-                                                        const { classes, matrix } = calculateConfusionMatrix(yTrueForCm, yPredForCm, classOrder);
+                                                        const classes = thresholdClasses;
+                                                        const matrix = thresholdMatrix;
 
                                                         // Compute live OvR metrics for the selected class
                                                         let liveMetrics: { accuracy: number; precision: number; recall: number; f1: number } | null = null;
