@@ -1,7 +1,8 @@
 import React from 'react';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
-import { AlertTriangle, Hash, Type, Calendar, AlignLeft, EyeOff, Eye } from 'lucide-react';
+import { AlertTriangle, Type, EyeOff, Eye } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
+import { getDtypeIcon, getDtypeIconColorClass, getDtypeBadgeClass, getDtypeHexColor } from '../../core/utils/dtypeVisuals';
 import type { ColumnProfile } from '../../core/types/edaProfile';
 
 interface VariableCardProps {
@@ -12,15 +13,10 @@ interface VariableCardProps {
 }
 
 export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, onToggleExclude, isExcluded = false }) => {
-  const getIcon = () => {
-    if (isExcluded) return <Type className="w-4 h-4 text-gray-400" />;
-    switch (profile.dtype) {
-      case 'Numeric': return <Hash className="w-4 h-4 text-blue-500" />;
-      case 'Categorical': return <AlignLeft className="w-4 h-4 text-purple-500" />;
-      case 'DateTime': return <Calendar className="w-4 h-4 text-green-500" />;
-      default: return <Type className="w-4 h-4 text-gray-500" />;
-    }
-  };
+  const DtypeIcon = getDtypeIcon(profile.dtype);
+  const icon = isExcluded
+    ? <Type className="w-4 h-4 text-gray-400" />
+    : <DtypeIcon className={`w-4 h-4 ${getDtypeIconColorClass(profile.dtype)}`} />;
 
   // Mini histogram data for the card preview.
   type MiniDatum = { name: string; count: number };
@@ -47,7 +43,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
     >
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2 w-full">
-          {getIcon()}
+          {icon}
           <h3 className={`font-medium text-sm truncate flex-1 ${isExcluded ? 'text-gray-500 line-through' : ''}`} title={profile.name}>
             {profile.name}
           </h3>
@@ -56,7 +52,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
 
       <div className="flex items-center gap-2 mb-3">
             {!isExcluded && (
-                <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full">
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getDtypeBadgeClass(profile.dtype)}`}>
                 {profile.dtype}
                 </span>
             )}
@@ -108,7 +104,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
               <BarChart data={miniChartData}>
                 <Bar
                     dataKey="count"
-                    fill={profile.dtype === 'Numeric' ? '#3b82f6' : profile.dtype === 'Categorical' ? '#8b5cf6' : '#10b981'}
+                    fill={getDtypeHexColor(profile.dtype)}
                     radius={[2, 2, 0, 0]}
                 />
               </BarChart>
