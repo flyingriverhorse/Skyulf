@@ -77,7 +77,7 @@ const CastTypeSettings: React.FC<{ config: CastTypeConfig; onChange: (c: CastTyp
   return (
     <div ref={containerRef} className="p-4 space-y-4 h-full overflow-y-auto">
       {!datasetId && (
-        <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+        <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
           Connect a dataset node to see available columns.
         </div>
       )}
