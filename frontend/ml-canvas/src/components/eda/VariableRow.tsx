@@ -200,6 +200,8 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                             e.stopPropagation();
                             onToggleExclude(profile.name, !isExcluded);
                         }}
+                        title={isExcluded ? "Include in analysis" : "Exclude from analysis"}
+                        aria-label={isExcluded ? "Include in analysis" : "Exclude from analysis"}
                     >
                         {isExcluded ? <EyeOff size={16} /> : <Eye size={16} />}
                     </Button>

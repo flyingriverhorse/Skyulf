@@ -19,6 +19,14 @@ const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set<JobStatus>([
   'cancelled',
 ]);
 
+// If a job's fetch fails this many times in a row (e.g. the job was
+// deleted server-side, or the backend is persistently erroring for
+// that id), stop retrying it instead of polling forever with no way
+// to ever reach a terminal state. A single job that will never
+// recover previously kept `allTerminal`/`allCompleted` false forever,
+// so `stopOnTerminal` never fired and the interval ran indefinitely.
+const MAX_CONSECUTIVE_FETCH_FAILURES = 5;
+
 export function isTerminalStatus(status: JobStatus | string | undefined | null): boolean {
   return !!status && TERMINAL_STATUSES.has(status as JobStatus);
 }
@@ -83,6 +91,12 @@ export function useJobPolling(
   const idsRef = useRef<readonly string[]>(jobIds);
   idsRef.current = jobIds;
 
+  // Consecutive-failure counter per job id, so a persistently-erroring
+  // fetch can eventually be given up on (see MAX_CONSECUTIVE_FETCH_FAILURES
+  // above) instead of blocking `stopOnTerminal` forever. Reset whenever
+  // `jobIds` changes (new poll target set) via the idsKey-keyed effect below.
+  const failureCountsRef = useRef<Record<string, number>>({});
+
   useEffect(() => {
     if (idsRef.current.length === 0) {
       setJobs({});
@@ -90,6 +104,9 @@ export function useJobPolling(
       setIsPolling(false);
       return undefined;
     }
+
+    // Fresh failure counters for this poll target set.
+    failureCountsRef.current = {};
 
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
@@ -100,9 +117,12 @@ export function useJobPolling(
         const results = await Promise.all(
           ids.map(async (id) => {
             try {
-              return await jobsApi.getJob(id);
+              const job = await jobsApi.getJob(id);
+              failureCountsRef.current[id] = 0;
+              return job;
             } catch (err) {
               console.error('useJobPolling: fetch failed', id, err);
+              failureCountsRef.current[id] = (failureCountsRef.current[id] ?? 0) + 1;
               return null;
             }
           }),
@@ -111,13 +131,22 @@ export function useJobPolling(
 
         const next: Record<string, JobInfo> = {};
         let anyFailed = false;
+        let anyGaveUp = false;
         let allTerminal = true;
         let allCompleted = true;
         for (let i = 0; i < ids.length; i += 1) {
           const result = results[i];
           const id = ids[i]!;
           if (!result) {
-            // Treat fetch failures as non-terminal so we keep retrying.
+            // A single persistently-failing job (e.g. deleted server-side)
+            // must not block `stopOnTerminal` forever — once it's failed
+            // MAX_CONSECUTIVE_FETCH_FAILURES times in a row, give up on it
+            // and let the aggregate settle instead of polling indefinitely.
+            if ((failureCountsRef.current[id] ?? 0) >= MAX_CONSECUTIVE_FETCH_FAILURES) {
+              anyGaveUp = true;
+              allCompleted = false;
+              continue;
+            }
             allTerminal = false;
             allCompleted = false;
             continue;
@@ -134,6 +163,7 @@ export function useJobPolling(
         }
         setJobs(next);
         if (anyFailed) setAggregateStatus('failed');
+        else if (anyGaveUp) setAggregateStatus('error');
         else if (allCompleted && allTerminal) setAggregateStatus('completed');
         else setAggregateStatus('running');
 
