@@ -45,6 +45,10 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
         col.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    const filteredExcludedColumns = (profile.excluded_columns ?? []).filter((colName: string) =>
+        colName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <div className="space-y-4">
              {/* Toolbar */}
@@ -87,12 +91,12 @@ export const VariablesTab: React.FC<VariablesTabProps> = ({
                 ))}
 
                 {/* Excluded Section if any */}
-                {profile.excluded_columns && profile.excluded_columns.length > 0 && (
+                {filteredExcludedColumns.length > 0 && (
                     <div className="mt-8">
                         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2 text-muted-foreground">
-                            Excluded Variables <Badge variant="secondary">{profile.excluded_columns.length}</Badge>
+                            Excluded Variables <Badge variant="secondary">{filteredExcludedColumns.length}</Badge>
                         </h3>
-                        {profile.excluded_columns.map((colName: string) => (
+                        {filteredExcludedColumns.map((colName: string) => (
                             <VariableRow
                                 key={colName}
                                 profile={{ name: colName, dtype: 'Excluded', missing_count: 0, missing_percentage: 0 }}

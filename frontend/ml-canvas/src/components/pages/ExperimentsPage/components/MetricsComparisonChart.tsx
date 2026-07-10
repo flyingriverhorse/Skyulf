@@ -61,7 +61,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
               type="checkbox"
               checked={showTrainMetrics}
               onChange={e => { setShowTrainMetrics(e.target.checked); }}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
             />
             <span className="text-gray-700 dark:text-gray-300">Train</span>
           </label>
@@ -70,7 +70,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
               type="checkbox"
               checked={showTestMetrics}
               onChange={e => { setShowTestMetrics(e.target.checked); }}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
             />
             <span className="text-gray-700 dark:text-gray-300">Test</span>
           </label>
@@ -79,7 +79,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
               type="checkbox"
               checked={showValMetrics}
               onChange={e => { setShowValMetrics(e.target.checked); }}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
             />
             <span className="text-gray-700 dark:text-gray-300">Validation</span>
           </label>
@@ -88,7 +88,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
               type="checkbox"
               checked={showCvMetrics}
               onChange={e => { setShowCvMetrics(e.target.checked); }}
-              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 dark:border-gray-600 dark:bg-gray-700"
             />
             <span className="text-gray-700 dark:text-gray-300">Cross-Validation</span>
           </label>

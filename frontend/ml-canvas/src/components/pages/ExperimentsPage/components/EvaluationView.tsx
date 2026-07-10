@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LoadingState, ErrorState } from '../../../shared';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationData, EvaluationSplit } from '../types';
@@ -66,6 +66,45 @@ export const EvaluationView: React.FC<Props> = ({
   downloadingChart,
   doneChart,
 }) => {
+  // Regression split tabs (Train/Test/Validation). Hoisted here and
+  // memoized because this exact derivation was previously duplicated
+  // verbatim in two places below (the control-bar tab strip and the
+  // per-split chart filter), and both copies checked for the literal
+  // key `'val'` — but the backend's `splits` dict key is `'validation'`
+  // (`val_` is only the flattened *metric* prefix, e.g. `val_accuracy`).
+  // That mismatch meant `_ct`/`_tabs2` never included the validation
+  // split, so the "Validation" tab silently never appeared for
+  // regression jobs even when a validation split existed.
+  const availableRegressionSplits = useMemo(() => {
+    if (!evaluationData) return [];
+    return (Object.keys(evaluationData.splits) as string[]).filter(
+      (s) => evaluationData.splits[s as keyof typeof evaluationData.splits] != null
+    );
+  }, [evaluationData]);
+
+  const regressionSplitTabs = useMemo(
+    () => ['train', 'test', 'validation'].filter((s) => availableRegressionSplits.includes(s)),
+    [availableRegressionSplits]
+  );
+
+  const regressionSplitLabels: Record<string, string> = {
+    train: 'Train',
+    test: 'Test',
+    validation: 'Validation',
+  };
+
+  const activeRegressionSplit = useMemo(() => {
+    if (selectedRegressionSplit != null && availableRegressionSplits.includes(selectedRegressionSplit)) {
+      return selectedRegressionSplit;
+    }
+    return (
+      regressionSplitTabs.find((t) => t === 'validation') ??
+      regressionSplitTabs.find((t) => t === 'test') ??
+      regressionSplitTabs[0] ??
+      availableRegressionSplits[0]
+    );
+  }, [selectedRegressionSplit, availableRegressionSplits, regressionSplitTabs]);
+
   return (
     <div className="space-y-6">
       {/* Job Selector if multiple */}
@@ -130,43 +169,35 @@ export const EvaluationView: React.FC<Props> = ({
           {/* Controls bar — sticky so it stays visible while scrolling splits */}
           <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             {/* Regression: split tabs inline in the control bar */}
-            {evaluationData.problem_type === 'regression' && (() => {
-              const _cs = (Object.keys(evaluationData.splits) as string[]).filter(s => evaluationData.splits[s as keyof typeof evaluationData.splits] != null);
-              const _ct = ['train', 'test', 'val'].filter(s => _cs.includes(s));
-              const _cl: Record<string, string> = { train: 'Train', test: 'Test', val: 'Validation' };
-              const _ca: string = (selectedRegressionSplit != null && _cs.includes(selectedRegressionSplit))
-                ? selectedRegressionSplit
-                : (_ct.find(t => t === 'val') ?? _ct.find(t => t === 'test') ?? _ct[0] ?? _cs[0]!);
-              return (
-                <div className="flex items-center gap-0.5">
-                  <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mr-1">Split:</span>
-                  {_ct.map(tab => (
-                    <button
-                      key={tab}
-                      onClick={() => setSelectedRegressionSplit(tab)}
-                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                        _ca === tab
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-                      }`}
-                    >{_cl[tab] ?? tab}</button>
-                  ))}
-                </div>
-              );
-            })()}
+            {evaluationData.problem_type === 'regression' && (
+              <div className="flex items-center gap-0.5">
+                <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mr-1">Split:</span>
+                {regressionSplitTabs.map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setSelectedRegressionSplit(tab)}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      activeRegressionSplit === tab
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >{regressionSplitLabels[tab] ?? tab}</button>
+                ))}
+              </div>
+            )}
             {/* Split visibility toggles — classification only */}
             {evaluationData.problem_type !== 'regression' && (<>
               <div className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Splits:</div>
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                <input type="checkbox" checked={showTrainMetrics} onChange={e => { setShowTrainMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <input type="checkbox" checked={showTrainMetrics} onChange={e => { setShowTrainMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
                 <span className="text-gray-700 dark:text-gray-300">Train</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                <input type="checkbox" checked={showTestMetrics} onChange={e => { setShowTestMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <input type="checkbox" checked={showTestMetrics} onChange={e => { setShowTestMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
                 <span className="text-gray-700 dark:text-gray-300">Test</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                <input type="checkbox" checked={showValMetrics} onChange={e => { setShowValMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <input type="checkbox" checked={showValMetrics} onChange={e => { setShowValMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
                 <span className="text-gray-700 dark:text-gray-300">Validation</span>
               </label>
             </>)}
@@ -251,12 +282,7 @@ export const EvaluationView: React.FC<Props> = ({
                 .filter(([splitName]) => {
                   if (evaluationData.problem_type === 'regression') {
                     // Only show the active tab split
-                    const _avail2 = (Object.keys(evaluationData.splits) as string[]).filter(s => evaluationData.splits[s as keyof typeof evaluationData.splits] != null);
-                    const _tabs2 = ['train', 'test', 'val'].filter(s => _avail2.includes(s));
-                    const _act2: string = (selectedRegressionSplit != null && _avail2.includes(selectedRegressionSplit))
-                      ? selectedRegressionSplit
-                      : (_tabs2.find(t => t === 'val') ?? _tabs2.find(t => t === 'test') ?? _tabs2[0] ?? _avail2[0]!);
-                    return splitName === _act2;
+                    return splitName === activeRegressionSplit;
                   }
                   if (splitName === 'train' && !showTrainMetrics) return false;
                   if (splitName === 'test' && !showTestMetrics) return false;

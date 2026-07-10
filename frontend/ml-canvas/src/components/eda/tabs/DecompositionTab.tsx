@@ -56,6 +56,7 @@ export const DecompositionTab: React.FC<DecompositionTabProps> = ({ datasetId, c
                     onClick={handleReset}
                     className="p-2 border rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 text-slate-600 dark:text-slate-300"
                     title="Reset Tree"
+                    aria-label="Reset Tree"
                 >
                     <RefreshCw className="w-4 h-4" />
                 </button>
