@@ -144,7 +144,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                     <div className="flex items-center justify-between w-full mb-2">
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className="flex items-center text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700"
+                            className="flex items-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300"
                         >
                             <span>Active Filters ({filters.length})</span>
                             {showFilters ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
@@ -165,10 +165,10 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                 <div key={idx} className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded px-2 py-1 text-xs">
                                     <div className="truncate max-w-[140px]">
                                         <span className="font-medium text-blue-700 dark:text-blue-300">{filter.column}</span>
-                                        <span className="mx-1 text-gray-500">{filter.operator}</span>
+                                        <span className="mx-1 text-gray-500 dark:text-gray-400">{filter.operator}</span>
                                         <span className="text-gray-600 dark:text-gray-400">{String(filter.value)}</span>
                                     </div>
-                                    <button onClick={() => onRemoveFilter(idx)} className="text-gray-400 hover:text-red-500">
+                                    <button onClick={() => onRemoveFilter(idx)} className="text-gray-400 dark:text-gray-500 hover:text-red-500">
                                         <X className="w-3 h-3" />
                                     </button>
                                 </div>
@@ -207,14 +207,14 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                         />
                                     </div>
                                     <div className="flex justify-end gap-2">
-                                        <button onClick={() => setIsAddingFilter(false)} className="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                                        <button onClick={() => setIsAddingFilter(false)} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">Cancel</button>
                                         <button onClick={handleAddFilterSubmit} className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Add</button>
                                     </div>
                                 </div>
                             ) : (
                                 <button
                                     onClick={() => setIsAddingFilter(true)}
-                                    className="w-full flex items-center justify-center px-2 py-1 text-xs border border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-colors"
+                                    className="w-full flex items-center justify-center px-2 py-1 text-xs border border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:border-blue-300 transition-colors"
                                 >
                                     <Plus className="w-3 h-3 mr-1" /> Add Filter
                                 </button>
@@ -227,7 +227,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                 <div>
                     <button
                         onClick={() => setShowExclusions(!showExclusions)}
-                        className="flex items-center justify-between w-full text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 hover:text-gray-700"
+                        className="flex items-center justify-between w-full text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 hover:text-gray-700 dark:hover:text-gray-300"
                     >
                         <span>Excluded ({excludedCols.length})</span>
                         {showExclusions ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -237,10 +237,10 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                         <div className="space-y-2">
                             {excludedCols.map((col, idx) => (
                                 <div key={idx} className="flex items-center justify-between bg-gray-50 dark:bg-gray-900/50 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-xs">
-                                    <span className="font-medium text-gray-500 line-through truncate max-w-[140px]">{col}</span>
+                                    <span className="font-medium text-gray-500 dark:text-gray-400 line-through truncate max-w-[140px]">{col}</span>
                                     <button
                                         onClick={() => onToggleExclude(col, false)}
-                                        className="text-gray-400 hover:text-green-500"
+                                        className="text-gray-400 dark:text-gray-500 hover:text-green-500"
                                         title="Include back"
                                     >
                                         <Plus className="w-3 h-3" />
@@ -278,12 +278,12 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                             <option key={col} value={col}>{col}</option>
                                         ))}
                                     </select>
-                                    <button onClick={() => setIsAddingExclusion(false)} className="w-full text-xs text-gray-500 hover:text-gray-700 text-center">Cancel</button>
+                                    <button onClick={() => setIsAddingExclusion(false)} className="w-full text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-center">Cancel</button>
                                 </div>
                             ) : (
                                 <button
                                     onClick={() => setIsAddingExclusion(true)}
-                                    className="w-full flex items-center justify-center px-2 py-1 text-xs border border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-500 hover:text-red-600 hover:border-red-300 transition-colors"
+                                    className="w-full flex items-center justify-center px-2 py-1 text-xs border border-dashed border-gray-300 dark:border-gray-600 rounded text-gray-500 dark:text-gray-400 hover:text-red-600 hover:border-red-300 transition-colors"
                                 >
                                     <EyeOff className="w-3 h-3 mr-1" /> Exclude Column
                                 </button>
@@ -297,13 +297,13 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
             <div className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-2' : 'p-3'}`}>
                 <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} mb-3`}>
                     {!isCollapsed && (
-                    <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    <h2 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
                         Analysis Modules
                     </h2>
                     )}
                     <button
                         onClick={() => setIsCollapsed(!isCollapsed)}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400"
                         title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                     >
                         {isCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
@@ -316,7 +316,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
 
                         return (
                             <div key={groupIdx}>
-                                {!isCollapsed && <h3 className="px-2 text-xs font-medium text-gray-500 mb-2">{group.title}</h3>}
+                                {!isCollapsed && <h3 className="px-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{group.title}</h3>}
                                 <div className="space-y-1">
                                     {visibleItems.map((item) => (
                                         <button

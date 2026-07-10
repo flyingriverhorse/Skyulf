@@ -19,7 +19,7 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
 
   const getColor = (value: number) => {
     // -1 (blue) -> 0 (white) -> 1 (red)
-    if (value === null) return 'rgba(243, 244, 246, 1)'; // gray-100
+    if (value === null || Number.isNaN(value)) return 'rgba(243, 244, 246, 1)'; // gray-100
 
     // Use opacity for intensity, but ensure minimum visibility
     // Scale opacity: 0.1 -> 0.4, 1.0 -> 1.0
@@ -51,7 +51,7 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
           {/* Header Row */}
           <div className="p-2"></div>
           {displayColumns.map((col, i) => (
-            <div key={i} className="p-2 text-xs font-medium truncate text-center" title={col}>
+            <div key={i} className="p-2 text-xs font-medium truncate text-center text-gray-700 dark:text-gray-300" title={col}>
               {col.length > 8 ? col.substring(0, 8) + '...' : col}
             </div>
           ))}
@@ -60,7 +60,7 @@ export const CorrelationHeatmap: React.FC<CorrelationHeatmapProps> = ({ data }) 
           {displayColumns.map((rowCol, i) => (
             <React.Fragment key={i}>
               {/* Row Label */}
-              <div className="p-2 text-xs font-medium truncate text-right pr-4" title={rowCol}>
+              <div className="p-2 text-xs font-medium truncate text-right pr-4 text-gray-700 dark:text-gray-300" title={rowCol}>
                 {rowCol}
               </div>
               {/* Cells */}

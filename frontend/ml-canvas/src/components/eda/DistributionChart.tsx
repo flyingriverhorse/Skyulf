@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { getChartTheme } from './constants';
@@ -24,47 +24,67 @@ interface DistributionChartProps {
 }
 
 export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, onBarClick }) => {
+  const { data, typeMatched } = useMemo((): { data: DistributionDatum[]; typeMatched: boolean } => {
+    if (!profile) return { data: [], typeMatched: false };
+
+    const type = profile.dtype;
+
+    if (type === 'Numeric' && profile.histogram) {
+      return {
+        data: profile.histogram.map((bin) => ({
+          name: `${Number(bin.start).toFixed(2)}`, // Simplified label for X-axis
+          fullName: `${Number(bin.start).toFixed(2)} - ${Number(bin.end).toFixed(2)}`,
+          count: bin.count,
+          rawBin: bin
+        })),
+        typeMatched: true
+      };
+    } else if (type === 'Text' && profile.histogram) {
+      return {
+        data: profile.histogram.map((bin) => ({
+          name: `${Number(bin.start).toFixed(0)}`,
+          fullName: `${Number(bin.start).toFixed(0)} - ${Number(bin.end).toFixed(0)} chars`,
+          count: bin.count,
+          rawBin: bin
+        })),
+        typeMatched: true
+      };
+    } else if (type === 'DateTime' && profile.histogram) {
+      return {
+        data: profile.histogram.map((bin) => ({
+          name: new Date(bin.start).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
+          fullName: `${new Date(bin.start).toLocaleDateString()} - ${new Date(bin.end).toLocaleDateString()}`,
+          count: bin.count,
+          rawBin: bin
+        })),
+        typeMatched: true
+      };
+    } else if (type === 'Categorical' && profile.categorical_stats?.top_k) {
+      return {
+        data: profile.categorical_stats.top_k.map((item) => ({
+          name: String(item.value).substring(0, 15) + (String(item.value).length > 15 ? '...' : ''),
+          fullName: String(item.value),
+          count: item.count,
+          value: item.value
+        })),
+        typeMatched: true
+      };
+    }
+
+    return { data: [], typeMatched: false };
+  }, [profile]);
+
   if (!profile) return null;
 
-  let data: DistributionDatum[] = [];
-  const type = profile.dtype;
-
-  if (type === 'Numeric' && profile.histogram) {
-    data = profile.histogram.map((bin) => ({
-      name: `${Number(bin.start).toFixed(2)}`, // Simplified label for X-axis
-      fullName: `${Number(bin.start).toFixed(2)} - ${Number(bin.end).toFixed(2)}`,
-      count: bin.count,
-      rawBin: bin
-    }));
-  } else if (type === 'Text' && profile.histogram) {
-    data = profile.histogram.map((bin) => ({
-      name: `${Number(bin.start).toFixed(0)}`,
-      fullName: `${Number(bin.start).toFixed(0)} - ${Number(bin.end).toFixed(0)} chars`,
-      count: bin.count,
-      rawBin: bin
-    }));
-  } else if (type === 'DateTime' && profile.histogram) {
-    data = profile.histogram.map((bin) => ({
-      name: new Date(bin.start).toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
-      fullName: `${new Date(bin.start).toLocaleDateString()} - ${new Date(bin.end).toLocaleDateString()}`,
-      count: bin.count,
-      rawBin: bin
-    }));
-  } else if (type === 'Categorical' && profile.categorical_stats?.top_k) {
-    data = profile.categorical_stats.top_k.map((item) => ({
-      name: String(item.value).substring(0, 15) + (String(item.value).length > 15 ? '...' : ''),
-      fullName: String(item.value),
-      count: item.count,
-      value: item.value
-    }));
-  } else {
-    return <div className="text-gray-500 text-sm italic p-4 text-center">No distribution data available for this type</div>;
+  if (!typeMatched) {
+    return <div className="text-gray-500 dark:text-gray-400 text-sm italic p-4 text-center">No distribution data available for this type</div>;
   }
 
   if (data.length === 0) {
-    return <div className="text-gray-500 text-sm italic p-4 text-center">No data points</div>;
+    return <div className="text-gray-500 dark:text-gray-400 text-sm italic p-4 text-center">No data points</div>;
   }
 
+  const type = profile.dtype;
   const theme = getChartTheme();
 
   return (

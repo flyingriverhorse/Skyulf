@@ -108,4 +108,19 @@ describe('useJobPolling', () => {
     // the idsKey signature didn't change so the effect must not restart.
     expect(spy).toHaveBeenCalledTimes(1);
   });
+
+  it('gives up on a persistently-failing job after MAX_CONSECUTIVE_FETCH_FAILURES instead of polling forever', async () => {
+    vi.spyOn(jobsApi, 'getJob').mockRejectedValue(new Error('404 not found'));
+
+    const { result } = renderHook(() => useJobPolling(['deleted'], { intervalMs: 5 }));
+
+    // Aggregate settles to 'error' once the job has failed enough
+    // consecutive times, and polling stops instead of retrying forever.
+    await waitFor(() => {
+      expect(result.current.aggregateStatus).toBe('error');
+    });
+    await waitFor(() => {
+      expect(result.current.isPolling).toBe(false);
+    });
+  });
 });

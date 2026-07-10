@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Filter, X, Plus, EyeOff } from 'lucide-react';
 import { InfoTooltip } from '../ui/InfoTooltip';
+import { useDismissable } from '../layout/toolbar/_hooks/useDismissable';
 
 interface FilterItem {
     column: string;
@@ -32,6 +33,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     const [newFilterOp, setNewFilterOp] = useState('==');
     const [newFilterVal, setNewFilterVal] = useState('');
     const [showExcludeDropdown, setShowExcludeDropdown] = useState(false);
+    const excludeDropdownRef = useRef<HTMLDivElement>(null);
+    useDismissable(showExcludeDropdown, () => setShowExcludeDropdown(false), excludeDropdownRef);
 
     const handleAdd = () => {
         if (newFilterCol && newFilterVal) {
@@ -65,6 +68,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                             <button
                                 onClick={() => onRemoveFilter(idx)}
                                 className="ml-2 text-gray-400 hover:text-red-500"
+                                aria-label={`Remove filter on ${filter.column}`}
                             >
                                 <X className="w-3 h-3" />
                             </button>
@@ -114,12 +118,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                             <button
                                 onClick={handleAdd}
                                 className="p-1 text-green-600 hover:bg-green-50 rounded"
+                                aria-label="Add filter"
                             >
                                 <Plus className="w-3 h-3" />
                             </button>
                             <button
                                 onClick={() => setShowFilterForm(false)}
                                 className="p-1 text-gray-400 hover:text-gray-600"
+                                aria-label="Cancel adding filter"
                             >
                                 <X className="w-3 h-3" />
                             </button>
@@ -153,13 +159,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                                 onClick={() => onToggleExclude(col, false)}
                                 className="ml-2 text-gray-400 hover:text-green-500"
                                 title="Include back in analysis"
+                                aria-label={`Include ${col} back in analysis`}
                             >
                                 <Plus className="w-3 h-3" />
                             </button>
                         </div>
                     ))}
 
-                    <div className="relative">
+                    <div className="relative" ref={excludeDropdownRef}>
                         <button
                             onClick={() => setShowExcludeDropdown(!showExcludeDropdown)}
                             className="flex items-center px-2 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"

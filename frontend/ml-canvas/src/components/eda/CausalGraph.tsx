@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import dagre from 'dagre';
 import {
     ReactFlow,
@@ -48,6 +48,17 @@ const getEdgeStrokeColor = (type: string): string => {
 export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+    // Bumped whenever the document's `dark` class toggles, so the graph
+    // styling effect below re-runs even when `graph` itself hasn't changed.
+    const [themeVersion, setThemeVersion] = useState(0);
+
+    useEffect(() => {
+        const observer = new MutationObserver(() => {
+            setThemeVersion((v) => v + 1);
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
 
     const getLayoutedElements = useCallback((nodes: Node[], edges: Edge[]) => {
         try {
@@ -141,7 +152,7 @@ export const CausalGraph: React.FC<CausalGraphProps> = ({ graph }) => {
         setNodes(layouted.nodes);
         setEdges(layouted.edges);
 
-    }, [graph, getLayoutedElements, setNodes, setEdges]);
+    }, [graph, getLayoutedElements, setNodes, setEdges, themeVersion]);
 
     return (
         <div className="space-y-2">

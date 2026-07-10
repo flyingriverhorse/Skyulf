@@ -72,6 +72,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
                             : 'hover:bg-red-100 text-gray-400 hover:text-red-500 dark:hover:bg-red-900/30'
                     }`}
                     title={isExcluded ? "Include in analysis" : "Exclude from analysis"}
+                    aria-label={isExcluded ? "Include in analysis" : "Exclude from analysis"}
                 >
                     {isExcluded ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                 </button>
@@ -80,7 +81,7 @@ export const VariableCard: React.FC<VariableCardProps> = ({ profile, onClick, on
 
       {!isExcluded && (
       <div className="flex justify-between items-end mt-auto">
-        <div className="text-xs text-gray-500 space-y-1">
+        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
           {profile.missing_percentage > 0 && (
             <div className="flex items-center text-amber-600">
               <AlertTriangle className="w-3 h-3 mr-1" />

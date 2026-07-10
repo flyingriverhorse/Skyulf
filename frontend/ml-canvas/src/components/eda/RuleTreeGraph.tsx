@@ -44,7 +44,7 @@ const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }
 
     // Calculate class distribution percentage
     const total = data.value.reduce((a: number, b: number) => a + b, 0);
-    const maxVal = Math.max(...data.value);
+    const maxVal = data.value.length > 0 ? Math.max(...data.value) : 0;
     const purity = total > 0 ? (maxVal / total) * 100 : 0;
 
     return (
@@ -96,11 +96,11 @@ const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }
                         </div>
                     </TooltipProvider>
                     {/* Class Distribution Bar */}
-                    <div className="w-full h-1.5 bg-gray-200 rounded-full mt-1 overflow-hidden flex">
+                    <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden flex">
                         {data.value.map((val: number, idx: number) => (
                             <div
                                 key={idx}
-                                style={{ width: `${(val / total) * 100}%`, backgroundColor: `hsl(${idx * 137.5}, 70%, 50%)` }}
+                                style={{ width: `${total > 0 ? (val / total) * 100 : 0}%`, backgroundColor: `hsl(${idx * 137.5}, 70%, 50%)` }}
                                 title={`Class ${idx}: ${val}`}
                             />
                         ))}
