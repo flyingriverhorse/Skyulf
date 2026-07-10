@@ -111,12 +111,12 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 
                     {/* Normality / Status Indicators */}
                     {profile.normality_test && profile.normality_test.is_normal && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-purple-600 border-purple-200 bg-purple-50">
+                        <Badge variant="outline" className="text-[10px] h-4 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
                             Normal Dist
                         </Badge>
                     )}
                     {profile.normality_test && !profile.normality_test.is_normal && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-amber-600 border-amber-200 bg-amber-50">
+                        <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
                             Not Normal
                         </Badge>
                     )}

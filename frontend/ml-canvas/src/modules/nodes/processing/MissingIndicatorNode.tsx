@@ -46,7 +46,7 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
       {/* Top Status Bar (Always Visible) */}
       <div className="shrink-0 p-4 pb-0 space-y-2">
         {!datasetId && (
-          <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
             Connect a dataset node to see available columns.
           </div>
         )}

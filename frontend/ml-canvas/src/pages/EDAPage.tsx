@@ -542,7 +542,7 @@ export const EDAPage: React.FC = () => {
                 <button
                     onClick={() => loadSpecificReport(existingReport.id)}
                     disabled={isLoadingReport}
-                    className="flex items-center px-3 py-1.5 text-xs bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center px-3 py-1.5 text-xs bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-md hover:bg-green-100 dark:hover:bg-green-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title={`Load existing from ${new Date(existingReport.created_at).toLocaleString()}`}
                 >
                     {isLoadingReport ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <RefreshCw className="w-3 h-3 mr-1" />}
@@ -575,8 +575,8 @@ export const EDAPage: React.FC = () => {
                         disabled={isLoadingReport}
                         className={`px-2 py-0.5 text-xs rounded-full border transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed ${
                             report?.profile_data?.target_col === target
-                            ? 'bg-blue-50 text-blue-600 border-blue-200 font-medium'
-                            : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:text-gray-700'
+                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 font-medium'
+                            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-200'
                         }`}
                     >
                         <Target className="w-3 h-3 mr-1" />
