@@ -1,11 +1,14 @@
 """Text column profiling: stats, common words, sentiment, PII heuristics."""
 
+import logging
 import re
 
 import polars as pl
 
 from ..schemas import TextStats
 from ._utils import VADER_AVAILABLE, _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class TextMixin(_AnalyzerState):
@@ -37,7 +40,7 @@ class TextMixin(_AnalyzerState):
                 for row in word_counts.iter_rows(named=True)
             )
         except Exception as e:
-            print(f"Error calculating common words for {col}: {e}")
+            logger.warning(f"Error calculating common words for {col}: {e}")
 
         return TextStats(
             avg_length=advanced_stats.get(f"{col}__avg_len") or 0.0,
@@ -94,8 +97,20 @@ class TextMixin(_AnalyzerState):
             return None
 
     def _check_pii(self, col: str) -> bool:
-        # Simple heuristic on a small sample. Email-only for now.
+        # Simple heuristic on a small sample. Alerts claim "Email/Phone", so
+        # both patterns must actually be checked here (previously only email
+        # was implemented, making the alert message misleading for
+        # phone-number-only columns).
         sample = self.df[col].drop_nulls().head(20).to_list()  # type: ignore[attr-defined]
         email_pattern = r"[^@]+@[^@]+\.[^@]+"
+        # Loose heuristic for common phone formats, e.g. "+1 (555) 123-4567",
+        # "555-123-4567", "5551234567". Requires at least 7 digits so plain
+        # numeric IDs/years don't false-positive.
+        phone_pattern = r"^\+?[\d\s().-]{7,20}$"
 
-        return any(re.match(email_pattern, str(val)) for val in sample)
+        def _looks_like_phone(value: str) -> bool:
+            return bool(re.match(phone_pattern, value)) and sum(c.isdigit() for c in value) >= 7
+
+        return any(
+            re.match(email_pattern, str(val)) or _looks_like_phone(str(val)) for val in sample
+        )

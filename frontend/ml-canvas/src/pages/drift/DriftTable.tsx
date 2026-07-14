@@ -50,7 +50,8 @@ const sortRows = (
     fi: Record<string, number> | undefined,
 ): ColumnDrift[] => {
     const getMetric = (col: ColumnDrift, metric: string) =>
-        col.metrics.find(m => m.metric === metric)?.value ?? 0;
+        col.metrics.find(m => m.metric === metric || (metric === 'psi' && m.metric === 'psi_categorical'))
+            ?.value ?? 0;
     return [...rows].sort((a, b) => {
         let cmp = 0;
         switch (sortConfig.key) {
@@ -290,7 +291,11 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                     ) : (
                         rows.map(col => {
                             const wasserstein = col.metrics.find(m => m.metric === 'wasserstein_distance');
-                            const psi = col.metrics.find(m => m.metric === 'psi');
+                            // Categorical columns report PSI as 'psi_categorical' (category-frequency
+                            // based) instead of the numeric-binned 'psi'; treat them the same in the UI.
+                            const psi = col.metrics.find(
+                                m => m.metric === 'psi' || m.metric === 'psi_categorical',
+                            );
                             const kl = col.metrics.find(m => m.metric === 'kl_divergence');
                             const ks = col.metrics.find(m => m.metric === 'ks_test_p_value');
                             const isExpanded = expandedRows[col.column];

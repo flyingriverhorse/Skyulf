@@ -88,6 +88,22 @@ def test_aggregate_metrics_single_fold_zero_std():
     assert result["r2"]["std"] == 0.0
 
 
+def test_aggregate_metrics_uses_union_of_keys_across_folds():
+    """A metric present in only some folds must still be aggregated using
+    just the folds that have it — regression guard against the old
+    `fold_metrics[0].keys()` bug, which silently dropped any metric absent
+    from the first fold even if every other fold reported it."""
+    fold_metrics = [
+        {"accuracy": 0.8},
+        {"accuracy": 0.9, "roc_auc": 0.95},
+        {"accuracy": 0.7, "roc_auc": 0.85},
+    ]
+    result = _aggregate_metrics(fold_metrics)
+    assert "accuracy" in result
+    assert "roc_auc" in result
+    assert result["roc_auc"]["mean"] == pytest.approx(0.9, abs=1e-6)
+
+
 # ---------------------------------------------------------------------------
 # _build_splitter
 # ---------------------------------------------------------------------------

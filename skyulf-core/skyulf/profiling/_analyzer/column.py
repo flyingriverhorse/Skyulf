@@ -1,11 +1,15 @@
 """Per-column dispatch: semantic typing + the big ``_analyze_column`` orchestrator."""
 
+import logging
+
 import numpy as np
 import polars as pl
 
 from ..distributions import calculate_histogram
 from ..schemas import Alert, ColumnProfile, HistogramBin, NormalityTestResult
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class ColumnMixin(_AnalyzerState):
@@ -120,7 +124,7 @@ class ColumnMixin(_AnalyzerState):
                             is_normal=float(p_value) > 0.05,
                         )
                 except Exception as e:
-                    print(f"Normality test failed for {col}: {e}")
+                    logger.warning(f"Normality test failed for {col}: {e}")
 
             # IQR-based outlier hint (cheap; just looks at min/max vs whiskers).
             if (
@@ -218,7 +222,7 @@ class ColumnMixin(_AnalyzerState):
                         for i in range(len(hist))
                     ]
             except Exception as e:
-                print(f"Failed to calculate date histogram for {col}: {e}")
+                logger.warning(f"Failed to calculate date histogram for {col}: {e}")
 
         elif semantic_type == "Text":
             profile.text_stats = self._analyze_text(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
@@ -242,7 +246,7 @@ class ColumnMixin(_AnalyzerState):
                         for i in range(len(hist))
                     ]
             except Exception as e:
-                print(f"Failed to calculate text histogram for {col}: {e}")
+                logger.warning(f"Failed to calculate text histogram for {col}: {e}")
 
             if self._check_pii(col):  # type: ignore[attr-defined]
                 alerts.append(

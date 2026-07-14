@@ -32,7 +32,12 @@ def _aggregate_metrics(
     if not fold_metrics:
         return {}
 
-    keys = fold_metrics[0].keys()
+    # Union of keys across all folds — using only fold_metrics[0].keys() would
+    # silently drop any metric that happened to be missing from the first
+    # fold (e.g. a class-imbalance-dependent metric absent in one fold only).
+    keys: set[str] = set()
+    for m in fold_metrics:
+        keys.update(m.keys())
     aggregated = {}
 
     for key in keys:
