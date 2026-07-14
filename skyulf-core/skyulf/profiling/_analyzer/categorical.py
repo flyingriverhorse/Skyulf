@@ -16,8 +16,9 @@ class CategoricalMixin(_AnalyzerState):
             for item in top_k_list:
                 # Polars value_counts returns a struct: {col_name: value, count: c}.
                 if isinstance(item, dict):
-                    keys = list(item.keys())
-                    val_key = keys[0] if keys[0] != "count" else keys[1]
+                    val_key = next((k for k in item if k != "count"), None)
+                    if val_key is None:
+                        continue
                     top_k.append({"value": str(item[val_key]), "count": item["count"]})
 
         rare_count = row.get(f"{col}__rare", 0)
