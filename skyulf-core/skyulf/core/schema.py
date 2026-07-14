@@ -13,9 +13,12 @@ The default returns `None`, meaning "I can't predict my output schema
 from config alone" — callers fall back to runtime introspection.
 """
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class SchemaMismatchError(ValueError):
@@ -270,6 +273,7 @@ def _extract_pandas_dtypes(df: Any) -> dict[str, str]:
     try:
         return {str(name): str(dt) for name, dt in pd_dtypes.items()}
     except Exception:  # noqa: BLE001 - best-effort schema infer
+        logger.debug("Failed to extract pandas dtypes for schema inference", exc_info=True)
         return {}
 
 
@@ -281,4 +285,5 @@ def _extract_polars_dtypes(df: Any) -> dict[str, str]:
         items = schema_attr.items() if hasattr(schema_attr, "items") else schema_attr
         return {str(name): str(dt) for name, dt in items}
     except Exception:  # noqa: BLE001
+        logger.debug("Failed to extract polars dtypes for schema inference", exc_info=True)
         return {}

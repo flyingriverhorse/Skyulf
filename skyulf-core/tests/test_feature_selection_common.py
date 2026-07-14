@@ -126,6 +126,22 @@ class TestInferProblemType:
         s = pd.Series(values, dtype=dtype)
         assert _infer_problem_type(s) == expected
 
+    def test_infer_problem_type_logs_debug_note_on_classification_heuristic(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Regression test: the numeric <=10-unique-values classification
+        heuristic is a coarse cutoff with no config knob, so a debug note
+        must be logged to make the inference visible in diagnostics."""
+        import logging
+
+        s = pd.Series([1.0, 2.0, 3.0], dtype="float64")
+        with caplog.at_level(
+            logging.DEBUG, logger="skyulf.preprocessing.feature_selection._common"
+        ):
+            result = _infer_problem_type(s)
+        assert result == "classification"
+        assert any("classification" in rec.message for rec in caplog.records)
+
 
 # ---------------------------------------------------------------------------
 # _resolve_score_function

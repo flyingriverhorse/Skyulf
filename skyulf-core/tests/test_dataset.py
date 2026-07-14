@@ -150,11 +150,31 @@ def test_copy_uses_clone_when_copy_is_unavailable() -> None:
     assert typing.cast(_CloneOnly, ds_copy.train).value == 1
 
 
-def test_copy_returns_same_object_when_neither_copy_nor_clone_available() -> None:
-    """copy() must return the payload unchanged when it has no .copy()/.clone() method."""
+def test_copy_falls_back_to_shallow_copy_when_neither_copy_nor_clone_available() -> None:
+    """Regression test: copy() must not silently alias generic payloads with
+    neither .copy() nor .clone() (e.g. a plain object/list) - it must fall
+    back to a real (shallow) copy.copy() so mutating the copy doesn't affect
+    the original."""
     train = _NoCopyNoClone(1)
     test = _NoCopyNoClone(2)
     ds = SplitDataset(train=typing.cast(SplitPayload, train), test=typing.cast(SplitPayload, test))
     ds_copy = ds.copy()
-    assert ds_copy.train is train
-    assert ds_copy.test is test
+    assert ds_copy.train is not train
+    assert ds_copy.test is not test
+    assert typing.cast(_NoCopyNoClone, ds_copy.train).value == train.value
+    assert typing.cast(_NoCopyNoClone, ds_copy.test).value == test.value
+
+
+def test_copy_list_payload_is_independent_of_original() -> None:
+    """Regression test: a plain list payload (e.g. raw y target values) has
+    no .copy() method distinguishable from other builtins ambiguity, but
+    SplitDataset.copy() must still return an independent list so appending
+    to the copy doesn't mutate the original."""
+    train_list = [1, 2, 3]
+    ds = SplitDataset(
+        train=typing.cast(SplitPayload, train_list), test=typing.cast(SplitPayload, [4, 5])
+    )
+    ds_copy = ds.copy()
+    assert ds_copy.train == train_list
+    typing.cast(list, ds_copy.train).append(999)
+    assert train_list == [1, 2, 3]
