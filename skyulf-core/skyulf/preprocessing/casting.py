@@ -144,9 +144,38 @@ def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: boo
     return numeric
 
 
+def _mask_out_of_range_or_raise(
+    numeric: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool
+) -> pd.Series:
+    """Mask values outside the target integer dtype's range to NaN (coerce) or raise.
+
+    Without this, ``pandas.Series.astype`` silently clamps out-of-range floats
+    (e.g. 3e9 -> int32) instead of erroring or nulling, diverging from the
+    polars apply path which correctly nulls/raises via ``strict`` casts.
+    """
+    try:
+        info = np.iinfo(np.dtype(target_dtype))
+    except TypeError:
+        # Unrecognized/non-integer dtype string: skip range-checking rather
+        # than fail the cast outright.
+        return numeric
+    valid = numeric.notna()
+    out_of_range_mask = valid & ((numeric < info.min) | (numeric > info.max))
+    if not out_of_range_mask.any():
+        return numeric
+    if not coerce_on_error:
+        raise OverflowError(
+            f"Column {col} contains values out of range for {target_dtype} "
+            f"(valid range [{info.min}, {info.max}])."
+        )
+    numeric.loc[out_of_range_mask] = np.nan
+    return numeric
+
+
 def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
     numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
+    numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
     if numeric.isna().any() and target_dtype in ("int32", "int64", "int"):
         # NaNs require pandas' nullable Int64 container.
         return numeric.astype("Int64")

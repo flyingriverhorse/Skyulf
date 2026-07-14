@@ -6,6 +6,9 @@ from typing import Any
 
 from ._common import (
     DEFAULT_EPSILON,
+    SEASON_BY_MONTH,
+    TIME_OF_DAY_BUCKETS,
+    TIME_OF_DAY_DEFAULT,
     _compute_similarity_score,
     _resolve_group_agg_cols,
     _resolve_output_col,
@@ -149,6 +152,24 @@ def _polars_similarity(op: dict[str, Any], existing: list[str], _eps: float) -> 
 _POLARS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {}
 
 
+def _polars_season(d: Any) -> Any:
+    """Map a datetime expr's month to its meteorological season name."""
+    import polars as pl
+
+    return d.dt.month().replace_strict(SEASON_BY_MONTH, return_dtype=pl.String)
+
+
+def _polars_time_of_day(d: Any) -> Any:
+    """Bucket a datetime expr's hour into a time-of-day label."""
+    import polars as pl
+
+    hour = d.dt.hour()
+    expr = pl.lit(TIME_OF_DAY_DEFAULT)
+    for lo, hi, label in reversed(TIME_OF_DAY_BUCKETS):
+        expr = pl.when((hour >= lo) & (hour <= hi)).then(pl.lit(label)).otherwise(expr)
+    return expr
+
+
 def _register_polars_dt() -> None:
     import polars as pl
 
@@ -169,6 +190,8 @@ def _register_polars_dt() -> None:
             "week": lambda d: d.dt.week(),
             "month_name": lambda d: d.dt.strftime("%B"),
             "day_name": lambda d: d.dt.strftime("%A"),
+            "season": _polars_season,
+            "time_of_day": _polars_time_of_day,
         }
     )
 

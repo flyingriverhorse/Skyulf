@@ -126,6 +126,21 @@ def test_cast_int_fractional_raises_without_coerce() -> None:
         _cast_int(s, "col", "int64", coerce_on_error=False)
 
 
+def test_cast_int_out_of_range_coerced_to_null() -> None:
+    """Out-of-range values with coerce_on_error=True must become null, not clamp silently."""
+    s = pd.Series([3e9, 100.0])
+    result = _cast_int(s, "col", "int32", coerce_on_error=True)
+    assert result.isna().iloc[0]
+    assert result.iloc[1] == 100
+
+
+def test_cast_int_out_of_range_raises_without_coerce() -> None:
+    """Out-of-range values with coerce_on_error=False must raise OverflowError."""
+    s = pd.Series([3e9, 100.0])
+    with pytest.raises(OverflowError, match="out of range"):
+        _cast_int(s, "col", "int32", coerce_on_error=False)
+
+
 # ---------------------------------------------------------------------------
 # _drop_fractional_or_raise
 # ---------------------------------------------------------------------------
@@ -479,6 +494,20 @@ if _POLARS_AVAILABLE:
         # Result must remain a polars frame with correct dtypes.
         assert result["x"].dtype == pl.Float64
         assert result["y"].dtype == pl.Int64
+
+    def test_casting_apply_int_overflow_engine_parity() -> None:
+        """Out-of-range int casts must null on both engines under coerce_on_error=True."""
+        df_pd = pd.DataFrame({"x": [3e9, 100.0]})
+        df_pl = pl.from_pandas(df_pd)
+        params: dict[str, Any] = {"type_map": {"x": "int32"}, "coerce_on_error": True}
+
+        pd_result = CastingApplier().apply(df_pd, params)
+        pl_result = CastingApplier().apply(df_pl, params)
+
+        assert pd_result["x"].isna().iloc[0]
+        assert pd_result["x"].iloc[1] == 100
+        assert pl_result["x"][0] is None
+        assert pl_result["x"][1] == 100
 
     def test_casting_apply_polars_empty_type_map_returns_unchanged() -> None:
         """Polars apply with empty type_map must return the frame unchanged."""

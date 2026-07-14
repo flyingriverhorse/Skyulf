@@ -279,8 +279,8 @@ def test_no_columns_or_numeric_returns_empty(calculator: str, df_data: dict, con
 def test_applier_pandas_noop(
     applier: str, df_data: dict, config: dict, imputer_kind: str | None
 ) -> None:
-    """Applier must return X unchanged (pandas) when: fitted columns are missing
-    from X, no imputer object was fitted, or the sklearn imputer raises."""
+    """Applier must return X unchanged (pandas) when fitted columns are missing
+    from X, or no imputer object was fitted."""
     df = pd.DataFrame(df_data)
     full_config = dict(config)
     if imputer_kind is not None:
@@ -292,12 +292,31 @@ def test_applier_pandas_noop(
 @pytest.mark.parametrize(*_applier_polars_noop_cases)
 def test_applier_polars_noop(applier: str, df_data: dict, config: dict, imputer_kind: str) -> None:
     """Applier must return X unchanged (Polars) when fitted columns are missing
-    from X, or the sklearn imputer raises during transform."""
+    from X."""
     df = pl.DataFrame(df_data)
     full_config = dict(config)
     full_config["imputer_object"] = _IMPUTER_KIND[imputer_kind]()
     out = _APPLIER_BY_NAME[applier]().apply(df, full_config)
     assert out.equals(df)
+
+
+@pytest.mark.parametrize("applier", ["knn", "iterative"])
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_applier_transform_error_propagates(
+    applier: str, engine: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """When the underlying sklearn imputer's ``transform`` raises, the exception
+    must propagate through the dispatcher (log-and-reraise), not be silently
+    swallowed and returned as the original, un-imputed data."""
+    config = {"columns": ["a"], "imputer_object": _BrokenImputer()}
+    with caplog.at_level("ERROR"), pytest.raises(RuntimeError, match="boom"):
+        if engine == "polars":
+            X = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+        else:
+            X = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+        _APPLIER_BY_NAME[applier]().apply(X, dict(config))
+
+    assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 @pytest.mark.parametrize(*_infer_output_schema_cases)

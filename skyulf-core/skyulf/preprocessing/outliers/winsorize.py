@@ -8,7 +8,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
 from .._artifacts import WinsorizeArtifact
-from .._helpers import to_pandas
+from .._helpers import auto_detect_numeric_columns, to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -32,9 +32,10 @@ class WinsorizeApplier(BaseApplier):
         if not bounds:
             return X, y
 
+        numeric_cols = set(auto_detect_numeric_columns(X))
         exprs = []
         for col, bound in bounds.items():
-            if col not in X.columns:
+            if col not in X.columns or col not in numeric_cols:
                 continue
             # Cast to float to avoid integer truncation when bounds are float.
             exprs.append(

@@ -37,7 +37,7 @@ const OPERATION_TYPES = [
 ];
 
 const ARITHMETIC_METHODS = ['add', 'subtract', 'multiply', 'divide'];
-const DATE_METHODS = ['year', 'quarter', 'month', 'month_name', 'week', 'day', 'day_name', 'weekday', 'is_weekend', 'hour'];
+const DATE_METHODS = ['year', 'quarter', 'month', 'month_name', 'week', 'day', 'day_name', 'weekday', 'is_weekend', 'hour', 'season', 'time_of_day'];
 
 // Tooltip descriptions shown on hover for each datetime feature.
 // Both pandas and polars paths produce identical semantics.
@@ -52,6 +52,8 @@ const DATE_METHOD_META: Record<string, { type: string; desc: string }> = {
   weekday:    { type: 'int',    desc: 'Day of week — 0 (Mon) to 6 (Sun)' },
   is_weekend: { type: 'int',    desc: 'Weekend flag — 1 if Sat/Sun, else 0' },
   hour:       { type: 'int',    desc: 'Hour of day — 0 to 23' },
+  season:     { type: 'string', desc: 'Meteorological season — "Winter", "Spring", "Summer", "Autumn"' },
+  time_of_day:{ type: 'string', desc: 'Hour bucket — "Morning" (5-11), "Afternoon" (12-16), "Evening" (17-20), "Night" (21-4)' },
 };
 const SIMILARITY_METHODS = ['ratio', 'token_sort_ratio', 'token_set_ratio'];
 const GROUP_AGG_METHODS = ['mean', 'sum', 'count', 'min', 'max', 'std', 'median'];
