@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
 from backend.database.models import AdvancedTuningJob
 from backend.ml_pipeline._execution.graph_utils import (
     determine_search_strategy,
@@ -289,14 +290,16 @@ class AdvancedTuningManager:
 
     @staticmethod
     async def get_tuning_jobs_for_model(
-        session: AsyncSession, model_type: str, limit: int = 20
+        session: AsyncSession, model_type: str, limit: int | None = None
     ) -> list[JobInfo]:
+        """Lists recent completed tuning jobs for a model type."""
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
         result = await session.execute(
             select(AdvancedTuningJob)
             .where(AdvancedTuningJob.model_type == model_type)
             .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
             .order_by(AdvancedTuningJob.finished_at.desc())
-            .limit(limit)
+            .limit(effective_limit)
         )
         jobs = result.scalars().all()
 

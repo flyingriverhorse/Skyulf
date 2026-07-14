@@ -21,6 +21,25 @@ class SecurityMixin:
     MAX_LOGIN_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_DURATION_MINUTES: int = 30
 
+    # Baseline rate limit applied to every endpoint that doesn't declare its own
+    # stricter @limiter.limit(...). Provides a safety net so a route the developers
+    # forgot to decorate isn't left completely unprotected. Endpoint-specific limits
+    # (e.g. "10/minute" on ingestion routes) still take precedence when declared.
+    RATE_LIMIT_DEFAULT: str = "200/minute"
+
+    # Maximum number of rows accepted in a single POST /deployment/predict
+    # request body. Prevents an unbounded JSON payload from exhausting worker
+    # memory in one synchronous request (this endpoint is meant for ad-hoc/
+    # interactive inference, e.g. the frontend's Inference page — bulk dataset
+    # scoring should go through pipeline execution instead, not this endpoint).
+    # Configurable via MAX_PREDICT_REQUEST_ROWS env var.
+    MAX_PREDICT_REQUEST_ROWS: int = 10_000
+
+    # Maximum allowed length for a user-supplied column name (e.g. EDA
+    # requests referencing a column). Prevents pathologically long strings
+    # from being used in downstream queries/labels.
+    MAX_COLUMN_NAME_LENGTH: int = 255
+
     # Developer fallback auth — off by default; set AUTH_FALLBACK_ENABLED=true in .env to enable.
     # AUTH_FALLBACK_USERNAME and AUTH_FALLBACK_PASSWORD must be explicitly set when enabled.
     AUTH_FALLBACK_ENABLED: bool = False

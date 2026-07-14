@@ -355,6 +355,22 @@ class AdvancedTuningJob(MLJob):
         return data
 
 
+class ModelVersionCounter(Base):
+    """Atomic per-(dataset, model_type) version counter.
+
+    Backs ``ModelRegistryService.get_next_version`` via a single
+    UPDATE ... RETURNING statement so concurrent training/tuning job
+    submissions can never be handed the same version number (the previous
+    read-then-write via ``SELECT MAX(version)`` was a classic TOCTOU race).
+    """
+
+    __tablename__ = "model_version_counters"
+
+    dataset_source_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    model_type: Mapped[str] = mapped_column(String(100), primary_key=True)
+    current_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
 class Deployment(Base, TimestampMixin):
     """
     Tracks deployed models.

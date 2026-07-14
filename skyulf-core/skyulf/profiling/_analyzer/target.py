@@ -1,10 +1,14 @@
 """Target-feature association: correlations, eta², box-plot interactions."""
 
+import logging
+
 import numpy as np
 import polars as pl
 
 from ..schemas import BoxPlotStats, CategoryBoxPlot, TargetInteraction
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState, _collect
+
+logger = logging.getLogger(__name__)
 
 
 class TargetMixin(_AnalyzerState):
@@ -36,7 +40,7 @@ class TargetMixin(_AnalyzerState):
             return dict(sorted(corrs.items(), key=lambda item: abs(item[1]), reverse=True))
 
         except Exception as e:
-            print(f"Error calculating target correlations: {e}")
+            logger.warning(f"Error calculating target correlations: {e}")
             return {}
 
     def _calculate_categorical_target_associations(
@@ -81,7 +85,7 @@ class TargetMixin(_AnalyzerState):
                 eta_squared = ss_between / ss_total
                 associations[col] = float(np.sqrt(eta_squared))
             except Exception as e:
-                print(f"Error calculating categorical target association for '{col}': {e}")
+                logger.warning(f"Error calculating categorical target association for '{col}': {e}")
                 continue
 
         return dict(sorted(associations.items(), key=lambda item: item[1], reverse=True))
@@ -169,7 +173,7 @@ class TargetMixin(_AnalyzerState):
                             if not np.isnan(p_val):
                                 p_value = float(p_val)
                     except Exception as e:
-                        print(f"ANOVA failed for {feature}: {e}")
+                        logger.warning(f"ANOVA failed for {feature}: {e}")
 
                 if category_plots:
                     interactions.append(
@@ -184,5 +188,5 @@ class TargetMixin(_AnalyzerState):
             return interactions
 
         except Exception as e:
-            print(f"Error calculating target interactions: {e}")
+            logger.warning(f"Error calculating target interactions: {e}")
             return []

@@ -144,3 +144,33 @@ class TestRealShapedDataset:
         assert word_counts["york"] == 4
         assert word_counts["houston"] == 3
         assert stats.avg_length == 8.0
+
+
+class TestCheckPii:
+    """Regression guard: the "PII (Email/Phone)" alert message claims both
+    email and phone detection, so _check_pii must actually check both."""
+
+    def test_check_pii_detects_email(self) -> None:
+        df = pl.DataFrame(
+            {"contact": ["alice@example.com", "bob@example.com", "carol@example.com"]}
+        )
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("contact") is True
+
+    def test_check_pii_detects_phone_number(self) -> None:
+        df = pl.DataFrame(
+            {"contact": ["+1 (555) 123-4567", "555-123-4568", "555-123-4569", "555-123-4570"]}
+        )
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("contact") is True
+
+    def test_check_pii_does_not_flag_plain_text(self) -> None:
+        df = pl.DataFrame({"notes": ["hello world", "some notes here", "nothing special"]})
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("notes") is False
+
+    def test_check_pii_does_not_flag_short_numeric_ids(self) -> None:
+        """Plain short numeric IDs (fewer than 7 digits) must not false-positive as phone numbers."""
+        df = pl.DataFrame({"id": ["123", "456", "789"]})
+        analyzer = EDAAnalyzer(df)
+        assert analyzer._check_pii("id") is False

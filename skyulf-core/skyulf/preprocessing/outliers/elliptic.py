@@ -87,7 +87,7 @@ class EllipticEnvelopeApplier(BaseApplier):
     name="Elliptic Envelope",
     category="Preprocessing",
     description="Detect outliers in a Gaussian distributed dataset.",
-    params={"contamination": 0.01, "columns": []},
+    params={"contamination": 0.01, "columns": [], "random_state": 42},
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
     def infer_output_schema(
@@ -103,6 +103,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
 
         X_pd = to_pandas(X)
         contamination = config.get("contamination", 0.01)
+        random_state = config.get("random_state", 42)
         cols = resolve_columns(X_pd, config, detect_numeric_columns)
         if not cols:
             return {}
@@ -115,7 +116,7 @@ class EllipticEnvelopeCalculator(BaseCalculator):
                 warnings.append(f"Column '{col}': Too few samples ({series.shape[0]})")
                 continue
             try:
-                model = EllipticEnvelope(contamination=contamination)
+                model = EllipticEnvelope(contamination=contamination, random_state=random_state)
                 model.fit(series.to_numpy().reshape(-1, 1))
                 models[col] = model
             except Exception as e:

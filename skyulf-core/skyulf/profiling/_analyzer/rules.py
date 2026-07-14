@@ -1,10 +1,14 @@
 """Decision-tree surrogate model for human-readable rule extraction."""
 
+import logging
+
 import numpy as np
 import polars as pl
 
 from ..schemas import RuleNode, RuleTree
 from ._utils import SKLEARN_AVAILABLE, _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class RulesMixin(_AnalyzerState):
@@ -53,6 +57,12 @@ class RulesMixin(_AnalyzerState):
 
             X_data = {}
             feature_names: list[str] = []
+            # Maps a categorical feature name to its ordered category labels
+            # (physical code i == cat_categories[col][i]), so rule text can
+            # show human-readable category names instead of the raw ordinal
+            # code the tree actually split on (e.g. "color <= 2.00" is
+            # meaningless without this mapping).
+            cat_categories: dict[str, list[str]] = {}
 
             for col in num_cols:
                 mean_val = df_sample[col].mean()
@@ -62,9 +72,11 @@ class RulesMixin(_AnalyzerState):
             for col in cat_cols:
                 s = df_sample[col].cast(pl.Utf8).fill_null("Missing")
                 # Ordinal encode (factorize) — keeps tree splits readable.
-                codes = s.cast(pl.Categorical).to_physical().to_numpy()
+                cat_series = s.cast(pl.Categorical)
+                codes = cat_series.to_physical().to_numpy()
                 X_data[col] = codes
                 feature_names.append(col)
+                cat_categories[col] = cat_series.cat.get_categories().to_list()
 
             X_list = [X_data[col] for col in feature_names]
             X = np.column_stack(X_list)
@@ -186,18 +198,20 @@ class RulesMixin(_AnalyzerState):
                 feature_name = feature_names[feature_idx]
                 threshold = tree_.threshold[node_id]
 
-                left_rule = (
-                    f"{current_rule} AND {feature_name} <= {threshold:.2f}"
-                    if current_rule
-                    else f"{feature_name} <= {threshold:.2f}"
-                )
+                if feature_name in cat_categories:
+                    categories = cat_categories[feature_name]
+                    left_categories = [c for i, c in enumerate(categories) if i <= threshold]
+                    right_categories = [c for i, c in enumerate(categories) if i > threshold]
+                    left_clause = f"{feature_name} in {left_categories}"
+                    right_clause = f"{feature_name} in {right_categories}"
+                else:
+                    left_clause = f"{feature_name} <= {threshold:.2f}"
+                    right_clause = f"{feature_name} > {threshold:.2f}"
+
+                left_rule = f"{current_rule} AND {left_clause}" if current_rule else left_clause
                 recurse_rules(tree_.children_left[node_id], left_rule)
 
-                right_rule = (
-                    f"{current_rule} AND {feature_name} > {threshold:.2f}"
-                    if current_rule
-                    else f"{feature_name} > {threshold:.2f}"
-                )
+                right_rule = f"{current_rule} AND {right_clause}" if current_rule else right_clause
                 recurse_rules(tree_.children_right[node_id], right_rule)
 
             recurse_rules(0, "")
@@ -207,8 +221,9 @@ class RulesMixin(_AnalyzerState):
                 accuracy=float(clf.score(X, y)),
                 rules=rules_text,
                 feature_importances=feature_importance_list,
+                categories=cat_categories or None,
             )
 
         except Exception as e:
-            print(f"Error in rule discovery: {e}")
+            logger.warning(f"Error in rule discovery: {e}")
             return None

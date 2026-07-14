@@ -26,14 +26,27 @@ def _resolve_features(config: dict[str, Any]) -> list[str]:
     return [f for f in requested if f in DATE_FEATURE_ACCESSORS]
 
 
-def _pandas_feature(dt: Any, feature: str) -> Any:
+def _pandas_feature(dt: Any, feature: str, is_null: Any) -> Any:
+    """Compute one calendar feature from a pandas ``.dt`` accessor.
+
+    All numeric features are returned as nullable ``Int64`` (not plain
+    ``int64``/``float64``) so an invalid/unparseable date produces a proper
+    null - matching polars' `Int32`/null semantics for the same input,
+    instead of silently becoming `NaN` (for plain integer properties) or a
+    misleading `0`/`False` (for the boolean-derived features below, whose
+    NaN-vs-comparison behavior doesn't propagate nulls on its own).
+    """
     if feature == "weekofyear":
-        return dt.isocalendar().week.astype("int64")
+        return dt.isocalendar().week.astype("Int64")
     if feature == "is_weekend":
-        return (dt.dayofweek >= 5).astype("int64")
+        result = (dt.dayofweek >= 5).astype("Int64")
+        result[is_null] = pd.NA
+        return result
     if feature in ("is_month_start", "is_month_end"):
-        return getattr(dt, feature).astype("int64")
-    return getattr(dt, feature)
+        result = getattr(dt, feature).astype("Int64")
+        result[is_null] = pd.NA
+        return result
+    return getattr(dt, feature).astype("Int64")
 
 
 def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -47,9 +60,11 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     for col in columns:
         if col not in df.columns:
             continue
-        dt = pd.to_datetime(df[col], errors="coerce").dt
+        parsed = pd.to_datetime(df[col], errors="coerce")
+        is_null = parsed.isna()
+        dt = parsed.dt
         for feature in features:
-            df[_feat_name(col, feature)] = _pandas_feature(dt, feature)
+            df[_feat_name(col, feature)] = _pandas_feature(dt, feature, is_null)
         if drop_original:
             df = df.drop(columns=[col])
     return df, _y
@@ -74,14 +89,27 @@ def _polars_feature(col_expr: Any, feature: str) -> Any:
     return builders[feature]()
 
 
-def _polars_date_exprs(columns: list[str], available: list[str], features: list[str]) -> list:
+def _polars_base_expr(col: str, dtype: Any) -> Any:
+    """Build the datetime expression for ``col``, dispatching on its source dtype.
+
+    Plain ``cast(pl.Datetime, strict=False)`` only parses columns that are already
+    temporal (or full ISO-8601 datetime strings); it silently returns null for
+    ordinary date strings like "2021-01-01". String/Utf8 columns must instead go
+    through ``str.to_datetime`` so common date formats are parsed correctly.
+    """
     import polars as pl
 
+    if dtype in (pl.Utf8, pl.String):
+        return pl.col(col).str.to_datetime(strict=False)
+    return pl.col(col).cast(pl.Datetime, strict=False)
+
+
+def _polars_date_exprs(columns: list[str], schema: dict[str, Any], features: list[str]) -> list:
     exprs = []
     for col in columns:
-        if col not in available:
+        if col not in schema:
             continue
-        base = pl.col(col).cast(pl.Datetime, strict=False)
+        base = _polars_base_expr(col, schema[col])
         exprs.extend(
             _polars_feature(base, feature).alias(_feat_name(col, feature)) for feature in features
         )
@@ -95,7 +123,7 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         return X, _y
 
     X_out = X
-    exprs = _polars_date_exprs(columns, list(X_out.columns), features)
+    exprs = _polars_date_exprs(columns, dict(X_out.schema), features)
     if exprs:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_original"):
@@ -136,13 +164,18 @@ class DateFeaturesCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        # Calendar parts are integers; shape derivable from config alone.
+        # Calendar parts are nullable integers (an unparseable date yields a
+        # null feature value, not 0/NaN) - "Int64" here is a best-effort,
+        # engine-agnostic label communicating nullability; the *actual*
+        # column width still varies per engine/feature (e.g. polars uses
+        # Int8/Int16/Int32 for narrower fields like month/day/hour), so this
+        # is intentionally not asserted via check_dtypes=True comparisons.
         cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         features = _resolve_features(config)
         schema = input_schema
         for col in cols:
             for feature in features:
-                schema = schema.add(_feat_name(col, feature), "int64")
+                schema = schema.add(_feat_name(col, feature), "Int64")
         if config.get("drop_original"):
             schema = schema.drop(cols)
         return schema

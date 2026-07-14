@@ -1,5 +1,6 @@
 """Text cleaning node (trim / case / remove-special / regex)."""
 
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -15,6 +16,24 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import _REMOVE_SPECIAL_PATTERNS
+
+# Matches M/D/YYYY or MM/DD/YYYY (1-2 digit month/day, 4-digit year), not
+# part of a longer digit run, e.g. "12/01/2024" or "1/5/2023" but not
+# "123/01/20245".
+_SLASH_DATE_RE = re.compile(r"(?<!\d)(\d{1,2})/(\d{1,2})/(\d{4})(?!\d)")
+
+
+def _slash_date_repl(match: re.Match[str]) -> str:
+    """Rewrite a captured M/D/YYYY (or MM/DD/YYYY) match to ISO YYYY-MM-DD."""
+    month, day, year = match.group(1), match.group(2), match.group(3)
+    return f"{year}-{int(month):02d}-{int(day):02d}"
+
+
+def _normalize_slash_dates_text(text: str | None) -> str | None:
+    """Replace any M/D/YYYY-style substrings in `text` with ISO YYYY-MM-DD."""
+    if text is None or (isinstance(text, float) and pd.isna(text)):
+        return text
+    return _SLASH_DATE_RE.sub(_slash_date_repl, text)
 
 
 def _trim_polars(expr: Any, mode: str) -> Any:
@@ -46,7 +65,9 @@ def _regex_polars(expr: Any, mode: str, pattern: str | None, repl: str) -> Any:
     if mode == "extract_digits":
         return expr.str.extract(r"(\d+)", 1)
     if mode == "normalize_slash_dates":
-        return expr  # placeholder
+        import polars as pl
+
+        return expr.map_elements(_normalize_slash_dates_text, return_dtype=pl.String)
     if mode == "custom" and pattern:
         return expr.str.replace_all(pattern, repl)
     return expr
@@ -93,7 +114,7 @@ def _regex_pandas(series: pd.Series, mode: str, pattern: str | None, repl: str) 
     if mode == "extract_digits":
         return series.str.extract(r"(\d+)", expand=False)
     if mode == "normalize_slash_dates":
-        return series  # placeholder
+        return series.map(_normalize_slash_dates_text)
     if mode == "custom" and pattern:
         return series.str.replace(pattern, repl, regex=True)
     return series

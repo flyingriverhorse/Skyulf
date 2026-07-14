@@ -20,8 +20,15 @@ def evaluate_regression_model(
     X_train: pd.DataFrame | SkyulfDataFrame | None = None,
     y_train: pd.Series | Any | None = None,
     dataset_name: str = "test",
+    random_state: int | None = 42,
 ) -> ModelEvaluationReport:
-    """Evaluate a regression model and return a structured report."""
+    """Evaluate a regression model and return a structured report.
+
+    ``random_state`` seeds the residual-plot downsampling (when the test set
+    exceeds ``max_points``) so repeated evaluations of the same model/data
+    produce the same sampled points instead of a different random subset
+    each time.
+    """
 
     # Convert to Numpy for compatibility
     X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
@@ -45,7 +52,8 @@ def evaluate_regression_model(
     # We downsample if there are too many points to keep the payload size reasonable
     max_points = 1000
     if len(y_true_arr) > max_points:
-        indices = np.random.choice(len(y_true_arr), max_points, replace=False)
+        rng = np.random.default_rng(random_state)
+        indices = rng.choice(len(y_true_arr), max_points, replace=False)
         y_true_sample = y_true_arr[indices]
         y_pred_sample = y_pred_arr[indices]
         residuals_sample = residuals[indices]

@@ -183,6 +183,18 @@ class DataSplitter:
         shuffle: bool = True,
         stratify_col: str | None = None,
     ):
+        if not 0 < test_size < 1:
+            raise ValueError(f"test_size must be between 0 and 1 (exclusive), got {test_size!r}.")
+        if not 0 <= validation_size < 1:
+            raise ValueError(
+                f"validation_size must be between 0 (inclusive) and 1 (exclusive), "
+                f"got {validation_size!r}."
+            )
+        if test_size + validation_size >= 1:
+            raise ValueError(
+                f"test_size ({test_size!r}) + validation_size ({validation_size!r}) must be "
+                f"less than 1, otherwise there is no data left for training."
+            )
         self.test_size = test_size
         self.validation_size = validation_size
         self.random_state = random_state

@@ -135,3 +135,51 @@ class TestRealShapedDataset:
         # Row 6 (customer_id=6) has null lat/lon and must not produce a sample point.
         assert all(p.lat is not None and p.lon is not None for p in result.sample_points)
         assert all(p.label in ("premium", "basic", "enterprise") for p in result.sample_points)
+
+
+class TestCoordinateRangeValidation:
+    """Regression guard for the out-of-range lat/lon false-positive fix."""
+
+    def test_analyze_geospatial_rejects_out_of_range_latitude(self) -> None:
+        """A column named 'lat' holding values outside [-90, 90] (e.g. an ID
+        or percentage column) must not be reported as valid geospatial data."""
+        df = pl.DataFrame(
+            {
+                "lat": [100.0, 200.0, 300.0, 400.0],
+                "lon": [10.0, 20.0, 30.0, 40.0],
+            }
+        )
+        analyzer = EDAAnalyzer(df)
+        result = analyzer._analyze_geospatial(
+            numeric_cols=["lat", "lon"], lat_col="lat", lon_col="lon"
+        )
+        assert result is None
+
+    def test_analyze_geospatial_rejects_out_of_range_longitude(self) -> None:
+        """A column named 'lon' holding values outside [-180, 180] must not be
+        reported as valid geospatial data."""
+        df = pl.DataFrame(
+            {
+                "lat": [10.0, 20.0, 30.0, 40.0],
+                "lon": [500.0, 600.0, 700.0, 800.0],
+            }
+        )
+        analyzer = EDAAnalyzer(df)
+        result = analyzer._analyze_geospatial(
+            numeric_cols=["lat", "lon"], lat_col="lat", lon_col="lon"
+        )
+        assert result is None
+
+    def test_analyze_geospatial_accepts_valid_boundary_coordinates(self) -> None:
+        """Values exactly at the valid boundary (+/-90, +/-180) must still be accepted."""
+        df = pl.DataFrame(
+            {
+                "lat": [-90.0, 0.0, 90.0, 45.0],
+                "lon": [-180.0, 0.0, 180.0, 90.0],
+            }
+        )
+        analyzer = EDAAnalyzer(df)
+        result = analyzer._analyze_geospatial(
+            numeric_cols=["lat", "lon"], lat_col="lat", lon_col="lon"
+        )
+        assert result is not None

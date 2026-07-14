@@ -119,6 +119,52 @@ def test_missing_indicator_infer_output_schema_none_without_explicit_columns() -
     assert out is None
 
 
+def test_missing_indicator_custom_flag_suffix_pandas() -> None:
+    """Regression test: a custom flag_suffix must actually be honored, not
+    silently ignored in favor of a hardcoded "_missing" - previously
+    node_meta declared unused "features"/"sparse" params while the
+    frontend's flag_suffix field (forwarded via pipelineConverter.ts) was
+    accepted into params but never read by the apply functions."""
+    df = _missing_df()
+    art = MissingIndicatorCalculator().fit(df, {"columns": ["a"], "flag_suffix": "_was_missing"})
+    assert art["flag_suffix"] == "_was_missing"
+    out = MissingIndicatorApplier().apply(df, art)
+    assert "a_was_missing" in out.columns
+    assert "a_missing" not in out.columns
+    assert out["a_was_missing"].tolist() == [0, 1, 0, 1]
+
+
+def test_missing_indicator_custom_flag_suffix_polars() -> None:
+    """Polars apply path must also honor a custom flag_suffix."""
+    df = pl.from_pandas(_missing_df())
+    art = MissingIndicatorCalculator().fit(df, {"columns": ["a"], "flag_suffix": "_was_missing"})
+    out = MissingIndicatorApplier().apply(df, art)
+    assert "a_was_missing" in out.columns
+    assert "a_missing" not in out.columns
+    assert out["a_was_missing"].to_list() == [0, 1, 0, 1]
+
+
+def test_missing_indicator_default_flag_suffix_when_not_configured() -> None:
+    """Omitting flag_suffix must still default to '_missing' for backward compat."""
+    df = _missing_df()
+    art = MissingIndicatorCalculator().fit(df, {"columns": ["a"]})
+    assert art["flag_suffix"] == "_missing"
+    out = MissingIndicatorApplier().apply(df, art)
+    assert "a_missing" in out.columns
+
+
+def test_missing_indicator_infer_output_schema_honors_custom_flag_suffix() -> None:
+    """infer_output_schema must predict the correctly-suffixed column name
+    when a custom flag_suffix is configured."""
+    schema = SkyulfSchema.from_columns(["a", "b"], {"a": "float64", "b": "float64"})
+    out = MissingIndicatorCalculator().infer_output_schema(
+        schema, {"columns": ["a"], "flag_suffix": "_was_missing"}
+    )
+    assert out is not None
+    assert "a_was_missing" in out
+    assert "a_missing" not in out
+
+
 # ---------------------------------------------------------------------------
 # Deduplicate
 # ---------------------------------------------------------------------------

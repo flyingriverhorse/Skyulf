@@ -41,13 +41,29 @@ SCORE_FUNCTIONS: dict[str, Callable] = {
 }
 
 
+# Heuristic threshold: a numeric target with this many or fewer distinct
+# values is treated as classification (e.g. a small integer-coded label).
+# This is a coarse heuristic, not a config knob - a genuine regression
+# target that happens to take <= this many distinct values (e.g. a discrete
+# count) will be misclassified as classification. Logged at inference time
+# so this silent assumption is at least visible in diagnostics.
+_MAX_UNIQUE_VALUES_FOR_CLASSIFICATION = 10
+
+
 def _infer_problem_type(series: pd.Series) -> str:
     if series.empty:
         return "classification"
     if pd.api.types.is_bool_dtype(series) or pd.api.types.is_object_dtype(series):
         return "classification"
     unique_values = series.dropna().unique()
-    if len(unique_values) <= 10:
+    if len(unique_values) <= _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION:
+        logger.debug(
+            "Inferred problem_type='classification' for target with %d distinct "
+            "numeric values (<= %d cutoff heuristic); pass problem_type explicitly "
+            "if this is actually a regression target.",
+            len(unique_values),
+            _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION,
+        )
         return "classification"
     return "regression"
 
@@ -199,6 +215,24 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
             step=config.get("step", 1),
         )
     return None
+
+
+def _fillna_zero_with_warning(X_pd: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """Fill missing values with 0 before scoring, warning when this actually
+    changes data (unlike ``_maybe_chi2_rescale``'s already-existing warning
+    pattern, a silent ``fillna(0)`` can bias univariate/model-based feature
+    scores whenever 0 is itself a meaningful value, or missingness is
+    correlated with the target)."""
+    subset = X_pd[cols]
+    if subset.isna().any().any():
+        logger.warning(
+            "Feature selection: filling missing values with 0 before scoring "
+            "for columns %s. This may bias scores/importances if 0 is a "
+            "meaningful value for these columns or if missingness itself "
+            "correlates with the target; consider imputing upstream instead.",
+            [c for c in cols if subset[c].isna().any()],
+        )
+    return subset.fillna(0)
 
 
 def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: str | None) -> np.ndarray:

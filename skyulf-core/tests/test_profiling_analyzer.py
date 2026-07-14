@@ -128,6 +128,27 @@ def test_analyze_classification_target_uses_categorical_path(mixed_df: pl.DataFr
             assert interaction.plot_type == "boxplot"
 
 
+def test_analyze_boolean_target_gets_correlations_and_interactions() -> None:
+    """Regression test: a Boolean target (common for binary classification,
+    e.g. `churned`/`is_fraud`) previously fell through both the Numeric and
+    Categorical target_semantic_type branches and got no target_correlations
+    or leakage-alert analysis at all. It must now be treated the same as a
+    Categorical target."""
+    df = pl.DataFrame(
+        {
+            "is_churned": [True, False, True, False, True, False, True, False, True, False] * 3,
+            "usage": [10.0, 90.0, 12.0, 88.0, 15.0, 85.0, 8.0, 92.0, 11.0, 89.0] * 3,
+        }
+    )
+    analyzer = EDAAnalyzer(df)
+    profile = analyzer.analyze(target_col="is_churned")
+
+    assert profile.target_correlations
+    assert "usage" in profile.target_correlations
+    for val in profile.target_correlations.values():
+        assert -1.0 <= val <= 1.0
+
+
 def test_analyze_detects_geospatial_and_dates(mixed_df: pl.DataFrame) -> None:
     """Lat/lon columns and date-like strings should be auto-detected."""
     analyzer = EDAAnalyzer(mixed_df)
@@ -175,6 +196,38 @@ def test_analyze_applies_filters_and_exclusions(mixed_df: pl.DataFrame) -> None:
     assert profile.active_filters[0].column == "cat"
 
 
+def test_analyze_exclude_cols_does_not_skew_missing_or_duplicate_stats() -> None:
+    """Regression test: excluding an all-null column must not inflate
+    missing_cells_percentage, and excluded columns must not affect
+    duplicate_rows or leak into sample_data.
+    """
+    df = pl.DataFrame(
+        {
+            "keep": [1, 2, 3, 4],
+            "all_null": pl.Series("all_null", [None, None, None, None], dtype=pl.Float64),
+            "secret_pii": ["alice", "bob", "carol", "dave"],
+        }
+    )
+    analyzer = EDAAnalyzer(df)
+
+    # Without exclusion: 4 nulls out of 12 cells (3 cols x 4 rows) -> 33.33%.
+    profile_no_exclude = EDAAnalyzer(df).analyze()
+    assert profile_no_exclude.missing_cells_percentage == pytest.approx(100.0 / 3.0)
+
+    # Excluding the all-null column: 0/4 cells are null among the remaining
+    # columns -> must be 0%, not 100% (bug: previously computed missing_cells
+    # from the full unfiltered frame while total_cells used the narrowed set).
+    profile = analyzer.analyze(exclude_cols=["all_null", "secret_pii"])
+    assert profile.missing_cells_percentage == pytest.approx(0.0)
+    assert profile.duplicate_rows == 0
+
+    # sample_data must not leak the excluded PII column.
+    assert profile.sample_data is not None
+    for row in profile.sample_data:
+        assert "secret_pii" not in row
+        assert "all_null" not in row
+
+
 def test_analyze_filters_all_operators(mixed_df: pl.DataFrame) -> None:
     """Each supported filter operator should be applied without raising."""
     ops: list[dict] = [
@@ -189,6 +242,41 @@ def test_analyze_filters_all_operators(mixed_df: pl.DataFrame) -> None:
         analyzer = EDAAnalyzer(mixed_df)
         profile = analyzer.analyze(filters=[op])
         assert profile.row_count >= 0
+
+
+def test_analyze_unrecognized_filter_operator_not_recorded_as_active(
+    mixed_df: pl.DataFrame,
+) -> None:
+    """An unsupported operator must not filter rows nor be reported as active."""
+    analyzer = EDAAnalyzer(mixed_df)
+    profile = analyzer.analyze(filters=[{"column": "cat", "operator": "~=", "value": "A"}])
+
+    assert profile.row_count == mixed_df.height
+    assert profile.active_filters == []
+
+
+def test_analyze_in_operator_with_non_list_value_not_recorded_as_active(
+    mixed_df: pl.DataFrame,
+) -> None:
+    """The 'in' operator requires a list value; a scalar must not be applied or recorded."""
+    analyzer = EDAAnalyzer(mixed_df)
+    profile = analyzer.analyze(filters=[{"column": "cat", "operator": "in", "value": "A"}])
+
+    assert profile.row_count == mixed_df.height
+    assert profile.active_filters == []
+
+
+def test_analyze_filter_on_unknown_column_not_recorded_as_active(
+    mixed_df: pl.DataFrame,
+) -> None:
+    """A filter referencing a column absent from the dataset is skipped entirely."""
+    analyzer = EDAAnalyzer(mixed_df)
+    profile = analyzer.analyze(
+        filters=[{"column": "does_not_exist", "operator": "==", "value": "A"}]
+    )
+
+    assert profile.row_count == mixed_df.height
+    assert profile.active_filters == []
 
 
 def test_analyze_empty_filter_result_returns_empty_profile(mixed_df: pl.DataFrame) -> None:

@@ -395,6 +395,49 @@ def test_iterative_imputer_uses_kneighbors_estimator() -> None:
     assert out["a"].isna().sum() == 0
 
 
+def test_iterative_imputer_honors_configured_random_state() -> None:
+    """Regression test: the configured `random_state` must actually reach
+    sklearn's IterativeImputer instead of being silently hardcoded to 0.
+
+    BayesianRidge's IterativeImputer draws random samples internally, so two
+    fits with different random_state values on a dataset with multiple valid
+    imputations should diverge, while two fits with the *same* explicit
+    random_state must be reproducible.
+    """
+    rng = np.random.default_rng(3)
+    n = 60
+    b = rng.normal(size=n)
+    c = rng.normal(size=n)
+    a = 2.0 * b + 0.5 * c + rng.normal(scale=1.0, size=n)
+    df = pd.DataFrame({"a": a, "b": b, "c": c})
+    df.loc[[1, 2, 3], "a"] = np.nan
+
+    config_seed_5: dict[str, Any] = {
+        "columns": ["a", "b", "c"],
+        "max_iter": 10,
+        "random_state": 5,
+    }
+    config_seed_99: dict[str, Any] = {
+        "columns": ["a", "b", "c"],
+        "max_iter": 10,
+        "random_state": 99,
+    }
+
+    params_5a = IterativeImputerCalculator().fit(df, dict(config_seed_5))
+    params_5b = IterativeImputerCalculator().fit(df, dict(config_seed_5))
+    params_99 = IterativeImputerCalculator().fit(df, dict(config_seed_99))
+
+    out_5a = IterativeImputerApplier().apply(df, params_5a)
+    out_5b = IterativeImputerApplier().apply(df, params_5b)
+
+    # Same random_state -> reproducible imputed values.
+    pd.testing.assert_series_equal(out_5a["a"], out_5b["a"])
+    # Different random_state -> the config value must actually reach sklearn's
+    # IterativeImputer (previously always hardcoded to 0 regardless of config).
+    assert params_5a["imputer_object"].random_state == 5
+    assert params_99["imputer_object"].random_state == 99
+
+
 # ---------------------------------------------------------------------------
 # SimpleImputer — most_frequent / constant strategies
 # ---------------------------------------------------------------------------

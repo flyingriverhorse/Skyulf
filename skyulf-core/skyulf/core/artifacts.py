@@ -201,6 +201,7 @@ class DropMissingRowsArtifact(TypedDict, total=False):
 class MissingIndicatorArtifact(TypedDict, total=False):
     type: str
     columns: list[str]
+    flag_suffix: str
 
 
 # ── Casting ──────────────────────────────────────────────────────────────────

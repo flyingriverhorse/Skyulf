@@ -24,6 +24,10 @@ class TuningConfig:
     cv_shuffle: bool = True
     cv_random_state: int = 42
     random_state: int = 42
+    # Column to sort by chronologically when cv_type == "time_series_split"
+    # (also dropped from features so it doesn't leak into training). Mirrors
+    # the `time_column` parameter accepted by cross_validation.perform_cross_validation().
+    cv_time_column: str | None = None
     # Parallelism — set by the backend from settings, not by the user directly.
     n_jobs: int = 1
     parallel_backend: str = ""

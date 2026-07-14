@@ -55,7 +55,11 @@ export function useDriftReport(thresholds: DriftThresholds) {
         for (const [colName, col] of Object.entries(report.column_drifts)) {
             const newMetrics = col.metrics.map(m => {
                 let hasDrift = m.has_drift;
-                if (m.metric === 'psi' && t.psi != null) hasDrift = m.value > t.psi;
+                // 'psi_categorical' is PSI computed on a category frequency
+                // distribution instead of numeric bins; it shares the same
+                // threshold as numeric PSI.
+                if ((m.metric === 'psi' || m.metric === 'psi_categorical') && t.psi != null)
+                    hasDrift = m.value > t.psi;
                 if (m.metric === 'ks_test_p_value' && t.ks != null) hasDrift = m.value < t.ks;
                 if (m.metric === 'wasserstein_distance' && t.wasserstein != null)
                     hasDrift = m.value > t.wasserstein;

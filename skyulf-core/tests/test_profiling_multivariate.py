@@ -256,6 +256,36 @@ def test_detect_outliers_missing_columns_returns_none() -> None:
     assert result is None
 
 
+def test_detect_outliers_uses_random_sample_not_first_rows() -> None:
+    """Regression test: when the dataset exceeds the internal 50k-row limit,
+    `_detect_outliers` must draw a random (seeded) sample rather than only the
+    first N rows, so outliers located later in a sorted/ordered dataset are
+    not systematically excluded from analysis (previously used `.head(limit)`,
+    inconsistent with the `.sample()` strategy used by PCA/clustering).
+
+    Builds a dataset just over the 50,000-row limit with all outlier rows
+    placed strictly after row 50,000 — `.head(50000)` would have missed every
+    one of them, while a random sample should pick up at least some.
+    """
+    rng = np.random.default_rng(7)
+    n_normal = 50_010
+    normal_a = rng.normal(0, 1, n_normal)
+    normal_b = rng.normal(0, 1, n_normal)
+    # Outliers appended strictly after the first 50,000 rows.
+    outlier_a = [500.0, -500.0, 600.0, -600.0, 550.0] * 20
+    outlier_b = [500.0, -500.0, 600.0, -600.0, 550.0] * 20
+    df = pl.DataFrame(
+        {
+            "a": list(normal_a) + outlier_a,
+            "b": list(normal_b) + outlier_b,
+        }
+    )
+    analyzer = EDAAnalyzer(df)
+    result = analyzer._detect_outliers(["a", "b"])
+    assert result is not None
+    assert result.total_outliers > 0
+
+
 def test_detect_outliers_outer_exception(monkeypatch) -> None:
     """IsolationForest.fit raising should be caught by the outer except (lines 294-296)."""
     analyzer = EDAAnalyzer(_multivariate_df())

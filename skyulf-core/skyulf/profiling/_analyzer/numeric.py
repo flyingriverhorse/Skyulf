@@ -1,9 +1,13 @@
 """Numeric column profiling + multicollinearity (VIF)."""
 
+import logging
+
 import numpy as np
 
 from ..schemas import NumericStats
 from ._utils import _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class NumericMixin(_AnalyzerState):
@@ -56,5 +60,5 @@ class NumericMixin(_AnalyzerState):
 
             return {col: max(1.0, float(inv_corr[i, i])) for i, col in enumerate(numeric_cols)}
         except Exception as e:
-            print(f"Error calculating VIF: {e}")
+            logger.warning(f"Error calculating VIF: {e}")
             return None

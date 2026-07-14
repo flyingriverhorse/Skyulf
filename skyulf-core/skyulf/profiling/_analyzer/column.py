@@ -1,11 +1,15 @@
 """Per-column dispatch: semantic typing + the big ``_analyze_column`` orchestrator."""
 
+import logging
+
 import numpy as np
 import polars as pl
 
 from ..distributions import calculate_histogram
 from ..schemas import Alert, ColumnProfile, HistogramBin, NormalityTestResult
 from ._utils import SCIPY_AVAILABLE, _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class ColumnMixin(_AnalyzerState):
@@ -120,7 +124,7 @@ class ColumnMixin(_AnalyzerState):
                             is_normal=float(p_value) > 0.05,
                         )
                 except Exception as e:
-                    print(f"Normality test failed for {col}: {e}")
+                    logger.warning(f"Normality test failed for {col}: {e}")
 
             # IQR-based outlier hint (cheap; just looks at min/max vs whiskers).
             if (
@@ -218,7 +222,7 @@ class ColumnMixin(_AnalyzerState):
                         for i in range(len(hist))
                     ]
             except Exception as e:
-                print(f"Failed to calculate date histogram for {col}: {e}")
+                logger.warning(f"Failed to calculate date histogram for {col}: {e}")
 
         elif semantic_type == "Text":
             profile.text_stats = self._analyze_text(  # type: ignore[attr-defined]  # pylint: disable=assignment-from-no-return
@@ -242,7 +246,7 @@ class ColumnMixin(_AnalyzerState):
                         for i in range(len(hist))
                     ]
             except Exception as e:
-                print(f"Failed to calculate text histogram for {col}: {e}")
+                logger.warning(f"Failed to calculate text histogram for {col}: {e}")
 
             if self._check_pii(col):  # type: ignore[attr-defined]
                 alerts.append(
@@ -251,6 +255,30 @@ class ColumnMixin(_AnalyzerState):
                         type="PII",
                         message=f"Column '{col}' may contain PII (Email/Phone).",
                         severity="error",
+                    )
+                )
+        # `is_unique` (used by the "possible ID column" recommendation) is
+        # only ever set above for Categorical columns via categorical_stats.
+        # Text and Numeric columns never got a chance to be flagged even
+        # when every value is distinct (e.g. a numeric or free-text ID
+        # column), so the recommendation was silently dead for those dtypes.
+        # Compute it generically here from the batched `__unique` aggregate,
+        # using the same >50-unique-values threshold as the Categorical
+        # branch above to avoid over-flagging small tables.
+        if not profile.is_unique and semantic_type in ("Text", "Numeric"):
+            n_unique = basic_stats.get(f"{col}__unique", 0)
+            if (
+                n_unique > 50
+                and self.row_count > 0  # type: ignore[attr-defined]
+                and n_unique == self.row_count  # type: ignore[attr-defined]
+            ):
+                profile.is_unique = True
+                alerts.append(
+                    Alert(
+                        column=col,
+                        type="Possible ID",
+                        message=f"Column '{col}' appears to be an ID.",
+                        severity="info",
                     )
                 )
 

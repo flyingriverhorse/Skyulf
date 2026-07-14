@@ -1,9 +1,13 @@
 """Geospatial analysis (lat/lon detection + sample point extraction)."""
 
+import logging
+
 import polars as pl
 
 from ..schemas import GeoPoint, GeospatialStats
 from ._utils import _AnalyzerState, _collect
+
+logger = logging.getLogger(__name__)
 
 
 class GeoMixin(_AnalyzerState):
@@ -63,6 +67,26 @@ class GeoMixin(_AnalyzerState):
             if stats[0] is None or stats[3] is None:
                 return None
 
+            # Guard against false-positive lat/lon detection: a column merely
+            # named "lat"/"lon" that holds unrelated numeric data (an ID,
+            # a percentage, etc.) would otherwise be reported as valid
+            # geospatial bounds. Valid latitudes/longitudes must fall within
+            # [-90, 90] / [-180, 180].
+            min_lat, max_lat = stats[0], stats[1]
+            min_lon, max_lon = stats[3], stats[4]
+            if not (-90.0 <= min_lat <= 90.0 and -90.0 <= max_lat <= 90.0):
+                logger.warning(
+                    f"Column '{lat_col}' detected as latitude but values are out of "
+                    f"range [-90, 90] (min={min_lat}, max={max_lat}); skipping."
+                )
+                return None
+            if not (-180.0 <= min_lon <= 180.0 and -180.0 <= max_lon <= 180.0):
+                logger.warning(
+                    f"Column '{lon_col}' detected as longitude but values are out of "
+                    f"range [-180, 180] (min={min_lon}, max={max_lon}); skipping."
+                )
+                return None
+
             sample_size = min(5000, self.row_count)  # type: ignore[attr-defined]
 
             cols_to_fetch = [
@@ -97,5 +121,5 @@ class GeoMixin(_AnalyzerState):
                 sample_points=points,
             )
         except Exception as e:
-            print(f"Error in geospatial analysis: {e}")
+            logger.warning(f"Error in geospatial analysis: {e}")
             return None

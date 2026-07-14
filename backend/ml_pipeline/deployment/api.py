@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.exceptions.core import SkyulfException
 from backend.middleware.rate_limiter import limiter
 
@@ -56,12 +57,13 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
 
 @router.get("/history", response_model=list[DeploymentInfo])
 async def list_deployments(
-    limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_async_session)
+    limit: int | None = None, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Lists deployment history.
     """
-    deployments = await DeploymentService.list_deployments(session, limit, skip)
+    effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+    deployments = await DeploymentService.list_deployments(session, effective_limit, skip)
     return deployments
 
 
@@ -85,6 +87,17 @@ async def predict(
     Makes predictions using the active model.
     """
     try:
+        max_rows = get_settings().MAX_PREDICT_REQUEST_ROWS
+        if len(prediction_request.data) > max_rows:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Request contains {len(prediction_request.data)} rows; the limit "
+                    f"is {max_rows}. Set the MAX_PREDICT_REQUEST_ROWS env var to raise "
+                    "this limit, or use pipeline execution for bulk dataset scoring."
+                ),
+            )
+
         deployment = await DeploymentService.get_active_deployment(session)
         if not deployment:
             raise HTTPException(status_code=404, detail="No active deployment found")

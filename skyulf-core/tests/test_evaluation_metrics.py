@@ -68,6 +68,42 @@ def test_classification_metrics_binary_adds_unweighted_variants(binary_data):
     assert "f1" in metrics
 
 
+def test_classification_metrics_binary_non_01_string_labels_still_produce_precision_recall_f1():
+    """Regression test: binary labels that aren't literally {0, 1} (e.g. string
+    labels) must not silently drop precision/recall/f1. Previously
+    average="binary" relied on sklearn's default pos_label=1, which raises for
+    non-{0,1} labels — swallowed by a bare `except Exception: pass`."""
+    rng = np.random.RandomState(0)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 60), "f2": rng.normal(0, 1, 60)})
+    y = pd.Series(np.where(X["f1"] + X["f2"] > 0, "yes", "no"), name="target")
+    model = LogisticRegression().fit(X, y)
+
+    metrics = calculate_classification_metrics(model, X, y)
+    assert "precision" in metrics
+    assert "recall" in metrics
+    assert "f1" in metrics
+
+    predictions = model.predict(X)
+    pos_label = model.classes_[1]
+    expected_f1 = f1_score(y, predictions, average="binary", pos_label=pos_label)
+    assert metrics["f1"] == pytest.approx(expected_f1)
+
+
+def test_classification_metrics_binary_negative_positive_int_labels():
+    """Non-{0,1} integer binary labels (e.g. {-1, 1}) must also produce
+    precision/recall/f1 using the correct positive-class label."""
+    rng = np.random.RandomState(2)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 60), "f2": rng.normal(0, 1, 60)})
+    y = pd.Series(np.where(X["f1"] + X["f2"] > 0, 1, -1), name="target")
+    model = LogisticRegression().fit(X, y)
+
+    metrics = calculate_classification_metrics(model, X, y)
+    predictions = model.predict(X)
+    pos_label = model.classes_[1]
+    expected_precision = f1_score(y, predictions, average="binary", pos_label=pos_label)
+    assert metrics["f1"] == pytest.approx(expected_precision)
+
+
 def test_classification_metrics_binary_roc_auc_matches_sklearn(binary_data):
     """roc_auc for binary classification should match sklearn's roc_auc_score."""
     model, X, y = binary_data
@@ -86,6 +122,23 @@ def test_classification_metrics_multiclass_has_ovr_and_ovo_variants(multiclass_d
     assert "roc_auc_ovr_weighted" in metrics
     assert "roc_auc_ovo_weighted" in metrics
     assert "roc_auc" not in metrics
+
+
+def test_classification_metrics_multiclass_survives_fold_missing_a_trained_class(multiclass_data):
+    """Regression test: multiclass roc_auc/pr_auc must not silently disappear
+    when the evaluated split doesn't contain every class the model was
+    trained on (common with small/imbalanced CV folds). Previously
+    roc_auc_score raised "Number of classes in y_true not equal to the number
+    of columns in y_score", swallowed by a bare except."""
+    model, X, y = multiclass_data
+    # Evaluate on a subset containing only 2 of the 3 trained classes.
+    mask = y != 2
+    X_subset, y_subset = X[mask], y[mask]
+
+    metrics = calculate_classification_metrics(model, X_subset, y_subset)
+    assert "roc_auc_ovr" in metrics
+    assert "roc_auc_ovo" in metrics
+    assert "pr_auc_weighted" in metrics
 
 
 def test_classification_metrics_multiclass_pr_auc_weighted_present(multiclass_data):

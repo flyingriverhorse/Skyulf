@@ -97,6 +97,28 @@ class StatefulEstimator:
         self.node_id = node_id
         self.model = None  # In-memory model storage
 
+    @staticmethod
+    def _is_non_empty_split(data: Any) -> bool:
+        """Engine-agnostic non-empty check for a dataset split.
+
+        Handles pandas (`.empty`), polars/Skyulf wrappers (`.is_empty()`),
+        and (X, y) tuples - previously only pandas DataFrames and tuples
+        were recognized, so a bare polars DataFrame split (test/validation)
+        was silently treated as absent.
+        """
+        if data is None:
+            return False
+        if isinstance(data, tuple):
+            return len(data) == 2 and data[0] is not None and len(data[0]) > 0
+        if hasattr(data, "empty"):
+            return not data.empty
+        if hasattr(data, "is_empty"):
+            return not data.is_empty()
+        try:
+            return len(data) > 0
+        except TypeError:
+            return False
+
     def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
@@ -356,23 +378,14 @@ class StatefulEstimator:
 
         # Helper to evaluate a single split
         def evaluate_split(split_name: str, data: Any):
-            if isinstance(data, tuple):
-                X, y = data
-                # If y is None, the target may still be embedded in X
-                if y is None and hasattr(X, "columns"):
-                    if target_column not in X.columns:
-                        return None  # Cannot evaluate without target
-                    y = X[target_column]
-                    try:
-                        X = X.drop(columns=[target_column])
-                    except TypeError:
-                        X = X.drop([target_column])
-            elif isinstance(data, pd.DataFrame):
-                if target_column not in data.columns:
-                    return None  # Cannot evaluate without target
-                X = data.drop(columns=[target_column])
-                y = data[target_column]
-            else:
+            # Delegate to the same engine-agnostic (pandas/polars/tuple) X/y
+            # extraction used by fit_predict, instead of duplicating
+            # ad-hoc pandas-only logic that silently dropped polars splits.
+            try:
+                X, y = self._extract_xy(data, target_column)
+            except ValueError:
+                return None  # Cannot evaluate without target
+            if X is None or y is None:
                 return None
 
             y_pred = self.applier.predict(X, self.model)
@@ -419,22 +432,14 @@ class StatefulEstimator:
         splits_payload["train"] = evaluate_split("train", dataset.train)
 
         # 3. Evaluate Test
-        has_test = False
-        if isinstance(dataset.test, pd.DataFrame):
-            has_test = not dataset.test.empty
-        elif isinstance(dataset.test, tuple):
-            has_test = len(dataset.test) == 2 and len(dataset.test[0]) > 0
+        has_test = self._is_non_empty_split(dataset.test)
 
         if has_test:
             splits_payload["test"] = evaluate_split("test", dataset.test)
 
         # 4. Evaluate Validation
         if dataset.validation is not None:
-            has_val = False
-            if isinstance(dataset.validation, pd.DataFrame):
-                has_val = not dataset.validation.empty
-            elif isinstance(dataset.validation, tuple):
-                has_val = len(dataset.validation) == 2 and len(dataset.validation[0]) > 0
+            has_val = self._is_non_empty_split(dataset.validation)
 
             if has_val:
                 splits_payload["validation"] = evaluate_split("validation", dataset.validation)

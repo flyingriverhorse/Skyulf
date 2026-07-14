@@ -288,3 +288,51 @@ class TestRealShapedDataset:
         for val in df.loc[~nan_mask, "city"].unique():
             mask = df["city"] == val
             assert result.loc[mask, "city"].nunique() == 1
+
+
+def test_label_encoder_pandas_dtype_stays_int64_with_unseen_category() -> None:
+    """Regression test: pandas output must stay int64 (matching Polars'
+    explicit `.cast(pl.Int64)`) even when the applied data contains a
+    category unseen during fit - previously `.map().fillna(missing_code)`
+    silently upcast the whole column to float64 the moment any value
+    mapped to NaN, even though `fillna` filled it with an int missing_code."""
+    X_fit = pd.DataFrame({"category": ["a", "b"]})
+    params = LabelEncoderCalculator().fit(X_fit, {"columns": ["category"]})
+
+    X_apply = pd.DataFrame({"category": ["a", "b", "unseen"]})
+    result = LabelEncoderApplier().apply(X_apply, dict(params))
+
+    assert result["category"].dtype == np.int64
+    assert result["category"].tolist() == [0, 1, -1]
+
+
+def test_label_encoder_pandas_target_dtype_stays_int64_with_unseen_category() -> None:
+    """Same dtype-parity fix applied to the target (`y`) encoding path."""
+    X_fit = pd.DataFrame({"f": [1, 2]})
+    y_fit = pd.Series(["a", "b"], name="target")
+    params = LabelEncoderCalculator().fit((X_fit, y_fit), {"columns": []})
+
+    X_apply = pd.DataFrame({"f": [1, 2, 3]})
+    y_apply = pd.Series(["a", "b", "unseen"], name="target")
+    _, y_out = LabelEncoderApplier().apply((X_apply, y_apply), dict(params))
+
+    assert y_out.dtype == np.int64
+    assert y_out.tolist() == [0, 1, -1]
+
+
+def test_label_encoder_polars_pandas_dtype_parity_with_unseen_category() -> None:
+    """Cross-engine parity: pandas and Polars must agree on both the dtype
+    "kind" (integer) and the encoded values for an unseen category."""
+    X_fit_pd = pd.DataFrame({"category": ["a", "b"]})
+    X_fit_pl = pl.DataFrame({"category": ["a", "b"]})
+    params_pd = LabelEncoderCalculator().fit(X_fit_pd, {"columns": ["category"]})
+    params_pl = LabelEncoderCalculator().fit(X_fit_pl, {"columns": ["category"]})
+
+    X_apply_pd = pd.DataFrame({"category": ["a", "b", "unseen"]})
+    X_apply_pl = pl.DataFrame({"category": ["a", "b", "unseen"]})
+    result_pd = LabelEncoderApplier().apply(X_apply_pd, dict(params_pd))
+    result_pl = LabelEncoderApplier().apply(X_apply_pl, dict(params_pl))
+
+    assert result_pd["category"].tolist() == result_pl["category"].to_list()
+    assert np.issubdtype(result_pd["category"].dtype, np.integer)
+    assert result_pl["category"].dtype == pl.Int64

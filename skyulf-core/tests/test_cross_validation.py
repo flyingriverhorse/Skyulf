@@ -1,5 +1,7 @@
 """Tests for skyulf.modeling.cross_validation."""
 
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,6 +20,8 @@ from skyulf.modeling.cross_validation import (
     perform_cross_validation,
 )
 from skyulf.modeling.regression import (
+    LinearRegressionApplier,
+    LinearRegressionCalculator,
     RandomForestRegressorApplier,
     RandomForestRegressorCalculator,
 )
@@ -86,6 +90,22 @@ def test_aggregate_metrics_single_fold_zero_std():
     """Single fold should produce std of 0.0."""
     result = _aggregate_metrics([{"r2": 0.95}])
     assert result["r2"]["std"] == 0.0
+
+
+def test_aggregate_metrics_uses_union_of_keys_across_folds():
+    """A metric present in only some folds must still be aggregated using
+    just the folds that have it — regression guard against the old
+    `fold_metrics[0].keys()` bug, which silently dropped any metric absent
+    from the first fold even if every other fold reported it."""
+    fold_metrics = [
+        {"accuracy": 0.8},
+        {"accuracy": 0.9, "roc_auc": 0.95},
+        {"accuracy": 0.7, "roc_auc": 0.85},
+    ]
+    result = _aggregate_metrics(fold_metrics)
+    assert "accuracy" in result
+    assert "roc_auc" in result
+    assert result["roc_auc"]["mean"] == pytest.approx(0.9, abs=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -417,6 +437,26 @@ def test_perform_cv_kfold_with_numpy_arrays_no_iloc():
     assert "accuracy" in result["aggregated_metrics"]
 
 
+def test_perform_cross_validation_unknown_cv_type_warns_and_falls_back(caplog):
+    """Regression test: perform_cross_validation's splitter setup must go
+    through the same _build_splitter() helper as elsewhere, so an unknown
+    cv_type value warns (instead of silently falling back to KFold with no
+    signal) - previously this path duplicated the splitter branching inline
+    without the warning that _build_splitter already had."""
+    import logging
+
+    X, y = _make_classification_xy(n=60)
+    calc = LogisticRegressionCalculator()
+    appl = LogisticRegressionApplier()
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.modeling.cross_validation"):
+        result = perform_cross_validation(
+            calc, appl, X, y, config={}, n_folds=3, cv_type="not_a_real_cv_type"
+        )
+    assert len(result["folds"]) == 3
+    assert any("Unknown cv_type" in rec.message for rec in caplog.records)
+
+
 class _FlakyInnerCalculator(BaseModelCalculator):
     """Wraps LogisticRegressionCalculator but fails fit() on small (inner-fold-sized) splits."""
 
@@ -437,7 +477,10 @@ class _FlakyInnerCalculator(BaseModelCalculator):
 
 
 def test_perform_nested_cv_inner_fold_failure_is_caught():
-    """A failing inner-fold fit should be caught and recorded as a 0.0 score, not raised."""
+    """A failing inner-fold fit must be caught (not raised) and must not
+    silently corrupt inner_cv_mean with a misleading 0.0 - for regression
+    0.0 is itself a meaningful R^2 value, so an all-failed fold's mean must
+    surface as None (JSON-safe NaN) instead."""
     X, y = _make_classification_xy(n=150)
     calc = _FlakyInnerCalculator()
     appl = LogisticRegressionApplier()
@@ -445,7 +488,46 @@ def test_perform_nested_cv_inner_fold_failure_is_caught():
     result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="nested_cv")
     assert len(result["folds"]) == 3
     for fold in result["folds"]:
-        assert fold["inner_cv_mean"] == 0.0
+        assert fold["inner_cv_mean"] is None
+
+
+class _FlakyOnceCalculator(BaseModelCalculator):
+    """Wraps LogisticRegressionCalculator but fails fit() exactly once per
+    outer fold (on the first inner-fold call), then succeeds for the rest."""
+
+    def __init__(self):
+        self._real = LogisticRegressionCalculator()
+        self._call_count = 0
+
+    @property
+    def problem_type(self) -> str:
+        """Report classification, matching the wrapped calculator."""
+        return "classification"
+
+    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+        """Raise on every 3rd call (the first inner-fold call per outer fold, since
+        each outer fold does 1 outer fit + inner_folds inner fits and inner_folds=2)."""
+        self._call_count += 1
+        if self._call_count % 3 == 1:
+            raise RuntimeError("Simulated single inner-fold failure")
+        return self._real.fit(X, y, config)
+
+
+def test_perform_nested_cv_partial_inner_failure_excludes_nan_from_mean():
+    """Regression test: when only some inner folds fail, inner_cv_mean must be
+    the mean of the *valid* scores only, not silently include the failed
+    fold as 0.0 (which would corrupt an otherwise-good mean)."""
+    X, y = _make_classification_xy(n=150)
+    calc = _FlakyOnceCalculator()
+    appl = LogisticRegressionApplier()
+
+    result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="nested_cv")
+    assert len(result["folds"]) == 3
+    for fold in result["folds"]:
+        # At least one inner fold succeeded per outer fold, so the mean must
+        # be a real (non-None) number, not corrupted toward 0 by the failure.
+        assert fold["inner_cv_mean"] is not None
+        assert fold["inner_cv_mean"] >= 0.0
 
 
 def test_perform_nested_cv_with_callbacks_and_numpy_arrays():
@@ -542,6 +624,61 @@ def test_sort_by_time_no_datetime_column_with_log_callback():
     _sort_by_time(X, y, None, messages.append, logger)
 
     assert any("no datetime column found" in m for m in messages)
+
+
+def test_sort_by_time_polars_sorts_and_drops_time_column():
+    """Regression test: _sort_by_time must sort Polars X/y in lockstep and
+    drop the time column from features - previously this function only
+    handled pandas, so a Polars X was returned completely unsorted with the
+    time column left in place (silently leaking into the model)."""
+    import logging
+
+    import polars as pl
+
+    logger = logging.getLogger(__name__)
+    X = pl.DataFrame({"ts": [3, 1, 2], "x": [30, 10, 20]})
+    y = pl.Series("target", [300, 100, 200])
+
+    X_sorted, y_sorted = _sort_by_time(X, y, "ts", None, logger)
+
+    assert "ts" not in X_sorted.columns
+    assert X_sorted["x"].to_list() == [10, 20, 30]
+    assert y_sorted.to_list() == [100, 200, 300]
+
+
+def test_perform_cv_time_series_split_polars_prevents_leakage():
+    """Regression test: time_series_split CV on a Polars X must chronologically
+    sort by time_column and drop it from features - previously the pandas-only
+    isinstance gate skipped this entirely for Polars, so an out-of-order time
+    column perfectly correlated with y leaked directly into training, and folds
+    were built on arbitrary (unsorted) row order instead of chronological order."""
+    import polars as pl
+
+    rng = np.random.RandomState(0)
+    n = 60
+    ts = np.arange(n)
+    perm = rng.permutation(n)
+    X = pl.DataFrame({"ts": ts[perm], "feat": rng.normal(size=n)})
+    y = pl.Series("target", ts[perm].astype(float))  # y perfectly matches true time order
+
+    calc = LinearRegressionCalculator()
+    appl = LinearRegressionApplier()
+
+    result = perform_cross_validation(
+        calc,
+        appl,
+        cast(Any, X),
+        y,
+        config={},
+        n_folds=3,
+        cv_type="time_series_split",
+        time_column="ts",
+    )
+    # If the time column leaked into features (or folds were unsorted), r2
+    # would be artificially ~1.0. With the leak fixed it must not be a
+    # (near-)perfect fit.
+    r2_mean = result["aggregated_metrics"]["r2"]["mean"]
+    assert r2_mean < 0.9
 
     """time_series_split should sort by datetime column when provided."""
     np.random.seed(1)

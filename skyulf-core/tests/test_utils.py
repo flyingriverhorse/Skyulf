@@ -88,6 +88,61 @@ def test_get_data_stats_split_dataset_with_validation() -> None:
     assert rows == 6
 
 
+def test_get_data_stats_split_dataset_warns_on_test_column_mismatch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Regression test: get_data_stats() for a SplitDataset only ever reflected
+    train's column set, silently assuming test/validation match. Must now warn
+    when test's columns actually diverge from train's."""
+    import logging
+
+    train = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
+    test = pd.DataFrame({"a": [5], "c": [6]})  # different columns than train
+    ds = SplitDataset(train=train, test=test)
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.utils"):
+        rows, cols = get_data_stats(ds)
+
+    assert rows == 3
+    assert cols == {"a", "b"}  # still reports train's columns (documented behavior)
+    assert any("differ from" in rec.message for rec in caplog.records)
+
+
+def test_get_data_stats_split_dataset_warns_on_validation_column_mismatch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Same regression as above but for the validation split."""
+    import logging
+
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [3]})
+    val = pd.DataFrame({"a": [4], "extra": [5]})  # different columns than train
+    ds = SplitDataset(train=train, test=test, validation=val)
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.utils"):
+        rows, _ = get_data_stats(ds)
+
+    assert rows == 4
+    assert any("differ from" in rec.message for rec in caplog.records)
+
+
+def test_get_data_stats_split_dataset_no_warning_when_columns_match(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Matching train/test/validation columns must not trigger the warning."""
+    import logging
+
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [3]})
+    val = pd.DataFrame({"a": [4]})
+    ds = SplitDataset(train=train, test=test, validation=val)
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.utils"):
+        get_data_stats(ds)
+
+    assert not any("differ from" in rec.message for rec in caplog.records)
+
+
 # ---------------------------------------------------------------------------
 # unpack_pipeline_input
 # ---------------------------------------------------------------------------
@@ -142,6 +197,27 @@ def test_pack_not_tuple_with_y_concatenates(capsys: pytest.CaptureFixture) -> No
     assert isinstance(result, pd.DataFrame)
     assert "target" in result.columns
     assert list(result["x"]) == [1, 2]
+
+
+def test_pack_raises_on_row_count_mismatch() -> None:
+    """Regression test: X and y with different row counts must raise instead
+    of silently NaN-padding/duplicating rows via a naive axis=1 concat."""
+    X = pd.DataFrame({"x": [1, 2, 3]})
+    y = pd.Series([10, 20], name="target")
+    with pytest.raises(ValueError, match="different row counts"):
+        pack_pipeline_output(X, y, False)
+
+
+def test_pack_realigns_mismatched_but_same_length_indices() -> None:
+    """Regression test: same row count but non-matching pandas indices (e.g. a
+    row-dropping step that reset X's index without resetting y's) must still
+    concatenate positionally rather than NaN-padding via index-based concat."""
+    X = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])
+    y = pd.Series([100, 200, 300], name="target", index=[0, 1, 2])
+    result = pack_pipeline_output(X, y, False)
+    assert isinstance(result, pd.DataFrame)
+    assert not result["target"].isna().any()
+    assert list(result["target"]) == [100, 200, 300]
 
 
 def test_pack_was_tuple_y_none_warns(caplog: pytest.LogCaptureFixture) -> None:
@@ -293,6 +369,16 @@ def test_resolve_columns_filters_nonexistent() -> None:
     df = pd.DataFrame({"a": [1], "b": [2]})
     result = resolve_columns(df, {"columns": ["a", "z"]})
     assert result == ["a"]
+
+
+def test_resolve_columns_dedupes_explicit_duplicates_preserving_order() -> None:
+    """Regression test: duplicate column names in an explicit `columns` list
+    must be deduplicated (preserving first-occurrence order), otherwise
+    stateful calculators (encoders/scalers) would process the same column
+    twice, potentially corrupting fitted artifacts."""
+    df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
+    result = resolve_columns(df, {"columns": ["b", "a", "b", "c", "a"]})
+    assert result == ["b", "a", "c"]
 
 
 def test_resolve_columns_auto_detect_with_func() -> None:

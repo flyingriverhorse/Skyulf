@@ -6,6 +6,7 @@ import typing
 from typing import Any
 
 import pandas as pd
+import polars as pl
 import pytest
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LogisticRegression
@@ -159,6 +160,25 @@ def test_fit_raises_on_inf_features():
         tuner.fit(X, y, config=_clf_config())
 
 
+def test_fit_raises_on_nan_in_object_dtype_features():
+    """Regression test: the NaN/Inf pre-flight check must also catch missing
+    values in object-dtype feature arrays (e.g. mixed numeric+string columns
+    from SklearnBridge), not only pure numeric-dtype arrays. Previously this
+    guard was skipped entirely via `np.issubdtype(dtype, np.number)`, so a
+    NaN buried in an object array silently reached the model and produced an
+    opaque downstream sklearn error instead of the clear upfront message."""
+    X = pd.DataFrame(
+        {
+            "num": [1.0, 2.0, float("nan"), 4.0] * 30,
+            "cat": (["x", "y", "z", "w"] * 30),
+        }
+    )
+    y = pd.Series([0, 1] * 60)
+    tuner = _tuner_clf()
+    with pytest.raises(ValueError, match="missing/NaN values"):
+        tuner.fit(X, y, config=_clf_config())
+
+
 def test_fit_raises_on_nan_target():
     """fit() should raise ValueError when y contains NaN values."""
     X, y = _reg_xy()
@@ -274,6 +294,42 @@ def test_fit_cv_disabled_uses_holdout():
     cfg = _clf_config(cv_enabled=False)
     model, result = tuner.fit(X, y, config=cfg)
     assert hasattr(model, "predict")
+
+
+def test_fit_time_series_split_sorts_and_drops_time_column_prevents_leakage():
+    """Regression test: tuning with cv_type='time_series_split' must
+    chronologically sort by cv_time_column and drop it from features before
+    building CV folds - previously TuningCalculator.fit() converted X/y
+    straight to numpy (discarding column names) without ever calling the
+    shared _sort_by_time() helper used by perform_cross_validation(), so an
+    out-of-order time column perfectly correlated with y leaked directly
+    into training and folds were built on unsorted row order."""
+    import numpy as np
+
+    from skyulf.modeling.regression import LinearRegressionCalculator
+
+    rng = np.random.RandomState(0)
+    n = 60
+    ts = np.arange(n)
+    perm = rng.permutation(n)
+    X = pd.DataFrame({"ts": ts[perm], "feat": rng.normal(size=n)})
+    y = pd.Series(ts[perm].astype(float))  # y perfectly matches true time order
+
+    tuner = TuningCalculator(LinearRegressionCalculator())
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="r2",
+        search_space={"fit_intercept": [True, False]},
+        cv_folds=3,
+        cv_type="time_series_split",
+        cv_time_column="ts",
+    )
+    _, result = tuner.fit(X, y, config=cfg.__dict__)
+
+    # If the time column leaked into features (or folds were unsorted), the
+    # best CV r2 would be artificially ~1.0 since `ts` == `y`. With the leak
+    # fixed it must not be a (near-)perfect fit.
+    assert result.best_score < 0.9
 
 
 # ---------------------------------------------------------------------------
@@ -687,6 +743,20 @@ def test_fit_grid_search_handles_failing_candidate():
     assert any("Failed" in msg for msg in logs)
 
 
+def test_fit_grid_search_raises_when_all_candidates_fail():
+    """Regression test: if EVERY candidate fails on every fold, the tuner must
+    raise a clear error instead of silently refitting with untuned defaults
+    (previously best_params fell back to {} with best_score=-inf, matching
+    the halving/optuna strategies' behavior for "no trials completed")."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    # Both C values are invalid for LogisticRegression -> every candidate fails.
+    cfg = _clf_config(search_space={"C": [-5, -10]}, cv_folds=3)
+
+    with pytest.raises(ValueError, match="All trials failed"):
+        tuner.fit(X, y, config=cfg)
+
+
 # ---------------------------------------------------------------------------
 # TuningCalculator.tune — halving_grid / halving_random log callbacks
 # ---------------------------------------------------------------------------
@@ -1025,6 +1095,18 @@ def test_tuning_applier_predict_without_tuple_artifact_returns_nan():
     assert len(preds) == 3
 
 
+def test_tuning_applier_predict_without_tuple_artifact_handles_polars_input():
+    """Regression test: the NaN-fallback previously always did
+    `pd.Series(np.nan, index=df.index)`, which raises AttributeError for a
+    Polars DataFrame (no `.index` attribute). Must return an all-null
+    placeholder of the correct length instead of crashing."""
+    applier = TuningApplier(LogisticRegressionApplier())
+    X_pl = pl.DataFrame({"a": [1, 2, 3]})
+    preds = applier.predict(X_pl, "not-a-tuple-artifact")  # ty: ignore[invalid-argument-type]
+    assert len(preds) == 3
+    assert preds.isna().all()
+
+
 def test_tuning_applier_predict_proba_with_tuple_artifact():
     """predict_proba() should unwrap the tuple and delegate to the base applier."""
     X, y = _clf_xy()
@@ -1044,3 +1126,78 @@ def test_tuning_applier_predict_proba_without_tuple_artifact_returns_none():
     X_df = pd.DataFrame({"a": [1, 2, 3]})
     proba = applier.predict_proba(X_df, "not-a-tuple-artifact")
     assert proba is None
+
+
+# ---------------------------------------------------------------------------
+# TuningCalculator.tune — cv_shuffle / cv_random_state honored in search phase
+# ---------------------------------------------------------------------------
+
+
+def test_tune_search_phase_honors_cv_random_state(monkeypatch):
+    """The search-phase CV splitter must use cv_random_state, not random_state."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    cfg = _clf_config(cv_random_state=123, random_state=999)  # default cv_type="k_fold"
+
+    captured: dict[str, Any] = {}
+    real_kfold = engine_mod.KFold
+
+    class _CapturingKFold(real_kfold):
+        def __init__(self, *args, **kwargs):
+            captured["shuffle"] = kwargs.get("shuffle")
+            captured["random_state"] = kwargs.get("random_state")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(engine_mod, "KFold", _CapturingKFold)
+
+    tuner.fit(X, y, config=cfg)
+
+    assert captured["random_state"] == 123
+    assert captured["shuffle"] is True
+
+
+def test_tune_search_phase_honors_cv_shuffle_false(monkeypatch):
+    """cv_shuffle=False must produce shuffle=False and random_state=None (sklearn
+    raises ValueError if random_state is set while shuffle=False)."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    cfg = _clf_config(cv_shuffle=False, cv_random_state=123)  # default cv_type="k_fold"
+
+    captured: dict[str, Any] = {}
+    real_kfold = engine_mod.KFold
+
+    class _CapturingKFold(real_kfold):
+        def __init__(self, *args, **kwargs):
+            captured["shuffle"] = kwargs.get("shuffle")
+            captured["random_state"] = kwargs.get("random_state")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(engine_mod, "KFold", _CapturingKFold)
+
+    # Should not raise despite cv_random_state being set, since shuffle=False
+    # must force random_state=None internally.
+    tuner.fit(X, y, config=cfg)
+
+    assert captured["shuffle"] is False
+    assert captured["random_state"] is None
+
+
+def test_tune_search_phase_shuffle_split_honors_cv_random_state(monkeypatch):
+    """The shuffle_split CV type must seed ShuffleSplit from cv_random_state."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    cfg = _clf_config(cv_type="shuffle_split", cv_random_state=77, random_state=999)
+
+    captured: dict[str, Any] = {}
+    real_shuffle_split = engine_mod.ShuffleSplit
+
+    class _CapturingShuffleSplit(real_shuffle_split):
+        def __init__(self, *args, **kwargs):
+            captured["random_state"] = kwargs.get("random_state")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(engine_mod, "ShuffleSplit", _CapturingShuffleSplit)
+
+    tuner.fit(X, y, config=cfg)
+
+    assert captured["random_state"] == 77

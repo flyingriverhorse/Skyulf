@@ -87,6 +87,73 @@ class TestLogisticRegression:
         assert report["problem_type"] == "classification"
         assert "accuracy" in report["splits"]["test"].metrics
 
+    def test_fit_raises_clear_error_on_incompatible_solver_penalty(
+        self, classification_dataset: SplitDataset
+    ) -> None:
+        """solver='lbfgs' + penalty='l1' is invalid in sklearn; the calculator
+        must fail fast with an actionable message rather than surfacing
+        sklearn's own deep ValueError from inside LogisticRegression.fit."""
+        from skyulf.modeling.classification import (
+            LogisticRegressionApplier,
+            LogisticRegressionCalculator,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="lr",
+            calculator=LogisticRegressionCalculator(),
+            applier=LogisticRegressionApplier(),
+        )
+        with pytest.raises(ValueError, match="does not support penalty"):
+            estimator.fit_predict(
+                classification_dataset,
+                target_column="target",
+                config={"params": {"solver": "lbfgs", "penalty": "l1"}},
+            )
+
+    def test_fit_allows_compatible_solver_penalty(
+        self, classification_dataset: SplitDataset
+    ) -> None:
+        """saga supports l1/l2/elasticnet/None -- must not raise."""
+        from skyulf.modeling.classification import (
+            LogisticRegressionApplier,
+            LogisticRegressionCalculator,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="lr",
+            calculator=LogisticRegressionCalculator(),
+            applier=LogisticRegressionApplier(),
+        )
+        preds = estimator.fit_predict(
+            classification_dataset,
+            target_column="target",
+            config={"params": {"solver": "saga", "penalty": "l1", "max_iter": 1000}},
+        )
+        assert len(preds["test"]) == 40
+
+    def test_fit_allows_solver_without_penalty_override(
+        self, classification_dataset: SplitDataset
+    ) -> None:
+        """Overriding only `solver` (no explicit `penalty` key) must not raise
+        -- validation only runs when both keys are present in the same
+        config so we don't reject a partial config the model defaults fill in."""
+        from skyulf.modeling.classification import (
+            LogisticRegressionApplier,
+            LogisticRegressionCalculator,
+        )
+
+        estimator = StatefulEstimator(
+            node_id="lr",
+            calculator=LogisticRegressionCalculator(),
+            applier=LogisticRegressionApplier(),
+        )
+        preds = estimator.fit_predict(
+            classification_dataset,
+            target_column="target",
+            config={"params": {"solver": "liblinear"}},
+        )
+        assert len(preds["test"]) == 40
+
 
 class TestRandomForestClassifier:
     def test_fit_predict(self, classification_dataset: SplitDataset) -> None:
@@ -661,6 +728,19 @@ class TestHyperparameterRegistry:
         for key in self.NEW_MODELS:
             space = get_default_search_space(key)
             assert len(space) > 0, f"No search space defined for {key!r}"
+
+    def test_logistic_regression_solver_options_include_newton_cholesky(self) -> None:
+        """Regression test: `LogisticRegressionCalculator` supports the
+        'newton-cholesky' solver (`_SOLVER_PENALTIES`), but the hyperparameter
+        UI options list didn't include it, so users had no way to select it
+        from the frontend dropdown (which is generated from this registry
+        via the backend's hyperparameters API)."""
+        from skyulf.modeling.hyperparameters import get_hyperparameters
+
+        params = get_hyperparameters("logistic_regression")
+        solver_field = next(p for p in params if p["name"] == "solver")
+        option_values = {opt["value"] for opt in solver_field["options"]}
+        assert "newton-cholesky" in option_values
 
 
 # ===========================================================================

@@ -191,3 +191,15 @@ class Settings(
     def is_field_set(self, field_name: str) -> bool:
         """Return True if the given settings field was explicitly provided by the user."""
         return field_name in getattr(self, "model_fields_set", set())
+
+    @property
+    def environment_name(self) -> str:
+        """Return the deployment environment name for health checks/monitoring.
+
+        Uses the explicit ``ENVIRONMENT`` setting when provided (e.g. "staging").
+        Falls back to deriving from ``DEBUG`` when unset, preserving behavior for
+        deployments that don't set ``ENVIRONMENT`` explicitly.
+        """
+        if self.ENVIRONMENT:
+            return self.ENVIRONMENT
+        return "development" if self.DEBUG else "production"

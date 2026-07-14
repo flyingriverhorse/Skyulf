@@ -35,6 +35,7 @@ LOGISTIC_REGRESSION_PARAMS = [
             {"label": "LBFGS", "value": "lbfgs"},
             {"label": "Liblinear", "value": "liblinear"},
             {"label": "Newton-CG", "value": "newton-cg"},
+            {"label": "Newton-Cholesky", "value": "newton-cholesky"},
             {"label": "SAG", "value": "sag"},
             {"label": "SAGA", "value": "saga"},
         ],

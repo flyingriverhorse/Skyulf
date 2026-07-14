@@ -67,13 +67,15 @@ def test_cast_date_columns_falls_back_to_explicit_format(monkeypatch) -> None:
     assert parsed.drop_nulls().len() == 3
 
 
-def test_cast_date_columns_prints_when_final_cast_raises(monkeypatch, capsys) -> None:
+def test_cast_date_columns_logs_warning_when_final_cast_raises(monkeypatch, caplog) -> None:
     """A parse-success-at-sample-level but failure-at-full-column-apply should be logged.
 
-    Exercises the outer ``except Exception as e: print(...)`` branch in the final
-    cast-application step, by making the full-column ``Expr``-level ``to_datetime``
-    raise while leaving the ``Series``-level sample check untouched.
+    Exercises the outer ``except Exception as e: logger.warning(...)`` branch in the
+    final cast-application step, by making the full-column ``Expr``-level
+    ``to_datetime`` raise while leaving the ``Series``-level sample check untouched.
     """
+    import logging
+
     import polars.expr.string as pl_expr_string
 
     real_expr_to_datetime = pl_expr_string.ExprStringNameSpace.to_datetime
@@ -95,12 +97,12 @@ def test_cast_date_columns_prints_when_final_cast_raises(monkeypatch, capsys) ->
         }
     )
     analyzer = EDAAnalyzer(df)
-    analyzer._cast_date_columns()
+    with caplog.at_level(logging.WARNING, logger="skyulf.profiling._analyzer.dates"):
+        analyzer._cast_date_columns()
 
     monkeypatch.setattr(pl_expr_string.ExprStringNameSpace, "to_datetime", real_expr_to_datetime)
 
-    captured = capsys.readouterr()
-    assert "Failed to cast column event_date" in captured.out
+    assert any("Failed to cast column event_date" in record.message for record in caplog.records)
     # Column should remain untouched (still Utf8) since the cast raised.
     assert analyzer.df["event_date"].dtype == pl.Utf8
 
@@ -135,3 +137,28 @@ class TestRealShapedDataset:
         assert analyzer.df["signup_date"].dtype in (pl.Date, pl.Datetime)
         # All 15 rows have a signup_date, so parsing should not drop any values.
         assert analyzer.df["signup_date"].drop_nulls().len() == df.height
+
+
+def test_cast_date_columns_warns_on_ambiguous_dmy_mdy_tie(caplog) -> None:
+    """When multiple date formats (e.g. %m/%d/%Y vs %d/%m/%Y) parse a sample
+    equally well (same distinct-month count), the ambiguous D/M/Y-vs-M/D/Y
+    choice must be surfaced via a warning instead of silently picking
+    whichever format happened to be tried first."""
+    import logging
+
+    df = pl.DataFrame(
+        {
+            "event_date": ["01/02/2021", "03/04/2021", "05/06/2021", "07/08/2021"],
+            "x": [1, 2, 3, 4],
+        }
+    )
+    analyzer = EDAAnalyzer(df)
+    with caplog.at_level(logging.WARNING, logger="skyulf.profiling._analyzer.dates"):
+        analyzer._cast_date_columns()
+
+    assert any(
+        "multiple date formats" in record.message and "event_date" in record.message
+        for record in caplog.records
+    )
+    # The column should still get cast to *some* datetime interpretation.
+    assert analyzer.df["event_date"].dtype != pl.Utf8

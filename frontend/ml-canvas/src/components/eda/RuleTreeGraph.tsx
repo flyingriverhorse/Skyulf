@@ -32,14 +32,39 @@ interface RuleTreeGraphProps {
     tree: {
         nodes: RuleNodeData[];
         accuracy?: number;
+        categories?: Record<string, string[]>;
     };
 }
 
 const nodeWidth = 220;
 const nodeHeight = 100;
 
+/**
+ * Formats a node's decision label, translating categorical splits (ordinal
+ * code thresholds) into readable "feature in [...]" clauses via the
+ * categories map, instead of a meaningless "feature <= <code>".
+ */
+function formatDecisionLabel(
+    data: RuleNodeData,
+    categories?: Record<string, string[]>
+): string {
+    if (data.feature === undefined || data.threshold === undefined) {
+        return '';
+    }
+    const featureCategories = categories?.[data.feature];
+    if (featureCategories) {
+        const left = featureCategories.filter((_, i) => i <= (data.threshold as number));
+        return `${data.feature} in [${left.join(', ')}]`;
+    }
+    return `${data.feature} <= ${data.threshold.toFixed(2)}`;
+}
+
 // Custom Node Component
-const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }) => {
+const DecisionNode = ({
+    data,
+}: {
+    data: RuleNodeData & { class_name?: string; categories?: Record<string, string[]> };
+}) => {
     const isLeaf = data.is_leaf;
 
     // Calculate class distribution percentage
@@ -62,7 +87,7 @@ const DecisionNode = ({ data }: { data: RuleNodeData & { class_name?: string } }
                     ) : (
                         <span className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
                             <GitFork className="w-4 h-4" />
-                            {data.feature} {data.threshold !== undefined ? `<= ${data.threshold.toFixed(2)}` : ''}
+                            {formatDecisionLabel(data, data.categories)}
                         </span>
                     )}
                 </div>
@@ -166,7 +191,7 @@ export const RuleTreeGraph: React.FC<RuleTreeGraphProps> = ({ tree }) => {
         const flowNodes: Node[] = tree.nodes.map(n => ({
             id: n.id.toString(),
             type: 'decision',
-            data: { ...n },
+            data: { ...n, categories: tree.categories },
             position: { x: 0, y: 0 }, // Calculated by layout
         }));
 

@@ -90,3 +90,30 @@ def test_get_all_metadata_returns_snapshot_not_live_reference():
     snapshot = NodeRegistry.get_all_metadata()
     snapshot["dummy_node_snapshot"] = {"tampered": True}
     assert NodeRegistry.get_all_metadata()["dummy_node_snapshot"] != {"tampered": True}
+
+
+def test_register_is_thread_safe_under_concurrent_registration():
+    """Regression test: concurrent registration must not interleave a
+    calculator/applier pair from different registration calls (which would
+    silently produce a mismatched calculator/applier for the same name).
+    Registers many distinct node names concurrently and checks every one
+    ends up with a consistent (name -> its own applier) mapping.
+    """
+    import threading
+
+    n_nodes = 50
+    appliers = {f"concurrent_node_{i}": type(f"Applier{i}", (), {}) for i in range(n_nodes)}
+    calculators = {f"concurrent_node_{i}": type(f"Calc{i}", (), {}) for i in range(n_nodes)}
+
+    def _register(name: str) -> None:
+        NodeRegistry.register(name, appliers[name])(calculators[name])
+
+    threads = [threading.Thread(target=_register, args=(name,)) for name in appliers]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    for name in appliers:
+        assert NodeRegistry.get_calculator(name) is calculators[name]
+        assert NodeRegistry.get_applier(name) is appliers[name]

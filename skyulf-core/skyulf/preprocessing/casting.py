@@ -41,6 +41,12 @@ TYPE_ALIASES = {
     "datetime64[ns]": "datetime64[ns]",
 }
 
+# Shared string-alias table for boolean coercion (used by both the pandas
+# and Polars apply paths so "yes"/"no"-style flags are recognized
+# identically regardless of engine).
+_BOOL_TRUE_ALIASES = ("true", "yes", "1", "on", "y", "t")
+_BOOL_FALSE_ALIASES = ("false", "no", "0", "off", "n", "f")
+
 
 # -----------------------------------------------------------------------------
 # Polars apply
@@ -63,6 +69,13 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
         "int64": pl.Int64,
         "integer": pl.Int64,
         "int32": pl.Int32,
+        "int16": pl.Int16,
+        "int8": pl.Int8,
+        "uint": pl.UInt64,
+        "uint64": pl.UInt64,
+        "uint32": pl.UInt32,
+        "uint16": pl.UInt16,
+        "uint8": pl.UInt8,
         "string": pl.String,
         "str": pl.String,
         "text": pl.String,
@@ -79,6 +92,32 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
     return None
 
 
+def _bool_expr_from_string_col_polars(col: str) -> Any:
+    """Build a Polars expression casting a String/Utf8 column to Boolean.
+
+    Polars has no direct Utf8->Boolean cast at all (raises
+    `InvalidOperationError` even with ``strict=False``), unlike pandas'
+    `.astype("boolean")` which happens to fail the same way for strings but
+    then falls back to a per-value alias table (`_coerce_boolean_value`).
+    Without this, casting a "yes"/"no"-style string column to boolean on the
+    Polars engine hard-crashes instead of coercing - a stark engine-parity
+    break for a very common use case. Mirrors `_coerce_boolean_value`'s alias
+    table; unrecognized values become null (the caller decides whether to
+    raise on that, mirroring `coerce_on_error`).
+    """
+    import polars as pl
+
+    normalized = pl.col(col).str.strip_chars().str.to_lowercase()
+    return (
+        pl.when(normalized.is_in(list(_BOOL_TRUE_ALIASES)))
+        .then(True)  # noqa: FBT003
+        .when(normalized.is_in(list(_BOOL_FALSE_ALIASES)))
+        .then(False)  # noqa: FBT003
+        .otherwise(None)
+        .alias(col)
+    )
+
+
 def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     import polars as pl
 
@@ -88,15 +127,44 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     coerce_on_error = params.get("coerce_on_error", True)
 
     exprs = []
+    string_bool_cols: list[str] = []
     for col, target_dtype in type_map.items():
         if col not in X.columns:
             continue
         pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
         if pl_dtype is None:
+            # In strict mode (coerce_on_error=False), an unsupported dtype
+            # string is a configuration error and must be surfaced loudly -
+            # previously this silently skipped the column even in strict
+            # mode, while the equivalent pandas path raises. In coerce mode
+            # we keep the existing best-effort "leave untouched" behavior.
+            if not coerce_on_error:
+                raise ValueError(
+                    f"Column '{col}': unsupported target dtype '{target_dtype}' for the "
+                    "Polars engine."
+                )
+            continue
+        if pl_dtype == pl.Boolean and X.schema[col] in (pl.String, pl.Utf8, pl.Categorical):
+            exprs.append(_bool_expr_from_string_col_polars(col))
+            string_bool_cols.append(col)
             continue
         exprs.append(pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col))
 
-    return (X.with_columns(exprs) if exprs else X), y
+    if not exprs:
+        return X, y
+
+    result = X.with_columns(exprs)
+
+    if not coerce_on_error and string_bool_cols:
+        for col in string_bool_cols:
+            newly_null = result[col].is_null() & X[col].is_not_null()
+            if newly_null.any():
+                raise ValueError(
+                    f"Cannot cast column '{col}' to boolean: contains value(s) "
+                    "not recognized as true/false."
+                )
+
+    return result, y
 
 
 # -----------------------------------------------------------------------------
@@ -117,9 +185,9 @@ def _coerce_boolean_value(value: Any) -> bool | None:
             return False
         return None
     s = str(value).strip().lower()
-    if s in ("true", "yes", "1", "on", "y", "t"):
+    if s in _BOOL_TRUE_ALIASES:
         return True
-    if s in ("false", "no", "0", "off", "n", "f"):
+    if s in _BOOL_FALSE_ALIASES:
         return False
     return None
 
@@ -172,13 +240,39 @@ def _mask_out_of_range_or_raise(
     return numeric
 
 
+# Map each numpy integer dtype string to its pandas nullable (NA-capable)
+# counterpart, preserving the requested width/signedness instead of always
+# widening to Int64.
+_NULLABLE_INT_DTYPES = {
+    "int8": "Int8",
+    "int16": "Int16",
+    "int32": "Int32",
+    "int64": "Int64",
+    "int": "Int64",
+    "uint8": "UInt8",
+    "uint16": "UInt16",
+    "uint32": "UInt32",
+    "uint64": "UInt64",
+    "uint": "UInt64",
+}
+
+
 def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
     numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
     numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
-    if numeric.isna().any() and target_dtype in ("int32", "int64", "int"):
-        # NaNs require pandas' nullable Int64 container.
-        return numeric.astype("Int64")
+    if numeric.isna().any():
+        # NaNs require a pandas nullable container. Previously this only
+        # covered int32/int64/int, so casting a narrower dtype (int8/int16/
+        # uint8/etc.) with coerce_on_error=True and any out-of-range/NaN
+        # value fell through to `numeric.astype(target_dtype)` below, which
+        # raises on plain numpy int dtypes with NaN present — that raise was
+        # then silently swallowed by the caller's best-effort except block,
+        # leaving the ENTIRE column completely uncast (not even in-range
+        # values got converted). Look up the matching nullable dtype for any
+        # integer width instead of only the three previously handled.
+        nullable_dtype = _NULLABLE_INT_DTYPES.get(str(target_dtype).lower(), "Int64")
+        return numeric.astype(nullable_dtype)  # ty: ignore[no-matching-overload]
     return numeric.astype(target_dtype)
 
 
@@ -205,7 +299,7 @@ def _cast_one_column(
     dtype_str = str(target_dtype).lower()
     if dtype_str.startswith("float"):
         return _cast_float(series, target_dtype, coerce_on_error)
-    if dtype_str.startswith("int"):
+    if dtype_str.startswith(("int", "uint")):
         return _cast_int(series, col, target_dtype, coerce_on_error)
     if dtype_str.startswith("bool"):
         return _cast_bool(series, coerce_on_error)

@@ -13,6 +13,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.config import get_settings
 from backend.utils.datetime import utcnow
 
 from .engine import Base
@@ -66,7 +67,7 @@ class BaseRepository[ModelType: Base]:
         self,
         *,
         skip: int = 0,
-        limit: int = 100,
+        limit: int | None = None,
         filters: dict[str, Any] | None = None,
         order_by: str | None = None,
     ) -> list[ModelType]:
@@ -82,6 +83,7 @@ class BaseRepository[ModelType: Base]:
         Returns:
             List[ModelType]: List of model instances
         """
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
         query = select(self.model)
 
         # Apply filters
@@ -95,7 +97,7 @@ class BaseRepository[ModelType: Base]:
             query = query.order_by(getattr(self.model, order_by))
 
         # Apply pagination
-        query = query.offset(skip).limit(limit)
+        query = query.offset(skip).limit(effective_limit)
 
         result = await self.session.execute(query)
         records = result.scalars().all()
