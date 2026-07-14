@@ -422,9 +422,7 @@ class TestSeasonAndTimeOfDay:
         pytest.importorskip("polars")
         out_pd = _run(self._ops(), df=self._df())
         out_pl = _run_polars(self._ops(), df=self._df())
-        assert list(out_pd[f"{DATE_COL}_time_of_day"]) == list(
-            out_pl[f"{DATE_COL}_time_of_day"]
-        )
+        assert list(out_pd[f"{DATE_COL}_time_of_day"]) == list(out_pl[f"{DATE_COL}_time_of_day"])
 
 
 # ---------------------------------------------------------------------------

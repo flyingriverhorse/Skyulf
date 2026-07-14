@@ -154,7 +154,7 @@ def _mask_out_of_range_or_raise(
     polars apply path which correctly nulls/raises via ``strict`` casts.
     """
     try:
-        info = np.iinfo(np.dtype(target_dtype))
+        info = np.iinfo(str(target_dtype))
     except TypeError:
         # Unrecognized/non-integer dtype string: skip range-checking rather
         # than fail the cast outright.

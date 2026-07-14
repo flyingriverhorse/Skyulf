@@ -17,7 +17,6 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import _parse_categories_order, detect_categorical_columns
 
-
 # -----------------------------------------------------------------------------
 # Apply
 # -----------------------------------------------------------------------------

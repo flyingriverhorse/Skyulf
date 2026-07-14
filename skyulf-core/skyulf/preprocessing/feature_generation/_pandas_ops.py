@@ -149,9 +149,7 @@ def _pandas_time_of_day(d: Any) -> Any:
     hour = d.dt.hour
     conditions = [(hour >= lo) & (hour <= hi) for lo, hi, _label in TIME_OF_DAY_BUCKETS]
     choices = [label for _lo, _hi, label in TIME_OF_DAY_BUCKETS]
-    return pd.Series(
-        np.select(conditions, choices, default=TIME_OF_DAY_DEFAULT), index=d.index
-    )
+    return pd.Series(np.select(conditions, choices, default=TIME_OF_DAY_DEFAULT), index=d.index)
 
 
 _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {

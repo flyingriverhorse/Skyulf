@@ -478,7 +478,6 @@ class TestFeatgenApplyPolars:
         assert any("Failed to apply arithmetic operation" in rec.message for rec in caplog.records)
 
 
-
 # ---------------------------------------------------------------------------
 # Engine parity: _featgen_apply_polars vs _featgen_apply_pandas
 # ---------------------------------------------------------------------------

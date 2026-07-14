@@ -87,9 +87,11 @@ def test_apply_dual_engine_pandas_exception_is_logged(caplog):
         raise ValueError("boom")
 
     df = pd.DataFrame({"a": [1, 2, 3]})
-    with caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.dispatcher"):
-        with pytest.raises(ValueError, match="boom"):
-            apply_dual_engine(df, {}, _polars_apply, _raising)
+    with (
+        caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.dispatcher"),
+        pytest.raises(ValueError, match="boom"),
+    ):
+        apply_dual_engine(df, {}, _polars_apply, _raising)
     assert any("Pandas engine apply failed" in rec.message for rec in caplog.records)
 
 
