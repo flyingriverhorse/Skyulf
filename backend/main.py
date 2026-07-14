@@ -166,8 +166,9 @@ def _reset_stale_jobs() -> None:
     BackgroundTasks (or a Celery worker) were mid-execution.  Without this
     reset the frontend polls forever because the status never changes.
 
-    A 2-hour staleness cutoff is applied so that jobs recently started by
-    Celery workers (which survive API restarts) are not incorrectly failed.
+    A staleness cutoff (``Settings.JOB_ORPHAN_STALE_HOURS``) is applied so that
+    jobs recently started by Celery workers (which survive API restarts) are
+    not incorrectly failed.
     """
     try:
         from datetime import datetime, timedelta
@@ -182,10 +183,12 @@ def _reset_stale_jobs() -> None:
 
         engine = create_engine(sync_url, pool_pre_ping=True)
         msg = "Server restarted while job was running — marked failed on startup."
-        # Only treat jobs as orphaned if they have been stuck for > 2 hours.
+        # Only treat jobs as orphaned if they have been stuck for > JOB_ORPHAN_STALE_HOURS.
         # This protects Celery-managed jobs that may still be running after
         # the API process restarts.
-        stale_cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
+        stale_cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(
+            hours=get_settings().JOB_ORPHAN_STALE_HOURS
+        )
         with engine.begin() as conn:
             for table in ("basic_training_jobs", "advanced_tuning_jobs"):
                 # `table` is drawn only from the fixed tuple above (never user input),

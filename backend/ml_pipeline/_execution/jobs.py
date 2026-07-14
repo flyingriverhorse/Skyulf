@@ -11,16 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
 from backend.database.models import AdvancedTuningJob, BasicTrainingJob
 from backend.ml_pipeline._execution.advanced_tuning_manager import AdvancedTuningManager
 from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
-
-# Jobs submitted within this window for the same pipeline+node are considered duplicates.
-_IDEMPOTENCY_WINDOW = timedelta(seconds=30)
-# Cross-table pagination merges Python objects from two ORM queries because a
-# portable UNION over heterogeneous job tables would require dropping to raw SQL.
-_MAX_SKIP = 500
 
 logger = logging.getLogger(__name__)
 
@@ -92,14 +87,17 @@ class JobManager:
 
         Keyed on (dataset_source_id, node_id, branch_index) so parallel branches
         that share the same terminal node are never confused with each other.
-        Scoped to jobs created within the last 30 seconds.  Returns None if no
+        Scoped to jobs created within the configured idempotency window
+        (``Settings.JOB_IDEMPOTENCY_WINDOW_SECONDS``).  Returns None if no
         active duplicate exists.
 
         The query runs inside the *caller's* transaction so that, on databases
         that support it (PostgreSQL), the session lock serialises concurrent
         workers at the DB level — not just within a single process.
         """
-        cutoff = datetime.now(UTC) - _IDEMPOTENCY_WINDOW
+        cutoff = datetime.now(UTC) - timedelta(
+            seconds=get_settings().JOB_IDEMPOTENCY_WINDOW_SECONDS
+        )
         active = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
         for model in (BasicTrainingJob, AdvancedTuningJob):
             # Fetch all recent active candidates then filter by branch_index
@@ -201,13 +199,14 @@ class JobManager:
         elif job_type in ["advanced_tuning", "tuning"]:
             jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
-            if skip > _MAX_SKIP:
+            max_skip = get_settings().MAX_CROSS_TABLE_SKIP
+            if skip > max_skip:
                 logger.warning(
                     "list_jobs: skip=%d exceeds cap %d; clamping to avoid OOM",
                     skip,
-                    _MAX_SKIP,
+                    max_skip,
                 )
-                skip = _MAX_SKIP
+                skip = max_skip
 
             # Combine both
             train_jobs = await BasicTrainingManager.list_training_jobs(session, limit + skip, 0)

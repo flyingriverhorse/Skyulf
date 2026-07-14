@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from backend.config import Settings
+from backend.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,9 @@ class AsyncSQLiteConnectionManager:
                 await conn.execute("PRAGMA wal_autocheckpoint=1000")  # Every 1000 pages
 
                 # Connection-specific settings
-                await conn.execute("PRAGMA busy_timeout=30000")  # 30 second timeout
+                await conn.execute(
+                    f"PRAGMA busy_timeout={get_settings().DB_SQLITE_BUSY_TIMEOUT_MS}"
+                )
                 await conn.execute("PRAGMA foreign_keys=ON")  # Enable FK constraints
 
                 await conn.commit()
@@ -95,7 +97,9 @@ class AsyncSQLiteConnectionManager:
                 conn = await aiosqlite.connect(self.database_path, timeout=self.timeout)
 
                 # Set connection-specific pragmas
-                await conn.execute("PRAGMA busy_timeout=30000")
+                await conn.execute(
+                    f"PRAGMA busy_timeout={get_settings().DB_SQLITE_BUSY_TIMEOUT_MS}"
+                )
                 await conn.execute("PRAGMA foreign_keys=ON")
 
                 yield conn
