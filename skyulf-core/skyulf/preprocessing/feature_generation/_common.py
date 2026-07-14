@@ -51,6 +51,31 @@ _FUZZ_METHODS: dict[str, str] = {
     "token_set_ratio": "token_set_ratio",
 }
 
+# Shared bucketing conventions for the "season" and "time_of_day" datetime
+# features, so both the pandas and polars engines produce identical labels.
+SEASON_BY_MONTH: dict[int, str] = {
+    12: "Winter",
+    1: "Winter",
+    2: "Winter",
+    3: "Spring",
+    4: "Spring",
+    5: "Spring",
+    6: "Summer",
+    7: "Summer",
+    8: "Summer",
+    9: "Autumn",
+    10: "Autumn",
+    11: "Autumn",
+}
+# (min_hour, max_hour, label) buckets, inclusive on both ends. "Night" wraps
+# around midnight (21-23 and 0-4) and is used as the catch-all default.
+TIME_OF_DAY_BUCKETS: list[tuple[int, int, str]] = [
+    (5, 11, "Morning"),
+    (12, 16, "Afternoon"),
+    (17, 20, "Evening"),
+]
+TIME_OF_DAY_DEFAULT = "Night"
+
 
 def _coerce_float(value: Any) -> float | None:
     if value is None:

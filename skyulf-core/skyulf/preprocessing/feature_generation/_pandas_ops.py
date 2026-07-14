@@ -5,10 +5,14 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from ._common import (
     DEFAULT_EPSILON,
+    SEASON_BY_MONTH,
+    TIME_OF_DAY_BUCKETS,
+    TIME_OF_DAY_DEFAULT,
     _resolve_group_agg_cols,
     _resolve_output_col,
     _resolve_similarity_pair,
@@ -135,6 +139,21 @@ def _pandas_similarity(op: dict[str, Any], df_out: Any, _eps: float) -> pd.Serie
     return _vectorised_similarity(df_out[col_a], df_out[col_b], op.get("method") or "ratio")
 
 
+def _pandas_season(d: Any) -> Any:
+    """Map a datetime series' month to its meteorological season name."""
+    return d.dt.month.map(SEASON_BY_MONTH)
+
+
+def _pandas_time_of_day(d: Any) -> Any:
+    """Bucket a datetime series' hour into a time-of-day label."""
+    hour = d.dt.hour
+    conditions = [(hour >= lo) & (hour <= hi) for lo, hi, _label in TIME_OF_DAY_BUCKETS]
+    choices = [label for _lo, _hi, label in TIME_OF_DAY_BUCKETS]
+    return pd.Series(
+        np.select(conditions, choices, default=TIME_OF_DAY_DEFAULT), index=d.index
+    )
+
+
 _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "year": lambda d: d.dt.year,
     "month": lambda d: d.dt.month,
@@ -148,6 +167,8 @@ _PANDAS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {
     "week": lambda d: d.dt.isocalendar().week.astype(int),
     "month_name": lambda d: d.dt.month_name(),
     "day_name": lambda d: d.dt.day_name(),
+    "season": _pandas_season,
+    "time_of_day": _pandas_time_of_day,
 }
 
 

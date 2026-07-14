@@ -1,6 +1,5 @@
 """Iterative imputer node (MICE / chained equations)."""
 
-import logging
 from typing import Any
 
 # Enable experimental IterativeImputer
@@ -18,8 +17,6 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import _build_iterative_estimator, _sklearn_transform_subset
 
-logger = logging.getLogger(__name__)
-
 
 class IterativeImputerApplier(BaseApplier):
     @apply_method
@@ -32,11 +29,7 @@ class IterativeImputerApplier(BaseApplier):
         imputer = params.get("imputer_object")
         if not resolve_valid_columns(X, cols) or not imputer:
             return X, _y
-        try:
-            return _sklearn_transform_subset(X, cols, imputer, is_polars=True), _y
-        except Exception as e:
-            logger.error(f"Iterative Imputation failed: {e}")
-            return X, _y
+        return _sklearn_transform_subset(X, cols, imputer, is_polars=True), _y
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -44,11 +37,7 @@ class IterativeImputerApplier(BaseApplier):
         imputer = params.get("imputer_object")
         if not resolve_valid_columns(X, cols) or not imputer:
             return X, _y
-        try:
-            return _sklearn_transform_subset(X, cols, imputer, is_polars=False), _y
-        except Exception as e:
-            logger.error(f"Iterative Imputation failed: {e}")
-            return X, _y
+        return _sklearn_transform_subset(X, cols, imputer, is_polars=False), _y
 
 
 @NodeRegistry.register("IterativeImputer", IterativeImputerApplier)

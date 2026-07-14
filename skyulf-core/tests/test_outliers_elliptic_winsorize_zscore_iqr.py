@@ -329,6 +329,21 @@ class TestWinsorizeApplier:
         out = WinsorizeApplier().apply(df, params)
         assert out["label"].tolist() == ["a", "b"]
 
+    def test_non_numeric_column_untouched_polars(self) -> None:
+        """Polars path must mirror pandas: a non-numeric column referenced in bounds
+        is skipped (not cast/clipped), while a numeric column with bounds is still
+        winsorized correctly."""
+        df = pl.DataFrame({"val": [1.0, 1000.0], "label": ["a", "b"]})
+        params = {
+            "bounds": {
+                "val": {"lower": 0.0, "upper": 500.0},
+                "label": {"lower": 0.0, "upper": 1.0},
+            }
+        }
+        out = WinsorizeApplier().apply(df, params)
+        assert out["label"].to_list() == ["a", "b"]
+        assert out["val"].to_list() == [1.0, 500.0]
+
     @pytest.mark.parametrize(*_winsorize_pandas_passthrough_cases)
     def test_pandas_passthrough(self, values: list, config: dict, expected: list) -> None:
         """Empty bounds, or bounds for an unknown column, must return the frame unchanged."""
