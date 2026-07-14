@@ -55,10 +55,21 @@ def _build_node_registry() -> list[RegistryItem]:
         ),
     ]
     dynamic: list[RegistryItem] = []
+    seen_ids: set[str] = set()
     for node_id, meta in SkyulfRegistry.get_all_metadata().items():
         item_data = dict(meta)
         if "id" not in item_data:
             item_data["id"] = node_id
+        item_id = item_data["id"]
+        # Some skyulf-core nodes are registered under multiple aliases for
+        # backward-compatible calculator/applier lookup (e.g.
+        # "Split"/"TrainTestSplitter", "PolynomialFeatures"/"PolynomialFeaturesNode"),
+        # all sharing the same underlying metadata id. Without this guard,
+        # every alias would produce a duplicate card in the frontend node
+        # palette. Keep only the first-seen entry per id.
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
         dynamic.append(RegistryItem(**item_data))
 
     dynamic_ids = {n.id for n in dynamic}

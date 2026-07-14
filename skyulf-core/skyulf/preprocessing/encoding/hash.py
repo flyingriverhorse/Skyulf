@@ -63,7 +63,14 @@ def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
     n_features = params.get("n_features", 10)
     X_out = X.copy()
     for col in valid_cols:
-        X_out[col] = X_out[col].astype(str).apply(lambda x: _stable_hash(x) % n_features)
+        s = X_out[col].astype(str)
+        # Hash each *unique* value once, then vectorize the lookup via
+        # `.map()` — cheaper than a per-row `.apply()` on high-row-count,
+        # low-cardinality columns. Building the mapping from this column's
+        # own `.unique()` guarantees every value is covered, so there's no
+        # NaN-from-unmapped-key risk.
+        bucket_by_value = {v: _stable_hash(v) % n_features for v in s.unique()}
+        X_out[col] = s.map(bucket_by_value)
     return X_out, y
 
 
