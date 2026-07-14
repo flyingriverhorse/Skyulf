@@ -57,7 +57,7 @@ class IterativeImputerApplier(BaseApplier):
     name="Iterative Imputer (MICE)",
     category="Preprocessing",
     description="Multivariate imputation using chained equations.",
-    params={"max_iter": 10, "random_state": 0, "estimator": "bayesian_ridge", "columns": []},
+    params={"max_iter": 10, "random_state": 0, "estimator": "BayesianRidge", "columns": []},
 )
 class IterativeImputerCalculator(BaseCalculator):
     def infer_output_schema(

@@ -135,7 +135,7 @@ class CountVectorizerCalculator(BaseCalculator):
         prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
         output_columns = [f"{prefix}__count__{name}" for name in feature_names]
 
-        warn = _warn_large_output(len(output_columns))
+        warn = _warn_large_output(len(output_columns), threshold=_LARGE_VOCAB_THRESHOLD)
         if warn:
             logger.warning(warn)
 

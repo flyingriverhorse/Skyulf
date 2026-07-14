@@ -185,14 +185,16 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
 
     valid = [c for c in op.get("input_columns", []) if c in X_out.columns]
     features = op.get("datetime_features", [])
-    dt_exprs: list[Any] = []
     for col in valid:
-        base_dt = pl.col(col)
-        if X_out.schema[col] == pl.String:
-            base_dt = pl.col(col).str.to_datetime(strict=False)
-        dt_exprs.extend(_build_polars_dt_exprs(col, base_dt, features))
-    if dt_exprs:
-        X_out = X_out.with_columns(dt_exprs)
+        try:
+            base_dt = pl.col(col)
+            if X_out.schema[col] == pl.String:
+                base_dt = pl.col(col).str.to_datetime(strict=False)
+            col_exprs = _build_polars_dt_exprs(col, base_dt, features)
+            if col_exprs:
+                X_out = X_out.with_columns(col_exprs)
+        except Exception:
+            pass  # nosec B110 - skip a column that fails datetime feature extraction
     return X_out
 
 
