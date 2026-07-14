@@ -8,6 +8,7 @@ plus a small JSON-on-disk fallback for the "json" storage backend.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -34,6 +35,26 @@ logger = logging.getLogger(__name__)
 # so all paths (`/save/...`, `/load/...`, `/versions/...`) stay byte-identical.
 router = APIRouter(tags=["ML Pipeline"])
 
+# `dataset_id` comes straight from the URL path and is used to build a
+# filename for the on-disk "json" storage backend. Only allow the charset
+# real dataset ids use (alphanumerics, dash, underscore) -- this rejects
+# path separators, "..", null bytes, and any other filesystem-meaningful
+# character outright, so the on-disk path can never leave `storage_dir`
+# regardless of how it's later joined/formatted.
+_SAFE_DATASET_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _pipeline_json_path(storage_dir: str | Path, dataset_id: str) -> Path:
+    """Return the on-disk JSON path for `dataset_id`, or raise ValueError.
+
+    `dataset_id` must match `_SAFE_DATASET_ID_RE`; anything else (path
+    separators, "..", absolute-path overrides, etc.) is rejected before any
+    `Path` is built from it.
+    """
+    if not _SAFE_DATASET_ID_RE.fullmatch(dataset_id):
+        raise ValueError(f"Invalid dataset_id: {dataset_id!r}")
+    return Path(storage_dir) / f"{dataset_id}.json"
+
 
 @router.post("/save/{dataset_id}")
 async def save_pipeline(
@@ -47,11 +68,10 @@ async def save_pipeline(
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
         Path(storage_dir).mkdir(parents=True, exist_ok=True)
-        # Guard against path traversal in dataset_id (e.g. "../../etc/passwd")
-        safe_id = Path(dataset_id).name
-        if not safe_id or safe_id != dataset_id:
-            raise HTTPException(status_code=400, detail="Invalid dataset_id")
-        file_path = Path(storage_dir) / f"{safe_id}.json"
+        try:
+            file_path = _pipeline_json_path(storage_dir, dataset_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid dataset_id") from e
         try:
             with file_path.open("w") as f:
                 json.dump(payload.model_dump(), f, indent=2)
@@ -120,11 +140,10 @@ async def load_pipeline(
 
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
-        # Guard against path traversal in dataset_id
-        safe_id = Path(dataset_id).name
-        if not safe_id or safe_id != dataset_id:
+        try:
+            file_path = _pipeline_json_path(storage_dir, dataset_id)
+        except ValueError:
             return None
-        file_path = Path(storage_dir) / f"{safe_id}.json"
         if not file_path.exists():
             return None
         try:
