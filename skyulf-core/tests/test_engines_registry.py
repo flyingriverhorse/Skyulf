@@ -101,6 +101,25 @@ def test_resolve_unknown_type_falls_back_to_default_and_warns(caplog):
     assert any("Unknown data type" in record.message for record in caplog.records)
 
 
+def test_resolve_plain_list_falls_back_without_warning(caplog):
+    """Regression test: a plain Python list (e.g. a raw y target) is a common,
+    expected input shape, not a genuinely unknown type - resolve() must fall
+    back to the default engine silently, without emitting the 'Unknown data
+    type' warning."""
+    with caplog.at_level(logging.WARNING, logger="skyulf.engines.registry"):
+        resolved = EngineRegistry.resolve([1, 2, 3])
+    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert not any("Unknown data type" in record.message for record in caplog.records)
+
+
+def test_resolve_plain_tuple_falls_back_without_warning(caplog):
+    """Same as above but for a plain tuple."""
+    with caplog.at_level(logging.WARNING, logger="skyulf.engines.registry"):
+        resolved = EngineRegistry.resolve((1, 2, 3))
+    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+    assert not any("Unknown data type" in record.message for record in caplog.records)
+
+
 def test_resolve_uses_top_level_package_not_substring_match():
     """A module whose name merely *contains* 'pandas'/'polars' as a substring
     (e.g. a third-party 'fake_polars_stub' or 'my_pandas_wrapper' module) must

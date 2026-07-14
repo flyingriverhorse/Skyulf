@@ -41,13 +41,29 @@ SCORE_FUNCTIONS: dict[str, Callable] = {
 }
 
 
+# Heuristic threshold: a numeric target with this many or fewer distinct
+# values is treated as classification (e.g. a small integer-coded label).
+# This is a coarse heuristic, not a config knob - a genuine regression
+# target that happens to take <= this many distinct values (e.g. a discrete
+# count) will be misclassified as classification. Logged at inference time
+# so this silent assumption is at least visible in diagnostics.
+_MAX_UNIQUE_VALUES_FOR_CLASSIFICATION = 10
+
+
 def _infer_problem_type(series: pd.Series) -> str:
     if series.empty:
         return "classification"
     if pd.api.types.is_bool_dtype(series) or pd.api.types.is_object_dtype(series):
         return "classification"
     unique_values = series.dropna().unique()
-    if len(unique_values) <= 10:
+    if len(unique_values) <= _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION:
+        logger.debug(
+            "Inferred problem_type='classification' for target with %d distinct "
+            "numeric values (<= %d cutoff heuristic); pass problem_type explicitly "
+            "if this is actually a regression target.",
+            len(unique_values),
+            _MAX_UNIQUE_VALUES_FOR_CLASSIFICATION,
+        )
         return "classification"
     return "regression"
 

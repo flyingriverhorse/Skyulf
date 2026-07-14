@@ -147,9 +147,13 @@ class SklearnApplier(BaseModelApplier):
         if hasattr(df, "index"):
             index = df.index
 
-        # Column names usually 0, 1, etc. or classes_
+        # Column names usually 0, 1, etc. or classes_. Coerce to native
+        # Python types (str) so downstream JSON serialization of the
+        # resulting DataFrame's columns doesn't choke on numpy scalar
+        # types (e.g. np.int64), mirroring the class_names normalization
+        # already done in modeling/_evaluation/classification.py.
         columns = None
         if hasattr(model_artifact, "classes_"):
-            columns = model_artifact.classes_
+            columns = [str(c) for c in model_artifact.classes_]
 
         return pd.DataFrame(probs, index=index, columns=columns)

@@ -1,3 +1,4 @@
+import copy as _copy
 from dataclasses import dataclass
 from typing import Any
 
@@ -16,26 +17,29 @@ class SplitDataset:
     validation: SplitPayload | None = None
 
     def copy(self) -> "SplitDataset":
+        def copy_leaf(value):
+            # Fall back to a real copy (not the same reference) for
+            # generic objects with neither `.copy()` nor `.clone()` (e.g.
+            # a plain list/dict), so `SplitDataset.copy()` always returns
+            # an independent object instead of silently aliasing.
+            if hasattr(value, "copy"):
+                return value.copy()
+            if hasattr(value, "clone"):
+                return value.clone()
+            return _copy.copy(value)
+
         def copy_data(data):
             if isinstance(data, tuple):
                 # Handle target copy safely (Series/Array/List)
                 y = data[1]
-                y_copy = (
-                    y.copy() if hasattr(y, "copy") else (y.clone() if hasattr(y, "clone") else y)
-                )
+                y_copy = copy_leaf(y)
 
                 X = data[0]
-                X_copy = (
-                    X.copy() if hasattr(X, "copy") else (X.clone() if hasattr(X, "clone") else X)
-                )
+                X_copy = copy_leaf(X)
 
                 return (X_copy, y_copy)
 
-            if hasattr(data, "copy"):
-                return data.copy()
-            if hasattr(data, "clone"):
-                return data.clone()
-            return data
+            return copy_leaf(data)
 
         return SplitDataset(
             train=copy_data(self.train),

@@ -261,6 +261,36 @@ def test_voting_regressor_ignores_calibration():
     assert not hasattr(model, "calibrate_base_models")
 
 
+def test_maybe_calibrate_warns_and_coerces_invalid_cv(caplog):
+    """Regression test: an invalid calibration cv (< 2, e.g. 0 or 1) is
+    silently coerced to 2 rather than raised - this must at least log a
+    warning so the coercion is visible in diagnostics."""
+    import logging
+
+    from sklearn.linear_model import LogisticRegression
+
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    estimator = LogisticRegression()
+    with caplog.at_level(logging.WARNING, logger="skyulf.modeling.ensemble"):
+        calibrated = calc._maybe_calibrate(estimator, {"cv": 1})
+    assert calibrated.cv == 2
+    assert any("cv=1" in rec.message for rec in caplog.records)
+
+
+def test_maybe_calibrate_no_warning_for_valid_cv(caplog):
+    """A valid cv (>= 2) must not trigger the coercion warning."""
+    import logging
+
+    from sklearn.linear_model import LogisticRegression
+
+    calc = NodeRegistry.get_calculator("voting_classifier")()
+    estimator = LogisticRegression()
+    with caplog.at_level(logging.WARNING, logger="skyulf.modeling.ensemble"):
+        calibrated = calc._maybe_calibrate(estimator, {"cv": 5})
+    assert calibrated.cv == 5
+    assert not any("coercing" in rec.message for rec in caplog.records)
+
+
 def test_voting_regressor_predicts_finite():
     X, y = _reg_data()
     calc = NodeRegistry.get_calculator("voting_regressor")()

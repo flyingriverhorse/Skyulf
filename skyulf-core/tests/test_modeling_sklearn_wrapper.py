@@ -97,9 +97,12 @@ def test_predict_proba_returns_none_when_unsupported():
 
 
 def test_predict_proba_returns_dataframe_with_classes_as_columns(clf_data):
-    """predict_proba should return a DataFrame whose columns are the model's classes_."""
+    """predict_proba should return a DataFrame whose columns are the model's
+    classes_, coerced to native str so downstream JSON serialization never
+    chokes on numpy scalar types."""
     X, y = clf_data
     model = SVC(probability=True).fit(X, y)
     result = SklearnApplier().predict_proba(X, model)
     assert isinstance(result, pd.DataFrame)
-    assert list(result.columns) == list(model.classes_)
+    assert list(result.columns) == [str(c) for c in model.classes_]
+    assert all(isinstance(c, str) for c in result.columns)

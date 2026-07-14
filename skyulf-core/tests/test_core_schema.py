@@ -250,3 +250,45 @@ def test_extract_polars_dtypes_direct_call_on_real_polars_frame():
     df = pl.DataFrame({"a": [1, 2], "b": [1.0, 2.0]})
     dtypes = _extract_polars_dtypes(df)
     assert set(dtypes.keys()) == {"a", "b"}
+
+
+def test_extract_pandas_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFixture):
+    """Regression test: a swallowed exception while extracting pandas dtypes
+    must still be logged at debug level for diagnosability, not silently
+    dropped."""
+    import logging
+
+    from skyulf.core.schema import _extract_pandas_dtypes
+
+    class _BrokenDtypes:
+        def items(self):
+            raise RuntimeError("broken")
+
+    class _BrokenFrame:
+        dtypes = _BrokenDtypes()
+
+    with caplog.at_level(logging.DEBUG, logger="skyulf.core.schema"):
+        result = _extract_pandas_dtypes(_BrokenFrame())
+    assert result == {}
+    assert any("pandas dtypes" in rec.message for rec in caplog.records)
+
+
+def test_extract_polars_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFixture):
+    """Regression test: a swallowed exception while extracting polars dtypes
+    must still be logged at debug level for diagnosability, not silently
+    dropped."""
+    import logging
+
+    from skyulf.core.schema import _extract_polars_dtypes
+
+    class _BrokenSchema:
+        def items(self):
+            raise RuntimeError("broken")
+
+    class _BrokenFrame:
+        schema = _BrokenSchema()
+
+    with caplog.at_level(logging.DEBUG, logger="skyulf.core.schema"):
+        result = _extract_polars_dtypes(_BrokenFrame())
+    assert result == {}
+    assert any("polars dtypes" in rec.message for rec in caplog.records)

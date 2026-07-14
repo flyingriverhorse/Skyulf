@@ -115,9 +115,13 @@ class EngineRegistry:
             return cls.get("dask")
 
         # Fallback to default if unknown (or let it fail later)
-        logger.warning(
-            f"Unknown data type {type(data)}, falling back to default engine: {cls._active_engine}"
-        )
+        # Plain Python sequences (list/tuple) are a common, expected input
+        # shape (e.g. a raw y target list) rather than a genuinely unknown
+        # type, so don't warn for those - only for anything else.
+        if not isinstance(data, list | tuple):
+            logger.warning(
+                f"Unknown data type {type(data)}, falling back to default engine: {cls._active_engine}"
+            )
         return cls.get(cls._active_engine)
 
     @classmethod
