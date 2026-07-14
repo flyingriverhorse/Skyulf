@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Any, cast
 
-from sqlalchemy import func, select
+from sqlalchemy import func, insert, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.models import (
@@ -9,23 +10,25 @@ from backend.database.models import (
     BasicTrainingJob,
     DataSource,
     Deployment,
+    ModelVersionCounter,
 )
 from backend.ml_pipeline._services.job_service import JobService
 
 from .schemas import ArtifactListResponse, ModelRegistryEntry, ModelVersion, RegistryStats
 
 _MIN_DATETIME = datetime.min
+_MAX_VERSION_ALLOCATION_ATTEMPTS = 5
 
 
 class ModelRegistryService:
     @staticmethod
-    async def get_next_version(
-        session: AsyncSession, dataset_id: str, model_type: str, job_type: str
-    ) -> int:
-        """Calculates the next version number for a given dataset and model type."""
-        # Unified versioning: Query both tables and take the max
+    async def _compute_seed_version(session: AsyncSession, dataset_id: str, model_type: str) -> int:
+        """Best-effort seed for a brand-new counter row from pre-existing job history.
 
-        # 1. Get max version from BasicTrainingJob
+        Only used the first time a (dataset, model_type) pair is versioned via
+        the counter table, so historical jobs created before the counter
+        existed keep receiving version numbers that continue their sequence.
+        """
         stmt_train = select(func.max(BasicTrainingJob.version)).where(
             BasicTrainingJob.dataset_source_id == dataset_id,
             BasicTrainingJob.model_type == model_type,
@@ -33,7 +36,6 @@ class ModelRegistryService:
         result_train = await session.execute(stmt_train)
         max_train = result_train.scalar() or 0
 
-        # 2. Get max run_number from AdvancedTuningJob
         stmt_tune = select(func.max(AdvancedTuningJob.run_number)).where(
             AdvancedTuningJob.dataset_source_id == dataset_id,
             AdvancedTuningJob.model_type == model_type,
@@ -42,6 +44,63 @@ class ModelRegistryService:
         max_tune = result_tune.scalar() or 0
 
         return max(max_train, max_tune) + 1
+
+    @staticmethod
+    async def get_next_version(
+        session: AsyncSession, dataset_id: str, model_type: str, job_type: str
+    ) -> int:
+        """Atomically allocates the next version number for a dataset/model_type pair.
+
+        Versions are shared between ``BasicTrainingJob.version`` and
+        ``AdvancedTuningJob.run_number`` (same sequence), backed by a single
+        ``ModelVersionCounter`` row per (dataset_id, model_type). The previous
+        implementation computed ``max(...) + 1`` via a plain SELECT with no
+        locking, so two concurrent job submissions for the same dataset/model
+        could read the same max and both be handed the identical "next"
+        version. The UPDATE ... RETURNING below is a single atomic statement,
+        so concurrent callers are serialized by the database itself instead
+        of racing in application code.
+        """
+        for _attempt in range(_MAX_VERSION_ALLOCATION_ATTEMPTS):
+            stmt = (
+                update(ModelVersionCounter)
+                .where(
+                    ModelVersionCounter.dataset_source_id == dataset_id,
+                    ModelVersionCounter.model_type == model_type,
+                )
+                .values(current_version=ModelVersionCounter.current_version + 1)
+                .returning(ModelVersionCounter.current_version)
+            )
+            result = await session.execute(stmt)
+            row = result.first()
+            if row is not None:
+                await session.commit()
+                return cast(int, row[0])
+
+            # No counter row yet for this pair - seed one from existing job
+            # history. If a concurrent request wins this insert first, our
+            # insert raises IntegrityError (PK conflict) and we retry the
+            # atomic UPDATE above, which will now succeed against the row
+            # the winner just created.
+            seed = await ModelRegistryService._compute_seed_version(session, dataset_id, model_type)
+            try:
+                await session.execute(
+                    insert(ModelVersionCounter).values(
+                        dataset_source_id=dataset_id,
+                        model_type=model_type,
+                        current_version=seed,
+                    )
+                )
+                await session.commit()
+                return seed
+            except IntegrityError:
+                await session.rollback()
+                continue
+
+        raise RuntimeError(
+            f"Failed to allocate a model version for dataset={dataset_id!r} "
+            f"model_type={model_type!r} after {_MAX_VERSION_ALLOCATION_ATTEMPTS} attempts"
+        )
 
     @staticmethod
     async def get_registry_stats(session: AsyncSession) -> RegistryStats:
