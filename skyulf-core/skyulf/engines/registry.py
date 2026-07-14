@@ -81,6 +81,14 @@ class EngineRegistry:
         return cls._engines[name]
 
     @classmethod
+    def set_active_engine(cls, name: str) -> None:
+        """Set the default/fallback engine used when no data is given to resolve()."""
+        if name not in cls._engines:
+            raise ValueError(f"Engine '{name}' not found. Available: {list(cls._engines.keys())}")
+        cls._active_engine = name
+        logger.debug(f"Active engine set to: {name}")
+
+    @classmethod
     def resolve(cls, data: Any = None) -> type[BaseEngine]:
         """
         Auto-detect engine based on input data type.

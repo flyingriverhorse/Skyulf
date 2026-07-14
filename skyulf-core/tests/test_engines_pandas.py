@@ -47,12 +47,44 @@ def test_wrapper_drop_removes_column(df):
     assert dropped.columns == ["b"]
 
 
+def test_wrapper_select_with_bare_string_returns_dataframe_not_series(df):
+    """select() with a plain string column name must return a wrapper around a
+    DataFrame (matching Polars' select() semantics), not a bare Series
+    (regression guard for r5 select() str-vs-list engine parity bug)."""
+    wrapper = SkyulfPandasWrapper(df)
+    selected = wrapper.select("a")
+    assert isinstance(selected, SkyulfPandasWrapper)
+    assert isinstance(selected.to_pandas(), pd.DataFrame)
+    assert selected.columns == ["a"]
+
+
 def test_wrapper_with_column_adds_new_column(df):
     """with_column() should add a new column via assign, without mutating original."""
     wrapper = SkyulfPandasWrapper(df)
     result = wrapper.with_column("c", [7, 8, 9])
     assert "c" in result.columns
     assert "c" not in df.columns
+
+
+def test_wrapper_with_column_ignores_mismatched_series_index(df):
+    """with_column() must assign Series values positionally, matching Polars,
+    instead of pandas' default index-alignment which would silently produce
+    NaNs for a Series whose index doesn't match the target frame's
+    (regression guard for r5 pandas with_column index-misalignment bug)."""
+    wrapper = SkyulfPandasWrapper(df)
+    mismatched = pd.Series([7, 8, 9], index=[100, 101, 102])
+    result = wrapper.with_column("c", mismatched)
+    assert list(result.to_pandas()["c"]) == [7, 8, 9]
+    assert not result.to_pandas()["c"].isna().any()
+
+
+def test_wrapper_with_column_raises_on_length_mismatch(df):
+    """with_column() should raise a clear error rather than silently
+    NaN-filling when a mismatched-index Series has the wrong length."""
+    wrapper = SkyulfPandasWrapper(df)
+    too_short = pd.Series([7, 8], index=[100, 101])
+    with pytest.raises(ValueError, match="Length mismatch"):
+        wrapper.with_column("c", too_short)
 
 
 def test_wrapper_to_pandas_returns_same_object(df):
@@ -88,6 +120,16 @@ def test_wrapper_setitem_mutates_underlying_frame(df):
     wrapper = SkyulfPandasWrapper(df)
     wrapper["c"] = [10, 11, 12]
     assert list(df["c"]) == [10, 11, 12]
+
+
+def test_wrapper_setitem_ignores_mismatched_series_index(df):
+    """__setitem__ must also assign positionally for a mismatched-index
+    Series, mirroring with_column()'s fix (regression guard for r5)."""
+    wrapper = SkyulfPandasWrapper(df)
+    mismatched = pd.Series([10, 11, 12], index=[7, 8, 9])
+    wrapper["c"] = mismatched
+    assert list(df["c"]) == [10, 11, 12]
+    assert not df["c"].isna().any()
 
 
 def test_wrapper_len_returns_row_count(df):
