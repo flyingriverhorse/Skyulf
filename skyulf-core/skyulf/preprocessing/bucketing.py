@@ -7,6 +7,7 @@ stays at low CCN. Fits are sklearn / pandas-bound (`pd.cut`, `pd.qcut`,
 not use :func:`fit_dual_engine`.
 """
 
+import logging
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -25,6 +26,8 @@ from ._artifacts import GeneralBinningArtifact
 from ._helpers import to_pandas
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from .dispatcher import apply_dual_engine
+
+logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
 # Polars apply
@@ -247,7 +250,13 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any
             )
             df_out[f"{col}{output_suffix}"] = binned_series
         except Exception:
-            # Skip columns that fail (e.g. degenerate edges, dtype mismatch).
+            # Skip columns that fail (e.g. degenerate edges, dtype mismatch),
+            # but log so a silently-unbinned column isn't a total mystery.
+            logger.warning(
+                "Bucketing: failed to bin column %r, leaving it unbinned.",
+                col,
+                exc_info=True,
+            )
             continue  # nosec B112
 
     if drop_original and processed_cols:
@@ -409,6 +418,13 @@ def _fit_one_column_into_maps(
         if edges is not None:
             bin_edges_map[col] = edges.tolist()
     except Exception:
+        # Skip columns whose binning strategy can't be fit (e.g. all-NaN
+        # after dropna, degenerate quantiles), but log for visibility.
+        logger.warning(
+            "Bucketing: failed to fit binning strategy for column %r, skipping it.",
+            col,
+            exc_info=True,
+        )
         return
 
 
