@@ -35,6 +35,11 @@ class SecurityMixin:
     # Configurable via MAX_PREDICT_REQUEST_ROWS env var.
     MAX_PREDICT_REQUEST_ROWS: int = 10_000
 
+    # Maximum allowed length for a user-supplied column name (e.g. EDA
+    # requests referencing a column). Prevents pathologically long strings
+    # from being used in downstream queries/labels.
+    MAX_COLUMN_NAME_LENGTH: int = 255
+
     # Developer fallback auth — off by default; set AUTH_FALLBACK_ENABLED=true in .env to enable.
     # AUTH_FALLBACK_USERNAME and AUTH_FALLBACK_PASSWORD must be explicitly set when enabled.
     AUTH_FALLBACK_ENABLED: bool = False
