@@ -141,6 +141,17 @@ class TuningCalculator(BaseModelCalculator):
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
             tuning_config = TuningConfig(**filtered_config)
 
+        # For Time Series Split, sort data chronologically (and drop the time
+        # column from features) before converting to numpy below - numpy has
+        # no column names, so this must happen while X still carries them.
+        # Mirrors the same fix already applied to perform_cross_validation();
+        # without it, tuning with cv_type="time_series_split" silently leaks
+        # the time column and evaluates folds out of chronological order.
+        if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
+            from ..cross_validation import _sort_by_time
+
+            X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 

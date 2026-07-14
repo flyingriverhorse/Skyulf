@@ -296,6 +296,42 @@ def test_fit_cv_disabled_uses_holdout():
     assert hasattr(model, "predict")
 
 
+def test_fit_time_series_split_sorts_and_drops_time_column_prevents_leakage():
+    """Regression test: tuning with cv_type='time_series_split' must
+    chronologically sort by cv_time_column and drop it from features before
+    building CV folds - previously TuningCalculator.fit() converted X/y
+    straight to numpy (discarding column names) without ever calling the
+    shared _sort_by_time() helper used by perform_cross_validation(), so an
+    out-of-order time column perfectly correlated with y leaked directly
+    into training and folds were built on unsorted row order."""
+    import numpy as np
+
+    from skyulf.modeling.regression import LinearRegressionCalculator
+
+    rng = np.random.RandomState(0)
+    n = 60
+    ts = np.arange(n)
+    perm = rng.permutation(n)
+    X = pd.DataFrame({"ts": ts[perm], "feat": rng.normal(size=n)})
+    y = pd.Series(ts[perm].astype(float))  # y perfectly matches true time order
+
+    tuner = TuningCalculator(LinearRegressionCalculator())
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="r2",
+        search_space={"fit_intercept": [True, False]},
+        cv_folds=3,
+        cv_type="time_series_split",
+        cv_time_column="ts",
+    )
+    _, result = tuner.fit(X, y, config=cfg.__dict__)
+
+    # If the time column leaked into features (or folds were unsorted), the
+    # best CV r2 would be artificially ~1.0 since `ts` == `y`. With the leak
+    # fixed it must not be a (near-)perfect fit.
+    assert result.best_score < 0.9
+
+
 # ---------------------------------------------------------------------------
 # TuningCalculator.fit — callbacks
 # ---------------------------------------------------------------------------
