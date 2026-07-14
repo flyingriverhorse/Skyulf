@@ -367,6 +367,15 @@ class DriftCalculator:
             if len(breakpoints) < 2:
                 return 0.0
 
+            # np.histogram silently drops any values outside the explicit bin
+            # edges instead of counting them in the first/last bin. Since the
+            # very scenario drift detection exists to catch is `actual`
+            # shifting entirely outside `expected`'s range, clip both arrays
+            # into [breakpoints[0], breakpoints[-1]] first so out-of-range
+            # values land in the boundary bin rather than vanishing.
+            expected = np.clip(expected, breakpoints[0], breakpoints[-1])
+            actual = np.clip(actual, breakpoints[0], breakpoints[-1])
+
             # Calculate frequencies
             expected_percents = np.histogram(expected, breakpoints)[0] / len(expected)
             actual_percents = np.histogram(actual, breakpoints)[0] / len(actual)
@@ -400,6 +409,13 @@ class DriftCalculator:
 
             if len(breakpoints) < 2:
                 return 0.0
+
+            # See _calculate_psi: clip out-of-range values into the boundary
+            # bin instead of letting np.histogram silently drop them (which
+            # would otherwise mask the exact "current" shifted entirely
+            # outside "reference" scenario drift detection exists to catch).
+            reference = np.clip(reference, breakpoints[0], breakpoints[-1])
+            current = np.clip(current, breakpoints[0], breakpoints[-1])
 
             ref_percents = np.histogram(reference, breakpoints)[0] / len(reference)
             curr_percents = np.histogram(current, breakpoints)[0] / len(current)

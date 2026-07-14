@@ -41,6 +41,12 @@ TYPE_ALIASES = {
     "datetime64[ns]": "datetime64[ns]",
 }
 
+# Shared string-alias table for boolean coercion (used by both the pandas
+# and Polars apply paths so "yes"/"no"-style flags are recognized
+# identically regardless of engine).
+_BOOL_TRUE_ALIASES = ("true", "yes", "1", "on", "y", "t")
+_BOOL_FALSE_ALIASES = ("false", "no", "0", "off", "n", "f")
+
 
 # -----------------------------------------------------------------------------
 # Polars apply
@@ -79,6 +85,32 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
     return None
 
 
+def _bool_expr_from_string_col_polars(col: str) -> Any:
+    """Build a Polars expression casting a String/Utf8 column to Boolean.
+
+    Polars has no direct Utf8->Boolean cast at all (raises
+    `InvalidOperationError` even with ``strict=False``), unlike pandas'
+    `.astype("boolean")` which happens to fail the same way for strings but
+    then falls back to a per-value alias table (`_coerce_boolean_value`).
+    Without this, casting a "yes"/"no"-style string column to boolean on the
+    Polars engine hard-crashes instead of coercing - a stark engine-parity
+    break for a very common use case. Mirrors `_coerce_boolean_value`'s alias
+    table; unrecognized values become null (the caller decides whether to
+    raise on that, mirroring `coerce_on_error`).
+    """
+    import polars as pl
+
+    normalized = pl.col(col).str.strip_chars().str.to_lowercase()
+    return (
+        pl.when(normalized.is_in(list(_BOOL_TRUE_ALIASES)))
+        .then(True)  # noqa: FBT003
+        .when(normalized.is_in(list(_BOOL_FALSE_ALIASES)))
+        .then(False)  # noqa: FBT003
+        .otherwise(None)
+        .alias(col)
+    )
+
+
 def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     import polars as pl
 
@@ -88,15 +120,34 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     coerce_on_error = params.get("coerce_on_error", True)
 
     exprs = []
+    string_bool_cols: list[str] = []
     for col, target_dtype in type_map.items():
         if col not in X.columns:
             continue
         pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
         if pl_dtype is None:
             continue
+        if pl_dtype == pl.Boolean and X.schema[col] in (pl.String, pl.Utf8, pl.Categorical):
+            exprs.append(_bool_expr_from_string_col_polars(col))
+            string_bool_cols.append(col)
+            continue
         exprs.append(pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col))
 
-    return (X.with_columns(exprs) if exprs else X), y
+    if not exprs:
+        return X, y
+
+    result = X.with_columns(exprs)
+
+    if not coerce_on_error and string_bool_cols:
+        for col in string_bool_cols:
+            newly_null = result[col].is_null() & X[col].is_not_null()
+            if newly_null.any():
+                raise ValueError(
+                    f"Cannot cast column '{col}' to boolean: contains value(s) "
+                    "not recognized as true/false."
+                )
+
+    return result, y
 
 
 # -----------------------------------------------------------------------------
@@ -117,9 +168,9 @@ def _coerce_boolean_value(value: Any) -> bool | None:
             return False
         return None
     s = str(value).strip().lower()
-    if s in ("true", "yes", "1", "on", "y", "t"):
+    if s in _BOOL_TRUE_ALIASES:
         return True
-    if s in ("false", "no", "0", "off", "n", "f"):
+    if s in _BOOL_FALSE_ALIASES:
         return False
     return None
 

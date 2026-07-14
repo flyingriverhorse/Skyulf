@@ -132,6 +132,34 @@ def test_calculate_kl_is_zero_for_constant_reference() -> None:
     assert kl == 0.0
 
 
+def test_calculate_psi_detects_drift_when_actual_fully_outside_reference_range() -> None:
+    """Regression test: PSI must not silently report ~0 when `actual` has
+    shifted entirely outside `expected`'s range.
+
+    np.histogram excludes (rather than clips into the boundary bin) values
+    outside the explicit bin edges derived from `expected`'s percentiles, so
+    without clipping, a fully-shifted `actual` array previously produced
+    actual_percents summing to 0 and a near-zero PSI - a false "no drift"
+    for the exact scenario drift detection exists to catch.
+    """
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+    expected = np.random.RandomState(0).normal(loc=0, scale=1, size=500)
+    actual = np.random.RandomState(1).normal(loc=100, scale=1, size=500)  # fully out of range
+    psi = calc._calculate_psi(expected, actual)
+    assert psi > 1.0, f"expected a large PSI for a fully-shifted distribution, got {psi}"
+
+
+def test_calculate_kl_detects_drift_when_current_fully_outside_reference_range() -> None:
+    """Regression test: KL divergence must not silently report ~0 when
+    `current` has shifted entirely outside `reference`'s range (same
+    out-of-range-clipping bug as PSI above)."""
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+    reference = np.random.RandomState(0).normal(loc=0, scale=1, size=500)
+    current = np.random.RandomState(1).normal(loc=100, scale=1, size=500)  # fully out of range
+    kl = calc._calculate_kl(reference, current)
+    assert kl > 1.0, f"expected a large KL divergence for a fully-shifted distribution, got {kl}"
+
+
 def test_calculate_distribution_handles_constant_arrays() -> None:
     """A constant reference/current pair should still produce a valid histogram."""
     calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
