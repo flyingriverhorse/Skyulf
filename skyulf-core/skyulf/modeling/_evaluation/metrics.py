@@ -73,13 +73,28 @@ def calculate_classification_metrics(
     try:
         unique_classes = np.unique(y_arr)
         if len(unique_classes) == 2:
+            # Determine the actual positive-class label rather than relying on
+            # sklearn's default pos_label=1, which raises (silently swallowed
+            # below) for non-{0,1} binary labels (e.g. "yes"/"no", {1,2},
+            # {-1,1}) — mirrors the pos_label resolution already used in
+            # _evaluation/classification.py.
+            classes_ = getattr(model, "classes_", None)
+            pos_label = (
+                classes_[1] if classes_ is not None and len(classes_) == 2 else unique_classes[1]
+            )
             metrics["precision"] = float(
-                precision_score(y_arr, predictions, average="binary", zero_division=0)
+                precision_score(
+                    y_arr, predictions, average="binary", pos_label=pos_label, zero_division=0
+                )
             )
             metrics["recall"] = float(
-                recall_score(y_arr, predictions, average="binary", zero_division=0)
+                recall_score(
+                    y_arr, predictions, average="binary", pos_label=pos_label, zero_division=0
+                )
             )
-            metrics["f1"] = float(f1_score(y_arr, predictions, average="binary", zero_division=0))
+            metrics["f1"] = float(
+                f1_score(y_arr, predictions, average="binary", pos_label=pos_label, zero_division=0)
+            )
     except Exception:
         pass
 
@@ -101,25 +116,40 @@ def calculate_classification_metrics(
                         metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
                         metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
                     else:
+                        # Explicitly pass the full label set the model was trained on
+                        # (`classes`, resolved below) so a CV fold whose validation
+                        # split happens not to contain every trained class doesn't
+                        # raise "Number of classes in y_true not equal to columns
+                        # in y_score" — previously swallowed silently by the
+                        # surrounding except, dropping these metrics entirely.
+                        classes = getattr(model, "classes_", None)
+                        if classes is None or len(classes) != class_count:
+                            classes = np.arange(class_count)
+
                         # OVR variants
                         ovr_weighted = float(
-                            roc_auc_score(y_arr, proba, multi_class="ovr", average="weighted")
+                            roc_auc_score(
+                                y_arr, proba, multi_class="ovr", average="weighted", labels=classes
+                            )
                         )
                         metrics["roc_auc_weighted"] = ovr_weighted  # kept for backward compat
                         metrics["roc_auc_ovr_weighted"] = ovr_weighted
                         metrics["roc_auc_ovr"] = float(
-                            roc_auc_score(y_arr, proba, multi_class="ovr", average="macro")
+                            roc_auc_score(
+                                y_arr, proba, multi_class="ovr", average="macro", labels=classes
+                            )
                         )
                         # OVO variants
                         metrics["roc_auc_ovo"] = float(
-                            roc_auc_score(y_arr, proba, multi_class="ovo", average="macro")
+                            roc_auc_score(
+                                y_arr, proba, multi_class="ovo", average="macro", labels=classes
+                            )
                         )
                         metrics["roc_auc_ovo_weighted"] = float(
-                            roc_auc_score(y_arr, proba, multi_class="ovo", average="weighted")
+                            roc_auc_score(
+                                y_arr, proba, multi_class="ovo", average="weighted", labels=classes
+                            )
                         )
-                        classes = getattr(model, "classes_", None)
-                        if classes is None or len(classes) != class_count:
-                            classes = np.arange(class_count)
                         y_indicator = label_binarize(y_arr, classes=classes)
                         metrics["pr_auc_weighted"] = float(
                             average_precision_score(y_indicator, proba, average="weighted")
