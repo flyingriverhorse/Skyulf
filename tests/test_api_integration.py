@@ -24,6 +24,21 @@ def test_get_registry(client):
     assert any(item["id"] == "random_forest_classifier" for item in data)
 
 
+def test_get_registry_has_no_duplicate_ids(client):
+    """Regression test: aliased skyulf-core nodes (e.g. Split/TrainTestSplitter,
+    PolynomialFeatures/PolynomialFeaturesNode, FeatureGeneration/FeatureMath/
+    FeatureGenerationNode) previously produced a duplicate RegistryItem per
+    alias since NodeRegistry.get_all_metadata() is keyed by registration name,
+    not by the logical node id. That surfaced as duplicate cards in the
+    frontend node palette.
+    """
+    response = client.get("/api/pipeline/registry")
+    assert response.status_code == 200
+    data = response.json()
+    ids = [item["id"] for item in data]
+    assert len(ids) == len(set(ids)), f"Duplicate ids in /registry response: {ids}"
+
+
 def test_preview_pipeline(client):
     # Create a dummy CSV for testing
     Path("temp_test_data").mkdir(parents=True, exist_ok=True)

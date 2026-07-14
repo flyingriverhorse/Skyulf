@@ -94,8 +94,13 @@ class SkyulfPipeline:
             try:
                 calculator = NodeRegistry.get_calculator(model_type)()
                 applier = NodeRegistry.get_applier(model_type)()
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.debug(
+                    "Model type '%s' not found in NodeRegistry (%s); "
+                    "falling back to hardcoded type map.",
+                    model_type,
+                    e,
+                )
 
         if calculator is None:
             # Map model types to classes
@@ -124,8 +129,13 @@ class SkyulfPipeline:
                     try:
                         base_calc = NodeRegistry.get_calculator(base_model_type)()
                         base_applier = NodeRegistry.get_applier(base_model_type)()
-                    except ValueError:
-                        pass
+                    except ValueError as e:
+                        logger.debug(
+                            "Base model type '%s' not found in NodeRegistry (%s); "
+                            "falling back to hardcoded type map.",
+                            base_model_type,
+                            e,
+                        )
 
                 if base_calc is None:
                     if base_model_type == "logistic_regression":
