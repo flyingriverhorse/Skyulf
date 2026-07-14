@@ -31,18 +31,19 @@ class DataIngestionService:
         self.data_service = DataService()
 
     async def list_sources(
-        self, user_id: int | None = None, limit: int = 50, skip: int = 0
+        self, user_id: int | None = None, limit: int | None = None, skip: int = 0
     ) -> Sequence[DataSource]:
         """
         List all data sources.
         """
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
         query = select(DataSource)
         if user_id:
             query = query.where(DataSource.created_by == user_id)
 
         # Order by created_at desc for consistent pagination
         query = query.order_by(DataSource.created_at.desc())
-        query = query.offset(skip).limit(limit)
+        query = query.offset(skip).limit(effective_limit)
 
         result = await self.session.execute(query)
         return result.scalars().all()
@@ -152,10 +153,11 @@ class DataIngestionService:
         # already holds, so the cancel is a successful no-op.
         return True
 
-    async def get_sample(self, source_id: int | str, limit: int = 5) -> list[dict]:
+    async def get_sample(self, source_id: int | str, limit: int | None = None) -> list[dict]:
         """
         Get a sample of data from the source.
         """
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
         from backend.data_ingestion.connectors.file import LocalFileConnector
         from backend.data_ingestion.connectors.s3 import S3Connector
 
@@ -184,7 +186,7 @@ class DataIngestionService:
                 )
                 connector = S3Connector(file_path, storage_options=str_options)
                 await connector.connect()
-                df = await connector.fetch_data(limit=limit)
+                df = await connector.fetch_data(limit=effective_limit)
                 return df.to_dicts()
             except (ForbiddenException, ResourceNotFoundException) as e:
                 # Typed exceptions raised by S3Connector for 403/404 provider
@@ -220,7 +222,7 @@ class DataIngestionService:
                     # Try relative to workspace if absolute fails
                     abs_path = LocalFileConnector.resolve_safe_path(str(Path.cwd() / file_path))
 
-                return await self.data_service.get_sample(abs_path, limit=limit)
+                return await self.data_service.get_sample(abs_path, limit=effective_limit)
             except HTTPException:
                 raise
             except PermissionError as e:
@@ -246,7 +248,7 @@ class DataIngestionService:
                     abs_path = Path(file_path).absolute()
                     connector = LocalFileConnector(str(abs_path))
                     await connector.connect()
-                    df = await connector.fetch_data(limit=limit)
+                    df = await connector.fetch_data(limit=effective_limit)
                     return df.to_dicts()
                 except PermissionError as e:
                     # Raised by LocalFileConnector's containment guard when
@@ -265,7 +267,7 @@ class DataIngestionService:
                 str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
                 connector = S3Connector(file_path, storage_options=str_options)
                 await connector.connect()
-                df = await connector.fetch_data(limit=limit)
+                df = await connector.fetch_data(limit=effective_limit)
                 return df.to_dicts()
             except (ForbiddenException, ResourceNotFoundException) as e:
                 logger.error(f"Failed to get S3 sample: {e}")

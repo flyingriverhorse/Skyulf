@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
 from backend.database.models import BasicTrainingJob
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
@@ -225,10 +226,11 @@ class BasicTrainingManager:
     @staticmethod
     async def list_training_jobs(
         session: AsyncSession,
-        limit: int = 50,
+        limit: int | None = None,
         skip: int = 0,
     ) -> list[JobInfo]:
         """Lists recent training jobs (Async)."""
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
         # 1. Fetch all DataSources for robust name resolution
         ds_map = await get_dataset_map(session)
 
@@ -237,7 +239,7 @@ class BasicTrainingManager:
             select(BasicTrainingJob)
             .where(BasicTrainingJob.model_type != "preview")
             .order_by(BasicTrainingJob.started_at.desc())
-            .limit(limit)
+            .limit(effective_limit)
             .offset(skip)
         )
         train_rows = result_train.scalars().all()

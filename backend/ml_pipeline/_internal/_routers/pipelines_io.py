@@ -304,7 +304,7 @@ def _diff_versions(prev: Any, curr: Any) -> dict[str, Any]:
 @router.get("/versions/{dataset_source_id}/audit")
 async def get_pipeline_audit_log(
     dataset_source_id: str,
-    limit: int = 50,
+    limit: int | None = None,
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
     """Return a chronological audit trail for one dataset's pipeline.
@@ -313,7 +313,8 @@ async def get_pipeline_audit_log(
     against its immediate predecessor. The first version has no predecessor
     so its diff lists every node as `added`.
     """
-    capped_limit = max(1, min(int(limit or 50), 200))
+    default_limit = get_settings().DEFAULT_PAGE_SIZE
+    capped_limit = max(1, min(int(limit or default_limit), 200))
     versions = await PipelineVersionsService.list_versions(session, dataset_source_id)
     # Service returns newest-first; walk oldest->newest so each diff sees the
     # prior version, then re-reverse for the response.

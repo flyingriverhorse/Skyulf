@@ -5,6 +5,7 @@ from sqlalchemy import func, insert, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.database.models import (
     AdvancedTuningJob,
     BasicTrainingJob,
@@ -128,7 +129,7 @@ class ModelRegistryService:
 
     @staticmethod
     async def list_models(
-        session: AsyncSession, skip: int = 0, limit: int = 20
+        session: AsyncSession, skip: int = 0, limit: int | None = None
     ) -> list[ModelRegistryEntry]:
         """
         Lists all model types and their versions.
@@ -276,7 +277,8 @@ class ModelRegistryService:
             reverse=True,
         )
 
-        return results[skip : skip + limit]
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+        return results[skip : skip + effective_limit]
 
     @staticmethod
     async def get_model_versions(session: AsyncSession, model_type: str) -> list[ModelVersion]:

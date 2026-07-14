@@ -131,10 +131,16 @@ class DeploymentService:
 
     @staticmethod
     async def list_deployments(
-        session: AsyncSession, limit: int = 50, skip: int = 0
+        session: AsyncSession, limit: int | None = None, skip: int = 0
     ) -> Sequence[Deployment]:
         """Lists deployment history."""
-        stmt = select(Deployment).order_by(Deployment.created_at.desc()).limit(limit).offset(skip)
+        effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+        stmt = (
+            select(Deployment)
+            .order_by(Deployment.created_at.desc())
+            .limit(effective_limit)
+            .offset(skip)
+        )
         result = await session.execute(stmt)
         return result.scalars().all()
 

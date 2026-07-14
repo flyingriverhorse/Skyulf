@@ -57,12 +57,13 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
 
 @router.get("/history", response_model=list[DeploymentInfo])
 async def list_deployments(
-    limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_async_session)
+    limit: int | None = None, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
     """
     Lists deployment history.
     """
-    deployments = await DeploymentService.list_deployments(session, limit, skip)
+    effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+    deployments = await DeploymentService.list_deployments(session, effective_limit, skip)
     return deployments
 
 
