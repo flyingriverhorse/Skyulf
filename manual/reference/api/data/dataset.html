@@ -2981,8 +2981,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/data/dataset.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
-<span class="normal">13</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">13</span>
 <span class="normal">14</span>
 <span class="normal">15</span>
 <span class="normal">16</span>
@@ -3013,33 +3012,40 @@
 <span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
-<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SplitDataset</span><span class="p">:</span>
     <span class="n">train</span><span class="p">:</span> <span class="n">SplitPayload</span>
     <span class="n">test</span><span class="p">:</span> <span class="n">SplitPayload</span>
     <span class="n">validation</span><span class="p">:</span> <span class="n">SplitPayload</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SplitDataset&quot;</span><span class="p">:</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">copy_leaf</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="c1"># Fall back to a real copy (not the same reference) for</span>
+            <span class="c1"># generic objects with neither `.copy()` nor `.clone()` (e.g.</span>
+            <span class="c1"># a plain list/dict), so `SplitDataset.copy()` always returns</span>
+            <span class="c1"># an independent object instead of silently aliasing.</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;copy&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;clone&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">_copy</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
         <span class="k">def</span><span class="w"> </span><span class="nf">copy_data</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
                 <span class="c1"># Handle target copy safely (Series/Array/List)</span>
                 <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                <span class="n">y_copy</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="n">y</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="s2">&quot;copy&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="s2">&quot;clone&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">y</span><span class="p">)</span>
-                <span class="p">)</span>
+                <span class="n">y_copy</span> <span class="o">=</span> <span class="n">copy_leaf</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
 
                 <span class="n">X</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-                <span class="n">X_copy</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;copy&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;clone&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">X</span><span class="p">)</span>
-                <span class="p">)</span>
+                <span class="n">X_copy</span> <span class="o">=</span> <span class="n">copy_leaf</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
 
                 <span class="k">return</span> <span class="p">(</span><span class="n">X_copy</span><span class="p">,</span> <span class="n">y_copy</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;copy&quot;</span><span class="p">):</span>
-                <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;clone&quot;</span><span class="p">):</span>
-                <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
-            <span class="k">return</span> <span class="n">data</span>
+            <span class="k">return</span> <span class="n">copy_leaf</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span>
             <span class="n">train</span><span class="o">=</span><span class="n">copy_data</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">train</span><span class="p">),</span>
