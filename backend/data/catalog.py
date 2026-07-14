@@ -91,7 +91,9 @@ class FileSystemCatalog(DataCatalog):
                     df = pd.read_parquet(path)
                     return df.head(limit) if limit else df
                 except Exception:
-                    raise ValueError(f"Unsupported format or file not found: {dataset_id}") from None
+                    raise ValueError(
+                        f"Unsupported format or file not found: {dataset_id}"
+                    ) from None
         except Exception as e:
             logger.error(f"Error loading dataset {dataset_id}: {e}")
             raise e

@@ -1,6 +1,5 @@
 """Geospatial analysis (lat/lon detection + sample point extraction)."""
 
-
 import polars as pl
 
 from ..schemas import GeoPoint, GeospatialStats

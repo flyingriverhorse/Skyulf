@@ -1,6 +1,5 @@
 """Tests for skyulf.profiling._analyzer.multivariate.MultivariateMixin."""
 
-
 import numpy as np
 import polars as pl
 from tests.utils.dataset_loader import load_sample_dataset

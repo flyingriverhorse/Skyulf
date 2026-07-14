@@ -20,6 +20,7 @@ from .models import DataSource, User
 
 logger = logging.getLogger(__name__)
 
+
 class BaseRepository[ModelType: Base]:
     """
     Generic repository class for common database operations.

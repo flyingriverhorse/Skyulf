@@ -68,7 +68,9 @@ def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
         import polars as pl
 
         return [
-            c for c, t in zip(df.columns, df.dtypes, strict=True) if t in [pl.Utf8, pl.Categorical, pl.Object]
+            c
+            for c, t in zip(df.columns, df.dtypes, strict=True)
+            if t in [pl.Utf8, pl.Categorical, pl.Object]
         ]
     return list(df.select_dtypes(include=["object", "string", "category"]).columns)
 

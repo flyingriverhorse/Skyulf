@@ -7,7 +7,6 @@ empty data) since ``analyze()`` fans out into nearly every ``_analyzer``
 mixin in one pass.
 """
 
-
 import numpy as np
 import polars as pl
 import pytest

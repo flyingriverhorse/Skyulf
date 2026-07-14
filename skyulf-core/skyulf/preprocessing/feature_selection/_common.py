@@ -173,9 +173,7 @@ _UNIVARIATE_SELECTOR_BUILDERS: dict[str, Callable[[Any, dict[str, Any]], Any]] =
 }
 
 
-def _build_univariate_selector(
-    method: str, score_func: Any, config: dict[str, Any]
-) -> Any | None:
+def _build_univariate_selector(method: str, score_func: Any, config: dict[str, Any]) -> Any | None:
     """Construct the sklearn univariate selector named by ``method``."""
     builder = _UNIVARIATE_SELECTOR_BUILDERS.get(method)
     return builder(score_func, config) if builder else None

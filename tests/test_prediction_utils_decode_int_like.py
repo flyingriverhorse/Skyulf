@@ -1,4 +1,3 @@
-
 import pytest
 from sklearn.preprocessing import LabelEncoder
 

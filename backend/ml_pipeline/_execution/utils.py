@@ -21,9 +21,7 @@ def parse_branch_info(pipeline_id: str) -> tuple[str | None, int | None]:
     return parent, idx
 
 
-async def resolve_dataset_name(
-    session: AsyncSession, dataset_source_id: str | None
-) -> str | None:
+async def resolve_dataset_name(session: AsyncSession, dataset_source_id: str | None) -> str | None:
     """
     Resolves the dataset name from a dataset_source_id.
     Handles both integer IDs (as strings) and UUIDs.

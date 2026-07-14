@@ -6,7 +6,6 @@ from the database. This eliminates the pattern of "Try TrainingJob, then TuningJ
 scattered across the codebase.
 """
 
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session

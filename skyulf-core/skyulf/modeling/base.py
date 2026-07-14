@@ -75,9 +75,7 @@ class BaseModelCalculator(ABC):
 
 class BaseModelApplier(ABC):
     @abstractmethod
-    def predict(
-        self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
-    ) -> pd.Series | Any:
+    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> pd.Series | Any:
         """
         Generates predictions.
         """
@@ -178,7 +176,10 @@ class StatefulEstimator:
 
     def fit_predict(
         self,
-        dataset: SplitDataset | pd.DataFrame | tuple[pd.DataFrame, pd.Series] | tuple[pd.DataFrame, pd.DataFrame],
+        dataset: SplitDataset
+        | pd.DataFrame
+        | tuple[pd.DataFrame, pd.Series]
+        | tuple[pd.DataFrame, pd.DataFrame],
         target_column: str,
         config: dict[str, Any],
         progress_callback: Callable[[int, int], None] | None = None,
@@ -242,9 +243,7 @@ class StatefulEstimator:
         test_df = dataset.test[0] if isinstance(dataset.test, tuple) else dataset.test
 
         # is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`
-        is_test_empty = (
-            test_df.empty if hasattr(test_df, "empty") else test_df.is_empty()
-        )
+        is_test_empty = test_df.empty if hasattr(test_df, "empty") else test_df.is_empty()
 
         if not is_test_empty:
             if isinstance(dataset.test, tuple):

@@ -1,6 +1,5 @@
 """Heuristic data-cleaning recommendations derived from column profiles."""
 
-
 from ..schemas import Alert, ColumnProfile, Recommendation
 from ._utils import _AnalyzerState
 

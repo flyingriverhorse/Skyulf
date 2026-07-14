@@ -6,11 +6,7 @@ import pandas as pd
 from skyulf.engines import SkyulfDataFrame
 
 # Payload for a split slot: engine-neutral frame, pandas frame, or (X, y) tuple.
-SplitPayload = (
-    SkyulfDataFrame
-    | pd.DataFrame
-    | tuple[SkyulfDataFrame | pd.DataFrame, Any]
-)
+SplitPayload = SkyulfDataFrame | pd.DataFrame | tuple[SkyulfDataFrame | pd.DataFrame, Any]
 
 
 @dataclass

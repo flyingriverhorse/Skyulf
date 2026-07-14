@@ -24,9 +24,7 @@ class BaseConnector(ABC):
         """
 
     @abstractmethod
-    async def fetch_data(
-        self, query: str | None = None, limit: int | None = None
-    ) -> pl.DataFrame:
+    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
         """
         Fetch data from the source.
 

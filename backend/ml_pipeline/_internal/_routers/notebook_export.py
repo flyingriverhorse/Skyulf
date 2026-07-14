@@ -258,9 +258,7 @@ def _resolve_dataset_path(
     )
 
 
-def _resolve_target_column(
-    feat_target: _NodeIn | None, train_test: _NodeIn | None
-) -> str | None:
+def _resolve_target_column(feat_target: _NodeIn | None, train_test: _NodeIn | None) -> str | None:
     for src in (feat_target, train_test):
         if src and isinstance(src.params.get("target_column"), str):
             return src.params["target_column"]

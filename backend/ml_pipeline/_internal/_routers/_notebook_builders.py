@@ -550,9 +550,7 @@ def _feat_target_cells(
     ]
 
 
-def _train_test_cells(
-    train_test: _NodeIn | None, in_branch: bool = False
-) -> list[dict[str, Any]]:
+def _train_test_cells(train_test: _NodeIn | None, in_branch: bool = False) -> list[dict[str, Any]]:
     h = "###" if in_branch else "## 5."
     if train_test is not None:
         p = train_test.params

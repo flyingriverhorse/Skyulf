@@ -92,9 +92,7 @@ class S3Connector(BaseConnector):
                     "and that the configured S3 credentials have access."
                 ) from e
 
-    async def fetch_data(
-        self, query: str | None = None, limit: int | None = None
-    ) -> pl.DataFrame:
+    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
         options = self._get_storage_options()
 
         # Determine format based on extension to avoid lazy evaluation errors

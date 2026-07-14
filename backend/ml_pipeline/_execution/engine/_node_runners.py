@@ -570,7 +570,9 @@ class NodeRunnersMixin:
             return calculator_cls(), applier_cls()
         except ValueError:
             # Fallback: Raise original error if not found in registry
-            raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})") from None
+            raise ValueError(
+                f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})"
+            ) from None
 
     def _run_data_preview(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         """

@@ -64,7 +64,9 @@ async def create(settings: Settings, row: dict[str, Any]) -> Any:  # noqa: C901
                     )
 
             logger.exception("SQLite insert failed for data_sources")
-            raise RuntimeError("Failed to persist data_sources row to primary database (SQLite)") from e
+            raise RuntimeError(
+                "Failed to persist data_sources row to primary database (SQLite)"
+            ) from e
 
         # Secondary sync to PostgreSQL (best-effort)
         try:

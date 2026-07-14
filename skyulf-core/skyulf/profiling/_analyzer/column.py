@@ -1,6 +1,5 @@
 """Per-column dispatch: semantic typing + the big ``_analyze_column`` orchestrator."""
 
-
 import numpy as np
 import polars as pl
 

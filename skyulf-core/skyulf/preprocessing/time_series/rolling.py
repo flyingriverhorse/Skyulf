@@ -91,7 +91,9 @@ def _pandas_roll_column(
     for agg in aggs:
         if group_by:
             grouped = numeric.groupby([df[g] for g in group_by])
-            rolled = grouped.transform(lambda s, agg=agg: _pandas_rolling(s, agg, window, min_periods))
+            rolled = grouped.transform(
+                lambda s, agg=agg: _pandas_rolling(s, agg, window, min_periods)
+            )
         else:
             rolled = _pandas_rolling(numeric, agg, window, min_periods)
         df[_roll_name(col, agg, window)] = rolled

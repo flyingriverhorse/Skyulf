@@ -1,7 +1,6 @@
 """AWS and S3 configuration."""
 
 
-
 class AWSMixin:
     """AWS credentials and S3 artifact settings."""
 
