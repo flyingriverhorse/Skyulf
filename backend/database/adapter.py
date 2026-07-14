@@ -202,7 +202,7 @@ async def async_session_or_connection(  # noqa: C901
             ) from None
 
         # Create connection in thread pool since Snowflake is sync-only
-        executor = ThreadPoolExecutor(max_workers=1)
+        executor = ThreadPoolExecutor(max_workers=settings.DB_SYNC_EXECUTOR_WORKERS)
 
         def create_snowflake_connection():
             return snowflake.connector.connect(
