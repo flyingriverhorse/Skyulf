@@ -299,7 +299,7 @@ def _cast_one_column(
     dtype_str = str(target_dtype).lower()
     if dtype_str.startswith("float"):
         return _cast_float(series, target_dtype, coerce_on_error)
-    if dtype_str.startswith("int"):
+    if dtype_str.startswith(("int", "uint")):
         return _cast_int(series, col, target_dtype, coerce_on_error)
     if dtype_str.startswith("bool"):
         return _cast_bool(series, coerce_on_error)
