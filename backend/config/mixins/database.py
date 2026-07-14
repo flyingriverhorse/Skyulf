@@ -13,6 +13,25 @@ class DatabaseMixin:
     DB_POOL_SIZE: int = 10
     DB_MAX_OVERFLOW: int = 20
 
+    # How long a SQLite connection will wait on a lock held by another
+    # connection/process before raising "database is locked" (milliseconds).
+    # Applied via `PRAGMA busy_timeout`. Only relevant for the sqlite backend;
+    # ignored for postgres. Raise this on write-heavy/high-concurrency dev
+    # setups if you see intermittent lock errors.
+    DB_SQLITE_BUSY_TIMEOUT_MS: int = 30_000
+
+    # Size of the dedicated thread pool used to run sync SQLAlchemy calls
+    # from async code paths (see database/adapter.py). Kept small by default
+    # since sync DB access here is meant to be a narrow compatibility shim,
+    # not a general-purpose worker pool.
+    DB_SYNC_EXECUTOR_WORKERS: int = 1
+
+    # Safety cap on the `skip`/offset applied when paginating across two
+    # related ORM tables in a single combined query (see
+    # ml_pipeline/_execution/jobs.py). Prevents pathologically large offsets
+    # from forcing an unbounded in-memory merge.
+    MAX_CROSS_TABLE_SKIP: int = 500
+
     # Pipeline storage
     PIPELINE_STORAGE_TYPE: str = "database"
     PIPELINE_STORAGE_PATH: str = "exports/pipelines"

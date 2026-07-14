@@ -43,6 +43,12 @@ class FilesMixin:
     ENABLE_SCHEMA_DRIFT: bool = True
     ENABLE_RETENTION: bool = True
 
+    # When serializing large DataFrames/collections to JSON (see
+    # data_ingestion/serialization.py), yield control back to the event loop
+    # via `asyncio.sleep(0)` every N rows/items so a very large payload
+    # doesn't block other requests for the whole serialization duration.
+    SERIALIZATION_YIELD_THRESHOLD_ROWS: int = 1000
+
     def create_directories(self) -> None:
         """Create all necessary directories if they don't exist."""
         directories: list[str | Path] = [
