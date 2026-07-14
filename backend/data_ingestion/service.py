@@ -17,7 +17,7 @@ from backend.data_ingestion.schemas.ingestion import (
 )
 from backend.data_ingestion.tasks import ingest_data_task
 from backend.database.models import DataSource
-from backend.exceptions.core import SkyulfException
+from backend.exceptions.core import ForbiddenException, ResourceNotFoundException, SkyulfException
 from backend.services.data_service import DataService
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,14 @@ class DataIngestionService:
     async def delete_source(self, source_id: int | str) -> bool:
         """
         Delete a data source and its associated file if applicable.
+
+        File removal is attempted before the DB row is deleted, but a
+        failure to remove the file (permissions, file locked, already
+        gone, etc.) does not block deleting the data source record — a
+        stuck/missing file on disk shouldn't prevent a user from removing
+        the source. If removal fails, we log a clear, discoverable ERROR
+        that flags the file as orphaned (no DB row will reference it
+        afterwards) so an operator can find and clean it up manually.
         """
         source = await self.get_source(source_id)
         if not source:
@@ -97,7 +105,14 @@ class DataIngestionService:
                         path.unlink()
                         logger.info(f"Deleted file: {file_path}")
                 except Exception as e:
-                    logger.error(f"Failed to delete file {file_path}: {e}")
+                    logger.error(
+                        "Orphaned file: failed to delete '%s' while deleting source %s "
+                        "(the data source record will still be removed); manual cleanup "
+                        "required. Error: %s",
+                        file_path,
+                        source_id,
+                        e,
+                    )
 
         await self.session.delete(source)
         await self.session.commit()
@@ -171,27 +186,46 @@ class DataIngestionService:
                 await connector.connect()
                 df = await connector.fetch_data(limit=limit)
                 return df.to_dicts()
+            except (ForbiddenException, ResourceNotFoundException) as e:
+                # Typed exceptions raised by S3Connector for 403/404 provider
+                # responses — classified there rather than string-matched here.
+                logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=400, detail="S3 access denied or resource not found"
+                ) from e
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
-                # If it's a 403/404 from S3, it might come as ValueError from connector
-                if "403" in str(e) or "404" in str(e):
-                    raise HTTPException(
-                        status_code=400, detail="S3 access denied or resource not found"
-                    ) from e
                 raise SkyulfException(message="Failed to read S3 data sample") from e
 
         if source.type in ["file", "csv", "txt"]:
             if not file_path:
                 raise HTTPException(status_code=400, detail="Missing file path")
 
+            # Defense-in-depth: this branch calls `data_service.get_sample`
+            # directly instead of going through `LocalFileConnector`, so it
+            # does NOT automatically benefit from the connector's
+            # `resolve_safe_path` containment guard. Apply the same guard
+            # explicitly here so a crafted/attacker-influenced `file_path`
+            # (e.g. via source config) cannot resolve outside the configured
+            # upload directory, even if this call site is ever reached with
+            # an unvalidated path.
             try:
-                # Ensure we use the absolute path
-                abs_path = Path(file_path).absolute()
+                abs_path = LocalFileConnector.resolve_safe_path(str(file_path))
+            except PermissionError as e:
+                logger.warning("Rejected out-of-bounds file path for sample: %s", file_path)
+                raise HTTPException(status_code=400, detail="Invalid file path") from e
+
+            try:
                 if not abs_path.exists():
                     # Try relative to workspace if absolute fails
-                    abs_path = Path.cwd() / file_path
+                    abs_path = LocalFileConnector.resolve_safe_path(str(Path.cwd() / file_path))
 
                 return await self.data_service.get_sample(abs_path, limit=limit)
+            except HTTPException:
+                raise
+            except PermissionError as e:
+                logger.warning("Rejected out-of-bounds file path for sample: %s", file_path)
+                raise HTTPException(status_code=400, detail="Invalid file path") from e
             except Exception as e:
                 logger.error(f"Failed to get sample: {e}")
                 raise SkyulfException(message="Failed to read data sample") from e
@@ -214,6 +248,11 @@ class DataIngestionService:
                     await connector.connect()
                     df = await connector.fetch_data(limit=limit)
                     return df.to_dicts()
+                except PermissionError as e:
+                    # Raised by LocalFileConnector's containment guard when
+                    # `abs_path` resolves outside the configured upload dir.
+                    logger.warning("Rejected out-of-bounds parquet path for sample: %s", file_path)
+                    raise HTTPException(status_code=400, detail="Invalid file path") from e
                 except Exception:
                     logger.exception("Failed to read local parquet: %s", file_path)
                     raise SkyulfException(message="Failed to read local parquet file") from None
@@ -228,6 +267,11 @@ class DataIngestionService:
                 await connector.connect()
                 df = await connector.fetch_data(limit=limit)
                 return df.to_dicts()
+            except (ForbiddenException, ResourceNotFoundException) as e:
+                logger.error(f"Failed to get S3 sample: {e}")
+                raise HTTPException(
+                    status_code=400, detail="S3 access denied or resource not found"
+                ) from e
             except Exception as e:
                 logger.error(f"Failed to get S3 sample: {e}")
                 raise SkyulfException(message="Failed to read S3 data sample") from e

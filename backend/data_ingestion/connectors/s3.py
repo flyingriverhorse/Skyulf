@@ -1,11 +1,20 @@
 import logging
+import re
 from typing import cast
 
 import polars as pl
 
 from backend.data_ingestion.connectors.base import BaseConnector
+from backend.exceptions.core import ForbiddenException, ResourceNotFoundException
 
 logger = logging.getLogger(__name__)
+
+# Matches a bare HTTP status code (403/404) in an underlying object_store /
+# botocore error message, e.g. "... status: 403 Forbidden ...". Used to
+# classify S3 errors into typed exceptions instead of leaving callers to
+# substring-match on `str(exc)`.
+_HTTP_403_RE = re.compile(r"\b403\b")
+_HTTP_404_RE = re.compile(r"\b404\b")
 
 
 class S3Connector(BaseConnector):
@@ -52,6 +61,10 @@ class S3Connector(BaseConnector):
         try:
             await self.get_schema()
             return True
+        except (ForbiddenException, ResourceNotFoundException):
+            # Preserve typed access-error classification for callers instead
+            # of collapsing it into a generic ConnectionError.
+            raise
         except Exception as e:
             logger.error(
                 "S3 connection check failed for %s: %s", self.path, self._sanitize_error(e)
@@ -86,6 +99,17 @@ class S3Connector(BaseConnector):
                         "S3 Connection Error: Could not find AWS credentials. "
                         "If running locally, ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
                         "are set or passed in storage_options."
+                    ) from e
+                # Classify into typed exceptions so callers (e.g.
+                # DataIngestionService.get_sample) can use isinstance checks
+                # instead of substring-matching on the raw error message.
+                if _HTTP_403_RE.search(msg):
+                    raise ForbiddenException(
+                        message=f"Access denied reading S3 path {self.path}"
+                    ) from e
+                if _HTTP_404_RE.search(msg):
+                    raise ResourceNotFoundException(
+                        message=f"S3 resource not found: {self.path}"
                     ) from e
                 raise ValueError(
                     f"Could not infer schema for {self.path}. Ensure it is a valid Parquet or CSV file "

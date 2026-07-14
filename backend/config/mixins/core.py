@@ -23,6 +23,12 @@ class CoreMixin:
     DEBUG: bool = False
     TESTING: bool = False
 
+    # Environment name reported by health checks / monitoring (e.g. "development",
+    # "staging", "production"). Read from the ENVIRONMENT env var. When unset, falls
+    # back to deriving from DEBUG (see Settings.environment_name) to preserve prior
+    # behavior for deployments that don't set it explicitly.
+    ENVIRONMENT: str | None = None
+
     # Server
     HOST: str = "127.0.0.1"
     PORT: int = 8000

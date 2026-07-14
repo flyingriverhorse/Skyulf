@@ -63,10 +63,17 @@ class EvaluationService:
 
         try:
             data = artifact_store.load(key)
-            # Verify it belongs to this job (since we share the folder)
+            # Verify it belongs to this job (since we share the folder). A mismatch
+            # means we are about to serve stale/foreign evaluation results (e.g. a
+            # leftover artifact from a previous job that reused the same node_id
+            # key) — treat this as an error rather than silently returning it.
             if isinstance(data, dict) and data.get("job_id") != job_id:
-                logger.warning(
+                logger.error(
                     f"Evaluation data job_id mismatch. Requested: {job_id}, Found: {data.get('job_id')}"
+                )
+                raise ValueError(
+                    f"Evaluation data job_id mismatch for job {job_id} "
+                    f"(found data belonging to job {data.get('job_id')!r})"
                 )
 
             # Optional: decode target labels for nicer UI (ROC selector, confusion matrix)
