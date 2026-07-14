@@ -232,9 +232,21 @@ class TargetEncoderCalculator(BaseCalculator):
         input_schema: SkyulfSchema,
         config: dict[str, Any],
     ) -> SkyulfSchema | None:
-        # Target encoder replaces values in source columns in place — same
-        # column names, dtype becomes float (per-column dtype is best-effort
-        # so we don't bother rewriting it).
+        # For binary/regression targets, the encoder replaces values in
+        # source columns in place — same column names, dtype becomes float
+        # (per-column dtype is best-effort so we don't bother rewriting it).
+        #
+        # For multiclass targets, the apply logic (see
+        # ``_target_apply_polars``/``_target_apply_pandas``) drops the
+        # original columns and creates ``{col}_cls{i}`` columns instead — the
+        # number of classes is data-dependent and unknown here, so we can't
+        # confidently predict the output columns. The default/"auto"
+        # target_type is resolved to multiclass at fit time whenever y has
+        # more than two classes, so we must also treat "auto" as unknown
+        # rather than assuming binary/regression. Only the explicit
+        # "binary"/"regression" config values are confidently in-place.
+        if config.get("target_type", "auto") not in ("binary", "regression"):
+            return None
         return input_schema
 
 

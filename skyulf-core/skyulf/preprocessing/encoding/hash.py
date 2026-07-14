@@ -1,5 +1,6 @@
 """Hash Encoder node (Calculator + Applier)."""
 
+import hashlib
 import logging
 from typing import Any
 
@@ -34,8 +35,27 @@ def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
     return X.with_columns(exprs), y
 
 
+def _stable_hash(value: str) -> int:
+    """Deterministic hash for strings, stable across processes/interpreters.
+
+    Python's built-in ``hash()`` is salted per-process (``PYTHONHASHSEED``),
+    so the same category would map to a different bucket every time the
+    interpreter restarts (e.g. a new Celery worker or API server), silently
+    corrupting encodings learned at fit time. ``blake2b`` is deterministic,
+    fixing that cross-process instability.
+
+    Note: this does not make pandas and polars produce identical buckets for
+    the same input — ``_hash_apply_polars`` uses polars' own native hash,
+    which is a different algorithm. Fit and apply must use the same engine
+    for encodings to be reproducible; mixing engines was already inconsistent
+    before this change and remains a separate, unaddressed limitation.
+    """
+    digest = hashlib.blake2b(value.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "little")
+
+
 def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Pandas apply path — Python's built-in ``hash`` per value."""
+    """Pandas apply path — uses a stable hash per value."""
     valid_cols = _resolve_valid_cols(X, params)
     if not valid_cols:
         return X, y
@@ -43,7 +63,7 @@ def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
     n_features = params.get("n_features", 10)
     X_out = X.copy()
     for col in valid_cols:
-        X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
+        X_out[col] = X_out[col].astype(str).apply(lambda x: _stable_hash(x) % n_features)
     return X_out, y
 
 

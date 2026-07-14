@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder, TargetEncoder
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing.encoding.target import (
     TargetEncoderApplier,
     TargetEncoderCalculator,
@@ -392,6 +393,44 @@ def test_fit_target_encoder_reraises_unrelated_value_error() -> None:
     with pytest.raises(ValueError) as exc_info:
         _fit_target_encoder(X, y, config)
     assert "TargetEncoder failed" not in str(exc_info.value)
+
+
+def test_infer_output_schema_preserves_columns_for_binary_target() -> None:
+    """Binary/regression target encoding replaces values in place — schema unchanged."""
+    input_schema = SkyulfSchema.from_columns(["city", "target"])
+    output_schema = TargetEncoderCalculator().infer_output_schema(
+        input_schema, {"target_type": "binary", "columns": ["city"]}
+    )
+    assert output_schema is input_schema
+
+
+def test_infer_output_schema_returns_none_for_multiclass_target() -> None:
+    """Multiclass target encoding fans out into ``{col}_cls{i}`` columns and drops
+    the originals (see ``_target_apply_polars``/``_target_apply_pandas``), so the
+    output columns are data-dependent (unknown number of classes) and can't be
+    confidently predicted from config alone. Regression test for a bug where this
+    unconditionally returned ``input_schema`` unchanged, misleading downstream
+    schema consumers about the real output columns.
+    """
+    input_schema = SkyulfSchema.from_columns(["city", "target"])
+    output_schema = TargetEncoderCalculator().infer_output_schema(
+        input_schema, {"target_type": "multiclass", "columns": ["city"]}
+    )
+    assert output_schema is None
+
+
+def test_infer_output_schema_returns_none_for_default_auto_target_type() -> None:
+    """The default ``target_type="auto"`` resolves to multiclass at fit time
+    whenever y has more than two classes, so it must also be treated as
+    "unknown" — not confidently binary/regression. Regression test for a gap
+    where only the explicit "multiclass" string was handled, missing the
+    common default config that omits ``target_type`` entirely.
+    """
+    input_schema = SkyulfSchema.from_columns(["city", "target"])
+    output_schema = TargetEncoderCalculator().infer_output_schema(
+        input_schema, {"columns": ["city"]}
+    )
+    assert output_schema is None
 
 
 class TestRealShapedDataset:

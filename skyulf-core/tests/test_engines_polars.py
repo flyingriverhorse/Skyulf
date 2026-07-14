@@ -103,6 +103,15 @@ def test_wrapper_setitem_mutates_underlying_frame(pl_df):
     assert wrapper._df[0, "a"] == 99
 
 
+def test_wrapper_setitem_whole_column_raises_clear_error(pl_df):
+    """polars has no pandas-style whole-column assignment; wrapper should raise
+    a clear, actionable error instead of a confusing polars-internal TypeError.
+    """
+    wrapper = SkyulfPolarsWrapper(pl_df)
+    with pytest.raises(NotImplementedError, match="with_column"):
+        wrapper["a"] = [10, 20, 30]
+
+
 # ---------------------------------------------------------------------------
 # HAS_POLARS=False guard branches (simulated via monkeypatch, since polars is
 # actually installed in this environment and the `except ImportError` branch
