@@ -69,6 +69,13 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
         "int64": pl.Int64,
         "integer": pl.Int64,
         "int32": pl.Int32,
+        "int16": pl.Int16,
+        "int8": pl.Int8,
+        "uint": pl.UInt64,
+        "uint64": pl.UInt64,
+        "uint32": pl.UInt32,
+        "uint16": pl.UInt16,
+        "uint8": pl.UInt8,
         "string": pl.String,
         "str": pl.String,
         "text": pl.String,
@@ -126,6 +133,16 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
             continue
         pl_dtype = _resolve_polars_dtype(str(target_dtype).lower())
         if pl_dtype is None:
+            # In strict mode (coerce_on_error=False), an unsupported dtype
+            # string is a configuration error and must be surfaced loudly -
+            # previously this silently skipped the column even in strict
+            # mode, while the equivalent pandas path raises. In coerce mode
+            # we keep the existing best-effort "leave untouched" behavior.
+            if not coerce_on_error:
+                raise ValueError(
+                    f"Column '{col}': unsupported target dtype '{target_dtype}' for the "
+                    "Polars engine."
+                )
             continue
         if pl_dtype == pl.Boolean and X.schema[col] in (pl.String, pl.Utf8, pl.Categorical):
             exprs.append(_bool_expr_from_string_col_polars(col))
@@ -223,13 +240,39 @@ def _mask_out_of_range_or_raise(
     return numeric
 
 
+# Map each numpy integer dtype string to its pandas nullable (NA-capable)
+# counterpart, preserving the requested width/signedness instead of always
+# widening to Int64.
+_NULLABLE_INT_DTYPES = {
+    "int8": "Int8",
+    "int16": "Int16",
+    "int32": "Int32",
+    "int64": "Int64",
+    "int": "Int64",
+    "uint8": "UInt8",
+    "uint16": "UInt16",
+    "uint32": "UInt32",
+    "uint64": "UInt64",
+    "uint": "UInt64",
+}
+
+
 def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
     numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
     numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
-    if numeric.isna().any() and target_dtype in ("int32", "int64", "int"):
-        # NaNs require pandas' nullable Int64 container.
-        return numeric.astype("Int64")
+    if numeric.isna().any():
+        # NaNs require a pandas nullable container. Previously this only
+        # covered int32/int64/int, so casting a narrower dtype (int8/int16/
+        # uint8/etc.) with coerce_on_error=True and any out-of-range/NaN
+        # value fell through to `numeric.astype(target_dtype)` below, which
+        # raises on plain numpy int dtypes with NaN present — that raise was
+        # then silently swallowed by the caller's best-effort except block,
+        # leaving the ENTIRE column completely uncast (not even in-range
+        # values got converted). Look up the matching nullable dtype for any
+        # integer width instead of only the three previously handled.
+        nullable_dtype = _NULLABLE_INT_DTYPES.get(str(target_dtype).lower(), "Int64")
+        return numeric.astype(nullable_dtype)  # ty: ignore[no-matching-overload]
     return numeric.astype(target_dtype)
 
 
