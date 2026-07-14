@@ -1,5 +1,6 @@
 """Multivariate analyses: PCA, KMeans clustering, Isolation Forest outliers."""
 
+import logging
 from typing import Any, cast
 
 import numpy as np
@@ -15,6 +16,8 @@ from ..schemas import (
     PCAPoint,
 )
 from ._utils import SKLEARN_AVAILABLE, _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class MultivariateMixin(_AnalyzerState):
@@ -76,7 +79,7 @@ class MultivariateMixin(_AnalyzerState):
             return X_scaled, sample_df, scaler
 
         except Exception as e:
-            print(f"Error preparing matrix sample: {e}")
+            logger.warning(f"Error preparing matrix sample: {e}")
             return None, None, None
 
     def _calculate_pca(
@@ -142,7 +145,7 @@ class MultivariateMixin(_AnalyzerState):
             return points, components_list
 
         except Exception as e:
-            print(f"Error calculating PCA: {e}")
+            logger.warning(f"Error calculating PCA: {e}")
             return None, None
 
     def _perform_clustering(
@@ -221,7 +224,7 @@ class MultivariateMixin(_AnalyzerState):
             )
 
         except Exception as e:
-            print(f"Error in clustering analysis: {e}")
+            logger.warning(f"Error in clustering analysis: {e}")
             return None
 
     def _detect_outliers(self, numeric_cols: list[str]) -> OutlierAnalysis | None:
@@ -296,5 +299,5 @@ class MultivariateMixin(_AnalyzerState):
             )
 
         except Exception as e:
-            print(f"Error in outlier detection: {e}")
+            logger.warning(f"Error in outlier detection: {e}")
             return None

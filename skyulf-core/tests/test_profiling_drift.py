@@ -52,10 +52,41 @@ def test_calculate_drift_reports_missing_and_new_columns() -> None:
     assert "b" not in report.column_drifts
 
 
-def test_calculate_drift_skips_non_numeric_columns() -> None:
-    """Non-numeric common columns should be excluded from drift metrics entirely."""
+def test_calculate_drift_computes_categorical_psi_for_low_cardinality_string_column() -> None:
+    """A low-cardinality string column should now get PSI-based categorical
+    drift detection instead of being skipped entirely."""
     reference = pl.DataFrame({"cat": ["a", "b", "c"]})
     current = pl.DataFrame({"cat": ["a", "b", "c"]})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "cat" in report.column_drifts
+    col_drift = report.column_drifts["cat"]
+    assert col_drift.drift_detected is False
+    metric_names = {m.metric for m in col_drift.metrics}
+    assert metric_names == {"psi_categorical"}
+
+
+def test_calculate_drift_detects_categorical_distribution_shift() -> None:
+    """A current dataset whose category proportions have shifted heavily
+    away from the reference should be flagged as drifted."""
+    rng = np.random.default_rng(3)
+    reference = pl.DataFrame({"cat": rng.choice(["a", "b", "c"], size=500, p=[0.8, 0.1, 0.1])})
+    current = pl.DataFrame({"cat": rng.choice(["a", "b", "c"], size=500, p=[0.1, 0.1, 0.8])})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "cat" in report.column_drifts
+    assert report.column_drifts["cat"].drift_detected is True
+    assert report.drifted_columns_count == 1
+
+
+def test_calculate_drift_skips_high_cardinality_categorical_column() -> None:
+    """A near-unique-per-row string column (free text / IDs) must be skipped
+    rather than blowing up the PSI computation on effectively-unique values."""
+    n = 200
+    reference = pl.DataFrame({"cat": [f"id_{i}" for i in range(n)]})
+    current = pl.DataFrame({"cat": [f"id_{i}" for i in range(n)]})
 
     report = DriftCalculator(reference, current).calculate_drift()
 

@@ -101,6 +101,44 @@ def test_resolve_unknown_type_falls_back_to_default_and_warns(caplog):
     assert any("Unknown data type" in record.message for record in caplog.records)
 
 
+def test_resolve_uses_top_level_package_not_substring_match():
+    """A module whose name merely *contains* 'pandas'/'polars' as a substring
+    (e.g. a third-party 'fake_polars_stub' or 'my_pandas_wrapper' module) must
+    NOT be misdetected as the real pandas/polars engine — regression guard
+    against the old `"pandas" in module` substring check."""
+
+    class _FakePolarsLookalike:
+        pass
+
+    _FakePolarsLookalike.__module__ = "fake_polars_stub.frame"
+    resolved = EngineRegistry.resolve(_FakePolarsLookalike())
+    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+
+    class _FakePandasLookalike:
+        pass
+
+    _FakePandasLookalike.__module__ = "my_pandas_wrapper.core"
+    resolved = EngineRegistry.resolve(_FakePandasLookalike())
+    assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
+
+
+def test_resolve_matches_submodules_of_real_pandas_polars():
+    """A dotted submodule of the real library (e.g. `pandas.core.frame`) must
+    still match via the top-level package check."""
+
+    class _RealPandasSubmoduleType:
+        pass
+
+    _RealPandasSubmoduleType.__module__ = "pandas.core.frame"
+    assert EngineRegistry.resolve(_RealPandasSubmoduleType()) is EngineRegistry.get("pandas")
+
+    class _RealPolarsSubmoduleType:
+        pass
+
+    _RealPolarsSubmoduleType.__module__ = "polars.dataframe.frame"
+    assert EngineRegistry.resolve(_RealPolarsSubmoduleType()) is EngineRegistry.get("polars")
+
+
 def test_wrap_dispatches_to_correct_engine_for_pandas():
     """EngineRegistry.wrap should auto-detect pandas input and produce a pandas wrapper."""
     df = pd.DataFrame({"a": [1, 2]})

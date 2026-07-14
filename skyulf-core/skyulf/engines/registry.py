@@ -84,17 +84,33 @@ class EngineRegistry:
         if data is None:
             return cls.get(cls._active_engine)
 
-        # Check module path to identify the library
+        # Check the top-level package of the module path to identify the
+        # library. Using the top-level component (rather than a bare
+        # substring check) avoids false positives from unrelated modules
+        # that merely contain "pandas"/"polars" in their name, e.g. a
+        # third-party "fake_polars_stub" or "my_pandas_wrapper" module.
         module = type(data).__module__
+        top_level = module.split(".", 1)[0]
 
-        if "polars" in module:
+        # Our own engine wrappers (SkyulfPandasWrapper/SkyulfPolarsWrapper,
+        # under `skyulf.engines.*`) hold the real dataframe in `._df`; unwrap
+        # and re-check *only* in that case so detection is based on the
+        # underlying library. We deliberately don't do this unconditionally
+        # for any object with a `._df` attribute, since e.g. polars'
+        # DataFrame itself has an internal `._df` (its Rust-backed handle)
+        # that would otherwise be mistakenly "unwrapped".
+        if top_level == "skyulf" and hasattr(data, "_df"):
+            module = type(data._df).__module__
+            top_level = module.split(".", 1)[0]
+
+        if top_level == "polars":
             return cls.get("polars")
-        if "pandas" in module:
+        if top_level == "pandas":
             return cls.get("pandas")
-        if "pyspark" in module and "spark" in cls._engines:
+        if top_level == "pyspark" and "spark" in cls._engines:
             # Future proofing
             return cls.get("spark")
-        if "dask" in module and "dask" in cls._engines:
+        if top_level == "dask" and "dask" in cls._engines:
             # Future proofing
             return cls.get("dask")
 

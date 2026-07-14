@@ -102,6 +102,17 @@ class SkyulfSchema:
 
     def rename(self, mapping: dict[str, str]) -> "SkyulfSchema":
         new_cols = tuple(mapping.get(c, c) for c in self.columns)
+        if len(set(new_cols)) != len(new_cols):
+            seen: set[str] = set()
+            collisions: set[str] = set()
+            for c in new_cols:
+                if c in seen:
+                    collisions.add(c)
+                seen.add(c)
+            raise ValueError(
+                "Schema rename() would produce duplicate column name(s): "
+                f"{sorted(collisions)}. Rename mapping: {mapping}"
+            )
         new_dtypes: dict[str, str] = {}
         for k, v in self.dtypes.items():
             new_dtypes[mapping.get(k, k)] = v

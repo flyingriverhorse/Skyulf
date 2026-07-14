@@ -30,6 +30,30 @@ def test_register_stores_metadata():
     assert entry.metadata == {"accuracy": 0.9}
 
 
+def test_register_is_thread_safe_no_duplicate_or_skipped_versions():
+    """Concurrent register() calls for the same name must each get a unique,
+    contiguous version number — regression guard against the
+    read-len-then-append race in the old unguarded implementation."""
+    import threading
+
+    registry = InMemoryModelRegistry()
+    n_threads = 20
+    barrier = threading.Barrier(n_threads)
+
+    def _register():
+        barrier.wait()  # maximize the chance of interleaving
+        registry.register("concurrent_model", object())
+
+    threads = [threading.Thread(target=_register) for _ in range(n_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    versions = sorted(v.version for v in registry.versions("concurrent_model"))
+    assert versions == list(range(1, n_threads + 1))
+
+
 def test_register_defaults_metadata_to_empty_dict():
     """Omitting metadata should default to an empty dict, not None."""
     registry = InMemoryModelRegistry()

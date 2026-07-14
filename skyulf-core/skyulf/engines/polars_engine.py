@@ -44,8 +44,6 @@ class SkyulfPolarsWrapper:
         return self._df.to_pandas()
 
     def to_arrow(self) -> Any:
-        pass
-
         return self._df.to_arrow()
 
     def copy(self) -> "SkyulfDataFrame":
