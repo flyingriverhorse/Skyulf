@@ -23,7 +23,8 @@ class DeploymentInfo(BaseModel):
 
 
 class PredictionRequest(BaseModel):
-    data: list[dict[str, Any]]  # List of records (rows)
+    data: list[dict[str, Any]]  # List of records (rows). Row-count is capped
+    # dynamically in the /predict route via Settings.MAX_PREDICT_REQUEST_ROWS.
 
 
 class PredictionResponse(BaseModel):

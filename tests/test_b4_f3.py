@@ -72,21 +72,37 @@ class TestRunPipelineBatchTask:
             s.close.assert_called_once()
 
     def test_session_closed_even_if_execute_raises(self):
-        """DB session is always closed, even when execute_pipeline raises."""
+        """DB session is always closed, even when execute_pipeline raises.
+
+        The task's exception handler also opens a second, short-lived
+        session to attempt marking the job as failed (see
+        `_mark_job_failed_if_unrecorded`); that fallback session must be
+        closed too.
+        """
         from backend.ml_pipeline.tasks import run_pipeline_batch_task
 
         session = _make_session()
+        fallback_session = _make_session()
+        sessions = iter([session, fallback_session])
         with (
-            patch("backend.ml_pipeline.tasks.get_db_session", return_value=session),
+            patch(
+                "backend.ml_pipeline.tasks.get_db_session",
+                side_effect=lambda: next(sessions),
+            ),
             patch(
                 "backend.ml_pipeline.tasks.execute_pipeline",
                 side_effect=RuntimeError("boom"),
+            ),
+            patch(
+                "backend.ml_pipeline._execution.strategies.JobStrategyFactory.find_job",
+                return_value=(None, None),
             ),
             pytest.raises(RuntimeError, match="boom"),
         ):
             run_pipeline_batch_task([("job-err", {"pipeline_id": "p", "nodes": []})])
 
         session.close.assert_called_once()
+        fallback_session.close.assert_called_once()
 
     def test_multi_branch_propagates_first_exception(self):
         """If any branch raises, the exception propagates out of the task."""

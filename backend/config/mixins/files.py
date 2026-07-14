@@ -17,6 +17,13 @@ class FilesMixin:
     # Docker Compose users can override with: MAX_UPLOAD_SIZE=5368709120
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024 * 1024  # 10 GB
     # NoDecode: pydantic-settings must not JSON-decode this before field_validator runs.
+    # `.pkl`/`.pickle`/`.h5`/`.hdf5` are intentionally excluded: nothing in the
+    # ingestion pipeline (LocalFileConnector.SUPPORTED_EXTENSIONS) actually
+    # reads these formats today, and pickle/unsafe-HDF5 deserialization of an
+    # arbitrary user-uploaded file is a latent RCE risk if a loader for these
+    # formats is ever added on this same upload path. Model artifacts (which
+    # do use `.pkl`/`.joblib`) are stored and loaded through a separate,
+    # trusted path (backend/ml_pipeline/deployment), not this upload allow-list.
     ALLOWED_EXTENSIONS: Annotated[list[str], NoDecode] = [
         ".csv",
         ".xlsx",
@@ -24,11 +31,7 @@ class FilesMixin:
         ".parquet",
         ".json",
         ".txt",
-        ".pkl",
-        ".pickle",
         ".feather",
-        ".h5",
-        ".hdf5",
     ]
     TRAINING_ARTIFACT_DIR: str = "uploads/models"
     TEMP_DIR: str = "temp/processing"

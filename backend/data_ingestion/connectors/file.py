@@ -33,18 +33,47 @@ class LocalFileConnector(BaseConnector):
         self._schema: dict[str, str] | None = None
 
     def _resolve_file_path(self, file_path: str) -> str:
+        return str(
+            self.resolve_safe_path(file_path, base_path=self.base_path, testing=self._testing)
+        )
+
+    @staticmethod
+    def resolve_safe_path(
+        file_path: str,
+        *,
+        base_path: Path | None = None,
+        testing: bool | None = None,
+    ) -> Path:
+        """Resolve ``file_path`` against the configured upload directory and
+        enforce that the result stays contained within it.
+
+        This is the single source of truth for local-path containment used
+        by ``LocalFileConnector.__init__``. Call sites that resolve a local
+        path *before* handing it to the connector (e.g.
+        ``DataIngestionService.get_sample``) should call this directly for
+        defense-in-depth, instead of duplicating the containment logic or
+        relying solely on the connector to enforce it later.
+
+        Raises:
+            PermissionError: if the resolved path escapes ``base_path``.
+        """
+        settings = get_settings()
+        if base_path is None:
+            base_path = Path(settings.UPLOAD_DIR).expanduser().resolve()
+        if testing is None:
+            testing = getattr(settings, "TESTING", False)
+
         candidate = Path(file_path).expanduser()
         if not candidate.is_absolute():
-            candidate = self.base_path / candidate
+            candidate = base_path / candidate
 
         resolved = candidate.resolve(strict=False)
         # Skip containment check in test mode — tests use tmp_path outside UPLOAD_DIR
-        if self._testing:
-            return str(resolved)
-        base = self.base_path
-        if resolved != base and base not in resolved.parents:
+        if testing:
+            return resolved
+        if resolved != base_path and base_path not in resolved.parents:
             raise PermissionError("File path resolves outside the configured upload directory")
-        return str(resolved)
+        return resolved
 
     async def connect(self) -> bool:
         if not Path(self.file_path).exists():

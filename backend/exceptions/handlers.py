@@ -93,7 +93,7 @@ async def skyulf_exception_handler(request: Request, exc: Exception) -> JSONResp
             route=str(request.url.path),
             error_type=type(exc).__name__,
             message=exc.message,
-            traceback=tb_module.format_exc(),
+            traceback="".join(tb_module.format_exception(type(exc), exc, exc.__traceback__)),
             status_code=exc.status_code,
         )
 
@@ -176,7 +176,7 @@ async def generic_http_exception_handler(
             route=str(request.url.path),
             error_type=type(exc).__name__,
             message=str(getattr(exc, "detail", exc)),
-            traceback=tb_module.format_exc(),
+            traceback="".join(tb_module.format_exception(type(exc), exc, exc.__traceback__)),
             status_code=status_code,
         )
 

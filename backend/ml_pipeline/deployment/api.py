@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.exceptions.core import SkyulfException
 from backend.middleware.rate_limiter import limiter
 
@@ -85,6 +86,17 @@ async def predict(
     Makes predictions using the active model.
     """
     try:
+        max_rows = get_settings().MAX_PREDICT_REQUEST_ROWS
+        if len(prediction_request.data) > max_rows:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"Request contains {len(prediction_request.data)} rows; the limit "
+                    f"is {max_rows}. Set the MAX_PREDICT_REQUEST_ROWS env var to raise "
+                    "this limit, or use pipeline execution for bulk dataset scoring."
+                ),
+            )
+
         deployment = await DeploymentService.get_active_deployment(session)
         if not deployment:
             raise HTTPException(status_code=404, detail="No active deployment found")
