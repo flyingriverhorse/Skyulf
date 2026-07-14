@@ -71,10 +71,10 @@ def _pandas_apply_mapping(
         if is_nested:
             for col, map_dict in mapping.items():
                 if col in valid:
-                    df_out[col] = df_out[col].replace(map_dict).infer_objects(copy=False)
+                    df_out[col] = df_out[col].replace(map_dict).infer_objects()
         else:
             for col in valid:
-                df_out[col] = df_out[col].replace(mapping).infer_objects(copy=False)
+                df_out[col] = df_out[col].replace(mapping).infer_objects()
     return df_out
 
 
@@ -85,9 +85,9 @@ def _pandas_apply_to_replace(
     with pd.option_context("future.no_silent_downcasting", True):
         for col in valid:
             if is_map:
-                df_out[col] = df_out[col].replace(to_replace).infer_objects(copy=False)
+                df_out[col] = df_out[col].replace(to_replace).infer_objects()
             else:
-                df_out[col] = df_out[col].replace(to_replace, value).infer_objects(copy=False)
+                df_out[col] = df_out[col].replace(to_replace, value).infer_objects()
     return df_out
 
 
