@@ -530,6 +530,52 @@ if _POLARS_AVAILABLE:
         result = CastingApplier().apply(df_pl, params)
         assert result["flag"].dtype == pl.Boolean
 
+    def test_casting_apply_polars_bool_cast_from_yes_no_strings() -> None:
+        """Regression test: casting a "yes"/"no"-style string column to
+        Boolean on the Polars engine must not crash.
+
+        Polars has no direct Utf8->Boolean cast at all (raises
+        InvalidOperationError even with strict=False), unlike pandas which
+        falls back to a per-value alias table for the same input. Previously
+        this hard-crashed the whole pipeline for the Polars engine while the
+        identical pandas pipeline succeeded - a stark engine-parity break.
+        """
+        df_pl = pl.DataFrame({"flag": ["Yes", "no", "Y", "N", "1", "0", "TRUE", "off"]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        result = CastingApplier().apply(df_pl, params)
+        assert result["flag"].dtype == pl.Boolean
+        assert result["flag"].to_list() == [True, False, True, False, True, False, True, False]
+
+    def test_casting_apply_polars_bool_cast_unrecognized_string_becomes_null() -> None:
+        """An unrecognized string value must become null under coerce_on_error=True,
+        matching pandas' `_coerce_boolean_value` fallback-to-None behavior."""
+        df_pl = pl.DataFrame({"flag": ["yes", "maybe"]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        result = CastingApplier().apply(df_pl, params)
+        assert result["flag"].to_list() == [True, None]
+
+    def test_casting_apply_polars_bool_cast_raises_without_coerce() -> None:
+        """An unrecognized string value must raise ValueError when
+        coerce_on_error=False, mirroring pandas' `_cast_bool` strict-mode re-raise."""
+        df_pl = pl.DataFrame({"flag": ["yes", "maybe"]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": False}
+        with pytest.raises(ValueError, match="not recognized as true/false"):
+            CastingApplier().apply(df_pl, params)
+
+    def test_casting_apply_bool_cast_string_engine_parity() -> None:
+        """pandas and Polars must produce identical boolean values for the
+        same "yes"/"no"-style string column."""
+        df_pd = pd.DataFrame({"flag": ["Yes", "no", "1", "0", "maybe"]})
+        df_pl = pl.from_pandas(df_pd)
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+
+        pd_result = CastingApplier().apply(df_pd, params)
+        pl_result = CastingApplier().apply(df_pl, params)
+
+        pd_values = [None if pd.isna(v) else bool(v) for v in pd_result["flag"]]
+        pl_values = pl_result["flag"].to_list()
+        assert pd_values == pl_values == [True, False, True, False, None]
+
     # -----------------------------------------------------------------------
     # _resolve_polars_dtype (datetime-prefix branch + unsupported-dtype None)
     # -----------------------------------------------------------------------
