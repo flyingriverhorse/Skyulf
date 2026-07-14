@@ -69,6 +69,20 @@ def decode_int_like(values: list[Any], label_encoder: Any) -> list[Any]:
         if arr.size == 0:
             return values
 
+        # y_proba's "classes" list comes from DataFrame column names (e.g.
+        # ``model.classes_``/``predict_proba`` columns), which sklearn/pandas
+        # often stringifies (e.g. "0"/"1"/"2") even though they represent the
+        # same encoded integer indices as y_true/y_pred. Without this, such
+        # arrays have dtype.kind "U"/"O" and were silently skipped below,
+        # leaving y_proba's "classes"/"labels" undecoded while y_true/y_pred
+        # (real int arrays) decoded fine — causing the frontend's positive-
+        # class lookup (which matches against decoded "labels") to fail.
+        if arr.dtype.kind in {"U", "S", "O"}:
+            try:
+                arr = arr.astype(float)
+            except (TypeError, ValueError):
+                return values
+
         # Only attempt decoding for numeric arrays that are *integer-like*.
         # This prevents accidentally decoding true regression targets/predictions
         # (floats) when a target LabelEncoder exists in the artifact bundle.
