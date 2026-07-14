@@ -325,6 +325,56 @@ def test_apply_column_missing_from_frame_is_skipped() -> None:
     assert list(result.columns) == ["y"]
 
 
+def test_apply_pandas_logs_warning_when_column_binning_fails(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A column whose edges are degenerate (< 2 unique values) must be skipped
+    without crashing the whole apply - but it must log a warning so a
+    silently-unbinned column isn't a total mystery (regression for previously
+    fully-silent `except Exception: continue`)."""
+    df = pd.DataFrame({"x": [1, 2, 3]})
+    params: dict[str, Any] = {
+        "bin_edges": {"x": [5.0, 5.0]},  # degenerate: only 1 unique edge
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "ordinal",
+        "missing_strategy": "keep",
+        "missing_label": "Missing",
+        "include_lowest": True,
+        "precision": 3,
+    }
+    with caplog.at_level("WARNING"):
+        result = GeneralBinningApplier().apply(df, params)
+    # Column left unbinned (no crash), but the failure was logged.
+    assert "x_binned" not in result.columns
+    assert any(
+        "x" in record.message and "bin" in record.message.lower() for record in caplog.records
+    )
+
+
+def test_fit_one_column_into_maps_logs_warning_on_failure(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A column that can't be fit under the chosen strategy (e.g. a
+    non-numeric column with 'kmeans') must be skipped without raising, but
+    the failure must be logged for visibility (regression for previously
+    fully-silent `except Exception: return`)."""
+    df = pd.DataFrame({"x": ["a", "b", "c", "a", "b"]})
+    bin_edges_map: dict[str, list[float]] = {}
+    custom_labels_map: dict[str, Any] = {}
+    defaults = {"default_n_bins": 5, "n_bins": 5, "q_bins": 5, "duplicates": "drop"}
+
+    with caplog.at_level("WARNING"):
+        _fit_one_column_into_maps(
+            df, "x", {"strategy": "kmeans"}, defaults, bin_edges_map, custom_labels_map
+        )
+
+    assert "x" not in bin_edges_map
+    assert any(
+        "x" in record.message and "bin" in record.message.lower() for record in caplog.records
+    )
+
+
 # ---------------------------------------------------------------------------
 # Apply — polars engine parity
 # ---------------------------------------------------------------------------

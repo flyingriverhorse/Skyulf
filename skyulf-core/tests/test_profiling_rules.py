@@ -98,6 +98,36 @@ def test_discover_rules_with_categorical_feature() -> None:
     assert tree.rules
 
 
+def test_discover_rules_categorical_split_uses_category_names_not_raw_codes() -> None:
+    """When the surrogate tree actually splits on a categorical feature, the
+    human-readable rule text must show category names (e.g. "color in
+    ['red', 'blue']"), not the meaningless raw ordinal-encoding threshold
+    (e.g. "color <= 2.00") — regression guard for the misleading-threshold fix.
+    """
+    rng = np.random.default_rng(25)
+    n = 90
+    # Target is driven entirely by the categorical feature, so the tree must
+    # split on it to get any accuracy.
+    color = rng.choice(["red", "green", "blue"], size=n)
+    target = np.where(color == "red", "positive", "negative")
+    noise = rng.normal(0, 1, n)
+    df = pl.DataFrame({"color": color, "noise": noise, "target": target})
+    analyzer = EDAAnalyzer(df)
+    tree = analyzer._discover_rules(["color", "noise"], "target")
+
+    assert tree is not None
+    assert tree.categories is not None
+    assert "color" in tree.categories
+    assert set(tree.categories["color"]) == {"red", "green", "blue"}
+
+    # At least one rule must reference the categorical feature using the
+    # "in [...]" form rather than a raw numeric threshold.
+    color_rules = [r for r in (tree.rules or []) if "color" in r]
+    assert color_rules
+    assert any("color in [" in r for r in color_rules)
+    assert not any("color <=" in r or "color >" in r for r in color_rules)
+
+
 def test_discover_rules_sklearn_unavailable(monkeypatch) -> None:
     """SKLEARN_AVAILABLE=False should short-circuit to None (line 23)."""
     analyzer = EDAAnalyzer(_classification_df())

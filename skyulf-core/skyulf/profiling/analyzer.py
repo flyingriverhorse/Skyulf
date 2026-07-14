@@ -7,6 +7,7 @@ This module keeps only the orchestrator: ``EDAAnalyzer.__init__`` and
 ``EDAAnalyzer.analyze``.
 """
 
+import logging
 from typing import Any
 
 import polars as pl
@@ -31,6 +32,8 @@ from .correlations import calculate_correlations
 from .schemas import Alert, DatasetProfile, Filter
 
 __all__ = ["EDAAnalyzer"]
+
+logger = logging.getLogger(__name__)
 
 
 class EDAAnalyzer(
@@ -108,8 +111,21 @@ class EDAAnalyzer(
                         self.df = self.df.filter(pl.col(col) <= val)
                     elif op == "in" and isinstance(val, list):
                         self.df = self.df.filter(pl.col(col).is_in(val))
+                    else:
+                        logger.warning(
+                            "Skipping unsupported filter operator %r for column %r "
+                            "(value=%r); filter was not applied.",
+                            op,
+                            col,
+                            val,
+                        )
+                        continue
 
                     active_filters.append(Filter(column=str(col), operator=str(op), value=val))
+                else:
+                    logger.warning(
+                        "Skipping filter on unknown column %r; filter was not applied.", col
+                    )
 
             self.lazy_df = self.df.lazy()
             self.row_count = self.df.height
@@ -141,11 +157,15 @@ class EDAAnalyzer(
             excluded_columns = [c for c in exclude_cols if c in self.columns]
             self.columns = [c for c in self.columns if c not in excluded_columns]
 
+        # Narrowed view used for frame-level stats/sample so excluded columns
+        # (e.g. PII) never leak into missing/duplicate counts or sample_data.
+        stats_df = self.df.select(self.columns) if excluded_columns else self.df
+
         # 2. Frame-level stats.
-        missing_cells = self.df.null_count().sum_horizontal()[0]
+        missing_cells = stats_df.null_count().sum_horizontal()[0]
         total_cells = self.row_count * len(self.columns)
         missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0.0
-        duplicate_rows = int(self.df.is_duplicated().sum())
+        duplicate_rows = int(stats_df.is_duplicated().sum())
         memory_usage = self.df.estimated_size("mb")
 
         col_profiles = {}
@@ -285,12 +305,18 @@ class EDAAnalyzer(
             if profile.dtype == "Numeric" or profile.dtype == "Categorical" and is_numeric_type:
                 numeric_cols.append(col)
 
-        # Encode string targets so they appear in causal graphs.
+        # Encode string/boolean targets so they appear in causal graphs.
         encoded_target_col: str | None = None
         if target_col and target_col in self.columns and target_col not in numeric_cols:
             encoded_target = f"{target_col}_encoded"
+            # `cast(pl.Categorical)` only accepts string-like columns directly;
+            # a Boolean target (a common binary-classification target dtype)
+            # must be cast to Utf8 first or polars raises InvalidOperationError.
+            target_expr = pl.col(target_col)
+            if self.df.schema[target_col] == pl.Boolean:  # type: ignore[attr-defined]
+                target_expr = target_expr.cast(pl.Utf8)
             self.df = self.df.with_columns(
-                pl.col(target_col).cast(pl.Categorical).to_physical().alias(encoded_target)
+                target_expr.cast(pl.Categorical).to_physical().alias(encoded_target)
             )
             self.lazy_df = self.df.lazy()
             encoded_target_col = encoded_target
@@ -373,7 +399,7 @@ class EDAAnalyzer(
                             target_col, cat_cols, is_target_numeric=True
                         )
 
-            elif target_semantic_type == "Categorical":
+            elif target_semantic_type in ("Categorical", "Boolean"):
                 target_correlations = self._calculate_categorical_target_associations(
                     target_col, feature_cols
                 )
@@ -394,7 +420,7 @@ class EDAAnalyzer(
             )
 
         # 5. Sample (used for FE scatter plots).
-        sample_rows = self.df.head(5000).to_dicts()
+        sample_rows = stats_df.head(5000).to_dicts()
 
         # 6. Multivariate.
         pca_data = None

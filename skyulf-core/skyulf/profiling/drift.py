@@ -51,6 +51,11 @@ class DriftCalculator:
     Uses Polars for efficient data processing.
     """
 
+    # Categorical columns with more distinct reference values than this are
+    # treated as free-text/ID-like (not a meaningful categorical distribution)
+    # and skipped, to avoid PSI blowing up on effectively-unique values.
+    _MAX_CATEGORICAL_CARDINALITY = 50
+
     def __init__(self, reference_df: pl.DataFrame, current_df: pl.DataFrame):
         self.reference_df = reference_df
         self.current_df = current_df
@@ -81,10 +86,20 @@ class DriftCalculator:
         new_columns = list(curr_cols - ref_cols)
 
         for col in self.common_columns:
-            # Skip non-numeric for now (except PSI which can handle categorical with binning)
-            # For simplicity, let's focus on numeric columns first
             dtype = self.reference_df[col].dtype
-            if dtype not in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]:
+            is_numeric = dtype.is_numeric()
+            is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Boolean]
+
+            if is_categorical:
+                col_drift = self._calculate_categorical_drift(col, thresholds)
+                if col_drift is not None:
+                    column_drifts[col] = col_drift
+                    if col_drift.drift_detected:
+                        drifted_count += 1
+                continue
+
+            if not is_numeric:
+                # Unsupported dtype (e.g. nested/struct columns) — skip.
                 continue
 
             # Ensure current data is also numeric or castable to the reference type
@@ -247,6 +262,88 @@ class DriftCalculator:
         except Exception:
             return DriftDistribution(bins=[])
 
+    def _calculate_categorical_drift(
+        self, col: str, thresholds: dict[str, float]
+    ) -> "ColumnDrift | None":
+        """
+        Calculates PSI-based drift for a categorical/text/boolean column using
+        the category frequency distribution (union of categories seen in
+        either dataset). Returns ``None`` if the column looks like free-text
+        or a high-cardinality identifier (not a meaningful categorical
+        distribution), or if either side has no non-null values.
+        """
+        ref_data = self.reference_df[col].cast(pl.Utf8, strict=False).drop_nulls()
+        curr_data = self.current_df[col].cast(pl.Utf8, strict=False).drop_nulls()
+
+        if len(ref_data) == 0 or len(curr_data) == 0:
+            return None
+
+        ref_n_unique = ref_data.n_unique()
+        if ref_n_unique > self._MAX_CATEGORICAL_CARDINALITY:
+            return None
+
+        ref_counts = ref_data.value_counts()
+        curr_counts = curr_data.value_counts()
+
+        categories = sorted(set(ref_counts[col].to_list()) | set(curr_counts[col].to_list()))
+        if len(categories) < 2:
+            return None
+
+        ref_map = dict(zip(ref_counts[col].to_list(), ref_counts["count"].to_list(), strict=True))
+        curr_map = dict(
+            zip(curr_counts[col].to_list(), curr_counts["count"].to_list(), strict=True)
+        )
+
+        n_ref = len(ref_data)
+        n_curr = len(curr_data)
+        expected_percents = np.array([ref_map.get(c, 0) / n_ref for c in categories])
+        actual_percents = np.array([curr_map.get(c, 0) / n_curr for c in categories])
+
+        # Floor zero-proportion bins with a sample-size-scaled epsilon
+        # (rather than a fixed constant) so the log-ratio doesn't blow up on
+        # categories that are simply rare/absent in one dataset, while still
+        # scaling sensibly for both small and large samples.
+        eps_ref = 0.5 / n_ref
+        eps_curr = 0.5 / n_curr
+        expected_percents = np.where(expected_percents == 0, eps_ref, expected_percents)
+        actual_percents = np.where(actual_percents == 0, eps_curr, actual_percents)
+
+        psi_val = float(
+            np.sum(
+                (actual_percents - expected_percents) * np.log(actual_percents / expected_percents)
+            )
+        )
+        psi_drift = psi_val > thresholds["psi"]
+
+        metrics = [
+            DriftMetric(
+                metric="psi_categorical",
+                value=psi_val,
+                has_drift=psi_drift,
+                threshold=thresholds["psi"],
+            )
+        ]
+
+        suggestions: list[str] = []
+        if psi_drift:
+            if psi_val > 0.25:
+                suggestions.append(
+                    "Critical category-distribution shift detected (PSI > 0.25). "
+                    "Immediate model retraining is recommended."
+                )
+            else:
+                suggestions.append(
+                    "Moderate category-distribution shift detected. Monitor model performance closely."
+                )
+
+        return ColumnDrift(
+            column=col,
+            metrics=metrics,
+            drift_detected=psi_drift,
+            suggestions=suggestions,
+            distribution=None,
+        )
+
     def _calculate_psi(self, expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
         """
         Calculate Population Stability Index (PSI).
@@ -269,6 +366,15 @@ class DriftCalculator:
             breakpoints = np.unique(breakpoints)
             if len(breakpoints) < 2:
                 return 0.0
+
+            # np.histogram silently drops any values outside the explicit bin
+            # edges instead of counting them in the first/last bin. Since the
+            # very scenario drift detection exists to catch is `actual`
+            # shifting entirely outside `expected`'s range, clip both arrays
+            # into [breakpoints[0], breakpoints[-1]] first so out-of-range
+            # values land in the boundary bin rather than vanishing.
+            expected = np.clip(expected, breakpoints[0], breakpoints[-1])
+            actual = np.clip(actual, breakpoints[0], breakpoints[-1])
 
             # Calculate frequencies
             expected_percents = np.histogram(expected, breakpoints)[0] / len(expected)
@@ -303,6 +409,13 @@ class DriftCalculator:
 
             if len(breakpoints) < 2:
                 return 0.0
+
+            # See _calculate_psi: clip out-of-range values into the boundary
+            # bin instead of letting np.histogram silently drop them (which
+            # would otherwise mask the exact "current" shifted entirely
+            # outside "reference" scenario drift detection exists to catch).
+            reference = np.clip(reference, breakpoints[0], breakpoints[-1])
+            current = np.clip(current, breakpoints[0], breakpoints[-1])
 
             ref_percents = np.histogram(reference, breakpoints)[0] / len(reference)
             curr_percents = np.histogram(current, breakpoints)[0] / len(current)

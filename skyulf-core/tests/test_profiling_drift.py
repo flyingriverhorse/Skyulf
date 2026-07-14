@@ -26,6 +26,20 @@ def test_calculate_drift_detects_shifted_distribution() -> None:
     assert {"wasserstein_distance", "ks_test_p_value", "psi", "kl_divergence"} == metric_names
 
 
+def test_calculate_drift_detects_shift_in_small_int_dtypes() -> None:
+    """Regression test: Int8/Int16/UInt* columns must not be silently dropped
+    from the report — only the original Float32/Float64/Int32/Int64 allow-list
+    was checked previously, which skipped narrower integer dtypes entirely.
+    """
+    reference = pl.DataFrame({"feature": pl.Series("feature", list(range(0, 100)), dtype=pl.Int16)})
+    current = pl.DataFrame({"feature": pl.Series("feature", list(range(100, 200)), dtype=pl.Int16)})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "feature" in report.column_drifts
+    assert report.column_drifts["feature"].drift_detected is True
+
+
 def test_calculate_drift_no_drift_for_identical_distribution() -> None:
     """Sampling from the same distribution twice (large N) should not trigger drift."""
     rng = np.random.default_rng(1)
@@ -52,10 +66,41 @@ def test_calculate_drift_reports_missing_and_new_columns() -> None:
     assert "b" not in report.column_drifts
 
 
-def test_calculate_drift_skips_non_numeric_columns() -> None:
-    """Non-numeric common columns should be excluded from drift metrics entirely."""
+def test_calculate_drift_computes_categorical_psi_for_low_cardinality_string_column() -> None:
+    """A low-cardinality string column should now get PSI-based categorical
+    drift detection instead of being skipped entirely."""
     reference = pl.DataFrame({"cat": ["a", "b", "c"]})
     current = pl.DataFrame({"cat": ["a", "b", "c"]})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "cat" in report.column_drifts
+    col_drift = report.column_drifts["cat"]
+    assert col_drift.drift_detected is False
+    metric_names = {m.metric for m in col_drift.metrics}
+    assert metric_names == {"psi_categorical"}
+
+
+def test_calculate_drift_detects_categorical_distribution_shift() -> None:
+    """A current dataset whose category proportions have shifted heavily
+    away from the reference should be flagged as drifted."""
+    rng = np.random.default_rng(3)
+    reference = pl.DataFrame({"cat": rng.choice(["a", "b", "c"], size=500, p=[0.8, 0.1, 0.1])})
+    current = pl.DataFrame({"cat": rng.choice(["a", "b", "c"], size=500, p=[0.1, 0.1, 0.8])})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "cat" in report.column_drifts
+    assert report.column_drifts["cat"].drift_detected is True
+    assert report.drifted_columns_count == 1
+
+
+def test_calculate_drift_skips_high_cardinality_categorical_column() -> None:
+    """A near-unique-per-row string column (free text / IDs) must be skipped
+    rather than blowing up the PSI computation on effectively-unique values."""
+    n = 200
+    reference = pl.DataFrame({"cat": [f"id_{i}" for i in range(n)]})
+    current = pl.DataFrame({"cat": [f"id_{i}" for i in range(n)]})
 
     report = DriftCalculator(reference, current).calculate_drift()
 
@@ -85,6 +130,34 @@ def test_calculate_kl_is_zero_for_constant_reference() -> None:
     calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
     kl = calc._calculate_kl(np.array([5.0, 5.0, 5.0]), np.array([5.0, 6.0, 7.0]))
     assert kl == 0.0
+
+
+def test_calculate_psi_detects_drift_when_actual_fully_outside_reference_range() -> None:
+    """Regression test: PSI must not silently report ~0 when `actual` has
+    shifted entirely outside `expected`'s range.
+
+    np.histogram excludes (rather than clips into the boundary bin) values
+    outside the explicit bin edges derived from `expected`'s percentiles, so
+    without clipping, a fully-shifted `actual` array previously produced
+    actual_percents summing to 0 and a near-zero PSI - a false "no drift"
+    for the exact scenario drift detection exists to catch.
+    """
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+    expected = np.random.RandomState(0).normal(loc=0, scale=1, size=500)
+    actual = np.random.RandomState(1).normal(loc=100, scale=1, size=500)  # fully out of range
+    psi = calc._calculate_psi(expected, actual)
+    assert psi > 1.0, f"expected a large PSI for a fully-shifted distribution, got {psi}"
+
+
+def test_calculate_kl_detects_drift_when_current_fully_outside_reference_range() -> None:
+    """Regression test: KL divergence must not silently report ~0 when
+    `current` has shifted entirely outside `reference`'s range (same
+    out-of-range-clipping bug as PSI above)."""
+    calc = DriftCalculator(pl.DataFrame({"a": [1.0]}), pl.DataFrame({"a": [1.0]}))
+    reference = np.random.RandomState(0).normal(loc=0, scale=1, size=500)
+    current = np.random.RandomState(1).normal(loc=100, scale=1, size=500)  # fully out of range
+    kl = calc._calculate_kl(reference, current)
+    assert kl > 1.0, f"expected a large KL divergence for a fully-shifted distribution, got {kl}"
 
 
 def test_calculate_distribution_handles_constant_arrays() -> None:

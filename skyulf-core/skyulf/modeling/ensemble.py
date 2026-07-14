@@ -307,6 +307,11 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             cv = int(calibration.get("cv", 3))
         except (TypeError, ValueError):
             cv = 3
+        if cv < 2:
+            logger.warning(
+                "CalibratedClassifierCV requires cv >= 2; got cv=%s, coercing to 2.",
+                cv,
+            )
         return CalibratedClassifierCV(estimator, method=method, cv=max(cv, 2))
 
     @staticmethod

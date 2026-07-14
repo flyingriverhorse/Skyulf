@@ -13,6 +13,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.database.engine import get_async_session
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._execution.jobs import JobInfo, JobManager
@@ -109,13 +110,14 @@ async def get_job_evaluation(  # noqa: C901
 
 @router.get("/jobs", response_model=list[JobInfo])
 async def list_jobs(
-    limit: int = 50,
+    limit: int | None = None,
     skip: int = 0,
     job_type: Literal["training", "tuning"] | None = None,
     session: AsyncSession = Depends(get_async_session),
 ):
     """List recent jobs."""
-    return await JobManager.list_jobs(session, limit, skip, job_type)
+    effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+    return await JobManager.list_jobs(session, effective_limit, skip, job_type)
 
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=JobInfo | None)

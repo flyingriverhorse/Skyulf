@@ -65,6 +65,42 @@ def test_calculate_correlations_caps_at_twenty_columns() -> None:
     assert len(matrix.columns) <= 20
 
 
+def test_calculate_correlations_truncation_logs_warning_with_dropped_columns(
+    caplog,
+) -> None:
+    """Regression test: truncating to the first 20 columns (by order, not
+    variance/relevance) previously gave the caller/UI no signal that data was
+    dropped. Must now log a warning naming the dropped columns."""
+    import logging
+
+    data = {f"c{i}": list(np.linspace(0, 1, 10) + i) for i in range(25)}
+    df = pl.DataFrame(data).lazy()
+    cols = list(data.keys())
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.profiling.correlations"):
+        matrix = calculate_correlations(df, cols)
+
+    assert matrix is not None
+    assert any("truncating to the first 20" in rec.message for rec in caplog.records)
+    # The dropped columns (c20..c24) must be named in the warning.
+    assert any("c20" in rec.message for rec in caplog.records)
+
+
+def test_calculate_correlations_no_warning_when_under_cap(caplog) -> None:
+    """20 or fewer numeric columns must not trigger the truncation warning."""
+    import logging
+
+    data = {f"c{i}": list(np.linspace(0, 1, 10) + i) for i in range(10)}
+    df = pl.DataFrame(data).lazy()
+    cols = list(data.keys())
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.profiling.correlations"):
+        matrix = calculate_correlations(df, cols)
+
+    assert matrix is not None
+    assert not any("truncating" in rec.message for rec in caplog.records)
+
+
 def test_calculate_correlations_returns_none_on_unexpected_error() -> None:
     """An internal error (e.g. a column that doesn't exist) should be caught and return None."""
     df = pl.DataFrame({"a": [1.0, 2.0, 3.0]}).lazy()

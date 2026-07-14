@@ -20,6 +20,7 @@ interface RuleTreeShape {
     accuracy?: number;
     feature_importances?: Array<{ feature: string; importance: number }>;
     rules?: string[];
+    categories?: Record<string, string[]>;
 }
 
 interface RuleDiscoveryTabProps {

@@ -1,9 +1,13 @@
 """Date detection (string→datetime cast) and date stat profiling."""
 
+import logging
+
 import polars as pl
 
 from ..schemas import DateStats
 from ._utils import _AnalyzerState
+
+logger = logging.getLogger(__name__)
 
 
 class DatesMixin(_AnalyzerState):
@@ -43,6 +47,11 @@ class DatesMixin(_AnalyzerState):
             best_parsed = None
             max_months = -1
             best_method_name = ""
+            # Track every format that ties for the best month-distinctness
+            # score, so we can warn when the D/M/Y vs M/D/Y choice was
+            # ambiguous rather than silently picking whichever format
+            # happened to be tried first.
+            tied_candidates: list[str] = []
 
             try:
                 parsed = sample.str.to_datetime(strict=False)
@@ -84,8 +93,19 @@ class DatesMixin(_AnalyzerState):
                             max_months = n_months
                             best_parsed = (fmt, "datetime_format")
                             best_method_name = f"Format {fmt}"
+                            tied_candidates = [fmt]
+                        elif n_months == max_months and best_parsed is not None:
+                            tied_candidates.append(fmt)
                 except Exception:
                     continue  # nosec B112 - format candidate didn't match; next format is tried
+
+            if len(tied_candidates) > 1:
+                logger.warning(
+                    f"Column '{col}': multiple date formats {tied_candidates} parsed "
+                    f"equally well (tied on distinct months); picked '{best_method_name}' "
+                    "arbitrarily. Values may be misinterpreted if the true format differs "
+                    "(e.g. day/month swap)."
+                )
 
             if best_parsed:
                 fmt, method = best_parsed
@@ -103,7 +123,7 @@ class DatesMixin(_AnalyzerState):
                             pl.col(col).str.to_datetime(format=fmt, strict=False).alias(col)
                         )
                 except Exception as e:
-                    print(f"Failed to cast column {col} using {best_method_name}: {e}")
+                    logger.warning(f"Failed to cast column {col} using {best_method_name}: {e}")
 
     def _analyze_date(self, col: str, row: dict) -> DateStats:
         min_date = row.get(f"{col}__min")

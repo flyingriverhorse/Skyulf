@@ -244,7 +244,8 @@ async def run_pipeline(  # noqa: C901
         else:
 
             def _run_branches_concurrently(payloads: list[tuple]) -> None:
-                with ThreadPoolExecutor(max_workers=len(payloads)) as pool:
+                max_workers = min(len(payloads), settings.MAX_PARALLEL_BRANCH_WORKERS)
+                with ThreadPoolExecutor(max_workers=max_workers) as pool:
                     futures = [pool.submit(run_pipeline_task, jid, pl) for jid, pl in payloads]
                     for f in futures:
                         f.result()  # propagate exceptions per-branch via logging

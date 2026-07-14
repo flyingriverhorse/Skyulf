@@ -126,6 +126,22 @@ class TestInferProblemType:
         s = pd.Series(values, dtype=dtype)
         assert _infer_problem_type(s) == expected
 
+    def test_infer_problem_type_logs_debug_note_on_classification_heuristic(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Regression test: the numeric <=10-unique-values classification
+        heuristic is a coarse cutoff with no config knob, so a debug note
+        must be logged to make the inference visible in diagnostics."""
+        import logging
+
+        s = pd.Series([1.0, 2.0, 3.0], dtype="float64")
+        with caplog.at_level(
+            logging.DEBUG, logger="skyulf.preprocessing.feature_selection._common"
+        ):
+            result = _infer_problem_type(s)
+        assert result == "classification"
+        assert any("classification" in rec.message for rec in caplog.records)
+
 
 # ---------------------------------------------------------------------------
 # _resolve_score_function
@@ -369,6 +385,44 @@ class TestMaybeChi2Rescale:
             assert result.max() <= 1.0 + 1e-9
         else:
             np.testing.assert_array_equal(result, X)
+
+
+# ---------------------------------------------------------------------------
+# _fillna_zero_with_warning
+# ---------------------------------------------------------------------------
+
+
+class TestFillnaZeroWithWarning:
+    def test_warns_when_missing_values_present(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Regression test: a silent fillna(0) before scoring can bias
+        univariate/model-based feature scores when 0 is meaningful or
+        missingness correlates with the target - must now warn."""
+        import logging
+
+        from skyulf.preprocessing.feature_selection._common import _fillna_zero_with_warning
+
+        df = pd.DataFrame({"a": [1.0, None, 3.0], "b": [1.0, 2.0, 3.0]})
+        with caplog.at_level(
+            logging.WARNING, logger="skyulf.preprocessing.feature_selection._common"
+        ):
+            result = _fillna_zero_with_warning(df, ["a", "b"])
+        assert list(result["a"]) == [1.0, 0.0, 3.0]
+        assert any("filling missing values with 0" in rec.message for rec in caplog.records)
+        assert any("'a'" in rec.message for rec in caplog.records)
+
+    def test_no_warning_when_no_missing_values(self, caplog: pytest.LogCaptureFixture) -> None:
+        """No missing values means fillna(0) is a no-op - must not warn."""
+        import logging
+
+        from skyulf.preprocessing.feature_selection._common import _fillna_zero_with_warning
+
+        df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [1.0, 2.0, 3.0]})
+        with caplog.at_level(
+            logging.WARNING, logger="skyulf.preprocessing.feature_selection._common"
+        ):
+            result = _fillna_zero_with_warning(df, ["a", "b"])
+        assert list(result["a"]) == [1.0, 2.0, 3.0]
+        assert not any("filling missing values with 0" in rec.message for rec in caplog.records)
 
 
 # ---------------------------------------------------------------------------

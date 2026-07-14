@@ -141,29 +141,52 @@ class TuningCalculator(BaseModelCalculator):
             filtered_config = {k: v for k, v in config.items() if k in valid_keys}
             tuning_config = TuningConfig(**filtered_config)
 
+        # For Time Series Split, sort data chronologically (and drop the time
+        # column from features) before converting to numpy below - numpy has
+        # no column names, so this must happen while X still carries them.
+        # Mirrors the same fix already applied to perform_cross_validation();
+        # without it, tuning with cv_type="time_series_split" silently leaks
+        # the time column and evaluates folds out of chronological order.
+        if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
+            from ..cross_validation import _sort_by_time
+
+            X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+
         # Convert data to Numpy for tuning
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
         # --- VALIDATION: Check for NaNs/Inf in Data ---
         # Many tuning errors ("No trials completed") are actually due to dirty data causing instant failures.
-        # We catch this early to give a clear message.
-        if isinstance(X_np, np.ndarray) and np.issubdtype(X_np.dtype, np.number):
-            if np.isnan(X_np).any():
+        # We catch this early to give a clear message. Object-dtype arrays (e.g. mixed dtypes or
+        # leftover categorical/string columns that were never encoded) are also scanned via
+        # pd.isna, since np.isnan/np.isinf raise on non-numeric dtypes.
+        if isinstance(X_np, np.ndarray):
+            if np.issubdtype(X_np.dtype, np.number):
+                if np.isnan(X_np).any():
+                    raise ValueError(
+                        "Input features (X) contain NaN values. Please use an 'Imputer' node before this model."
+                    )
+                if np.isinf(X_np).any():
+                    raise ValueError(
+                        "Input features (X) contain Infinite values. Please scale or clean your data."
+                    )
+            elif X_np.dtype == object and pd.isna(X_np).any():
                 raise ValueError(
-                    "Input features (X) contain NaN values. Please use an 'Imputer' node before this model."
-                )
-            if np.isinf(X_np).any():
-                raise ValueError(
-                    "Input features (X) contain Infinite values. Please scale or clean your data."
+                    "Input features (X) contain missing/NaN values. Please use an 'Imputer' node before this model."
                 )
 
-        if isinstance(y_np, np.ndarray) and np.issubdtype(y_np.dtype, np.number):
-            if np.isnan(y_np).any():
+        if isinstance(y_np, np.ndarray):
+            if np.issubdtype(y_np.dtype, np.number):
+                if np.isnan(y_np).any():
+                    raise ValueError(
+                        "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them."
+                    )
+                if np.isinf(y_np).any():
+                    raise ValueError("Target variable (y) contains Infinite values.")
+            elif y_np.dtype == object and pd.isna(y_np).any():
                 raise ValueError(
-                    "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them."
+                    "Target variable (y) contains missing/NaN values. Please drop rows with missing targets or impute them."
                 )
-            if np.isinf(y_np).any():
-                raise ValueError("Target variable (y) contains Infinite values.")
         # ----------------------------------------------
 
         validation_data_np = None
@@ -261,23 +284,24 @@ class TuningCalculator(BaseModelCalculator):
         else:
             if not config.cv_enabled:
                 # Single split validation (20% holdout)
-                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.random_state)
+                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.cv_random_state)
             elif config.cv_type == "nested_cv":
                 # Nested CV during tuning: use fewer inner folds for
                 # candidate scoring. The outer evaluation loop runs
                 # post-tuning in engine.py (as stratified_k_fold).
                 inner_folds = min(3, config.cv_folds - 1) if config.cv_folds > 2 else 2
+                inner_cv_random_state = config.cv_random_state if config.cv_shuffle else None
                 if self.model_calculator.problem_type == "classification":
                     cv = StratifiedKFold(
                         n_splits=inner_folds,
-                        shuffle=True,
-                        random_state=config.random_state,
+                        shuffle=config.cv_shuffle,
+                        random_state=inner_cv_random_state,
                     )
                 else:
                     cv = KFold(
                         n_splits=inner_folds,
-                        shuffle=True,
-                        random_state=config.random_state,
+                        shuffle=config.cv_shuffle,
+                        random_state=inner_cv_random_state,
                     )
             elif config.cv_type == "time_series_split":
                 cv = TimeSeriesSplit(n_splits=config.cv_folds)
@@ -285,7 +309,7 @@ class TuningCalculator(BaseModelCalculator):
                 cv = ShuffleSplit(
                     n_splits=config.cv_folds,
                     test_size=0.2,
-                    random_state=config.random_state,
+                    random_state=config.cv_random_state,
                 )
             elif (
                 config.cv_type == "stratified_k_fold"
@@ -293,15 +317,15 @@ class TuningCalculator(BaseModelCalculator):
             ):
                 cv = StratifiedKFold(
                     n_splits=config.cv_folds,
-                    shuffle=True,
-                    random_state=config.random_state,
+                    shuffle=config.cv_shuffle,
+                    random_state=config.cv_random_state if config.cv_shuffle else None,
                 )
             else:
                 # Default to KFold (also fallback for stratified if regression)
                 cv = KFold(
                     n_splits=config.cv_folds,
-                    shuffle=True,
-                    random_state=config.random_state,
+                    shuffle=config.cv_shuffle,
+                    random_state=config.cv_random_state if config.cv_shuffle else None,
                 )
 
         # 3. Select Search Strategy
@@ -490,8 +514,15 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback(f"Tuning Completed. Best Score: {best_score:.4f}")
                 log_callback(f"Best Params: {best_params}")
 
+            if best_params is None:
+                raise ValueError(
+                    "Hyperparameter tuning failed: All trials failed. "
+                    "This usually means the model failed to train with the provided hyperparameter combinations. "
+                    "Please check your search space and data."
+                )
+
             return TuningResult(
-                best_params=best_params if best_params is not None else {},
+                best_params=best_params,
                 best_score=best_score,
                 n_trials=total_candidates,
                 trials=trials,
@@ -777,8 +808,14 @@ class TuningApplier(BaseModelApplier):
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict(df, model)
-        # Fallback if artifact is just the result (legacy)
-        return pd.Series(np.nan, index=df.index)
+        # Fallback: artifact isn't the expected (model, tuning_result) tuple
+        # (e.g. a plain fitted model, before it's wrapped by the tuner). Return
+        # an all-null placeholder of the right length/engine instead of
+        # crashing - `df.index` doesn't exist on a Polars DataFrame, so build
+        # the placeholder in an engine-aware way.
+        if hasattr(df, "index"):
+            return pd.Series(np.nan, index=df.index)
+        return pd.Series(np.full(len(df), np.nan))
 
     def predict_proba(
         self,

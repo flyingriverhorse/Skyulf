@@ -1,5 +1,6 @@
 """Time series analysis: trend, seasonality, autocorrelation, stationarity."""
 
+import logging
 from typing import Any, cast
 
 import numpy as np
@@ -7,6 +8,8 @@ import polars as pl
 
 from ..schemas import SeasonalityStats, TimeSeriesAnalysis, TimeSeriesPoint
 from ._utils import STATSMODELS_AVAILABLE, _AnalyzerState, _collect
+
+logger = logging.getLogger(__name__)
 
 
 class TemporalMixin(_AnalyzerState):
@@ -183,7 +186,7 @@ class TemporalMixin(_AnalyzerState):
                             "metric": target_metric,
                         }
                 except Exception as e:
-                    print(f"ADF test failed: {e}")
+                    logger.warning(f"ADF test failed: {e}")
 
             return TimeSeriesAnalysis(
                 date_col=date_col,
@@ -193,5 +196,5 @@ class TemporalMixin(_AnalyzerState):
                 stationarity_test=stationarity_test,
             )
         except Exception as e:
-            print(f"Error in time series analysis: {e}")
+            logger.warning(f"Error in time series analysis: {e}")
             return None

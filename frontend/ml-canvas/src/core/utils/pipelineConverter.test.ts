@@ -75,6 +75,28 @@ describe('convertGraphToPipelineConfig', () => {
     expect(knn?.params).toMatchObject({ n_neighbors: 7, weights: 'distance' });
   });
 
+  it('forwards the configured random_state for the iterative (MICE) imputer', () => {
+    // Regression test: the converter previously hardcoded random_state: 0
+    // for the IterativeImputer step regardless of the UI's random_state
+    // field (ImputationNode.tsx), so the backend's random_state fix had no
+    // user-visible effect until this was corrected here too.
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('iter', 'imputation_node', {
+        method: 'iterative',
+        columns: ['x'],
+        max_iter: 15,
+        estimator: 'BayesianRidge',
+        random_state: 99,
+      }),
+    ];
+    const edges = [edge('ds', 'iter')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const iter = cfg.nodes.find((n) => n.node_id === 'iter');
+    expect(iter?.step_type).toBe('IterativeImputer');
+    expect(iter?.params).toMatchObject({ max_iter: 15, estimator: 'BayesianRidge', random_state: 99 });
+  });
+
   it('attaches _merge_strategy as an underscore-prefixed param when not "last_wins"', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),

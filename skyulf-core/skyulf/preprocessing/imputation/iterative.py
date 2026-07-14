@@ -62,12 +62,15 @@ class IterativeImputerCalculator(BaseCalculator):
 
         max_iter = config.get("max_iter", 10)
         estimator_name = config.get("estimator", "BayesianRidge")
+        random_state = config.get("random_state", 0)
         cols = resolve_columns(X, config, detect_numeric_columns)
         if not cols:
             return {}
 
         estimator = _build_iterative_estimator(estimator_name)
-        imputer = IterativeImputer(estimator=estimator, max_iter=max_iter, random_state=0)
+        imputer = IterativeImputer(
+            estimator=estimator, max_iter=max_iter, random_state=random_state
+        )
 
         X_subset = X.select(cols) if hasattr(X, "select") and not hasattr(X, "loc") else X[cols]
         X_np, _ = SklearnBridge.to_sklearn(X_subset)

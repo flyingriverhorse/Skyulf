@@ -141,6 +141,67 @@ def test_cast_int_out_of_range_raises_without_coerce() -> None:
         _cast_int(s, "col", "int32", coerce_on_error=False)
 
 
+def test_cast_int_narrow_dtype_out_of_range_coerced_not_silently_uncast() -> None:
+    """Regression test: casting a narrow int dtype (int8) with an
+    out-of-range value under coerce_on_error=True must null the offending
+    value and cast the rest - previously only int32/int64/int were routed to
+    a nullable container when NaNs were present; int8/int16/uint8/etc. fell
+    through to `numeric.astype("int8")`, which raises on NaN-containing data.
+    That raise was silently swallowed by the caller's best-effort except
+    block, leaving the ENTIRE column completely uncast (not just the
+    out-of-range value)."""
+    s = pd.Series([300.0, 100.0])  # 300 is out of int8 range [-128, 127]
+    result = _cast_int(s, "col", "int8", coerce_on_error=True)
+    assert result.dtype == pd.Int8Dtype()
+    assert result.isna().iloc[0]
+    assert result.iloc[1] == 100
+
+
+def test_cast_int_narrow_uint_dtype_out_of_range_coerced() -> None:
+    """Same regression for an unsigned narrow dtype (uint8)."""
+    s = pd.Series([300.0, 50.0])  # 300 is out of uint8 range [0, 255]
+    result = _cast_int(s, "col", "uint8", coerce_on_error=True)
+    assert result.dtype == pd.UInt8Dtype()
+    assert result.isna().iloc[0]
+    assert result.iloc[1] == 50
+
+
+def test_casting_applier_narrow_int_dtype_out_of_range_not_silently_uncast() -> None:
+    """End-to-end regression: CastingApplier.apply() on a DataFrame column
+    targeting int8 with an out-of-range value must actually cast (nulling
+    the bad value), not silently leave the whole column untouched."""
+    df = pd.DataFrame({"a": [300, 100]})
+    params: dict[str, Any] = {"type_map": {"a": "int8"}, "coerce_on_error": True}
+    result = CastingApplier().apply(df, params)
+    assert result["a"].dtype == pd.Int8Dtype()
+    assert pd.isna(result["a"].iloc[0])
+    assert result["a"].iloc[1] == 100
+
+
+def test_casting_applier_uint_dtype_out_of_range_masks_not_wraps() -> None:
+    """Regression test: casting to an unsigned narrow dtype (uint8) on
+    pandas must mask an out-of-range value to null (coerce) or raise
+    (strict) - not silently wrap around. `_cast_one_column` previously
+    dispatched only `int*`-prefixed target dtypes to `_cast_int()`;
+    `uint*` fell through to a bare `series.astype("uint8")`, which
+    silently WRAPS (300 -> 44 via mod 256) instead of erroring or nulling,
+    a data-corruption bug distinct from (and worse than) the narrow-int
+    silent-no-op bug."""
+    df = pd.DataFrame({"a": [300, 100]})
+
+    # Coerce mode: out-of-range value must become null, not wrap to 44.
+    coerce_params: dict[str, Any] = {"type_map": {"a": "uint8"}, "coerce_on_error": True}
+    coerced = CastingApplier().apply(df, coerce_params)
+    assert coerced["a"].dtype == pd.UInt8Dtype()
+    assert pd.isna(coerced["a"].iloc[0])
+    assert coerced["a"].iloc[1] == 100
+
+    # Strict mode: out-of-range value must raise, not silently wrap.
+    strict_params: dict[str, Any] = {"type_map": {"a": "uint8"}, "coerce_on_error": False}
+    with pytest.raises(OverflowError, match="out of range"):
+        CastingApplier().apply(df, strict_params)
+
+
 # ---------------------------------------------------------------------------
 # _drop_fractional_or_raise
 # ---------------------------------------------------------------------------
@@ -530,6 +591,52 @@ if _POLARS_AVAILABLE:
         result = CastingApplier().apply(df_pl, params)
         assert result["flag"].dtype == pl.Boolean
 
+    def test_casting_apply_polars_bool_cast_from_yes_no_strings() -> None:
+        """Regression test: casting a "yes"/"no"-style string column to
+        Boolean on the Polars engine must not crash.
+
+        Polars has no direct Utf8->Boolean cast at all (raises
+        InvalidOperationError even with strict=False), unlike pandas which
+        falls back to a per-value alias table for the same input. Previously
+        this hard-crashed the whole pipeline for the Polars engine while the
+        identical pandas pipeline succeeded - a stark engine-parity break.
+        """
+        df_pl = pl.DataFrame({"flag": ["Yes", "no", "Y", "N", "1", "0", "TRUE", "off"]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        result = CastingApplier().apply(df_pl, params)
+        assert result["flag"].dtype == pl.Boolean
+        assert result["flag"].to_list() == [True, False, True, False, True, False, True, False]
+
+    def test_casting_apply_polars_bool_cast_unrecognized_string_becomes_null() -> None:
+        """An unrecognized string value must become null under coerce_on_error=True,
+        matching pandas' `_coerce_boolean_value` fallback-to-None behavior."""
+        df_pl = pl.DataFrame({"flag": ["yes", "maybe"]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        result = CastingApplier().apply(df_pl, params)
+        assert result["flag"].to_list() == [True, None]
+
+    def test_casting_apply_polars_bool_cast_raises_without_coerce() -> None:
+        """An unrecognized string value must raise ValueError when
+        coerce_on_error=False, mirroring pandas' `_cast_bool` strict-mode re-raise."""
+        df_pl = pl.DataFrame({"flag": ["yes", "maybe"]})
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": False}
+        with pytest.raises(ValueError, match="not recognized as true/false"):
+            CastingApplier().apply(df_pl, params)
+
+    def test_casting_apply_bool_cast_string_engine_parity() -> None:
+        """pandas and Polars must produce identical boolean values for the
+        same "yes"/"no"-style string column."""
+        df_pd = pd.DataFrame({"flag": ["Yes", "no", "1", "0", "maybe"]})
+        df_pl = pl.from_pandas(df_pd)
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+
+        pd_result = CastingApplier().apply(df_pd, params)
+        pl_result = CastingApplier().apply(df_pl, params)
+
+        pd_values = [None if pd.isna(v) else bool(v) for v in pd_result["flag"]]
+        pl_values = pl_result["flag"].to_list()
+        assert pd_values == pl_values == [True, False, True, False, None]
+
     # -----------------------------------------------------------------------
     # _resolve_polars_dtype (datetime-prefix branch + unsupported-dtype None)
     # -----------------------------------------------------------------------
@@ -557,6 +664,32 @@ if _POLARS_AVAILABLE:
         # 'a' must remain untouched (Int64), 'b' must be cast to String.
         assert result["a"].dtype == df_pl["a"].dtype
         assert result["b"].dtype == pl.String
+
+    def test_casting_apply_polars_unsupported_dtype_raises_in_strict_mode() -> None:
+        """Regression test: an unsupported target dtype string must raise a
+        clear error under coerce_on_error=False (strict mode), instead of
+        silently skipping the column with zero error - previously this
+        silently no-op'd even in strict mode, diverging from the pandas
+        path (which raises on an unrecognized dtype string via astype())."""
+        df_pl = pl.DataFrame({"a": [1, 2]})
+        params: dict[str, Any] = {
+            "type_map": {"a": "totally_unsupported_dtype"},
+            "coerce_on_error": False,
+        }
+        with pytest.raises(ValueError, match="unsupported target dtype"):
+            CastingApplier().apply(df_pl, params)
+
+    def test_resolve_polars_dtype_narrow_int_widths_supported() -> None:
+        """Regression test: narrow int dtype strings (int8/int16/uint8/etc.)
+        must resolve to a concrete Polars dtype - previously only int32/
+        int64/int were mapped, so requesting e.g. "int16" on the Polars
+        engine silently no-op'd (parity gap vs. pandas, which supports it)."""
+        assert _resolve_polars_dtype("int8") is pl.Int8
+        assert _resolve_polars_dtype("int16") is pl.Int16
+        assert _resolve_polars_dtype("uint8") is pl.UInt8
+        assert _resolve_polars_dtype("uint16") is pl.UInt16
+        assert _resolve_polars_dtype("uint32") is pl.UInt32
+        assert _resolve_polars_dtype("uint64") is pl.UInt64
 
 
 # ---------------------------------------------------------------------------

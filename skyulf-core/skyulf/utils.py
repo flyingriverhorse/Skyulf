@@ -44,12 +44,28 @@ def get_data_stats(
         rows += r
         cols = c  # Assume columns are same
 
-        r, _ = get_data_stats(data.test)
+        r, test_cols = get_data_stats(data.test)
         rows += r
+        if test_cols and test_cols != cols:
+            logger.warning(
+                "get_data_stats: SplitDataset.test columns %s differ from "
+                "SplitDataset.train columns %s; reporting train's column set, "
+                "which may not reflect test/validation data actual shape.",
+                sorted(test_cols),
+                sorted(cols),
+            )
 
         if data.validation is not None:
-            r, _ = get_data_stats(data.validation)
+            r, val_cols = get_data_stats(data.validation)
             rows += r
+            if val_cols and val_cols != cols:
+                logger.warning(
+                    "get_data_stats: SplitDataset.validation columns %s differ "
+                    "from SplitDataset.train columns %s; reporting train's "
+                    "column set, which may not reflect validation data actual shape.",
+                    sorted(val_cols),
+                    sorted(cols),
+                )
 
     return rows, cols
 
@@ -141,7 +157,23 @@ def pack_pipeline_output(
 
         y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
 
-        # Ensure indices align (they should if coming from same operation)
+        # Concatenating on mismatched indices (e.g. a row-dropping step that
+        # updated X but not y) would otherwise silently NaN-pad/duplicate rows
+        # instead of raising. A row-count mismatch always indicates a real bug
+        # upstream, so fail loudly with a clear message. When counts match but
+        # indices differ (the common, benign case), reset both to a shared
+        # positional index before concatenating so rows still line up.
+        if len(X_pd) != len(y_pd):
+            raise ValueError(
+                "pack_pipeline_output: X and y have different row counts "
+                f"({len(X_pd)} vs {len(y_pd)}); cannot safely reattach y to X. "
+                "This usually means a preprocessing step dropped/added rows for "
+                "one but not the other."
+            )
+        if hasattr(X_pd, "index") and hasattr(y_pd, "index") and not X_pd.index.equals(y_pd.index):
+            X_pd = X_pd.reset_index(drop=True)
+            y_pd = y_pd.reset_index(drop=True)
+
         return pd.concat([X_pd, y_pd], axis=1)
 
     return X
@@ -292,8 +324,16 @@ def resolve_columns(
 
     # Case 1: Explicit columns provided
     if cols:
-        # Just filter for existence
-        return [c for c in cols if c in df.columns]
+        # Filter for existence, then dedupe while preserving first-occurrence
+        # order (a duplicated column name would otherwise be processed twice
+        # by stateful calculators like encoders/scalers).
+        seen: set[str] = set()
+        deduped = []
+        for c in cols:
+            if c in df.columns and c not in seen:
+                seen.add(c)
+                deduped.append(c)
+        return deduped
 
     # Case 2: Auto-detection
     if default_selection_func:

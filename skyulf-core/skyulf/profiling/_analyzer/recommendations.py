@@ -107,7 +107,7 @@ class RecommendationsMixin(_AnalyzerState):
         if target_col and target_col in profiles:
             target_profile = profiles[target_col]
             if target_profile.dtype == "Categorical" and target_profile.categorical_stats:
-                counts = [item["count"] for item in target_profile.categorical_stats.top_k]
+                counts = self._target_class_counts(target_col, target_profile)
                 if counts:
                     min_c = min(counts)
                     max_c = max(counts)
@@ -135,3 +135,30 @@ class RecommendationsMixin(_AnalyzerState):
                         )
 
         return recs
+
+    def _target_class_counts(self, target_col: str, target_profile: ColumnProfile) -> list[int]:
+        """Return per-class counts for the target column.
+
+        Uses a full group-by over the target column rather than the
+        already-truncated ``categorical_stats.top_k`` (capped to the 10 most
+        frequent classes upstream), so classes outside the top 10 are not
+        silently ignored when computing the imbalance ratio. Falls back to
+        ``top_k`` if the target's cardinality is too high for a full count to
+        be meaningful (e.g. an ID-like column mistakenly typed as target).
+        """
+        cat_stats = target_profile.categorical_stats
+        unique_count = cat_stats.unique_count if cat_stats else 0
+        # Guard against accidentally high-cardinality "targets" (e.g. an ID
+        # column): a full group-by over thousands of distinct values isn't a
+        # meaningful class-imbalance signal, so fall back to top_k.
+        if unique_count == 0 or unique_count > 1000 or cat_stats is None:
+            return [item["count"] for item in cat_stats.top_k] if cat_stats else []
+
+        counts_df = (
+            self.lazy_df.select(target_col)
+            .drop_nulls()
+            .group_by(target_col)
+            .len(name="count")
+            .collect()
+        )
+        return counts_df["count"].to_list()

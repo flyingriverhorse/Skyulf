@@ -23,6 +23,12 @@ class CoreMixin:
     DEBUG: bool = False
     TESTING: bool = False
 
+    # Environment name reported by health checks / monitoring (e.g. "development",
+    # "staging", "production"). Read from the ENVIRONMENT env var. When unset, falls
+    # back to deriving from DEBUG (see Settings.environment_name) to preserve prior
+    # behavior for deployments that don't set it explicitly.
+    ENVIRONMENT: str | None = None
+
     # Server
     HOST: str = "127.0.0.1"
     PORT: int = 8000
@@ -30,3 +36,16 @@ class CoreMixin:
 
     # Observability — opt-in; no-op when not set
     SENTRY_DSN: str | None = None
+
+    # ── Pagination defaults ──────────────────────────────────────────────
+    # Fallback page size used by list endpoints that don't declare a more
+    # specific default of their own. Centralized so "what's a reasonable
+    # default page size" is a single tunable instead of ad-hoc literals
+    # (previously 5/20/50/100/200 scattered across routers/services).
+    DEFAULT_PAGE_SIZE: int = 50
+    # Upper bound list endpoints should clamp a caller-supplied `limit` to,
+    # regardless of what the endpoint's own default is.
+    MAX_PAGE_SIZE: int = 500
+    # Default number of rows returned by lightweight "preview"/"sample"
+    # endpoints (e.g. dataset sample previews).
+    DEFAULT_SAMPLE_ROWS: int = 5

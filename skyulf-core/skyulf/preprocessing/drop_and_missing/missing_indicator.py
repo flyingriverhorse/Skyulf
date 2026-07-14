@@ -9,6 +9,8 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 
+_DEFAULT_FLAG_SUFFIX = "_missing"
+
 
 def _missing_indicator_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
@@ -16,8 +18,9 @@ def _missing_indicator_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> t
     cols = params.get("columns", [])
     if not cols:
         return X, y
+    suffix = params.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
     exprs = [
-        pl.col(c).is_null().cast(pl.Int64).alias(f"{c}_missing") for c in cols if c in X.columns
+        pl.col(c).is_null().cast(pl.Int64).alias(f"{c}{suffix}") for c in cols if c in X.columns
     ]
     return (X.with_columns(exprs) if exprs else X), y
 
@@ -26,10 +29,11 @@ def _missing_indicator_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> t
     cols = params.get("columns", [])
     if not cols:
         return X, y
+    suffix = params.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
     X_out = X.copy()
     for col in cols:
         if col in X.columns:
-            X_out[f"{col}_missing"] = X[col].isna().astype(int)
+            X_out[f"{col}{suffix}"] = X[col].isna().astype(int)
     return X_out, y
 
 
@@ -55,7 +59,11 @@ def _missing_indicator_fit_polars(
 ) -> MissingIndicatorArtifact:
     explicit = config.get("columns")
     cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_polars(X)
-    return {"type": "missing_indicator", "columns": cols}
+    return {
+        "type": "missing_indicator",
+        "columns": cols,
+        "flag_suffix": config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX,
+    }
 
 
 def _missing_indicator_fit_pandas(
@@ -63,7 +71,11 @@ def _missing_indicator_fit_pandas(
 ) -> MissingIndicatorArtifact:
     explicit = config.get("columns")
     cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_pandas(X)
-    return {"type": "missing_indicator", "columns": cols}
+    return {
+        "type": "missing_indicator",
+        "columns": cols,
+        "flag_suffix": config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX,
+    }
 
 
 @NodeRegistry.register("MissingIndicator", MissingIndicatorApplier)
@@ -72,21 +84,22 @@ def _missing_indicator_fit_pandas(
     name="Missing Indicator",
     category="Feature Engineering",
     description="Create binary indicators for missing values.",
-    params={"features": "missing-only", "sparse": "auto"},
+    params={"columns": [], "flag_suffix": _DEFAULT_FLAG_SUFFIX},
 )
 class MissingIndicatorCalculator(BaseCalculator):
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
-        # Adds one boolean column "<col>_missing" per indicator column.
+        # Adds one boolean column "<col><flag_suffix>" per indicator column.
         # Only predictable when the user supplied an explicit column list;
         # otherwise the set depends on which columns actually contain NaNs.
         explicit = config.get("columns") or []
         if not explicit:
             return None
+        suffix = config.get("flag_suffix") or _DEFAULT_FLAG_SUFFIX
         new_schema = input_schema
         for col in explicit:
-            new_schema = new_schema.add(f"{col}_missing", "bool")
+            new_schema = new_schema.add(f"{col}{suffix}", "bool")
         return new_schema
 
     def fit(self, df: Any, config: dict[str, Any]) -> MissingIndicatorArtifact:

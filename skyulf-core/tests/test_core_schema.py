@@ -67,6 +67,21 @@ def test_rename_updates_columns_and_dtypes():
     assert result.dtypes == {"renamed": "int64"}
 
 
+def test_rename_raises_on_collision_with_existing_column():
+    """Renaming a column to a name that already exists elsewhere in the schema
+    must raise instead of silently producing duplicate column names."""
+    schema = SkyulfSchema.from_columns(["a", "b"], {"a": "int64", "b": "string"})
+    with pytest.raises(ValueError, match="duplicate column"):
+        schema.rename({"a": "b"})
+
+
+def test_rename_raises_on_collision_between_two_renamed_columns():
+    """Renaming two different columns to the same target name must raise."""
+    schema = SkyulfSchema.from_columns(["a", "b", "c"])
+    with pytest.raises(ValueError, match="duplicate column"):
+        schema.rename({"a": "x", "b": "x"})
+
+
 def test_with_dtype_updates_existing_column():
     """with_dtype() should update the dtype label for an existing column."""
     schema = SkyulfSchema.from_columns(["a"], {"a": "int64"})
@@ -235,3 +250,45 @@ def test_extract_polars_dtypes_direct_call_on_real_polars_frame():
     df = pl.DataFrame({"a": [1, 2], "b": [1.0, 2.0]})
     dtypes = _extract_polars_dtypes(df)
     assert set(dtypes.keys()) == {"a", "b"}
+
+
+def test_extract_pandas_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFixture):
+    """Regression test: a swallowed exception while extracting pandas dtypes
+    must still be logged at debug level for diagnosability, not silently
+    dropped."""
+    import logging
+
+    from skyulf.core.schema import _extract_pandas_dtypes
+
+    class _BrokenDtypes:
+        def items(self):
+            raise RuntimeError("broken")
+
+    class _BrokenFrame:
+        dtypes = _BrokenDtypes()
+
+    with caplog.at_level(logging.DEBUG, logger="skyulf.core.schema"):
+        result = _extract_pandas_dtypes(_BrokenFrame())
+    assert result == {}
+    assert any("pandas dtypes" in rec.message for rec in caplog.records)
+
+
+def test_extract_polars_dtypes_logs_debug_on_failure(caplog: pytest.LogCaptureFixture):
+    """Regression test: a swallowed exception while extracting polars dtypes
+    must still be logged at debug level for diagnosability, not silently
+    dropped."""
+    import logging
+
+    from skyulf.core.schema import _extract_polars_dtypes
+
+    class _BrokenSchema:
+        def items(self):
+            raise RuntimeError("broken")
+
+    class _BrokenFrame:
+        schema = _BrokenSchema()
+
+    with caplog.at_level(logging.DEBUG, logger="skyulf.core.schema"):
+        result = _extract_polars_dtypes(_BrokenFrame())
+    assert result == {}
+    assert any("polars dtypes" in rec.message for rec in caplog.records)

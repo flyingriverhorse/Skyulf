@@ -90,6 +90,12 @@ class RuleTree(BaseModel):
     feature_importances: list[dict[str, str | float]] | None = (
         None  # Feature importance from surrogate model
     )
+    # For categorical features, maps feature name -> ordered category labels
+    # (physical code i == categories[feature][i]). A node's numeric
+    # `threshold` on such a feature is an internal ordinal-encoding split
+    # point, not a meaningful magnitude — consumers should use this mapping
+    # to render "feature in [...]" instead of "feature <= <code>".
+    categories: dict[str, list[str]] | None = None
 
 
 class ColumnProfile(BaseModel):

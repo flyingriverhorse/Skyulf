@@ -161,7 +161,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   columns: node.data.columns,
                   max_iter: node.data.max_iter,
                   estimator: node.data.estimator,
-                  random_state: 0
+                  random_state: node.data.random_state ?? 0
               };
           } else {
               stepType = 'SimpleImputer';

@@ -32,7 +32,12 @@ def _aggregate_metrics(
     if not fold_metrics:
         return {}
 
-    keys = fold_metrics[0].keys()
+    # Union of keys across all folds — using only fold_metrics[0].keys() would
+    # silently drop any metric that happened to be missing from the first
+    # fold (e.g. a class-imbalance-dependent metric absent in one fold only).
+    keys: set[str] = set()
+    for m in fold_metrics:
+        keys.update(m.keys())
     aggregated = {}
 
     for key in keys:
@@ -93,8 +98,10 @@ def perform_cross_validation(
     if log_callback:
         log_callback(f"Starting Cross-Validation (Folds: {n_folds}, Type: {cv_type})")
 
-    # For Time Series Split, sort data chronologically
-    if cv_type == "time_series_split" and isinstance(X, pd.DataFrame):
+    # For Time Series Split, sort data chronologically. Only applies to
+    # DataFrame-like X (pandas or Polars); a plain array has no columns to
+    # sort/drop by, so time_series_split relies on the caller's row order.
+    if cv_type == "time_series_split" and hasattr(X, "columns"):
         X, y = _sort_by_time(X, y, time_column, log_callback, logger)
 
     # Handle nested CV separately
@@ -112,24 +119,15 @@ def perform_cross_validation(
             log_callback=log_callback,
         )
 
-    # 1. Setup Splitter
-    if cv_type == "time_series_split":
-        splitter = TimeSeriesSplit(n_splits=n_folds)
-    elif cv_type == "shuffle_split":
-        splitter = ShuffleSplit(n_splits=n_folds, test_size=0.2, random_state=random_state)
-    elif cv_type == "stratified_k_fold" and problem_type == "classification":
-        splitter = StratifiedKFold(
-            n_splits=n_folds,
-            shuffle=shuffle,
-            random_state=random_state if shuffle else None,
-        )
-    else:
-        # Default to KFold
-        splitter = KFold(
-            n_splits=n_folds,
-            shuffle=shuffle,
-            random_state=random_state if shuffle else None,
-        )
+    # 1. Setup Splitter (delegates to _build_splitter so unknown cv_type
+    # values get the same warning/fallback behavior in both call paths).
+    splitter = _build_splitter(
+        cv_type=cv_type,
+        n_folds=n_folds,
+        problem_type=problem_type,
+        shuffle=shuffle,
+        random_state=random_state,
+    )
 
     fold_results = []
 
@@ -208,7 +206,7 @@ def perform_cross_validation(
 
 
 def _sort_by_time(
-    X: pd.DataFrame,
+    X: Any,
     y: Any,
     time_column: str | None,
     log_callback: Callable[[str], None] | None,
@@ -219,12 +217,29 @@ def _sort_by_time(
     If time_column is provided, sort by that column (and drop it from features).
     If not provided, auto-detect the first datetime column.
     If no datetime column is found, log a warning and return data as-is.
+
+    Supports both pandas and Polars DataFrames - previously this only handled
+    pandas, so a Polars `time_series_split` run silently skipped chronological
+    sorting AND never dropped the time column from features, leaking it
+    directly into training.
     """
+    from ..engines import EngineName, get_engine
+
+    is_polars = get_engine(X).name == EngineName.POLARS
+
     sort_col = time_column
 
     if not sort_col:
-        # Auto-detect: find first datetime64 column
-        datetime_cols = X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
+        if is_polars:
+            import polars as pl
+
+            datetime_cols = [
+                col
+                for col, dtype in zip(X.columns, X.dtypes, strict=True)
+                if dtype in (pl.Datetime, pl.Date) or dtype.base_type() in (pl.Datetime, pl.Date)
+            ]
+        else:
+            datetime_cols = X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
         if datetime_cols:
             sort_col = datetime_cols[0]
             msg = f"Time Series CV: auto-detected datetime column '{sort_col}' for sorting."
@@ -233,15 +248,27 @@ def _sort_by_time(
             logger.info(msg)
 
     if sort_col and sort_col in X.columns:
-        sort_order = X[sort_col].argsort()
-        X = X.iloc[sort_order].reset_index(drop=True)
-        y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
         msg = f"Time Series CV: data sorted by '{sort_col}'."
+        if is_polars:
+            # Sort y in lockstep by attaching it as a temporary column so the
+            # same row order is applied to both X and y, then split apart.
+            import polars as pl
+
+            y_series = y if hasattr(y, "name") else pl.Series("__cv_y__", y)
+            y_name = getattr(y_series, "name", None) or "__cv_y__"
+            combined = X.with_columns(y_series.alias(y_name))
+            combined = combined.sort(sort_col)
+            y = combined[y_name]
+            X = combined.drop([y_name, sort_col])
+        else:
+            sort_order = X[sort_col].argsort()
+            X = X.iloc[sort_order].reset_index(drop=True)
+            y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
+            # Drop the time column from features so it doesn't leak into the model
+            X = X.drop(columns=[sort_col])
         if log_callback:
             log_callback(msg)
         logger.info(msg)
-        # Drop the time column from features so it doesn't leak into the model
-        X = X.drop(columns=[sort_col])
     elif sort_col:
         msg = f"Time Series CV: specified time column '{sort_col}' not found in data. Using row order."
         if log_callback:
@@ -307,12 +334,17 @@ def _perform_nested_cv(
     log_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """
-    Performs nested cross-validation with an outer loop for evaluation
-    and an inner loop for hyperparameter selection per fold.
+    Performs nested cross-validation with an outer loop for generalization
+    evaluation and an inner loop that produces a diagnostic stability signal.
 
     Outer loop: evaluates generalization (same as standard CV).
-    Inner loop: selects best hyperparameters via 3-fold CV within each
-    training fold (avoids overfitting to the validation set).
+    Inner loop: fits the *same* config across inner folds within each outer
+    training fold and reports the resulting score as ``inner_cv_mean`` - a
+    diagnostic of how stable/consistent the model is on sub-splits of the
+    training data. This does **not** perform hyperparameter search; the same
+    ``config`` passed by the caller is used unchanged for every inner and
+    outer fold. Real inner-loop hyperparameter selection is out of scope for
+    this function.
     """
     import logging
 
@@ -363,11 +395,12 @@ def _perform_nested_cv(
             y_train_fold = y[train_idx]
             y_val_fold = y[val_idx]
 
-        # --- Inner loop: quick hyperparameter selection ---
-        # Try each config variant with inner CV and pick the best
-        # For now, we just do a single inner CV to get a stable training signal,
-        # then evaluate on the held-out outer fold.
-        # This provides the key nested CV benefit: unbiased generalization estimate.
+        # --- Inner loop: diagnostic stability signal ---
+        # Fits the *same* config (no hyperparameter search) across inner
+        # folds of this outer training fold and records the resulting score.
+        # This measures how stable the model's performance is across
+        # sub-splits, not "the best hyperparameters" - it is purely
+        # diagnostic and does not influence the outer-fold model fit below.
 
         # Build inner splitter
         if problem_type == "classification":
@@ -415,9 +448,16 @@ def _perform_nested_cv(
                     inner_scores.append(inner_metrics.get("r2", 0.0))
             except Exception as e:
                 logger.warning(f"Inner fold failed: {e}")
-                inner_scores.append(0.0)
+                if log_callback:
+                    log_callback(f"Inner fold failed: {e}")
+                # Use NaN rather than 0.0: for regression, 0.0 is itself a
+                # meaningful R^2 value (not a neutral "no score" sentinel),
+                # so a hard failure must not silently corrupt inner_cv_mean.
+                # NaN is filtered out of the mean below.
+                inner_scores.append(float("nan"))
 
-        inner_mean = float(np.mean(inner_scores)) if inner_scores else 0.0
+        valid_inner_scores = [s for s in inner_scores if not np.isnan(s)]
+        inner_mean = float(np.mean(valid_inner_scores)) if valid_inner_scores else float("nan")
 
         # --- Outer evaluation: train on full outer train, evaluate on outer val ---
         model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
@@ -439,7 +479,9 @@ def _perform_nested_cv(
             {
                 "fold": fold_idx + 1,
                 "metrics": sanitize_metrics(metrics),
-                "inner_cv_mean": inner_mean,
+                # None (not NaN) when every inner fold failed, for JSON-safety
+                # parity with sanitize_metrics' non-finite-value handling.
+                "inner_cv_mean": inner_mean if not np.isnan(inner_mean) else None,
             }
         )
 
