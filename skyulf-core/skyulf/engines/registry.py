@@ -57,6 +57,16 @@ class EngineRegistry:
     _engines: dict[str, type[BaseEngine]] = {}
     _active_engine: str = "pandas"  # Default
 
+    # Maps a data object's detected top-level module package to the engine
+    # name registered for it. "spark"/"dask" are future-proofing: only used
+    # if/when those engines are actually registered in `_engines`.
+    _TOP_LEVEL_TO_ENGINE: dict[str, str] = {
+        "polars": "polars",
+        "pandas": "pandas",
+        "pyspark": "spark",
+        "dask": "dask",
+    }
+
     @classmethod
     def register(cls, name: str, engine_cls: type[BaseEngine]):
         """Register a new engine."""
@@ -84,45 +94,50 @@ class EngineRegistry:
         if data is None:
             return cls.get(cls._active_engine)
 
-        # Check the top-level package of the module path to identify the
-        # library. Using the top-level component (rather than a bare
-        # substring check) avoids false positives from unrelated modules
-        # that merely contain "pandas"/"polars" in their name, e.g. a
-        # third-party "fake_polars_stub" or "my_pandas_wrapper" module.
-        module = type(data).__module__
-        top_level = module.split(".", 1)[0]
-
-        # Our own engine wrappers (SkyulfPandasWrapper/SkyulfPolarsWrapper,
-        # under `skyulf.engines.*`) hold the real dataframe in `._df`; unwrap
-        # and re-check *only* in that case so detection is based on the
-        # underlying library. We deliberately don't do this unconditionally
-        # for any object with a `._df` attribute, since e.g. polars'
-        # DataFrame itself has an internal `._df` (its Rust-backed handle)
-        # that would otherwise be mistakenly "unwrapped".
-        if top_level == "skyulf" and hasattr(data, "_df"):
-            module = type(data._df).__module__
-            top_level = module.split(".", 1)[0]
-
-        if top_level == "polars":
-            return cls.get("polars")
-        if top_level == "pandas":
-            return cls.get("pandas")
-        if top_level == "pyspark" and "spark" in cls._engines:
-            # Future proofing
-            return cls.get("spark")
-        if top_level == "dask" and "dask" in cls._engines:
-            # Future proofing
-            return cls.get("dask")
+        top_level = cls._detect_top_level_package(data)
+        engine_name = cls._TOP_LEVEL_TO_ENGINE.get(top_level)
+        if engine_name is not None and engine_name in cls._engines:
+            return cls.get(engine_name)
 
         # Fallback to default if unknown (or let it fail later)
-        # Plain Python sequences (list/tuple) are a common, expected input
-        # shape (e.g. a raw y target list) rather than a genuinely unknown
-        # type, so don't warn for those - only for anything else.
+        cls._warn_unknown_data_type(data)
+        return cls.get(cls._active_engine)
+
+    @staticmethod
+    def _detect_top_level_package(data: Any) -> str:
+        """Return the top-level module package name backing `data`'s type.
+
+        Checks the top-level component of the module path (rather than a
+        bare substring check) to identify the library, avoiding false
+        positives from unrelated modules that merely contain "pandas"/
+        "polars" in their name, e.g. a third-party "fake_polars_stub" or
+        "my_pandas_wrapper" module.
+
+        Our own engine wrappers (SkyulfPandasWrapper/SkyulfPolarsWrapper,
+        under `skyulf.engines.*`) hold the real dataframe in `._df`; unwrap
+        and re-check *only* in that case so detection is based on the
+        underlying library. We deliberately don't do this unconditionally
+        for any object with a `._df` attribute, since e.g. polars' DataFrame
+        itself has an internal `._df` (its Rust-backed handle) that would
+        otherwise be mistakenly "unwrapped".
+        """
+        top_level = type(data).__module__.split(".", 1)[0]
+        if top_level == "skyulf" and hasattr(data, "_df"):
+            top_level = type(data._df).__module__.split(".", 1)[0]
+        return top_level
+
+    @classmethod
+    def _warn_unknown_data_type(cls, data: Any) -> None:
+        """Log a warning for a genuinely unrecognized data type.
+
+        Plain Python sequences (list/tuple) are a common, expected input
+        shape (e.g. a raw y target list) rather than a genuinely unknown
+        type, so don't warn for those - only for anything else.
+        """
         if not isinstance(data, list | tuple):
             logger.warning(
                 f"Unknown data type {type(data)}, falling back to default engine: {cls._active_engine}"
             )
-        return cls.get(cls._active_engine)
 
     @classmethod
     def wrap(cls, data: Any) -> "SkyulfDataFrame":
