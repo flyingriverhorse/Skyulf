@@ -6,6 +6,7 @@ import typing
 from typing import Any
 
 import pandas as pd
+import polars as pl
 import pytest
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LogisticRegression
@@ -1056,6 +1057,18 @@ def test_tuning_applier_predict_without_tuple_artifact_returns_nan():
     preds = applier.predict(X_df, "not-a-tuple-artifact")
     assert preds.isna().all()
     assert len(preds) == 3
+
+
+def test_tuning_applier_predict_without_tuple_artifact_handles_polars_input():
+    """Regression test: the NaN-fallback previously always did
+    `pd.Series(np.nan, index=df.index)`, which raises AttributeError for a
+    Polars DataFrame (no `.index` attribute). Must return an all-null
+    placeholder of the correct length instead of crashing."""
+    applier = TuningApplier(LogisticRegressionApplier())
+    X_pl = pl.DataFrame({"a": [1, 2, 3]})
+    preds = applier.predict(X_pl, "not-a-tuple-artifact")  # ty: ignore[invalid-argument-type]
+    assert len(preds) == 3
+    assert preds.isna().all()
 
 
 def test_tuning_applier_predict_proba_with_tuple_artifact():
