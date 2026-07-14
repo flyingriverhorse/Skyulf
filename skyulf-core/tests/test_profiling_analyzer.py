@@ -191,6 +191,41 @@ def test_analyze_filters_all_operators(mixed_df: pl.DataFrame) -> None:
         assert profile.row_count >= 0
 
 
+def test_analyze_unrecognized_filter_operator_not_recorded_as_active(
+    mixed_df: pl.DataFrame,
+) -> None:
+    """An unsupported operator must not filter rows nor be reported as active."""
+    analyzer = EDAAnalyzer(mixed_df)
+    profile = analyzer.analyze(filters=[{"column": "cat", "operator": "~=", "value": "A"}])
+
+    assert profile.row_count == mixed_df.height
+    assert profile.active_filters == []
+
+
+def test_analyze_in_operator_with_non_list_value_not_recorded_as_active(
+    mixed_df: pl.DataFrame,
+) -> None:
+    """The 'in' operator requires a list value; a scalar must not be applied or recorded."""
+    analyzer = EDAAnalyzer(mixed_df)
+    profile = analyzer.analyze(filters=[{"column": "cat", "operator": "in", "value": "A"}])
+
+    assert profile.row_count == mixed_df.height
+    assert profile.active_filters == []
+
+
+def test_analyze_filter_on_unknown_column_not_recorded_as_active(
+    mixed_df: pl.DataFrame,
+) -> None:
+    """A filter referencing a column absent from the dataset is skipped entirely."""
+    analyzer = EDAAnalyzer(mixed_df)
+    profile = analyzer.analyze(
+        filters=[{"column": "does_not_exist", "operator": "==", "value": "A"}]
+    )
+
+    assert profile.row_count == mixed_df.height
+    assert profile.active_filters == []
+
+
 def test_analyze_empty_filter_result_returns_empty_profile(mixed_df: pl.DataFrame) -> None:
     """A filter matching zero rows should short-circuit with an 'Empty Data' alert."""
     analyzer = EDAAnalyzer(mixed_df)

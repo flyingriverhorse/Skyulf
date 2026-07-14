@@ -7,6 +7,7 @@ This module keeps only the orchestrator: ``EDAAnalyzer.__init__`` and
 ``EDAAnalyzer.analyze``.
 """
 
+import logging
 from typing import Any
 
 import polars as pl
@@ -31,6 +32,8 @@ from .correlations import calculate_correlations
 from .schemas import Alert, DatasetProfile, Filter
 
 __all__ = ["EDAAnalyzer"]
+
+logger = logging.getLogger(__name__)
 
 
 class EDAAnalyzer(
@@ -108,8 +111,21 @@ class EDAAnalyzer(
                         self.df = self.df.filter(pl.col(col) <= val)
                     elif op == "in" and isinstance(val, list):
                         self.df = self.df.filter(pl.col(col).is_in(val))
+                    else:
+                        logger.warning(
+                            "Skipping unsupported filter operator %r for column %r "
+                            "(value=%r); filter was not applied.",
+                            op,
+                            col,
+                            val,
+                        )
+                        continue
 
                     active_filters.append(Filter(column=str(col), operator=str(op), value=val))
+                else:
+                    logger.warning(
+                        "Skipping filter on unknown column %r; filter was not applied.", col
+                    )
 
             self.lazy_df = self.df.lazy()
             self.row_count = self.df.height

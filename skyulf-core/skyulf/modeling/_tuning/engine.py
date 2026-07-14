@@ -261,23 +261,24 @@ class TuningCalculator(BaseModelCalculator):
         else:
             if not config.cv_enabled:
                 # Single split validation (20% holdout)
-                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.random_state)
+                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.cv_random_state)
             elif config.cv_type == "nested_cv":
                 # Nested CV during tuning: use fewer inner folds for
                 # candidate scoring. The outer evaluation loop runs
                 # post-tuning in engine.py (as stratified_k_fold).
                 inner_folds = min(3, config.cv_folds - 1) if config.cv_folds > 2 else 2
+                inner_cv_random_state = config.cv_random_state if config.cv_shuffle else None
                 if self.model_calculator.problem_type == "classification":
                     cv = StratifiedKFold(
                         n_splits=inner_folds,
-                        shuffle=True,
-                        random_state=config.random_state,
+                        shuffle=config.cv_shuffle,
+                        random_state=inner_cv_random_state,
                     )
                 else:
                     cv = KFold(
                         n_splits=inner_folds,
-                        shuffle=True,
-                        random_state=config.random_state,
+                        shuffle=config.cv_shuffle,
+                        random_state=inner_cv_random_state,
                     )
             elif config.cv_type == "time_series_split":
                 cv = TimeSeriesSplit(n_splits=config.cv_folds)
@@ -285,7 +286,7 @@ class TuningCalculator(BaseModelCalculator):
                 cv = ShuffleSplit(
                     n_splits=config.cv_folds,
                     test_size=0.2,
-                    random_state=config.random_state,
+                    random_state=config.cv_random_state,
                 )
             elif (
                 config.cv_type == "stratified_k_fold"
@@ -293,15 +294,15 @@ class TuningCalculator(BaseModelCalculator):
             ):
                 cv = StratifiedKFold(
                     n_splits=config.cv_folds,
-                    shuffle=True,
-                    random_state=config.random_state,
+                    shuffle=config.cv_shuffle,
+                    random_state=config.cv_random_state if config.cv_shuffle else None,
                 )
             else:
                 # Default to KFold (also fallback for stratified if regression)
                 cv = KFold(
                     n_splits=config.cv_folds,
-                    shuffle=True,
-                    random_state=config.random_state,
+                    shuffle=config.cv_shuffle,
+                    random_state=config.cv_random_state if config.cv_shuffle else None,
                 )
 
         # 3. Select Search Strategy

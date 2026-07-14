@@ -147,3 +147,48 @@ class TestRealShapedDataset:
         # unique_count > 50 threshold used to flag "likely ID" columns, so it
         # is not flagged here even though it is a perfect identifier.
         assert "customer_id" not in recs_by_column
+
+
+class TestTargetImbalanceRatioBeyondTopK:
+    """Regression tests for the target-imbalance ratio being computed from the
+    full per-class distribution instead of the already-truncated
+    ``categorical_stats.top_k`` (capped to the 10 most frequent classes
+    upstream in ``analyzer.py``)."""
+
+    def test_full_class_counts_reveal_imbalance_hidden_by_top_k_truncation(self) -> None:
+        """15 classes: 10 balanced "head" classes plus 5 rare "tail" classes
+        outside top_k. The old top_k-only ratio would report "Balanced
+        Target"; the fix must detect the true imbalance from the tail."""
+        head_values = [f"class_{i}" for i in range(10) for _ in range(100)]
+        tail_values = [f"rare_{i}" for i in range(5) for _ in range(1)]
+        df = pl.DataFrame({"target": head_values + tail_values})
+
+        analyzer = EDAAnalyzer(df)
+        profile = analyzer.analyze(target_col="target")
+
+        target_recs = [r for r in profile.recommendations if r.column == "target"]
+        actions = {r.action for r in target_recs}
+
+        assert "Resample" in actions
+        assert "Info" not in actions  # must not report "Balanced Target"
+
+    def test_target_class_counts_falls_back_to_top_k_for_high_cardinality(self) -> None:
+        """A target with very high cardinality (e.g. > 1000 distinct values,
+        likely an ID column mistakenly used as target) should fall back to
+        top_k rather than running an expensive/meaningless full group-by."""
+        from skyulf.profiling.schemas import CategoricalStats, ColumnProfile
+
+        analyzer = EDAAnalyzer(pl.DataFrame({"x": [1, 2, 3]}))
+        profile = ColumnProfile(
+            name="target",
+            dtype="Categorical",
+            missing_count=0,
+            missing_percentage=0.0,
+            categorical_stats=CategoricalStats(
+                unique_count=5000,
+                top_k=[{"value": f"v{i}", "count": 10} for i in range(10)],
+            ),
+        )
+
+        counts = analyzer._target_class_counts("target", profile)
+        assert counts == [10] * 10
