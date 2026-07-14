@@ -288,7 +288,11 @@ class StatefulEstimator:
                         X_val = X_val.drop([target_column])
             else:
                 if target_column in dataset.validation.columns:
-                    X_val = dataset.validation.drop(columns=[target_column])
+                    try:
+                        X_val = dataset.validation.drop(columns=[target_column])
+                    except TypeError:
+                        # Polars
+                        X_val = dataset.validation.drop([target_column])
                 else:
                     X_val = dataset.validation
             predictions["validation"] = self.applier.predict(X_val, self.model)
@@ -314,8 +318,14 @@ class StatefulEstimator:
         X_train, y_train = self._extract_xy(dataset.train, target_column)
         X_val, y_val = self._extract_xy(dataset.validation, target_column)
 
-        X_combined = pd.concat([X_train, X_val], axis=0)
-        y_combined = pd.concat([y_train, y_val], axis=0)
+        if get_engine(X_train).name == EngineName.POLARS:
+            import polars as pl
+
+            X_combined = pl.concat([X_train, X_val])
+            y_combined = pl.concat([y_train, y_val])
+        else:
+            X_combined = pd.concat([X_train, X_val], axis=0)
+            y_combined = pd.concat([y_train, y_val], axis=0)
 
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)

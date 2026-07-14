@@ -190,7 +190,6 @@ PASSTHROUGH_CALCULATORS = [
     LabelEncoderCalculator,
     OrdinalEncoderCalculator,
     HashEncoderCalculator,
-    TargetEncoderCalculator,
     SplitCalculator,
 ]
 
@@ -199,6 +198,15 @@ PASSTHROUGH_CALCULATORS = [
 def test_phase_a_passthrough(calc_cls: type) -> None:
     s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
     assert calc_cls().infer_output_schema(s, {}) == s
+
+
+def test_target_encoder_binary_regression_is_passthrough() -> None:
+    # Unlike the multiclass/"auto" case (covered in test_encoding_target.py),
+    # explicit binary/regression target_type is confidently in-place.
+    s = SkyulfSchema.from_columns(["a", "b", "c"], {"a": "float64"})
+    for target_type in ("binary", "regression"):
+        out = TargetEncoderCalculator().infer_output_schema(s, {"target_type": target_type})
+        assert out == s
 
 
 # ---------- Phase A: config-driven Calculators ----------
@@ -291,7 +299,9 @@ DATA_DEPENDENT_CALCULATORS = [
     OneHotEncoderCalculator,
     DummyEncoderCalculator,
     HashEncoderCalculator,  # passthrough actually — kept here pending review
-    TargetEncoderCalculator,  # passthrough actually — kept here pending review
+    TargetEncoderCalculator,  # returns None for the default "auto"/multiclass
+    # target_type (data-dependent column fan-out); binary/regression stays
+    # passthrough, covered separately in test_encoding_target.py.
     # Bucketing — output column set depends on fitted bin edges.
     GeneralBinningCalculator,
     CustomBinningCalculator,
