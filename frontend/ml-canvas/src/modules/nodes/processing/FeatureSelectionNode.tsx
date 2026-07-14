@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Filter } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -6,6 +6,8 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
+import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface FeatureSelectionConfig {
   method:
@@ -104,20 +106,8 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const columns = schema ? Object.values(schema.columns).map(c => c.name).filter(n => !droppedUpstream.has(n)) : [];
 
-  // Responsive Layout
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   // Helper to determine available score functions based on problem type
   const getScoreFunctions = () => {
@@ -250,7 +240,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
       {/* Top Status Bar */}
       <div className="shrink-0 p-4 pb-0 space-y-2">
         {!upstreamDatasetId && (
-          <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
             Connect a dataset node to configure.
           </div>
         )}
@@ -406,7 +396,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.k ?? 10}
-                onChange={(e) => onChange({ ...config, k: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, k: parseIntSafe(e.target.value, config.k) })}
               />
             </div>
           )}
@@ -419,7 +409,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 type="number"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.percentile ?? 10}
-                onChange={(e) => onChange({ ...config, percentile: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, percentile: parseIntSafe(e.target.value, config.percentile) })}
               />
             </div>
           )}
@@ -510,7 +500,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
                 min="1"
                 className="w-full p-2 border rounded bg-background text-sm"
                 value={config.step ?? 1}
-                onChange={(e) => onChange({ ...config, step: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ...config, step: parseIntSafe(e.target.value, config.step) })}
               />
               <p className="text-xs text-muted-foreground">Features to remove at each iteration.</p>
             </div>

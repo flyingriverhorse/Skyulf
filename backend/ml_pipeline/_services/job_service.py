@@ -6,8 +6,6 @@ from the database. This eliminates the pattern of "Try TrainingJob, then TuningJ
 scattered across the codebase.
 """
 
-from typing import Optional, Union
-
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -21,7 +19,7 @@ class JobService:
     @staticmethod
     def get_job_by_id_sync(
         session: Session, job_id: str
-    ) -> Optional[Union[BasicTrainingJob, AdvancedTuningJob]]:
+    ) -> BasicTrainingJob | AdvancedTuningJob | None:
         """
         Retrieves a job by ID (Synchronous), checking both BasicTrainingJob and AdvancedTuningJob tables.
         """
@@ -37,7 +35,7 @@ class JobService:
     @staticmethod
     async def get_job_by_id(
         session: AsyncSession, job_id: str
-    ) -> Optional[Union[BasicTrainingJob, AdvancedTuningJob]]:
+    ) -> BasicTrainingJob | AdvancedTuningJob | None:
         """
         Retrieves a job by ID, checking both BasicTrainingJob and AdvancedTuningJob tables.
 

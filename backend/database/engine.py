@@ -6,7 +6,7 @@ with support for the same databases as the Flask version (SQLite, PostgreSQL).
 """
 
 import logging
-from typing import AsyncGenerator, Optional
+from collections.abc import AsyncGenerator
 
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
@@ -31,8 +31,8 @@ except ImportError as exc:
 logger = logging.getLogger(__name__)
 
 # Global database engine and session factory
-async_engine: Optional[AsyncEngine] = None
-async_session_factory: Optional[async_sessionmaker] = None
+async_engine: AsyncEngine | None = None
+async_session_factory: async_sessionmaker | None = None
 
 # Sync database engine and session factory for compatibility
 sync_engine = None

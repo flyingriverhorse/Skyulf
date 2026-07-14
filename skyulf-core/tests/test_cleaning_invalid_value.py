@@ -4,7 +4,7 @@ Covers: mask helpers, inf-replacement helpers, resolver, Calculator.fit
 branches, Applier.apply (pandas + polars), edge cases, and engine-parity.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -58,13 +58,13 @@ def _basic_df() -> pd.DataFrame:
 
 def test_resolve_replacement_uses_value_when_set() -> None:
     """Explicit `value` key must take priority over `replacement`."""
-    params: Dict[str, Any] = {"replacement": np.nan, "value": 0}
+    params: dict[str, Any] = {"replacement": np.nan, "value": 0}
     assert _resolve_invalid_replacement(params) == 0
 
 
 def test_resolve_replacement_falls_back_to_replacement() -> None:
     """`replacement` is used when `value` is absent."""
-    params: Dict[str, Any] = {"replacement": -999}
+    params: dict[str, Any] = {"replacement": -999}
     assert _resolve_invalid_replacement(params) == -999
 
 
@@ -83,9 +83,9 @@ def test_resolve_replacement_default_is_nan() -> None:
 def test_pandas_mask(
     values: list,
     rule: str,
-    min_value: Optional[float],
-    max_value: Optional[float],
-    expected: Optional[list],
+    min_value: float | None,
+    max_value: float | None,
+    expected: list | None,
 ) -> None:
     """_invalid_rule_pandas_mask must flag values per rule, or return None for no-ops."""
     s = pd.Series(values)
@@ -111,8 +111,8 @@ def test_polars_rule(
     values: list,
     rule: str,
     replacement: float,
-    min_value: Optional[float],
-    max_value: Optional[float],
+    min_value: float | None,
+    max_value: float | None,
     expected: list,
 ) -> None:
     """_invalid_rule_polars must replace flagged values with the given replacement."""
@@ -185,17 +185,59 @@ def test_calculator_fit_value_key_stored() -> None:
     assert params["value"] == 0
 
 
+def test_calculator_fit_zero_to_nan_alias_normalizes_to_zero_rule() -> None:
+    """The frontend's 'zero_to_nan' UI mode must normalize to the canonical
+    'zero' rule -- previously it fell through as an unrecognized rule string
+    and silently no-op'd on both engines."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "mode": "zero_to_nan"})
+    assert params["rule"] == "zero"
+
+
+def test_calculator_fit_percentage_bounds_normalizes_with_defaults() -> None:
+    """The frontend's 'percentage_bounds' UI mode must normalize to
+    'custom_range' with a 0-100 default when the user hasn't overridden it."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(
+        df, {"columns": ["x"], "mode": "percentage_bounds"}
+    )
+    assert params["rule"] == "custom_range"
+    assert params["min_value"] == 0.0
+    assert params["max_value"] == 100.0
+
+
+def test_calculator_fit_age_bounds_normalizes_with_defaults() -> None:
+    """The frontend's 'age_bounds' UI mode must normalize to 'custom_range'
+    with a 0-120 default when the user hasn't overridden it."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "mode": "age_bounds"})
+    assert params["rule"] == "custom_range"
+    assert params["min_value"] == 0.0
+    assert params["max_value"] == 120.0
+
+
+def test_calculator_fit_percentage_bounds_respects_user_overrides() -> None:
+    """User-supplied min/max must take priority over the preset defaults."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(
+        df, {"columns": ["x"], "mode": "percentage_bounds", "min_value": 10.0, "max_value": 90.0}
+    )
+    assert params["rule"] == "custom_range"
+    assert params["min_value"] == 10.0
+    assert params["max_value"] == 90.0
+
+
 # ---------------------------------------------------------------------------
 # Applier.apply — pandas path
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(*_applier_pandas_cases)
-def test_applier_pandas(values: list, params: Dict[str, Any], expected: list) -> None:
+def test_applier_pandas(values: list, params: dict[str, Any], expected: list) -> None:
     """InvalidValueReplacementApplier must replace flagged values per rule config."""
     df = pd.DataFrame({"v": values})
     result = InvalidValueReplacementApplier().apply(df, params)
-    for got, exp in zip(result["v"], expected):
+    for got, exp in zip(result["v"], expected, strict=True):
         if exp is None:
             assert np.isnan(got)
         else:
@@ -212,7 +254,7 @@ def test_applier_empty_params_is_noop() -> None:
 def test_applier_empty_dataframe() -> None:
     """Applying to an empty DataFrame must not raise and must return empty."""
     df = pd.DataFrame({"v": pd.Series([], dtype=float)})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["v"],
         "rule": "negative",
         "replacement": np.nan,
@@ -226,7 +268,7 @@ def test_applier_empty_dataframe() -> None:
 def test_applier_all_nan_column() -> None:
     """An all-NaN column should survive the transformation without error."""
     df = pd.DataFrame({"v": [np.nan, np.nan, np.nan]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["v"],
         "rule": "negative",
         "replacement": 0.0,
@@ -235,6 +277,47 @@ def test_applier_all_nan_column() -> None:
     }
     result = InvalidValueReplacementApplier().apply(df, params)
     assert result["v"].isna().all()
+
+
+def test_applier_pandas_no_op_config_preserves_non_numeric_column() -> None:
+    """When no rule/inf-replacement is configured, a non-numeric column must be
+    left completely untouched (not silently NaN'd by an unconditional
+    pd.to_numeric coercion)."""
+    df = pd.DataFrame({"v": ["a", "b", "c"]})
+    params: dict[str, Any] = {
+        "columns": ["v"],
+        "rule": None,
+        "replace_inf": False,
+        "replace_neg_inf": False,
+    }
+    result = InvalidValueReplacementApplier().apply(df, params)
+    pd.testing.assert_series_equal(result["v"], df["v"])
+
+
+def test_applier_polars_negative_to_nan_alias_replaces_negatives() -> None:
+    """The `negative_to_nan` rule alias must behave identically on the polars
+    engine to the pandas engine (both replace negative values)."""
+    df = pl.DataFrame({"v": [-2.0, 0.0, 3.0]})
+    params: dict[str, Any] = {
+        "columns": ["v"],
+        "rule": "negative_to_nan",
+        "replacement": 0.0,
+        "replace_inf": False,
+        "replace_neg_inf": False,
+    }
+    result = InvalidValueReplacementApplier().apply(df, params)
+    assert result["v"].to_list() == [0.0, 0.0, 3.0]
+
+
+def test_fit_then_apply_percentage_bounds_end_to_end() -> None:
+    """Full fit -> apply flow for the frontend's 'percentage_bounds' UI mode."""
+    df = pd.DataFrame({"v": [0.0, 50.0, 150.0, -10.0]})
+    calculator = InvalidValueReplacementCalculator()
+    applier = InvalidValueReplacementApplier()
+    artifact = calculator.fit(df, {"columns": ["v"], "mode": "percentage_bounds"})
+    result = applier.apply(df, artifact)
+    assert result["v"].isna().sum() == 2
+    assert result["v"].dropna().tolist() == [0.0, 50.0]
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +344,7 @@ def test_fit_then_apply_matches_direct_params() -> None:
 
 
 @pytest.mark.parametrize(*_polars_applier_cases)
-def test_polars_applier(values: list, params: Dict[str, Any], expected: list) -> None:
+def test_polars_applier(values: list, params: dict[str, Any], expected: list) -> None:
     """Polars applier path must replace +inf/-inf per the given flags."""
     df = pl.DataFrame({"v": values})
     result = InvalidValueReplacementApplier().apply(df, params)
@@ -273,7 +356,7 @@ def test_polars_applier(values: list, params: Dict[str, Any], expected: list) ->
 def test_polars_applier_no_valid_columns_is_noop() -> None:
     """Polars applier must short-circuit when no valid column is found."""
     df = pl.DataFrame({"v": [1.0, 2.0]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["nonexistent"],
         "rule": "negative",
         "replacement": 0.0,
@@ -317,7 +400,7 @@ def _numeric_frame_for_iv(draw: st.DrawFn, min_rows: int = 5, max_rows: int = 30
 @given(df=_numeric_frame_for_iv())
 def test_invalid_value_apply_engine_parity_negative(df: pd.DataFrame) -> None:
     """pandas and polars paths must produce identical results for the negative rule."""
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["a", "b"],
         "rule": "negative",
         "replacement": 0.0,
@@ -342,7 +425,7 @@ def test_invalid_value_apply_engine_parity_negative(df: pd.DataFrame) -> None:
 @given(df=_numeric_frame_for_iv())
 def test_invalid_value_apply_engine_parity_custom_range(df: pd.DataFrame) -> None:
     """Pandas and polars custom_range paths must agree on which values are replaced."""
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["a", "b"],
         "rule": "custom_range",
         "min_value": -100.0,
@@ -372,7 +455,7 @@ class TestRealShapedDataset:
 
     def test_custom_range_replaces_income_outliers_and_preserves_missing(self) -> None:
         df = load_sample_dataset("customers")
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "columns": ["income"],
             "rule": "custom_range",
             "min_value": 30000.0,

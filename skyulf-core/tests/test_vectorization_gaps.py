@@ -128,7 +128,9 @@ def test_large_vocabulary_logs_warning(
     """A forced ``_warn_large_output`` result must surface through ``logger.warning``."""
     calculator_cls, _ = _VECTORIZER_NODES[node]
     module = importlib.import_module(module_path)
-    monkeypatch.setattr(module, "_warn_large_output", lambda output_cols: "forced warning for test")
+    monkeypatch.setattr(
+        module, "_warn_large_output", lambda output_cols, **kwargs: "forced warning for test"
+    )
     with caplog.at_level(logging.WARNING):
         df = pd.DataFrame({"text": ["hello world"]})
         calculator_cls().fit(df, {"columns": ["text"]})

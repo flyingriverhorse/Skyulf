@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.6.7"
+version = "0.6.8"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -58,7 +58,7 @@ dependencies = [
     "openpyxl>=3.1.0",
     "rapidfuzz>=3.6.1,<4.0.0",
     "vadersentiment>=3.3.2,<4.0.0",
-    "ty>=0.0.44",
+    "ty>=0.0.55",
     "sentence-transformers>=2.2.0",
 ]
 
@@ -96,7 +96,7 @@ dev = [
     # Test stack
     "pytest>=7.4.0,<10.0.0",
     "pytest-asyncio>=0.21.0,<2.0.0",
-    "pytest-cov>=4.1.0,<5.0.0",
+    "pytest-cov>=4.1.0,<8.0.0",
     "hypothesis>=6.100,<7.0.0",
     "syrupy>=4.0.0",
     "pytest-benchmark>=5.0.0,<6.0.0",
@@ -106,7 +106,7 @@ dev = [
 
     # Dev helpers
     "factory-boy>=3.3.0,<4.0.0",
-    "faker>=19.0.0,<20.0.0",
+    "faker>=19.0.0,<41.0.0",
     "pre-commit>=3.4.0",
     "pre-commit-hooks>=4.6.0",  # Hygiene hooks run via python -m (avoids AppLocker-blocked .exe wrappers)
     "ipython>=8.18.1",
@@ -143,24 +143,26 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Conservative swap from flake8: same blocking surface (critical errors) plus
-# import sorting (I). E501/line-length stays non-blocking — it was never in the
-# flake8 blocking select. Expand rule classes (E, W, B, UP, ...) later if desired.
-select = ["E9", "F63", "F7", "F82", "I"]
-# E203 (whitespace before punctuation) is owned by the formatter. W503 has no Ruff
-# equivalent (ruff-format handles line breaks around binary operators).
-ignore = ["E203"]
+# UP (pyupgrade), B (bugbear), C4 (comprehensions), SIM (simplify), PERF
+# (perflint) added on top of the original flake8-parity set (E9/F63/F7/F82)
+# plus import sorting (I), now that the codebase targets py312 only.
+select = ["E9", "F63", "F7", "F82", "I", "UP", "B", "C4", "SIM", "PERF"]
+# E203: owned by the formatter. UP042/046/047: StrEnum/PEP 695 need
+# case-by-case review, not blanket enforcement. B008: FastAPI's Depends()
+# default-argument idiom, not a bug.
+ignore = ["E203", "UP042", "UP046", "UP047", "B008"]
 
 [tool.ruff.lint.per-file-ignores]
-# E402 (module import not at top of file) is intentional in these files: routers
-# append sys.path or set env vars before importing their dependencies;
-# analyzer.py wraps optional sklearn/scipy/etc imports in try/except blocks.
+# E402: these modules append sys.path/set env vars before importing, or wrap
+# optional imports in try/except.
 "backend/ml_pipeline/deployment/api.py" = ["E402"]
 "backend/ml_pipeline/execution/graph_utils.py" = ["E402"]
 "backend/ml_pipeline/execution/schemas.py" = ["E402"]
 "backend/ml_pipeline/model_registry/api.py" = ["E402"]
 "backend/monitoring/router.py" = ["E402"]
 "skyulf-core/skyulf/profiling/analyzer.py" = ["E402"]
+# Notebook zip() pairs two same-length lists; out of scope for tooling.
+"skyulf-core/examples/05_leakage_proof_titanic.ipynb" = ["B905"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["skyulf", "backend"]

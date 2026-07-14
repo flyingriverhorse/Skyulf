@@ -13,7 +13,7 @@ Public surface:
     - `AdvisorEngine().analyze(profile) -> List[Recommendation]`
 """
 
-from typing import Any, Dict, List, Optional, Union, cast
+from typing import Any, cast
 
 import pandas as pd
 from pydantic import BaseModel
@@ -21,19 +21,19 @@ from pydantic import BaseModel
 
 class Recommendation(BaseModel):
     type: str  # "imputation", "cleaning", "encoding", "outlier", "transformation"
-    rule_id: Optional[str] = None
-    target_columns: List[str]
-    action: Optional[str] = None
-    message: Optional[str] = None
-    severity: Optional[str] = "info"
-    suggestion: Optional[str] = None
+    rule_id: str | None = None
+    target_columns: list[str]
+    action: str | None = None
+    message: str | None = None
+    severity: str | None = "info"
+    suggestion: str | None = None
 
 
 class AnalysisProfile(BaseModel):
     row_count: int
     column_count: int
     duplicate_row_count: int
-    columns: Dict[str, Any]
+    columns: dict[str, Any]
 
 
 class DataProfiler:
@@ -49,21 +49,11 @@ class DataProfiler:
                 "missing_count": int(df[col].isnull().sum()),
                 "missing_ratio": float(df[col].isnull().mean()),
                 "unique_count": int(df[col].nunique()),
-                "min_value": (
-                    float(cast(Union[float, int], df[col].min())) if is_numeric else None
-                ),
-                "max_value": (
-                    float(cast(Union[float, int], df[col].max())) if is_numeric else None
-                ),
-                "mean_value": (
-                    float(cast(Union[float, int], df[col].mean())) if is_numeric else None
-                ),
-                "std_value": (
-                    float(cast(Union[float, int], df[col].std())) if is_numeric else None
-                ),
-                "skewness": (
-                    float(cast(Union[float, int], df[col].skew())) if is_numeric else None
-                ),
+                "min_value": (float(cast(float | int, df[col].min())) if is_numeric else None),
+                "max_value": (float(cast(float | int, df[col].max())) if is_numeric else None),
+                "mean_value": (float(cast(float | int, df[col].mean())) if is_numeric else None),
+                "std_value": (float(cast(float | int, df[col].std())) if is_numeric else None),
+                "skewness": (float(cast(float | int, df[col].skew())) if is_numeric else None),
             }
         return AnalysisProfile(
             row_count=len(df),
@@ -74,8 +64,8 @@ class DataProfiler:
 
 
 class AdvisorEngine:
-    def analyze(self, profile: AnalysisProfile) -> List[Recommendation]:
-        recs: List[Recommendation] = []
+    def analyze(self, profile: AnalysisProfile) -> list[Recommendation]:
+        recs: list[Recommendation] = []
 
         # 1. Imputation
         missing_cols = [col for col, stats in profile.columns.items() if stats["missing_count"] > 0]

@@ -1,6 +1,6 @@
 """Missing-indicator node (binary flags for missing values)."""
 
-from typing import Any, Dict, Optional, Tuple, cast
+from typing import Any, cast
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -10,7 +10,7 @@ from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 
 
-def _missing_indicator_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _missing_indicator_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
     cols = params.get("columns", [])
@@ -22,7 +22,7 @@ def _missing_indicator_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> T
     return (X.with_columns(exprs) if exprs else X), y
 
 
-def _missing_indicator_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _missing_indicator_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     cols = params.get("columns", [])
     if not cols:
         return X, y
@@ -35,7 +35,7 @@ def _missing_indicator_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> T
 
 class MissingIndicatorApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             X, params, _missing_indicator_apply_polars, _missing_indicator_apply_pandas
         )
@@ -51,7 +51,7 @@ def _missing_cols_pandas(X: Any) -> list:
 
 
 def _missing_indicator_fit_polars(
-    X: Any, _y: Any, config: Dict[str, Any]
+    X: Any, _y: Any, config: dict[str, Any]
 ) -> MissingIndicatorArtifact:
     explicit = config.get("columns")
     cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_polars(X)
@@ -59,7 +59,7 @@ def _missing_indicator_fit_polars(
 
 
 def _missing_indicator_fit_pandas(
-    X: Any, _y: Any, config: Dict[str, Any]
+    X: Any, _y: Any, config: dict[str, Any]
 ) -> MissingIndicatorArtifact:
     explicit = config.get("columns")
     cols = [c for c in explicit if c in X.columns] if explicit else _missing_cols_pandas(X)
@@ -76,8 +76,8 @@ def _missing_indicator_fit_pandas(
 )
 class MissingIndicatorCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
-    ) -> Optional[SkyulfSchema]:
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
+    ) -> SkyulfSchema | None:
         # Adds one boolean column "<col>_missing" per indicator column.
         # Only predictable when the user supplied an explicit column list;
         # otherwise the set depends on which columns actually contain NaNs.
@@ -89,7 +89,7 @@ class MissingIndicatorCalculator(BaseCalculator):
             new_schema = new_schema.add(f"{col}_missing", "bool")
         return new_schema
 
-    def fit(self, df: Any, config: Dict[str, Any]) -> MissingIndicatorArtifact:
+    def fit(self, df: Any, config: dict[str, Any]) -> MissingIndicatorArtifact:
         return cast(
             MissingIndicatorArtifact,
             fit_dual_engine(

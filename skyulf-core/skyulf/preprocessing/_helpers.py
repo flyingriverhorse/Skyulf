@@ -14,7 +14,8 @@ Boundary with ``dispatcher.py``:
       dispatcher never implements column-level logic.
 """
 
-from typing import Any, Iterable, List, Union
+from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -22,7 +23,7 @@ import pandas as pd
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
 
-def resolve_valid_columns(X: Any, requested: Iterable[str]) -> List[str]:
+def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
     """Filter ``requested`` to columns that actually exist on ``X``.
 
     Works for any frame exposing ``.columns`` (Pandas, Polars, our wrapper).
@@ -60,19 +61,21 @@ def is_polars(X: Any) -> bool:
     return get_engine(X).name == EngineName.POLARS
 
 
-def auto_detect_text_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def auto_detect_text_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return string-like columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
         import polars as pl
 
         return [
-            c for c, t in zip(df.columns, df.dtypes) if t in [pl.Utf8, pl.Categorical, pl.Object]
+            c
+            for c, t in zip(df.columns, df.dtypes, strict=True)
+            if t in [pl.Utf8, pl.Categorical, pl.Object]
         ]
     return list(df.select_dtypes(include=["object", "string", "category"]).columns)
 
 
-def auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return numeric columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
@@ -90,11 +93,11 @@ def auto_detect_numeric_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> Lis
             pl.UInt32,
             pl.UInt64,
         ]
-        return [c for c, t in zip(df.columns, df.dtypes) if t in numeric_dtypes]
+        return [c for c, t in zip(df.columns, df.dtypes, strict=True) if t in numeric_dtypes]
     return list(df.select_dtypes(include=["number"]).columns)
 
 
-def auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> List[str]:
+def auto_detect_datetime_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]:
     """Return datetime/date columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
@@ -102,7 +105,7 @@ def auto_detect_datetime_columns(df: Union[pd.DataFrame, SkyulfDataFrame]) -> Li
 
         return [
             c
-            for c, t in zip(df.columns, df.dtypes)
+            for c, t in zip(df.columns, df.dtypes, strict=True)
             if t in [pl.Date, pl.Datetime] or isinstance(t, pl.Datetime)
         ]
     return list(df.select_dtypes(include=["datetime", "datetimetz"]).columns)

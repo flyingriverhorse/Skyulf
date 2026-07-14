@@ -6,15 +6,15 @@ Used by DeploymentService and EvaluationService.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
 
 def extract_target_label_encoder(
     feature_engineer: Any,
-    target_column: Optional[str] = None,
-) -> Optional[Any]:
+    target_column: str | None = None,
+) -> Any | None:
     """Extract the target LabelEncoder from a fitted FeatureEngineer pipeline.
 
     Resolution order (walks steps backwards, most recent wins):
@@ -32,7 +32,7 @@ def extract_target_label_encoder(
     for raw_step in reversed(fitted_steps):
         if not isinstance(raw_step, dict):
             continue
-        step = cast(Dict[str, Any], raw_step)
+        step = cast(dict[str, Any], raw_step)
         if step.get("type") != "LabelEncoder":
             continue
         artifact = step.get("artifact")
@@ -57,7 +57,7 @@ def extract_target_label_encoder(
     return None
 
 
-def decode_int_like(values: List[Any], label_encoder: Any) -> List[Any]:
+def decode_int_like(values: list[Any], label_encoder: Any) -> list[Any]:
     """
     Best-effort decode for lists of encoded class indices.
     If values are not int-like (or decoding fails), returns the original list.

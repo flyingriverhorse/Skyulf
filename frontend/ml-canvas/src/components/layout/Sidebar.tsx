@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
@@ -9,10 +9,18 @@ export const Sidebar: React.FC = () => {
   const addNode = useGraphStore((state) => state.addNode);
   const { isSidebarOpen, setSidebarOpen } = useViewStore();
   const [searchTerm, setSearchTerm] = useState('');
+  // Cascades click-to-add nodes so repeated clicks don't stack them on top of each other.
+  const placementCounterRef = useRef(0);
 
   const handleDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleAddNodeClick = (nodeType: string) => {
+    const step = placementCounterRef.current % 8;
+    placementCounterRef.current += 1;
+    addNode(nodeType, { x: 100 + step * 30, y: 100 + step * 30 });
   };
 
   if (!isSidebarOpen) {
@@ -67,6 +75,12 @@ export const Sidebar: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin">
+        {filteredNodes.length === 0 && (
+          <div className="text-center py-8 px-2">
+            <p className="text-sm font-medium text-muted-foreground">No components found</p>
+            <p className="text-xs text-muted-foreground mt-1">Try a different search term.</p>
+          </div>
+        )}
         {categories.map((category) => {
           const categoryNodes = filteredNodes.filter(n => n.category === category);
           if (categoryNodes.length === 0) return null;
@@ -85,7 +99,7 @@ export const Sidebar: React.FC = () => {
                     className="group flex items-center p-3 border rounded-lg bg-card hover:border-primary/50 hover:shadow-sm cursor-grab active:cursor-grabbing transition-all"
                     draggable
                     onDragStart={(e) => { handleDragStart(e, node.type); }}
-                    onClick={() => addNode(node.type, { x: 100, y: 100 })}
+                    onClick={() => { handleAddNodeClick(node.type); }}
                   >
                     <div className="p-2 bg-primary/5 group-hover:bg-primary/10 rounded-md mr-3 transition-colors">
                       {node.icon && <node.icon className="w-4 h-4 text-primary" />}

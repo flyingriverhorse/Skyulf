@@ -1,23 +1,19 @@
 from dataclasses import dataclass
-from typing import Any, Optional, Tuple, Union
+from typing import Any
 
 import pandas as pd
 
 from skyulf.engines import SkyulfDataFrame
 
 # Payload for a split slot: engine-neutral frame, pandas frame, or (X, y) tuple.
-SplitPayload = Union[
-    SkyulfDataFrame,
-    pd.DataFrame,
-    Tuple[Union[SkyulfDataFrame, pd.DataFrame], Any],
-]
+SplitPayload = SkyulfDataFrame | pd.DataFrame | tuple[SkyulfDataFrame | pd.DataFrame, Any]
 
 
 @dataclass
 class SplitDataset:
     train: SplitPayload
     test: SplitPayload
-    validation: Optional[SplitPayload] = None
+    validation: SplitPayload | None = None
 
     def copy(self) -> "SplitDataset":
         def copy_data(data):

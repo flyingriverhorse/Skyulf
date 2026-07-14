@@ -7,7 +7,7 @@ This module keeps only the orchestrator: ``EDAAnalyzer.__init__`` and
 ``EDAAnalyzer.analyze``.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import polars as pl
 
@@ -66,13 +66,13 @@ class EDAAnalyzer(
 
     def analyze(  # noqa: C901  # top-level orchestrator: each stage delegates to a mixin
         self,
-        target_col: Optional[str] = None,
-        exclude_cols: Optional[List[str]] = None,
-        filters: Optional[List[Dict[str, Any]]] = None,
-        date_col: Optional[str] = None,
-        lat_col: Optional[str] = None,
-        lon_col: Optional[str] = None,
-        task_type: Optional[str] = None,
+        target_col: str | None = None,
+        exclude_cols: list[str] | None = None,
+        filters: list[dict[str, Any]] | None = None,
+        date_col: str | None = None,
+        lat_col: str | None = None,
+        lon_col: str | None = None,
+        task_type: str | None = None,
     ) -> DatasetProfile:
         """Produce the full profile.
 
@@ -86,7 +86,7 @@ class EDAAnalyzer(
         """
 
         # 1. Apply user filters (mutates self.df / self.lazy_df / self.row_count).
-        active_filters: List[Filter] = []
+        active_filters: list[Filter] = []
         if filters:
             for f in filters:
                 col = f.get("column")
@@ -136,7 +136,7 @@ class EDAAnalyzer(
                 target_col=target_col,
             )
 
-        excluded_columns: List[str] = []
+        excluded_columns: list[str] = []
         if exclude_cols:
             excluded_columns = [c for c in exclude_cols if c in self.columns]
             self.columns = [c for c in self.columns if c not in excluded_columns]
@@ -149,8 +149,8 @@ class EDAAnalyzer(
         memory_usage = self.df.estimated_size("mb")
 
         col_profiles = {}
-        alerts: List[Alert] = []
-        numeric_cols: List[str] = []
+        alerts: list[Alert] = []
+        numeric_cols: list[str] = []
 
         # -- A3: BATCHED PER-COLUMN AGGREGATIONS --
         # Two single-pass polars queries replace ~N python-level "select(col)"
@@ -169,7 +169,7 @@ class EDAAnalyzer(
         basic_stats = basic_stats_df.row(0, named=True) if len(basic_stats_df) > 0 else {}
 
         # Inline semantic-type inference (avoids re-fetching n_unique per column).
-        semantic_types: Dict[str, str] = {}
+        semantic_types: dict[str, str] = {}
         for col in self.columns:
             dtype = self.df[col].dtype
             n_unique = basic_stats.get(f"{col}__unique", 0)
@@ -282,13 +282,11 @@ class EDAAnalyzer(
                 pl.UInt32,
                 pl.UInt64,
             ]
-            if profile.dtype == "Numeric":
-                numeric_cols.append(col)
-            elif profile.dtype == "Categorical" and is_numeric_type:
+            if profile.dtype == "Numeric" or profile.dtype == "Categorical" and is_numeric_type:
                 numeric_cols.append(col)
 
         # Encode string targets so they appear in causal graphs.
-        encoded_target_col: Optional[str] = None
+        encoded_target_col: str | None = None
         if target_col and target_col in self.columns and target_col not in numeric_cols:
             encoded_target = f"{target_col}_encoded"
             self.df = self.df.with_columns(
@@ -328,7 +326,7 @@ class EDAAnalyzer(
 
         # 3a. Feature-vs-target correlations (separate matrix).
         correlations_with_target = None
-        target_corr_cols: List[str] = []
+        target_corr_cols: list[str] = []
         if target_col:
             if target_col in numeric_cols:
                 target_corr_cols = feature_cols + [target_col]
@@ -338,7 +336,7 @@ class EDAAnalyzer(
             correlations_with_target = calculate_correlations(self.lazy_df, target_corr_cols)
 
         # 3b. Target-relationship analytics (correlations / interactions / leakage).
-        target_correlations: Dict[str, float] = {}
+        target_correlations: dict[str, float] = {}
         target_interactions = None
         if target_col and target_col in self.columns:
             target_semantic_type = self._get_semantic_type(  # pylint: disable=assignment-from-no-return

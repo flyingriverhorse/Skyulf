@@ -15,18 +15,17 @@ Usage:
 
 import functools
 import warnings
-from typing import Any, Callable, Optional, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 __all__ = ["deprecated", "warn_deprecated"]
-
-_F = TypeVar("_F", bound=Callable[..., Any])
 
 
 def _build_message(
     name: str,
-    since: Optional[str],
-    removed_in: Optional[str],
-    replacement: Optional[str],
+    since: str | None,
+    removed_in: str | None,
+    replacement: str | None,
 ) -> str:
     parts = [f"'{name}' is deprecated"]
     if since:
@@ -42,9 +41,9 @@ def _build_message(
 def warn_deprecated(
     name: str,
     *,
-    since: Optional[str] = None,
-    removed_in: Optional[str] = None,
-    replacement: Optional[str] = None,
+    since: str | None = None,
+    removed_in: str | None = None,
+    replacement: str | None = None,
     stacklevel: int = 2,
 ) -> None:
     """Emit a standardised ``DeprecationWarning`` for ``name``.
@@ -59,12 +58,12 @@ def warn_deprecated(
     )
 
 
-def deprecated(
+def deprecated[F: Callable[..., Any]](
     *,
-    since: Optional[str] = None,
-    removed_in: Optional[str] = None,
-    replacement: Optional[str] = None,
-) -> Callable[[_F], _F]:
+    since: str | None = None,
+    removed_in: str | None = None,
+    replacement: str | None = None,
+) -> Callable[[F], F]:
     """Decorator that marks a callable as deprecated.
 
     Wraps the callable so that calling it emits a :class:`DeprecationWarning`
@@ -72,7 +71,7 @@ def deprecated(
     behaviour and return value are preserved.
     """
 
-    def decorator(func: _F) -> _F:
+    def decorator(func: F) -> F:
         message = _build_message(
             getattr(func, "__qualname__", getattr(func, "__name__", "callable")),
             since,
@@ -85,6 +84,6 @@ def deprecated(
             warnings.warn(message, category=DeprecationWarning, stacklevel=2)
             return func(*args, **kwargs)
 
-        return cast(_F, wrapper)
+        return cast(F, wrapper)
 
     return decorator

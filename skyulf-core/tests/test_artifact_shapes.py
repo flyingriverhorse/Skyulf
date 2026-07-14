@@ -16,7 +16,8 @@ the only thing that catches a calculator silently emitting an unknown
 key (which Appliers would then ignore at runtime).
 """
 
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -149,7 +150,7 @@ def _bool_alias_df() -> pd.DataFrame:
 
 
 CASES: list[
-    Tuple[Type[BaseCalculator], Type[Any], Optional[str], Callable[[], Any], Dict[str, Any]]
+    tuple[type[BaseCalculator], type[Any], str | None, Callable[[], Any], dict[str, Any]]
 ] = [
     # Scalers --------------------------------------------------------------
     (
@@ -437,7 +438,7 @@ CASES: list[
 
 
 def _ids(
-    case: Tuple[Type[BaseCalculator], Type[Any], Optional[str], Callable[[], Any], Dict[str, Any]],
+    case: tuple[type[BaseCalculator], type[Any], str | None, Callable[[], Any], dict[str, Any]],
 ) -> str:
     return case[0].__name__
 
@@ -446,11 +447,11 @@ def _ids(
     "calc_cls,artifact_cls,expected_type,make_data,config", CASES, ids=[_ids(c) for c in CASES]
 )
 def test_artifact_shape(
-    calc_cls: Type[BaseCalculator],
-    artifact_cls: Type[Any],
-    expected_type: Optional[str],
+    calc_cls: type[BaseCalculator],
+    artifact_cls: type[Any],
+    expected_type: str | None,
     make_data: Callable[[], Any],
-    config: Dict[str, Any],
+    config: dict[str, Any],
 ) -> None:
     """Drive ``calc.fit(df, config)`` and validate the returned artifact."""
     df = make_data()

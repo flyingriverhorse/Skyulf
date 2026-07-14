@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -8,7 +8,7 @@ class NodeMetadata:
     name: str
     category: str
     description: str
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
     tags: list[str] = field(default_factory=list)
 
 
@@ -17,8 +17,8 @@ def node_meta(
     name: str,
     category: str,
     description: str,
-    params: Optional[Dict[str, Any]] = None,
-    tags: Optional[list[str]] = None,
+    params: dict[str, Any] | None = None,
+    tags: list[str] | None = None,
 ):
     def decorator(cls):
         cls.__node_meta__ = NodeMetadata(

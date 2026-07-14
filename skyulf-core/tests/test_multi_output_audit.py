@@ -17,7 +17,6 @@ import pandas as pd
 import pytest
 
 from skyulf.modeling.classification import (
-    LogisticRegressionApplier,
     LogisticRegressionCalculator,
     RandomForestClassifierApplier,
     RandomForestClassifierCalculator,

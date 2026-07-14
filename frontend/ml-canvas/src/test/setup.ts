@@ -32,3 +32,46 @@ if (!('ResizeObserver' in window)) {
     disconnect() {}
   };
 }
+
+// jsdom 24 + newer Node (which ships its own experimental global
+// `localStorage` gated behind `--localstorage-file`) leaves
+// `window.localStorage` undefined in this environment instead of a working
+// Storage implementation. Several utils (`recentPipelines`,
+// `canvasPersistence`) rely on `getItem`/`setItem`/`removeItem`/`clear`, so
+// provide a minimal in-memory polyfill — plenty for tests, which never
+// need persistence across process restarts.
+if (!window.localStorage) {
+  class MemoryStorage implements Storage {
+    private store = new Map<string, string>();
+
+    get length(): number {
+      return this.store.size;
+    }
+
+    clear(): void {
+      this.store.clear();
+    }
+
+    getItem(key: string): string | null {
+      return this.store.has(key) ? this.store.get(key)! : null;
+    }
+
+    key(index: number): string | null {
+      return Array.from(this.store.keys())[index] ?? null;
+    }
+
+    removeItem(key: string): void {
+      this.store.delete(key);
+    }
+
+    setItem(key: string, value: string): void {
+      this.store.set(key, String(value));
+    }
+  }
+
+  Object.defineProperty(window, 'localStorage', {
+    value: new MemoryStorage(),
+    writable: true,
+    configurable: true,
+  });
+}

@@ -7,7 +7,7 @@ apply time, single-unique-value (constant) columns, drop_original /
 output_suffix options, and the polars apply path.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -199,7 +199,7 @@ def test_apply_range_label_format_produces_interval_strings() -> None:
 def test_apply_custom_labels_assigns_named_bins() -> None:
     """Custom bin edges with matching custom_labels must assign the given names."""
     df = _series_0_to_9()
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [0, 5, 9]},
         "custom_labels": {"x": ["low", "high"]},
         "output_suffix": "_binned",
@@ -255,7 +255,7 @@ class TestApplyOutOfRangeMissingStrategy:
         self, missing_strategy: str, missing_label: str, expected: list[Any]
     ) -> None:
         df = pd.DataFrame({"x": [-5.0, 2.0, 7.0, 15.0]})
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "bin_edges": {"x": [0.0, 5.0, 10.0]},
             "output_suffix": "_binned",
             "drop_original": False,
@@ -293,7 +293,7 @@ def test_apply_empty_bin_edges_is_noop() -> None:
 def test_apply_empty_dataframe() -> None:
     """Applying to an empty DataFrame must not raise."""
     df = pd.DataFrame({"x": pd.Series([], dtype=float)})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [0.0, 5.0, 10.0]},
         "output_suffix": "_binned",
         "drop_original": False,
@@ -311,7 +311,7 @@ def test_apply_empty_dataframe() -> None:
 def test_apply_column_missing_from_frame_is_skipped() -> None:
     """A bin_edges entry for a column absent from the frame must be silently skipped."""
     df = pd.DataFrame({"y": [1, 2, 3]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [0.0, 5.0, 10.0]},
         "output_suffix": "_binned",
         "drop_original": False,
@@ -398,7 +398,7 @@ def test_fit_then_apply_round_trip_kbins_discretizer() -> None:
 def test_apply_polars_degenerate_edges_produce_no_expr() -> None:
     """A column whose sorted-unique edges collapse to <2 must be skipped (no cut expr)."""
     df_pl = pl.DataFrame({"x": [1, 2, 3]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [5.0, 5.0]},
         "output_suffix": "_binned",
         "drop_original": False,
@@ -415,7 +415,7 @@ def test_apply_polars_degenerate_edges_produce_no_expr() -> None:
 def test_apply_polars_missing_column_is_skipped() -> None:
     """A bin_edges entry for a column absent from the polars frame must be skipped."""
     df_pl = pl.DataFrame({"y": [1, 2, 3]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [0.0, 5.0, 10.0]},
         "output_suffix": "_binned",
         "drop_original": False,
@@ -441,6 +441,21 @@ def test_apply_polars_range_label_format_keeps_categorical_alias() -> None:
     assert not pd.api.types.is_integer_dtype(result["x_binned"])
 
 
+def test_apply_range_label_format_matches_between_pandas_and_polars() -> None:
+    """The exact range-format label TEXT must be identical across engines
+    for the same fitted bin_edges artifact."""
+    df_pd = pd.DataFrame({"x": list(range(10))})
+    config = {"columns": ["x"], "strategy": "equal_width", "n_bins": 5, "label_format": "range"}
+    params = GeneralBinningCalculator().fit(df_pd, config)
+
+    result_pd = GeneralBinningApplier().apply(df_pd, params)
+    result_pl = GeneralBinningApplier().apply(pl.DataFrame({"x": list(range(10))}), params)
+    if hasattr(result_pl, "to_pandas"):
+        result_pl = result_pl.to_pandas()
+
+    assert result_pd["x_binned"].astype(str).tolist() == result_pl["x_binned"].astype(str).tolist()
+
+
 # ---------------------------------------------------------------------------
 # Pandas — missing-label formatting on categorical (range) output
 # ---------------------------------------------------------------------------
@@ -449,7 +464,7 @@ def test_apply_polars_range_label_format_keeps_categorical_alias() -> None:
 def test_apply_range_format_with_missing_label_tags_out_of_range_category() -> None:
     """range format + missing_strategy='label' must format the added string category as-is."""
     df = pd.DataFrame({"x": [-5.0, 2.0, 7.0]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [0.0, 5.0, 10.0]},
         "output_suffix": "_binned",
         "drop_original": False,
@@ -472,7 +487,7 @@ def test_apply_range_format_with_missing_label_tags_out_of_range_category() -> N
 def test_apply_pandas_degenerate_edges_column_is_skipped() -> None:
     """A column with <2 unique edges must raise internally and be skipped, not crash apply."""
     df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "bin_edges": {"x": [5.0, 5.0]},
         "output_suffix": "_binned",
         "drop_original": False,
@@ -580,8 +595,8 @@ def test_fit_general_binning_all_nan_column_is_skipped() -> None:
 def test_fit_one_column_into_maps_swallows_sklearn_errors() -> None:
     """An invalid n_bins that makes sklearn raise must be caught, leaving the maps untouched."""
     df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
-    bin_edges_map: Dict[str, Any] = {}
-    custom_labels_map: Dict[str, Any] = {}
+    bin_edges_map: dict[str, Any] = {}
+    custom_labels_map: dict[str, Any] = {}
     _fit_one_column_into_maps(
         df,
         "x",

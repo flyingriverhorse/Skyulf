@@ -32,6 +32,10 @@ export const DataDriftPage: React.FC = () => {
     const [thresholds, setThresholds] = useState<DriftThresholds>(DEFAULT_THRESHOLDS);
     const [showThresholds, setShowThresholds] = useState(false);
     const [showOnlyDrifted, setShowOnlyDrifted] = useState(false);
+    // Tracks whether the user has tried to run analysis with missing
+    // fields, so JobSelector/FileUploader can highlight which one(s) are
+    // the actual blocker instead of a single generic banner.
+    const [submitAttempted, setSubmitAttempted] = useState(false);
 
     // Data sources
     const { jobs, refreshing, refresh, updateJobDescription } = useDriftJobs();
@@ -46,9 +50,11 @@ export const DataDriftPage: React.FC = () => {
 
     const handleCalculate = async () => {
         if (!selectedJob || !file) {
+            setSubmitAttempted(true);
             setError('Please select a Reference Job and upload Current Data.');
             return;
         }
+        setSubmitAttempted(false);
         const result = await calculate({ selectedJob, file, job: selectedJobData, thresholds });
         if (result) refreshHistory();
     };
@@ -66,8 +72,8 @@ export const DataDriftPage: React.FC = () => {
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow mb-6 border dark:border-slate-700">
                 {/* Toolbar */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4">
-                    <JobSelector jobs={jobs} selectedJob={selectedJob} onSelect={setSelectedJob} />
-                    <FileUploader file={file} onFileChange={setFile} />
+                    <JobSelector jobs={jobs} selectedJob={selectedJob} onSelect={setSelectedJob} invalid={submitAttempted && !selectedJob} />
+                    <FileUploader file={file} onFileChange={setFile} invalid={submitAttempted && !file} />
                     <button
                         onClick={() => void handleCalculate()}
                         disabled={loading || !selectedJob || !file}

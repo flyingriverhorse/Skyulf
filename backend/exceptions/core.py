@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class SkyulfException(Exception):
@@ -7,7 +7,7 @@ class SkyulfException(Exception):
     status_code: int = 500
     error_code: str = "INTERNAL_SERVER_ERROR"
 
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
         self.message = message
         self.details = details or {}
         super().__init__(self.message)

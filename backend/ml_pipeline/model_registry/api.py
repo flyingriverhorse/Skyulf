@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +23,7 @@ async def get_registry_stats(session: AsyncSession = Depends(get_async_session))
     return await ModelRegistryService.get_registry_stats(session)
 
 
-@router.get("/models", response_model=List[ModelRegistryEntry])
+@router.get("/models", response_model=list[ModelRegistryEntry])
 async def list_models(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=10, ge=1, le=100),
@@ -36,7 +35,7 @@ async def list_models(
     return await ModelRegistryService.list_models(session, skip=skip, limit=limit)
 
 
-@router.get("/models/{model_type}/versions", response_model=List[ModelVersion])
+@router.get("/models/{model_type}/versions", response_model=list[ModelVersion])
 async def get_model_versions(model_type: str, session: AsyncSession = Depends(get_async_session)):
     """
     Get all versions for a specific model type.
@@ -53,7 +52,7 @@ async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_as
         return await ModelRegistryService.get_job_artifacts(session, job_id)
     except ValueError as e:
         logger.warning("Artifact lookup failed for job %s: %s", job_id, e)
-        raise HTTPException(status_code=404, detail="Job artifacts not found")
+        raise HTTPException(status_code=404, detail="Job artifacts not found") from e
     except Exception:
         logger.exception("Failed to list artifacts for job %s", job_id)
-        raise SkyulfException(message="Failed to retrieve job artifacts")
+        raise SkyulfException(message="Failed to retrieve job artifacts") from None

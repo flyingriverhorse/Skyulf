@@ -4,7 +4,7 @@ Covers fit_transform roundtrips, transform-after-fit, edge cases, and metrics
 collection.  Every pipeline step uses real DataFrames — no mocking of pandas.
 """
 
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -12,7 +12,6 @@ import pytest
 from tests.utils.test_case_loader import TestCaseLoader
 
 # Trigger node registration by importing the package.
-import skyulf.preprocessing  # noqa: F401
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
@@ -73,12 +72,12 @@ def categorical_df() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def _steps(*args: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _steps(*args: dict[str, Any]) -> list[dict[str, Any]]:
     """Wrap step dicts into a steps_config list."""
     return list(args)
 
 
-def _step(name: str, transformer: str, **params: Any) -> Dict[str, Any]:
+def _step(name: str, transformer: str, **params: Any) -> dict[str, Any]:
     return {"name": name, "transformer": transformer, "params": params}
 
 
@@ -300,7 +299,6 @@ def test_node_id_prefix_used_in_step_ids(numeric_df: pd.DataFrame) -> None:
 
 def test_extract_y_for_resampling_tuple_path() -> None:
     """_extract_y_for_resampling must return y from (X, y) tuple."""
-    from skyulf.data.dataset import SplitDataset
 
     X = pd.DataFrame({"f": [1, 2]})
     y = pd.Series([0, 1], name="label")
@@ -349,6 +347,112 @@ def test_pipeline_with_split_dataset_applies_to_train_and_test() -> None:
     assert abs(result.train["a"].mean()) < 1e-9
 
 
+def _make_imbalanced_df(n_major: int, n_minor: int) -> pd.DataFrame:
+    """Build a simple 2-feature frame with an imbalanced binary 'target' column."""
+    n = n_major + n_minor
+    return pd.DataFrame(
+        {
+            "f1": [float(i) for i in range(n)],
+            "f2": [float(i) * 2 for i in range(n)],
+            "target": [0] * n_major + [1] * n_minor,
+        }
+    )
+
+
+def test_fit_transform_does_not_oversample_test_or_validation() -> None:
+    """Oversampling must only ever run on train -- test/validation must pass
+    through fit_transform byte-for-byte unchanged, not be synthetically
+    resampled."""
+    train = _make_imbalanced_df(40, 8)
+    test = _make_imbalanced_df(10, 3)
+    validation = _make_imbalanced_df(10, 2)
+    ds = SplitDataset(train=train, test=test.copy(), validation=validation.copy())
+
+    steps = _steps(
+        _step(
+            "over",
+            "Oversampling",
+            method="smote",
+            target_column="target",
+            k_neighbors=1,
+        )
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    result, _ = fe.fit_transform(ds)
+
+    # Train IS resampled: balanced and grew in row count.
+    assert result.train.shape[0] > train.shape[0]
+    train_counts = result.train["target"].value_counts()
+    assert train_counts[0] == train_counts[1]
+
+    # Test/validation must be completely untouched -- no synthetic rows added.
+    pd.testing.assert_frame_equal(result.test.reset_index(drop=True), test.reset_index(drop=True))
+    pd.testing.assert_frame_equal(
+        result.validation.reset_index(drop=True), validation.reset_index(drop=True)
+    )
+
+
+def test_fit_transform_does_not_undersample_test_or_validation() -> None:
+    """Undersampling must only ever run on train -- test/validation must pass
+    through fit_transform byte-for-byte unchanged, not have rows dropped."""
+    train = _make_imbalanced_df(40, 8)
+    test = _make_imbalanced_df(10, 3)
+    validation = _make_imbalanced_df(10, 2)
+    ds = SplitDataset(train=train, test=test.copy(), validation=validation.copy())
+
+    steps = _steps(
+        _step(
+            "under",
+            "Undersampling",
+            method="random_under_sampling",
+            target_column="target",
+            random_state=42,
+        )
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    result, _ = fe.fit_transform(ds)
+
+    # Train IS resampled: balanced and shrank in row count (majority undersampled).
+    assert result.train.shape[0] < train.shape[0]
+    train_counts = result.train["target"].value_counts()
+    assert train_counts[0] == train_counts[1]
+
+    # Test/validation must be completely untouched -- no rows dropped.
+    pd.testing.assert_frame_equal(result.test.reset_index(drop=True), test.reset_index(drop=True))
+    pd.testing.assert_frame_equal(
+        result.validation.reset_index(drop=True), validation.reset_index(drop=True)
+    )
+
+
+def test_fit_transform_resampling_then_scaler_still_scales_all_splits() -> None:
+    """A step AFTER resampling (e.g. a scaler) must still apply to every split
+    normally -- the test/validation skip is resampling-specific, not global."""
+    train = _make_imbalanced_df(40, 8)
+    test = _make_imbalanced_df(10, 3)
+    validation = _make_imbalanced_df(10, 2)
+    ds = SplitDataset(train=train, test=test.copy(), validation=validation.copy())
+
+    steps = _steps(
+        _step(
+            "over",
+            "Oversampling",
+            method="smote",
+            target_column="target",
+            k_neighbors=1,
+        ),
+        _step("scale", "StandardScaler", columns=["f1", "f2"]),
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    result, _ = fe.fit_transform(ds)
+
+    # The scaler step still ran on test/validation (their row counts are
+    # unchanged from resampling, but their values are now standardized).
+    assert not np.allclose(result.test["f1"].to_numpy(), test["f1"].to_numpy())
+    assert not np.allclose(result.validation["f1"].to_numpy(), validation["f1"].to_numpy())
+    assert result.test.shape[0] == test.shape[0]
+    assert result.validation.shape[0] == validation.shape[0]
+
+
 # ---------------------------------------------------------------------------
 # TrainTestSplitter skip-on-already-split path (_run_step lines 154-155)
 # ---------------------------------------------------------------------------
@@ -393,7 +497,7 @@ def test_collect_step_metrics_swallows_exception_from_fitted_params(
         raise RuntimeError("boom")
 
     monkeypatch.setattr(fe, "_metrics_from_fitted_params", _boom)
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     # Should not raise despite _metrics_from_fitted_params blowing up.
     fe._collect_step_metrics(
         transformer_type="StandardScaler",
@@ -421,7 +525,7 @@ def test_collect_step_metrics_dispatches_resampling_metrics() -> None:
     """Oversampling/Undersampling step types must trigger resampling metrics."""
     fe = FeatureEngineer(steps_config=[])
     df = pd.DataFrame({"f": [1, 2, 3, 4], "label": [0, 0, 1, 1]})
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._collect_step_metrics(
         transformer_type="Oversampling",
         fitted_params={},
@@ -447,17 +551,17 @@ def test_collect_step_metrics_dispatches_resampling_metrics() -> None:
 @pytest.mark.parametrize(*_metrics_from_fitted_params_cases)
 def test_metrics_from_fitted_params_copies_keys(
     transformer_type: str,
-    fitted_params: Dict[str, Any],
-    df_before: Dict[str, Any],
-    df_after: Dict[str, Any],
-    expected_metrics: Dict[str, Any],
+    fitted_params: dict[str, Any],
+    df_before: dict[str, Any],
+    df_after: dict[str, Any],
+    expected_metrics: dict[str, Any],
 ) -> None:
     """_metrics_from_fitted_params must copy the transformer-family-specific keys
     it recognizes (or derive them, e.g. ``generated_features``) into the metrics
     dict, across every transformer family it handles.
     """
     fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_from_fitted_params(
         transformer_type, fitted_params, pd.DataFrame(df_before), pd.DataFrame(df_after), metrics
     )
@@ -528,7 +632,7 @@ def test_metrics_resampling_success_populates_class_counts() -> None:
     fe = FeatureEngineer(steps_config=[])
     X = pd.DataFrame({"f": [1, 2, 3]})
     y = pd.Series([0, 1, 1])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling((X, y), {}, metrics)
     assert metrics["total_samples"] == 3
     assert metrics["class_counts"] == {"0": 1, "1": 2}
@@ -537,7 +641,7 @@ def test_metrics_resampling_success_populates_class_counts() -> None:
 def test_metrics_resampling_returns_early_when_y_is_none() -> None:
     """When y cannot be extracted, no metrics should be added and no error raised."""
     fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling(pd.DataFrame({"f": [1, 2]}), {}, metrics)
     assert metrics == {}
 
@@ -553,7 +657,7 @@ def test_metrics_resampling_converts_polars_like_y_via_to_pandas() -> None:
 
     fe = FeatureEngineer(steps_config=[])
     X = pd.DataFrame({"f": [1, 2, 3]})
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling((X, _FakePolarsSeries()), {}, metrics)
     assert metrics["total_samples"] == 3
     assert metrics["class_counts"] == {"0": 2, "1": 1}
@@ -563,7 +667,7 @@ def test_metrics_resampling_handles_extraction_failure_gracefully() -> None:
     """If y extraction / value_counts blows up, the method must not raise."""
     fe = FeatureEngineer(steps_config=[])
     # y_res will be `5` (an int) -> .value_counts() raises AttributeError internally.
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_resampling((pd.DataFrame({"f": [1]}), 5), {}, metrics)
     assert "class_counts" not in metrics
 
@@ -575,10 +679,10 @@ def test_metrics_resampling_handles_extraction_failure_gracefully() -> None:
 
 @pytest.mark.parametrize(*_count_winsorize_diffs_tuple_cases)
 def test_count_winsorize_diffs_tuple_path(
-    before_x: Dict[str, Any],
-    before_y: List[Any],
-    after_x: Dict[str, Any],
-    after_y: List[Any],
+    before_x: dict[str, Any],
+    before_y: list[Any],
+    after_x: dict[str, Any],
+    after_y: list[Any],
     expected: int,
 ) -> None:
     """Tuple (X, y) diffs must sum differing cells across both X and y."""
@@ -598,7 +702,7 @@ def test_metrics_winsorize_clipped_dataframe_path() -> None:
     fe = FeatureEngineer(steps_config=[])
     before = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
     after = pd.DataFrame({"a": [1.0, 2.0, 99.0]})
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_winsorize_clipped(before, after, metrics)
     assert metrics["values_clipped"] == 1
 
@@ -616,7 +720,7 @@ def test_metrics_winsorize_clipped_split_dataset_path() -> None:
         test=pd.DataFrame({"a": [5.0]}),
         validation=pd.DataFrame({"a": [70.0]}),
     )
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_winsorize_clipped(before, after, metrics)
     assert metrics["values_clipped"] == 2
 
@@ -629,7 +733,7 @@ def test_metrics_winsorize_clipped_swallows_exception(monkeypatch: pytest.Monkey
         raise RuntimeError("boom")
 
     monkeypatch.setattr(FeatureEngineer, "_count_winsorize_diffs", staticmethod(_boom))
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_winsorize_clipped(pd.DataFrame({"a": [1.0]}), pd.DataFrame({"a": [2.0]}), metrics)
     assert "values_clipped" not in metrics
 
@@ -643,21 +747,21 @@ def test_metrics_winsorize_clipped_swallows_exception(monkeypatch: pytest.Monkey
 @pytest.mark.parametrize(*_metrics_shape_change_cases)
 def test_metrics_shape_change(
     transformer_type: str,
-    df_before: Dict[str, Any],
-    df_after: Dict[str, Any],
-    params: Dict[str, Any],
+    df_before: dict[str, Any],
+    df_after: dict[str, Any],
+    params: dict[str, Any],
     rows_before: int,
-    cols_before: List[str],
+    cols_before: list[str],
     rows_after: int,
-    cols_after: List[str],
-    expected_metrics: Dict[str, Any],
+    cols_after: list[str],
+    expected_metrics: dict[str, Any],
 ) -> None:
     """_metrics_shape_change must record the transformer-family-specific
     shape-change metrics (rows dropped, new/dropped columns, encoder counts)
     across every transformer family it handles.
     """
     fe = FeatureEngineer(steps_config=[])
-    metrics: Dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     fe._metrics_shape_change(
         transformer_type,
         pd.DataFrame(df_before),

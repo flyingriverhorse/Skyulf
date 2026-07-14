@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Hash, AlignLeft, Calendar, Ban } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Clock, CheckCircle, AlertCircle, Loader2, ArrowLeft, Database, Columns, FileText, EyeOff, Play, Ban } from 'lucide-react';
 import { useCancelEdaJob } from '../../core/hooks/useEdaJobs';
 import { ModalShell, useConfirm } from '../shared';
 import { StatusBadge } from '../shared/StatusBadge';
 import { clickableProps } from '../../core/utils/a11y';
+import { getDtypeIcon, getDtypeIconColorClass } from '../../core/utils/dtypeVisuals';
 import { toast } from '../../core/toast';
 import type { EDAProfile, ColumnProfile } from '../../core/types/edaProfile';
 
@@ -38,6 +39,9 @@ interface JobsHistoryModalProps {
 export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onClose, history, datasetId, onSelect, onFetchReport, onRefresh }) => {
   const [selectedJob, setSelectedJob] = useState<EdaHistoryJob | null>(null);
   const [loading, setLoading] = useState(false);
+  // Track in-flight request id so a slow response to an older click can't
+  // overwrite the state set by a newer click (rapid clicks on multiple jobs).
+  const requestIdRef = useRef(0);
   const cancelMutation = useCancelEdaJob(datasetId);
   const cancelling = cancelMutation.isPending ? cancelMutation.variables ?? null : null;
   const confirm = useConfirm();
@@ -68,23 +72,22 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
   };
 
   const handleJobClick = async (job: EdaHistoryJob) => {
+    const myRequestId = ++requestIdRef.current;
     setLoading(true);
     try {
         const fullReport = await onFetchReport(job.id);
+        // Drop stale responses (a newer click has since been issued).
+        if (myRequestId !== requestIdRef.current) return;
         setSelectedJob(fullReport);
     } catch (err) {
         console.error("Failed to load report details", err);
+        if (myRequestId === requestIdRef.current) {
+          toast.error('Failed to load job details', 'Please try again.');
+        }
     } finally {
-        setLoading(false);
-    }
-  };
-
-  const getIconForType = (dtype: string) => {
-    switch (dtype) {
-      case 'Numeric': return <Hash className="w-4 h-4 text-blue-500" />;
-      case 'Categorical': return <AlignLeft className="w-4 h-4 text-purple-500" />;
-      case 'DateTime': return <Calendar className="w-4 h-4 text-green-500" />;
-      default: return <FileText className="w-4 h-4 text-gray-500" />;
+        if (myRequestId === requestIdRef.current) {
+          setLoading(false);
+        }
     }
   };
 
@@ -272,12 +275,14 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {selectedJob.profile_data?.columns && (Object.values(selectedJob.profile_data.columns) as ColumnProfile[]).map((v) => (
+                                {selectedJob.profile_data?.columns && (Object.values(selectedJob.profile_data.columns) as ColumnProfile[]).map((v) => {
+                                    const DtypeIcon = getDtypeIcon(v.dtype);
+                                    return (
                                     <tr key={v.name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                         <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{v.name}</td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-2">
-                                                {getIconForType(v.dtype)}
+                                                <DtypeIcon className={`w-4 h-4 ${getDtypeIconColorClass(v.dtype)}`} />
                                                 <span>{v.dtype}</span>
                                             </div>
                                         </td>
@@ -292,7 +297,8 @@ export const JobsHistoryModal: React.FC<JobsHistoryModalProps> = ({ isOpen, onCl
                                             {v.categorical_stats?.unique_count || '-'}
                                         </td>
                                     </tr>
-                                ))}
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

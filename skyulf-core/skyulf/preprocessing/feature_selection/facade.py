@@ -1,7 +1,8 @@
 """Unified feature-selection facade node."""
 
 import logging
-from typing import Any, Callable, Dict, Mapping, Optional
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -18,13 +19,13 @@ class FeatureSelectionApplier(BaseApplier):
     def apply(
         self,
         df: Any,
-        params: Dict[str, Any],
+        params: dict[str, Any],
     ) -> Any:
         # The params returned by the specific calculator carry a "type" tag
         # that selects the right concrete applier.
         type_name = params.get("type")
 
-        applier: Optional[BaseApplier] = None
+        applier: BaseApplier | None = None
         if type_name == "variance_threshold":
             applier = VarianceThresholdApplier()
         elif type_name == "correlation_threshold":
@@ -40,7 +41,7 @@ class FeatureSelectionApplier(BaseApplier):
         return df
 
 
-_FS_CALCULATORS: Dict[str, Callable[[], BaseCalculator]] = {
+_FS_CALCULATORS: dict[str, Callable[[], BaseCalculator]] = {
     "variance_threshold": VarianceThresholdCalculator,
     "correlation_threshold": CorrelationThresholdCalculator,
     "select_k_best": UnivariateSelectionCalculator,
@@ -66,7 +67,7 @@ class FeatureSelectionCalculator(BaseCalculator):
     def fit(
         self,
         df: Any,
-        config: Dict[str, Any],
+        config: dict[str, Any],
     ) -> Mapping[str, Any]:
         method = config.get("method", "select_k_best")
         ctor = _FS_CALCULATORS.get(method)

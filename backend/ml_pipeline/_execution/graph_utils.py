@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 
@@ -23,10 +23,10 @@ PARTITION_TERMINAL_STEP_TYPES = TERMINAL_STEP_TYPES | {"data_preview"}
 AUTO_PARALLEL_STEP_TYPES = {"data_preview"}
 
 
-def _dedupe_preserve_order(items: List[str]) -> List[str]:
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
     """Return ``items`` with duplicates removed, preserving original order."""
     seen: set[str] = set()
-    out: List[str] = []
+    out: list[str] = []
     for x in items:
         if x not in seen:
             seen.add(x)
@@ -34,7 +34,7 @@ def _dedupe_preserve_order(items: List[str]) -> List[str]:
     return out
 
 
-def _unique_inputs(node: NodeConfig) -> List[str]:
+def _unique_inputs(node: NodeConfig) -> list[str]:
     """Multi-handle splitters (TrainTestSplitter, FeatureTargetSplitter) emit
     several edges from the same source into one downstream node. The frontend
     converter dedupes ``inputs`` already, but older saved pipelines may still
@@ -53,7 +53,7 @@ def _is_parallel_terminal(term: NodeConfig) -> bool:
     return term.step_type in AUTO_PARALLEL_STEP_TYPES
 
 
-def partition_for_preview(config: PipelineConfig) -> List[PipelineConfig]:
+def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     """Split a pipeline into one sub-pipeline per data leaf, for preview.
 
     Unlike :func:`partition_parallel_pipeline`, this does NOT require training
@@ -74,7 +74,7 @@ def partition_for_preview(config: PipelineConfig) -> List[PipelineConfig]:
     if not data_nodes:
         return [config]
 
-    node_map: Dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
 
     # A node is a leaf when no other (data) node lists it as an input.
     has_consumer: set[str] = set()
@@ -94,7 +94,7 @@ def partition_for_preview(config: PipelineConfig) -> List[PipelineConfig]:
     if len(leaves) <= 1:
         return [base]
 
-    sub_configs: List[PipelineConfig] = []
+    sub_configs: list[PipelineConfig] = []
     for idx, leaf in enumerate(leaves):
         ancestors = _collect_ancestors(leaf.node_id, node_map)
         branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
@@ -113,19 +113,19 @@ def partition_for_preview(config: PipelineConfig) -> List[PipelineConfig]:
     return sub_configs
 
 
-def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
+def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
     """Split a pipeline into one PipelineConfig per connected subgraph.
 
     Disconnected parts of the canvas (e.g. two datasets with no shared nodes)
     become separate experiment groups, each with its own pipeline_id.
     Returns a single-element list when the graph is fully connected.
     """
-    node_map: Dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
     if not node_map:
         return [config]
 
     # Build undirected adjacency
-    adj: Dict[str, set[str]] = defaultdict(set)
+    adj: dict[str, set[str]] = defaultdict(set)
     for node in config.nodes:
         for parent_id in node.inputs:
             if parent_id in node_map:
@@ -134,11 +134,11 @@ def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
 
     # BFS to find connected components
     visited: set[str] = set()
-    components: List[List[str]] = []
+    components: list[list[str]] = []
     for nid in node_map:
         if nid in visited:
             continue
-        component: List[str] = []
+        component: list[str] = []
         queue = [nid]
         while queue:
             cur = queue.pop(0)
@@ -146,16 +146,14 @@ def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
                 continue
             visited.add(cur)
             component.append(cur)
-            for neighbor in adj[cur]:
-                if neighbor not in visited:
-                    queue.append(neighbor)
+            queue.extend(neighbor for neighbor in adj[cur] if neighbor not in visited)
         components.append(component)
 
     if len(components) <= 1:
         return [config]
 
     # Each component gets its own pipeline_id
-    results: List[PipelineConfig] = []
+    results: list[PipelineConfig] = []
     for component_ids in components:
         comp_nodes = [node_map[nid] for nid in component_ids]
         # Preserve original ID for first component, generate new for rest
@@ -171,7 +169,7 @@ def _split_connected_components(config: PipelineConfig) -> List[PipelineConfig]:
     return results
 
 
-def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
+def partition_parallel_pipeline(config: PipelineConfig) -> list[PipelineConfig]:
     """Split a pipeline into independent sub-pipelines for parallel execution.
 
     Returns a list of PipelineConfig objects.  When the graph contains only a
@@ -186,7 +184,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
        each incoming branch is treated as a separate experiment sharing the
        same model configuration.
     """
-    node_map: Dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
 
     # Identify terminal nodes (training, tuning, and data_preview leaves).
     terminals = [n for n in config.nodes if n.step_type in PARTITION_TERMINAL_STEP_TYPES]
@@ -201,7 +199,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
             return [config]
 
         # Each input to the terminal is a separate experiment branch
-        sub_configs: List[PipelineConfig] = []
+        sub_configs: list[PipelineConfig] = []
         for idx, branch_root_id in enumerate(_unique_inputs(term)):
             ancestors = _collect_ancestors(branch_root_id, node_map)
             # Build a copy of the terminal node with only this branch's input
@@ -277,7 +275,7 @@ def partition_parallel_pipeline(config: PipelineConfig) -> List[PipelineConfig]:
     return sub_configs
 
 
-def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[str]:
+def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[str]:
     """Collect a node and all its ancestors in true topological order.
 
     Algorithm overview
@@ -319,13 +317,15 @@ def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[st
         if nid in discovered or nid not in node_map:
             continue
         discovered.add(nid)
-        for parent_id in node_map[nid].inputs:
-            if parent_id in node_map and parent_id not in discovered:
-                queue.append(parent_id)
+        queue.extend(
+            parent_id
+            for parent_id in node_map[nid].inputs
+            if parent_id in node_map and parent_id not in discovered
+        )
 
     # Pass 2 — Kahn's algorithm: build in-degree map for the subgraph.
-    in_degree: Dict[str, int] = {nid: 0 for nid in discovered}
-    children: Dict[str, List[str]] = {nid: [] for nid in discovered}
+    in_degree: dict[str, int] = dict.fromkeys(discovered, 0)
+    children: dict[str, list[str]] = {nid: [] for nid in discovered}
     for nid in discovered:
         for parent_id in node_map[nid].inputs:
             if parent_id in discovered:
@@ -333,7 +333,7 @@ def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[st
                 children[parent_id].append(nid)
 
     # Pass 2 — repeatedly emit zero-in-degree nodes.
-    result: List[str] = []
+    result: list[str] = []
     ready = [nid for nid, deg in in_degree.items() if deg == 0]
     while ready:
         nid = ready.pop(0)
@@ -356,7 +356,7 @@ def _collect_ancestors(node_id: str, node_map: Dict[str, NodeConfig]) -> List[st
     return result
 
 
-def _get_strategy_from_params(params: Dict[str, Any]) -> Optional[str]:
+def _get_strategy_from_params(params: dict[str, Any]) -> str | None:
     if "tuning_config" in params and "strategy" in params["tuning_config"]:
         return cast(str, params["tuning_config"]["strategy"])
     if "tuning" in params and "strategy" in params["tuning"]:
@@ -368,7 +368,7 @@ def _get_strategy_from_params(params: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def extract_tuning_strategy(node_data: Dict[str, Any]) -> Optional[str]:
+def extract_tuning_strategy(node_data: dict[str, Any]) -> str | None:
     """Extracts tuning strategy from node data."""
     # Check PipelineConfigModel params
     params = node_data.get("params", {})
@@ -389,9 +389,7 @@ def extract_tuning_strategy(node_data: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _find_strategy_in_nodes(
-    nodes: List[Dict[str, Any]], node_id: Optional[str] = None
-) -> Optional[str]:
+def _find_strategy_in_nodes(nodes: list[dict[str, Any]], node_id: str | None = None) -> str | None:
     for node in nodes:
         if node_id:
             if node.get("node_id") == node_id or node.get("id") == node_id:
@@ -405,7 +403,7 @@ def _find_strategy_in_nodes(
     return None
 
 
-def determine_search_strategy(graph: Dict[str, Any], node_id: str) -> str:
+def determine_search_strategy(graph: dict[str, Any], node_id: str) -> str:
     """Determines the search strategy for a tuning job from the graph."""
     if not graph or "nodes" not in graph:
         return "random"
@@ -423,7 +421,7 @@ def determine_search_strategy(graph: Dict[str, Any], node_id: str) -> str:
     return "random"
 
 
-def _parse_node_info(node: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
+def _parse_node_info(node: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
     if "step_type" in node:
         # PipelineConfigModel structure
         nid = node.get("node_id", "")
@@ -443,8 +441,8 @@ def _parse_node_info(node: Dict[str, Any]) -> Tuple[str, str, Dict[str, Any]]:
 from backend.ml_pipeline.constants import StepType  # noqa: E402
 
 
-def _extract_columns(ntype: str, params: Dict[str, Any]) -> List[str]:
-    dropped: List[str] = []
+def _extract_columns(ntype: str, params: dict[str, Any]) -> list[str]:
+    dropped: list[str] = []
     if ntype in [
         "drop_missing_columns",
         "DropMissingColumns",
@@ -462,12 +460,12 @@ def _extract_columns(ntype: str, params: Dict[str, Any]) -> List[str]:
 
 
 def extract_job_details(
-    graph: Dict[str, Any], node_id: str
-) -> Tuple[Optional[Dict[str, Any]], Optional[str], List[str]]:
+    graph: dict[str, Any], node_id: str
+) -> tuple[dict[str, Any] | None, str | None, list[str]]:
     """Extracts hyperparameters, target_column, and dropped_columns from graph."""
     hyperparameters = None
     target_column = None
-    dropped_columns: List[str] = []
+    dropped_columns: list[str] = []
 
     if not graph or "nodes" not in graph:
         return hyperparameters, target_column, dropped_columns

@@ -1,5 +1,7 @@
 """Tests for skyulf.preprocessing.dispatcher (apply_dual_engine / fit_dual_engine)."""
 
+import logging
+
 import pandas as pd
 import polars as pl
 import pytest
@@ -70,6 +72,27 @@ def test_apply_dual_engine_propagates_pandas_exception():
     df = pd.DataFrame({"a": [1, 2, 3]})
     with pytest.raises(ValueError, match="boom"):
         apply_dual_engine(df, {}, _polars_apply, _raising)
+
+
+def test_apply_dual_engine_pandas_exception_is_logged(caplog):
+    """A pandas_func failure should be logged (with traceback) before propagating.
+
+    Regression test: the dispatcher previously had a dead
+    ``try/except: raise e`` with the actual logging call commented out,
+    meaning engine-dispatch failures went completely unlogged at this
+    central chokepoint used by ~50 preprocessing nodes.
+    """
+
+    def _raising(X, y, params):
+        raise ValueError("boom")
+
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    with (
+        caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.dispatcher"),
+        pytest.raises(ValueError, match="boom"),
+    ):
+        apply_dual_engine(df, {}, _polars_apply, _raising)
+    assert any("Pandas engine apply failed" in rec.message for rec in caplog.records)
 
 
 def test_apply_dual_engine_propagates_polars_exception():

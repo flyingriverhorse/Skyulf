@@ -367,6 +367,65 @@ class TestDatetimeExtractPolars:
 
 
 # ---------------------------------------------------------------------------
+# 5b. Datetime extraction — "season" and "time_of_day" (both engines)
+# ---------------------------------------------------------------------------
+
+
+class TestSeasonAndTimeOfDay:
+    # One timestamp per season (month) and per time-of-day bucket (hour).
+    _SEASON_TIMESTAMPS = [
+        "2024-01-15 03:00",  # Jan -> Winter, 03:00 -> Night
+        "2024-04-15 08:00",  # Apr -> Spring, 08:00 -> Morning
+        "2024-07-15 14:00",  # Jul -> Summer, 14:00 -> Afternoon
+        "2024-10-15 18:00",  # Oct -> Autumn, 18:00 -> Evening
+    ]
+    _EXPECTED_SEASONS = ["Winter", "Spring", "Summer", "Autumn"]
+    _EXPECTED_TIME_OF_DAY = ["Night", "Morning", "Afternoon", "Evening"]
+
+    def _df(self) -> pd.DataFrame:
+        return pd.DataFrame({DATE_COL: pd.to_datetime(self._SEASON_TIMESTAMPS)})
+
+    def _ops(self) -> list:
+        return [
+            {
+                "operation_type": "datetime_extract",
+                "input_columns": [DATE_COL],
+                "datetime_features": ["season", "time_of_day"],
+            }
+        ]
+
+    def test_season_pandas(self) -> None:
+        out = _run(self._ops(), df=self._df())
+        assert list(out[f"{DATE_COL}_season"]) == self._EXPECTED_SEASONS
+
+    def test_time_of_day_pandas(self) -> None:
+        out = _run(self._ops(), df=self._df())
+        assert list(out[f"{DATE_COL}_time_of_day"]) == self._EXPECTED_TIME_OF_DAY
+
+    def test_season_polars(self) -> None:
+        pytest.importorskip("polars")
+        out = _run_polars(self._ops(), df=self._df())
+        assert list(out[f"{DATE_COL}_season"]) == self._EXPECTED_SEASONS
+
+    def test_time_of_day_polars(self) -> None:
+        pytest.importorskip("polars")
+        out = _run_polars(self._ops(), df=self._df())
+        assert list(out[f"{DATE_COL}_time_of_day"]) == self._EXPECTED_TIME_OF_DAY
+
+    def test_season_engine_parity(self) -> None:
+        pytest.importorskip("polars")
+        out_pd = _run(self._ops(), df=self._df())
+        out_pl = _run_polars(self._ops(), df=self._df())
+        assert list(out_pd[f"{DATE_COL}_season"]) == list(out_pl[f"{DATE_COL}_season"])
+
+    def test_time_of_day_engine_parity(self) -> None:
+        pytest.importorskip("polars")
+        out_pd = _run(self._ops(), df=self._df())
+        out_pl = _run_polars(self._ops(), df=self._df())
+        assert list(out_pd[f"{DATE_COL}_time_of_day"]) == list(out_pl[f"{DATE_COL}_time_of_day"])
+
+
+# ---------------------------------------------------------------------------
 # 6. Edge cases
 # ---------------------------------------------------------------------------
 

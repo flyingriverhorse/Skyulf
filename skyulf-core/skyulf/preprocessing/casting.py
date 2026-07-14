@@ -5,7 +5,7 @@ The pandas apply path was previously a single CCN-busting function; it is now
 split per dtype family (`float / int / bool / datetime / other`).
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -79,7 +79,7 @@ def _resolve_polars_dtype(dtype_str: str) -> Any:
     return None
 
 
-def _casting_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Any:
+def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
     import polars as pl
 
     type_map = params.get("type_map", {})
@@ -104,7 +104,7 @@ def _casting_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Any:
 # -----------------------------------------------------------------------------
 
 
-def _coerce_boolean_value(value: Any) -> Optional[bool]:
+def _coerce_boolean_value(value: Any) -> bool | None:
     """Robustly coerce a single value to bool; ``None`` if undecidable."""
     if pd.isna(value):
         return None
@@ -132,7 +132,10 @@ def _cast_float(series: pd.Series, target_dtype: Any, coerce_on_error: bool) -> 
 def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: bool) -> pd.Series:
     """Mask fractional values to NaN (coerce) or raise."""
     valid = numeric.notna()
-    fractional_mask = valid & ~np.isclose(numeric, np.round(numeric))
+    # Use a small FIXED absolute tolerance rather than np.isclose's default
+    # rtol=1e-5, which scales with magnitude and would let large fractional
+    # values (e.g. 100000.001) slip through as "close enough" to integral.
+    fractional_mask = valid & (np.abs(numeric - np.round(numeric)) >= 1e-9)
     if not fractional_mask.any():
         return numeric
     if not coerce_on_error:
@@ -141,9 +144,38 @@ def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: boo
     return numeric
 
 
+def _mask_out_of_range_or_raise(
+    numeric: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool
+) -> pd.Series:
+    """Mask values outside the target integer dtype's range to NaN (coerce) or raise.
+
+    Without this, ``pandas.Series.astype`` silently clamps out-of-range floats
+    (e.g. 3e9 -> int32) instead of erroring or nulling, diverging from the
+    polars apply path which correctly nulls/raises via ``strict`` casts.
+    """
+    try:
+        info = np.iinfo(str(target_dtype))
+    except TypeError:
+        # Unrecognized/non-integer dtype string: skip range-checking rather
+        # than fail the cast outright.
+        return numeric
+    valid = numeric.notna()
+    out_of_range_mask = valid & ((numeric < info.min) | (numeric > info.max))
+    if not out_of_range_mask.any():
+        return numeric
+    if not coerce_on_error:
+        raise OverflowError(
+            f"Column {col} contains values out of range for {target_dtype} "
+            f"(valid range [{info.min}, {info.max}])."
+        )
+    numeric.loc[out_of_range_mask] = np.nan
+    return numeric
+
+
 def _cast_int(series: pd.Series, col: str, target_dtype: Any, coerce_on_error: bool) -> pd.Series:
     numeric = pd.to_numeric(series, errors="coerce" if coerce_on_error else "raise")
     numeric = _drop_fractional_or_raise(numeric, col, coerce_on_error)
+    numeric = _mask_out_of_range_or_raise(numeric, col, target_dtype, coerce_on_error)
     if numeric.isna().any() and target_dtype in ("int32", "int64", "int"):
         # NaNs require pandas' nullable Int64 container.
         return numeric.astype("Int64")
@@ -182,7 +214,7 @@ def _cast_one_column(
     return series.astype(target_dtype)
 
 
-def _casting_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Any:
+def _casting_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> Any:
     type_map = params.get("type_map", {})
     if not type_map:
         return X, y
@@ -203,7 +235,7 @@ def _casting_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Any:
 
 class CastingApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _casting_apply_polars, _casting_apply_pandas)
 
 
@@ -217,7 +249,7 @@ class CastingApplier(BaseApplier):
 )
 class CastingCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Casting preserves the column set but rewrites dtype labels.
         column_types = dict(config.get("column_types", {}) or {})
@@ -233,7 +265,7 @@ class CastingCalculator(BaseCalculator):
         return new_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> CastingArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CastingArtifact:  # pylint: disable=arguments-differ
         # Config supports two shapes:
         #   {'columns': ['col1'], 'target_type': 'float'}
         #   {'column_types': {'col1': 'float', 'col2': 'int'}}
@@ -241,7 +273,7 @@ class CastingCalculator(BaseCalculator):
         columns = config.get("columns", [])
         column_types = config.get("column_types", {})
 
-        final_map: Dict[str, Any] = {}
+        final_map: dict[str, Any] = {}
         for col, dtype in column_types.items():
             if col in X.columns:
                 final_map[col] = TYPE_ALIASES.get(str(dtype).lower(), dtype)

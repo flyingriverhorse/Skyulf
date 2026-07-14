@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, cast
+from typing import Any, cast
 
 from fastapi import HTTPException
 
@@ -8,13 +8,13 @@ from backend.utils.file_utils import extract_file_path_from_source
 
 
 async def resolve_pipeline_nodes(
-    nodes: List[Any], ingestion_service: DataIngestionService
-) -> Dict[str, Any]:
+    nodes: list[Any], ingestion_service: DataIngestionService
+) -> dict[str, Any]:
     """
     Resolves dataset IDs to paths in the nodes and returns any S3 storage options found.
     Modifies the nodes in-place.
     """
-    resolved_s3_options: Dict[str, Any] = {}
+    resolved_s3_options: dict[str, Any] = {}
 
     for node in nodes:
         # Handle both Pydantic models and dicts/objects
@@ -61,7 +61,7 @@ async def resolve_pipeline_nodes(
                             and ds.config
                             and "storage_options" in ds.config
                         ):
-                            resolved_s3_options = cast(Dict[str, Any], ds.config["storage_options"])
+                            resolved_s3_options = cast(dict[str, Any], ds.config["storage_options"])
                     else:
                         raise HTTPException(
                             status_code=400,

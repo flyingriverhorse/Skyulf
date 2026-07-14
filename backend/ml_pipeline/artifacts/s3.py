@@ -1,6 +1,7 @@
+import contextlib
 import logging
-import os
-from typing import Any, Optional
+from pathlib import Path
+from typing import Any
 
 import joblib
 
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class S3ArtifactStore(ArtifactStore):
-    def __init__(self, bucket_name: str, prefix: str = "", storage_options: Optional[dict] = None):
+    def __init__(self, bucket_name: str, prefix: str = "", storage_options: dict | None = None):
         self.bucket_name = bucket_name.strip()
         self.prefix = self._normalize_prefix(prefix)
         self.storage_options = storage_options or {}
@@ -48,7 +49,7 @@ class S3ArtifactStore(ArtifactStore):
 
             self.fs = s3fs.S3FileSystem(**self.storage_options)
         except ImportError:
-            raise ImportError("s3fs is required for S3ArtifactStore")
+            raise ImportError("s3fs is required for S3ArtifactStore") from None
         except Exception as e:
             logger.error("Failed to initialize S3 filesystem client: %s", self._sanitize_error(e))
             raise RuntimeError("Failed to initialize S3 artifact storage") from e
@@ -157,18 +158,17 @@ class S3ArtifactStore(ArtifactStore):
             for f in files:
                 normalized = str(f).replace("s3://", "")
                 bucket_prefix = f"{self.bucket_name}/"
-                if normalized.startswith(bucket_prefix):
-                    normalized = normalized[len(bucket_prefix) :]
+                normalized = normalized.removeprefix(bucket_prefix)
                 if self.prefix:
                     prefix = f"{self.prefix}/"
                     if not normalized.startswith(prefix):
                         continue
-                    normalized = normalized[len(prefix) :]
+                    normalized = normalized.removeprefix(prefix)
                 if "/" in normalized.strip("/"):
                     continue
-                filename = os.path.basename(normalized)
+                filename = Path(normalized).name
                 if filename.endswith(".joblib"):
-                    keys.append(filename[:-7])
+                    keys.append(filename.removesuffix(".joblib"))
                 else:
                     keys.append(filename)
             return keys
@@ -186,7 +186,6 @@ class S3ArtifactStore(ArtifactStore):
             close()
 
     def __del__(self) -> None:
-        try:
+        # best-effort cleanup; logging is unsafe during interpreter shutdown
+        with contextlib.suppress(Exception):
             self.close()
-        except Exception:
-            pass  # nosec B110 - best-effort cleanup; logging is unsafe during interpreter shutdown

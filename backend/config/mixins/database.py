@@ -1,8 +1,8 @@
 """Database and pipeline storage settings."""
 
-import os
 import urllib.parse
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any
 
 
 class DatabaseMixin:
@@ -21,22 +21,22 @@ class DatabaseMixin:
     DB_TYPE: str = "sqlite"
     DB_PRIMARY: str = "sqlite"
     DB_PATH: str = "mlops_database.db"
-    DB_PROVIDER: Optional[str] = None
-    DB_USER: Optional[str] = None
-    DB_PASSWORD: Optional[str] = None
-    DB_HOST: Optional[str] = None
-    DB_PORT: Optional[int] = None
-    DB_NAME: Optional[str] = None
-    DB_SSLMODE: Optional[str] = None
-    DB_SSLROOTCERT: Optional[str] = None
-    DB_EXTRA_PARAMS: Optional[str] = None
+    DB_PROVIDER: str | None = None
+    DB_USER: str | None = None
+    DB_PASSWORD: str | None = None
+    DB_HOST: str | None = None
+    DB_PORT: int | None = None
+    DB_NAME: str | None = None
+    DB_SSLMODE: str | None = None
+    DB_SSLROOTCERT: str | None = None
+    DB_EXTRA_PARAMS: str | None = None
 
     # ── Helper methods ────────────────────────────────────────────────
 
     def get_sqlite_url(self) -> str:
         """Get SQLite database URL."""
         db_path = self.DB_PATH or "mlops_database.db"  # type: ignore[attr-defined]
-        if os.path.isabs(db_path):
+        if Path(db_path).is_absolute():
             return f"sqlite+aiosqlite:///{db_path}"
         return f"sqlite+aiosqlite:///./{db_path}"
 
@@ -74,7 +74,7 @@ class DatabaseMixin:
             return self.get_postgresql_url()
         raise ValueError(f"Unsupported database type: {db_type}")
 
-    def get_database_config_info(self) -> Dict[str, Any]:
+    def get_database_config_info(self) -> dict[str, Any]:
         """Get database configuration information for admin dashboard."""
         return {
             "primary_db": self.DB_PRIMARY,  # type: ignore[attr-defined]

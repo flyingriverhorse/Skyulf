@@ -7,8 +7,6 @@ empty data) since ``analyze()`` fans out into nearly every ``_analyzer``
 mixin in one pass.
 """
 
-from typing import List
-
 import numpy as np
 import polars as pl
 import pytest
@@ -31,7 +29,7 @@ def _mixed_dataset(n: int = 120) -> pl.DataFrame:
 
     months = rng.integers(1, 13, size=n)
     days = rng.integers(1, 28, size=n)
-    dates = [f"2021-{m:02d}-{d:02d}" for m, d in zip(months, days)]
+    dates = [f"2021-{m:02d}-{d:02d}" for m, d in zip(months, days, strict=True)]
 
     words = ["good", "bad", "excellent", "terrible", "average", "great"]
     text_col = [" ".join(rng.choice(words, size=4)) + f" note {i}" for i in range(n)]
@@ -179,7 +177,7 @@ def test_analyze_applies_filters_and_exclusions(mixed_df: pl.DataFrame) -> None:
 
 def test_analyze_filters_all_operators(mixed_df: pl.DataFrame) -> None:
     """Each supported filter operator should be applied without raising."""
-    ops: List[dict] = [
+    ops: list[dict] = [
         {"column": "num1", "operator": ">", "value": 0.0},
         {"column": "num1", "operator": "<", "value": 100.0},
         {"column": "num1", "operator": ">=", "value": -100.0},

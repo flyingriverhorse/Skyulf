@@ -98,6 +98,13 @@ interface GraphState {
   branchLabelColors: Record<string, string>;
   setBranchLabelColors: (colors: Record<string, string>) => void;
 
+  // Canvas-derived map: nodeId -> distinct upstream source count. Computed
+  // once in `FlowCanvas` from `edges` so every node card can O(1) look up
+  // its own fan-in instead of each one filtering/mapping the whole edges
+  // array on every render (was O(N·E) across the canvas).
+  incomingSourceCounts: Record<string, number>;
+  setIncomingSourceCounts: (counts: Record<string, number>) => void;
+
   // C7: pre-execution schema prediction. Populated by `useSchemaPreview`
   // (debounced POST to `/api/pipeline/schema-preview`). Per-node predicted
   // output schema; `null` means the calculator is data-dependent or the
@@ -139,6 +146,9 @@ export const useGraphStore = create<GraphState>()(
 
   branchLabelColors: {},
   setBranchLabelColors: (colors) => set({ branchLabelColors: colors }),
+
+  incomingSourceCounts: {},
+  setIncomingSourceCounts: (counts) => set({ incomingSourceCounts: counts }),
 
   predictedSchemas: {},
   setPredictedSchemas: (schemas) => set({ predictedSchemas: schemas }),

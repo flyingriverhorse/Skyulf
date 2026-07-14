@@ -1,12 +1,10 @@
-from typing import List
-
 import pytest
 from sklearn.preprocessing import LabelEncoder
 
 from backend.ml_pipeline._services.prediction_utils import decode_int_like
 
 
-def _make_label_encoder(classes: List[str]) -> LabelEncoder:
+def _make_label_encoder(classes: list[str]) -> LabelEncoder:
     encoder = LabelEncoder()
     encoder.fit(classes)
     return encoder

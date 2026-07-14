@@ -1,10 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Scaling } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface ScalingConfig {
   columns: string[];
@@ -38,21 +40,8 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
 
-  // Responsive Layout
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   // Filter for numeric columns only, as scaling only applies to them
   const numericColumns = schema
@@ -61,17 +50,6 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
         .filter(c => !droppedUpstream.has(c.name))
         .map(c => c.name)
     : [];
-
-  const filteredColumns = numericColumns.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: filteredColumns });
-  };
-
-  const handleDeselectAll = () => {
-    const newCols = config.columns.filter(c => !filteredColumns.includes(c));
-    onChange({ ...config, columns: newCols });
-  };
 
   const renderFeedback = () => {
     if (!nodeResult || !nodeResult.metrics) return null;
@@ -135,7 +113,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
       {/* Top Status Bar */}
       <div className="shrink-0 p-4 pb-0 space-y-2">
         {!datasetId && (
-          <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
             Connect a dataset node to see available columns.
           </div>
         )}
@@ -263,47 +241,17 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
         </div>
 
         {/* Right Column: Columns */}
-        <div className={`flex flex-col h-full min-h-[200px] border rounded-md overflow-hidden ${isWide ? '' : 'shrink-0'}`}>
-           <div className="p-2 border-b bg-muted/30 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Numeric Columns ({config.columns.length})</span>
-                <div className="flex gap-1">
-                  <button onClick={handleSelectAll} className="text-[10px] px-2 py-1 hover:bg-accent rounded">All</button>
-                  <button onClick={handleDeselectAll} className="text-[10px] px-2 py-1 hover:bg-accent rounded">None</button>
-                </div>
-              </div>
-              <input
-                type="text"
-                placeholder="Search columns..."
-                className="w-full text-xs p-1.5 border rounded bg-background"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); }}
-              />
-           </div>
-           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {filteredColumns.length > 0 ? (
-                filteredColumns.map(col => (
-                  <label key={col} className="flex items-center gap-2 text-sm hover:bg-accent/50 p-1.5 rounded cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={config.columns.includes(col)}
-                      onChange={(e) => {
-                        const newCols = e.target.checked
-                          ? [...config.columns, col]
-                          : config.columns.filter(c => c !== col);
-                        onChange({ ...config, columns: newCols });
-                      }}
-                      className="rounded border-gray-300 text-primary focus:ring-primary"
-                    />
-                    <span className="truncate" title={col}>{col}</span>
-                  </label>
-                ))
-            ) : (
-              <div className="text-xs text-muted-foreground italic p-4 text-center">
-                {isLoading ? 'Loading schema...' : (numericColumns.length === 0 ? 'No numeric columns found' : 'No matches found')}
-              </div>
-            )}
-           </div>
+        <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+          <ColumnMultiSelect
+            columns={numericColumns}
+            selected={config.columns}
+            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+            label="Numeric Columns"
+            variant="panel"
+            isLoading={isLoading}
+            emptyMessage="No numeric columns found"
+            fillHeight={isWide}
+          />
         </div>
 
         {/* Feedback Section (Narrow) */}

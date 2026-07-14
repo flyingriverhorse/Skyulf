@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Pin, PinOff, Pencil, Trash2, Loader2, Play, FileClock, MessageSquare, Save, X, Info, ChevronUp } from 'lucide-react';
 
 import { ModalShell, useConfirm } from '../shared';
+import { VirtualList } from '../shared/VirtualList';
 import { toast } from '../../core/toast';
 import {
   pipelineVersionsApi,
@@ -236,11 +237,16 @@ export const PipelineVersionsModal: React.FC<PipelineVersionsModalProps> = ({
         </div>
       )}
       {!loading && !error && versions.length > 0 && (
-        <div className="divide-y border rounded-md overflow-hidden">
-          {versions.map((entry) => {
+        <div className="max-h-[70vh] flex flex-col border rounded-md overflow-hidden">
+          <VirtualList
+            items={versions}
+            getKey={(entry) => entry.id}
+            estimateSize={80}
+            className="flex-1 overflow-y-auto"
+            renderItem={(entry) => {
             const isEditing = editingId === entry.id;
             return (
-              <div key={entry.id} className="p-3 hover:bg-accent/40 transition-colors">
+              <div className="p-3 border-b last:border-b-0 hover:bg-accent/40 transition-colors">
                 {isEditing ? (
                   <div className="space-y-2">
                     <input
@@ -425,7 +431,8 @@ export const PipelineVersionsModal: React.FC<PipelineVersionsModalProps> = ({
                 )}
               </div>
             );
-          })}
+            }}
+          />
         </div>
       )}
     </ModalShell>

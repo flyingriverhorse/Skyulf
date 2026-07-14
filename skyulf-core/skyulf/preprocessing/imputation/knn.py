@@ -1,7 +1,6 @@
 """KNN imputer node (k-Nearest Neighbors)."""
 
-import logging
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from sklearn.impute import KNNImputer
 
@@ -16,37 +15,27 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import _sklearn_transform_subset
 
-logger = logging.getLogger(__name__)
-
 
 class KNNImputerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         imputer = params.get("imputer_object")
         if not resolve_valid_columns(X, cols) or not imputer:
             return X, _y
-        try:
-            return _sklearn_transform_subset(X, cols, imputer, is_polars=True), _y
-        except Exception as e:
-            logger.error(f"KNN Imputation failed: {e}")
-            return X, _y
+        return _sklearn_transform_subset(X, cols, imputer, is_polars=True), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         imputer = params.get("imputer_object")
         if not resolve_valid_columns(X, cols) or not imputer:
             return X, _y
-        try:
-            return _sklearn_transform_subset(X, cols, imputer, is_polars=False), _y
-        except Exception as e:
-            logger.error(f"KNN Imputation failed: {e}")
-            return X, _y
+        return _sklearn_transform_subset(X, cols, imputer, is_polars=False), _y
 
 
 @NodeRegistry.register("KNNImputer", KNNImputerApplier)
@@ -59,13 +48,13 @@ class KNNImputerApplier(BaseApplier):
 )
 class KNNImputerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # KNN imputation fills NaNs in place; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> KNNImputerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> KNNImputerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

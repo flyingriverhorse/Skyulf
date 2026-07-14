@@ -6,11 +6,9 @@ plus file cleanup and maintenance utilities.
 """
 
 import logging
-import os
 import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +23,10 @@ def _is_within_base(path: Path, base: Path) -> bool:
 
 
 def safe_delete_path(
-    path: Union[str, Path],
+    path: str | Path,
     force_delete: bool = True,
     files_only: bool = True,
-    allowed_base: Optional[Union[str, Path]] = None,
+    allowed_base: str | Path | None = None,
 ) -> bool:
     """
     Safely delete a file or directory.
@@ -47,14 +45,13 @@ def safe_delete_path(
     path = Path(path)
 
     # Guard against path-traversal when a base directory is enforced.
-    if allowed_base is not None:
-        if not _is_within_base(path, Path(allowed_base)):
-            logger.error(
-                "safe_delete_path: refusing to delete %s — path escapes allowed base %s",
-                path,
-                allowed_base,
-            )
-            return False
+    if allowed_base is not None and not _is_within_base(path, Path(allowed_base)):
+        logger.error(
+            "safe_delete_path: refusing to delete %s — path escapes allowed base %s",
+            path,
+            allowed_base,
+        )
+        return False
 
     if not path.exists():
         logger.warning(f"Path does not exist: {path}")
@@ -103,7 +100,7 @@ def _delete_immediately(path: Path, files_only: bool = True) -> bool:
         return False
 
 
-def cleanup_empty_directories(base_path: Union[str, Path]) -> int:
+def cleanup_empty_directories(base_path: str | Path) -> int:
     """
     Remove empty directories recursively from base_path.
 
@@ -121,9 +118,7 @@ def cleanup_empty_directories(base_path: Union[str, Path]) -> int:
 
     try:
         # Walk bottom-up to remove empty directories
-        for dirpath, dirnames, filenames in os.walk(base_path, topdown=False):
-            dir_path = Path(dirpath)
-
+        for dir_path, _dirnames, _filenames in base_path.walk(top_down=False):
             # Skip the base directory itself
             if dir_path == base_path:
                 continue
@@ -143,7 +138,7 @@ def cleanup_empty_directories(base_path: Union[str, Path]) -> int:
     return removed_count
 
 
-def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
+def extract_file_path_from_source(source_data: dict) -> Path | None:
     """
     Extract the file path from a data source record.
 
@@ -207,7 +202,7 @@ def extract_file_path_from_source(source_data: dict) -> Optional[Path]:
 
 
 def cleanup_old_files(
-    directory: Union[str, Path],
+    directory: str | Path,
     max_files: int = 10,
     max_age_days: int = 7,
     file_pattern: str = "*",
@@ -285,10 +280,10 @@ def cleanup_old_files(
 
 
 def cleanup_uploads_directory(
-    uploads_dir: Union[str, Path],
+    uploads_dir: str | Path,
     max_files: int = 10,
     max_age_days: int = 7,
-    file_extensions: Optional[List[str]] = None,
+    file_extensions: list[str] | None = None,
 ) -> dict:
     """
     Clean up uploaded files based on settings.

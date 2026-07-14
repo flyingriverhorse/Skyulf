@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Optional, Tuple, Union, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import pandas as pd
 
@@ -23,11 +24,11 @@ class BaseModelCalculator(ABC):
         """Returns 'classification' or 'regression'."""
 
     @property
-    def default_params(self) -> Dict[str, Any]:
+    def default_params(self) -> dict[str, Any]:
         """Default hyperparameters for the model."""
         return {}
 
-    def prepare_tuning_params(self, config: Dict[str, Any]) -> None:
+    def prepare_tuning_params(self, config: dict[str, Any]) -> None:
         """Hook for structural models (e.g. ensembles) to absorb their
         sub-estimator selection before the tuner builds the base model.
 
@@ -37,7 +38,7 @@ class BaseModelCalculator(ABC):
         """
         return None
 
-    def build_tuning_search_space(self, config: Dict[str, Any], strategy: str) -> Dict[str, Any]:
+    def build_tuning_search_space(self, config: dict[str, Any], strategy: str) -> dict[str, Any]:
         """Hook: let a model auto-build its tuning search space.
 
         Returns an empty dict for plain models (the caller keeps the
@@ -49,14 +50,12 @@ class BaseModelCalculator(ABC):
     @abstractmethod
     def fit(
         self,
-        X: Union[pd.DataFrame, SkyulfDataFrame],
-        y: Union[pd.Series, Any],
-        config: Dict[str, Any],
-        progress_callback: Optional[Callable[..., None]] = None,
-        log_callback: Optional[Callable[[str], None]] = None,
-        validation_data: Optional[
-            tuple[Union[pd.DataFrame, SkyulfDataFrame], Union[pd.Series, Any]]
-        ] = None,
+        X: pd.DataFrame | SkyulfDataFrame,
+        y: pd.Series | Any,
+        config: dict[str, Any],
+        progress_callback: Callable[..., None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+        validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
     ) -> Any:
         """Trains the model and returns the fitted model artifact.
 
@@ -76,16 +75,14 @@ class BaseModelCalculator(ABC):
 
 class BaseModelApplier(ABC):
     @abstractmethod
-    def predict(
-        self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
-    ) -> Union[pd.Series, Any]:
+    def predict(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> pd.Series | Any:
         """
         Generates predictions.
         """
 
     def predict_proba(
-        self, df: Union[pd.DataFrame, SkyulfDataFrame], model_artifact: Any
-    ) -> Optional[Union[pd.DataFrame, SkyulfDataFrame]]:
+        self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
+    ) -> pd.DataFrame | SkyulfDataFrame | None:
         """
         Generates prediction probabilities if supported.
         Returns DataFrame where columns are classes.
@@ -145,15 +142,15 @@ class StatefulEstimator:
         self,
         dataset: SplitDataset,
         target_column: str,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         n_folds: int = 5,
         cv_type: str = "k_fold",
         shuffle: bool = True,
         random_state: int = 42,
-        time_column: Optional[str] = None,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
-        log_callback: Optional[Callable[[str], None]] = None,
-    ) -> Dict[str, Any]:
+        time_column: str | None = None,
+        progress_callback: Callable[[int, int], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+    ) -> dict[str, Any]:
         """
         Performs cross-validation on the training split.
         """
@@ -179,18 +176,16 @@ class StatefulEstimator:
 
     def fit_predict(
         self,
-        dataset: Union[
-            SplitDataset,
-            pd.DataFrame,
-            Tuple[pd.DataFrame, pd.Series],
-            Tuple[pd.DataFrame, pd.DataFrame],
-        ],
+        dataset: SplitDataset
+        | pd.DataFrame
+        | tuple[pd.DataFrame, pd.Series]
+        | tuple[pd.DataFrame, pd.DataFrame],
         target_column: str,
-        config: Dict[str, Any],
-        progress_callback: Optional[Callable[[int, int], None]] = None,
-        log_callback: Optional[Callable[[str], None]] = None,
+        config: dict[str, Any],
+        progress_callback: Callable[[int, int], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
         job_id: str = "unknown",
-    ) -> Dict[str, pd.Series]:
+    ) -> dict[str, pd.Series]:
         """
         Fits the model on training data and returns predictions for all splits.
         """
@@ -245,16 +240,10 @@ class StatefulEstimator:
         # Test Predictions
         is_test_empty = False
         test_df = None
-        if isinstance(dataset.test, tuple):
-            test_df = dataset.test[0]
-        else:
-            test_df = dataset.test
+        test_df = dataset.test[0] if isinstance(dataset.test, tuple) else dataset.test
 
-        if hasattr(test_df, "empty"):
-            is_test_empty = test_df.empty
-        else:
-            # Polars
-            is_test_empty = test_df.is_empty()
+        # is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`
+        is_test_empty = test_df.empty if hasattr(test_df, "empty") else test_df.is_empty()
 
         if not is_test_empty:
             if isinstance(dataset.test, tuple):
@@ -298,7 +287,11 @@ class StatefulEstimator:
                         X_val = X_val.drop([target_column])
             else:
                 if target_column in dataset.validation.columns:
-                    X_val = dataset.validation.drop(columns=[target_column])
+                    try:
+                        X_val = dataset.validation.drop(columns=[target_column])
+                    except TypeError:
+                        # Polars
+                        X_val = dataset.validation.drop([target_column])
                 else:
                     X_val = dataset.validation
             predictions["validation"] = self.applier.predict(X_val, self.model)
@@ -309,7 +302,7 @@ class StatefulEstimator:
         self,
         dataset: SplitDataset,
         target_column: str,
-        config: Dict[str, Any],
+        config: dict[str, Any],
         job_id: str = "unknown",
     ) -> None:
         """
@@ -324,8 +317,14 @@ class StatefulEstimator:
         X_train, y_train = self._extract_xy(dataset.train, target_column)
         X_val, y_val = self._extract_xy(dataset.validation, target_column)
 
-        X_combined = pd.concat([X_train, X_val], axis=0)
-        y_combined = pd.concat([y_train, y_val], axis=0)
+        if get_engine(X_train).name == EngineName.POLARS:
+            import polars as pl
+
+            X_combined = pl.concat([X_train, X_val])
+            y_combined = pl.concat([y_train, y_val])
+        else:
+            X_combined = pd.concat([X_train, X_val], axis=0)
+            y_combined = pd.concat([y_train, y_val], axis=0)
 
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
@@ -348,7 +347,7 @@ class StatefulEstimator:
         splits_payload = {}
 
         # Container for raw predictions
-        evaluation_data: Dict[str, Any] = {
+        evaluation_data: dict[str, Any] = {
             "job_id": job_id,
             "node_id": self.node_id,
             "problem_type": problem_type,

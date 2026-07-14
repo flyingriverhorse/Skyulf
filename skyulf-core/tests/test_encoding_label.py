@@ -38,7 +38,7 @@ def test_fit_apply_roundtrip_sorts_classes_alphabetically() -> None:
 
     assert params["classes_count"] == {"category": 3}
     expected = {"a": 0, "b": 1, "c": 2}
-    for raw, code in zip(df["category"], result["category"]):
+    for raw, code in zip(df["category"], result["category"], strict=True):
         assert code == expected[raw]
 
 
@@ -103,6 +103,18 @@ def test_empty_dataframe_with_no_columns_returns_empty_artifact() -> None:
     params = calc.fit(df, {"columns": None})
     assert params["encoders"] == {}
     assert params["classes_count"] == {}
+
+
+def test_no_columns_and_no_target_warns_about_noop(caplog: pytest.LogCaptureFixture) -> None:
+    """Fitting with no configured columns and no y logs a warning about the no-op."""
+    df = pd.DataFrame({"category": ["a", "b", "c"]})
+    calc = LabelEncoderCalculator()
+
+    with caplog.at_level("WARNING", logger="skyulf.preprocessing.encoding.label"):
+        params = calc.fit(df, {"columns": None})
+
+    assert params["encoders"] == {}
+    assert any("no-op" in record.message for record in caplog.records)
 
 
 def test_single_row_dataframe() -> None:

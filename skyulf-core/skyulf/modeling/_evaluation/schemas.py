@@ -1,6 +1,6 @@
 """Schemas for model evaluation artifacts."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -16,44 +16,44 @@ class CurveData(BaseModel):
     """Data for a curve (ROC, PR, etc)."""
 
     name: str
-    points: List[CurvePoint]
-    auc: Optional[float] = None
+    points: list[CurvePoint]
+    auc: float | None = None
 
 
 class ConfusionMatrixData(BaseModel):
     """Confusion matrix data."""
 
-    labels: List[str]
-    matrix: List[List[int]]
+    labels: list[str]
+    matrix: list[list[int]]
 
 
 class ClassificationEvaluation(BaseModel):
     """Classification specific evaluation data."""
 
-    confusion_matrix: Optional[ConfusionMatrixData] = None
-    roc_curves: List[CurveData] = Field(default_factory=list)
-    pr_curves: List[CurveData] = Field(default_factory=list)
+    confusion_matrix: ConfusionMatrixData | None = None
+    roc_curves: list[CurveData] = Field(default_factory=list)
+    pr_curves: list[CurveData] = Field(default_factory=list)
 
 
 class ResidualsData(BaseModel):
     """Residuals data for regression."""
 
-    predicted: List[float]
-    residuals: List[float]
-    actual: List[float]
+    predicted: list[float]
+    residuals: list[float]
+    actual: list[float]
 
 
 class RegressionEvaluation(BaseModel):
     """Regression specific evaluation data."""
 
-    residuals: Optional[ResidualsData] = None
-    prediction_error: Optional[Any] = None
+    residuals: ResidualsData | None = None
+    prediction_error: Any | None = None
 
 
 class ModelEvaluationReport(BaseModel):
     """Evaluation report for a single dataset."""
 
     dataset_name: str
-    metrics: Dict[str, float]
-    classification: Optional[ClassificationEvaluation] = None
-    regression: Optional[RegressionEvaluation] = None
+    metrics: dict[str, float]
+    classification: ClassificationEvaluation | None = None
+    regression: RegressionEvaluation | None = None

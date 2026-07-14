@@ -6,7 +6,7 @@ NaN replacement, unseen values, edge cases (empty df, no valid columns),
 and fit -> apply round trips.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -56,7 +56,7 @@ def _coerce_numeric_keys(mapping: Any) -> Any:
 
 @pytest.mark.parametrize(*_fit_mapping_cases)
 def test_fit_mapping_scenarios(
-    config: Dict[str, Any], expected_mapping: Dict[str, Any], expected_columns: Any
+    config: dict[str, Any], expected_mapping: dict[str, Any], expected_columns: Any
 ) -> None:
     """fit must resolve `mapping`/`replacements` config into the artifact's mapping."""
     df = pd.DataFrame({"a": [1, 2, 3]})
@@ -94,7 +94,7 @@ def test_fit_infer_output_schema_passes_through() -> None:
 
 @pytest.mark.parametrize(*_apply_scenario_cases)
 def test_apply_scenarios(
-    engine: str, data: Dict[str, Any], config: Dict[str, Any], expected: Dict[str, Any]
+    engine: str, data: dict[str, Any], config: dict[str, Any], expected: dict[str, Any]
 ) -> None:
     """Flat/nested mapping, to_replace, and no-op scenarios across pandas + polars."""
     cfg = dict(config)
@@ -112,7 +112,7 @@ def test_apply_scenarios(
 def test_apply_pandas_mapping_replaces_nan() -> None:
     """NaN must be replaceable via the mapping (using np.nan as a key)."""
     df = pd.DataFrame({"a": [1.0, np.nan, 3.0]})
-    params: Dict[str, Any] = {"columns": ["a"], "mapping": {np.nan: -1.0}}
+    params: dict[str, Any] = {"columns": ["a"], "mapping": {np.nan: -1.0}}
     result = ValueReplacementApplier().apply(df, params)
     assert result["a"].tolist() == [1.0, -1.0, 3.0]
 
@@ -120,7 +120,7 @@ def test_apply_pandas_mapping_replaces_nan() -> None:
 def test_apply_pandas_empty_dataframe() -> None:
     """Applying to an empty DataFrame must not raise and must stay empty."""
     df = pd.DataFrame({"a": pd.Series([], dtype=float)})
-    params: Dict[str, Any] = {"columns": ["a"], "mapping": {1: 100}}
+    params: dict[str, Any] = {"columns": ["a"], "mapping": {1: 100}}
     result = ValueReplacementApplier().apply(df, params)
     assert result.shape == (0, 1)
 
@@ -132,7 +132,7 @@ def test_apply_pandas_empty_dataframe() -> None:
 
 @pytest.mark.parametrize(*_roundtrip_cases)
 def test_fit_then_apply_round_trip(
-    data: Dict[str, Any], config: Dict[str, Any], column: str, expected: list
+    data: dict[str, Any], config: dict[str, Any], column: str, expected: list
 ) -> None:
     """fit() output must apply correctly end-to-end for replacements/to_replace configs."""
     df = pd.DataFrame(data)

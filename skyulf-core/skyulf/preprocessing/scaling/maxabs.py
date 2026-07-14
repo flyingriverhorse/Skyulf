@@ -1,6 +1,6 @@
 """MaxAbs scaler node (scale by maximum absolute value)."""
 
-from typing import Any, Dict, List, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 from sklearn.preprocessing import MaxAbsScaler
@@ -19,11 +19,11 @@ from ._common import _select_subset_pandas, _select_subset_polars
 
 class MaxAbsScalerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         cols = params.get("columns", [])
@@ -39,7 +39,7 @@ class MaxAbsScalerApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         cols = params.get("columns", [])
         scale = params.get("scale")
         valid = resolve_valid_columns(X, cols)
@@ -64,12 +64,12 @@ class MaxAbsScalerApplier(BaseApplier):
 )
 class MaxAbsScalerCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> MaxAbsScalerArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> MaxAbsScalerArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(MaxAbsScalerArtifact, {})
         return cast(
@@ -78,21 +78,21 @@ class MaxAbsScalerCalculator(BaseCalculator):
         )
 
     @staticmethod
-    def _fit_polars(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_polars(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_polars(X, config)
         if not cols:
             return {}
         return _fit_maxabs(X_subset, cols)
 
     @staticmethod
-    def _fit_pandas(X: Any, _y: Any, config: Dict[str, Any]) -> Dict[str, Any]:
+    def _fit_pandas(X: Any, _y: Any, config: dict[str, Any]) -> dict[str, Any]:
         cols, X_subset = _select_subset_pandas(X, config)
         if not cols:
             return {}
         return _fit_maxabs(X_subset, cols)
 
 
-def _fit_maxabs(X_subset: Any, cols: List[str]) -> Dict[str, Any]:
+def _fit_maxabs(X_subset: Any, cols: list[str]) -> dict[str, Any]:
     scaler = MaxAbsScaler()
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     scaler.fit(X_np)

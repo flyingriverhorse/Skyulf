@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, cast
+from typing import cast
 
 import numpy as np
 import polars as pl
@@ -16,7 +16,7 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
 
 def calculate_histogram(
     df: pl.LazyFrame, col_name: str, bins: int = 20
-) -> Optional[List[HistogramBin]]:
+) -> list[HistogramBin] | None:
     """
     Calculates histogram bins for a numeric column using Polars.
     """

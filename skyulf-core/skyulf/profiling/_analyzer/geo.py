@@ -1,7 +1,5 @@
 """Geospatial analysis (lat/lon detection + sample point extraction)."""
 
-from typing import List, Optional
-
 import polars as pl
 
 from ..schemas import GeoPoint, GeospatialStats
@@ -13,11 +11,11 @@ class GeoMixin(_AnalyzerState):
 
     def _analyze_geospatial(
         self,
-        numeric_cols: List[str],
-        target_col: Optional[str] = None,
-        lat_col: Optional[str] = None,
-        lon_col: Optional[str] = None,
-    ) -> Optional[GeospatialStats]:
+        numeric_cols: list[str],
+        target_col: str | None = None,
+        lat_col: str | None = None,
+        lon_col: str | None = None,
+    ) -> GeospatialStats | None:
         """Detect lat/lon columns by name, then return bbox + sample points."""
         try:
             if not lat_col or not lon_col:

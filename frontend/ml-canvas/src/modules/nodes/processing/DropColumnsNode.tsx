@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Trash2, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
@@ -8,6 +8,9 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface DropColumnsConfig {
   columns: string[];
@@ -35,20 +38,8 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
       ? (nodeResult.metrics as Record<string, unknown>)
       : null;
 
-  // Responsive Layout Logic
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450); // Switch to 2-column layout if wider than 450px
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   const recommendations = useRecommendations(nodeId || '', {
     types: ['cleaning', 'feature_selection'],
@@ -63,27 +54,12 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
     }
   };
 
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredColumns = useMemo(() => {
-    return availableColumns.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [availableColumns, searchTerm]);
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: filteredColumns });
-  };
-
-  const handleDeselectAll = () => {
-    const newCols = config.columns.filter(c => !filteredColumns.includes(c));
-    onChange({ ...config, columns: newCols });
-  };
-
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Top Status Bar (Always Visible) */}
       <div className="shrink-0 p-4 pb-0 space-y-2">
         {!datasetId && (
-          <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
             Connect a dataset node to see available columns.
           </div>
         )}
@@ -129,7 +105,7 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
               max="100"
               step="5"
               value={config.missing_threshold ?? 0}
-              onChange={(e) => onChange({ ...config, missing_threshold: parseInt(e.target.value) })}
+              onChange={(e) => onChange({ ...config, missing_threshold: parseIntSafe(e.target.value, config.missing_threshold) })}
               className="w-full h-2 bg-secondary rounded-lg appearance-none cursor-pointer accent-primary"
             />
           </div>
@@ -167,66 +143,16 @@ const DropColumnsSettings: React.FC<{ config: DropColumnsConfig; onChange: (c: D
         </div>
 
         {/* Right Column (Column List) */}
-        <div className={`flex flex-col border rounded-md bg-background shadow-sm overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'h-96 shrink-0'}`}>
-          <div className="p-3 border-b bg-muted/5 space-y-3 shrink-0">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Explicitly Drop Columns</span>
-                <span className="text-xs text-muted-foreground">
-                  {config.columns.length} selected
-                </span>
-            </div>
-
-            {/* Search */}
-            <div className="relative group">
-              <input
-                type="text"
-                placeholder="Search columns..."
-                className="block w-full pl-9 pr-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none"
-                value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); }}
-              />
-            </div>
-
-            <div className="flex gap-2 text-xs justify-end">
-                <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
-                <span className="text-border">|</span>
-                <button onClick={handleDeselectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Deselect All</button>
-            </div>
-          </div>
-
-          {/* Scrollable List */}
-          <div className="flex-1 overflow-y-auto p-1">
-            {availableColumns.length > 0 ? (
-              filteredColumns.length > 0 ? (
-                <div className="space-y-0.5">
-                  {filteredColumns.map(col => (
-                    <label key={col} className="flex items-center gap-2 text-sm hover:bg-accent/50 p-2 rounded cursor-pointer transition-colors select-none">
-                      <input
-                        type="checkbox"
-                        checked={config.columns.includes(col)}
-                        onChange={(e) => {
-                          const newCols = e.target.checked
-                            ? [...config.columns, col]
-                            : config.columns.filter(c => c !== col);
-                          onChange({ ...config, columns: newCols });
-                        }}
-                        className="rounded border-gray-300 text-primary focus:ring-primary w-4 h-4"
-                      />
-                      <span className="truncate font-mono text-xs" title={col}>{col}</span>
-                    </label>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-xs text-muted-foreground text-center py-8">
-                  No columns match &quot;{searchTerm}&quot;
-                </div>
-              )
-            ) : (
-              <div className="text-xs text-muted-foreground italic p-8 text-center">
-                No columns available
-              </div>
-            )}
-          </div>
+        <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+          <ColumnMultiSelect
+            columns={availableColumns}
+            selected={config.columns}
+            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+            label="Explicitly Drop Columns"
+            variant="panel"
+            isLoading={isLoading}
+            fillHeight={isWide}
+          />
         </div>
       </div>
     </div>

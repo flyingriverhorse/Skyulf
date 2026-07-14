@@ -15,7 +15,8 @@ simply don't know enough to validate. False positives on save would be
 worse than missed detections.
 """
 
-from typing import Any, Dict, Iterable, List, Optional, Set
+from collections.abc import Iterable
+from typing import Any
 
 from skyulf.preprocessing import SkyulfSchema
 
@@ -45,7 +46,7 @@ _DICT_KEY_REF_KEYS = ("column_types", "column_mapping", "rename_map")
 # the training strategy which column to use as y. The input to these nodes
 # is a SplitDataset where X already has the target separated out, so the
 # column is intentionally absent from the predicted feature schema.
-_OPTIONAL_PARAM_KEYS: Dict[str, Set[str]] = {
+_OPTIONAL_PARAM_KEYS: dict[str, set[str]] = {
     # TrainTestSplitter: target_column is only for stratification; optional.
     # When FeatureTargetSplitter is upstream the target is already dropped.
     "TrainTestSplitter": {"target_column"},
@@ -72,7 +73,7 @@ _OPTIONAL_PARAM_KEYS: Dict[str, Set[str]] = {
 }
 
 
-def _iter_string_refs(params: Dict[str, Any]) -> Iterable[tuple[str, str]]:
+def _iter_string_refs(params: dict[str, Any]) -> Iterable[tuple[str, str]]:
     """Yield references from single-string param fields (e.g. `target`)."""
     for key in _STRING_REF_KEYS:
         val = params.get(key)
@@ -80,7 +81,7 @@ def _iter_string_refs(params: Dict[str, Any]) -> Iterable[tuple[str, str]]:
             yield key, val
 
 
-def _iter_list_refs(params: Dict[str, Any]) -> Iterable[tuple[str, str]]:
+def _iter_list_refs(params: dict[str, Any]) -> Iterable[tuple[str, str]]:
     """Yield references from list-of-string param fields (e.g. `columns`)."""
     for key in _LIST_REF_KEYS:
         val = params.get(key)
@@ -91,18 +92,18 @@ def _iter_list_refs(params: Dict[str, Any]) -> Iterable[tuple[str, str]]:
                 yield key, item
 
 
-def _iter_dict_key_refs(params: Dict[str, Any]) -> Iterable[tuple[str, str]]:
+def _iter_dict_key_refs(params: dict[str, Any]) -> Iterable[tuple[str, str]]:
     """Yield references from dict-keyed param fields (e.g. `column_types`)."""
     for key in _DICT_KEY_REF_KEYS:
         val = params.get(key)
         if not isinstance(val, dict):
             continue
-        for col in val.keys():
+        for col in val:
             if isinstance(col, str) and col:
                 yield key, col
 
 
-def _iter_referenced_columns(params: Dict[str, Any]) -> Iterable[tuple[str, str]]:
+def _iter_referenced_columns(params: dict[str, Any]) -> Iterable[tuple[str, str]]:
     """Yield ``(field_name, column_name)`` for every column reference in params."""
     yield from _iter_string_refs(params)
     yield from _iter_list_refs(params)
@@ -111,8 +112,8 @@ def _iter_referenced_columns(params: Dict[str, Any]) -> Iterable[tuple[str, str]
 
 def _upstream_schema(
     node: NodeConfig,
-    predicted: Dict[str, Optional[SkyulfSchema]],
-) -> Optional[SkyulfSchema]:
+    predicted: dict[str, SkyulfSchema | None],
+) -> SkyulfSchema | None:
     """Pick the upstream predicted schema the node actually consumes."""
     if not node.inputs:
         return None
@@ -122,8 +123,8 @@ def _upstream_schema(
 
 def find_broken_references(
     config: PipelineConfig,
-    predicted_schemas: Dict[str, Optional[SkyulfSchema]],
-) -> List[Dict[str, Any]]:
+    predicted_schemas: dict[str, SkyulfSchema | None],
+) -> list[dict[str, Any]]:
     """Return a list of broken column references.
 
     Each entry: ``{"node_id", "field", "column", "upstream_node_id"}``.
@@ -136,7 +137,7 @@ def find_broken_references(
         List of broken-reference dicts (empty when nothing to flag).
         Nodes whose upstream schema is unknown (``None``) are skipped.
     """
-    broken: List[Dict[str, Any]] = []
+    broken: list[dict[str, Any]] = []
 
     for node in config.nodes:
         upstream = _upstream_schema(node, predicted_schemas)
@@ -144,7 +145,7 @@ def find_broken_references(
             continue
         upstream_id = node.inputs[0] if node.inputs else None
         step = node.step_type.value if hasattr(node.step_type, "value") else str(node.step_type)
-        optional_keys: Set[str] = _OPTIONAL_PARAM_KEYS.get(step, set())
+        optional_keys: set[str] = _OPTIONAL_PARAM_KEYS.get(step, set())
         for field_name, col in _iter_referenced_columns(node.params):
             if field_name in optional_keys:
                 continue

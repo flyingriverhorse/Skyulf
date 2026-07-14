@@ -9,9 +9,10 @@ It provides better concurrency support compared to the Flask implementation.
 
 import logging
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import UTC
 from pathlib import Path
-from typing import AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +36,7 @@ from backend.exceptions.handlers import (
     method_not_allowed_exception_handler,
     not_found_exception_handler,
     skyulf_exception_handler,
+    unauthorized_exception_handler,
     validation_exception_handler,
 )
 from backend.health.routes import router as health_router
@@ -168,7 +170,7 @@ def _reset_stale_jobs() -> None:
     Celery workers (which survive API restarts) are not incorrectly failed.
     """
     try:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         from sqlalchemy import create_engine, text
 
@@ -183,7 +185,7 @@ def _reset_stale_jobs() -> None:
         # Only treat jobs as orphaned if they have been stuck for > 2 hours.
         # This protects Celery-managed jobs that may still be running after
         # the API process restarts.
-        stale_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=2)
+        stale_cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=2)
         with engine.begin() as conn:
             for table in ("basic_training_jobs", "advanced_tuning_jobs"):
                 # `table` is drawn only from the fixed tuple above (never user input),
@@ -368,7 +370,6 @@ def _include_routers(app: FastAPI) -> None:
 
     # ML Pipeline — canonical path is /api/pipeline.
     app.include_router(ml_pipeline_router, prefix="/api/pipeline")
-    app.include_router(model_registry_router, prefix="/api/ml", tags=["Model Registry"])
 
     app.include_router(deployment_router, prefix="/api", tags=["Deployment"])
     app.include_router(model_registry_router, prefix="/api", tags=["Model Registry"])
@@ -426,6 +427,10 @@ def _add_exception_handlers(app: FastAPI) -> None:
 
     # Handle 404 Not Found
     app.add_exception_handler(404, not_found_exception_handler)
+
+    # Handle 401 Unauthorized / 403 Forbidden
+    app.add_exception_handler(401, unauthorized_exception_handler)
+    app.add_exception_handler(403, unauthorized_exception_handler)
 
     # Handle 405 Method Not Allowed
     app.add_exception_handler(405, method_not_allowed_exception_handler)

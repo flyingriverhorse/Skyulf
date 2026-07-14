@@ -18,7 +18,6 @@ import {
   Sparkles,
   Gauge,
   MoreHorizontal,
-  BookOpen,
   Trash2,
 } from 'lucide-react';
 import { useGraphStore, useTemporalStore } from '../../core/store/useGraphStore';
@@ -41,6 +40,8 @@ import { usePipelineActions } from './toolbar/_hooks/usePipelineActions';
 import { CanvasLegend } from './toolbar/CanvasLegend';
 import { RecentPipelinesMenu } from './toolbar/RecentPipelinesMenu';
 import { VersionLoadMenu } from './toolbar/VersionLoadMenu';
+import { ToolbarIconButton } from './toolbar/ToolbarIconButton';
+import { NotebookExportMenuItems } from './toolbar/NotebookExportMenuItems';
 
 export const Toolbar: React.FC = () => {
   const nodes = useGraphStore((state) => state.nodes);
@@ -205,69 +206,59 @@ export const Toolbar: React.FC = () => {
         }`}
       >
         <div className="relative">
-          <button
+          <ToolbarIconButton
+            icon={<HelpCircle className="w-4 h-4" />}
             onClick={() => setShowLegend((v) => !v)}
             title="Show node badge legend"
-            aria-label="Show node badge legend"
-            aria-expanded={showLegend}
-            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
-          >
-            <HelpCircle className="w-4 h-4" />
-          </button>
+            ariaLabel="Show node badge legend"
+            ariaExpanded={showLegend}
+            focusRing={false}
+          />
         </div>
-        <button
+        <ToolbarIconButton
+          icon={<Keyboard className="w-4 h-4" />}
           onClick={() => window.dispatchEvent(new CustomEvent(SHOW_SHORTCUTS_EVENT))}
           title="Keyboard shortcuts (?)"
-          aria-label="Keyboard shortcuts"
-          className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors focus-ring"
-        >
-          <Keyboard className="w-4 h-4" />
-        </button>
+          ariaLabel="Keyboard shortcuts"
+        />
         {!readOnly && (
-          <button
+          <ToolbarIconButton
+            icon={<Command className="w-4 h-4" />}
             onClick={() => window.dispatchEvent(new CustomEvent(SHOW_PALETTE_EVENT))}
             title="Command palette (Ctrl/Cmd+K)"
-            aria-label="Open command palette"
-            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors focus-ring"
-          >
-            <Command className="w-4 h-4" />
-          </button>
+            ariaLabel="Open command palette"
+          />
         )}
         {!readOnly && (
-          <button
+          <ToolbarIconButton
+            icon={<Redo2 className="w-4 h-4" />}
             onClick={() => redo()}
             disabled={!canRedo}
             title="Redo (Ctrl+Shift+Z)"
-            aria-label="Redo"
-            data-testid="toolbar-redo"
-            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
-          >
-            <Redo2 className="w-4 h-4" />
-          </button>
+            ariaLabel="Redo"
+            testId="toolbar-redo"
+          />
         )}
         {!readOnly && (
-          <button
+          <ToolbarIconButton
+            icon={<Undo2 className="w-4 h-4" />}
             onClick={() => undo()}
             disabled={!canUndo}
             title="Undo (Ctrl+Z)"
-            aria-label="Undo"
-            data-testid="toolbar-undo"
-            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
-          >
-            <Undo2 className="w-4 h-4" />
-          </button>
+            ariaLabel="Undo"
+            testId="toolbar-undo"
+          />
         )}
         {!readOnly && (
-          <button
+          <ToolbarIconButton
+            icon={<Trash2 className="w-4 h-4" />}
             onClick={() => { void handleClearCanvas(); }}
             disabled={!canClear}
             title="Clear canvas (Ctrl+Z to undo)"
-            aria-label="Clear canvas"
-            data-testid="toolbar-clear-canvas"
-            className="flex items-center justify-center w-10 h-10 bg-background border rounded-md shadow-sm hover:bg-red-50 hover:text-red-600 hover:border-red-300 dark:hover:bg-red-950/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus-ring"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+            ariaLabel="Clear canvas"
+            testId="toolbar-clear-canvas"
+            variant="danger"
+          />
         )}
         {showLegend && <CanvasLegend onClose={() => setShowLegend(false)} />}
       </div>
@@ -355,25 +346,11 @@ export const Toolbar: React.FC = () => {
               >
                 <Download className="w-4 h-4" /> Export SVG
               </button>
-              {currentDatasetId && (
-                <>
-                  <div className="border-t my-1" />
-                  <button
-                    role="menuitem"
-                    onClick={() => { setShowMoreMenu(false); void exportNotebook('compact'); }}
-                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
-                  >
-                    <BookOpen className="w-4 h-4" /> Notebook (compact)
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => { setShowMoreMenu(false); void exportNotebook('full'); }}
-                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
-                  >
-                    <BookOpen className="w-4 h-4" /> Notebook (full)
-                  </button>
-                </>
-              )}
+              <NotebookExportMenuItems
+                currentDatasetId={currentDatasetId}
+                onExportNotebook={exportNotebook}
+                onBeforeSelect={() => setShowMoreMenu(false)}
+              />
             </div>
           )}
         </div>
@@ -553,25 +530,11 @@ export const Toolbar: React.FC = () => {
               >
                 SVG (vector)
               </button>
-              {currentDatasetId && (
-                <>
-                  <div className="border-t my-1" />
-                  <button
-                    role="menuitem"
-                    onClick={() => { setShowExportMenu(false); void exportNotebook('compact'); }}
-                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
-                  >
-                    <BookOpen className="w-4 h-4" /> Notebook (compact)
-                  </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => { setShowExportMenu(false); void exportNotebook('full'); }}
-                    className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm hover:bg-accent"
-                  >
-                    <BookOpen className="w-4 h-4" /> Notebook (full)
-                  </button>
-                </>
-              )}
+              <NotebookExportMenuItems
+                currentDatasetId={currentDatasetId}
+                onExportNotebook={exportNotebook}
+                onBeforeSelect={() => setShowExportMenu(false)}
+              />
             </div>
           )}
         </div>

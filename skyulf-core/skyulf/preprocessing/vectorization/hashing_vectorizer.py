@@ -10,7 +10,7 @@ Output is **always dense**.  Column names use the indexed scheme
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -29,10 +29,10 @@ _DEFAULT_N_FEATURES = 1_024
 # ── Apply ─────────────────────────────────────────────────────────────────────
 
 
-def _hash_apply_pandas(X: pd.DataFrame, y: Any, params: Dict[str, Any]) -> Tuple[pd.DataFrame, Any]:
-    cols: List[str] = params.get("columns", [])
-    vectorizer: Optional[HashingVectorizer] = params.get("vectorizer_object")
-    output_columns: List[str] = params.get("output_columns", [])
+def _hash_apply_pandas(X: pd.DataFrame, y: Any, params: dict[str, Any]) -> tuple[pd.DataFrame, Any]:
+    cols: list[str] = params.get("columns", [])
+    vectorizer: HashingVectorizer | None = params.get("vectorizer_object")
+    output_columns: list[str] = params.get("output_columns", [])
     drop_original: bool = params.get("drop_original", False)
 
     if not cols or vectorizer is None or not output_columns:
@@ -60,7 +60,7 @@ def _hash_apply_pandas(X: pd.DataFrame, y: Any, params: Dict[str, Any]) -> Tuple
 
 class HashingVectorizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _hash_apply_pandas)
 
 
@@ -89,14 +89,14 @@ class HashingVectorizerApplier(BaseApplier):
     tags=["text", "nlp", "hashing", "vectorizer", "stateless"],
 )
 class HashingVectorizerCalculator(BaseCalculator):
-    def infer_output_schema(self, input_schema: Any, config: Dict[str, Any]) -> None:
+    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         # n_features is fixed by config, but we still return None because the
         # source column list may not be known without seeing data.
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> HashingVectorizerArtifact:  # pylint: disable=arguments-differ
-        cols: List[str] = config.get("columns", [])
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> HashingVectorizerArtifact:  # pylint: disable=arguments-differ
+        cols: list[str] = config.get("columns", [])
         if not cols:
             return {}
 
@@ -108,10 +108,10 @@ class HashingVectorizerCalculator(BaseCalculator):
             return {}
 
         n_features: int = int(config.get("n_features", _DEFAULT_N_FEATURES))
-        norm: Optional[str] = config.get("norm", "l2") or None
+        norm: str | None = config.get("norm", "l2") or None
         alternate_sign: bool = bool(config.get("alternate_sign", True))
         lowercase: bool = bool(config.get("lowercase", True))
-        stop_words: Optional[str] = config.get("stop_words") or None
+        stop_words: str | None = config.get("stop_words") or None
 
         vectorizer = HashingVectorizer(
             n_features=n_features,

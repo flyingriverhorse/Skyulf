@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Zap, Search, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { Zap, ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { clickableProps } from '../../../core/utils/a11y';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface PolynomialFeaturesConfig {
   columns: string[];
@@ -15,72 +16,6 @@ interface PolynomialFeaturesConfig {
   include_input_features: boolean;
   isExpanded?: boolean;
 }
-
-const ColumnSelector: React.FC<{
-  columns: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-  label?: string;
-}> = ({ columns, selected, onChange, label }) => {
-  const [search, setSearch] = useState('');
-
-  const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
-
-  const toggle = (col: string) => {
-    if (selected.includes(col)) {
-      onChange(selected.filter(c => c !== col));
-    } else {
-      onChange([...selected, col]);
-    }
-  };
-
-  return (
-    <div className="space-y-1.5">
-      {label && <label className="text-xs font-medium text-muted-foreground">{label}</label>}
-      <div className="border rounded bg-background overflow-hidden flex flex-col">
-        <div className="flex items-center px-2 py-1.5 border-b bg-muted/20">
-          <Search size={12} className="text-muted-foreground mr-1.5" />
-          <input
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
-            placeholder="Search columns..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); }}
-          />
-        </div>
-        <div className="max-h-32 overflow-y-auto p-1 space-y-0.5">
-          {filtered.length > 0 ? (
-            filtered.map(col => {
-              const isSelected = selected.includes(col);
-              return (
-                <div
-                  key={col}
-                  {...clickableProps(() => { toggle(col); })}
-                  className={`
-                    flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
-                    ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent text-foreground'}
-                  `}
-                >
-                  <div className={`
-                    w-3 h-3 rounded border flex items-center justify-center
-                    ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'}
-                  `}>
-                    {isSelected && <div className="w-1.5 h-1.5 bg-current rounded-sm" />}
-                  </div>
-                  <span className="truncate">{col}</span>
-                </div>
-              );
-            })
-          ) : (
-            <div className="p-2 text-xs text-muted-foreground text-center">No columns found</div>
-          )}
-        </div>
-      </div>
-      <div className="text-[10px] text-muted-foreground text-right">
-        {selected.length} selected
-      </div>
-    </div>
-  );
-};
 
 export const PolynomialFeaturesNode: NodeDefinition = {
   type: 'PolynomialFeaturesNode',
@@ -128,8 +63,11 @@ export const PolynomialFeaturesNode: NodeDefinition = {
       updateConfig({ isExpanded: !config.isExpanded });
     };
 
+    // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+    const [containerRef, isWide] = useIsWideContainer();
+
     return (
-      <div className="space-y-2 min-w-[280px]">
+      <div ref={containerRef} className="space-y-2 w-full">
         <div className="border rounded-md bg-card">
           <div
             className="flex items-center justify-between p-2 cursor-pointer hover:bg-accent/50 transition-colors"
@@ -143,13 +81,15 @@ export const PolynomialFeaturesNode: NodeDefinition = {
           </div>
 
           {config.isExpanded && (
-            <div className="p-3 space-y-4 border-t">
+            <div className={`p-3 border-t gap-4 ${isWide ? 'grid grid-cols-2 items-start' : 'space-y-4'}`}>
 
-              <ColumnSelector
+              <ColumnMultiSelect
                 label="Input Columns (Numeric)"
                 columns={numericColumns}
                 selected={config.columns || []}
                 onChange={(cols) => updateConfig({ columns: cols })}
+                variant="compact"
+                showFooterCount={true}
               />
 
               <div className="space-y-3">

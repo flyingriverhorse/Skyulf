@@ -2,8 +2,9 @@
 
 import math
 from difflib import SequenceMatcher
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
+import numpy as np
 import pandas as pd
 
 # --- Optional Dependencies ---
@@ -45,13 +46,38 @@ ALLOWED_DATETIME_FEATURES = {
     "time_of_day",
 }
 
-_FUZZ_METHODS: Dict[str, str] = {
+_FUZZ_METHODS: dict[str, str] = {
     "token_sort_ratio": "token_sort_ratio",
     "token_set_ratio": "token_set_ratio",
 }
 
+# Shared bucketing conventions for the "season" and "time_of_day" datetime
+# features, so both the pandas and polars engines produce identical labels.
+SEASON_BY_MONTH: dict[int, str] = {
+    12: "Winter",
+    1: "Winter",
+    2: "Winter",
+    3: "Spring",
+    4: "Spring",
+    5: "Spring",
+    6: "Summer",
+    7: "Summer",
+    8: "Summer",
+    9: "Autumn",
+    10: "Autumn",
+    11: "Autumn",
+}
+# (min_hour, max_hour, label) buckets, inclusive on both ends. "Night" wraps
+# around midnight (21-23 and 0-4) and is used as the catch-all default.
+TIME_OF_DAY_BUCKETS: list[tuple[int, int, str]] = [
+    (5, 11, "Morning"),
+    (12, 16, "Afternoon"),
+    (17, 20, "Evening"),
+]
+TIME_OF_DAY_DEFAULT = "Night"
 
-def _coerce_float(value: Any) -> Optional[float]:
+
+def _coerce_float(value: Any) -> float | None:
     if value is None:
         return None
     try:
@@ -63,11 +89,15 @@ def _coerce_float(value: Any) -> Optional[float]:
 
 def _safe_divide(numerator: pd.Series, denominator: pd.Series, epsilon: float) -> pd.Series:
     adjusted = denominator.copy()
-    adjusted = adjusted.replace({0: epsilon, -0.0: epsilon})
-    adjusted = adjusted.fillna(epsilon)
-    mask = adjusted.abs() < epsilon
-    if mask.any():
-        adjusted[mask] = epsilon
+    near_zero = adjusted.isna() | (adjusted.abs() < epsilon)
+    if near_zero.any():
+        # Preserve the sign of the original denominator when clamping its
+        # magnitude to epsilon, so a small negative denominator doesn't flip
+        # the sign of the result. NaN defaults to positive epsilon.
+        signed_epsilon = pd.Series(
+            np.copysign(epsilon, adjusted.fillna(1.0).to_numpy()), index=adjusted.index
+        )
+        adjusted = adjusted.where(~near_zero, signed_epsilon)
     return numerator / adjusted
 
 
@@ -112,7 +142,7 @@ def _vectorised_similarity(s_a: pd.Series, s_b: pd.Series, method: str) -> pd.Se
 
 
 def _resolve_output_col(
-    op: Dict[str, Any], i: int, existing: List[str], allow_overwrite: bool
+    op: dict[str, Any], i: int, existing: list[str], allow_overwrite: bool
 ) -> str:
     """Pick a non-colliding output column name for op ``i``."""
     output_col = op.get("output_column")
@@ -128,7 +158,7 @@ def _resolve_output_col(
     return output_col
 
 
-def _resolve_similarity_pair(op: Dict[str, Any], existing: List[str]) -> Optional[Tuple[str, str]]:
+def _resolve_similarity_pair(op: dict[str, Any], existing: list[str]) -> tuple[str, str] | None:
     """Return ``(col_a, col_b)`` for similarity ops, or ``None`` if unresolved."""
     inputs = op.get("input_columns", [])
     secondary = op.get("secondary_columns", [])
@@ -139,9 +169,7 @@ def _resolve_similarity_pair(op: Dict[str, Any], existing: List[str]) -> Optiona
     return col_a, col_b
 
 
-def _resolve_group_agg_cols(
-    op: Dict[str, Any], existing: List[str]
-) -> Optional[Tuple[str, str, str]]:
+def _resolve_group_agg_cols(op: dict[str, Any], existing: list[str]) -> tuple[str, str, str] | None:
     """Return ``(group_col, target_col, method)`` if op is well-formed, else None."""
     group_cols = [c for c in op.get("input_columns", []) if c in existing]
     target_cols = [c for c in op.get("secondary_columns", []) if c in existing]

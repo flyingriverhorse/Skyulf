@@ -1,6 +1,6 @@
 """Central registry: maps model_key → param list, plus search-space dicts."""
 
-from typing import Any, Dict, List
+from typing import Any
 
 from ._bayes import BERNOULLI_NB_PARAMS, GAUSSIAN_NB_PARAMS, MULTINOMIAL_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
@@ -72,7 +72,7 @@ MODEL_HYPERPARAMETERS = {
 }
 
 
-def get_hyperparameters(model_key: str) -> List[Dict[str, Any]]:
+def get_hyperparameters(model_key: str) -> list[dict[str, Any]]:
     params = MODEL_HYPERPARAMETERS.get(model_key, [])
     return [p.to_dict() for p in params]
 
@@ -81,7 +81,7 @@ def get_hyperparameters(model_key: str) -> List[Dict[str, Any]]:
 # Default search spaces
 # Used to populate the UI for Hyperparameter Tuning.
 # ---------------------------------------------------------------------------
-DEFAULT_SEARCH_SPACES: Dict[str, Any] = {
+DEFAULT_SEARCH_SPACES: dict[str, Any] = {
     "logistic_regression": {
         "C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
         "penalty": ["l1", "l2", "elasticnet"],
@@ -292,7 +292,7 @@ DEFAULT_SEARCH_SPACES: Dict[str, Any] = {
 # DEFAULT_SEARCH_SPACES above are designed for random / optuna /
 # halving_random where only a subset of combinations is ever evaluated.
 # ---------------------------------------------------------------------------
-GRID_SEARCH_SPACES: Dict[str, Any] = {
+GRID_SEARCH_SPACES: dict[str, Any] = {
     "logistic_regression": {
         "C": [0.01, 0.1, 1.0, 10.0],
         "penalty": ["l1", "l2"],
@@ -469,7 +469,7 @@ GRID_SEARCH_SPACES: Dict[str, Any] = {
 _GRID_STRATEGIES = {"grid", "halving_grid"}
 
 
-def get_default_search_space(model_key: str, strategy: str = "random") -> Dict[str, Any]:
+def get_default_search_space(model_key: str, strategy: str = "random") -> dict[str, Any]:
     """Return the default search space for *model_key*.
 
     For grid-based strategies (``grid`` / ``halving_grid``) the trimmed
@@ -488,7 +488,7 @@ def get_default_search_space(model_key: str, strategy: str = "random") -> Dict[s
 # to its registry key so its parameter grid can be expanded into nested
 # ``<name>__<param>`` keys understood by sklearn's Voting/Stacking estimators.
 # ---------------------------------------------------------------------------
-_BASE_KEY_TO_REGISTRY_CLF: Dict[str, str] = {
+_BASE_KEY_TO_REGISTRY_CLF: dict[str, str] = {
     "logistic_regression": "logistic_regression",
     "random_forest": "random_forest_classifier",
     "extra_trees": "extra_trees_classifier",
@@ -503,7 +503,7 @@ _BASE_KEY_TO_REGISTRY_CLF: Dict[str, str] = {
     "lightgbm": "lgbm_classifier",
 }
 
-_BASE_KEY_TO_REGISTRY_REG: Dict[str, str] = {
+_BASE_KEY_TO_REGISTRY_REG: dict[str, str] = {
     "linear_regression": "linear_regression",
     "ridge": "ridge_regression",
     "lasso": "lasso_regression",
@@ -523,12 +523,12 @@ _BASE_KEY_TO_REGISTRY_REG: Dict[str, str] = {
 
 def build_ensemble_search_space(
     ensemble_key: str,
-    base_estimators: List[str],
+    base_estimators: list[str],
     final_estimator: str = "",
     strategy: str = "random",
     problem_type: str = "classification",
     calibrate_base_models: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Expand an ensemble's base learners into a nested tuning search space.
 
     Combines the ensemble's own meta-params (``voting`` / ``cv``) with each
@@ -542,7 +542,7 @@ def build_ensemble_search_space(
     deeper — keys become ``<name>__estimator__<param>``. The final estimator is
     never calibrated, so its prefix is unchanged.
     """
-    space: Dict[str, Any] = dict(get_default_search_space(ensemble_key, strategy))
+    space: dict[str, Any] = dict(get_default_search_space(ensemble_key, strategy))
     mapping = (
         _BASE_KEY_TO_REGISTRY_CLF if problem_type == "classification" else _BASE_KEY_TO_REGISTRY_REG
     )

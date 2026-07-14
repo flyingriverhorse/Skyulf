@@ -1,6 +1,6 @@
 """Deduplicate node (drop duplicate rows, y-synced)."""
 
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -16,7 +16,7 @@ def _normalize_keep(keep: Any) -> Any:
     return False if keep == "none" else keep
 
 
-def _dedup_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _dedup_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     keep = _normalize_keep(params.get("keep", "first"))
     subset = _normalize_subset(params.get("subset"), list(X.columns))
 
@@ -37,7 +37,7 @@ def _dedup_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
     return X_dedup.drop("__idx__"), _polars_filter_y_by_kept_indices(y, kept)
 
 
-def _dedup_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _dedup_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     keep = _normalize_keep(params.get("keep", "first"))
     subset = _normalize_subset(params.get("subset"), list(X.columns))
 
@@ -49,7 +49,7 @@ def _dedup_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
 
 class DeduplicateApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         # Note: dedup must propagate row drops to y, so we route X+y as a tuple
         # through apply_dual_engine which handles unpack/pack.
         return apply_dual_engine(
@@ -70,12 +70,12 @@ class DeduplicateApplier(BaseApplier):
 )
 class DeduplicateCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Deduplication removes rows; column set is preserved.
         return input_schema
 
-    def fit(self, df: Any, config: Dict[str, Any]) -> DeduplicateArtifact:
+    def fit(self, df: Any, config: dict[str, Any]) -> DeduplicateArtifact:
         return {
             "type": "deduplicate",
             "subset": config.get("subset"),

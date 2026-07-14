@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator, List
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -35,10 +35,10 @@ async def deploy_model(
         # Enrich with schema
         return await DeploymentService.get_deployment_details(session, deployment)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception:
         logger.exception("Failed to deploy model for job %s", job_id)
-        raise SkyulfException(message="Failed to deploy model")
+        raise SkyulfException(message="Failed to deploy model") from None
 
 
 @router.get("/active", response_model=DeploymentInfo)
@@ -54,7 +54,7 @@ async def get_active_deployment(session: AsyncSession = Depends(get_async_sessio
     return await DeploymentService.get_deployment_details(session, deployment)
 
 
-@router.get("/history", response_model=List[DeploymentInfo])
+@router.get("/history", response_model=list[DeploymentInfo])
 async def list_deployments(
     limit: int = 50, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
@@ -95,7 +95,7 @@ async def predict(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception:
         logger.exception("Prediction failed")
-        raise HTTPException(status_code=500, detail="Prediction failed")
+        raise HTTPException(status_code=500, detail="Prediction failed") from None

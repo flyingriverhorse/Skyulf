@@ -9,7 +9,7 @@ the chain is sane (no unexpected NaNs, correct dtypes/columns) — the same
 "fit once, apply many" contract the real ``SkyulfPipeline`` relies on.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -39,7 +39,7 @@ from skyulf.preprocessing.scaling.standard import (
 
 
 def _fit_apply(
-    calculator: Any, applier: Any, df: pd.DataFrame, config: Dict[str, Any]
+    calculator: Any, applier: Any, df: pd.DataFrame, config: dict[str, Any]
 ) -> pd.DataFrame:
     """Run ``calculator.fit`` then ``applier.apply`` and return the transformed frame."""
     params = calculator.fit(df, config)

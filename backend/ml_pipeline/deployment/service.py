@@ -1,6 +1,7 @@
 import logging
-import os
-from typing import Any, Dict, List, Optional, Sequence, Union, cast
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any, cast
 
 import pandas as pd
 import sklearn
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _maybe_decode_predictions(
     predictions: Any,
     feature_engineer: Any,
-    target_column: Optional[str] = None,
+    target_column: str | None = None,
 ) -> Any:
     """Decode numeric class predictions to original labels if possible.
 
@@ -52,7 +53,7 @@ def _maybe_decode_predictions(
 class DeploymentService:
     @staticmethod
     async def deploy_model(
-        session: AsyncSession, job_id: str, user_id: Optional[int] = None
+        session: AsyncSession, job_id: str, user_id: int | None = None
     ) -> Deployment:
         # 1. Get Job Entity
         db_job = await JobService.get_job_by_id(session, job_id)
@@ -82,7 +83,7 @@ class DeploymentService:
         # We need to store the pipeline_id to know where to look for the artifact
         # For now, we'll append it to the artifact_uri if it's just a node_id
         # Or better, we assume the store path logic is consistent.
-        # In api.py: persistent_path = os.path.join(os.getcwd(), "exports", "models", config.pipeline_id)
+        # In api.py: persistent_path = Path.cwd() / "exports" / "models" / config.pipeline_id
         # So we need pipeline_id to reconstruct the path.
         # Let's store "pipeline_id/node_id" as the URI if it's not already.
 
@@ -97,10 +98,10 @@ class DeploymentService:
                     # Assume it's a prefix, append job_id.joblib
                     final_uri = f"{artifact_uri.rstrip('/')}/{job_id}.joblib"
             # Check if it's a directory on disk
-            elif os.path.isdir(artifact_uri):
+            elif Path(artifact_uri).is_dir():
                 # The artifact is likely named {job_id}.joblib inside it.
                 # We construct the full path to the file so predict() can parse it correctly.
-                final_uri = os.path.join(artifact_uri, f"{job_id}.joblib")
+                final_uri = str(Path(artifact_uri) / f"{job_id}.joblib")
             elif not artifact_uri.endswith(".joblib") and not artifact_uri.endswith(".pkl"):
                 # Not a directory, and no extension. Assume it's a node_id or job_id.
                 # Construct the abstract URI for exports/models
@@ -123,7 +124,7 @@ class DeploymentService:
         return deployment
 
     @staticmethod
-    async def get_active_deployment(session: AsyncSession) -> Optional[Deployment]:
+    async def get_active_deployment(session: AsyncSession) -> Deployment | None:
         stmt = select(Deployment).where(Deployment.is_active).order_by(Deployment.created_at.desc())
         result = await session.execute(stmt)
         return result.scalars().first()
@@ -171,29 +172,29 @@ class DeploymentService:
                     store_uri = f"s3://{bucket}"
             else:
                 # Local path handling
-                if os.path.isabs(uri):
-                    store_uri = os.path.dirname(uri)
-                    artifact_key = os.path.basename(uri)
+                if Path(uri).is_absolute():
+                    store_uri = str(Path(uri).parent)
+                    artifact_key = Path(uri).name
                 elif "/" in uri or "\\" in uri:
-                    if not os.path.exists(uri) and not os.path.exists(os.path.dirname(uri)):
+                    if not Path(uri).exists() and not Path(uri).parent.exists():
                         parts = uri.replace("\\", "/").split("/")
                         if len(parts) == 2:
                             pipeline_id = parts[0]
                             node_id = parts[1]
-                            store_uri = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                            store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
                             artifact_key = node_id
                         else:
-                            store_uri = os.path.dirname(uri)
-                            artifact_key = os.path.basename(uri)
+                            store_uri = str(Path(uri).parent)
+                            artifact_key = Path(uri).name
                     else:
-                        store_uri = os.path.dirname(uri)
-                        artifact_key = os.path.basename(uri)
+                        store_uri = str(Path(uri).parent)
+                        artifact_key = Path(uri).name
                 else:
                     parts = uri.split("/")
                     if len(parts) >= 2:
                         pipeline_id = parts[0]
                         node_id = parts[1]
-                        store_uri = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                        store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
                         artifact_key = node_id
                     else:
                         raise ValueError(f"Invalid artifact URI format: {uri}")
@@ -203,7 +204,7 @@ class DeploymentService:
 
         except Exception as e:
             logger.error(f"Failed to load artifact: {e}")
-            raise ValueError(f"Could not load model artifact: {deployment.artifact_uri}")
+            raise ValueError(f"Could not load model artifact: {deployment.artifact_uri}") from e
 
         # Handle tuple artifact (model, metadata/tuning_result) from TunerCalculator
         if isinstance(artifact, tuple) and len(artifact) >= 1:
@@ -251,7 +252,7 @@ class DeploymentService:
                     X_transformed = feature_engineer.transform(df)
             except Exception as e:
                 logger.error(f"Feature engineering failed: {e}")
-                raise ValueError(f"Feature engineering failed: {str(e)}")
+                raise ValueError(f"Feature engineering failed: {str(e)}") from e
 
             # Predict
             try:
@@ -260,11 +261,11 @@ class DeploymentService:
                     predictions, feature_engineer, target_column=target_col
                 )
                 if hasattr(predictions, "tolist"):
-                    return cast(List[Any], predictions.tolist())
+                    return cast(list[Any], predictions.tolist())
                 return list(predictions)
             except Exception as e:
                 logger.error(f"Prediction failed: {e}")
-                raise ValueError(f"Prediction failed: {str(e)}")
+                raise ValueError(f"Prediction failed: {str(e)}") from e
 
         # Legacy support or direct model loading (if artifact is just the model)
         elif hasattr(artifact, "predict"):
@@ -284,7 +285,7 @@ class DeploymentService:
 
             predictions = artifact.predict(df)
             if hasattr(predictions, "tolist"):
-                return cast(List[Any], predictions.tolist())
+                return cast(list[Any], predictions.tolist())
             return list(predictions)
         else:
             raise ValueError(
@@ -294,7 +295,7 @@ class DeploymentService:
     @staticmethod
     async def get_deployment_details(  # noqa: C901  # orchestrator: aggregates many optional fields
         session: AsyncSession, deployment: Deployment
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Returns deployment info enriched with input/output schema from the artifact.
         """
@@ -305,7 +306,7 @@ class DeploymentService:
         try:
             # Load Artifact (Reuse logic from predict - simplified)
             artifact_uri = str(deployment.artifact_uri)
-            store: Union[S3ArtifactStore, LocalArtifactStore]
+            store: S3ArtifactStore | LocalArtifactStore
 
             if artifact_uri.startswith("s3://"):
                 # Parse bucket and key: s3://bucket/key
@@ -326,44 +327,33 @@ class DeploymentService:
                 store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
                 artifact = store.load(key)
 
-            elif os.path.isabs(artifact_uri):
-                base_path = os.path.dirname(artifact_uri)
-                node_id = os.path.basename(artifact_uri)
+            elif Path(artifact_uri).is_absolute():
+                base_path = str(Path(artifact_uri).parent)
+                node_id = Path(artifact_uri).name
                 store = LocalArtifactStore(base_path)
-                if store.exists(node_id):
-                    artifact = store.load(node_id)
-                else:
-                    artifact = None
+                artifact = store.load(node_id) if store.exists(node_id) else None
             elif "/" in artifact_uri or "\\" in artifact_uri:
-                if not os.path.exists(artifact_uri) and not os.path.exists(
-                    os.path.dirname(artifact_uri)
-                ):
+                if not Path(artifact_uri).exists() and not Path(artifact_uri).parent.exists():
                     parts = artifact_uri.replace("\\", "/").split("/")
                     if len(parts) == 2:
                         pipeline_id = parts[0]
                         node_id = parts[1]
-                        base_path = os.path.join(os.getcwd(), "exports", "models", pipeline_id)
+                        base_path = str(Path.cwd() / "exports" / "models" / pipeline_id)
                     else:
-                        base_path = os.path.dirname(artifact_uri)
-                        node_id = os.path.basename(artifact_uri)
+                        base_path = str(Path(artifact_uri).parent)
+                        node_id = Path(artifact_uri).name
                 else:
-                    base_path = os.path.dirname(artifact_uri)
-                    node_id = os.path.basename(artifact_uri)
+                    base_path = str(Path(artifact_uri).parent)
+                    node_id = Path(artifact_uri).name
 
                 store = LocalArtifactStore(base_path)
-                if store.exists(node_id):
-                    artifact = store.load(node_id)
-                else:
-                    artifact = None
+                artifact = store.load(node_id) if store.exists(node_id) else None
             else:
                 # Fallback
-                base_path = os.getcwd()
+                base_path = str(Path.cwd())
                 node_id = artifact_uri
                 store = LocalArtifactStore(base_path)
-                if store.exists(node_id):
-                    artifact = store.load(node_id)
-                else:
-                    artifact = None
+                artifact = store.load(node_id) if store.exists(node_id) else None
 
             if artifact:
                 # Handle tuple
@@ -430,4 +420,4 @@ class DeploymentService:
         except Exception as e:
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
 
-        return cast(Dict[str, Any], info)
+        return cast(dict[str, Any], info)

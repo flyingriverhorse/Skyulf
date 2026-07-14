@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -32,9 +32,9 @@ class DataService:
 
     async def load_file(
         self,
-        path: Union[str, Path],
-        force_type: Optional[str] = None,
-        storage_options: Optional[dict] = None,
+        path: str | Path,
+        force_type: str | None = None,
+        storage_options: dict | None = None,
     ) -> Any:
         """
         Loads a file into a DataFrame (Polars or Pandas).
@@ -79,7 +79,7 @@ class DataService:
             logger.error(f"Failed to load file {path_str}: {e}")
             raise
 
-    def _load_polars(self, path: str, storage_options: Optional[dict] = None) -> Any:
+    def _load_polars(self, path: str, storage_options: dict | None = None) -> Any:
         """Load using Polars."""
         if path.endswith(".parquet"):
             return pl.read_parquet(path, storage_options=storage_options)
@@ -94,7 +94,7 @@ class DataService:
             # Fallback to pandas for other formats, then convert
             return pl.from_pandas(self._load_pandas(path, storage_options))
 
-    def _load_pandas(self, path: str, storage_options: Optional[dict] = None) -> pd.DataFrame:
+    def _load_pandas(self, path: str, storage_options: dict | None = None) -> pd.DataFrame:
         """Load using Pandas."""
         if path.endswith(".parquet"):
             return pd.read_parquet(path, storage_options=storage_options)
@@ -107,7 +107,7 @@ class DataService:
         else:
             raise ValueError(f"Unsupported file format: {path}")
 
-    async def get_sample(self, path: Union[str, Path], limit: int = 5) -> Any:
+    async def get_sample(self, path: str | Path, limit: int = 5) -> Any:
         """
         Get a sample of the data as a list of dictionaries.
         Efficiently reads only the first N rows.
@@ -145,7 +145,7 @@ class DataService:
         # It's likely a Pandas DataFrame
         return data.head(limit).to_dict(orient="records")
 
-    async def save_artifact(self, data: Any, path: Union[str, Path]) -> None:
+    async def save_artifact(self, data: Any, path: str | Path) -> None:
         """
         Save a DataFrame to disk (Parquet preferred).
 
@@ -190,10 +190,7 @@ class DataService:
             self._save_pandas(data, path_str)
 
     def _save_pandas(self, data: Any, path: str):
-        if hasattr(data, "to_pandas"):
-            df = data.to_pandas()
-        else:
-            df = data
+        df = data.to_pandas() if hasattr(data, "to_pandas") else data
 
         if path.endswith(".parquet"):
             df.to_parquet(path)

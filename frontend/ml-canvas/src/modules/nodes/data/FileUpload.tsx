@@ -49,8 +49,14 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
     setError(null);
     setProgress(0);
 
+    const MAX_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
+    if (file.size > MAX_SIZE_BYTES) {
+      setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 500MB.`);
+      return;
+    }
+
     try {
-      const response = await uploadMutation.mutateAsync(file);
+      const response = await uploadMutation.mutateAsync({ file, onProgress: setProgress });
       // Returns job_id (which is source_id) and status
       onUploadComplete(response.job_id, file.name);
     } catch (err: unknown) {

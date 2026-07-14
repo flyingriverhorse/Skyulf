@@ -205,7 +205,7 @@ def test_simple_transformation_method(
     out = SimpleTransformationApplier().apply(df, art)
     result = out["a"].tolist()
     assert len(result) == len(expected)
-    for actual, exp in zip(result, expected):
+    for actual, exp in zip(result, expected, strict=True):
         if exp is None:
             assert np.isnan(actual)
         else:

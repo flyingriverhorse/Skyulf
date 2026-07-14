@@ -1,7 +1,7 @@
 """Tests for SkyulfPipeline."""
 
-import os
 import tempfile
+from pathlib import Path
 
 import pandas as pd
 
@@ -65,5 +65,5 @@ def test_end_to_end_pipeline(sample_classification_data):
         pd.testing.assert_series_equal(predictions, loaded_preds)
 
     finally:
-        if os.path.exists(save_path):
-            os.remove(save_path)
+        if Path(save_path).exists():
+            Path(save_path).unlink()

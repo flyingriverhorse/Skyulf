@@ -6,7 +6,7 @@
  * String coercion is intentional because <select> values are always strings.
  */
 
-import type { YProba } from '../types';
+import type { EvaluationSplit, YProba } from '../types';
 
 /** Locate the column index of `targetClass` in y_proba, preferring `labels` over `classes`. */
 function findClassIndex(y_proba: YProba, targetClass: string | number): number {
@@ -33,6 +33,64 @@ export function calculateConfusionMatrix(
     ),
   );
   return { classes, matrix };
+}
+
+/**
+ * Reassigns predicted classes for one split using an OvR (one-vs-rest) decision
+ * threshold on `selectedClass`, then returns the resulting confusion matrix.
+ *
+ * Shared by ClassificationChartsForSplit and PerClassConfusionMatrix, which
+ * both need the same "apply threshold to reassign predictions" behaviour —
+ * previously duplicated verbatim in both components.
+ *
+ * A sample is predicted as `selectedClass` when P(selectedClass) >= threshold;
+ * otherwise it falls back to the argmax of all other classes' probabilities.
+ * If `selectedClass` is not provided, or `y_proba` is missing, no threshold
+ * reassignment is applied and the split's original y_true/y_pred are used.
+ */
+export function applyThreshold(
+  splitData: EvaluationSplit,
+  selectedClass: string | null,
+  threshold: number,
+): { classes: (string | number)[]; matrix: number[][] } {
+  const proba = splitData.y_proba;
+  let yTrue: (string | number)[] = splitData.y_true;
+  let yPred: (string | number)[] = splitData.y_pred;
+
+  // Map string labels back to their class values, when the split reports
+  // labels separately from classes (e.g. label-encoded targets).
+  if (proba?.labels && proba.labels.length === proba.classes.length) {
+    const labelToClass = new Map<string, string | number>();
+    proba.labels.forEach((label, idx) => {
+      const cls = proba.classes[idx];
+      if (cls !== undefined) labelToClass.set(String(label), cls);
+    });
+    yTrue = yTrue.map(y => labelToClass.get(String(y)) ?? y);
+    yPred = yPred.map(y => labelToClass.get(String(y)) ?? y);
+  }
+
+  // Apply OvR threshold for the selected class (works for binary and multiclass)
+  if (proba && selectedClass) {
+    const labelList = proba.labels?.length === proba.classes.length ? proba.labels : undefined;
+    const posIdx = (labelList ?? proba.classes).findIndex(c => String(c) === selectedClass);
+    if (posIdx !== -1) {
+      const posVal = proba.classes[posIdx];
+      const origPred = [...yPred];
+      if (posVal !== undefined) {
+        yPred = proba.values.map((v, i) => {
+          if ((v[posIdx] ?? 0) >= threshold) return posVal;
+          // Argmax of all other classes
+          let bestIdx = -1, bestProb = -Infinity;
+          v.forEach((p, idx) => {
+            if (idx !== posIdx && p > bestProb) { bestProb = p; bestIdx = idx; }
+          });
+          return bestIdx >= 0 ? (proba.classes[bestIdx] ?? origPred[i]!) : (origPred[i]!);
+        });
+      }
+    }
+  }
+
+  return calculateConfusionMatrix(yTrue, yPred, proba?.classes);
 }
 
 /** Best classification threshold: scans every unique prediction score and returns the one maximising F1 for targetClass. */

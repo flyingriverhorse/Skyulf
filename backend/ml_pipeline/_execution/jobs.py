@@ -4,8 +4,8 @@ Handles persistence of Training and Tuning jobs to the database.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Literal, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,9 +38,9 @@ class JobManager:
         node_id: str,
         job_type: Literal["basic_training", "advanced_tuning", "preview"],
         dataset_id: str = "unknown",
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
         model_type: str = "unknown",
-        graph: Optional[Dict[str, Any]] = None,
+        graph: dict[str, Any] | None = None,
         branch_index: int = 0,
     ) -> str:
         """Creates a new job in the database (Async)."""
@@ -87,7 +87,7 @@ class JobManager:
         dataset_id: str,
         node_id: str,
         branch_index: int = 0,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Return the ID of an existing queued/running job for (dataset_id, node_id, branch_index).
 
         Keyed on (dataset_source_id, node_id, branch_index) so parallel branches
@@ -99,7 +99,7 @@ class JobManager:
         that support it (PostgreSQL), the session lock serialises concurrent
         workers at the DB level — not just within a single process.
         """
-        cutoff = datetime.now(timezone.utc) - _IDEMPOTENCY_WINDOW
+        cutoff = datetime.now(UTC) - _IDEMPOTENCY_WINDOW
         active = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
         for model in (BasicTrainingJob, AdvancedTuningJob):
             # Fetch all recent active candidates then filter by branch_index
@@ -155,10 +155,10 @@ class JobManager:
     def update_status_sync(
         session: Session,
         job_id: str,
-        status: Optional[JobStatus] = None,
-        error: Optional[str] = None,
-        result: Optional[Dict[str, Any]] = None,
-        logs: Optional[List[str]] = None,
+        status: JobStatus | None = None,
+        error: str | None = None,
+        result: dict[str, Any] | None = None,
+        logs: list[str] | None = None,
     ):
         """Updates job status (Sync - for Background Tasks)."""
         # Try BasicTrainingJob first
@@ -169,7 +169,7 @@ class JobManager:
         AdvancedTuningManager.update_status_sync(session, job_id, status, error, result, logs)
 
     @staticmethod
-    async def get_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
+    async def get_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves job info (Async)."""
         # Try BasicTrainingJob
         job = await BasicTrainingManager.get_training_job(session, job_id)
@@ -184,8 +184,8 @@ class JobManager:
         session: AsyncSession,
         limit: int = 50,
         skip: int = 0,
-        job_type: Optional[str] = None,
-    ) -> List[JobInfo]:
+        job_type: str | None = None,
+    ) -> list[JobInfo]:
         """Lists recent jobs (Async).
 
         When listing all job types, results are merge-sorted in Python because a
@@ -216,7 +216,7 @@ class JobManager:
             all_jobs = train_jobs + tune_jobs
             # Sort by start_time desc
             all_jobs.sort(
-                key=lambda x: x.start_time or datetime.min.replace(tzinfo=timezone.utc),
+                key=lambda x: x.start_time or datetime.min.replace(tzinfo=UTC),
                 reverse=True,
             )
 
@@ -226,15 +226,13 @@ class JobManager:
         return jobs
 
     @staticmethod
-    async def get_latest_tuning_job_for_node(
-        session: AsyncSession, node_id: str
-    ) -> Optional[JobInfo]:
+    async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
         return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod
     async def get_node_summaries(
         session: AsyncSession, limit: int = 200
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> dict[str, list[dict[str, Any]]]:
         """Per-node card summaries from the latest *run group*, keyed by ``node_id``.
 
         Returns ``{node_id: [entry, ...]}`` where each entry is::
@@ -268,7 +266,7 @@ class JobManager:
         # "latest run group" key.
         all_jobs = sorted(
             train_jobs + tune_jobs,
-            key=lambda j: j.start_time or datetime.min.replace(tzinfo=timezone.utc),
+            key=lambda j: j.start_time or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
         # Phase 1: pick the parent_pipeline_id of the most recent
@@ -276,7 +274,7 @@ class JobManager:
         # ``parent_pipeline_id`` as a single-branch run; collapse it on
         # the job's own ``pipeline_id`` so single-terminal runs still
         # group together correctly.
-        latest_group: Dict[str, str] = {}
+        latest_group: dict[str, str] = {}
         for job in all_jobs:
             if job.status != "completed" or not job.node_id:
                 continue
@@ -286,7 +284,7 @@ class JobManager:
             if group_key:
                 latest_group[job.node_id] = group_key
         # Phase 2: collect every completed job belonging to that group.
-        out: Dict[str, List[Dict[str, Any]]] = {}
+        out: dict[str, list[dict[str, Any]]] = {}
         for job in all_jobs:
             if job.status != "completed" or not job.node_id:
                 continue
@@ -299,7 +297,7 @@ class JobManager:
             summary = (job.metrics or {}).get("summary") if job.metrics else None
             if not isinstance(summary, str) or not summary.strip():
                 continue
-            entry: Dict[str, Any] = {
+            entry: dict[str, Any] = {
                 "summary": summary.strip(),
                 "branch_index": job.branch_index,
                 "pipeline_id": job.pipeline_id,
@@ -331,13 +329,13 @@ class JobManager:
     @staticmethod
     async def get_best_tuning_job_for_model(
         session: AsyncSession, model_type: str
-    ) -> Optional[JobInfo]:
+    ) -> JobInfo | None:
         return await AdvancedTuningManager.get_best_tuning_job_for_model(session, model_type)
 
     @staticmethod
     async def get_tuning_jobs_for_model(
         session: AsyncSession, model_type: str, limit: int = 20
-    ) -> List[JobInfo]:
+    ) -> list[JobInfo]:
         return await AdvancedTuningManager.get_tuning_jobs_for_model(session, model_type, limit)
 
     @staticmethod
@@ -350,7 +348,7 @@ class JobManager:
             if job:
                 if job.status != "completed":
                     return False
-                job.promoted_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+                job.promoted_at = datetime.now(UTC)  # type: ignore[assignment]
                 await session.commit()
                 return True
         return False

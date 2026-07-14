@@ -1,7 +1,8 @@
 """Hash Encoder node (Calculator + Applier)."""
 
+import hashlib
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -15,13 +16,13 @@ from ._common import _exclude_target_column, detect_categorical_columns
 logger = logging.getLogger(__name__)
 
 
-def _resolve_valid_cols(X: Any, params: Dict[str, Any]) -> List[str]:
+def _resolve_valid_cols(X: Any, params: dict[str, Any]) -> list[str]:
     """Filter requested columns down to those present in ``X``."""
     cols = params.get("columns", [])
     return [c for c in cols if c in X.columns]
 
 
-def _hash_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Polars apply path — uses Polars native ``hash()`` for speed."""
     import polars as pl
 
@@ -34,8 +35,27 @@ def _hash_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any
     return X.with_columns(exprs), y
 
 
-def _hash_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
-    """Pandas apply path — Python's built-in ``hash`` per value."""
+def _stable_hash(value: str) -> int:
+    """Deterministic hash for strings, stable across processes/interpreters.
+
+    Python's built-in ``hash()`` is salted per-process (``PYTHONHASHSEED``),
+    so the same category would map to a different bucket every time the
+    interpreter restarts (e.g. a new Celery worker or API server), silently
+    corrupting encodings learned at fit time. ``blake2b`` is deterministic,
+    fixing that cross-process instability.
+
+    Note: this does not make pandas and polars produce identical buckets for
+    the same input — ``_hash_apply_polars`` uses polars' own native hash,
+    which is a different algorithm. Fit and apply must use the same engine
+    for encodings to be reproducible; mixing engines was already inconsistent
+    before this change and remains a separate, unaddressed limitation.
+    """
+    digest = hashlib.blake2b(value.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(digest, "little")
+
+
+def _hash_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    """Pandas apply path — uses a stable hash per value."""
     valid_cols = _resolve_valid_cols(X, params)
     if not valid_cols:
         return X, y
@@ -43,13 +63,20 @@ def _hash_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any
     n_features = params.get("n_features", 10)
     X_out = X.copy()
     for col in valid_cols:
-        X_out[col] = X_out[col].astype(str).apply(lambda x: hash(x) % n_features)
+        s = X_out[col].astype(str)
+        # Hash each *unique* value once, then vectorize the lookup via
+        # `.map()` — cheaper than a per-row `.apply()` on high-row-count,
+        # low-cardinality columns. Building the mapping from this column's
+        # own `.unique()` guarantees every value is covered, so there's no
+        # NaN-from-unmapped-key risk.
+        bucket_by_value = {v: _stable_hash(v) % n_features for v in s.unique()}
+        X_out[col] = s.map(bucket_by_value)
     return X_out, y
 
 
 class HashEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -68,7 +95,7 @@ class HashEncoderApplier(BaseApplier):
 )
 class HashEncoderCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> HashEncoderArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> HashEncoderArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 
@@ -86,8 +113,8 @@ class HashEncoderCalculator(BaseCalculator):
     def infer_output_schema(
         self,
         input_schema: SkyulfSchema,
-        config: Dict[str, Any],
-    ) -> Optional[SkyulfSchema]:
+        config: dict[str, Any],
+    ) -> SkyulfSchema | None:
         # Hash encoder replaces values in source columns in place
         # (`pl.col(col)...alias(col)`). Schema is unchanged.
         return input_schema

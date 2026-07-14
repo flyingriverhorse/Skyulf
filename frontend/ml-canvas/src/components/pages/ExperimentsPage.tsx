@@ -6,6 +6,7 @@ import { toast } from '../../core/toast';
 import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
+import { formatDuration } from '../../core/utils/format';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 import type { EvaluationData } from './ExperimentsPage/types';
 import { getJobScoringMetric, shortRunId } from './ExperimentsPage/utils/jobMeta';
@@ -96,6 +97,7 @@ export const ExperimentsPage: React.FC = () => {
       setDatasets(response.data);
     } catch (e) {
       console.error('Failed to fetch datasets', e);
+      toast.error('Failed to load datasets', 'The dataset filter may be incomplete. Please retry.');
     }
   };
 
@@ -190,7 +192,7 @@ export const ExperimentsPage: React.FC = () => {
     }
   }, [activeView, selectedJobIds, evalJobId]);
 
-  const filteredJobs = jobs.filter(job => {
+  const filteredJobs = useMemo(() => jobs.filter(job => {
     const typeMatch = filterType === 'all' || job.job_type === filterType;
     const datasetMatch = selectedDatasetId === 'all' || job.dataset_id === selectedDatasetId;
     const statusMatch = job.status === 'completed';
@@ -200,9 +202,12 @@ export const ExperimentsPage: React.FC = () => {
     if (a.promoted_at && !b.promoted_at) return -1;
     if (!a.promoted_at && b.promoted_at) return 1;
     return 0;
-  });
+  }), [jobs, filterType, selectedDatasetId]);
 
-  const selectedJobs = jobs.filter(job => selectedJobIds.includes(job.job_id));
+  const selectedJobs = useMemo(
+    () => jobs.filter(job => selectedJobIds.includes(job.job_id)),
+    [jobs, selectedJobIds]
+  );
 
   const toggleJobSelection = (jobId: string) => {
     setSelectedJobIds(prev =>
@@ -213,13 +218,13 @@ export const ExperimentsPage: React.FC = () => {
   };
 
   // Prepare data for charts
-  const metricsData = selectedJobs.map(job => {
+  const metricsData = useMemo(() => selectedJobs.map(job => {
     const metrics = job.metrics || job.result?.metrics || {};
     return { name: shortRunId(job), ...metrics };
-  });
+  }), [selectedJobs]);
 
   // Get all unique metric keys from selected jobs (numeric only, filtered by visibility)
-  const metricKeys = Array.from(new Set(
+  const metricKeys = useMemo(() => Array.from(new Set(
     selectedJobs.flatMap(job => {
       const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
       return Object.keys(m).filter(k => {
@@ -233,41 +238,38 @@ export const ExperimentsPage: React.FC = () => {
     if (key.startsWith('val_') && !showValMetrics) return false;
     if (key.startsWith('cv_') && !showCvMetrics) return false;
     return true;
-  });
-
-  const getDuration = (start: string | null, end: string | null) => {
-    if (!start || !end) return '-';
-    const diff = new Date(end).getTime() - new Date(start).getTime();
-    const seconds = Math.floor(diff / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes}m ${seconds % 60}s`;
-  };
+  }), [selectedJobs, showTrainMetrics, showTestMetrics, showValMetrics, showCvMetrics]);
 
   // Group keys by base metric name for the metric-tab selector
-  const metricGroups = new Map<string, string[]>();
-  metricKeys.forEach(key => {
-    const { base } = parseMetricKey(key);
-    if (!metricGroups.has(base)) metricGroups.set(base, []);
-    metricGroups.get(base)?.push(key);
-  });
-  metricGroups.forEach((keys, base) => {
-    metricGroups.set(base, keys.sort());
-  });
+  const metricGroups = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    metricKeys.forEach(key => {
+      const { base } = parseMetricKey(key);
+      if (!groups.has(base)) groups.set(base, []);
+      groups.get(base)?.push(key);
+    });
+    groups.forEach((keys, base) => {
+      groups.set(base, keys.sort());
+    });
+    return groups;
+  }, [metricKeys]);
 
-  const availableMetrics = Array.from(metricGroups.keys()).sort();
+  const availableMetrics = useMemo(() => Array.from(metricGroups.keys()).sort(), [metricGroups]);
   const activeMetric = (selectedMetric && availableMetrics.includes(selectedMetric))
     ? selectedMetric
     : availableMetrics[0] || null;
 
   // Feature Importances across selected jobs
-  const featureImportancesByJob = selectedJobs.map(job => {
+  const featureImportancesByJob = useMemo(() => selectedJobs.map(job => {
     const result = (job.result ?? {}) as Record<string, unknown>;
     const metrics = result.metrics as Record<string, unknown> | undefined;
     const raw = (metrics?.feature_importances ?? result.feature_importances) as Record<string, number> | undefined;
     return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', importances: raw ?? null };
-  });
-  const hasFeatureImportances = featureImportancesByJob.some(j => j.importances !== null);
+  }), [selectedJobs]);
+  const hasFeatureImportances = useMemo(
+    () => featureImportancesByJob.some(j => j.importances !== null),
+    [featureImportancesByJob]
+  );
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
@@ -291,7 +293,7 @@ export const ExperimentsPage: React.FC = () => {
           loadMoreJobs={loadMoreJobs}
           handlePromote={handlePromote}
           handleDeploy={handleDeploy}
-          getDuration={getDuration}
+          getDuration={formatDuration}
         />
 
         {/* Comparison Area */}
@@ -309,7 +311,7 @@ export const ExperimentsPage: React.FC = () => {
                 hasFeatureImportances={hasFeatureImportances}
               />
 
-              <BranchComparisonCard selectedJobs={selectedJobs} getDuration={getDuration} />
+              <BranchComparisonCard selectedJobs={selectedJobs} getDuration={formatDuration} />
 
               {activeView === 'charts' && (
                 <MetricsComparisonChart

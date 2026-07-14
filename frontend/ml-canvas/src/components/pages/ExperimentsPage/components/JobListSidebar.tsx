@@ -52,6 +52,11 @@ export const JobListSidebar: React.FC<Props> = ({
         </button>
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        {filteredJobs.length === 0 && !isLoading && !isSidebarCollapsed && (
+          <div className="p-4 text-center text-xs text-gray-400 dark:text-gray-500">
+            No runs match the current filters.
+          </div>
+        )}
         {filteredJobs.map(job => (
           <div
             key={job.job_id}

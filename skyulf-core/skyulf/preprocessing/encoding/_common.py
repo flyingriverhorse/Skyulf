@@ -1,7 +1,7 @@
 """Shared helpers and constants for all encoder modules."""
 
 import logging
-from typing import Any, Dict, List, Union
+from typing import Any
 
 from ...engines import EngineName, get_engine
 
@@ -18,11 +18,15 @@ _COLUMN_DESTROYING_ENCODERS = frozenset(
     ]
 )
 
-# Encoders that map values in-place and preserve the column name.
-_TARGET_SAFE_ENCODERS = frozenset(["LabelEncoder", "OrdinalEncoder"])
+# Encoders that fit against `y` and replace values in-place (column name/count
+# preserved, so they don't break Feature/Target Split by renaming) but would
+# produce a degenerate, leaky encoding if the target column were included in
+# its own `columns` list (e.g. WOE computed against itself is near-perfect
+# separation, and silently overwrites the target's own values).
+_SUPERVISED_INPLACE_ENCODERS = frozenset(["WOEEncoder"])
 
 
-def _parse_categories_order(raw: Any, n_cols: int) -> Union[str, List[List[str]]]:
+def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """Convert the frontend categories_order string/list into sklearn-compatible categories.
 
     The frontend sends a newline-separated string where each line holds
@@ -46,17 +50,23 @@ def _parse_categories_order(raw: Any, n_cols: int) -> Union[str, List[List[str]]
 
 
 def _exclude_target_column(
-    columns: List[str],
-    config: Dict[str, Any],
+    columns: list[str],
+    config: dict[str, Any],
     encoder_name: str,
     y: Any = None,
-) -> List[str]:
-    """Remove the target column from the encoding list for column-destroying encoders.
+) -> list[str]:
+    """Remove the target column from the encoding list for encoders that must
+    not encode it (column-destroying encoders, and supervised in-place
+    encoders that would produce a leaky/degenerate encoding against
+    themselves).
 
     Detects the target column from config['target_column'] or the name of y.
     Returns the filtered column list and logs a warning when a column is removed.
     """
-    if encoder_name not in _COLUMN_DESTROYING_ENCODERS:
+    if (
+        encoder_name not in _COLUMN_DESTROYING_ENCODERS
+        and encoder_name not in _SUPERVISED_INPLACE_ENCODERS
+    ):
         return columns
 
     target_col: str | None = config.get("target_column")
@@ -64,26 +74,35 @@ def _exclude_target_column(
         target_col = getattr(y, "name", None)
 
     if target_col and target_col in columns:
+        if encoder_name in _COLUMN_DESTROYING_ENCODERS:
+            reason = (
+                f"{encoder_name} would replace the column with multiple derived columns, "
+                "breaking downstream Feature/Target Split and model training."
+            )
+        else:
+            reason = (
+                f"{encoder_name} fits against the target and replaces values in-place; "
+                "encoding the target against itself produces a degenerate, leaky mapping "
+                "and silently overwrites the target's own values."
+            )
         logger.warning(
             f"{encoder_name}: Excluding target column '{target_col}' from encoding. "
-            f"{encoder_name} would replace the column with multiple derived columns, "
-            "breaking downstream Feature/Target Split and model training. "
-            "Use LabelEncoder or OrdinalEncoder for target columns instead."
+            f"{reason} Use LabelEncoder or OrdinalEncoder for target columns instead."
         )
         columns = [c for c in columns if c != target_col]
 
     return columns
 
 
-def detect_categorical_columns(df: Any) -> List[str]:
+def detect_categorical_columns(df: Any) -> list[str]:
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
         import polars as pl
 
         df_pl: Any = df
-        return list(
+        return [
             c
-            for c, t in zip(df_pl.columns, df_pl.dtypes)
+            for c, t in zip(df_pl.columns, df_pl.dtypes, strict=True)
             if t in [pl.Utf8, pl.Categorical, pl.Object]
-        )
+        ]
     return df.select_dtypes(include=["object", "category"]).columns.tolist()

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FileText, Database, Columns, AlignJustify } from 'lucide-react';
 import { DatasetService } from '../../core/api/datasets';
 import { Dataset } from '../../core/types/api';
@@ -43,6 +43,10 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
   const [activeTab, setActiveTab] = useState<'sample' | 'stats'>('sample');
   const [sampleSize, setSampleSize] = useState(100);
 
+  // Track in-flight request id so a slow/stale response doesn't overwrite
+  // state from a newer request (e.g. rapid dataset switch or Load More).
+  const requestIdRef = useRef(0);
+
   useEffect(() => {
     if (isOpen && dataset) {
       void fetchData(100);
@@ -58,6 +62,7 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
 
   const fetchData = async (limit: number) => {
     if (!dataset) return;
+    const myRequestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -65,13 +70,18 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
         DatasetService.getSample(dataset.id, limit),
         DatasetService.getProfile(dataset.id)
       ]);
+      if (myRequestId !== requestIdRef.current) return;
       setSampleData(sample);
       setProfile(profileData);
     } catch (err) {
       console.error('Failed to fetch data:', err);
-      setError('Failed to load dataset preview.');
+      if (myRequestId === requestIdRef.current) {
+        setError('Failed to load dataset preview.');
+      }
     } finally {
-      setLoading(false);
+      if (myRequestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   };
 

@@ -1,7 +1,7 @@
 """General Transformation node (simple ops + fitted power transforms)."""
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 _POWER_METHODS = {"box-cox", "yeo-johnson"}
 
 
-def _apply_power_to_polars_col(X_out: Any, item: Dict[str, Any]) -> Any:
+def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
     """Apply a fitted Box-Cox / Yeo-Johnson to one Polars column in place."""
     import polars as pl
 
@@ -54,7 +54,7 @@ def _apply_power_to_polars_col(X_out: Any, item: Dict[str, Any]) -> Any:
         return X_out
 
 
-def _apply_power_to_pandas_col(df_out: Any, item: Dict[str, Any]) -> Any:
+def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
     """Apply a fitted Box-Cox / Yeo-Johnson to one Pandas column in place."""
     col = item["column"]
     method = item["method"]
@@ -86,11 +86,11 @@ def _apply_power_to_pandas_col(df_out: Any, item: Dict[str, Any]) -> Any:
 
 class GeneralTransformationApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         transformations = params.get("transformations", [])
         if not transformations:
             return X, _y
@@ -111,7 +111,7 @@ class GeneralTransformationApplier(BaseApplier):
         return X_out, _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         transformations = params.get("transformations", [])
         if not transformations:
             return X, _y
@@ -132,7 +132,7 @@ class GeneralTransformationApplier(BaseApplier):
         return df_out, _y
 
 
-def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> Dict[str, Any]:
+def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dict[str, Any]:
     """Fit a PowerTransformer for one column; return the per-column artifact dict."""
     if is_polars:
         col_series = X[col].to_pandas()
@@ -150,7 +150,7 @@ def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> Dic
     pt = PowerTransformer(method=method, standardize=True)
     pt.fit(col_df)
 
-    fitted: Dict[str, Any] = {"lambdas": pt.lambdas_.tolist()}
+    fitted: dict[str, Any] = {"lambdas": pt.lambdas_.tolist()}
     if hasattr(pt, "_scaler") and pt._scaler:
         fitted["scaler_params"] = {
             "mean": pt._scaler.mean_.tolist() if pt._scaler.mean_ is not None else None,
@@ -169,18 +169,18 @@ def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> Dic
 )
 class GeneralTransformationCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Transformations are keyed by source column and replace it in place;
         # column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralTransformationArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralTransformationArtifact:  # pylint: disable=arguments-differ
         # Config: {'transformations': [{'column': 'col1', 'method': 'log'},
         #                              {'column': 'col2', 'method': 'yeo-johnson'}]}
         is_polars = get_engine(X).name == EngineName.POLARS
-        fitted_transformations: List[Dict[str, Any]] = []
+        fitted_transformations: list[dict[str, Any]] = []
 
         for item in config.get("transformations", []):
             col = item.get("column")
@@ -188,7 +188,7 @@ class GeneralTransformationCalculator(BaseCalculator):
             if col not in X.columns:
                 continue
 
-            fitted_item: Dict[str, Any] = {"column": col, "method": method}
+            fitted_item: dict[str, Any] = {"column": col, "method": method}
 
             if method in _POWER_METHODS:
                 try:

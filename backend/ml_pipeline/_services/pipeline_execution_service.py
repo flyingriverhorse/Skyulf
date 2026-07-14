@@ -6,10 +6,11 @@ called (and unit-tested) without a Celery worker context.
 call ``execute_pipeline`` directly with a real or mocked session.
 """
 
+import contextlib
 import logging
 import re
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
@@ -40,7 +41,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
             return
 
         job.status = "running"
-        job.started_at = datetime.now(timezone.utc)
+        job.started_at = datetime.now(UTC)
         job.progress = 0
         session.commit()
         publish_job_event(JobEvent(event="status", job_id=job_id, status="running", progress=0))
@@ -140,7 +141,7 @@ def execute_pipeline(job_id: str, pipeline_config_dict: dict, session: Session) 
         if result.status == "success":
             job.status = "completed"
             job.progress = 100
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
             job.artifact_uri = base_artifact_uri
             strategy.handle_success(job, result)
         else:
@@ -181,10 +182,8 @@ def _resolve_dataset_name(session: Session, job: object) -> str:
     if source_id:
         ds = session.query(DataSource).filter(DataSource.source_id == source_id).first()
         if not ds:
-            try:
+            with contextlib.suppress(ValueError):
                 ds = session.query(DataSource).filter(DataSource.id == int(source_id)).first()
-            except ValueError:
-                pass
         if ds:
             dataset_name = ds.name
 

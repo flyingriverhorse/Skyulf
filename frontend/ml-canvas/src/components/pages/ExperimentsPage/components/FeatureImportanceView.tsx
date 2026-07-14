@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Loader2, Check, Download } from 'lucide-react';
 import {
   BarChart,
@@ -49,51 +49,59 @@ export const FeatureImportanceView: React.FC<Props> = ({
   downloadingChart,
   doneChart,
 }) => {
-  const jobsWithData = featureImportancesByJob.filter(j => j.importances !== null);
-  if (jobsWithData.length === 0) return null;
+  // The Set/sort/map operations below scan every job and feature, so they're
+  // memoised on featureImportancesByJob to avoid recomputing on every
+  // unrelated re-render (e.g. hover state on download buttons).
+  const { chartData, barKeys, topFeatures, allFeatures, jobsWithDataCount } = useMemo(() => {
+    const jobsWithData = featureImportancesByJob.filter(j => j.importances !== null);
 
-  // Pre-compute normalised importances once per job
-  const normalized = jobsWithData.map(j => ({
-    ...j,
-    importances: normalizePerJob(j.importances ?? {}),
-  }));
+    // Pre-compute normalised importances once per job
+    const normalized = jobsWithData.map(j => ({
+      ...j,
+      importances: normalizePerJob(j.importances ?? {}),
+    }));
 
-  // Collect all unique features across selected jobs
-  const allFeatures = new Set<string>();
-  normalized.forEach(j => {
-    Object.keys(j.importances).forEach(f => allFeatures.add(f));
-  });
-
-  // Rank features by AVERAGE normalised importance across jobs that report
-  // them. With normalisation, every job contributes on the same [0,1] scale
-  // so a feature that ranks high in either run still surfaces in the top 15.
-  const featureAvg = Array.from(allFeatures).map(f => {
-    let sum = 0;
-    let count = 0;
+    // Collect all unique features across selected jobs
+    const allFeatures = new Set<string>();
     normalized.forEach(j => {
-      const val = j.importances[f];
-      if (val !== undefined) { sum += Math.abs(val); count++; }
+      Object.keys(j.importances).forEach(f => allFeatures.add(f));
     });
-    return { feature: f, avg: count > 0 ? sum / count : 0 };
-  });
-  featureAvg.sort((a, b) => b.avg - a.avg);
-  const topFeatures = featureAvg.slice(0, 15).map(f => f.feature);
 
-  // Build chart data: each feature row carries one numeric column per job
-  const chartData = topFeatures.map(feature => {
-    const row: Record<string, string | number> = { feature };
-    normalized.forEach(j => {
+    // Rank features by AVERAGE normalised importance across jobs that report
+    // them. With normalisation, every job contributes on the same [0,1] scale
+    // so a feature that ranks high in either run still surfaces in the top 15.
+    const featureAvg = Array.from(allFeatures).map(f => {
+      let sum = 0;
+      let count = 0;
+      normalized.forEach(j => {
+        const val = j.importances[f];
+        if (val !== undefined) { sum += Math.abs(val); count++; }
+      });
+      return { feature: f, avg: count > 0 ? sum / count : 0 };
+    });
+    featureAvg.sort((a, b) => b.avg - a.avg);
+    const topFeatures = featureAvg.slice(0, 15).map(f => f.feature);
+
+    // Build chart data: each feature row carries one numeric column per job
+    const chartData = topFeatures.map(feature => {
+      const row: Record<string, string | number> = { feature };
+      normalized.forEach(j => {
+        const shortId = j.jobId.slice(0, 8);
+        const label = j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
+        row[label] = j.importances[feature] ?? 0;
+      });
+      return row;
+    });
+
+    const barKeys = normalized.map((j) => {
       const shortId = j.jobId.slice(0, 8);
-      const label = j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
-      row[label] = j.importances[feature] ?? 0;
+      return j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
     });
-    return row;
-  });
 
-  const barKeys = normalized.map((j) => {
-    const shortId = j.jobId.slice(0, 8);
-    return j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
-  });
+    return { chartData, barKeys, topFeatures, allFeatures, jobsWithDataCount: jobsWithData.length };
+  }, [featureImportancesByJob]);
+
+  if (jobsWithDataCount === 0) return null;
 
   return (
     <div className="space-y-6">

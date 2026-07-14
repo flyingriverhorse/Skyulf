@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
 import { Flag, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface MissingIndicatorConfig {
   columns: string[];
@@ -31,146 +33,98 @@ const MissingIndicatorSettings: React.FC<{ config: MissingIndicatorConfig; onCha
     ? (nodeResult.metrics as Record<string, unknown>)
     : null;
 
-  const [searchTerm, setSearchTerm] = useState('');
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
-  const filteredColumns = useMemo(() => {
-    return availableColumns.filter(c => c.toLowerCase().includes(searchTerm.toLowerCase()));
-  }, [availableColumns, searchTerm]);
-
-  const handleSelectAll = () => {
-    onChange({ ...config, columns: filteredColumns });
-  };
-
-  const handleDeselectAll = () => {
-    const newCols = config.columns.filter(c => !filteredColumns.includes(c));
-    onChange({ ...config, columns: newCols });
-  };
+  const indicatorsCreated = metrics?.missing_indicators_created;
+  const indicatorColumns = Array.isArray(metrics?.missing_indicators_columns)
+    ? (metrics?.missing_indicators_columns as unknown[])
+    : [];
 
   return (
-    <div className="p-4 space-y-4">
-      {!datasetId && (
-        <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
-          Connect a dataset node to see available columns.
-        </div>
-      )}
-
-      {isLoading && !!datasetId && (
-        <div className="text-xs text-muted-foreground animate-pulse">
-          Loading schema...
-        </div>
-      )}
-
-      <div>
-        <span className="block text-sm font-medium mb-1">Indicator Suffix</span>
-        <input
-          type="text"
-          className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
-          value={config.flag_suffix}
-          onChange={(e) => onChange({ ...config, flag_suffix: e.target.value })}
-          placeholder="_was_missing"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Suffix added to the new indicator columns (e.g., &quot;Age_was_missing&quot;).
-        </p>
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <span className="block text-sm font-medium">Target Columns (Optional)</span>
-          <span className="text-xs text-muted-foreground">
-            {config.columns.length} selected
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground mb-2">
-          Create indicators for these columns. If empty, all columns with missing values are used.
-        </p>
-
-        {/* Search & Actions */}
-        <div className="space-y-2 mb-2">
-          <input
-            type="text"
-            placeholder="Search columns..."
-            className="block w-full px-3 py-1.5 text-sm bg-background border rounded-md shadow-sm focus:ring-1 focus:ring-primary outline-none"
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); }}
-          />
-          <div className="flex gap-2 text-xs justify-end">
-            <button onClick={handleSelectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Select All</button>
-            <span className="text-border">|</span>
-            <button onClick={handleDeselectAll} className="text-primary hover:text-primary/80 font-medium transition-colors">Deselect All</button>
+    <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      {/* Top Status Bar (Always Visible) */}
+      <div className="shrink-0 p-4 pb-0 space-y-2">
+        {!datasetId && (
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
+            Connect a dataset node to see available columns.
           </div>
-        </div>
+        )}
 
-        {availableColumns.length > 0 ? (
-          <div className="space-y-1 max-h-40 overflow-y-auto border rounded p-2 bg-background">
-            {filteredColumns.map(col => (
-              <label key={col} className="flex items-center gap-2 text-sm hover:bg-accent/50 p-1 rounded cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                  checked={config.columns.includes(col)}
-                  onChange={(e) => {
-                    const newCols = e.target.checked
-                      ? [...config.columns, col]
-                      : config.columns.filter(c => c !== col);
-                    onChange({ ...config, columns: newCols });
-                  }}
-                />
-                {col}
-              </label>
-            ))}
-            {filteredColumns.length === 0 && (
-              <div className="text-xs text-muted-foreground text-center py-2">
-                No columns match &quot;{searchTerm}&quot;
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-xs text-muted-foreground italic border rounded p-4 text-center">
-            No columns available
+        {isLoading && !!datasetId && (
+          <div className="text-xs text-muted-foreground animate-pulse">
+            Loading schema...
           </div>
         )}
       </div>
 
-      {/* Feedback Section */}
-      {(() => {
-        const indicatorsCreated = metrics?.missing_indicators_created;
-        const indicatorColumns = Array.isArray(metrics?.missing_indicators_columns)
-          ? (metrics?.missing_indicators_columns as unknown[])
-          : [];
+      {/* Main Content Area - Responsive Grid/Flex */}
+      <div className={`flex-1 min-h-0 p-4 gap-4 ${isWide ? 'grid grid-cols-2' : 'flex flex-col'}`}>
 
-        if (indicatorsCreated === undefined) return null;
-
-        return (
-        <div className="mt-4 p-3 bg-muted/30 rounded-md border border-border">
-          <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
-            <Activity size={14} />
-            <span>Last Run Results</span>
+        {/* Left Column (Settings) */}
+        <div className={`space-y-4 ${isWide ? 'overflow-y-auto pr-2' : 'shrink-0'}`}>
+          <div>
+            <span className="block text-sm font-medium mb-1">Indicator Suffix</span>
+            <input
+              type="text"
+              className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
+              value={config.flag_suffix}
+              onChange={(e) => onChange({ ...config, flag_suffix: e.target.value })}
+              placeholder="_was_missing"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Suffix added to the new indicator columns (e.g., &quot;Age_was_missing&quot;).
+            </p>
           </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Indicators Created:</span>
-              <span className="font-medium text-primary">{String(indicatorsCreated)}</span>
-            </div>
-            {indicatorColumns.length > 0 && (
-              <div className="pt-1 border-t mt-1">
-                <span className="text-muted-foreground block mb-1">New Columns:</span>
-                <div className="flex flex-wrap gap-1">
-                  {indicatorColumns.map((col: unknown) => {
-                    const colKey = String(col);
-                    return (
-                      <span key={colKey} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
-                        {colKey}
-                      </span>
-                    );
-                  })}
-                </div>
+
+          {/* Feedback Section */}
+          {indicatorsCreated !== undefined && (
+            <div className="p-3 bg-muted/30 rounded-md border border-border">
+              <div className="flex items-center gap-2 mb-2 text-sm font-semibold text-primary">
+                <Activity size={14} />
+                <span>Last Run Results</span>
               </div>
-            )}
-          </div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Indicators Created:</span>
+                  <span className="font-medium text-primary">{String(indicatorsCreated)}</span>
+                </div>
+                {indicatorColumns.length > 0 && (
+                  <div className="pt-1 border-t mt-1">
+                    <span className="text-muted-foreground block mb-1">New Columns:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {indicatorColumns.map((col: unknown) => {
+                        const colKey = String(col);
+                        return (
+                          <span key={colKey} className="px-1.5 py-0.5 bg-background border rounded text-[10px] font-mono">
+                            {colKey}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-        );
-      })()}
+
+        {/* Right Column (Column List) */}
+        <div className={`flex flex-col overflow-hidden ${isWide ? 'min-h-0 flex-1' : 'shrink-0'}`}>
+          <p className="text-xs text-muted-foreground mb-2">
+            Create indicators for these columns. If empty, all columns with missing values are used.
+          </p>
+          <ColumnMultiSelect
+            columns={availableColumns}
+            selected={config.columns}
+            onChange={(newCols) => { onChange({ ...config, columns: newCols }); }}
+            label="Target Columns (Optional)"
+            variant="panel"
+            isLoading={isLoading}
+            fillHeight={isWide}
+          />
+        </div>
+      </div>
     </div>
   );
 };

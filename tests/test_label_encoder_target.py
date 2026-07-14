@@ -59,7 +59,6 @@ def test_label_encoder_on_target_after_split():
 
     # Get the mapping from the encoder
     encoder = le_params["encoders"]["__target__"]
-    encoder.classes_
     # e.g. classes_ might be ['A', 'B'], so A->0, B->1
 
     # Check consistency on Train

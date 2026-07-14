@@ -42,7 +42,7 @@ def test_registry():
 
     # Check if our dynamic nodes are in the list
     dynamic_ids = ["logistic_regression", "random_forest_classifier"]
-    found_map = {node_id: False for node_id in dynamic_ids}
+    found_map = dict.fromkeys(dynamic_ids, False)
 
     for node_id, meta in all_metadata.items():
         if node_id in found_map:

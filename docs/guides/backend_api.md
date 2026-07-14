@@ -16,8 +16,7 @@ and [`/redoc`](http://127.0.0.1:8000/redoc) (ReDoc) when `DEBUG=true`.
 | `/api/pipeline/*` | ML pipeline execution, preview, jobs, versions |
 | `/api/eda/*` | Automated EDA & profiling |
 | `/api/deployment/*` | Model deployment & inference |
-| `/api/ml/registry/*` | Model registry (alternate mount) |
-| `/api/registry/*` | Model registry (canonical mount) |
+| `/api/registry/*` | Model registry |
 | `/api/monitoring/*` | Drift monitoring, error tracking, pipeline logs |
 | `/ws/jobs` | WebSocket job event stream |
 
@@ -238,7 +237,7 @@ Returns `404` if no deployment is active.
 
 ## Model Registry
 
-The model registry is **read-only** — models are auto-registered when jobs complete and promoted via the jobs API. Both `/api/registry/*` (canonical) and `/api/ml/registry/*` (compatibility alias) are supported.
+The model registry is **read-only** — models are auto-registered when jobs complete and promoted via the jobs API.
 
 ### `GET /api/registry/stats`
 Aggregate registry statistics (model counts by type, total versions, etc.).

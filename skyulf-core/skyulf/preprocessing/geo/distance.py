@@ -6,7 +6,7 @@ engines compute the distance directly with trigonometric expressions, so this
 node works without ``geopandas``/``shapely``/``h3`` installed.
 """
 
-from typing import Any, Dict, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -64,7 +64,7 @@ def _euclidean_pandas(
     return radius * np.sqrt(x**2 + y**2)
 
 
-def _geo_distance_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _geo_distance_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute the configured distance and append it as a new pandas column."""
     lat1_col, lon1_col = params["lat1_col"], params["lon1_col"]
     lat2_col, lon2_col = params["lat2_col"], params["lon2_col"]
@@ -82,7 +82,7 @@ def _geo_distance_apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple
     return out, _y
 
 
-def _geo_distance_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _geo_distance_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute the configured distance and append it as a new polars column."""
     import polars as pl
 
@@ -115,7 +115,7 @@ def _geo_distance_apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple
 
 class GeoDistanceApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _geo_distance_apply_polars, _geo_distance_apply_pandas)
 
 
@@ -140,7 +140,7 @@ class GeoDistanceApplier(BaseApplier):
 )
 class GeoDistanceCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeoDistanceArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeoDistanceArtifact:  # pylint: disable=arguments-differ
         X_pd = to_pandas(X)
 
         lat1_col = config.get("lat1_col", "")

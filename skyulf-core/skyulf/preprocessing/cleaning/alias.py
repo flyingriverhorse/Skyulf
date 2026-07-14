@@ -2,7 +2,7 @@
 
 import re
 import string
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -16,7 +16,7 @@ from ..dispatcher import apply_dual_engine
 from ._common import ALIAS_PUNCTUATION_TABLE, COMMON_BOOLEAN_ALIASES, COUNTRY_ALIAS_MAP
 
 
-def _resolve_alias_type(config: Dict[str, Any]) -> str:
+def _resolve_alias_type(config: dict[str, Any]) -> str:
     """Resolve the alias-type alias and remap legacy values."""
     alias_type = config.get("alias_type") or config.get("mode", "boolean")
     if alias_type == "normalize_boolean":
@@ -26,11 +26,11 @@ def _resolve_alias_type(config: Dict[str, Any]) -> str:
     return alias_type
 
 
-def _normalize_alias_custom_map(custom_map: Dict[Any, Any]) -> Dict[Any, Any]:
+def _normalize_alias_custom_map(custom_map: dict[Any, Any]) -> dict[Any, Any]:
     """Lowercase + strip punctuation/spaces from string keys to match runtime cleaning."""
     if not custom_map:
         return custom_map
-    normalized: Dict[Any, Any] = {}
+    normalized: dict[Any, Any] = {}
     for k, v in custom_map.items():
         if isinstance(k, str):
             clean_k = k.lower().translate(ALIAS_PUNCTUATION_TABLE).replace(" ", "")
@@ -40,7 +40,7 @@ def _normalize_alias_custom_map(custom_map: Dict[Any, Any]) -> Dict[Any, Any]:
     return normalized
 
 
-def _resolve_alias_mapping(alias_type: str, custom_map: Dict[str, str]) -> Dict[str, str]:
+def _resolve_alias_mapping(alias_type: str, custom_map: dict[str, str]) -> dict[str, str]:
     if alias_type == "boolean":
         return COMMON_BOOLEAN_ALIASES
     if alias_type == "country":
@@ -50,7 +50,7 @@ def _resolve_alias_mapping(alias_type: str, custom_map: Dict[str, str]) -> Dict[
     return {}
 
 
-def _normalize_alias_pandas(val: Any, mapping: Dict[str, str]) -> Any:
+def _normalize_alias_pandas(val: Any, mapping: dict[str, str]) -> Any:
     if not isinstance(val, str):
         return val
     clean = val.lower().translate(ALIAS_PUNCTUATION_TABLE).replace(" ", "")
@@ -59,11 +59,11 @@ def _normalize_alias_pandas(val: Any, mapping: Dict[str, str]) -> Any:
 
 class AliasReplacementApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
 
     @staticmethod
-    def _apply_polars(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         import polars as pl
 
         valid = resolve_valid_columns(X, params.get("columns", []))
@@ -86,13 +86,13 @@ class AliasReplacementApplier(BaseApplier):
             )
             # Polars `replace(default=None)` returns null for non-matches, so we
             # coalesce back to the original value.
-            mapped_expr = clean_expr.replace(mapping, default=None)
+            mapped_expr = clean_expr.replace_strict(mapping, default=None)
             final_expr = pl.coalesce([mapped_expr, pl.col(col)])
             exprs.append(final_expr.alias(col))
         return X.with_columns(exprs), _y
 
     @staticmethod
-    def _apply_pandas(X: Any, _y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+    def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
             return X, _y
@@ -125,13 +125,13 @@ class AliasReplacementApplier(BaseApplier):
 )
 class AliasReplacementCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Alias normalization replaces values in place; column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> AliasReplacementArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> AliasReplacementArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return {}
 

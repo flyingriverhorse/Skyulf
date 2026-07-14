@@ -20,7 +20,6 @@ from skyulf.preprocessing.feature_generation import (
 )
 from skyulf.preprocessing.feature_generation._polars_ops import (
     _POLARS_DT_FEATURES,
-    _build_polars_dt_exprs,
     _polars_arith,
     _polars_arith_terms,
     _polars_datetime_apply,
@@ -171,6 +170,15 @@ class TestPolarsDivide:
         # 1 / epsilon = 1e9; just ensure no crash and value is finite.
         val = pl.DataFrame({"dummy": [1]}).select(result.alias("r"))["r"][0]
         assert abs(val) < 1e18
+
+    def test_near_zero_negative_denominator_preserves_sign(self) -> None:
+        """A small negative denominator column must yield a negative result, not flip sign."""
+        result = _polars_divide([pl.col("a"), pl.col("b")], [], self._EPS)
+        assert result is not None
+        df = pl.DataFrame({"a": [1.0], "b": [-1e-15]})
+        val = df.select(result.alias("r"))["r"][0]
+        assert val < 0
+        assert val == pytest.approx(-1e9)
 
 
 # ---------------------------------------------------------------------------
@@ -340,6 +348,23 @@ class TestPolarsDatetimeApply:
         out = _polars_datetime_apply(op, df)
         assert out["dt_is_weekend"].to_list() == [1, 0]
 
+    def test_bad_column_does_not_drop_good_column_features(self) -> None:
+        """A column that fails datetime extraction must not prevent other
+        columns in the same op from producing their features (per-column
+        isolation, matching the pandas engine's behaviour)."""
+        df = pl.DataFrame(
+            {
+                "good": pl.Series(["2024-01-15", "2024-07-04"]).str.to_datetime(),
+                "bad": [1, 2],
+            }
+        )
+        op = {"input_columns": ["bad", "good"], "datetime_features": ["year", "month"]}
+        out = _polars_datetime_apply(op, df)
+        assert "good_year" in out.columns
+        assert "good_month" in out.columns
+        assert out["good_year"].to_list() == [2024, 2024]
+        assert "bad_year" not in out.columns
+
     def test_register_polars_dt_idempotent(self) -> None:
         """Calling _register_polars_dt multiple times must not cause errors."""
         _register_polars_dt()
@@ -431,6 +456,26 @@ class TestFeatgenApplyPolars:
         df = _make_pl()
         out, _ = _featgen_apply_polars(df, None, {"operations": [{"operation_type": None}]})
         assert "a" in out.columns
+
+    def test_malformed_op_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """An op that raises inside the loop (bad round_digits) is skipped but logged."""
+        import logging
+
+        df = _make_pl()
+        params = {
+            "operations": [
+                {
+                    "operation_type": "arithmetic",
+                    "method": "add",
+                    "input_columns": ["a", "b"],
+                    "round_digits": "not-an-int",
+                }
+            ]
+        }
+        with caplog.at_level(logging.WARNING):
+            out, _ = _featgen_apply_polars(df, None, params)
+        assert "a" in out.columns
+        assert any("Failed to apply arithmetic operation" in rec.message for rec in caplog.records)
 
 
 # ---------------------------------------------------------------------------

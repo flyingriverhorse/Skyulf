@@ -11,7 +11,7 @@ toasts / a notification panel.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 # Logger trees we want to mirror to the user. ``skyulf`` covers all
 # preprocessing / modeling node logs; ``backend.ml_pipeline`` covers
@@ -33,23 +33,23 @@ class WarningCaptureHandler(logging.Handler):
 
     def __init__(self, level: int = logging.WARNING) -> None:
         super().__init__(level=level)
-        self._buffer: List[Dict[str, Any]] = []
-        self._current_node_id: Optional[str] = None
-        self._current_node_type: Optional[str] = None
+        self._buffer: list[dict[str, Any]] = []
+        self._current_node_id: str | None = None
+        self._current_node_type: str | None = None
         # Track which loggers we attached to so we can detach cleanly.
-        self._attached: List[logging.Logger] = []
+        self._attached: list[logging.Logger] = []
 
     # ------------------------------------------------------------------
     # Engine integration
     # ------------------------------------------------------------------
 
-    def set_current_node(self, node_id: Optional[str], node_type: Optional[str]) -> None:
+    def set_current_node(self, node_id: str | None, node_type: str | None) -> None:
         """Tag subsequent warnings with this node id (called by the engine
         before each ``_execute_node``). Pass ``None`` to clear."""
         self._current_node_id = node_id
         self._current_node_type = node_type
 
-    def drain(self) -> List[Dict[str, Any]]:
+    def drain(self) -> list[dict[str, Any]]:
         """Return and clear the buffered warnings."""
         out = self._buffer
         self._buffer = []

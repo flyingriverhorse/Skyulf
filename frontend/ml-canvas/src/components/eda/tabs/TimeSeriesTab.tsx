@@ -65,6 +65,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             )}
                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                             title="Download Chart"
+                            aria-label="Download Chart"
                         >
                             <Download className="w-4 h-4" />
                         </button>
@@ -113,6 +114,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             onClick={() => downloadChart('day-seasonality-chart', 'day-seasonality', 'Day of Week Seasonality')}
                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                             title="Download Chart"
+                            aria-label="Download Chart"
                         >
                             <Download className="w-3 h-3" />
                         </button>
@@ -145,6 +147,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                         onClick={() => downloadChart('month-seasonality-chart', 'month-seasonality', 'Monthly Seasonality')}
                         className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                         title="Download Chart"
+                        aria-label="Download Chart"
                     >
                         <Download className="w-3 h-3" />
                     </button>
@@ -188,6 +191,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             onClick={() => downloadChart('autocorrelation-chart', 'autocorrelation', 'Autocorrelation (Lag Analysis)')}
                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                             title="Download Chart"
+                            aria-label="Download Chart"
                         >
                             <Download className="w-3 h-3" />
                         </button>

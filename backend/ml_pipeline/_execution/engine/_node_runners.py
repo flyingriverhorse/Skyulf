@@ -14,8 +14,9 @@ sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, Callable, Dict, cast
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
@@ -43,7 +44,7 @@ class NodeRunnersMixin:
     # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
     artifact_store: "ArtifactStore"
     catalog: DataCatalog
-    executed_transformers: list[Dict[str, Any]]
+    executed_transformers: list[dict[str, Any]]
     log: Callable[[str], None]
     _get_input: Any
     _save_reference_data: Any
@@ -55,7 +56,7 @@ class NodeRunnersMixin:
     _pipeline_has_training_node: Any
 
     def _record_data_shape_metrics(
-        self, metrics: Dict[str, Any], data: Any, target_col: str
+        self, metrics: dict[str, Any], data: Any, target_col: str
     ) -> None:
         if isinstance(data, pd.DataFrame):
             metrics["n_rows"] = len(data)
@@ -117,7 +118,7 @@ class NodeRunnersMixin:
             # Try to resolve name for better error message
             raise FileNotFoundError(
                 f"Dataset {dataset_id} not found. Please check if the file exists."
-            )
+            ) from None
 
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
@@ -136,7 +137,7 @@ class NodeRunnersMixin:
 
     def _run_basic_training(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
-    ) -> tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
         # Supports multiple inputs — merges them before training.
 
@@ -296,7 +297,7 @@ class NodeRunnersMixin:
 
     def _run_advanced_tuning(  # noqa: C901
         self, node: NodeConfig, job_id: str = "unknown"
-    ) -> tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         # Input: SplitDataset — supports multiple inputs via merge.
         target_col = node.params["target_column"]
 
@@ -410,9 +411,9 @@ class NodeRunnersMixin:
             metrics = {}
 
         # Cross-Validation on the tuned model (using best params)
-        cv_metrics: Dict[str, Any] = {}
+        cv_metrics: dict[str, Any] = {}
         if tuning_params.get("cv_enabled", False):
-            best_params: Dict[str, Any] = tuning_result.best_params if tuning_result else {}
+            best_params: dict[str, Any] = tuning_result.best_params if tuning_result else {}
             cv_estimator = StatefulEstimator(calculator, applier, node.node_id)
 
             # For advanced tuning, nested_cv's inner loop already ran during
@@ -496,7 +497,7 @@ class NodeRunnersMixin:
 
     def _run_transformer(
         self, node: NodeConfig, job_id: str = "unknown"
-    ) -> tuple[str, Dict[str, Any]]:
+    ) -> tuple[str, dict[str, Any]]:
         """Runs a single transformer node as a 1-step feature engineering pipeline."""
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
         data = self._get_input(node)
@@ -569,17 +570,19 @@ class NodeRunnersMixin:
             return calculator_cls(), applier_cls()
         except ValueError:
             # Fallback: Raise original error if not found in registry
-            raise ValueError(f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})")
+            raise ValueError(
+                f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})"
+            ) from None
 
-    def _run_data_preview(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+    def _run_data_preview(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         """
         Generates a detailed preview of the data and pipeline state.
         """
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
         data = self._get_input(node)
 
-        preview_info: Dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+        preview_info: dict[str, Any] = {
+            "timestamp": datetime.now(UTC).isoformat(),
             "data_summary": {},
             "applied_transformations": [],
             "operation_mode": "unknown",
