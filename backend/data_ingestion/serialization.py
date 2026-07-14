@@ -16,6 +16,8 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+from backend.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,7 +78,7 @@ class AsyncJSONSafeSerializer:
     async def _handle_dataframe(obj: Any) -> Any:
         if not isinstance(obj, pd.DataFrame):
             return AsyncJSONSafeSerializer._NOT_HANDLED
-        if len(obj) > 1000:
+        if len(obj) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
             await asyncio.sleep(0)
         return obj.where(pd.notnull(obj), cast(Any, None)).to_dict("records")
 
@@ -84,7 +86,7 @@ class AsyncJSONSafeSerializer:
     async def _handle_series(obj: Any) -> Any:
         if not isinstance(obj, pd.Series):
             return AsyncJSONSafeSerializer._NOT_HANDLED
-        if len(obj) > 1000:
+        if len(obj) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
             await asyncio.sleep(0)
         return obj.where(pd.notnull(obj), cast(Any, None)).tolist()
 
@@ -211,7 +213,7 @@ class AsyncJSONSafeSerializer:
             logger.info(f"Truncated DataFrame to {max_rows} rows for serialization")
 
         # Yield control for large DataFrames
-        if len(df) > 1000:
+        if len(df) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
             await asyncio.sleep(0)
 
         # Clean the DataFrame

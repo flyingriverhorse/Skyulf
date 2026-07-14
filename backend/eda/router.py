@@ -36,7 +36,7 @@ class FilterRequest(BaseModel):
     def validate_column(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("column name cannot be empty")
-        if len(v) > 255:
+        if len(v) > get_settings().MAX_COLUMN_NAME_LENGTH:
             raise ValueError("column name too long")
         return v
 

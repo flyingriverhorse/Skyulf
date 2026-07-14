@@ -125,7 +125,8 @@ def run_pipeline_batch_task(branches: list[tuple[str, dict]]) -> None:
     if len(branches) == 1:
         _run_one(*branches[0])
     else:
-        with ThreadPoolExecutor(max_workers=len(branches)) as pool:
+        max_workers = min(len(branches), get_settings().MAX_PARALLEL_BRANCH_WORKERS)
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = [pool.submit(_run_one, jid, pl) for jid, pl in branches]
             errors = []
             for f in futures:

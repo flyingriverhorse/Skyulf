@@ -10,6 +10,7 @@ from fastapi import (
 )
 from fastapi.responses import Response
 
+from backend.config import get_settings
 from backend.middleware.rate_limiter import limiter
 
 from .dependencies import get_data_service
@@ -30,7 +31,7 @@ sources_router = APIRouter(prefix="/data/api", tags=["Data Sources"])
 
 @sources_router.get("/sources", response_model=DataSourceListResponse)
 async def list_sources(
-    limit: int = 50,
+    limit: int | None = None,
     skip: int = 0,
     service: DataIngestionService = Depends(get_data_service),
 ):
@@ -39,7 +40,8 @@ async def list_sources(
     """
     # KNOWN-GAP: Auth not implemented yet — all sources are visible.
     # TODO(auth): Replace None with real user ID from auth dependency.
-    sources = await service.list_sources(user_id=None, limit=limit, skip=skip)
+    effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
+    sources = await service.list_sources(user_id=None, limit=effective_limit, skip=skip)
     return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
 
@@ -68,13 +70,14 @@ async def get_source(source_id: str, service: DataIngestionService = Depends(get
 @sources_router.get("/sources/{source_id}/sample", response_model=DataSourceSampleResponse)
 async def get_source_sample(
     source_id: str,
-    limit: int = 5,
+    limit: int | None = None,
     service: DataIngestionService = Depends(get_data_service),
 ):
     """
     Get a sample of data from the source.
     """
-    data = await service.get_sample(source_id, limit)
+    effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
+    data = await service.get_sample(source_id, effective_limit)
     return DataSourceSampleResponse(data=data)
 
 
