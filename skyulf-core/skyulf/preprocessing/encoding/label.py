@@ -74,7 +74,10 @@ def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping_str(encoders["__target__"])
         y_out = (
-            y_out.cast(pl.Utf8).fill_null("nan").replace_strict(mapping, default=missing_code).cast(pl.Int64)
+            y_out.cast(pl.Utf8)
+            .fill_null("nan")
+            .replace_strict(mapping, default=missing_code)
+            .cast(pl.Int64)
         )
 
     return X_out, y_out

@@ -1,6 +1,5 @@
 """Target-feature association: correlations, eta², box-plot interactions."""
 
-
 import numpy as np
 import polars as pl
 

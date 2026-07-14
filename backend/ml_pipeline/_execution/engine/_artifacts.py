@@ -70,7 +70,10 @@ class ArtifactsMixin:
                     importances = abs(coef)
 
             if importances is not None and len(importances) == len(feature_names):
-                return {name: round(float(val), 6) for name, val in zip(feature_names, importances, strict=True)}
+                return {
+                    name: round(float(val), 6)
+                    for name, val in zip(feature_names, importances, strict=True)
+                }
         except Exception:
             logger.debug(
                 "Failed to extract feature importances for step_type=%s",

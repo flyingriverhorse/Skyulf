@@ -40,7 +40,9 @@ def _polars_to_replace_exprs(valid: list[str], to_replace: Any, value: Any) -> l
         if is_map:
             exprs.append(pl.col(col).replace_strict(to_replace, default=pl.col(col)).alias(col))
         else:
-            exprs.append(pl.col(col).replace_strict({to_replace: value}, default=pl.col(col)).alias(col))
+            exprs.append(
+                pl.col(col).replace_strict({to_replace: value}, default=pl.col(col)).alias(col)
+            )
     return exprs
 
 

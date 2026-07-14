@@ -135,9 +135,7 @@ class SklearnApplier(BaseModelApplier):
 
         return pd.Series(preds, index=index)
 
-    def predict_proba(
-        self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any
-    ) -> Any | None:
+    def predict_proba(self, df: pd.DataFrame | SkyulfDataFrame, model_artifact: Any) -> Any | None:
         if not hasattr(model_artifact, "predict_proba"):
             return None
 

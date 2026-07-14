@@ -119,9 +119,7 @@ class LocalFileConnector(BaseConnector):
         except Exception:
             return None
 
-    async def fetch_data(
-        self, query: str | None = None, limit: int | None = None
-    ) -> pl.DataFrame:
+    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
         lazy_head = self._try_lazy_head(query=query, limit=limit)
         if lazy_head is not None:
             return lazy_head
@@ -137,9 +135,7 @@ class LocalFileConnector(BaseConnector):
 
         return df
 
-    def _try_lazy_head(
-        self, *, query: str | None, limit: int | None
-    ) -> pl.DataFrame | None:
+    def _try_lazy_head(self, *, query: str | None, limit: int | None) -> pl.DataFrame | None:
         """Stream a bounded head from CSV/Parquet without materialising the file."""
         if (
             limit is None

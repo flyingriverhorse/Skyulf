@@ -1,7 +1,6 @@
 """Cache configuration settings."""
 
 
-
 class CacheMixin:
     """Filesystem/Redis cache settings."""
 

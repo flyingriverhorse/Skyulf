@@ -55,9 +55,7 @@ class DecompositionMixin(_AnalyzerState):
                     # tolerate "1.0" strings for int cols; on failure, fall
                     # through and cast the column to string below.
                     with contextlib.suppress(ValueError):
-                        val = (
-                            float(val) if dtype in (pl.Float32, pl.Float64) else int(float(val))
-                        )
+                        val = float(val) if dtype in (pl.Float32, pl.Float64) else int(float(val))
 
             col_expr = (
                 pl.col(col).cast(pl.Utf8) if (is_numeric and isinstance(val, str)) else pl.col(col)

@@ -175,7 +175,8 @@ class MultivariateMixin(_AnalyzerState):
             feature_names = numeric_cols
             for i, label in enumerate(unique_labels):
                 center_dict = {
-                    col: float(val) for col, val in zip(feature_names, centers_original[i], strict=True)
+                    col: float(val)
+                    for col, val in zip(feature_names, centers_original[i], strict=True)
                 }
                 clusters_stats.append(
                     ClusterStats(

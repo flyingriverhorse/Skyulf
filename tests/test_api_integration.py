@@ -335,4 +335,3 @@ def test_run_pipeline_rejects_empty_nodes(client):
     response = client.post("/api/pipeline/run", json=payload)
     assert response.status_code == 400
     assert "no nodes" in response.json()["message"].lower()
-

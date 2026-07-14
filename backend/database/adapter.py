@@ -197,7 +197,9 @@ async def async_session_or_connection(  # noqa: C901
         try:
             import snowflake.connector  # type: ignore
         except ImportError:
-            raise RuntimeError("snowflake-connector-python package required for Snowflake support") from None
+            raise RuntimeError(
+                "snowflake-connector-python package required for Snowflake support"
+            ) from None
 
         # Create connection in thread pool since Snowflake is sync-only
         executor = ThreadPoolExecutor(max_workers=1)

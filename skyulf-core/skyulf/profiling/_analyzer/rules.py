@@ -1,6 +1,5 @@
 """Decision-tree surrogate model for human-readable rule extraction."""
 
-
 import numpy as np
 import polars as pl
 

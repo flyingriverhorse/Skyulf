@@ -285,7 +285,9 @@ class TestH3Index:
         params = calc.fit(df, {"lat_col": "lat", "lon_col": "lon", "resolution": 9})
         result = applier.apply(df, params)
 
-        expected = [h3.latlng_to_cell(lat, lon, 9) for lat, lon in zip(df["lat"], df["lon"], strict=True)]
+        expected = [
+            h3.latlng_to_cell(lat, lon, 9) for lat, lon in zip(df["lat"], df["lon"], strict=True)
+        ]
         assert result["h3_index"].tolist() == expected
 
     def test_different_resolution_changes_cell(self) -> None:

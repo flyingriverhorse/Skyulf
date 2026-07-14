@@ -149,9 +149,7 @@ async def delete_data_source(settings: Settings, filter_dict: dict[str, Any]):
             raise
 
 
-async def count_data_sources(
-    settings: Settings, filter_dict: dict[str, Any] | None = None
-) -> int:
+async def count_data_sources(settings: Settings, filter_dict: dict[str, Any] | None = None) -> int:
     """Count data sources with optional filtering."""
     async with async_session_or_connection(settings) as session:
         try:

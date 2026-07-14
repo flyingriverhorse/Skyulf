@@ -389,9 +389,7 @@ def extract_tuning_strategy(node_data: dict[str, Any]) -> str | None:
     return None
 
 
-def _find_strategy_in_nodes(
-    nodes: list[dict[str, Any]], node_id: str | None = None
-) -> str | None:
+def _find_strategy_in_nodes(nodes: list[dict[str, Any]], node_id: str | None = None) -> str | None:
     for node in nodes:
         if node_id:
             if node.get("node_id") == node_id or node.get("id") == node_id:

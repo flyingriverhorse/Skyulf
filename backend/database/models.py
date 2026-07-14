@@ -114,9 +114,7 @@ class DataSource(Base, TimestampMixin):
     test_status: Mapped[str] = mapped_column(String(20), default="untested", nullable=False)
 
     # User who created this source
-    created_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Relationship to User model
     creator = relationship("User", back_populates="data_sources")
@@ -370,9 +368,7 @@ class Deployment(Base, TimestampMixin):
     model_type: Mapped[str] = mapped_column(String(100), nullable=False)
     artifact_uri: Mapped[str] = mapped_column(String(500), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    deployed_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+    deployed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
     def to_dict(self):
         return {

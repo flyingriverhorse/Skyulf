@@ -1,6 +1,5 @@
 """Tests for skyulf.modeling.cross_validation."""
 
-
 import numpy as np
 import pandas as pd
 import pytest

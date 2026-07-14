@@ -1,6 +1,5 @@
 """Numeric column profiling + multicollinearity (VIF)."""
 
-
 import numpy as np
 
 from ..schemas import NumericStats

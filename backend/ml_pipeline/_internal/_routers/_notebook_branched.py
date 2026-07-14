@@ -205,7 +205,9 @@ def _assemble_full_branch_cells(
 ) -> list[dict[str, Any]]:
     """Build per-branch section cells (extracted to reduce CCN of caller)."""
     cells: list[dict[str, Any]] = []
-    for i, (_t, branch_nodes, classified) in enumerate(zip(terminals, branches, classifications, strict=True)):
+    for i, (_t, branch_nodes, classified) in enumerate(
+        zip(terminals, branches, classifications, strict=True)
+    ):
         cells.extend(
             _full_branch_section(_branch_letter(i), 5 + i, branch_nodes, classified, shared_ids)
         )

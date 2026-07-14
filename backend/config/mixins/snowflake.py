@@ -1,7 +1,6 @@
 """Snowflake data warehouse settings."""
 
 
-
 class SnowflakeMixin:
     """Snowflake connection and feature toggle."""
 

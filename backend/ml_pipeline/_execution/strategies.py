@@ -165,9 +165,7 @@ class JobStrategyFactory:
             raise ValueError(f"Unknown job type: {type(job)}")
 
     @classmethod
-    def find_job(
-        cls, session: Session, job_id: str
-    ) -> tuple[MLJob | None, JobStrategy | None]:
+    def find_job(cls, session: Session, job_id: str) -> tuple[MLJob | None, JobStrategy | None]:
         """
         Tries to find the job in all known tables.
         Returns (job, strategy) or (None, None).

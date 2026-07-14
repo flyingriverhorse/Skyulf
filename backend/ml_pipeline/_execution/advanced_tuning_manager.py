@@ -256,9 +256,7 @@ class AdvancedTuningManager:
         return jobs
 
     @staticmethod
-    async def get_latest_tuning_job_for_node(
-        session: AsyncSession, node_id: str
-    ) -> JobInfo | None:
+    async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
         result = await session.execute(
             select(AdvancedTuningJob)
             .where(AdvancedTuningJob.node_id == node_id)

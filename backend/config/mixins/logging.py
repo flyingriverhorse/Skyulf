@@ -1,6 +1,5 @@
 """Logging configuration settings."""
 
-
 from backend.utils.logging_utils import setup_universal_logging
 
 

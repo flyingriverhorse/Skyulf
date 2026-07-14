@@ -226,9 +226,7 @@ class JobManager:
         return jobs
 
     @staticmethod
-    async def get_latest_tuning_job_for_node(
-        session: AsyncSession, node_id: str
-    ) -> JobInfo | None:
+    async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
         return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod

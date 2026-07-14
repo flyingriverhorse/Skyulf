@@ -49,21 +49,11 @@ class DataProfiler:
                 "missing_count": int(df[col].isnull().sum()),
                 "missing_ratio": float(df[col].isnull().mean()),
                 "unique_count": int(df[col].nunique()),
-                "min_value": (
-                    float(cast(float | int, df[col].min())) if is_numeric else None
-                ),
-                "max_value": (
-                    float(cast(float | int, df[col].max())) if is_numeric else None
-                ),
-                "mean_value": (
-                    float(cast(float | int, df[col].mean())) if is_numeric else None
-                ),
-                "std_value": (
-                    float(cast(float | int, df[col].std())) if is_numeric else None
-                ),
-                "skewness": (
-                    float(cast(float | int, df[col].skew())) if is_numeric else None
-                ),
+                "min_value": (float(cast(float | int, df[col].min())) if is_numeric else None),
+                "max_value": (float(cast(float | int, df[col].max())) if is_numeric else None),
+                "mean_value": (float(cast(float | int, df[col].mean())) if is_numeric else None),
+                "std_value": (float(cast(float | int, df[col].std())) if is_numeric else None),
+                "skewness": (float(cast(float | int, df[col].skew())) if is_numeric else None),
             }
         return AnalysisProfile(
             row_count=len(df),
