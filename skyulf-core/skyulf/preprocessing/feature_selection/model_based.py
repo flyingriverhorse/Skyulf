@@ -15,6 +15,7 @@ from ._common import (
     _drop_selected_pandas,
     _drop_selected_polars,
     _extract_target,
+    _fillna_zero_with_warning,
     _model_feature_importances,
     _prepare_sklearn_y,
     _resolve_candidate_columns,
@@ -72,7 +73,7 @@ class ModelBasedSelectionCalculator(BaseCalculator):
         if selector is None:
             return cast(ModelBasedSelectionArtifact, {})
 
-        X_np, _ = SklearnBridge.to_sklearn(X_pd[cols].fillna(0))
+        X_np, _ = SklearnBridge.to_sklearn(_fillna_zero_with_warning(X_pd, cols))
         selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
         support = selector.get_support()
         selected_cols = [c for c, s in zip(cols, support, strict=True) if s]

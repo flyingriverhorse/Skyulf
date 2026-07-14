@@ -388,6 +388,44 @@ class TestMaybeChi2Rescale:
 
 
 # ---------------------------------------------------------------------------
+# _fillna_zero_with_warning
+# ---------------------------------------------------------------------------
+
+
+class TestFillnaZeroWithWarning:
+    def test_warns_when_missing_values_present(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Regression test: a silent fillna(0) before scoring can bias
+        univariate/model-based feature scores when 0 is meaningful or
+        missingness correlates with the target - must now warn."""
+        import logging
+
+        from skyulf.preprocessing.feature_selection._common import _fillna_zero_with_warning
+
+        df = pd.DataFrame({"a": [1.0, None, 3.0], "b": [1.0, 2.0, 3.0]})
+        with caplog.at_level(
+            logging.WARNING, logger="skyulf.preprocessing.feature_selection._common"
+        ):
+            result = _fillna_zero_with_warning(df, ["a", "b"])
+        assert list(result["a"]) == [1.0, 0.0, 3.0]
+        assert any("filling missing values with 0" in rec.message for rec in caplog.records)
+        assert any("'a'" in rec.message for rec in caplog.records)
+
+    def test_no_warning_when_no_missing_values(self, caplog: pytest.LogCaptureFixture) -> None:
+        """No missing values means fillna(0) is a no-op - must not warn."""
+        import logging
+
+        from skyulf.preprocessing.feature_selection._common import _fillna_zero_with_warning
+
+        df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [1.0, 2.0, 3.0]})
+        with caplog.at_level(
+            logging.WARNING, logger="skyulf.preprocessing.feature_selection._common"
+        ):
+            result = _fillna_zero_with_warning(df, ["a", "b"])
+        assert list(result["a"]) == [1.0, 2.0, 3.0]
+        assert not any("filling missing values with 0" in rec.message for rec in caplog.records)
+
+
+# ---------------------------------------------------------------------------
 # _univariate_score_dicts
 # ---------------------------------------------------------------------------
 

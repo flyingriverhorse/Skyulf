@@ -42,6 +42,14 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
         # HARD LIMIT: Top 20 numeric columns to prevent backend/frontend crash
         # Reduced from 50 to 20 as per user report of crashes
         if len(numeric_cols) > 20:
+            dropped_cols = numeric_cols[20:]
+            logger.warning(
+                "calculate_correlations: %d numeric columns exceeds the 20-column "
+                "cap; truncating to the first 20 by column order (not variance or "
+                "relevance) and dropping %s from the correlation matrix.",
+                len(numeric_cols),
+                dropped_cols,
+            )
             numeric_cols = numeric_cols[:20]
 
         subset = _collect(df.select(numeric_cols))

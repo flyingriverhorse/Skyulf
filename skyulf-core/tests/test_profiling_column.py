@@ -180,6 +180,87 @@ def test_analyze_column_categorical_high_cardinality() -> None:
     assert any(a.type == "High Cardinality" for a in alerts)
 
 
+def test_analyze_column_numeric_all_unique_triggers_possible_id() -> None:
+    """Regression test: is_unique/'Possible ID' was previously only ever set
+    for Categorical columns, so a fully-unique Numeric ID column (e.g. a raw
+    integer primary key) never got flagged. Now uses the batched `__unique`
+    aggregate generically."""
+    n = 60
+    df = pl.DataFrame({"id": [float(i) for i in range(n)]})
+    analyzer = _basic_analyzer(df)
+    analyzer.row_count = n  # type: ignore[attr-defined]
+
+    values = df["id"].to_numpy()
+    basic_stats = {"id__null": 0, "id__unique": n}
+    advanced_stats = {
+        "id__mean": float(np.mean(values)),
+        "id__median": float(np.median(values)),
+        "id__std": float(np.std(values, ddof=1)),
+        "id__var": float(np.var(values, ddof=1)),
+        "id__min": float(np.min(values)),
+        "id__max": float(np.max(values)),
+        "id__q25": float(np.quantile(values, 0.25)),
+        "id__q75": float(np.quantile(values, 0.75)),
+        "id__skew": 0.0,
+        "id__kurt": 0.0,
+        "id__zeros": 0,
+        "id__negatives": 0,
+    }
+    semantic_types = {"id": "Numeric"}
+
+    profile, alerts = analyzer._analyze_column("id", basic_stats, advanced_stats, semantic_types)
+
+    assert profile.is_unique is True
+    assert any(a.type == "Possible ID" for a in alerts)
+
+
+def test_analyze_column_text_all_unique_triggers_possible_id() -> None:
+    """Same regression as above but for a fully-unique Text column (e.g. a
+    UUID-style string ID stored as free text)."""
+    n = 60
+    df = pl.DataFrame({"uid": [f"uuid-{i}" for i in range(n)]})
+    analyzer = _basic_analyzer(df)
+    analyzer.row_count = n  # type: ignore[attr-defined]
+
+    basic_stats = {"uid__null": 0, "uid__unique": n}
+    advanced_stats: dict = {}
+    semantic_types = {"uid": "Text"}
+
+    profile, alerts = analyzer._analyze_column("uid", basic_stats, advanced_stats, semantic_types)
+
+    assert profile.is_unique is True
+    assert any(a.type == "Possible ID" for a in alerts)
+
+
+def test_analyze_column_numeric_not_all_unique_stays_false() -> None:
+    """A Numeric column with repeated values must not be flagged as unique/ID."""
+    df = pl.DataFrame({"val": [1.0, 1.0, 2.0, 3.0]})
+    analyzer = _basic_analyzer(df)
+    analyzer.row_count = 4  # type: ignore[attr-defined]
+
+    basic_stats = {"val__null": 0, "val__unique": 3}
+    advanced_stats = {
+        "val__mean": 1.75,
+        "val__median": 1.5,
+        "val__std": 0.96,
+        "val__var": 0.92,
+        "val__min": 1.0,
+        "val__max": 3.0,
+        "val__q25": 1.0,
+        "val__q75": 2.25,
+        "val__skew": 0.0,
+        "val__kurt": 0.0,
+        "val__zeros": 0,
+        "val__negatives": 0,
+    }
+    semantic_types = {"val": "Numeric"}
+
+    profile, alerts = analyzer._analyze_column("val", basic_stats, advanced_stats, semantic_types)
+
+    assert profile.is_unique is False
+    assert not any(a.type == "Possible ID" for a in alerts)
+
+
 def test_analyze_column_datetime_histogram_exception_is_caught(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -128,6 +128,27 @@ def test_analyze_classification_target_uses_categorical_path(mixed_df: pl.DataFr
             assert interaction.plot_type == "boxplot"
 
 
+def test_analyze_boolean_target_gets_correlations_and_interactions() -> None:
+    """Regression test: a Boolean target (common for binary classification,
+    e.g. `churned`/`is_fraud`) previously fell through both the Numeric and
+    Categorical target_semantic_type branches and got no target_correlations
+    or leakage-alert analysis at all. It must now be treated the same as a
+    Categorical target."""
+    df = pl.DataFrame(
+        {
+            "is_churned": [True, False, True, False, True, False, True, False, True, False] * 3,
+            "usage": [10.0, 90.0, 12.0, 88.0, 15.0, 85.0, 8.0, 92.0, 11.0, 89.0] * 3,
+        }
+    )
+    analyzer = EDAAnalyzer(df)
+    profile = analyzer.analyze(target_col="is_churned")
+
+    assert profile.target_correlations
+    assert "usage" in profile.target_correlations
+    for val in profile.target_correlations.values():
+        assert -1.0 <= val <= 1.0
+
+
 def test_analyze_detects_geospatial_and_dates(mixed_df: pl.DataFrame) -> None:
     """Lat/lon columns and date-like strings should be auto-detected."""
     analyzer = EDAAnalyzer(mixed_df)
