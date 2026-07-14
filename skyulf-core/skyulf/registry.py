@@ -30,7 +30,7 @@ class NodeRegistry:
             cls._appliers[name] = applier_cls
 
             # 1. Use passed metadata if available
-            if metadata:
+            if metadata is not None:
                 cls._metadata[name] = metadata
             # 2. Otherwise check for __node_meta__ (from @node_meta decorator)
             elif hasattr(calculator_cls, "__node_meta__"):

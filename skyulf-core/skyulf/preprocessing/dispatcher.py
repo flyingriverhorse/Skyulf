@@ -59,9 +59,11 @@ def apply_dual_engine(
         # We pass X directly. The func should handle typing (X_pl: Any = X)
         try:
             X_out, y_out = polars_func(X, y, params)
-        except Exception as e:
-            # logger.error(f"Polars Engine Apply Failed: {e}")
-            raise e
+        except Exception:
+            logger.exception(
+                "Polars engine apply failed in %s", polars_func.__qualname__
+            )
+            raise
     else:
         # Pandas path
         # Ensure X is pandas
@@ -69,9 +71,11 @@ def apply_dual_engine(
 
         try:
             X_out, y_out = pandas_func(X_pd, y, params)
-        except Exception as e:
-            # logger.error(f"Pandas Engine Apply Failed: {e}")
-            raise e
+        except Exception:
+            logger.exception(
+                "Pandas engine apply failed in %s", pandas_func.__qualname__
+            )
+            raise
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
 
@@ -100,13 +104,17 @@ def fit_dual_engine(
     if engine.name == EngineName.POLARS:
         try:
             return dict(polars_func(X, y, params))
-        except Exception as e:
-            # logger.error(f"Polars Engine Fit Failed: {e}")
-            raise e
+        except Exception:
+            logger.exception(
+                "Polars engine fit failed in %s", polars_func.__qualname__
+            )
+            raise
     else:
         X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:
             return dict(pandas_func(X_pd, y, params))
-        except Exception as e:
-            # logger.error(f"Pandas Engine Fit Failed: {e}")
-            raise e
+        except Exception:
+            logger.exception(
+                "Pandas engine fit failed in %s", pandas_func.__qualname__
+            )
+            raise
