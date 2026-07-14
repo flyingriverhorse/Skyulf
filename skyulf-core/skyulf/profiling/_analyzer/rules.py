@@ -1,7 +1,5 @@
 """Decision-tree surrogate model for human-readable rule extraction."""
 
-from typing import List, Optional
-
 import numpy as np
 import polars as pl
 
@@ -14,10 +12,10 @@ class RulesMixin(_AnalyzerState):
 
     def _discover_rules(  # noqa: C901
         self,
-        feature_cols: List[str],
+        feature_cols: list[str],
         target_col: str,
-        task_type: Optional[str] = None,
-    ) -> Optional[RuleTree]:
+        task_type: str | None = None,
+    ) -> RuleTree | None:
         """Train a depth-4 surrogate tree, return its structure + IF/THEN rules."""
         if not SKLEARN_AVAILABLE:
             return None
@@ -54,7 +52,7 @@ class RulesMixin(_AnalyzerState):
             num_cols = [c for c in feature_cols if c not in cat_cols]
 
             X_data = {}
-            feature_names: List[str] = []
+            feature_names: list[str] = []
 
             for col in num_cols:
                 mean_val = df_sample[col].mean()
@@ -74,7 +72,7 @@ class RulesMixin(_AnalyzerState):
             if is_regression:
                 y_mean = df_sample[target_col].mean()
                 y = df_sample[target_col].fill_null(y_mean).to_numpy()
-                class_names: List[str] = []
+                class_names: list[str] = []
                 clf = DecisionTreeRegressor(max_depth=4, random_state=42)
             else:
                 y_series = df_sample[target_col].cast(pl.Utf8).fill_null("Missing")
@@ -109,7 +107,7 @@ class RulesMixin(_AnalyzerState):
             feature_importance_list.sort(key=lambda x: x["importance"], reverse=True)
 
             tree_ = clf.tree_
-            nodes: List[RuleNode] = []
+            nodes: list[RuleNode] = []
 
             def recurse(node_id):
                 is_leaf = bool(tree_.children_left[node_id] == _tree.TREE_LEAF)
@@ -157,7 +155,7 @@ class RulesMixin(_AnalyzerState):
             recurse(0)
             nodes.sort(key=lambda x: x.id)
 
-            rules_text: List[str] = []
+            rules_text: list[str] = []
 
             def recurse_rules(node_id, current_rule):
                 if tree_.children_left[node_id] == _tree.TREE_LEAF:

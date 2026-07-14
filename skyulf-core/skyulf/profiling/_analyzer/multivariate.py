@@ -1,6 +1,6 @@
 """Multivariate analyses: PCA, KMeans clustering, Isolation Forest outliers."""
 
-from typing import Any, List, Optional, Tuple, cast
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -22,10 +22,10 @@ class MultivariateMixin(_AnalyzerState):
 
     def _prepare_matrix_sample(
         self,
-        numeric_cols: List[str],
-        target_col: Optional[str] = None,
+        numeric_cols: list[str],
+        target_col: str | None = None,
         limit: int = 5000,
-    ) -> Tuple[Optional[np.ndarray], Optional[pl.DataFrame], Optional[Any]]:
+    ) -> tuple[np.ndarray | None, pl.DataFrame | None, Any | None]:
         """Sample → impute (mean) → scale → return ``(X_scaled, sample_df, scaler)``.
 
         ``seed=42`` is hard-coded so PCA and Clustering see the same subset
@@ -80,8 +80,8 @@ class MultivariateMixin(_AnalyzerState):
             return None, None, None
 
     def _calculate_pca(
-        self, numeric_cols: List[str], target_col: Optional[str] = None
-    ) -> Tuple[Optional[List[PCAPoint]], Optional[List[PCAComponent]]]:
+        self, numeric_cols: list[str], target_col: str | None = None
+    ) -> tuple[list[PCAPoint] | None, list[PCAComponent] | None]:
         """3-component PCA projection + per-component top loadings."""
         try:
             from sklearn.decomposition import PCA
@@ -93,7 +93,10 @@ class MultivariateMixin(_AnalyzerState):
             if X_scaled is None or sample_df is None:
                 return None, None
 
-            pca = PCA(n_components=3)
+            n_components = min(3, X_scaled.shape[0], X_scaled.shape[1])
+            if n_components < 1:
+                return None, None
+            pca = PCA(n_components=n_components)
             X_pca = pca.fit_transform(X_scaled)
 
             components_list = []
@@ -143,8 +146,8 @@ class MultivariateMixin(_AnalyzerState):
             return None, None
 
     def _perform_clustering(
-        self, numeric_cols: List[str], target_col: Optional[str] = None
-    ) -> Optional[ClusteringAnalysis]:
+        self, numeric_cols: list[str], target_col: str | None = None
+    ) -> ClusteringAnalysis | None:
         """KMeans (k=3) post-hoc segmentation, projected to 2D via PCA for plotting."""
         try:
             from sklearn.cluster import KMeans
@@ -172,7 +175,8 @@ class MultivariateMixin(_AnalyzerState):
             feature_names = numeric_cols
             for i, label in enumerate(unique_labels):
                 center_dict = {
-                    col: float(val) for col, val in zip(feature_names, centers_original[i])
+                    col: float(val)
+                    for col, val in zip(feature_names, centers_original[i], strict=True)
                 }
                 clusters_stats.append(
                     ClusterStats(
@@ -183,7 +187,7 @@ class MultivariateMixin(_AnalyzerState):
                     )
                 )
 
-            pca = PCA(n_components=2)
+            pca = PCA(n_components=min(2, X_scaled.shape[0], X_scaled.shape[1]))
             X_pca = pca.fit_transform(X_scaled)
             X_pca = np.asarray(X_pca)
             if len(X_pca.shape) == 1:
@@ -220,7 +224,7 @@ class MultivariateMixin(_AnalyzerState):
             print(f"Error in clustering analysis: {e}")
             return None
 
-    def _detect_outliers(self, numeric_cols: List[str]) -> Optional[OutlierAnalysis]:
+    def _detect_outliers(self, numeric_cols: list[str]) -> OutlierAnalysis | None:
         """Isolation-Forest outlier detection with per-feature deviation explanations."""
         try:
             from sklearn.ensemble import IsolationForest
@@ -244,7 +248,7 @@ class MultivariateMixin(_AnalyzerState):
             if total_outliers == 0:
                 return None
 
-            scored_indices = list(zip(range(len(scores)), scores))
+            scored_indices = list(zip(range(len(scores)), scores, strict=True))
             scored_indices.sort(key=lambda x: x[1])
 
             top_k = 20

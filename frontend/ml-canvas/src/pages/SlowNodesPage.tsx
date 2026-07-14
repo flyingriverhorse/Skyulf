@@ -7,7 +7,7 @@
  * `JobStrategy.handle_success`) — no extra instrumentation; jobs that
  * pre-date the field are skipped silently.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     AlertCircle,
     BarChart3,
@@ -67,18 +67,25 @@ export const SlowNodesPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [sortKey, setSortKey] = useState<SortKey>('total_seconds');
 
+    // Track in-flight request id so a slow response doesn't clobber the
+    // state set by a more recent one (e.g. rapid `days`/`limit` toggles).
+    const requestIdRef = useRef(0);
+
     const load = useCallback(async () => {
+        const myRequestId = ++requestIdRef.current;
         setIsLoading(true);
         setError(null);
         try {
             const resp = await monitoringApi.getSlowNodes(days, limit);
+            if (myRequestId !== requestIdRef.current) return;
             setData(resp);
         } catch (e) {
+            if (myRequestId !== requestIdRef.current) return;
             const msg = (e as Error).message || 'Failed to load slow-nodes telemetry';
             setError(msg);
             toast.error(msg);
         } finally {
-            setIsLoading(false);
+            if (myRequestId === requestIdRef.current) setIsLoading(false);
         }
     }, [days, limit]);
 

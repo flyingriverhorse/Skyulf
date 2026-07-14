@@ -7,7 +7,7 @@ This module provides common dependencies used across the application,
 including database sessions and configuration.
 """
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

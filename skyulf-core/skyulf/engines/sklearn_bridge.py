@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -11,7 +11,7 @@ class SklearnBridge:
     """
 
     @staticmethod
-    def to_sklearn(X: Any) -> Tuple[np.ndarray, Any]:
+    def to_sklearn(X: Any) -> tuple[np.ndarray, Any]:
         """
         Convert input to Numpy array for Scikit-Learn.
 
@@ -40,7 +40,7 @@ class SklearnBridge:
         return X_numpy, y
 
     @staticmethod
-    def _convert_single(data: Any) -> Optional[np.ndarray]:
+    def _convert_single(data: Any) -> np.ndarray | None:
         if data is None:
             return None
 

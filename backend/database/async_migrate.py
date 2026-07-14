@@ -5,7 +5,7 @@ This module centralizes migration entrypoints for async FastAPI application.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from backend.config import Settings
 
@@ -14,7 +14,7 @@ from .data_sources import async_postgres_queries, async_sqlite_queries
 logger = logging.getLogger(__name__)
 
 
-async def migrate_sqlite_to_postgres(settings: Settings) -> Dict[str, int]:
+async def migrate_sqlite_to_postgres(settings: Settings) -> dict[str, int]:
     """Copy all rows from async SQLite data_sources into async PostgreSQL.
 
     Returns a summary dict: {'copied': n, 'skipped': m}
@@ -25,7 +25,7 @@ async def migrate_sqlite_to_postgres(settings: Settings) -> Dict[str, int]:
     try:
         raw_rows = await async_sqlite_queries.select_data_sources(settings, None)
         if isinstance(raw_rows, list):
-            rows: List[Dict[str, Any]] = raw_rows
+            rows: list[dict[str, Any]] = raw_rows
         elif raw_rows is None:
             rows = []
         else:
@@ -49,7 +49,7 @@ async def migrate_sqlite_to_postgres(settings: Settings) -> Dict[str, int]:
     return {"copied": copied, "skipped": skipped}
 
 
-async def migrate_postgres_to_sqlite(settings: Settings) -> Dict[str, int]:
+async def migrate_postgres_to_sqlite(settings: Settings) -> dict[str, int]:
     """Copy all rows from async PostgreSQL data_sources into async SQLite.
 
     Returns a summary dict: {'copied': n, 'skipped': m}
@@ -60,7 +60,7 @@ async def migrate_postgres_to_sqlite(settings: Settings) -> Dict[str, int]:
     try:
         raw_rows = await async_postgres_queries.select_data_sources(settings, None)
         if isinstance(raw_rows, list):
-            rows: List[Dict[str, Any]] = raw_rows
+            rows: list[dict[str, Any]] = raw_rows
         elif raw_rows is None:
             rows = []
         else:

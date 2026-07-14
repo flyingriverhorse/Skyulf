@@ -99,8 +99,13 @@ export const useCreateDataSource = () => {
 
 export const useUploadDataset = () => {
   const qc = useQueryClient();
-  return useMutation<IngestionJobResponse, Error, File>({
-    mutationFn: (file) => DatasetService.upload(file),
+  return useMutation<
+    IngestionJobResponse,
+    Error,
+    { file: File; onProgress?: (percent: number) => void }
+  >({
+    mutationFn: ({ file, onProgress }) =>
+      onProgress ? DatasetService.uploadWithProgress(file, onProgress) : DatasetService.upload(file),
     onSuccess: () => {
       invalidateLists(qc);
     },

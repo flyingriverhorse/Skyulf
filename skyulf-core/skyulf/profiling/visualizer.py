@@ -1,5 +1,3 @@
-from typing import Optional
-
 import polars as pl
 
 from .schemas import DatasetProfile
@@ -10,7 +8,7 @@ class EDAVisualizer:
     Helper class to visualize Skyulf EDA results using Rich (terminal) and Matplotlib (plots).
     """
 
-    def __init__(self, profile: DatasetProfile, df: Optional[pl.DataFrame] = None):
+    def __init__(self, profile: DatasetProfile, df: pl.DataFrame | None = None):
         self.profile = profile
         self.df = df
 
@@ -564,19 +562,18 @@ class EDAVisualizer:
 
         for i, interaction in enumerate(display_items):
             plt.subplot(1, n_plots, i + 1)
-            bxp_stats = []
-            for cat_data in interaction.data:
-                bxp_stats.append(
-                    {
-                        "label": cat_data.name,
-                        "whislo": cat_data.stats.min,
-                        "q1": cat_data.stats.q1,
-                        "med": cat_data.stats.median,
-                        "q3": cat_data.stats.q3,
-                        "whishi": cat_data.stats.max,
-                        "fliers": [],
-                    }
-                )
+            bxp_stats = [
+                {
+                    "label": cat_data.name,
+                    "whislo": cat_data.stats.min,
+                    "q1": cat_data.stats.q1,
+                    "med": cat_data.stats.median,
+                    "q3": cat_data.stats.q3,
+                    "whishi": cat_data.stats.max,
+                    "fliers": [],
+                }
+                for cat_data in interaction.data
+            ]
             ax = plt.gca()
             ax.bxp(bxp_stats, showfliers=False)
             title = f"{interaction.feature} by Target"
@@ -686,7 +683,7 @@ class EDAVisualizer:
 
         # Initialize lists for each column found in the first point
         first_point = self.profile.timeseries.trend[0]
-        for col in first_point.values.keys():
+        for col in first_point.values:
             values_map[col] = []
 
         for point in self.profile.timeseries.trend:

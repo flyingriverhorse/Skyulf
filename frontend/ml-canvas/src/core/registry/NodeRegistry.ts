@@ -19,7 +19,14 @@ class NodeRegistry {
 
   public register<TConfig>(definition: NodeDefinition<TConfig>): void {
     if (this.nodes.has(definition.type)) {
-      console.warn(`Node type "${definition.type}" is already registered. Overwriting.`);
+      const message = `Node type "${definition.type}" is already registered. Overwriting.`;
+      // Duplicate registrations almost always indicate a copy-paste bug (two
+      // node files reusing the same `type` string). Registries get
+      // re-initialized legitimately in some test setups, so we don't throw
+      // (that could crash the app in production for the same accidental
+      // double-registration) — but we do use `console.error` instead of
+      // `console.warn` so it's impossible to miss in dev tooling/CI logs.
+      console.error(message);
     }
     this.nodes.set(definition.type, definition as unknown as AnyNodeDefinition);
   }

@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, cast
+from typing import cast
 
 import numpy as np
 import polars as pl
@@ -14,9 +14,7 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
     return cast(pl.DataFrame, lf.collect())
 
 
-def calculate_correlations(
-    df: pl.LazyFrame, numeric_cols: List[str]
-) -> Optional[CorrelationMatrix]:
+def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> CorrelationMatrix | None:
     """
     Calculates Pearson correlation matrix for numeric columns.
     """

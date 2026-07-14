@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -70,7 +70,7 @@ class ModelRegistryService:
     @staticmethod
     async def list_models(
         session: AsyncSession, skip: int = 0, limit: int = 20
-    ) -> List[ModelRegistryEntry]:
+    ) -> list[ModelRegistryEntry]:
         """
         Lists all model types and their versions.
         Aggregates BasicTrainingJob and AdvancedTuningJob by (model_type, dataset_source_id).
@@ -84,7 +84,7 @@ class ModelRegistryService:
 
         # Fetch DataSources for names
         data_sources_result = await session.execute(select(DataSource))
-        ds_map: Dict[Any, Dict[str, str]] = {}
+        ds_map: dict[Any, dict[str, str]] = {}
         for ds in data_sources_result.scalars().all():
             info = {"name": str(ds.name), "type": str(ds.type)}
             # Map by integer ID (if used)
@@ -112,7 +112,7 @@ class ModelRegistryService:
         tune_jobs = tune_jobs_result.scalars().all()
 
         # Group by (model_type, dataset_source_id)
-        grouped: Dict[Tuple[str, str], List[ModelVersion]] = {}
+        grouped: dict[tuple[str, str], list[ModelVersion]] = {}
 
         for job in train_jobs:
             m_type = cast(str, job.model_type or "unknown")
@@ -131,9 +131,9 @@ class ModelRegistryService:
                     version=cast(str, job.version),
                     source="training",
                     status=job.status,
-                    metrics=cast(Optional[Dict[str, Any]], job.metrics),
-                    hyperparameters=cast(Optional[Dict[str, Any]], job.hyperparameters),
-                    created_at=cast(Optional[datetime], job.created_at),
+                    metrics=cast(dict[str, Any] | None, job.metrics),
+                    hyperparameters=cast(dict[str, Any] | None, job.hyperparameters),
+                    created_at=cast(datetime | None, job.created_at),
                     artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
                     deployment_id=deployed_job_ids.get(job.id),
@@ -150,7 +150,7 @@ class ModelRegistryService:
 
             # For tuning jobs, we use run_number as version
             # And best_params as hyperparameters
-            metrics = dict(cast(Optional[Dict[str, Any]], job.metrics) or {})
+            metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})
             if job.best_score is not None:
                 metrics["best_score"] = job.best_score
 
@@ -164,8 +164,8 @@ class ModelRegistryService:
                     source="tuning",
                     status=job.status,
                     metrics=metrics,
-                    hyperparameters=cast(Optional[Dict[str, Any]], job.best_params),
-                    created_at=cast(Optional[datetime], job.created_at),
+                    hyperparameters=cast(dict[str, Any] | None, job.best_params),
+                    created_at=cast(datetime | None, job.created_at),
                     artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
                     deployment_id=deployed_job_ids.get(job.id),
@@ -184,10 +184,9 @@ class ModelRegistryService:
             # Resolve dataset name and type
             # Try exact match, then string conversion
             ds_info = ds_map.get(ds_id)
-            if not ds_info:
+            if not ds_info and isinstance(ds_id, str) and ds_id.isdigit():
                 # Fallback: check if ds_id is numeric string and try int key
-                if isinstance(ds_id, str) and ds_id.isdigit():
-                    ds_info = ds_map.get(int(ds_id))
+                ds_info = ds_map.get(int(ds_id))
 
             if ds_info:
                 ds_name = ds_info["name"]
@@ -221,7 +220,7 @@ class ModelRegistryService:
         return results[skip : skip + limit]
 
     @staticmethod
-    async def get_model_versions(session: AsyncSession, model_type: str) -> List[ModelVersion]:
+    async def get_model_versions(session: AsyncSession, model_type: str) -> list[ModelVersion]:
         # Similar to list_models but filtered by model_type
         # ... (implementation reuse or copy)
         # For brevity, just filtered the list_models result for now,
@@ -241,24 +240,24 @@ class ModelRegistryService:
             .where(BasicTrainingJob.model_type == model_type)
             .order_by(BasicTrainingJob.created_at.desc())
         )
-        for job in train_jobs.scalars().all():
-            versions.append(
-                ModelVersion(
-                    job_id=job.id,
-                    pipeline_id=job.pipeline_id,
-                    node_id=job.node_id,
-                    model_type=model_type,
-                    version=cast(str, job.version),
-                    source="training",
-                    status=job.status,
-                    metrics=cast(Optional[Dict[str, Any]], job.metrics),
-                    hyperparameters=cast(Optional[Dict[str, Any]], job.hyperparameters),
-                    created_at=cast(Optional[datetime], job.created_at),
-                    artifact_uri=job.artifact_uri,
-                    is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(job.id),
-                )
+        versions.extend(
+            ModelVersion(
+                job_id=job.id,
+                pipeline_id=job.pipeline_id,
+                node_id=job.node_id,
+                model_type=model_type,
+                version=cast(str, job.version),
+                source="training",
+                status=job.status,
+                metrics=cast(dict[str, Any] | None, job.metrics),
+                hyperparameters=cast(dict[str, Any] | None, job.hyperparameters),
+                created_at=cast(datetime | None, job.created_at),
+                artifact_uri=job.artifact_uri,
+                is_deployed=job.id in deployed_job_ids,
+                deployment_id=deployed_job_ids.get(job.id),
             )
+            for job in train_jobs.scalars().all()
+        )
 
         # Tuning Jobs
         tune_jobs = await session.execute(
@@ -268,7 +267,7 @@ class ModelRegistryService:
             .order_by(AdvancedTuningJob.created_at.desc())
         )
         for job in tune_jobs.scalars().all():
-            metrics = dict(cast(Optional[Dict[str, Any]], job.metrics) or {})
+            metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})
             if job.best_score is not None:
                 metrics["best_score"] = job.best_score
 
@@ -282,8 +281,8 @@ class ModelRegistryService:
                     source="tuning",
                     status=job.status,
                     metrics=metrics,
-                    hyperparameters=cast(Optional[Dict[str, Any]], job.best_params),
-                    created_at=cast(Optional[datetime], job.created_at),
+                    hyperparameters=cast(dict[str, Any] | None, job.best_params),
+                    created_at=cast(datetime | None, job.created_at),
                     artifact_uri=job.artifact_uri,
                     is_deployed=job.id in deployed_job_ids,
                     deployment_id=deployed_job_ids.get(job.id),
@@ -298,7 +297,6 @@ class ModelRegistryService:
         """
         List artifacts for a specific job (Training or Tuning).
         """
-        from typing import Union
 
         from backend.ml_pipeline.artifacts.local import LocalArtifactStore
         from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
@@ -313,14 +311,14 @@ class ModelRegistryService:
             return ArtifactListResponse(storage_type="unknown", base_uri="", files=[])
         artifact_uri = str(job.artifact_uri)
 
-        store: Union[S3ArtifactStore, LocalArtifactStore]
+        store: S3ArtifactStore | LocalArtifactStore
 
         # 3. Instantiate the appropriate ArtifactStore
         from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 
         try:
             store = cast(
-                Union[S3ArtifactStore, LocalArtifactStore],
+                S3ArtifactStore | LocalArtifactStore,
                 ArtifactFactory.get_artifact_store(artifact_uri),
             )
 

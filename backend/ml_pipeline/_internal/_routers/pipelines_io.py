@@ -8,8 +8,9 @@ plus a small JSON-on-disk fallback for the "json" storage backend.
 
 import json
 import logging
-import os
-from typing import Any, Dict, List, cast
+import re
+from pathlib import Path
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -34,6 +35,26 @@ logger = logging.getLogger(__name__)
 # so all paths (`/save/...`, `/load/...`, `/versions/...`) stay byte-identical.
 router = APIRouter(tags=["ML Pipeline"])
 
+# `dataset_id` comes straight from the URL path and is used to build a
+# filename for the on-disk "json" storage backend. Only allow the charset
+# real dataset ids use (alphanumerics, dash, underscore) -- this rejects
+# path separators, "..", null bytes, and any other filesystem-meaningful
+# character outright, so the on-disk path can never leave `storage_dir`
+# regardless of how it's later joined/formatted.
+_SAFE_DATASET_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _pipeline_json_path(storage_dir: str | Path, dataset_id: str) -> Path:
+    """Return the on-disk JSON path for `dataset_id`, or raise ValueError.
+
+    `dataset_id` must match `_SAFE_DATASET_ID_RE`; anything else (path
+    separators, "..", absolute-path overrides, etc.) is rejected before any
+    `Path` is built from it.
+    """
+    if not _SAFE_DATASET_ID_RE.fullmatch(dataset_id):
+        raise ValueError(f"Invalid dataset_id: {dataset_id!r}")
+    return Path(storage_dir) / f"{dataset_id}.json"
+
 
 @router.post("/save/{dataset_id}")
 async def save_pipeline(
@@ -46,18 +67,17 @@ async def save_pipeline(
 
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
-        os.makedirs(storage_dir, exist_ok=True)
-        # Guard against path traversal in dataset_id (e.g. "../../etc/passwd")
-        safe_id = os.path.basename(dataset_id)
-        if not safe_id or safe_id != dataset_id:
-            raise HTTPException(status_code=400, detail="Invalid dataset_id")
-        file_path = os.path.join(storage_dir, f"{safe_id}.json")
+        Path(storage_dir).mkdir(parents=True, exist_ok=True)
         try:
-            with open(file_path, "w") as f:
+            file_path = _pipeline_json_path(storage_dir, dataset_id)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid dataset_id") from e
+        try:
+            with file_path.open("w") as f:
                 json.dump(payload.model_dump(), f, indent=2)
             return {"status": "success", "id": dataset_id, "storage": "json"}
         except Exception as e:
-            raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}")
+            raise SkyulfException(message=f"Failed to save pipeline to JSON: {str(e)}") from e
 
     # Default: Database Storage
     try:
@@ -107,7 +127,7 @@ async def save_pipeline(
         return {"status": "success", "id": dataset_id, "storage": "database"}
     except Exception as e:
         await session.rollback()
-        raise SkyulfException(message=f"Failed to save pipeline: {str(e)}")
+        raise SkyulfException(message=f"Failed to save pipeline: {str(e)}") from e
 
 
 @router.get("/load/{dataset_id}")
@@ -120,18 +140,17 @@ async def load_pipeline(
 
     if settings.PIPELINE_STORAGE_TYPE == "json":
         storage_dir = settings.PIPELINE_STORAGE_PATH
-        # Guard against path traversal in dataset_id
-        safe_id = os.path.basename(dataset_id)
-        if not safe_id or safe_id != dataset_id:
+        try:
+            file_path = _pipeline_json_path(storage_dir, dataset_id)
+        except ValueError:
             return None
-        file_path = os.path.join(storage_dir, f"{safe_id}.json")
-        if not os.path.exists(file_path):
+        if not file_path.exists():
             return None
         try:
-            with open(file_path, "r") as f:
+            with file_path.open() as f:
                 return json.load(f)
         except Exception as e:
-            raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}")
+            raise SkyulfException(message=f"Failed to load pipeline from JSON: {str(e)}") from e
 
     # Default: Database Storage
     try:
@@ -145,7 +164,7 @@ async def load_pipeline(
             return None
         return pipeline.to_dict()
     except Exception as e:
-        raise SkyulfException(message=f"Failed to load pipeline: {str(e)}")
+        raise SkyulfException(message=f"Failed to load pipeline: {str(e)}") from e
 
 
 # --- L7: Server-side pipeline versioning ---
@@ -160,7 +179,7 @@ async def load_pipeline(
 async def list_pipeline_versions(
     dataset_source_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """List all snapshots for a dataset (pinned first, newest first)."""
     versions = await PipelineVersionsService.list_versions(session, dataset_source_id)
     return [v.to_dict() for v in versions]
@@ -171,7 +190,7 @@ async def create_pipeline_version(
     dataset_source_id: str,
     payload: PipelineVersionCreateModel,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Explicitly create a snapshot. `kind` defaults to 'manual'; pass
     'auto' from background callers (e.g. successful Run hooks)."""
     try:
@@ -188,7 +207,7 @@ async def create_pipeline_version(
         return version.to_dict()
     except Exception as e:  # noqa: BLE001
         await session.rollback()
-        raise SkyulfException(message=f"Failed to create pipeline version: {str(e)}")
+        raise SkyulfException(message=f"Failed to create pipeline version: {str(e)}") from e
 
 
 @router.patch("/versions/{dataset_source_id}/{version_id}")
@@ -197,7 +216,7 @@ async def update_pipeline_version(
     version_id: int,
     payload: PipelineVersionPatchModel,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Toggle pin, rename, or edit the note on a snapshot."""
     version = await PipelineVersionsService.get_version(session, version_id)
     if version is None or version.dataset_source_id != dataset_source_id:
@@ -219,7 +238,7 @@ async def delete_pipeline_version(
     dataset_source_id: str,
     version_id: int,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Hard-delete a snapshot. Pinned rows are not protected from
     explicit user deletion (matches the localStorage behavior)."""
     version = await PipelineVersionsService.get_version(session, version_id)
@@ -240,7 +259,7 @@ async def delete_pipeline_version(
 # ---------------------------------------------------------------------------
 
 
-def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
+def _node_set(graph: Any) -> dict[str, dict[str, Any]]:
     """Index a saved graph by node id for O(1) diff lookups.
 
     Tolerates both the canonical `{nodes: [...], edges: [...]}` shape and
@@ -252,7 +271,7 @@ def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
     nodes = graph.get("nodes")
     if not isinstance(nodes, list):
         return {}
-    indexed: Dict[str, Dict[str, Any]] = {}
+    indexed: dict[str, dict[str, Any]] = {}
     for n in nodes:
         if isinstance(n, dict):
             nid = n.get("id")
@@ -261,18 +280,19 @@ def _node_set(graph: Any) -> Dict[str, Dict[str, Any]]:
     return indexed
 
 
-def _diff_versions(prev: Any, curr: Any) -> Dict[str, Any]:
+def _diff_versions(prev: Any, curr: Any) -> dict[str, Any]:
     """Compute a compact node-level diff between two saved graphs."""
     a = _node_set(prev)
     b = _node_set(curr)
     added = sorted(set(b) - set(a))
     removed = sorted(set(a) - set(b))
-    modified: List[str] = []
-    for nid in set(a) & set(b):
+    modified: list[str] = [
+        nid
+        for nid in set(a) & set(b)
         # Cheap structural compare — sufficient because saved graphs are
         # JSON round-tripped (no datetimes, no sets, no class instances).
-        if json.dumps(a[nid], sort_keys=True) != json.dumps(b[nid], sort_keys=True):
-            modified.append(nid)
+        if json.dumps(a[nid], sort_keys=True) != json.dumps(b[nid], sort_keys=True)
+    ]
     return {
         "nodes_added": added,
         "nodes_removed": removed,
@@ -286,7 +306,7 @@ async def get_pipeline_audit_log(
     dataset_source_id: str,
     limit: int = 50,
     session: AsyncSession = Depends(get_async_session),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return a chronological audit trail for one dataset's pipeline.
 
     Each entry is a saved `PipelineVersion` augmented with a per-node diff
@@ -298,7 +318,7 @@ async def get_pipeline_audit_log(
     # Service returns newest-first; walk oldest->newest so each diff sees the
     # prior version, then re-reverse for the response.
     chronological = list(reversed(versions))
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     prev_graph: Any = None
     for v in chronological:
         diff = _diff_versions(prev_graph, v.graph)

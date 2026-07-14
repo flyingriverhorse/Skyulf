@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
 
 import polars as pl
 
@@ -18,16 +17,14 @@ class BaseConnector(ABC):
         """
 
     @abstractmethod
-    async def get_schema(self) -> Dict[str, str]:
+    async def get_schema(self) -> dict[str, str]:
         """
         Discover the schema of the data source.
         Returns a dictionary mapping column names to data types.
         """
 
     @abstractmethod
-    async def fetch_data(
-        self, query: Optional[str] = None, limit: Optional[int] = None
-    ) -> pl.DataFrame:
+    async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
         """
         Fetch data from the source.
 

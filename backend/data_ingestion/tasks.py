@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from celery import shared_task
 from sqlalchemy import create_engine
@@ -55,7 +55,7 @@ def ingest_data_task(source_id: int):
         metadata["ingestion_status"] = {
             "status": "processing",
             "progress": 0.1,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
         data_source.source_metadata = metadata
         session.commit()
@@ -107,7 +107,7 @@ def ingest_data_task(source_id: int):
         metadata["ingestion_status"] = {
             "status": "completed",
             "progress": 1.0,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
         # Flatten profile into metadata for easy access
         metadata["schema"] = {col: stats["type"] for col, stats in profile["columns"].items()}
@@ -117,7 +117,7 @@ def ingest_data_task(source_id: int):
 
         data_source.source_metadata = metadata
         data_source.test_status = "success"
-        data_source.last_tested = datetime.now(timezone.utc)
+        data_source.last_tested = datetime.now(UTC)
 
         session.commit()
         logger.info(f"Ingestion completed for source {source_id}")
@@ -125,14 +125,17 @@ def ingest_data_task(source_id: int):
     except Exception as e:
         logger.error(f"Ingestion failed for source {source_id}: {str(e)}")
         if session:
-            # Re-query to ensure session is valid
+            # Roll back first: if the exception came from a DB error (e.g. a
+            # failed commit above), the session is left in a rolled-back/
+            # invalid state and the re-query below would itself raise.
+            session.rollback()
             data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
             if data_source:
                 metadata = dict(data_source.source_metadata or {})
                 metadata["ingestion_status"] = {
                     "status": "failed",
                     "error": str(e),
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(UTC).isoformat(),
                 }
                 data_source.source_metadata = metadata
                 data_source.test_status = "failed"

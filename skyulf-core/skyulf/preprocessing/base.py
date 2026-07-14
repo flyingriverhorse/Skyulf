@@ -2,7 +2,8 @@ import functools
 import time
 import tracemalloc
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Mapping, Optional, TypeVar, Union, cast
+from collections.abc import Callable, Mapping
+from typing import Any, cast
 
 import pandas as pd
 
@@ -15,7 +16,6 @@ from ._schema import SkyulfSchema
 # TypeVar lets the specific NodeArtifact TypedDict flow through fit_method
 # so callers see the concrete return type. Bound to Mapping (not Dict) so
 # TypedDicts — which are not LSP-substitutable for Dict — are valid returns.
-_NodeParams = TypeVar("_NodeParams", bound=Mapping[str, Any])
 
 
 def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -37,7 +37,7 @@ def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
     """
 
     @functools.wraps(fn)
-    def wrapper(self: Any, df: Any, params: Dict[str, Any]) -> Any:
+    def wrapper(self: Any, df: Any, params: dict[str, Any]) -> Any:
         X, y, is_tuple = unpack_pipeline_input(df)
         result = fn(self, X, y, params)
         if isinstance(result, tuple) and len(result) == 2:
@@ -49,19 +49,19 @@ def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
     return wrapper
 
 
-def fit_method(fn: Callable[..., _NodeParams]) -> Callable[..., _NodeParams]:
+def fit_method[T: Mapping[str, Any]](fn: Callable[..., T]) -> Callable[..., T]:
     """Decorator that handles unpack boilerplate around a Calculator's `fit`.
 
     The decorated method is written as ``(self, X, y, config)`` and may
     ignore ``y`` for X-only fits. No packing is done — `fit` returns a
     params dict, not a frame.
 
-    The TypeVar ``_NodeParams`` preserves the specific TypedDict return type
+    The type parameter ``T`` preserves the specific TypedDict return type
     (see ``preprocessing._artifacts``) so callers see the concrete shape.
     """
 
     @functools.wraps(fn)
-    def wrapper(self: Any, df: Any, config: Dict[str, Any]) -> _NodeParams:
+    def wrapper(self: Any, df: Any, config: dict[str, Any]) -> T:
         X, y, _ = unpack_pipeline_input(df)
         return fn(self, X, y, config)
 
@@ -74,7 +74,7 @@ def fit_method(fn: Callable[..., _NodeParams]) -> Callable[..., _NodeParams]:
 class BaseCalculator(ABC):
     @abstractmethod
     def fit(
-        self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], config: Dict[str, Any]
+        self, df: pd.DataFrame | SkyulfDataFrame | tuple, config: dict[str, Any]
     ) -> Mapping[str, Any]:
         """
         Calculates parameters from the training data.
@@ -85,8 +85,8 @@ class BaseCalculator(ABC):
         """
 
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
-    ) -> Optional[SkyulfSchema]:
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
+    ) -> SkyulfSchema | None:
         """Best-effort prediction of the output schema from config alone.
 
         Override this in concrete Calculators when the output columns/dtypes
@@ -106,7 +106,7 @@ class BaseCalculator(ABC):
 
 class BaseApplier(ABC):
     @abstractmethod
-    def apply(self, df: Union[pd.DataFrame, SkyulfDataFrame, tuple], params: Dict[str, Any]) -> Any:
+    def apply(self, df: pd.DataFrame | SkyulfDataFrame | tuple, params: dict[str, Any]) -> Any:
         """
         Applies the transformation using fitted parameters.
 
@@ -140,7 +140,7 @@ class StatefulTransformer:
         self.node_id = node_id
         self.apply_on_test = apply_on_test
         self.apply_on_validation = apply_on_validation
-        self.params: Dict[str, Any] = {}  # Store params in memory instead of ArtifactStore
+        self.params: dict[str, Any] = {}  # Store params in memory instead of ArtifactStore
         # Profiling metrics
         self.fit_time: float = 0.0
         self.peak_memory_bytes: int = 0
@@ -149,9 +149,9 @@ class StatefulTransformer:
 
     def fit_transform(
         self,
-        dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple],
-        config: Dict[str, Any],
-    ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
+        dataset: SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple,
+        config: dict[str, Any],
+    ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
         self.rows_in, _ = get_data_stats(dataset)
         tracemalloc.start()
         start = time.time()
@@ -170,9 +170,9 @@ class StatefulTransformer:
 
     def _fit_transform_inner(
         self,
-        dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple],
-        config: Dict[str, Any],
-    ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
+        dataset: SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple,
+        config: dict[str, Any],
+    ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
         # Check for DataFrame-like (Pandas, Polars, Wrapper)
         if (
             hasattr(dataset, "shape")
@@ -184,17 +184,17 @@ class StatefulTransformer:
             frame = cast(Any, dataset)
             # Calculator.fit returns Mapping (TypedDicts allowed); cast to Dict
             # for storage so Appliers continue to receive a concrete Dict.
-            self.params = cast(Dict[str, Any], self.calculator.fit(frame, config))
+            self.params = cast(dict[str, Any], self.calculator.fit(frame, config))
             return self.applier.apply(frame, self.params)
 
         # If dataset is a tuple (e.g. from FeatureTargetSplitter), pass it through.
         # This allows nodes like TrainTestSplitter to accept (X, y) tuples.
         if isinstance(dataset, tuple):
-            self.params = cast(Dict[str, Any], self.calculator.fit(dataset, config))
+            self.params = cast(dict[str, Any], self.calculator.fit(dataset, config))
             return self.applier.apply(dataset, self.params)
 
         # 1. Calculate on Train
-        self.params = cast(Dict[str, Any], self.calculator.fit(dataset.train, config))
+        self.params = cast(dict[str, Any], self.calculator.fit(dataset.train, config))
 
         # 2. Apply to all splits
         new_train = self.applier.apply(dataset.train, self.params)
@@ -224,8 +224,8 @@ class StatefulTransformer:
         return SplitDataset(train=new_train, test=new_test, validation=new_val)
 
     def transform(
-        self, dataset: Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]
-    ) -> Union[SplitDataset, pd.DataFrame, SkyulfDataFrame, tuple]:
+        self, dataset: SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple
+    ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
         # Use stored params
         params = self.params
 

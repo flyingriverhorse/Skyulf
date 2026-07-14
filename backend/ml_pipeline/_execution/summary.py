@@ -18,8 +18,9 @@ Design constraints
 """
 
 import logging
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Mapping, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 # Node-family classification
 # ---------------------------------------------------------------------------
 
-_FAMILY: Dict[str, str] = {
+_FAMILY: dict[str, str] = {
     # Encoders — typically expand column count.
     "dummyencoder": "encode",
     "onehotencoder": "encode",
@@ -101,7 +102,7 @@ _FAMILY: Dict[str, str] = {
 }
 
 # Pretty short labels for scaler implementations.
-_SCALER_LABEL: Dict[str, str] = {
+_SCALER_LABEL: dict[str, str] = {
     "standardscaler": "standard",
     "minmaxscaler": "min-max",
     "maxabsscaler": "max-abs",
@@ -112,10 +113,9 @@ _SCALER_LABEL: Dict[str, str] = {
 
 
 def _normalize(step_type: Any) -> str:
-    # Prefer the enum's underlying value so `StepType.BASIC_TRAINING`
-    # normalises to `"basictraining"`, not `"steptype.basictraining"`
-    # (Python ≥ 3.11 changes `str(IntEnum)`/`str(StrEnum)` semantics; the
-    # project supports both 3.10 and 3.12, so don't rely on `str(enum)`).
+    # `step_type` may arrive as either a `StepType` member or a plain string
+    # (e.g. from a Pydantic field typed as `str`). Prefer `.value` explicitly
+    # rather than `str(step_type)` so both inputs normalise consistently.
     raw = getattr(step_type, "value", step_type)
     return str(raw or "").lower().replace(" ", "").replace("-", "").replace("_", "")
 
@@ -162,7 +162,7 @@ def _fmt_int(value: int) -> str:
     return f"{value:,}"
 
 
-def _shape_of(payload: Any) -> Optional[Tuple[int, int]]:
+def _shape_of(payload: Any) -> tuple[int, int] | None:
     """Return ``(rows, cols)`` for anything frame-shaped; ``None`` otherwise."""
     if isinstance(payload, pd.DataFrame):
         return payload.shape
@@ -174,7 +174,7 @@ def _shape_of(payload: Any) -> Optional[Tuple[int, int]]:
     return None
 
 
-def _dtype_breakdown(df: pd.DataFrame) -> Optional[str]:
+def _dtype_breakdown(df: pd.DataFrame) -> str | None:
     """Return ``"10 num · 2 cat"`` style breakdown when a DataFrame has a
     meaningful mix of dtypes. ``None`` when it's all one kind (avoids
     redundant noise)."""
@@ -200,7 +200,7 @@ def _dtype_breakdown(df: pd.DataFrame) -> Optional[str]:
         return None
 
 
-def _split_summary(data: SplitDataset) -> Optional[str]:
+def _split_summary(data: SplitDataset) -> str | None:
     """Format ``train / test [/ val]`` row counts with ratio + column count."""
     train = _shape_of(data.train)
     test = _shape_of(data.test)
@@ -236,7 +236,7 @@ def _split_summary(data: SplitDataset) -> Optional[str]:
     return f"{ratio_str} · {abs_str} × {train[1]} cols"
 
 
-def _delta_phrase(in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> Optional[str]:
+def _delta_phrase(in_shape: tuple[int, int], out_shape: tuple[int, int]) -> str | None:
     """Render the row/col delta between input and output shapes."""
     in_rows, in_cols = in_shape
     out_rows, out_cols = out_shape
@@ -263,7 +263,7 @@ def _delta_phrase(in_shape: Tuple[int, int], out_shape: Tuple[int, int]) -> Opti
 # ---------------------------------------------------------------------------
 
 
-def _strategy_label(params: Mapping[str, Any], *keys: str) -> Optional[str]:
+def _strategy_label(params: Mapping[str, Any], *keys: str) -> str | None:
     """Pull the first non-empty string param under any of ``keys``."""
     for key in keys:
         v = params.get(key)
@@ -288,7 +288,7 @@ def _frame_branch(
     family: str,
     step_type: Any,
     out: pd.DataFrame,
-    in_shape: Optional[Tuple[int, int]],
+    in_shape: tuple[int, int] | None,
     params: Mapping[str, Any],
 ) -> str:
     """Render a one-liner for a node whose output is a single DataFrame."""
@@ -332,7 +332,7 @@ def _frame_branch(
 # ---------------------------------------------------------------------------
 
 
-def _first_finite(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Optional[float]:
+def _first_finite(metrics: Mapping[str, Any], candidates: Iterable[str]) -> float | None:
     """Return the first finite numeric value found under any of ``candidates``."""
     for key in candidates:
         v = metrics.get(key)
@@ -346,7 +346,7 @@ def _first_finite(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Opti
     return None
 
 
-def _expand(name: str) -> Tuple[str, ...]:
+def _expand(name: str) -> tuple[str, ...]:
     """Search order: prefer ``test_*``, then bare, then ``val_*``, then ``train_*``."""
     return (f"test_{name}", name, f"val_{name}", f"train_{name}")
 
@@ -361,7 +361,7 @@ _MAE_KEYS = _expand("mae") + _expand("mean_absolute_error")
 _MSE_KEYS = _expand("mse") + _expand("mean_squared_error")
 
 
-def _train_only(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Optional[float]:
+def _train_only(metrics: Mapping[str, Any], candidates: Iterable[str]) -> float | None:
     """Same as ``_first_finite`` but only checks ``train_*`` keys."""
     for key in candidates:
         if not key.startswith("train_"):
@@ -377,7 +377,7 @@ def _train_only(metrics: Mapping[str, Any], candidates: Iterable[str]) -> Option
     return None
 
 
-def _gap_suffix(test_v: float, train_v: Optional[float], higher_is_better: bool) -> str:
+def _gap_suffix(test_v: float, train_v: float | None, higher_is_better: bool) -> str:
     """Render ``"  ▲0.12"`` when the train→test gap is meaningful overfit.
 
     Empty string when train is missing or the gap is small (< 0.05).
@@ -390,7 +390,7 @@ def _gap_suffix(test_v: float, train_v: Optional[float], higher_is_better: bool)
     return f" · ▲{diff:.2f}"
 
 
-def _training_summary(metrics: Mapping[str, Any]) -> Optional[str]:
+def _training_summary(metrics: Mapping[str, Any]) -> str | None:
     """Build the headline metric line for a trained model.
 
     Strategy: probe for classification metrics first (acc / f1 / auc),
@@ -439,7 +439,7 @@ def _training_summary(metrics: Mapping[str, Any]) -> Optional[str]:
 # Short labels used in the tuning headline. Mirrors what the JobsDrawer
 # renders next to "Best Score (…)" so the card and the drawer agree on
 # wording. Anything not listed falls back to the raw scoring name.
-_SCORING_LABEL: Dict[str, str] = {
+_SCORING_LABEL: dict[str, str] = {
     "accuracy": "acc",
     "balanced_accuracy": "bal-acc",
     "f1": "f1",
@@ -464,7 +464,7 @@ _SCORING_LABEL: Dict[str, str] = {
 }
 
 
-def _tuning_summary(metrics: Mapping[str, Any]) -> Optional[str]:
+def _tuning_summary(metrics: Mapping[str, Any]) -> str | None:
     """Hyperparameter-tuning summary.
 
     Leads with the tuner's own ``best_score`` + scoring-metric short
@@ -481,7 +481,7 @@ def _tuning_summary(metrics: Mapping[str, Any]) -> Optional[str]:
     (e.g. legacy job rows), then to nothing.
     """
     trials = metrics.get("trials")
-    n_trials: Optional[int] = None
+    n_trials: int | None = None
     if isinstance(trials, list):
         n_trials = len(trials)
     elif isinstance(trials, int):
@@ -530,28 +530,28 @@ class SummaryContext:
     step_type: Any
     output: Any
     metrics: Mapping[str, Any]
-    input_shape: Optional[Tuple[int, int]]
+    input_shape: tuple[int, int] | None
     params: Mapping[str, Any]
 
 
-SummaryRenderer = Callable[[SummaryContext], Optional[str]]
+SummaryRenderer = Callable[[SummaryContext], str | None]
 
 
-def _render_tune(ctx: SummaryContext) -> Optional[str]:
+def _render_tune(ctx: SummaryContext) -> str | None:
     return _tuning_summary(ctx.metrics)
 
 
-def _render_train(ctx: SummaryContext) -> Optional[str]:
+def _render_train(ctx: SummaryContext) -> str | None:
     return _training_summary(ctx.metrics)
 
 
-def _render_split(ctx: SummaryContext) -> Optional[str]:
+def _render_split(ctx: SummaryContext) -> str | None:
     if isinstance(ctx.output, SplitDataset):
         return _split_summary(ctx.output)
     return None
 
 
-def _render_frame(ctx: SummaryContext) -> Optional[str]:
+def _render_frame(ctx: SummaryContext) -> str | None:
     """Default renderer for any family whose output is a DataFrame.
 
     Covers loaders, snapshots, encoders, scalers, imputers, drops,
@@ -568,7 +568,7 @@ def _render_frame(ctx: SummaryContext) -> Optional[str]:
 # Family → renderer. Anything not listed falls through to the
 # DataFrame renderer when applicable (covers all "shape-changing"
 # data-prep families with one entry).
-_RENDERERS: Dict[str, SummaryRenderer] = {
+_RENDERERS: dict[str, SummaryRenderer] = {
     "tune": _render_tune,
     "train": _render_train,
     "split": _render_split,
@@ -603,10 +603,10 @@ def build_summary(
     *,
     step_type: Any,
     output: Any,
-    metrics: Dict[str, Any],
-    input_shape: Optional[Tuple[int, int]] = None,
-    params: Optional[Mapping[str, Any]] = None,
-) -> Optional[str]:
+    metrics: dict[str, Any],
+    input_shape: tuple[int, int] | None = None,
+    params: Mapping[str, Any] | None = None,
+) -> str | None:
     """Build the one-line node-card summary.
 
     Parameters

@@ -1,8 +1,8 @@
 import logging
 import traceback
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, nullcontext
-from typing import Generator, List, Tuple
 
 from celery import shared_task
 from sqlalchemy import create_engine
@@ -70,7 +70,7 @@ def run_pipeline_task(job_id: str, pipeline_config_dict: dict) -> None:
 
 
 @shared_task(name="core.ml_pipeline.tasks.run_pipeline_batch_task")
-def run_pipeline_batch_task(branches: List[Tuple[str, dict]]) -> None:
+def run_pipeline_batch_task(branches: list[tuple[str, dict]]) -> None:
     """Run multiple pipeline branches in a single Celery task.
 
     Saves N-1 Redis round-trips vs submitting one task per branch.

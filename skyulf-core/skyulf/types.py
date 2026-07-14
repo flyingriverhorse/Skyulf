@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, TypedDict
+from typing import Any, TypedDict
 
 
 class PreprocessingStepConfig(TypedDict, total=False):
@@ -6,7 +6,7 @@ class PreprocessingStepConfig(TypedDict, total=False):
 
     name: str
     transformer: str
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class ModelConfig(TypedDict, total=False):
@@ -14,14 +14,14 @@ class ModelConfig(TypedDict, total=False):
 
     type: str  # e.g. "random_forest_classifier"
     node_id: str
-    params: Dict[str, Any]
-    base_model: Dict[str, Any]  # nested ModelConfig (recursive type support varies)
+    params: dict[str, Any]
+    base_model: dict[str, Any]  # nested ModelConfig (recursive type support varies)
 
 
 class PipelineConfig(TypedDict, total=False):
     """Configuration for the full pipeline."""
 
-    preprocessing: List[PreprocessingStepConfig]
+    preprocessing: list[PreprocessingStepConfig]
     modeling: ModelConfig
 
 
@@ -32,5 +32,5 @@ class NodeMetadataDict(TypedDict, total=False):
     name: str
     category: str
     description: str
-    params: Dict[str, Any]
-    tags: List[str]
+    params: dict[str, Any]
+    tags: list[str]

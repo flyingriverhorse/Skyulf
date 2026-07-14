@@ -1,7 +1,7 @@
 """Univariate statistical feature selector."""
 
 import logging
-from typing import Any, Dict, cast
+from typing import Any, cast
 
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 class UnivariateSelectionApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _drop_selected_polars, _drop_selected_pandas)
 
 
@@ -43,7 +43,7 @@ class UnivariateSelectionApplier(BaseApplier):
 )
 class UnivariateSelectionCalculator(BaseCalculator):
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> UnivariateSelectionArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> UnivariateSelectionArtifact:  # pylint: disable=arguments-differ
         target_col = config.get("target_column")
         X_pd = to_pandas(X)
 
@@ -76,7 +76,7 @@ class UnivariateSelectionCalculator(BaseCalculator):
 
         selector.fit(X_np, _prepare_sklearn_y(y, problem_type))
         support = selector.get_support()
-        selected_cols = [c for c, s in zip(cols, support) if s]
+        selected_cols = [c for c, s in zip(cols, support, strict=True) if s]
         scores, pvalues = _univariate_score_dicts(selector, cols)
 
         return cast(

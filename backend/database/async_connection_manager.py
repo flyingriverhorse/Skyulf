@@ -6,9 +6,9 @@ Handles async connection pooling and concurrent access optimization for SQLite a
 import asyncio
 import atexit
 import logging
-import os
-from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional, cast
+from contextlib import asynccontextmanager, suppress
+from pathlib import Path
+from typing import Any, cast
 
 import aiosqlite
 from sqlalchemy import text
@@ -43,7 +43,7 @@ class AsyncSQLiteConnectionManager:
         """Initialize the async SQLite manager with optimized settings"""
         try:
             # Ensure database directory exists
-            os.makedirs(os.path.dirname(self.database_path), exist_ok=True)
+            Path(self.database_path).parent.mkdir(parents=True, exist_ok=True)
 
             # Enable WAL mode and optimizations
             await self._setup_database_optimizations()
@@ -102,23 +102,20 @@ class AsyncSQLiteConnectionManager:
 
             except Exception:
                 if conn:
-                    try:
+                    # connection already broken; rollback best-effort only
+                    with suppress(Exception):
                         await conn.rollback()
-                    except Exception:
-                        pass  # nosec B110 - connection already broken; rollback best-effort only
                 raise
             finally:
                 if conn:
-                    try:
+                    with suppress(Exception):
                         await conn.close()
-                    except Exception:
-                        pass
 
     async def execute_query(
         self,
         query: str,
         params: tuple[Any, ...] | None = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Execute a SELECT query and return results as list of dicts"""
         async with self.get_connection() as conn:
             if params:
@@ -130,7 +127,7 @@ class AsyncSQLiteConnectionManager:
             rows = await cursor.fetchall()
             await cursor.close()
 
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=True)) for row in rows]
 
     async def execute_update(
         self,
@@ -150,8 +147,13 @@ class AsyncSQLiteConnectionManager:
             return cast(int, rowcount)
 
     def _sync_close_all(self):
-        """Synchronous close for atexit handler"""
-        logger.info("[OK] Async SQLite manager cleanup registered")
+        """Synchronous atexit handler.
+
+        No-op: each `get_connection()` call opens and closes its own
+        short-lived `aiosqlite` connection via `async with`, so there is no
+        persistent connection/pool for this manager to tear down here.
+        """
+        logger.info("[OK] Async SQLite manager shutdown (no persistent connections to close)")
 
 
 class AsyncPostgreSQLConnectionManager:
@@ -162,8 +164,8 @@ class AsyncPostgreSQLConnectionManager:
     def __init__(self, connection_string: str, pool_size: int = 10):
         self.connection_string = connection_string
         self.pool_size = pool_size
-        self._engine: Optional[AsyncEngine] = None
-        self._session_maker: Optional[async_sessionmaker[AsyncSession]] = None
+        self._engine: AsyncEngine | None = None
+        self._session_maker: async_sessionmaker[AsyncSession] | None = None
         self._initialized = False
 
     async def initialize(self):
@@ -237,8 +239,8 @@ class AsyncPostgreSQLConnectionManager:
     async def execute_query(
         self,
         query: str,
-        params: Dict[str, Any] | None = None,
-    ) -> List[Dict[str, Any]]:
+        params: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Execute a SELECT query and return results as list of dicts"""
         async with self.get_connection() as conn:
             from sqlalchemy import text
@@ -246,12 +248,12 @@ class AsyncPostgreSQLConnectionManager:
             result = await conn.execute(text(query), params or {})
             columns = result.keys()
             rows = result.fetchall()
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=True)) for row in rows]
 
     async def execute_update(
         self,
         query: str,
-        params: Dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> int:
         """Execute an INSERT/UPDATE/DELETE query and return affected rows"""
         async with self.get_connection() as conn:
@@ -275,8 +277,8 @@ class AsyncDatabaseManager:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.sqlite_manager: Optional[AsyncSQLiteConnectionManager] = None
-        self.postgres_manager: Optional[AsyncPostgreSQLConnectionManager] = None
+        self.sqlite_manager: AsyncSQLiteConnectionManager | None = None
+        self.postgres_manager: AsyncPostgreSQLConnectionManager | None = None
         self._initialized = False
 
     async def initialize(self):
@@ -285,8 +287,8 @@ class AsyncDatabaseManager:
             # Initialize SQLite if configured
             sqlite_path = getattr(self.settings, "DB_PATH", None)
             if sqlite_path:
-                if not os.path.isabs(sqlite_path):
-                    sqlite_path = os.path.join(os.getcwd(), sqlite_path)
+                if not Path(sqlite_path).is_absolute():
+                    sqlite_path = str(Path.cwd() / sqlite_path)
 
                 pool_size = getattr(self.settings, "sqlite_pool_size", 10)
                 timeout = getattr(self.settings, "sqlite_timeout", 30)
@@ -340,7 +342,7 @@ class AsyncDatabaseManager:
 
     async def close_all(self):
         """Close all async database connections"""
-        tasks: List[Any] = []
+        tasks: list[Any] = []
 
         if self.postgres_manager:
             tasks.append(self.postgres_manager.close())
@@ -352,7 +354,7 @@ class AsyncDatabaseManager:
 
 
 # Global async database manager instance
-_async_db_manager: Optional[AsyncDatabaseManager] = None
+_async_db_manager: AsyncDatabaseManager | None = None
 
 
 async def initialize_async_database_manager(settings: Settings):
@@ -363,7 +365,7 @@ async def initialize_async_database_manager(settings: Settings):
     return _async_db_manager
 
 
-def get_async_database_manager() -> Optional[AsyncDatabaseManager]:
+def get_async_database_manager() -> AsyncDatabaseManager | None:
     """Get the global async database manager"""
     return _async_db_manager
 

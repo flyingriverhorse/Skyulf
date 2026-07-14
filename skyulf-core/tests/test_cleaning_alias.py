@@ -5,7 +5,7 @@ single-value helper, Calculator.fit branches, Applier.apply (boolean /
 country / custom), edge cases, and engine parity.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import pandas as pd
 import polars as pl
@@ -16,7 +16,6 @@ from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.preprocessing.cleaning._common import (
-    ALIAS_PUNCTUATION_TABLE,
     COMMON_BOOLEAN_ALIASES,
     COUNTRY_ALIAS_MAP,
 )
@@ -54,7 +53,7 @@ _applier_value_list_cases = TestCaseLoader(
 
 
 @pytest.mark.parametrize(*_alias_type_resolution_cases)
-def test_resolve_alias_type(config: Dict[str, Any], expected: str) -> None:
+def test_resolve_alias_type(config: dict[str, Any], expected: str) -> None:
     """_resolve_alias_type must resolve legacy aliases and defaults correctly."""
     assert _resolve_alias_type(config) == expected
 
@@ -65,7 +64,7 @@ def test_resolve_alias_type(config: Dict[str, Any], expected: str) -> None:
 
 
 @pytest.mark.parametrize(*_normalize_custom_map_cases)
-def test_normalize_alias_custom_map(input_map: Dict[str, str], expected: Dict[str, str]) -> None:
+def test_normalize_alias_custom_map(input_map: dict[str, str], expected: dict[str, str]) -> None:
     """_normalize_alias_custom_map must lowercase and strip punctuation from string keys."""
     assert _normalize_alias_custom_map(input_map) == expected
 
@@ -83,7 +82,7 @@ def test_normalize_custom_map_non_string_keys_unchanged() -> None:
 
 @pytest.mark.parametrize(*_resolve_mapping_cases)
 def test_resolve_alias_mapping(
-    alias_type: str, custom_map: Dict[str, str], expected_kind: str
+    alias_type: str, custom_map: dict[str, str], expected_kind: str
 ) -> None:
     """_resolve_alias_mapping must select the canonical/custom map per alias_type."""
     result = _resolve_alias_mapping(alias_type, custom_map)
@@ -197,11 +196,11 @@ def test_applier_uniform_normalisation(
 
 @pytest.mark.parametrize(*_applier_value_list_cases)
 def test_applier_value_lists(
-    values: list, alias_type: str, custom_map: Dict[str, str], expected: list
+    values: list, alias_type: str, custom_map: dict[str, str], expected: list
 ) -> None:
     """Applier must map/preserve each value in the list per the given alias config."""
     df = pd.DataFrame({"flag": values})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["flag"],
         "alias_type": alias_type,
         "custom_map": custom_map,
@@ -213,7 +212,7 @@ def test_applier_value_lists(
 def test_applier_empty_dataframe() -> None:
     """Applying to an empty DataFrame must return an empty DataFrame."""
     df = pd.DataFrame({"flag": pd.Series([], dtype=str)})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["flag"],
         "alias_type": "boolean",
         "custom_map": {},
@@ -225,7 +224,7 @@ def test_applier_empty_dataframe() -> None:
 def test_applier_no_valid_columns_is_noop() -> None:
     """Columns not present in the DataFrame must be silently skipped."""
     df = pd.DataFrame({"flag": ["yes"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["nonexistent"],
         "alias_type": "boolean",
         "custom_map": {},
@@ -245,7 +244,7 @@ def test_applier_empty_params_is_noop() -> None:
 def test_polars_applier_no_valid_columns_is_noop() -> None:
     """Polars alias applier must short-circuit when no valid column is found."""
     df = pl.DataFrame({"flag": ["yes", "no"]})
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["nonexistent"],
         "alias_type": "boolean",
         "custom_map": {},
@@ -289,7 +288,7 @@ def _boolean_frame(draw: st.DrawFn, min_rows: int = 4, max_rows: int = 20) -> pd
 @given(df=_boolean_frame())
 def test_alias_apply_engine_parity_boolean(df: pd.DataFrame) -> None:
     """Boolean alias replacement must produce identical results on pandas and polars."""
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "columns": ["flag"],
         "alias_type": "boolean",
         "custom_map": {},

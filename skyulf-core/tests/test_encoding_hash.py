@@ -1,5 +1,8 @@
 """Unit tests for the HashEncoder Calculator/Applier (fit + apply, dual-engine)."""
 
+import subprocess
+import sys
+import textwrap
 from typing import Any
 
 import pandas as pd
@@ -174,6 +177,47 @@ def test_fit_engine_parity_pandas_vs_polars(cats: list[str]) -> None:
     pl_params = HashEncoderCalculator().fit(df_pl, dict(config))
 
     assert pd_params == pl_params
+
+
+def test_pandas_bucket_assignment_stable_across_process_hash_seeds() -> None:
+    """The pandas apply path must not rely on Python's per-process ``hash()``.
+
+    Regression test for a bug where ``_hash_apply_pandas`` used the built-in
+    ``hash()``, which is salted by ``PYTHONHASHSEED`` per interpreter process.
+    That meant the same category could map to a different bucket in a
+    different worker process than the one that fit the encoder — silently
+    corrupting encodings. This spawns two subprocesses with different
+    explicit hash seeds and asserts the resulting buckets are identical.
+    """
+    script = textwrap.dedent(
+        """
+        import pandas as pd
+        from skyulf.preprocessing.encoding.hash import (
+            HashEncoderApplier,
+            HashEncoderCalculator,
+        )
+
+        df = pd.DataFrame({"city": ["ny", "la", "sf", "ny", "chicago"]})
+        config = {"columns": ["city"], "n_features": 5}
+        params = HashEncoderCalculator().fit(df, config)
+        out = HashEncoderApplier().apply(df, dict(params))
+        print(",".join(str(v) for v in out["city"].tolist()))
+        """
+    )
+
+    def _run_with_seed(seed: str) -> str:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env={"PYTHONHASHSEED": seed, "PATH": __import__("os").environ.get("PATH", "")},
+            check=True,
+        )
+        return result.stdout.strip()
+
+    buckets_seed_0 = _run_with_seed("0")
+    buckets_seed_42 = _run_with_seed("42")
+    assert buckets_seed_0 == buckets_seed_42
 
 
 class TestRealShapedDataset:

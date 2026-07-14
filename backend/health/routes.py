@@ -6,7 +6,7 @@ Basic health and status endpoints for monitoring and load balancer checks.
 
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -46,7 +46,7 @@ async def health_check(settings: Settings = Depends(get_config)):
     """
     return HealthResponse(
         status="healthy",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         version=settings.APP_VERSION,
         environment="development" if settings.DEBUG else "production",
         uptime_seconds=time.time() - START_TIME,
@@ -87,7 +87,7 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
 
     return DetailedHealthResponse(
         status="healthy" if database_status == "healthy" else "degraded",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         version=settings.APP_VERSION,
         environment="development" if settings.DEBUG else "production",
         uptime_seconds=time.time() - START_TIME,

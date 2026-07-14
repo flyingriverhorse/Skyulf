@@ -16,7 +16,6 @@ errors when drivers or configuration are missing.
 """
 
 import logging
-from typing import Optional
 
 from backend.config import Settings
 
@@ -45,26 +44,27 @@ async def _try_init_postgres(settings: Settings):
 async def _try_init_sqlite(settings: Settings):
     """Initialize SQLite with async connection."""
     try:
-        import os
+        from pathlib import Path
 
         import aiosqlite
 
         # Get SQLite database path from settings
         db_path = getattr(settings, "DB_PATH", "mlops_database.db")
-        if not os.path.isabs(db_path):
-            db_path = os.path.join(os.getcwd(), db_path)
+        db_path_obj = Path(db_path)
+        if not db_path_obj.is_absolute():
+            db_path_obj = Path.cwd() / db_path
 
         # Create directory if it doesn't exist
-        db_dir = os.path.dirname(db_path)
-        if db_dir and not os.path.exists(db_dir):
-            os.makedirs(db_dir, exist_ok=True)
+        db_dir = db_path_obj.parent
+        if db_dir and not db_dir.exists():
+            db_dir.mkdir(parents=True, exist_ok=True)
 
         # Test connection
-        async with aiosqlite.connect(db_path) as conn:
+        async with aiosqlite.connect(db_path_obj) as conn:
             await conn.execute("SELECT 1")
             await conn.commit()
 
-        logger.info(f"Async SQLite initialized at: {db_path}")
+        logger.info(f"Async SQLite initialized at: {db_path_obj}")
         return True
 
     except ImportError as ie:
@@ -87,7 +87,7 @@ async def _try_init_mongodb(settings: Settings):
     return False
 
 
-async def initialize(settings: Optional[Settings] = None) -> bool:
+async def initialize(settings: Settings | None = None) -> bool:
     """
     Initialize the database backend based on configuration.
 

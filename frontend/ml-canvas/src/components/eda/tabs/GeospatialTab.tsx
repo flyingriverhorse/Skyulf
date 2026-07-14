@@ -69,6 +69,7 @@ export const GeospatialTab: React.FC<GeospatialTabProps> = ({ profile }) => {
 
                         return (
                             <MapContainer
+                                key={`${profile.geospatial!.lat_col ?? ''}-${profile.geospatial!.lon_col ?? ''}-${bounds.flat().join(',')}`}
                                 bounds={bounds}
                                 style={{ height: '100%', width: '100%' }}
                                 scrollWheelZoom={true}

@@ -10,48 +10,46 @@ All fields are optional (``total=False``) so that the early-return
 call sites that collect params.
 """
 
-from typing import Any, Dict, List, Optional
-
-from typing_extensions import TypedDict
+from typing import Any, TypedDict
 
 # ── Scalers ───────────────────────────────────────────────────────────────────
 
 
 class StandardScalerArtifact(TypedDict, total=False):
     type: str
-    mean: List[float]
-    scale: Optional[List[float]]
-    var: List[float]
+    mean: list[float]
+    scale: list[float] | None
+    var: list[float]
     with_mean: bool
     with_std: bool
-    columns: List[str]
+    columns: list[str]
 
 
 class MinMaxScalerArtifact(TypedDict, total=False):
     type: str
-    min: List[float]
-    scale: List[float]
-    data_min: List[float]
-    data_max: List[float]
-    feature_range: List[float]
-    columns: List[str]
+    min: list[float]
+    scale: list[float]
+    data_min: list[float]
+    data_max: list[float]
+    feature_range: list[float]
+    columns: list[str]
 
 
 class RobustScalerArtifact(TypedDict, total=False):
     type: str
-    center: Optional[List[float]]
-    scale: Optional[List[float]]
+    center: list[float] | None
+    scale: list[float] | None
     quantile_range: Any
     with_centering: bool
     with_scaling: bool
-    columns: List[str]
+    columns: list[str]
 
 
 class MaxAbsScalerArtifact(TypedDict, total=False):
     type: str
-    scale: Optional[List[float]]
-    max_abs: Optional[List[float]]
-    columns: List[str]
+    scale: list[float] | None
+    max_abs: list[float] | None
+    columns: list[str]
 
 
 # ── Imputers ──────────────────────────────────────────────────────────────────
@@ -60,9 +58,9 @@ class MaxAbsScalerArtifact(TypedDict, total=False):
 class SimpleImputerArtifact(TypedDict, total=False):
     type: str
     strategy: str
-    fill_values: Dict[str, Any]
-    columns: List[str]
-    missing_counts: Dict[str, int]
+    fill_values: dict[str, Any]
+    columns: list[str]
+    missing_counts: dict[str, int]
     total_missing: int
 
 
@@ -70,7 +68,7 @@ class KNNImputerArtifact(TypedDict, total=False):
     type: str
     # sklearn object — intentionally Any; not JSON-serialisable
     imputer_object: Any
-    columns: List[str]
+    columns: list[str]
     n_neighbors: int
     weights: str
 
@@ -78,7 +76,7 @@ class KNNImputerArtifact(TypedDict, total=False):
 class IterativeImputerArtifact(TypedDict, total=False):
     type: str
     imputer_object: Any
-    columns: List[str]
+    columns: list[str]
     estimator: str
 
 
@@ -87,37 +85,37 @@ class IterativeImputerArtifact(TypedDict, total=False):
 
 class IQRArtifact(TypedDict, total=False):
     type: str
-    bounds: Dict[str, Dict[str, float]]
+    bounds: dict[str, dict[str, float]]
     multiplier: float
-    warnings: List[str]
+    warnings: list[str]
 
 
 class ZScoreArtifact(TypedDict, total=False):
     type: str
-    stats: Dict[str, Dict[str, float]]
+    stats: dict[str, dict[str, float]]
     threshold: float
-    warnings: List[str]
+    warnings: list[str]
 
 
 class WinsorizeArtifact(TypedDict, total=False):
     type: str
-    bounds: Dict[str, Dict[str, float]]
+    bounds: dict[str, dict[str, float]]
     lower_percentile: float
     upper_percentile: float
-    warnings: List[str]
+    warnings: list[str]
 
 
 class ManualBoundsArtifact(TypedDict, total=False):
     type: str
-    bounds: Dict[str, Any]
+    bounds: dict[str, Any]
 
 
 class EllipticEnvelopeArtifact(TypedDict, total=False):
     type: str
     # sklearn EllipticEnvelope objects per column — not JSON-serialisable
-    models: Dict[str, Any]
+    models: dict[str, Any]
     contamination: float
-    warnings: List[str]
+    warnings: list[str]
 
 
 # ── Transformations ──────────────────────────────────────────────────────────
@@ -125,24 +123,24 @@ class EllipticEnvelopeArtifact(TypedDict, total=False):
 
 class PowerTransformerArtifact(TypedDict, total=False):
     type: str
-    lambdas: List[float]
+    lambdas: list[float]
     method: str
     standardize: bool
-    columns: List[str]
+    columns: list[str]
     # Optional fitted scaler params when standardize=True
-    scaler_params: Optional[Dict[str, Any]]
+    scaler_params: dict[str, Any] | None
 
 
 class SimpleTransformationArtifact(TypedDict, total=False):
     type: str
     # List of {"column": str, "method": str, ...} dicts copied from config
-    transformations: List[Dict[str, Any]]
+    transformations: list[dict[str, Any]]
 
 
 class GeneralTransformationArtifact(TypedDict, total=False):
     type: str
     # Each item is {"column": str, "method": str, "params": {...}, ...}
-    transformations: List[Dict[str, Any]]
+    transformations: list[dict[str, Any]]
 
 
 # ── Resampling ───────────────────────────────────────────────────────────────
@@ -151,7 +149,7 @@ class GeneralTransformationArtifact(TypedDict, total=False):
 class OversamplingArtifact(TypedDict, total=False):
     type: str
     method: str
-    target_column: Optional[str]
+    target_column: str | None
     sampling_strategy: Any
     random_state: int
     k_neighbors: int
@@ -168,7 +166,7 @@ class OversamplingArtifact(TypedDict, total=False):
 class UndersamplingArtifact(TypedDict, total=False):
     type: str
     method: str
-    target_column: Optional[str]
+    target_column: str | None
     sampling_strategy: Any
     random_state: int
     replacement: bool
@@ -183,26 +181,26 @@ class UndersamplingArtifact(TypedDict, total=False):
 
 class DeduplicateArtifact(TypedDict, total=False):
     type: str
-    subset: Optional[List[str]]
+    subset: list[str] | None
     keep: str
 
 
 class DropMissingColumnsArtifact(TypedDict, total=False):
     type: str
-    columns_to_drop: List[str]
-    threshold: Optional[float]
+    columns_to_drop: list[str]
+    threshold: float | None
 
 
 class DropMissingRowsArtifact(TypedDict, total=False):
     type: str
-    subset: Optional[List[str]]
+    subset: list[str] | None
     how: str
-    threshold: Optional[int]
+    threshold: int | None
 
 
 class MissingIndicatorArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
 
 
 # ── Casting ──────────────────────────────────────────────────────────────────
@@ -210,7 +208,7 @@ class MissingIndicatorArtifact(TypedDict, total=False):
 
 class CastingArtifact(TypedDict, total=False):
     type: str
-    type_map: Dict[str, str]
+    type_map: dict[str, str]
     coerce_on_error: bool
 
 
@@ -219,8 +217,8 @@ class CastingArtifact(TypedDict, total=False):
 
 class GeneralBinningArtifact(TypedDict, total=False):
     type: str
-    bin_edges: Dict[str, List[float]]
-    custom_labels: Dict[str, List[Any]]
+    bin_edges: dict[str, list[float]]
+    custom_labels: dict[str, list[Any]]
     output_suffix: str
     drop_original: bool
     label_format: str
@@ -235,30 +233,30 @@ class GeneralBinningArtifact(TypedDict, total=False):
 
 class PolynomialFeaturesArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     degree: int
     interaction_only: bool
     include_bias: bool
     include_input_features: bool
     output_prefix: str
-    feature_names: List[str]
+    feature_names: list[str]
 
 
 class FeatureGenerationArtifact(TypedDict, total=False):
     type: str
-    operations: List[Dict[str, Any]]
+    operations: list[dict[str, Any]]
     epsilon: float
     allow_overwrite: bool
 
 
 class FeatureInteractionArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     degree: int
     interaction_only: bool
     include_bias: bool
-    combinations: List[List[str]]
-    feature_names: List[str]
+    combinations: list[list[str]]
+    feature_names: list[str]
 
 
 # ── Geo ───────────────────────────────────────────────────────────────────────
@@ -288,16 +286,16 @@ class H3IndexArtifact(TypedDict, total=False):
 
 class VarianceThresholdArtifact(TypedDict, total=False):
     type: str
-    selected_columns: List[str]
-    candidate_columns: List[str]
+    selected_columns: list[str]
+    candidate_columns: list[str]
     threshold: float
     drop_columns: bool
-    variances: Dict[str, float]
+    variances: dict[str, float]
 
 
 class CorrelationThresholdArtifact(TypedDict, total=False):
     type: str
-    columns_to_drop: List[str]
+    columns_to_drop: list[str]
     threshold: float
     method: str
     drop_columns: bool
@@ -305,24 +303,24 @@ class CorrelationThresholdArtifact(TypedDict, total=False):
 
 class UnivariateSelectionArtifact(TypedDict, total=False):
     type: str
-    selected_columns: List[str]
-    candidate_columns: List[str]
+    selected_columns: list[str]
+    candidate_columns: list[str]
     method: str
     drop_columns: bool
-    feature_scores: Dict[str, float]
-    p_values: Dict[str, float]
+    feature_scores: dict[str, float]
+    p_values: dict[str, float]
     # No-target fallback uses these legacy keys instead
-    scores: Dict[str, float]
-    pvalues: Dict[str, float]
+    scores: dict[str, float]
+    pvalues: dict[str, float]
 
 
 class ModelBasedSelectionArtifact(TypedDict, total=False):
     type: str
-    selected_columns: List[str]
-    candidate_columns: List[str]
+    selected_columns: list[str]
+    candidate_columns: list[str]
     method: str
     drop_columns: bool
-    feature_importances: Dict[str, float]
+    feature_importances: dict[str, float]
 
 
 # ── Cleaning ─────────────────────────────────────────────────────────────────
@@ -330,16 +328,16 @@ class ModelBasedSelectionArtifact(TypedDict, total=False):
 
 class TextCleaningArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    operations: List[Dict[str, Any]]
+    columns: list[str]
+    operations: list[dict[str, Any]]
 
 
 class InvalidValueReplacementArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     replace_inf: bool
     replace_neg_inf: bool
-    rule: Optional[str]
+    rule: str | None
     replacement: Any
     value: Any
     min_value: Any
@@ -348,8 +346,8 @@ class InvalidValueReplacementArtifact(TypedDict, total=False):
 
 class ValueReplacementArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    mapping: Optional[Dict[Any, Any]]
+    columns: list[str]
+    mapping: dict[Any, Any] | None
     to_replace: Any
     value: Any
 
@@ -359,12 +357,12 @@ class ValueReplacementArtifact(TypedDict, total=False):
 
 class CountVectorizerArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]  # source text column(s) fed to the vectorizer
-    output_columns: List[str]  # one name per vocabulary term
-    vocabulary: Dict[str, int]  # token → column-index mapping
-    max_features: Optional[int]
+    columns: list[str]  # source text column(s) fed to the vectorizer
+    output_columns: list[str]  # one name per vocabulary term
+    vocabulary: dict[str, int]  # token → column-index mapping
+    max_features: int | None
     lowercase: bool
-    stop_words: Optional[str]  # e.g. "english" or None
+    stop_words: str | None  # e.g. "english" or None
     binary: bool  # presence/absence (1/0) instead of counts
     vectorizer_object: Any  # fitted sklearn object (not JSON-serialisable)
     drop_original: bool
@@ -372,56 +370,56 @@ class CountVectorizerArtifact(TypedDict, total=False):
 
 class TfidfVectorizerArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    output_columns: List[str]
-    vocabulary: Dict[str, int]
-    idf: List[float]  # one value per vocabulary term
-    max_features: Optional[int]
+    columns: list[str]
+    output_columns: list[str]
+    vocabulary: dict[str, int]
+    idf: list[float]  # one value per vocabulary term
+    max_features: int | None
     lowercase: bool
-    stop_words: Optional[str]  # e.g. "english" or None
+    stop_words: str | None  # e.g. "english" or None
     vectorizer_object: Any  # fitted sklearn object (not JSON-serialisable)
     drop_original: bool
 
 
 class HashingVectorizerArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    output_columns: List[str]  # indexed: ``{src}__hash__{i}``
+    columns: list[str]
+    output_columns: list[str]  # indexed: ``{src}__hash__{i}``
     n_features: int
-    norm: Optional[str]
+    norm: str | None
     lowercase: bool
-    stop_words: Optional[str]  # e.g. "english" or None
+    stop_words: str | None  # e.g. "english" or None
     vectorizer_object: Any  # configured (but stateless) sklearn object
     drop_original: bool
 
 
 class TokenizerArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]  # source text column(s)
+    columns: list[str]  # source text column(s)
     analyzer: str  # word | char | char_wb
     lowercase: bool
-    stop_words: Optional[str]  # e.g. "english" or None
-    ngram_range: List[int]
-    output_columns: List[str]  # tokenized-text column name(s)
+    stop_words: str | None  # e.g. "english" or None
+    ngram_range: list[int]
+    output_columns: list[str]  # tokenized-text column name(s)
     add_token_count: bool
     drop_original: bool
 
 
 class SentenceEmbedderArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]  # source text column(s)
+    columns: list[str]  # source text column(s)
     model_name: str  # sentence-transformers model id
     embedding_dim: int
     normalize: bool
-    output_columns: List[str]  # indexed: ``{src}__emb__{i}``
+    output_columns: list[str]  # indexed: ``{src}__emb__{i}``
     drop_original: bool
 
 
 class AliasReplacementArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    alias_type: Optional[str]
-    custom_map: Optional[Dict[str, Any]]
+    columns: list[str]
+    alias_type: str | None
+    custom_map: dict[str, Any] | None
 
 
 # ── Inspection ───────────────────────────────────────────────────────────────
@@ -431,13 +429,13 @@ class DatasetProfileArtifact(TypedDict, total=False):
     type: str
     # Profile is a deeply nested dict produced by EDAAnalyzer; intentionally
     # left as Dict[str, Any] — schema is unstable and evolves with new metrics.
-    profile: Dict[str, Any]
+    profile: dict[str, Any]
 
 
 class DataSnapshotArtifact(TypedDict, total=False):
     type: str
     # Snapshot is metadata-only; shape depends on the snapshot strategy.
-    snapshot: Dict[str, Any]
+    snapshot: dict[str, Any]
 
 
 # ── Encoders ─────────────────────────────────────────────────────────────────
@@ -445,10 +443,10 @@ class DataSnapshotArtifact(TypedDict, total=False):
 
 class OneHotArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     # sklearn OneHotEncoder — not JSON-serialisable
     encoder_object: Any
-    feature_names: List[str]
+    feature_names: list[str]
     prefix_separator: str
     drop_original: bool
     include_missing: bool
@@ -456,38 +454,38 @@ class OneHotArtifact(TypedDict, total=False):
 
 class OrdinalArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     encoder_object: Any
     # Per-column LabelEncoder objects keyed by column name (plus optional "__target__")
-    encoders: Dict[str, Any]
-    categories_count: List[int]
+    encoders: dict[str, Any]
+    categories_count: list[int]
 
 
 class LabelEncoderArtifact(TypedDict, total=False):
     type: str
-    columns: Optional[List[str]]
-    encoders: Dict[str, Any]
-    classes_count: Dict[str, int]
+    columns: list[str] | None
+    encoders: dict[str, Any]
+    classes_count: dict[str, int]
     missing_code: int
 
 
 class TargetEncoderArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     # sklearn TargetEncoder — not JSON-serialisable
     encoder_object: Any
 
 
 class HashEncoderArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     n_features: int
 
 
 class DummyEncoderArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    categories: Dict[str, List[str]]
+    columns: list[str]
+    categories: dict[str, list[str]]
     drop_first: bool
 
 
@@ -503,7 +501,7 @@ class SplitArtifact(TypedDict, total=False):
     random_state: int
     shuffle: bool
     stratify: bool
-    target_column: Optional[str]
+    target_column: str | None
 
 
 class FeatureTargetSplitArtifact(TypedDict, total=False):
@@ -518,25 +516,25 @@ class FeatureTargetSplitArtifact(TypedDict, total=False):
 
 class LagFeaturesArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    lags: List[int]
-    group_by: Optional[List[str]]
-    sort_by: Optional[str]
+    columns: list[str]
+    lags: list[int]
+    group_by: list[str] | None
+    sort_by: str | None
     drop_na: bool
 
 
 class RollingAggregateArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
+    columns: list[str]
     window: int
-    aggregations: List[str]
+    aggregations: list[str]
     min_periods: int
-    group_by: Optional[List[str]]
-    sort_by: Optional[str]
+    group_by: list[str] | None
+    sort_by: str | None
 
 
 class DateFeaturesArtifact(TypedDict, total=False):
     type: str
-    columns: List[str]
-    features: List[str]
+    columns: list[str]
+    features: list[str]
     drop_original: bool

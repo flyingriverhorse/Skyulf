@@ -9,7 +9,8 @@ These methods rely on attributes provided by :class:`PipelineEngine`
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -29,19 +30,19 @@ class ArtifactsMixin:
     # the concrete :class:`PipelineEngine` (or its sibling mixins) at
     # runtime via the cooperative-mixin pattern. No runtime impact.
     artifact_store: "ArtifactStore"
-    dataset_name: Optional[str]
+    dataset_name: str | None
     log: Callable[[str], None]
 
     def _extract_feature_importances(
         self, model: Any, data: Any, target_col: str
-    ) -> Optional[Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """Extract feature importances from a trained sklearn-style model."""
         try:
             # Unwrap tuple (model, tuning_result) from advanced tuning
             actual_model = model[0] if isinstance(model, tuple) else model
 
             # Get feature names from data
-            feature_names: List[str] = []
+            feature_names: list[str] = []
             if isinstance(data, pd.DataFrame):
                 feature_names = [c for c in data.columns if c != target_col]
             elif hasattr(data, "train"):
@@ -57,7 +58,7 @@ class ArtifactsMixin:
                 return None
 
             # Extract importances
-            importances: Optional[Any] = None
+            importances: Any | None = None
             if hasattr(actual_model, "feature_importances_"):
                 importances = actual_model.feature_importances_
             elif hasattr(actual_model, "coef_"):
@@ -69,7 +70,10 @@ class ArtifactsMixin:
                     importances = abs(coef)
 
             if importances is not None and len(importances) == len(feature_names):
-                return {name: round(float(val), 6) for name, val in zip(feature_names, importances)}
+                return {
+                    name: round(float(val), 6)
+                    for name, val in zip(feature_names, importances, strict=True)
+                }
         except Exception:
             logger.debug(
                 "Failed to extract feature importances for step_type=%s",
@@ -115,10 +119,8 @@ class ArtifactsMixin:
             train_df = None
 
             # 1. Extract Training Data
-            if isinstance(data, SplitDataset):
-                raw_train = data.train
-            else:
-                raw_train = data  # Assume it's the full dataset if not split
+            # Assume it's the full dataset if not split
+            raw_train = data.train if isinstance(data, SplitDataset) else data
 
             # 2. Normalize to DataFrame
             if isinstance(raw_train, pd.DataFrame):

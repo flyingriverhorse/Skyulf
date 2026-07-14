@@ -10,7 +10,8 @@ Relies on ``self.artifact_store``, ``self._node_configs``, ``self._get_input``,
 """
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, List
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.pipeline import FeatureEngineer
@@ -29,8 +30,8 @@ class FeatureEngMixin:
     # Type-only stubs so ty can resolve attributes/methods provided by
     # :class:`PipelineEngine` (or its sibling mixins). No runtime impact.
     artifact_store: "ArtifactStore"
-    _node_configs: Dict[str, NodeConfig]
-    executed_transformers: List[Dict[str, Any]]
+    _node_configs: dict[str, NodeConfig]
+    executed_transformers: list[dict[str, Any]]
     log: Callable[[str], None]
     _get_input: Any
 
@@ -116,7 +117,7 @@ class FeatureEngMixin:
         feature_engineer_artifact_key: str | None = None,
         feature_engineer_override: Any | None = None,
         target_column: str | None = None,
-        dropped_columns: List[str] | None = None,
+        dropped_columns: list[str] | None = None,
     ):
         """Bundles fitted transformers with the model artifact for inference."""
         try:
@@ -208,7 +209,7 @@ class FeatureEngMixin:
             logger.exception("Failed to bundle transformers with model")
             raise
 
-    def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, Dict[str, Any]]:
+    def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
         df = self._get_input(node)
 

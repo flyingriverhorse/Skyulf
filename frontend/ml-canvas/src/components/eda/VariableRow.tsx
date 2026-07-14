@@ -10,6 +10,7 @@ import {
     Check
 } from 'lucide-react';
 import { clickableProps } from '../../core/utils/a11y';
+import { getDtypeBadgeClass } from '../../core/utils/dtypeVisuals';
 import { BarChart, Bar, ResponsiveContainer } from 'recharts';
 import { DistributionChart, type DistributionDatum } from './DistributionChart';
 import { Button } from '../ui/button';
@@ -87,17 +88,6 @@ export const VariableRow: React.FC<VariableRowProps> = ({
         }
     };
 
-    const getTypeColor = (type: string) => {
-        switch (type) {
-            case 'Numeric': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
-            case 'Categorical': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
-            case 'Boolean': return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
-            case 'DateTime': return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300';
-            case 'Text': return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300';
-            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300';
-        }
-    };
-
     // Summary stats for the closed state row
     const renderSummary = () => {
         return (
@@ -121,12 +111,12 @@ export const VariableRow: React.FC<VariableRowProps> = ({
 
                     {/* Normality / Status Indicators */}
                     {profile.normality_test && profile.normality_test.is_normal && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-purple-600 border-purple-200 bg-purple-50">
+                        <Badge variant="outline" className="text-[10px] h-4 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900/20">
                             Normal Dist
                         </Badge>
                     )}
                     {profile.normality_test && !profile.normality_test.is_normal && (
-                        <Badge variant="outline" className="text-[10px] h-4 text-amber-600 border-amber-200 bg-amber-50">
+                        <Badge variant="outline" className="text-[10px] h-4 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
                             Not Normal
                         </Badge>
                     )}
@@ -163,7 +153,7 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-sm truncate">{profile.name}</span>
-                        <Badge variant="outline" className={`text-[10px] h-5 px-1 ${getTypeColor(profile.dtype)}`}>
+                        <Badge variant="outline" className={`text-[10px] h-5 px-1 ${getDtypeBadgeClass(profile.dtype)}`}>
                             {profile.dtype}
                         </Badge>
                         {profile.is_unique && <Badge variant="secondary" className="text-[10px] h-5">ID</Badge>}
@@ -200,6 +190,8 @@ export const VariableRow: React.FC<VariableRowProps> = ({
                             e.stopPropagation();
                             onToggleExclude(profile.name, !isExcluded);
                         }}
+                        title={isExcluded ? "Include in analysis" : "Exclude from analysis"}
+                        aria-label={isExcluded ? "Include in analysis" : "Exclude from analysis"}
                     >
                         {isExcluded ? <EyeOff size={16} /> : <Eye size={16} />}
                     </Button>

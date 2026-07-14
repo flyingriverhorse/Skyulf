@@ -1,6 +1,7 @@
 """Decomposition-tree split: filter → group-by → measure aggregation."""
 
-from typing import Any, Dict, List, Optional, cast
+import contextlib
+from typing import Any, cast
 
 import polars as pl
 
@@ -12,11 +13,11 @@ class DecompositionMixin(_AnalyzerState):
 
     def get_decomposition_split(  # noqa: C901
         self,
-        measure_col: Optional[str],
+        measure_col: str | None,
         measure_agg: str,
-        split_col: Optional[str],
-        filters: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        split_col: str | None,
+        filters: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Apply ``filters``, then aggregate ``measure_col`` either globally or split by ``split_col``."""
         # 1. Apply filters (with numeric-vs-string coercion since FE serializes everything as strings).
         filtered_df = self.df  # type: ignore[attr-defined]
@@ -51,14 +52,10 @@ class DecompositionMixin(_AnalyzerState):
                         filtered_df = filtered_df.filter(pl.col(col).is_not_null())
                     continue
                 else:
-                    try:
-                        if dtype in (pl.Float32, pl.Float64):
-                            val = float(val)
-                        else:
-                            val = int(float(val))  # tolerate "1.0" strings for int cols
-                    except ValueError:
-                        # Fall through; we'll cast the column to string below.
-                        pass
+                    # tolerate "1.0" strings for int cols; on failure, fall
+                    # through and cast the column to string below.
+                    with contextlib.suppress(ValueError):
+                        val = float(val) if dtype in (pl.Float32, pl.Float64) else int(float(val))
 
             col_expr = (
                 pl.col(col).cast(pl.Utf8) if (is_numeric and isinstance(val, str)) else pl.col(col)

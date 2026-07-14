@@ -10,7 +10,7 @@ encodes text into ``{src}__emb__{i}`` float columns.  Models are cached per
 """
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -22,7 +22,7 @@ from ._common import _join_text_columns, apply_text_pandas_only
 
 logger = logging.getLogger(__name__)
 
-_MODEL_CACHE: Dict[str, Any] = {}
+_MODEL_CACHE: dict[str, Any] = {}
 
 _INSTALL_HINT = (
     "SentenceEmbedder requires the 'sentence-transformers' package. "
@@ -60,10 +60,10 @@ def _embedding_dimension(model: Any) -> int:
 
 
 def _embed_apply_pandas(
-    X: pd.DataFrame, y: Any, params: Dict[str, Any]
-) -> Tuple[pd.DataFrame, Any]:
-    cols: List[str] = params.get("columns", [])
-    output_columns: List[str] = params.get("output_columns", [])
+    X: pd.DataFrame, y: Any, params: dict[str, Any]
+) -> tuple[pd.DataFrame, Any]:
+    cols: list[str] = params.get("columns", [])
+    output_columns: list[str] = params.get("output_columns", [])
     model_name: str = params.get("model_name", "all-MiniLM-L6-v2")
     normalize: bool = params.get("normalize", True)
     drop_original: bool = params.get("drop_original", False)
@@ -90,7 +90,7 @@ def _embed_apply_pandas(
 
 class SentenceEmbedderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _embed_apply_pandas)
 
 
@@ -116,12 +116,12 @@ class SentenceEmbedderApplier(BaseApplier):
     tags=["text", "nlp", "embeddings", "transformers"],
 )
 class SentenceEmbedderCalculator(BaseCalculator):
-    def infer_output_schema(self, input_schema: Any, config: Dict[str, Any]) -> None:
+    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ
-        cols: List[str] = config.get("columns", [])
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ
+        cols: list[str] = config.get("columns", [])
         if not cols:
             return {}
 

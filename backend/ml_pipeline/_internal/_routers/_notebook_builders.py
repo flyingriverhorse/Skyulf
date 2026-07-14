@@ -8,7 +8,7 @@ classified `_NodeIn` lists and emit raw nbformat 4.5 cell dicts.
 import hashlib
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -16,14 +16,14 @@ from pydantic import BaseModel, Field
 class _NodeIn(BaseModel):
     node_id: str
     step_type: str
-    params: Dict[str, Any] = Field(default_factory=dict)
-    inputs: List[str] = Field(default_factory=list)
+    params: dict[str, Any] = Field(default_factory=dict)
+    inputs: list[str] = Field(default_factory=list)
 
 
 class _PipelineIn(BaseModel):
-    pipeline_id: Optional[str] = None
-    nodes: List[_NodeIn]
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    pipeline_id: str | None = None
+    nodes: list[_NodeIn]
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -31,11 +31,11 @@ class _PipelineIn(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def md_cell(text: str) -> Dict[str, Any]:
+def md_cell(text: str) -> dict[str, Any]:
     return {"cell_type": "markdown", "metadata": {}, "source": text.splitlines(keepends=True)}
 
 
-def code_cell(text: str) -> Dict[str, Any]:
+def code_cell(text: str) -> dict[str, Any]:
     return {
         "cell_type": "code",
         "metadata": {},
@@ -45,7 +45,7 @@ def code_cell(text: str) -> Dict[str, Any]:
     }
 
 
-def wrap_notebook(cells: List[Dict[str, Any]]) -> Dict[str, Any]:
+def wrap_notebook(cells: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "nbformat": 4,
         "nbformat_minor": 5,
@@ -79,11 +79,11 @@ _DROP_PARAMS = {
 }
 
 
-def strip_internal_params(params: Dict[str, Any]) -> Dict[str, Any]:
+def strip_internal_params(params: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in params.items() if k not in _DROP_PARAMS and not k.startswith("_")}
 
 
-def metrics_helper_cell() -> Dict[str, Any]:
+def metrics_helper_cell() -> dict[str, Any]:
     """Notebook cell defining `_summarize_metrics(m)`.
 
     Skyulf's `evaluate()` and `SkyulfPipeline.fit()` return deeply-nested
@@ -152,13 +152,13 @@ def _model_algorithm(model: _NodeIn) -> str:
     return str(model.params.get("algorithm") or model.params.get("type") or model.step_type)
 
 
-def _model_label(model: Optional[_NodeIn]) -> str:
+def _model_label(model: _NodeIn | None) -> str:
     if model is None:
         return "none"
     return _model_algorithm(model)
 
 
-def _build_modeling_block(model: _NodeIn) -> Dict[str, Any]:
+def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
     """Map a model `_NodeIn` to a SkyulfPipeline-compatible modeling dict.
 
     Re-injects ``type`` from ``params.algorithm`` (the engine's routing key,
@@ -181,7 +181,7 @@ def _build_modeling_block(model: _NodeIn) -> Dict[str, Any]:
     return {"type": algorithm or model.step_type, "node_id": model.node_id, **clean_params}
 
 
-def build_skyulf_config(preprocess: List[_NodeIn], model: Optional[_NodeIn]) -> Dict[str, Any]:
+def build_skyulf_config(preprocess: list[_NodeIn], model: _NodeIn | None) -> dict[str, Any]:
     """Convert engine `NodeConfig` shape -> SkyulfPipeline shape."""
     steps = [
         {"name": n.node_id, "transformer": n.step_type, "params": strip_internal_params(n.params)}
@@ -199,11 +199,11 @@ def build_skyulf_config(preprocess: List[_NodeIn], model: Optional[_NodeIn]) -> 
 def compact_summary_md(
     cfg: _PipelineIn,
     dataset_id: str,
-    dataset_name: Optional[str],
-    preprocess: List[_NodeIn],
-    feat_target: Optional[_NodeIn],
-    train_test: Optional[_NodeIn],
-    model: Optional[_NodeIn],
+    dataset_name: str | None,
+    preprocess: list[_NodeIn],
+    feat_target: _NodeIn | None,
+    train_test: _NodeIn | None,
+    model: _NodeIn | None,
 ) -> str:
     return (
         f"# Skyulf pipeline — `{dataset_name or dataset_id}` (compact)\n\n"
@@ -239,7 +239,7 @@ _FASTAPI_SNIPPET_CELL = code_cell(
 
 def compact_load_cells(
     data_path: str, target_col: str, resolved_from_db: bool = False
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     return [
         md_cell("## 1. Imports\n"),
         code_cell(
@@ -261,7 +261,7 @@ def compact_load_cells(
     ]
 
 
-def compact_run_cells(config_json: str) -> List[Dict[str, Any]]:
+def compact_run_cells(config_json: str) -> list[dict[str, Any]]:
     return [
         md_cell(
             "## 3. Pipeline configuration\n\n"
@@ -286,7 +286,7 @@ def compact_run_cells(config_json: str) -> List[Dict[str, Any]]:
     ]
 
 
-def compact_persist_cells() -> List[Dict[str, Any]]:
+def compact_persist_cells() -> list[dict[str, Any]]:
     return [
         md_cell(
             "## 6. Persist for production\n\n"
@@ -345,7 +345,7 @@ def _data_path_guidance_md(data_path: str, resolved_from_db: bool) -> str:
     )
 
 
-def node_to_cell(n: _NodeIn, idx: int) -> Dict[str, Any]:
+def node_to_cell(n: _NodeIn, idx: int) -> dict[str, Any]:
     config_json = _to_py_literal(strip_internal_params(n.params))
     var = f"step{idx:02d}"
     return code_cell(
@@ -359,7 +359,7 @@ def node_to_cell(n: _NodeIn, idx: int) -> Dict[str, Any]:
     )
 
 
-def topology_summary(nodes: List[_NodeIn]) -> str:
+def topology_summary(nodes: list[_NodeIn]) -> str:
     lines = ["```", "Topology (topological order):"]
     for i, n in enumerate(nodes, start=1):
         inputs = ", ".join(n.inputs) if n.inputs else "—"
@@ -372,12 +372,12 @@ def topology_summary(nodes: List[_NodeIn]) -> str:
 def full_summary_md(
     cfg: _PipelineIn,
     dataset_id: str,
-    dataset_name: Optional[str],
-    nodes: List[_NodeIn],
-    preprocess: List[_NodeIn],
-    feat_target: Optional[_NodeIn],
-    train_test: Optional[_NodeIn],
-    model: Optional[_NodeIn],
+    dataset_name: str | None,
+    nodes: list[_NodeIn],
+    preprocess: list[_NodeIn],
+    feat_target: _NodeIn | None,
+    train_test: _NodeIn | None,
+    model: _NodeIn | None,
 ) -> str:
     return (
         f"# Skyulf pipeline — `{dataset_name or dataset_id}` (full)\n\n"
@@ -392,7 +392,7 @@ def full_summary_md(
     )
 
 
-def _no_model_cells(in_branch: bool = False) -> List[Dict[str, Any]]:
+def _no_model_cells(in_branch: bool = False) -> list[dict[str, Any]]:
     h = "###" if in_branch else "## 6."
     return [
         md_cell(
@@ -494,8 +494,8 @@ def _modeling_cell_tuning(model: _NodeIn, algo: str, config_json: str, metrics_v
 
 
 def modeling_cells(
-    model: Optional[_NodeIn], in_branch: bool = False, branch_letter: Optional[str] = None
-) -> List[Dict[str, Any]]:
+    model: _NodeIn | None, in_branch: bool = False, branch_letter: str | None = None
+) -> list[dict[str, Any]]:
     if model is None:
         return _no_model_cells(in_branch)
     params = strip_internal_params(model.params)
@@ -526,8 +526,8 @@ def modeling_cells(
 
 
 def _feat_target_cells(
-    feat_target: Optional[_NodeIn], in_branch: bool = False
-) -> List[Dict[str, Any]]:
+    feat_target: _NodeIn | None, in_branch: bool = False
+) -> list[dict[str, Any]]:
     h = "###" if in_branch else "## 4."
     if feat_target is not None:
         target_col = feat_target.params.get("target_column", "<target_column>")
@@ -550,9 +550,7 @@ def _feat_target_cells(
     ]
 
 
-def _train_test_cells(
-    train_test: Optional[_NodeIn], in_branch: bool = False
-) -> List[Dict[str, Any]]:
+def _train_test_cells(train_test: _NodeIn | None, in_branch: bool = False) -> list[dict[str, Any]]:
     h = "###" if in_branch else "## 5."
     if train_test is not None:
         p = train_test.params
@@ -579,14 +577,14 @@ def _train_test_cells(
 
 
 def split_cells(
-    feat_target: Optional[_NodeIn],
-    train_test: Optional[_NodeIn],
+    feat_target: _NodeIn | None,
+    train_test: _NodeIn | None,
     in_branch: bool = False,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     return _feat_target_cells(feat_target, in_branch) + _train_test_cells(train_test, in_branch)
 
 
-def persist_cells(preprocess: List[_NodeIn]) -> List[Dict[str, Any]]:
+def persist_cells(preprocess: list[_NodeIn]) -> list[dict[str, Any]]:
     artifact_dict = "".join(
         f"    {i:>2}: ({n.step_type!r}, step{i:02d}_artifact),\n"
         for i, n in enumerate(preprocess, start=1)
@@ -622,7 +620,7 @@ def persist_cells(preprocess: List[_NodeIn]) -> List[Dict[str, Any]]:
     ]
 
 
-def full_intro_cells(data_path: str, resolved_from_db: bool = False) -> List[Dict[str, Any]]:
+def full_intro_cells(data_path: str, resolved_from_db: bool = False) -> list[dict[str, Any]]:
     return [
         md_cell("## 1. Imports\n"),
         code_cell(

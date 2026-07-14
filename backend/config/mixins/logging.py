@@ -1,7 +1,5 @@
 """Logging configuration settings."""
 
-from typing import Optional
-
 from backend.utils.logging_utils import setup_universal_logging
 
 
@@ -17,7 +15,7 @@ class LoggingMixin:
     LOG_MAX_SIZE: int = 50 * 1024 * 1024  # 50 MB
     LOG_BACKUP_COUNT: int = 5
     LOG_ROTATION_TYPE: str = "size"
-    LOG_ROTATION_WHEN: Optional[str] = "midnight"
+    LOG_ROTATION_WHEN: str | None = "midnight"
     LOG_ROTATION_INTERVAL: int = 1
 
     def setup_logging(self) -> None:

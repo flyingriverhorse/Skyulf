@@ -8,7 +8,7 @@ Pure read-side; no engine, no Celery, no locks.
 
 import logging
 from functools import lru_cache
-from typing import Any, Dict, List
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
@@ -40,12 +40,12 @@ router = APIRouter(tags=["ML Pipeline"])
 
 
 @lru_cache(maxsize=1)
-def _build_node_registry() -> List[RegistryItem]:
+def _build_node_registry() -> list[RegistryItem]:
     """Merge the static DATA_LOADER entry with all skyulf-core registered nodes.
 
     Result is cached so the dict scan runs only once per process lifetime.
     """
-    static: List[RegistryItem] = [
+    static: list[RegistryItem] = [
         RegistryItem(
             id=StepType.DATA_LOADER,
             name="Data Loader",
@@ -54,18 +54,29 @@ def _build_node_registry() -> List[RegistryItem]:
             params={"source_id": "string", "date_range": "optional[dict]"},
         ),
     ]
-    dynamic: List[RegistryItem] = []
+    dynamic: list[RegistryItem] = []
+    seen_ids: set[str] = set()
     for node_id, meta in SkyulfRegistry.get_all_metadata().items():
         item_data = dict(meta)
         if "id" not in item_data:
             item_data["id"] = node_id
+        item_id = item_data["id"]
+        # Some skyulf-core nodes are registered under multiple aliases for
+        # backward-compatible calculator/applier lookup (e.g.
+        # "Split"/"TrainTestSplitter", "PolynomialFeatures"/"PolynomialFeaturesNode"),
+        # all sharing the same underlying metadata id. Without this guard,
+        # every alias would produce a duplicate card in the frontend node
+        # palette. Keep only the first-seen entry per id.
+        if item_id in seen_ids:
+            continue
+        seen_ids.add(item_id)
         dynamic.append(RegistryItem(**item_data))
 
     dynamic_ids = {n.id for n in dynamic}
     return [n for n in static if n.id not in dynamic_ids] + dynamic
 
 
-@router.get("/stats", response_model=Dict[str, int])
+@router.get("/stats", response_model=dict[str, int])
 async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     """Return high-level system statistics for the dashboard."""
     training_count = await session.scalar(select(func.count(BasicTrainingJob.id)))
@@ -85,7 +96,7 @@ async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     }
 
 
-@router.get("/registry", response_model=List[RegistryItem])
+@router.get("/registry", response_model=list[RegistryItem])
 def get_node_registry():
     """List available pipeline nodes (transformers, models, etc.)."""
     return _build_node_registry()
@@ -153,9 +164,11 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
         catalog = FileSystemCatalog()
         df = catalog.load(str(path), limit=1000)
         return DataProfiler.generate_profile(df)
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("Failed to profile dataset %s", dataset_id)
-        raise SkyulfException(message="Failed to profile dataset")
+        raise SkyulfException(message="Failed to profile dataset") from None
 
 
 @router.get("/hyperparameters/{model_type}")
@@ -170,7 +183,7 @@ def get_model_default_search_space(model_type: str, strategy: str = "random"):
     return get_default_search_space(model_type, strategy=strategy)
 
 
-@router.get("/datasets/list", response_model=List[Dict[str, Any]])
+@router.get("/datasets/list", response_model=list[dict[str, Any]])
 async def list_datasets(session: AsyncSession = Depends(get_async_session)):
     """Return a simple list of available datasets for filtering."""
     stmt = select(DataSource.source_id, DataSource.name).where(DataSource.is_active)

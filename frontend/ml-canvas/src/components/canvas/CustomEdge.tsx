@@ -183,6 +183,7 @@ export const CustomEdge: React.FC<EdgeProps> = memo(({
             className="w-5 h-5 bg-background border border-border text-muted-foreground rounded-full flex items-center justify-center hover:bg-destructive hover:text-destructive-foreground transition-colors shadow-sm focus-ring"
             onClick={onEdgeClick}
             title="Remove Connection"
+            aria-label={`Remove connection from ${source} to ${target}`}
           >
             <X size={10} />
           </button>

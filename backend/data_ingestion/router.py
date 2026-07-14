@@ -14,6 +14,7 @@ from backend.middleware.rate_limiter import limiter
 
 from .dependencies import get_data_service
 from .schemas.ingestion import (
+    DataSourceCreate,
     DataSourceListResponse,
     DataSourceRead,
     DataSourceResponse,
@@ -145,6 +146,28 @@ async def upload_file(
     # TODO(auth): Replace with real user ID from auth dependency.
     user_id = 1
     return await service.handle_file_upload(file, user_id, background_tasks)
+
+
+@router.post("/database", response_model=IngestionJobResponse)
+@limiter.limit("10/minute")
+async def create_source(
+    request: Request,
+    payload: DataSourceCreate,
+    background_tasks: BackgroundTasks,
+    service: DataIngestionService = Depends(get_data_service),
+):
+    """
+    Create a data source from an inline config (e.g. S3) and start ingestion.
+
+    Named "/database" for historical/frontend-compatibility reasons; despite
+    the name it currently only supports the "s3" source type (see
+    `DataIngestionService._INLINE_SOURCE_TYPES`). "file" sources go through
+    `/upload` instead.
+    """
+    # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
+    # TODO(auth): Replace with real user ID from auth dependency.
+    user_id = 1
+    return await service.handle_create_source(payload, user_id, background_tasks)
 
 
 @router.get("/{source_id}/status", response_model=IngestionStatus)

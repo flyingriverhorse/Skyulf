@@ -5,8 +5,7 @@ Tests for:
 """
 
 import sys
-from contextlib import contextmanager
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -252,6 +251,6 @@ def client_with_celery():
             "backend.ml_pipeline._internal._routers.run_pipeline.resolve_pipeline_nodes",
             return_value=None,
         ),
+        TestClient(app, base_url="http://localhost") as c,
     ):
-        with TestClient(app, base_url="http://localhost") as c:
-            yield c, mock_batch_task.delay
+        yield c, mock_batch_task.delay

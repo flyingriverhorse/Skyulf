@@ -2,13 +2,31 @@ import unittest
 from unittest.mock import MagicMock
 
 from backend.database.models import AdvancedTuningJob, BasicTrainingJob
-from backend.ml_pipeline._execution.schemas import NodeExecutionResult, PipelineExecutionResult
+from backend.ml_pipeline._execution.schemas import (
+    JobStatus,
+    NodeExecutionResult,
+    PipelineExecutionResult,
+)
 from backend.ml_pipeline._execution.strategies import (
     AdvancedTuningStrategy,
     BasicTrainingStrategy,
     JobStrategyFactory,
 )
 from backend.ml_pipeline.constants import StepType
+
+
+class TestEnumStrSemantics(unittest.TestCase):
+    """StepType/JobStatus are StrEnum: str()/f-string must yield the bare
+    value, not `ClassName.MEMBER` (regression guard against reverting to
+    `(str, Enum)`)."""
+
+    def test_step_type_str_returns_value(self):
+        self.assertEqual(str(StepType.BASIC_TRAINING), "basic_training")
+        self.assertEqual(f"{StepType.ADVANCED_TUNING}", "advanced_tuning")
+
+    def test_job_status_str_returns_value(self):
+        self.assertEqual(str(JobStatus.QUEUED), "queued")
+        self.assertEqual(f"{JobStatus.COMPLETED}", "completed")
 
 
 class TestJobStrategyFactory(unittest.TestCase):

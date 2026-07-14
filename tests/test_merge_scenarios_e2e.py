@@ -17,7 +17,7 @@ Scenarios cover the bug categories in ``temp/merge_system_audit.md``:
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 
@@ -31,7 +31,7 @@ from skyulf.data.dataset import SplitDataset
 ARTIFACT_DIR = Path(__file__).parent / "artifacts" / "merge_scenarios"
 
 
-def _summarize_artifact(art: Any) -> Dict[str, Any]:
+def _summarize_artifact(art: Any) -> dict[str, Any]:
     """Same shape used by the engine's node_trace dump."""
     if isinstance(art, pd.DataFrame):
         return {"kind": "DataFrame", "columns": list(art.columns), "rows": len(art)}
@@ -71,7 +71,7 @@ def _summarize_artifact(art: Any) -> Dict[str, Any]:
     return {"kind": type(art).__name__}
 
 
-def _dump(scenario: str, payload: Dict[str, Any]) -> Path:
+def _dump(scenario: str, payload: dict[str, Any]) -> Path:
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     target = ARTIFACT_DIR / f"{scenario}.json"
     target.write_text(json.dumps(payload, indent=2, default=str))
@@ -101,9 +101,9 @@ def _new_engine(tmp_path: Path) -> tuple[PipelineEngine, LocalArtifactStore]:
 
 def _record_run(
     scenario: str, cfg: PipelineConfig, store: LocalArtifactStore, result: Any
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Collect every node's output artifact + the engine's merge warnings."""
-    node_outputs: Dict[str, Any] = {}
+    node_outputs: dict[str, Any] = {}
     for n in cfg.nodes:
         if store.exists(n.node_id):
             node_outputs[n.node_id] = _summarize_artifact(store.load(n.node_id))
@@ -117,7 +117,7 @@ def _record_run(
             nid: {
                 "status": nr.status,
                 "error": nr.error,
-                "metrics_keys": sorted(list((nr.metrics or {}).keys())),
+                "metrics_keys": sorted((nr.metrics or {}).keys()),
             }
             for nid, nr in result.node_results.items()
         },

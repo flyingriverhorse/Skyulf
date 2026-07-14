@@ -121,6 +121,11 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                     URL.revokeObjectURL(url);
                     resolve();
                 };
+                img.onerror = () => {
+                    // Skip this chart on failure but don't let it block the rest of the batch download.
+                    URL.revokeObjectURL(url);
+                    resolve();
+                };
                 img.src = url;
             });
         }
@@ -150,6 +155,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                             onClick={() => downloadChart('target-analysis-chart', 'target-analysis', `Target Analysis: ${profile.target_col}`, 'Top Associated Features')}
                             className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                             title="Download Chart"
+                            aria-label="Download Chart"
                         >
                             <Download className="w-4 h-4" />
                         </button>
@@ -216,6 +222,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                 disabled={dlAllState !== 'idle'}
                                 className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 disabled:opacity-50"
                                 title="Download All Charts"
+                                aria-label="Download All Charts"
                             >
                                 {dlAllState === 'downloading' ? <Loader2 className="w-4 h-4 animate-spin" /> : dlAllState === 'done' ? <Check className="w-4 h-4 text-green-500" /> : <Download className="w-4 h-4" />}
                             </button>
@@ -236,6 +243,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                             )}
                                             className="p-1.5 rounded-md bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 shadow-sm"
                                             title="Download Chart"
+                                            aria-label="Download Chart"
                                         >
                                             <Download className="w-3 h-3" />
                                         </button>

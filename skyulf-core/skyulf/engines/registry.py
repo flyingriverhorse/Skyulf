@@ -6,8 +6,8 @@ This module handles the auto-detection of the appropriate compute engine
 """
 
 import logging
-from enum import Enum
-from typing import Any, Dict, Type
+from enum import StrEnum
+from typing import Any
 
 # We import the protocol for type checking, but we don't strictly need it at runtime here
 # to avoid circular imports if engines import protocol.
@@ -16,7 +16,7 @@ from .protocol import SkyulfDataFrame
 logger = logging.getLogger(__name__)
 
 
-class EngineName(str, Enum):
+class EngineName(StrEnum):
     PANDAS = "pandas"
     POLARS = "polars"
     BASE = "base"
@@ -54,24 +54,24 @@ class BaseEngine:
 
 
 class EngineRegistry:
-    _engines: Dict[str, Type[BaseEngine]] = {}
+    _engines: dict[str, type[BaseEngine]] = {}
     _active_engine: str = "pandas"  # Default
 
     @classmethod
-    def register(cls, name: str, engine_cls: Type[BaseEngine]):
+    def register(cls, name: str, engine_cls: type[BaseEngine]):
         """Register a new engine."""
         cls._engines[name] = engine_cls
         logger.debug(f"Registered engine: {name}")
 
     @classmethod
-    def get(cls, name: str) -> Type[BaseEngine]:
+    def get(cls, name: str) -> type[BaseEngine]:
         """Get an engine by name."""
         if name not in cls._engines:
             raise ValueError(f"Engine '{name}' not found. Available: {list(cls._engines.keys())}")
         return cls._engines[name]
 
     @classmethod
-    def resolve(cls, data: Any = None) -> Type[BaseEngine]:
+    def resolve(cls, data: Any = None) -> type[BaseEngine]:
         """
         Auto-detect engine based on input data type.
 
@@ -91,14 +91,12 @@ class EngineRegistry:
             return cls.get("polars")
         if "pandas" in module:
             return cls.get("pandas")
-        if "pyspark" in module:
+        if "pyspark" in module and "spark" in cls._engines:
             # Future proofing
-            if "spark" in cls._engines:
-                return cls.get("spark")
-        if "dask" in module:
+            return cls.get("spark")
+        if "dask" in module and "dask" in cls._engines:
             # Future proofing
-            if "dask" in cls._engines:
-                return cls.get("dask")
+            return cls.get("dask")
 
         # Fallback to default if unknown (or let it fail later)
         logger.warning(
@@ -116,5 +114,5 @@ class EngineRegistry:
 
 
 # Global Helper
-def get_engine(data: Any = None) -> Type[BaseEngine]:
+def get_engine(data: Any = None) -> type[BaseEngine]:
     return EngineRegistry.resolve(data)

@@ -7,7 +7,7 @@ stays at low CCN. Fits are sklearn / pandas-bound (`pd.cut`, `pd.qcut`,
 not use :func:`fit_dual_engine`.
 """
 
-from typing import Any, Dict, List, Literal, Tuple, Union, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,7 @@ from .dispatcher import apply_dual_engine
 # -----------------------------------------------------------------------------
 
 
-def _polars_cut_expr(col: str, sorted_edges: List[float], labels: Any) -> Any:
+def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any) -> Any:
     """Build a single polars ``cut`` expression for one column."""
     import polars as pl
 
@@ -39,12 +39,32 @@ def _polars_cut_expr(col: str, sorted_edges: List[float], labels: Any) -> Any:
     return pl.col(col).cut(breaks=breaks, labels=labels, left_closed=False, include_breaks=False)
 
 
+def _range_edge_labels(
+    sorted_edges: list[float], include_lowest: bool, precision: int
+) -> list[str]:
+    """Build pandas-style ``'[a, b]'``/``'(a, b]'`` range labels directly from bin edges.
+
+    Mirrors the pandas apply path (:func:`_format_one_interval`): the same
+    bracket character is used for every bin, chosen by ``include_lowest``, so
+    the label text is identical across engines for the same fitted edges.
+    """
+    bracket_l = "[" if include_lowest else "("
+    labels = []
+    for i in range(len(sorted_edges) - 1):
+        l_val = round(sorted_edges[i], precision)
+        r_val = round(sorted_edges[i + 1], precision)
+        labels.append(f"{bracket_l}{l_val}, {r_val}]")
+    return labels
+
+
 def _polars_one_col_expr(
     col: str,
-    edges: List[float],
+    edges: list[float],
     output_suffix: str,
     label_format: str,
-    custom_labels_map: Dict[str, Any],
+    custom_labels_map: dict[str, Any],
+    include_lowest: bool,
+    precision: int,
 ) -> Any:
     """Build the polars cut-expression for a single column, or ``None`` if degenerate."""
     import polars as pl
@@ -59,29 +79,43 @@ def _polars_one_col_expr(
         if col_custom_labels and len(col_custom_labels) == len(sorted_edges) - 1
         else None
     )
+    if labels is None and label_format == "range":
+        # Reconstruct the same bracket-string labels pandas produces, instead
+        # of relying on pl.cut()'s own default interval-label text.
+        labels = _range_edge_labels(sorted_edges, include_lowest, precision)
 
     cut_expr = _polars_cut_expr(col, sorted_edges, labels)
     target_col_name = f"{col}{output_suffix}"
-    if label_format in ("ordinal", "bin_index") and not labels:
+    if label_format in ("ordinal", "bin_index") and not col_custom_labels:
         # Polars cut returns Categorical; cast → physical index.
         return cut_expr.cast(pl.UInt32).alias(target_col_name)
     return cut_expr.alias(target_col_name)
 
 
-def _build_polars_exprs(X: Any, params: Dict[str, Any]) -> Tuple[List[Any], List[str]]:
+def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list[str]]:
     """Build cut exprs and the list of original columns to drop."""
     bin_edges_map = params.get("bin_edges", {})
     output_suffix = params.get("output_suffix", "_binned")
     drop_original = params.get("drop_original", False)
     label_format = params.get("label_format", "ordinal")
     custom_labels_map = params.get("custom_labels", {})
+    include_lowest = params.get("include_lowest", True)
+    precision = params.get("precision", 3)
 
-    exprs: List[Any] = []
-    cols_to_drop: List[str] = []
+    exprs: list[Any] = []
+    cols_to_drop: list[str] = []
     for col, edges in bin_edges_map.items():
         if col not in X.columns:
             continue
-        expr = _polars_one_col_expr(col, edges, output_suffix, label_format, custom_labels_map)
+        expr = _polars_one_col_expr(
+            col,
+            edges,
+            output_suffix,
+            label_format,
+            custom_labels_map,
+            include_lowest,
+            precision,
+        )
         if expr is not None:
             exprs.append(expr)
             if drop_original:
@@ -89,7 +123,7 @@ def _build_polars_exprs(X: Any, params: Dict[str, Any]) -> Tuple[List[Any], List
     return exprs, cols_to_drop
 
 
-def _bucketing_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _bucketing_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     if not params.get("bin_edges"):
         return X, y
     exprs, cols_to_drop = _build_polars_exprs(X, params)
@@ -105,8 +139,8 @@ def _bucketing_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any
 
 
 def _resolve_pandas_labels(
-    label_format: str, edges: List[float], custom_labels: Any
-) -> Union[Literal[False], List[Any], None]:
+    label_format: str, edges: list[float], custom_labels: Any
+) -> Literal[False] | list[Any] | None:
     """Pick the ``labels`` argument for :func:`pd.cut`."""
     if custom_labels and len(custom_labels) == len(edges) - 1:
         return custom_labels
@@ -117,7 +151,7 @@ def _resolve_pandas_labels(
 
 
 def _format_one_interval(
-    iv: Any, sorted_edges: List[float], include_lowest: bool, precision: int
+    iv: Any, sorted_edges: list[float], include_lowest: bool, precision: int
 ) -> Any:
     """Format a single :class:`pd.Interval` as ``[a, b]`` / ``(a, b]``."""
     if pd.isna(iv) or isinstance(iv, str):
@@ -133,7 +167,7 @@ def _format_one_interval(
 
 def _format_intervals_to_strings(
     binned_series: pd.Series,
-    sorted_edges: List[float],
+    sorted_edges: list[float],
     include_lowest: bool,
     precision: int,
     missing_strategy: str,
@@ -167,7 +201,7 @@ def _apply_missing_strategy(
 
 
 def _bin_one_column_pandas(
-    series: pd.Series, edges: List[float], params: Dict[str, Any], custom_labels: Any
+    series: pd.Series, edges: list[float], params: dict[str, Any], custom_labels: Any
 ) -> pd.Series:
     """Build the binned series for one column. Raises on unrecoverable errors."""
     sorted_edges = sorted(set(edges))
@@ -191,7 +225,7 @@ def _bin_one_column_pandas(
     return binned
 
 
-def _bucketing_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _bucketing_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     bin_edges_map = params.get("bin_edges", {})
     if not bin_edges_map:
         return X, y
@@ -201,7 +235,7 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any
     custom_labels_map = params.get("custom_labels", {})
 
     df_out = X.copy()
-    processed_cols: List[str] = []
+    processed_cols: list[str] = []
 
     for col, edges in bin_edges_map.items():
         if col not in df_out.columns:
@@ -232,7 +266,7 @@ class BaseBinningApplier(BaseApplier):
     """
 
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, _bucketing_apply_polars, _bucketing_apply_pandas)
 
 
@@ -272,7 +306,7 @@ def _resolve_kbins_strategy(k_strategy: str) -> str:
 
 def _fit_kbins(series: pd.Series, n_bins: int, k_strategy: str) -> np.ndarray:
     sklearn_strategy = _resolve_kbins_strategy(k_strategy)
-    kwargs: Dict[str, Any] = {
+    kwargs: dict[str, Any] = {
         "n_bins": n_bins,
         "strategy": sklearn_strategy,
         "encode": "ordinal",
@@ -285,8 +319,8 @@ def _fit_kbins(series: pd.Series, n_bins: int, k_strategy: str) -> np.ndarray:
 
 
 def _resolve_custom_edges(
-    col: str, override: Dict[str, Any], config: Dict[str, Any]
-) -> Tuple[Any, Any]:
+    col: str, override: dict[str, Any], config: dict[str, Any]
+) -> tuple[Any, Any]:
     """Look up custom bins + labels from override-then-global config."""
     custom_bins = override.get("custom_bins") or config.get("custom_bins", {}).get(col)
     edges = np.array(sorted(custom_bins)) if custom_bins else None
@@ -297,10 +331,10 @@ def _resolve_custom_edges(
 def _fit_one_column_edges(
     series: pd.Series,
     strategy: str,
-    override: Dict[str, Any],
-    config: Dict[str, Any],
-    defaults: Dict[str, Any],
-) -> Tuple[Any, Any]:
+    override: dict[str, Any],
+    config: dict[str, Any],
+    defaults: dict[str, Any],
+) -> tuple[Any, Any]:
     """Dispatch one column to its strategy-specific fitter; returns ``(edges, labels)``."""
     default_n_bins = defaults["default_n_bins"]
     if strategy == "equal_width":
@@ -330,7 +364,7 @@ def _to_pandas_for_fit(X: Any) -> Any:
     return to_pandas(X)
 
 
-def _passthrough_artifact_options(config: Dict[str, Any]) -> Dict[str, Any]:
+def _passthrough_artifact_options(config: dict[str, Any]) -> dict[str, Any]:
     """Apply-time options that don't depend on the fit math."""
     return {
         "output_suffix": config.get("output_suffix", "_binned"),
@@ -355,10 +389,10 @@ class GeneralBinningApplier(BaseBinningApplier):
 def _fit_one_column_into_maps(
     X: Any,
     col: str,
-    config: Dict[str, Any],
-    defaults: Dict[str, Any],
-    bin_edges_map: Dict[str, List[float]],
-    custom_labels_map: Dict[str, Any],
+    config: dict[str, Any],
+    defaults: dict[str, Any],
+    bin_edges_map: dict[str, list[float]],
+    custom_labels_map: dict[str, Any],
 ) -> None:
     """Compute edges/labels for one column and write them into the result maps."""
     column_strategies = config.get("column_strategies", {})
@@ -390,7 +424,7 @@ class GeneralBinningCalculator(BaseCalculator):
     """Master calculator that handles mixed strategies and per-column overrides."""
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralBinningArtifact:  # pylint: disable=arguments-differ
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
@@ -405,13 +439,13 @@ class GeneralBinningCalculator(BaseCalculator):
         }
 
         valid_cols = [c for c in columns if c in X.columns]
-        bin_edges_map: Dict[str, List[float]] = {}
-        custom_labels_map: Dict[str, Any] = {}
+        bin_edges_map: dict[str, list[float]] = {}
+        custom_labels_map: dict[str, Any] = {}
 
         for col in valid_cols:
             _fit_one_column_into_maps(X, col, config, defaults, bin_edges_map, custom_labels_map)
 
-        artifact: Dict[str, Any] = {
+        artifact: dict[str, Any] = {
             "type": "general_binning",
             "bin_edges": bin_edges_map,
             "custom_labels": custom_labels_map,
@@ -436,7 +470,7 @@ class CustomBinningCalculator(BaseCalculator):
     """Apply user-supplied bin edges to selected columns."""
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> GeneralBinningArtifact:
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeneralBinningArtifact:
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
@@ -444,14 +478,14 @@ class CustomBinningCalculator(BaseCalculator):
         columns = resolve_columns(X, config, detect_numeric_columns)
         bins = config.get("bins")
 
-        bin_edges_map: Dict[str, List[float]] = {}
+        bin_edges_map: dict[str, list[float]] = {}
         if bins:
             sorted_bins = sorted(bins)
             for col in columns:
                 if col in X.columns:
                     bin_edges_map[col] = sorted_bins
 
-        artifact: Dict[str, Any] = {
+        artifact: dict[str, Any] = {
             "type": "general_binning",  # Reuses GeneralBinningApplier.
             "bin_edges": bin_edges_map,
         }
@@ -476,8 +510,8 @@ class KBinsDiscretizerCalculator(GeneralBinningCalculator):
 
     def fit(  # pylint: disable=arguments-differ
         self,
-        df: Union[pd.DataFrame, SkyulfDataFrame, Tuple[Any, ...], Any],
-        config: Dict[str, Any],
+        df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+        config: dict[str, Any],
     ) -> GeneralBinningArtifact:
         new_config = config.copy()
         new_config["strategy"] = "kbins"

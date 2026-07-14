@@ -114,6 +114,23 @@ const FlowCanvasContent: React.FC = () => {
     setBranchLabelColors(labelColors);
   }, [branchColorMap, setBranchEdgeLabels, setBranchLabelColors]);
 
+  // Distinct upstream-source count per node, computed once here instead
+  // of by every node card (was an O(N·E) edges scan per card per render).
+  const setIncomingSourceCounts = useGraphStore((s) => s.setIncomingSourceCounts);
+  useEffect(() => {
+    const counts: Record<string, number> = {};
+    const sourcesByTarget = new Map<string, Set<string>>();
+    for (const edge of edges) {
+      const sources = sourcesByTarget.get(edge.target) ?? new Set<string>();
+      sources.add(edge.source);
+      sourcesByTarget.set(edge.target, sources);
+    }
+    for (const [target, sources] of sourcesByTarget) {
+      counts[target] = sources.size;
+    }
+    setIncomingSourceCounts(counts);
+  }, [edges, setIncomingSourceCounts]);
+
   // Edges that "won" a merge: for every sibling_fan_in advisory, mark the
   // edge from winner_input -> advisory.node_id so the canvas can highlight
   // which branch's values survived the last-wins / first-wins tiebreak.

@@ -8,7 +8,7 @@ import { jobsApi } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
-import { useElementSize } from '../../../core/hooks/useElementSize';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
@@ -110,8 +110,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
   const [showCV, setShowCV] = useState(false);
   const [showInfo, setShowInfo] = useState(() => !sessionStorage.getItem('hide_info_model_optimizer'));
 
-  const [containerRef, { width }] = useElementSize();
-  const isWide = width > 450;
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   // --- Upstream Data Logic ---
   const { toggleDrawer, setTab, setActiveParallelRun, startPolling } = useJobStore();

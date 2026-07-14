@@ -6,7 +6,7 @@ strategies (``most_frequent`` / ``constant``), and shared edge cases
 (empty frame, all-NaN column, single row, no missing values).
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -232,7 +232,7 @@ def test_knn_imputer_fit_apply_round_trip_pandas() -> None:
             "b": [1.0, 2.0, 3.0, 4.0, 5.0],
         }
     )
-    config: Dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
+    config: dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
     calc = KNNImputerCalculator()
     params = calc.fit(df, config)
 
@@ -257,7 +257,7 @@ def test_knn_imputer_fit_apply_round_trip_polars() -> None:
         }
     )
     df = pl.from_pandas(pdf)
-    config: Dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
+    config: dict[str, Any] = {"columns": ["a", "b"], "n_neighbors": 2}
     calc = KNNImputerCalculator()
     params = calc.fit(df, config)
 
@@ -279,8 +279,8 @@ def test_no_columns_or_numeric_returns_empty(calculator: str, df_data: dict, con
 def test_applier_pandas_noop(
     applier: str, df_data: dict, config: dict, imputer_kind: str | None
 ) -> None:
-    """Applier must return X unchanged (pandas) when: fitted columns are missing
-    from X, no imputer object was fitted, or the sklearn imputer raises."""
+    """Applier must return X unchanged (pandas) when fitted columns are missing
+    from X, or no imputer object was fitted."""
     df = pd.DataFrame(df_data)
     full_config = dict(config)
     if imputer_kind is not None:
@@ -292,12 +292,31 @@ def test_applier_pandas_noop(
 @pytest.mark.parametrize(*_applier_polars_noop_cases)
 def test_applier_polars_noop(applier: str, df_data: dict, config: dict, imputer_kind: str) -> None:
     """Applier must return X unchanged (Polars) when fitted columns are missing
-    from X, or the sklearn imputer raises during transform."""
+    from X."""
     df = pl.DataFrame(df_data)
     full_config = dict(config)
     full_config["imputer_object"] = _IMPUTER_KIND[imputer_kind]()
     out = _APPLIER_BY_NAME[applier]().apply(df, full_config)
     assert out.equals(df)
+
+
+@pytest.mark.parametrize("applier", ["knn", "iterative"])
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_applier_transform_error_propagates(
+    applier: str, engine: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """When the underlying sklearn imputer's ``transform`` raises, the exception
+    must propagate through the dispatcher (log-and-reraise), not be silently
+    swallowed and returned as the original, un-imputed data."""
+    config = {"columns": ["a"], "imputer_object": _BrokenImputer()}
+    with caplog.at_level("ERROR"), pytest.raises(RuntimeError, match="boom"):
+        if engine == "polars":
+            X = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
+        else:
+            X = pd.DataFrame({"a": [1.0, 2.0, 3.0]})
+        _APPLIER_BY_NAME[applier]().apply(X, dict(config))
+
+    assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 @pytest.mark.parametrize(*_infer_output_schema_cases)
@@ -324,7 +343,7 @@ def test_iterative_imputer_fit_apply_round_trip_pandas() -> None:
     df = pd.DataFrame({"a": a, "b": b})
     df.loc[5, "a"] = np.nan
 
-    config: Dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5, "estimator": "BayesianRidge"}
+    config: dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5, "estimator": "BayesianRidge"}
     calc = IterativeImputerCalculator()
     params = calc.fit(df, config)
 
@@ -349,7 +368,7 @@ def test_iterative_imputer_fit_apply_round_trip_polars() -> None:
     pdf.loc[3, "a"] = np.nan
     df = pl.from_pandas(pdf)
 
-    config: Dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5}
+    config: dict[str, Any] = {"columns": ["a", "b"], "max_iter": 5}
     calc = IterativeImputerCalculator()
     params = calc.fit(df, config)
 
@@ -405,6 +424,23 @@ def test_simple_imputer_most_frequent_strategy_polars() -> None:
 
     out = SimpleImputerApplier().apply(df, params)
     assert out["cat"].null_count() == 0
+
+
+def test_simple_imputer_most_frequent_tie_picks_smallest_value_both_engines() -> None:
+    """On a genuine tie, both pandas and polars must pick the smallest value.
+
+    sklearn's SimpleImputer(strategy="most_frequent") and scipy.stats.mode
+    deterministically break ties by choosing the smallest value; polars'
+    .mode() has no guaranteed tie-break order, so we must force it.
+    """
+    df_pd = pd.DataFrame({"n": [2, 2, 1, 1, np.nan]})
+    calc = SimpleImputerCalculator()
+    params = calc.fit(df_pd, {"columns": ["n"], "strategy": "most_frequent"})
+    assert params["fill_values"]["n"] == 1
+
+    df_pl = pl.from_pandas(df_pd)
+    params_pl = calc.fit(df_pl, {"columns": ["n"], "strategy": "most_frequent"})
+    assert params_pl["fill_values"]["n"] == 1
 
 
 def test_simple_imputer_mode_alias_maps_to_most_frequent() -> None:
@@ -627,7 +663,7 @@ def test_compute_polars_fill_values_mean_matches_pandas_mean(df: pd.DataFrame) -
 @settings(max_examples=25, deadline=None, suppress_health_check=[HealthCheck.too_slow])
 def test_simple_imputer_constant_engine_parity(df: pd.DataFrame, fill_value: float) -> None:
     """SimpleImputer constant-strategy fit is identical across pandas and polars."""
-    config: Dict[str, Any] = {
+    config: dict[str, Any] = {
         "columns": ["a", "b"],
         "strategy": "constant",
         "fill_value": fill_value,

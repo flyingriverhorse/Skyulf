@@ -7,7 +7,7 @@ _cast_int, _cast_bool, _cast_datetime), and engine-parity via hypothesis.
 All tests use real DataFrames — no mocking of pandas.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -126,6 +126,21 @@ def test_cast_int_fractional_raises_without_coerce() -> None:
         _cast_int(s, "col", "int64", coerce_on_error=False)
 
 
+def test_cast_int_out_of_range_coerced_to_null() -> None:
+    """Out-of-range values with coerce_on_error=True must become null, not clamp silently."""
+    s = pd.Series([3e9, 100.0])
+    result = _cast_int(s, "col", "int32", coerce_on_error=True)
+    assert result.isna().iloc[0]
+    assert result.iloc[1] == 100
+
+
+def test_cast_int_out_of_range_raises_without_coerce() -> None:
+    """Out-of-range values with coerce_on_error=False must raise OverflowError."""
+    s = pd.Series([3e9, 100.0])
+    with pytest.raises(OverflowError, match="out of range"):
+        _cast_int(s, "col", "int32", coerce_on_error=False)
+
+
 # ---------------------------------------------------------------------------
 # _drop_fractional_or_raise
 # ---------------------------------------------------------------------------
@@ -144,6 +159,22 @@ def test_drop_fractional_coerce_sets_nan() -> None:
     result = _drop_fractional_or_raise(s, "col", coerce_on_error=True)
     assert np.isnan(result.iloc[1])
     assert result.iloc[0] == 1.0
+
+
+def test_drop_fractional_large_magnitude_value_is_detected() -> None:
+    """A large-magnitude fractional value must not be masked by a scaling tolerance.
+
+    np.isclose's default rtol=1e-5 scales with magnitude, so 100000.001 would
+    incorrectly be treated as "close enough" to 100000.0 and silently pass
+    through un-flagged. A fixed absolute tolerance must catch it instead.
+    """
+    s = pd.Series([100000.001, 3.0])
+    result = _drop_fractional_or_raise(s, "col", coerce_on_error=True)
+    assert np.isnan(result.iloc[0])
+    assert result.iloc[1] == 3.0
+
+    with pytest.raises(ValueError, match="fractional"):
+        _drop_fractional_or_raise(pd.Series([100000.001, 3.0]), "col", coerce_on_error=False)
 
 
 # ---------------------------------------------------------------------------
@@ -197,7 +228,7 @@ def test_cast_datetime_bad_string_coerced_to_nat() -> None:
 def test_cast_datetime_bad_string_raises_without_coerce() -> None:
     """Non-parseable strings with coerce_on_error=False must raise."""
     s = pd.Series(["not-a-date"])
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         _cast_datetime(s, coerce_on_error=False)
 
 
@@ -209,7 +240,7 @@ def test_cast_datetime_bad_string_raises_without_coerce() -> None:
 def test_casting_calculator_fit_column_types_config() -> None:
     """Fit with column_types config must build a type_map with resolved dtypes."""
     df = pd.DataFrame({"a": [1.0, 2.0], "b": ["x", "y"]})
-    config: Dict[str, Any] = {"column_types": {"a": "float"}}
+    config: dict[str, Any] = {"column_types": {"a": "float"}}
     artifact = CastingCalculator().fit(df, config)
     assert artifact["type_map"]["a"] == "float64"
     assert artifact["coerce_on_error"] is True
@@ -218,7 +249,7 @@ def test_casting_calculator_fit_column_types_config() -> None:
 def test_casting_calculator_fit_target_type_with_columns() -> None:
     """Fit with target_type + columns must map all columns to the resolved type."""
     df = pd.DataFrame({"x": [1, 2], "y": [3, 4]})
-    config: Dict[str, Any] = {"target_type": "float", "columns": ["x", "y"]}
+    config: dict[str, Any] = {"target_type": "float", "columns": ["x", "y"]}
     artifact = CastingCalculator().fit(df, config)
     assert artifact["type_map"]["x"] == "float64"
     assert artifact["type_map"]["y"] == "float64"
@@ -227,7 +258,7 @@ def test_casting_calculator_fit_target_type_with_columns() -> None:
 def test_casting_calculator_fit_skips_nonexistent_columns() -> None:
     """Fit must silently ignore columns that don't exist in the DataFrame."""
     df = pd.DataFrame({"a": [1]})
-    config: Dict[str, Any] = {"column_types": {"a": "int", "z": "float"}}
+    config: dict[str, Any] = {"column_types": {"a": "int", "z": "float"}}
     artifact = CastingCalculator().fit(df, config)
     assert "z" not in artifact["type_map"]
     assert "a" in artifact["type_map"]
@@ -243,7 +274,7 @@ def test_casting_calculator_fit_empty_config_returns_empty_map() -> None:
 def test_casting_calculator_fit_coerce_on_error_false() -> None:
     """Fit must respect coerce_on_error=False from config."""
     df = pd.DataFrame({"a": [1.0]})
-    config: Dict[str, Any] = {"column_types": {"a": "int"}, "coerce_on_error": False}
+    config: dict[str, Any] = {"column_types": {"a": "int"}, "coerce_on_error": False}
     artifact = CastingCalculator().fit(df, config)
     assert artifact["coerce_on_error"] is False
 
@@ -256,7 +287,7 @@ def test_casting_calculator_fit_coerce_on_error_false() -> None:
 def test_casting_applier_casts_float_column() -> None:
     """Applier must convert a string column to float64 using the type_map."""
     df = pd.DataFrame({"val": ["1.5", "2.0", "3.7"]})
-    params: Dict[str, Any] = {"type_map": {"val": "float64"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"val": "float64"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     assert result["val"].dtype == np.float64
 
@@ -264,7 +295,7 @@ def test_casting_applier_casts_float_column() -> None:
 def test_casting_applier_casts_int_column() -> None:
     """Applier must convert float column to integer (Int64 if NaN present)."""
     df = pd.DataFrame({"n": [1.0, 2.0, 3.0]})
-    params: Dict[str, Any] = {"type_map": {"n": "int64"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"n": "int64"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     assert pd.api.types.is_integer_dtype(result["n"])
 
@@ -272,7 +303,7 @@ def test_casting_applier_casts_int_column() -> None:
 def test_casting_applier_casts_bool_column() -> None:
     """Applier must convert 0/1 integer column to boolean dtype."""
     df = pd.DataFrame({"flag": [0, 1, 0]})
-    params: Dict[str, Any] = {"type_map": {"flag": "boolean"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"flag": "boolean"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     assert result["flag"].dtype == pd.BooleanDtype()
 
@@ -280,7 +311,7 @@ def test_casting_applier_casts_bool_column() -> None:
 def test_casting_applier_casts_datetime_column() -> None:
     """Applier must parse ISO date strings to datetime64 dtype."""
     df = pd.DataFrame({"dt": ["2024-01-01", "2024-06-15"]})
-    params: Dict[str, Any] = {"type_map": {"dt": "datetime64[ns]"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"dt": "datetime64[ns]"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     assert pd.api.types.is_datetime64_any_dtype(result["dt"])
 
@@ -288,7 +319,7 @@ def test_casting_applier_casts_datetime_column() -> None:
 def test_casting_applier_casts_category_column() -> None:
     """Applier must convert a string column to the pandas category dtype."""
     df = pd.DataFrame({"cat": ["A", "B", "A", "C"]})
-    params: Dict[str, Any] = {"type_map": {"cat": "category"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"cat": "category"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     assert result["cat"].dtype.name == "category"
 
@@ -296,7 +327,7 @@ def test_casting_applier_casts_category_column() -> None:
 def test_casting_applier_empty_type_map_returns_unchanged() -> None:
     """An empty type_map must return the DataFrame unchanged."""
     df = pd.DataFrame({"a": [1, 2]})
-    params: Dict[str, Any] = {"type_map": {}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     pd.testing.assert_frame_equal(result, df)
 
@@ -304,7 +335,7 @@ def test_casting_applier_empty_type_map_returns_unchanged() -> None:
 def test_casting_applier_skips_nonexistent_columns() -> None:
     """Applier must silently skip columns not present in the DataFrame."""
     df = pd.DataFrame({"a": [1.0]})
-    params: Dict[str, Any] = {"type_map": {"z": "float64"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"z": "float64"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     # 'z' must not appear; 'a' must be untouched.
     assert "z" not in result.columns
@@ -314,7 +345,7 @@ def test_casting_applier_skips_nonexistent_columns() -> None:
 def test_casting_applier_all_nan_column_coerced_to_float() -> None:
     """All-NaN column cast to float must remain all-NaN without raising."""
     df = pd.DataFrame({"v": [np.nan, np.nan, np.nan]})
-    params: Dict[str, Any] = {"type_map": {"v": "float64"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"v": "float64"}, "coerce_on_error": True}
     result = CastingApplier().apply(df, params)
     assert result["v"].isna().all()
 
@@ -322,8 +353,8 @@ def test_casting_applier_all_nan_column_coerced_to_float() -> None:
 def test_casting_applier_coerce_false_raises_on_bad_cast() -> None:
     """coerce_on_error=False must propagate exceptions from bad casts."""
     df = pd.DataFrame({"a": ["not_a_number", "also_bad"]})
-    params: Dict[str, Any] = {"type_map": {"a": "float64"}, "coerce_on_error": False}
-    with pytest.raises(Exception):
+    params: dict[str, Any] = {"type_map": {"a": "float64"}, "coerce_on_error": False}
+    with pytest.raises(ValueError):
         CastingApplier().apply(df, params)
 
 
@@ -331,7 +362,7 @@ def test_casting_applier_does_not_mutate_input() -> None:
     """Applier must return a new DataFrame and not modify the input in-place."""
     df = pd.DataFrame({"val": ["1.0", "2.0"]})
     original_dtype = df["val"].dtype
-    params: Dict[str, Any] = {"type_map": {"val": "float64"}, "coerce_on_error": True}
+    params: dict[str, Any] = {"type_map": {"val": "float64"}, "coerce_on_error": True}
     CastingApplier().apply(df, params)
     assert df["val"].dtype == original_dtype
 
@@ -355,7 +386,7 @@ def test_infer_output_schema_rewrites_dtypes() -> None:
     from skyulf.core.schema import SkyulfSchema
 
     schema = SkyulfSchema.from_columns(["a", "b"], dtypes={"a": "string", "b": "string"})
-    config: Dict[str, Any] = {"column_types": {"a": "float", "b": "int"}}
+    config: dict[str, Any] = {"column_types": {"a": "float", "b": "int"}}
     result = CastingCalculator().infer_output_schema(schema, config)
     assert result.dtypes["a"] == "float64"
     assert result.dtypes["b"] == "int64"
@@ -366,7 +397,7 @@ def test_infer_output_schema_target_type_with_columns() -> None:
     from skyulf.core.schema import SkyulfSchema
 
     schema = SkyulfSchema.from_columns(["x", "y"], dtypes={"x": "string", "y": "string"})
-    config: Dict[str, Any] = {"target_type": "float", "columns": ["x", "y"]}
+    config: dict[str, Any] = {"target_type": "float", "columns": ["x", "y"]}
     result = CastingCalculator().infer_output_schema(schema, config)
     assert result.dtypes["x"] == "float64"
     assert result.dtypes["y"] == "float64"
@@ -389,7 +420,7 @@ def test_infer_output_schema_empty_config_returns_same_schema() -> None:
 def test_calculator_fit_then_applier_apply_roundtrip() -> None:
     """Fit then apply must produce correct output on the same data."""
     df = pd.DataFrame({"a": ["1.5", "2.0", "3.0"], "b": [True, False, True]})
-    config: Dict[str, Any] = {"column_types": {"a": "float", "b": "boolean"}}
+    config: dict[str, Any] = {"column_types": {"a": "float", "b": "boolean"}}
     artifact = CastingCalculator().fit(df, config)
     result = CastingApplier().apply(df, artifact)
     assert result["a"].dtype == np.float64
@@ -399,7 +430,7 @@ def test_calculator_fit_then_applier_apply_roundtrip() -> None:
 def test_apply_on_new_data_uses_fitted_type_map() -> None:
     """Applier must cast new data using the artifact computed on training data."""
     train_df = pd.DataFrame({"score": ["10", "20", "30"]})
-    config: Dict[str, Any] = {"column_types": {"score": "int"}}
+    config: dict[str, Any] = {"column_types": {"score": "int"}}
     artifact = CastingCalculator().fit(train_df, config)
 
     new_df = pd.DataFrame({"score": ["40", "50"]})
@@ -444,7 +475,7 @@ if _POLARS_AVAILABLE:
         return exactly the same artifact dictionary.
         """
         assume(len(df) >= 5)
-        config: Dict[str, Any] = {"column_types": {"x": "float64", "y": "float64"}}
+        config: dict[str, Any] = {"column_types": {"x": "float64", "y": "float64"}}
         pd_artifact = CastingCalculator().fit(df, dict(config))
         pl_artifact = CastingCalculator().fit(pl.from_pandas(df), dict(config))
         # type_map must be identical — no numeric tolerance needed, just equality.
@@ -455,7 +486,7 @@ if _POLARS_AVAILABLE:
         """Polars apply path must cast numeric column to Float64."""
         df_pd = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
         df_pl = pl.from_pandas(df_pd)
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "type_map": {"x": "float64", "y": "int64"},
             "coerce_on_error": True,
         }
@@ -464,24 +495,38 @@ if _POLARS_AVAILABLE:
         assert result["x"].dtype == pl.Float64
         assert result["y"].dtype == pl.Int64
 
+    def test_casting_apply_int_overflow_engine_parity() -> None:
+        """Out-of-range int casts must null on both engines under coerce_on_error=True."""
+        df_pd = pd.DataFrame({"x": [3e9, 100.0]})
+        df_pl = pl.from_pandas(df_pd)
+        params: dict[str, Any] = {"type_map": {"x": "int32"}, "coerce_on_error": True}
+
+        pd_result = CastingApplier().apply(df_pd, params)
+        pl_result = CastingApplier().apply(df_pl, params)
+
+        assert pd_result["x"].isna().iloc[0]
+        assert pd_result["x"].iloc[1] == 100
+        assert pl_result["x"][0] is None
+        assert pl_result["x"][1] == 100
+
     def test_casting_apply_polars_empty_type_map_returns_unchanged() -> None:
         """Polars apply with empty type_map must return the frame unchanged."""
         df_pl = pl.DataFrame({"a": [1, 2]})
-        params: Dict[str, Any] = {"type_map": {}, "coerce_on_error": True}
+        params: dict[str, Any] = {"type_map": {}, "coerce_on_error": True}
         result = CastingApplier().apply(df_pl, params)
         assert result.equals(df_pl)
 
     def test_casting_apply_polars_skips_nonexistent_columns() -> None:
         """Polars apply must silently skip columns absent from the frame."""
         df_pl = pl.DataFrame({"a": [1, 2]})
-        params: Dict[str, Any] = {"type_map": {"z": "float64"}, "coerce_on_error": True}
+        params: dict[str, Any] = {"type_map": {"z": "float64"}, "coerce_on_error": True}
         result = CastingApplier().apply(df_pl, params)
         assert result.equals(df_pl)
 
     def test_casting_apply_polars_bool_cast() -> None:
         """Polars apply path must cast column to Boolean."""
         df_pl = pl.DataFrame({"flag": [0, 1, 0]})
-        params: Dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
+        params: dict[str, Any] = {"type_map": {"flag": "bool"}, "coerce_on_error": True}
         result = CastingApplier().apply(df_pl, params)
         assert result["flag"].dtype == pl.Boolean
 
@@ -504,7 +549,7 @@ if _POLARS_AVAILABLE:
         """Polars apply must silently skip a column whose target dtype is
         unsupported (_resolve_polars_dtype returns None), leaving it untouched."""
         df_pl = pl.DataFrame({"a": [1, 2], "b": ["x", "y"]})
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "type_map": {"a": "totally_unsupported_dtype", "b": "string"},
             "coerce_on_error": True,
         }

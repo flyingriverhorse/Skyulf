@@ -4,7 +4,8 @@ import { Scissors, Brain, Info, AlertTriangle } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
-import { ColumnSelector, NumberField, Checkbox } from './VectorizerNodes';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { NumberField, Checkbox } from './VectorizerNodes';
 
 // ── Config types ──────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ const ColumnsPanel: React.FC<{
       <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
         Text Columns ({selected.length})
       </label>
-      <ColumnSelector columns={columns} selected={selected} onChange={onColumns} />
+      <ColumnMultiSelect columns={columns} selected={selected} onChange={onColumns} variant="compact" />
       <p className="text-xs text-gray-500 mt-1">
         Only text/categorical columns are shown. Multiple columns are joined with a space.
       </p>

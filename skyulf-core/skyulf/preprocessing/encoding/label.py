@@ -1,7 +1,8 @@
 """Label Encoder node (Calculator + Applier)."""
 
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Tuple, cast
+from collections.abc import Mapping
+from typing import Any, cast
 
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
@@ -21,40 +22,45 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-def _le_mapping(le: LabelEncoder) -> Dict[Any, int]:
+def _le_mapping(le: LabelEncoder) -> dict[Any, int]:
     """Return ``{class -> int}`` mapping for a fitted LabelEncoder."""
-    return dict(zip(le.classes_, le.transform(le.classes_)))
+    return dict(zip(le.classes_, le.transform(le.classes_), strict=True))
 
 
-def _le_mapping_str(le: LabelEncoder) -> Dict[str, int]:
+def _le_mapping_str(le: LabelEncoder) -> dict[str, int]:
     """String-keyed variant for Polars `replace`."""
-    return {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_))}
+    return {str(k): int(v) for k, v in zip(le.classes_, le.transform(le.classes_), strict=True)}
 
 
 def _build_polars_feature_exprs(
-    X: Any, cols: List[str], encoders: Dict[str, Any], missing_code: Any
-) -> List[Any]:
+    X: Any, cols: list[str], encoders: dict[str, Any], missing_code: Any
+) -> list[Any]:
     import polars as pl
 
-    exprs: List[Any] = []
+    # `fill_null("nan")` mirrors the pandas path's `.astype(str)`, which turns
+    # NaN into the literal "nan" string that the fitted LabelEncoder learned a
+    # class for. Without this, polars nulls would always fall back to
+    # `missing_code` instead of the trained "nan" class id.
+    exprs: list[Any] = []
     for col in cols:
         if col in X.columns and col in encoders:
             mapping = _le_mapping_str(encoders[col])
             exprs.append(
                 pl.col(col)
                 .cast(pl.Utf8)
-                .replace(mapping, default=missing_code)
+                .fill_null("nan")
+                .replace_strict(mapping, default=missing_code)
                 .cast(pl.Int64)
                 .alias(col)
             )
     return exprs
 
 
-def _label_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _label_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
-    encoders: Dict[str, Any] = params.get("encoders", {})
-    cols: Optional[List[str]] = params.get("columns")
+    encoders: dict[str, Any] = params.get("encoders", {})
+    cols: list[str] | None = params.get("columns")
     missing_code = params.get("missing_code", -1)
 
     X_out = X.clone()
@@ -67,14 +73,19 @@ def _label_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
 
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping_str(encoders["__target__"])
-        y_out = y_out.cast(pl.Utf8).replace(mapping, default=missing_code).cast(pl.Int64)
+        y_out = (
+            y_out.cast(pl.Utf8)
+            .fill_null("nan")
+            .replace_strict(mapping, default=missing_code)
+            .cast(pl.Int64)
+        )
 
     return X_out, y_out
 
 
-def _label_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
-    encoders: Dict[str, Any] = params.get("encoders", {})
-    cols: Optional[List[str]] = params.get("columns")
+def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    encoders: dict[str, Any] = params.get("encoders", {})
+    cols: list[str] | None = params.get("columns")
     missing_code = params.get("missing_code", -1)
 
     X_out = X.copy()
@@ -95,7 +106,7 @@ def _label_apply_pandas(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, An
 
 class LabelEncoderApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(
             (X, y) if y is not None else X,
             params,
@@ -128,22 +139,29 @@ def _polars_col_to_str_array(X: Any, col: str) -> Any:
     return X.select(pl.col(col).cast(pl.Utf8)).to_series().to_numpy()
 
 
-def _maybe_pull_y_polars(X: Any, y: Any, target_col: Optional[str]) -> Any:
+def _maybe_pull_y_polars(X: Any, y: Any, target_col: str | None) -> Any:
     if y is not None or not target_col or target_col not in X.columns:
         return y
     return X.get_column(target_col)
 
 
-def _maybe_pull_y_pandas(X: Any, y: Any, target_col: Optional[str]) -> Any:
+def _maybe_pull_y_pandas(X: Any, y: Any, target_col: str | None) -> Any:
     if y is not None or not target_col or target_col not in X.columns:
         return y
     return X[target_col]
 
 
 def _maybe_fit_target(
-    y: Any, cols: Optional[List[str]], encoders: Dict[str, Any], counts: Dict[str, int]
+    y: Any, cols: list[str] | None, encoders: dict[str, Any], counts: dict[str, int]
 ) -> None:
-    """Fit a LabelEncoder on ``y`` when columns is empty OR y's name is in cols."""
+    """Fit a LabelEncoder on ``y`` when columns is empty OR y's name is in cols.
+
+    Note: unlike its sibling encoders (Ordinal/OneHot/Target/Hash/Dummy), LabelEncoder
+    deliberately does NOT auto-detect feature columns when ``columns`` is empty/missing.
+    This mirrors sklearn's own convention: ``LabelEncoder`` is a 1-D label/target
+    transformer, while ``OrdinalEncoder`` is the intended tool for encoding multiple
+    feature columns. See ``_warn_if_no_encoders_fit`` for the no-op edge case this implies.
+    """
     if y is None:
         return
     if cols:
@@ -156,12 +174,12 @@ def _maybe_fit_target(
 
 
 def _fit_feature_encoders(
-    valid_cols: List[str],
+    valid_cols: list[str],
     column_to_array: Any,
-) -> Tuple[Dict[str, Any], Dict[str, int]]:
+) -> tuple[dict[str, Any], dict[str, int]]:
     """Fit one LabelEncoder per column. ``column_to_array(col) -> 1-D str array``."""
-    encoders: Dict[str, Any] = {}
-    counts: Dict[str, int] = {}
+    encoders: dict[str, Any] = {}
+    counts: dict[str, int] = {}
     for col in valid_cols:
         le = _fit_le_on_array(column_to_array(col))
         encoders[col] = le
@@ -169,11 +187,29 @@ def _fit_feature_encoders(
     return encoders, counts
 
 
+def _warn_if_no_encoders_fit(encoders: dict[str, Any], cols: list[str] | None, y: Any) -> None:
+    """Warn when fit produces zero encoders (silent no-op edge case).
+
+    This happens when no feature ``columns`` are configured and no target ``y`` is
+    available to fall back to -- the node would otherwise do nothing without any
+    feedback to the user.
+    """
+    if encoders:
+        return
+    logger.warning(
+        "LabelEncoder.fit produced no encoders: no feature 'columns' were configured "
+        "(cols=%r) and no target 'y' was available to encode. This node will be a "
+        "no-op. To encode feature columns, configure 'columns' explicitly or use "
+        "OrdinalEncoder instead.",
+        cols,
+    )
+
+
 def _build_label_artifact(
-    encoders: Dict[str, Any],
-    cols: Optional[List[str]],
-    counts: Dict[str, int],
-    config: Dict[str, Any],
+    encoders: dict[str, Any],
+    cols: list[str] | None,
+    counts: dict[str, int],
+    config: dict[str, Any],
 ) -> Mapping[str, Any]:
     return {
         "type": "label_encoder",
@@ -184,31 +220,33 @@ def _build_label_artifact(
     }
 
 
-def _label_fit_polars(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _label_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     y = _maybe_pull_y_polars(X, y, config.get("target_column"))
-    cols: Optional[List[str]] = config.get("columns")
-    encoders: Dict[str, Any] = {}
-    counts: Dict[str, int] = {}
+    cols: list[str] | None = config.get("columns")
+    encoders: dict[str, Any] = {}
+    counts: dict[str, int] = {}
 
     if cols:
         valid = [c for c in cols if c in X.columns]
         encoders, counts = _fit_feature_encoders(valid, lambda c: _polars_col_to_str_array(X, c))
 
     _maybe_fit_target(y, cols, encoders, counts)
+    _warn_if_no_encoders_fit(encoders, cols, y)
     return _build_label_artifact(encoders, cols, counts, config)
 
 
-def _label_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, Any]:
+def _label_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     y = _maybe_pull_y_pandas(X, y, config.get("target_column"))
-    cols: Optional[List[str]] = config.get("columns")
-    encoders: Dict[str, Any] = {}
-    counts: Dict[str, int] = {}
+    cols: list[str] | None = config.get("columns")
+    encoders: dict[str, Any] = {}
+    counts: dict[str, int] = {}
 
     if cols:
         valid = [c for c in cols if c in X.columns]
         encoders, counts = _fit_feature_encoders(valid, lambda c: X[c].astype(str))
 
     _maybe_fit_target(y, cols, encoders, counts)
+    _warn_if_no_encoders_fit(encoders, cols, y)
     return _build_label_artifact(encoders, cols, counts, config)
 
 
@@ -222,14 +260,14 @@ def _label_fit_pandas(X: Any, y: Any, config: Dict[str, Any]) -> Mapping[str, An
 )
 class LabelEncoderCalculator(BaseCalculator):
     def infer_output_schema(
-        self, input_schema: SkyulfSchema, config: Dict[str, Any]
+        self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:
         # Label encoding replaces categorical values with ints in place;
         # column set is preserved.
         return input_schema
 
     @fit_method
-    def fit(self, X: Any, y: Any, config: Dict[str, Any]) -> LabelEncoderArtifact:  # pylint: disable=arguments-differ
+    def fit(self, X: Any, y: Any, config: dict[str, Any]) -> LabelEncoderArtifact:  # pylint: disable=arguments-differ
         return cast(
             LabelEncoderArtifact,
             fit_dual_engine(

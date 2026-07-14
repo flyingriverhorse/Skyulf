@@ -1,7 +1,9 @@
+import contextlib
 import logging
 import os
 import tempfile
-from typing import Any, Optional, cast
+from pathlib import Path
+from typing import Any, cast
 
 import pandas as pd
 from sqlalchemy.orm import Session
@@ -18,7 +20,7 @@ class FileSystemCatalog(DataCatalog):
     Replaces the old 'DataLoader'.
     """
 
-    def __init__(self, base_path: Optional[str] = None):
+    def __init__(self, base_path: str | None = None):
         if base_path is None:
             base_path = get_settings().UPLOAD_DIR
         self.base_path = base_path
@@ -62,16 +64,16 @@ class FileSystemCatalog(DataCatalog):
         path = self._get_path(dataset_id)
 
         # Auto-resolve extension if not found (legacy support for simple IDs)
-        if not os.path.exists(path):
-            if os.path.exists(path + ".parquet"):
+        if not Path(path).exists():
+            if Path(path + ".parquet").exists():
                 path += ".parquet"
-            elif os.path.exists(path + ".csv"):
+            elif Path(path + ".csv").exists():
                 path += ".csv"
             else:
                 raise FileNotFoundError(f"Dataset {dataset_id} not found at {path}")
 
         # Handle sampling if requested
-        limit = kwargs.get("limit", None)
+        limit = kwargs.get("limit")
 
         try:
             if path.endswith(".csv"):
@@ -89,7 +91,9 @@ class FileSystemCatalog(DataCatalog):
                     df = pd.read_parquet(path)
                     return df.head(limit) if limit else df
                 except Exception:
-                    raise ValueError(f"Unsupported format or file not found: {dataset_id}")
+                    raise ValueError(
+                        f"Unsupported format or file not found: {dataset_id}"
+                    ) from None
         except Exception as e:
             logger.error(f"Error loading dataset {dataset_id}: {e}")
             raise e
@@ -98,7 +102,7 @@ class FileSystemCatalog(DataCatalog):
         path = self._get_path(dataset_id)
 
         # Ensure directory exists
-        os.makedirs(os.path.dirname(path), exist_ok=True)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
 
         if path.endswith(".csv"):
             data.to_csv(path, index=False)
@@ -111,7 +115,7 @@ class FileSystemCatalog(DataCatalog):
             data.to_parquet(path, index=False)
 
     def exists(self, dataset_id: str) -> bool:
-        return os.path.exists(self._get_path(dataset_id))
+        return Path(self._get_path(dataset_id)).exists()
 
 
 class S3Catalog(DataCatalog):
@@ -124,9 +128,9 @@ class S3Catalog(DataCatalog):
     def __init__(
         self,
         bucket_name: str,
-        region_name: Optional[str] = None,
-        cache_dir: Optional[str] = None,
-        storage_options: Optional[dict] = None,
+        region_name: str | None = None,
+        cache_dir: str | None = None,
+        storage_options: dict | None = None,
     ):
         self.bucket_name = bucket_name
         self.storage_options = (storage_options or {}).copy()
@@ -135,8 +139,8 @@ class S3Catalog(DataCatalog):
             self.storage_options["region"] = region_name
 
         # Cache setup
-        self.cache_dir = cache_dir or os.path.join(tempfile.gettempdir(), "skyulf_s3_cache")
-        os.makedirs(self.cache_dir, exist_ok=True)
+        self.cache_dir = cache_dir or str(Path(tempfile.gettempdir()) / "skyulf_s3_cache")
+        Path(self.cache_dir).mkdir(parents=True, exist_ok=True)
 
         # Check for s3fs
         try:
@@ -149,7 +153,7 @@ class S3Catalog(DataCatalog):
             logger.error(
                 "s3fs is required for S3Catalog. Please install it with `pip install s3fs`."
             )
-            raise ImportError("s3fs is required for S3Catalog")
+            raise ImportError("s3fs is required for S3Catalog") from None
 
     def _prepare_s3fs_options(self, options: dict) -> dict:
         """
@@ -203,11 +207,11 @@ class S3Catalog(DataCatalog):
     def _get_cache_path(self, s3_path: str) -> str:
         # Create a safe filename from the S3 path
         safe_name = s3_path.replace("s3://", "").replace("/", "_")
-        return os.path.join(self.cache_dir, safe_name)
+        return str(Path(self.cache_dir) / safe_name)
 
     def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
         path = self._get_s3_path(dataset_id)
-        limit = kwargs.get("limit", None)
+        limit = kwargs.get("limit")
 
         # Merge storage options
         storage_options = self.storage_options.copy()
@@ -221,13 +225,13 @@ class S3Catalog(DataCatalog):
 
         # Check local cache first
         cache_path = self._get_cache_path(path)
-        if os.path.exists(cache_path):
+        if Path(cache_path).exists():
             try:
                 # If custom credentials are provided, skip cache validation to avoid auth issues.
                 # Otherwise, check if the S3 file is newer than the cache.
                 if "storage_options" not in kwargs:
                     s3_info = self.fs.info(path)
-                    local_mtime = os.path.getmtime(cache_path)
+                    local_mtime = Path(cache_path).stat().st_mtime
 
                     if s3_info["LastModified"].timestamp() < local_mtime:
                         logger.info(f"Cache hit for {path}")
@@ -314,8 +318,8 @@ class SmartCatalog(DataCatalog):
     def __init__(
         self,
         session: Session,
-        fs_catalog: Optional[FileSystemCatalog] = None,
-        s3_catalog: Optional[S3Catalog] = None,
+        fs_catalog: FileSystemCatalog | None = None,
+        s3_catalog: S3Catalog | None = None,
     ):
         self.session = session
         self.fs_catalog = fs_catalog or FileSystemCatalog()
@@ -325,10 +329,9 @@ class SmartCatalog(DataCatalog):
         if not self.s3_catalog:
             bucket = os.getenv("S3_BUCKET_NAME")
             if bucket:
-                try:
+                # s3fs not installed or configured
+                with contextlib.suppress(ImportError):
                     self.s3_catalog = S3Catalog(bucket_name=bucket)
-                except ImportError:
-                    pass  # s3fs not installed or configured
 
     def _resolve_id(self, dataset_id: str) -> tuple[str, dict]:
         """
@@ -374,7 +377,7 @@ class SmartCatalog(DataCatalog):
                         bucket_name="placeholder"
                     )  # Bucket name ignored if full path used
                 except ImportError:
-                    raise ValueError("S3 path encountered but s3fs is not installed.")
+                    raise ValueError("S3 path encountered but s3fs is not installed.") from None
             return self.s3_catalog
         return self.fs_catalog
 
@@ -417,7 +420,7 @@ class SmartCatalog(DataCatalog):
         catalog = self._get_catalog_for_path(resolved_id)
         return catalog.exists(resolved_id)
 
-    def get_dataset_name(self, dataset_id: str) -> Optional[str]:
+    def get_dataset_name(self, dataset_id: str) -> str | None:
         """Resolves dataset ID to name via DB."""
         if str(dataset_id).isdigit():
             try:
@@ -432,7 +435,7 @@ class SmartCatalog(DataCatalog):
 
 
 def create_catalog_from_options(
-    storage_options: Optional[dict], nodes: Optional[list] = None, session=None
+    storage_options: dict | None, nodes: list | None = None, session=None
 ) -> DataCatalog:
     """
     Factory to create the appropriate DataCatalog based on storage options and node paths.

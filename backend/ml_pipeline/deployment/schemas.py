@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -14,18 +14,18 @@ class DeploymentInfo(BaseModel):
     model_type: str
     artifact_uri: str
     is_active: bool
-    deployed_by: Optional[int]
+    deployed_by: int | None
     created_at: datetime
     updated_at: datetime
-    input_schema: Optional[List[Dict[str, Any]]] = None  # List of column definitions
-    output_schema: Optional[Dict[str, Any]] = None
-    target_column: Optional[str] = None
+    input_schema: list[dict[str, Any]] | None = None  # List of column definitions
+    output_schema: dict[str, Any] | None = None
+    target_column: str | None = None
 
 
 class PredictionRequest(BaseModel):
-    data: List[Dict[str, Any]]  # List of records (rows)
+    data: list[dict[str, Any]]  # List of records (rows)
 
 
 class PredictionResponse(BaseModel):
-    predictions: List[Any]
+    predictions: list[Any]
     model_version: str  # job_id

@@ -4,8 +4,7 @@ Covers: fit artifact, apply with imbalanced data, helper functions,
 edge cases (balanced input, 1-sample class, non-numeric columns, missing target).
 """
 
-import importlib.util
-from typing import Any, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -73,7 +72,7 @@ _IMPORT_FUNCS = {
 
 
 @pytest.fixture
-def imbalanced_pandas() -> Tuple[pd.DataFrame, pd.Series]:
+def imbalanced_pandas() -> tuple[pd.DataFrame, pd.Series]:
     """Imbalanced binary dataset: 80 majority / 20 minority samples."""
     rng = np.random.default_rng(0)
     n_maj, n_min = 80, 20
@@ -88,7 +87,7 @@ def imbalanced_pandas() -> Tuple[pd.DataFrame, pd.Series]:
 
 
 @pytest.fixture
-def balanced_pandas() -> Tuple[pd.DataFrame, pd.Series]:
+def balanced_pandas() -> tuple[pd.DataFrame, pd.Series]:
     """Already-balanced binary dataset: 50 samples per class."""
     rng = np.random.default_rng(1)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 100), "f2": rng.normal(0, 1, 100)})
@@ -374,7 +373,7 @@ class TestSingleSampleMinorityClass:
         X = pd.DataFrame({"f1": rng.normal(0, 1, 11), "f2": rng.normal(0, 1, 11)})
         y = pd.Series([0] * 10 + [1], name="target")  # only 1 minority sample
         art = OversamplingCalculator().fit((X, y), {"method": "smote", "k_neighbors": 5})
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             # imblearn raises ValueError when k_neighbors >= minority sample count
             OversamplingApplier().apply((X, y), art)
 

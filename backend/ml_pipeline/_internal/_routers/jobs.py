@@ -8,7 +8,7 @@ is a pure HTTP veneer.
 """
 
 import logging
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["ML Pipeline"])
 
 
-@router.get("/jobs/node-summaries", response_model=Dict[str, List[Dict[str, Any]]])
+@router.get("/jobs/node-summaries", response_model=dict[str, list[dict[str, Any]]])
 async def get_node_summaries(limit: int = 200, session: AsyncSession = Depends(get_async_session)):
     """Per-node card summaries from the latest completed run group.
 
@@ -98,33 +98,33 @@ async def get_job_evaluation(  # noqa: C901
         return await EvaluationService.get_job_evaluation(session, job_id)
     except ValueError as e:
         if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+            raise HTTPException(status_code=404, detail=str(e)) from e
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
     except Exception:
         logger.exception("Failed to retrieve evaluation for job %s", job_id)
-        raise SkyulfException(message="Failed to retrieve evaluation data")
+        raise SkyulfException(message="Failed to retrieve evaluation data") from None
 
 
-@router.get("/jobs", response_model=List[JobInfo])
+@router.get("/jobs", response_model=list[JobInfo])
 async def list_jobs(
     limit: int = 50,
     skip: int = 0,
-    job_type: Optional[Literal["training", "tuning"]] = None,
+    job_type: Literal["training", "tuning"] | None = None,
     session: AsyncSession = Depends(get_async_session),
 ):
     """List recent jobs."""
     return await JobManager.list_jobs(session, limit, skip, job_type)
 
 
-@router.get("/jobs/tuning/latest/{node_id}", response_model=Optional[JobInfo])
+@router.get("/jobs/tuning/latest/{node_id}", response_model=JobInfo | None)
 async def get_latest_tuning_job(node_id: str, session: AsyncSession = Depends(get_async_session)):
     """Latest completed tuning job for a specific node."""
     return await JobManager.get_latest_tuning_job_for_node(session, node_id)
 
 
-@router.get("/jobs/tuning/best/{model_type}", response_model=Optional[JobInfo])
+@router.get("/jobs/tuning/best/{model_type}", response_model=JobInfo | None)
 async def get_best_tuning_job_model(
     model_type: str, session: AsyncSession = Depends(get_async_session)
 ):
@@ -132,7 +132,7 @@ async def get_best_tuning_job_model(
     return await JobManager.get_best_tuning_job_for_model(session, model_type)
 
 
-@router.get("/jobs/tuning/history/{model_type}", response_model=List[JobInfo])
+@router.get("/jobs/tuning/history/{model_type}", response_model=list[JobInfo])
 async def get_tuning_jobs_history(
     model_type: str, session: AsyncSession = Depends(get_async_session)
 ):

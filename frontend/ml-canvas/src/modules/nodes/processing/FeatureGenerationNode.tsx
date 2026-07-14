@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { NodeDefinition } from '../../../core/types/nodes';
-import { Calculator, Trash2, Calendar, Percent, GitCompare, Search, Check, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
+import { Calculator, Trash2, Calendar, Percent, GitCompare, ChevronDown, ChevronRight, FunctionSquare, Info, Lightbulb, Activity } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
@@ -9,6 +9,8 @@ import { RecommendationsPanel } from '../../../components/panels/Recommendations
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { clickableProps } from '../../../core/utils/a11y';
+import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface MathOperation {
   operation_type: 'arithmetic' | 'datetime_extract' | 'ratio' | 'similarity' | 'group_agg';
@@ -35,7 +37,7 @@ const OPERATION_TYPES = [
 ];
 
 const ARITHMETIC_METHODS = ['add', 'subtract', 'multiply', 'divide'];
-const DATE_METHODS = ['year', 'quarter', 'month', 'month_name', 'week', 'day', 'day_name', 'weekday', 'is_weekend', 'hour'];
+const DATE_METHODS = ['year', 'quarter', 'month', 'month_name', 'week', 'day', 'day_name', 'weekday', 'is_weekend', 'hour', 'minute', 'second', 'season', 'time_of_day'];
 
 // Tooltip descriptions shown on hover for each datetime feature.
 // Both pandas and polars paths produce identical semantics.
@@ -50,79 +52,15 @@ const DATE_METHOD_META: Record<string, { type: string; desc: string }> = {
   weekday:    { type: 'int',    desc: 'Day of week — 0 (Mon) to 6 (Sun)' },
   is_weekend: { type: 'int',    desc: 'Weekend flag — 1 if Sat/Sun, else 0' },
   hour:       { type: 'int',    desc: 'Hour of day — 0 to 23' },
+  minute:     { type: 'int',    desc: 'Minute of hour — 0 to 59' },
+  second:     { type: 'int',    desc: 'Second of minute — 0 to 59' },
+  season:     { type: 'string', desc: 'Meteorological season — "Winter", "Spring", "Summer", "Autumn"' },
+  time_of_day:{ type: 'string', desc: 'Hour bucket — "Morning" (5-11), "Afternoon" (12-16), "Evening" (17-20), "Night" (21-4)' },
 };
 const SIMILARITY_METHODS = ['ratio', 'token_sort_ratio', 'token_set_ratio'];
 const GROUP_AGG_METHODS = ['mean', 'sum', 'count', 'min', 'max', 'std', 'median'];
 
 // --- Helper Components ---
-
-const ColumnSelector: React.FC<{
-  columns: string[];
-  selected: string[];
-  onChange: (selected: string[]) => void;
-  label?: string;
-  single?: boolean;
-}> = ({ columns, selected, onChange, label, single }) => {
-  const [search, setSearch] = useState('');
-
-  const filtered = columns.filter(c => c.toLowerCase().includes(search.toLowerCase()));
-
-  const toggle = (col: string) => {
-    if (single) {
-      onChange([col]);
-    } else {
-      if (selected.includes(col)) {
-        onChange(selected.filter(c => c !== col));
-      } else {
-        onChange([...selected, col]);
-      }
-    }
-  };
-
-  return (
-    <div className="space-y-1.5">
-      {label && <label className="text-xs font-medium text-muted-foreground">{label}</label>}
-      <div className="border rounded bg-background overflow-hidden flex flex-col">
-        <div className="flex items-center px-2 py-1.5 border-b bg-muted/20">
-          <Search size={12} className="text-muted-foreground mr-1.5" />
-          <input
-            className="flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/70"
-            placeholder="Search columns..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); }}
-          />
-        </div>
-        <div className="max-h-32 overflow-y-auto p-1 space-y-0.5">
-          {filtered.length > 0 ? (
-            filtered.map(col => {
-              const isSelected = selected.includes(col);
-              return (
-                <div
-                  key={col}
-                  {...clickableProps(() => { toggle(col); })}
-                  className={`
-                    flex items-center gap-2 px-2 py-1.5 rounded text-xs cursor-pointer transition-colors
-                    ${isSelected ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-accent text-foreground'}
-                  `}
-                >
-                  <div className={`
-                    w-3 h-3 rounded border flex items-center justify-center
-                    ${isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40'}
-                  `}>
-                    {isSelected && <Check size={8} strokeWidth={4} />}
-                  </div>
-                  <span className="truncate">{col}</span>
-                </div>
-              );
-            })
-          ) : (
-            <div className="p-2 text-xs text-muted-foreground text-center italic">No columns found</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onChange: (c: FeatureGenerationConfig) => void; nodeId?: string }> = ({
   config,
@@ -146,18 +84,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
       : [];
 
   const [showRecommendations, setShowRecommendations] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 380);
-      }
-    });
-    ro.observe(containerRef.current);
-    return () => { ro.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 380px.
+  const [containerRef, isWide] = useIsWideContainer(380);
 
 
 
@@ -352,7 +280,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                       ? 'Performs row-by-row division (Col A / Col B) for each record.'
                       : 'Performs row-by-row arithmetic between two columns.'}
                   </div>
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Column A (Left Operand)"
                     columns={numericColumns}
                     selected={op.input_columns.slice(0, 1)}
@@ -368,7 +297,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                      <div className="h-px bg-border flex-1"></div>
                   </div>
 
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Column B (Right Operand)"
                     columns={numericColumns}
                     selected={op.secondary_columns?.slice(0, 1) || []}
@@ -384,7 +314,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
                     Calculates aggregate ratio: <strong>Sum(Numerator) / Sum(Denominator)</strong>.
                   </div>
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Numerator (Sum)"
                     columns={numericColumns}
                     selected={op.input_columns}
@@ -396,7 +327,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">Divided By</span>
                   </div>
 
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Denominator (Sum)"
                     columns={numericColumns}
                     selected={op.secondary_columns || []}
@@ -416,7 +348,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                       <li><strong>Token Set:</strong> Compares intersection of words. Handles duplicates/subsets well.</li>
                     </ul>
                   </div>
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="String A"
                     columns={stringColumns}
                     selected={op.input_columns.slice(0, 1)}
@@ -430,7 +363,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                      <div className="h-px bg-border flex-1"></div>
                   </div>
 
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="String B"
                     columns={stringColumns}
                     selected={op.secondary_columns?.slice(0, 1) || []}
@@ -446,7 +380,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                   <div className="text-[10px] text-muted-foreground bg-muted/20 p-1.5 rounded border border-muted/20">
                     Calculates aggregate statistics (e.g., Mean Salary) grouped by a categorical column (e.g., Department) and assigns it back to each row.
                   </div>
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Group By (Categorical)"
                     columns={stringColumns.length > 0 ? stringColumns : allColumns}
                     selected={op.input_columns.slice(0, 1)}
@@ -459,7 +394,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
                     <span className="relative bg-card px-2 text-xs text-muted-foreground font-medium">Target Column</span>
                   </div>
 
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Target (Numeric)"
                     columns={numericColumns}
                     selected={op.secondary_columns?.slice(0, 1) || []}
@@ -472,7 +408,8 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
               {/* DATE EXTRACT */}
               {op.operation_type === 'datetime_extract' && (
                 <div className="space-y-3">
-                  <ColumnSelector
+                  <ColumnMultiSelect
+                    variant="compact"
                     label="Date Column"
                     columns={dateColumns.length > 0 ? dateColumns : allColumns}
                     selected={op.input_columns.slice(0, 1)}

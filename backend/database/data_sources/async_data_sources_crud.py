@@ -9,7 +9,7 @@ keeps behavior separate from the generic database CRUD dispatcher.
 # pylint: disable=broad-exception-caught
 
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from backend.config import Settings
 
@@ -28,7 +28,7 @@ def get_primary_database(settings: Settings) -> str:
     return getattr(settings, "DB_PRIMARY", "sqlite").lower()
 
 
-async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
+async def create(settings: Settings, row: dict[str, Any]) -> Any:  # noqa: C901
     """Create a new data source record with configurable primary database.
 
     Strategy: DB_PRIMARY-first approach
@@ -64,7 +64,9 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
                     )
 
             logger.exception("SQLite insert failed for data_sources")
-            raise RuntimeError("Failed to persist data_sources row to primary database (SQLite)")
+            raise RuntimeError(
+                "Failed to persist data_sources row to primary database (SQLite)"
+            ) from e
 
         # Secondary sync to PostgreSQL (best-effort)
         try:
@@ -106,7 +108,7 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
             logger.exception("PostgreSQL insert failed for data_sources")
             raise RuntimeError(
                 "Failed to persist data_sources row to primary database (PostgreSQL)"
-            )
+            ) from e
 
         # Secondary sync to SQLite (best-effort)
         try:
@@ -126,8 +128,8 @@ async def create(settings: Settings, row: Dict[str, Any]) -> Any:  # noqa: C901
 
 
 async def read(
-    settings: Settings, filter_dict: Optional[Dict[str, Any]] = None, one: bool = False
-) -> Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    settings: Settings, filter_dict: dict[str, Any] | None = None, one: bool = False
+) -> dict[str, Any] | list[dict[str, Any]] | None:
     """Read data sources from primary database."""
     primary_db = get_primary_database(settings)
 
@@ -139,7 +141,7 @@ async def read(
             return rows
         except Exception:
             logger.exception("Failed reading data_sources from SQLite (primary database)")
-            raise RuntimeError("Failed to read from primary database (SQLite)")
+            raise RuntimeError("Failed to read from primary database (SQLite)") from None
 
     elif primary_db == "postgres":
         try:
@@ -149,13 +151,13 @@ async def read(
             return rows
         except Exception:
             logger.exception("Failed reading data_sources from PostgreSQL (primary database)")
-            raise RuntimeError("Failed to read from primary database (PostgreSQL)")
+            raise RuntimeError("Failed to read from primary database (PostgreSQL)") from None
 
     else:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def update(settings: Settings, filter_dict: Dict[str, Any], update_data: Dict[str, Any]):
+async def update(settings: Settings, filter_dict: dict[str, Any], update_data: dict[str, Any]):
     """Update data sources with configurable primary database.
 
     Strategy: Primary database-first approach
@@ -183,7 +185,7 @@ async def update(settings: Settings, filter_dict: Dict[str, Any], update_data: D
             logger.info(f"Successfully updated data source in SQLite (primary): {filter_dict}")
         except Exception:
             logger.exception("SQLite update failed for data_sources")
-            raise RuntimeError("Failed to update in primary database (SQLite)")
+            raise RuntimeError("Failed to update in primary database (SQLite)") from None
 
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
@@ -201,7 +203,7 @@ async def update(settings: Settings, filter_dict: Dict[str, Any], update_data: D
             logger.info(f"Successfully updated data source in PostgreSQL (primary): {filter_dict}")
         except Exception:
             logger.exception("PostgreSQL update failed for data_sources")
-            raise RuntimeError("Failed to update in primary database (PostgreSQL)")
+            raise RuntimeError("Failed to update in primary database (PostgreSQL)") from None
 
         # Optional SQLite sync (best-effort, non-blocking)
         try:
@@ -216,7 +218,7 @@ async def update(settings: Settings, filter_dict: Dict[str, Any], update_data: D
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def delete(settings: Settings, filter_dict: Dict[str, Any]):
+async def delete(settings: Settings, filter_dict: dict[str, Any]):
     """Delete data sources with configurable primary database.
 
     Strategy: Primary database-first approach
@@ -244,7 +246,7 @@ async def delete(settings: Settings, filter_dict: Dict[str, Any]):
             logger.info(f"Successfully deleted data source from SQLite (primary): {filter_dict}")
         except Exception:
             logger.exception("SQLite delete failed for data_sources")
-            raise RuntimeError("Failed to delete from primary database (SQLite)")
+            raise RuntimeError("Failed to delete from primary database (SQLite)") from None
 
         # Optional PostgreSQL sync (best-effort, non-blocking)
         try:
@@ -264,7 +266,7 @@ async def delete(settings: Settings, filter_dict: Dict[str, Any]):
             )
         except Exception:
             logger.exception("PostgreSQL delete failed for data_sources")
-            raise RuntimeError("Failed to delete from primary database (PostgreSQL)")
+            raise RuntimeError("Failed to delete from primary database (PostgreSQL)") from None
 
         # Optional SQLite sync (best-effort, non-blocking)
         try:
@@ -279,7 +281,7 @@ async def delete(settings: Settings, filter_dict: Dict[str, Any]):
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def get_by_file_hash(settings: Settings, file_hash: str) -> Optional[Dict[str, Any]]:
+async def get_by_file_hash(settings: Settings, file_hash: str) -> dict[str, Any] | None:
     """Retrieve a data source row by the stored file hash in the JSON config."""
     if not file_hash:
         return None
@@ -318,7 +320,7 @@ async def get_by_file_hash(settings: Settings, file_hash: str) -> Optional[Dict[
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
-async def migrate_to_postgres(settings: Settings) -> Dict[str, int]:
+async def migrate_to_postgres(settings: Settings) -> dict[str, int]:
     """Migration function to copy all data from SQLite to PostgreSQL.
 
     This function can be called manually or triggered by a migration button.
@@ -334,24 +336,24 @@ async def migrate_to_postgres(settings: Settings) -> Dict[str, int]:
         return stats
     except Exception:
         logger.exception("Migration from SQLite to PostgreSQL failed")
-        raise RuntimeError("Migration to PostgreSQL failed")
+        raise RuntimeError("Migration to PostgreSQL failed") from None
 
 
-async def get_database_status(settings: Settings) -> Dict[str, Any]:
+async def get_database_status(settings: Settings) -> dict[str, Any]:
     """Get status of both SQLite and PostgreSQL databases.
 
     Returns information about connectivity and record counts.
     """
     primary_db = get_primary_database(settings)
 
-    sqlite_status: Dict[str, Any] = {
+    sqlite_status: dict[str, Any] = {
         "connected": False,
         "count": 0,
         "error": None,
         "path": None,
     }
-    postgres_status: Dict[str, Any] = {"connected": False, "count": 0, "error": None}
-    status: Dict[str, Any] = {
+    postgres_status: dict[str, Any] = {"connected": False, "count": 0, "error": None}
+    status: dict[str, Any] = {
         "sqlite": sqlite_status,
         "postgres": postgres_status,
         "primary": primary_db,

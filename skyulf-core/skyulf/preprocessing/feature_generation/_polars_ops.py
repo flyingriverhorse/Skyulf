@@ -1,17 +1,24 @@
 """Polars-engine op handlers for FeatureGeneration."""
 
-from typing import Any, Callable, Dict, List, Optional, Tuple
+import logging
+from collections.abc import Callable
+from typing import Any
 
 from ._common import (
     DEFAULT_EPSILON,
+    SEASON_BY_MONTH,
+    TIME_OF_DAY_BUCKETS,
+    TIME_OF_DAY_DEFAULT,
     _compute_similarity_score,
     _resolve_group_agg_cols,
     _resolve_output_col,
     _resolve_similarity_pair,
 )
 
+logger = logging.getLogger(__name__)
 
-def _polars_arith_terms(op: Dict[str, Any], existing: List[str]) -> Tuple[List[Any], List[float]]:
+
+def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[Any], list[float]]:
     import polars as pl
 
     valid = [
@@ -23,13 +30,13 @@ def _polars_arith_terms(op: Dict[str, Any], existing: List[str]) -> Tuple[List[A
     return col_exprs, const_vals
 
 
-def _polars_add(col_exprs: List[Any], const_vals: List[float], _epsilon: float) -> Any:
+def _polars_add(col_exprs: list[Any], const_vals: list[float], _epsilon: float) -> Any:
     import polars as pl
 
     return pl.sum_horizontal(col_exprs) + sum(const_vals) if col_exprs else pl.lit(sum(const_vals))
 
 
-def _polars_subtract(col_exprs: List[Any], const_vals: List[float], _epsilon: float) -> Any:
+def _polars_subtract(col_exprs: list[Any], const_vals: list[float], _epsilon: float) -> Any:
     import polars as pl
 
     expr = col_exprs[0] if col_exprs else pl.lit(0.0)
@@ -40,7 +47,7 @@ def _polars_subtract(col_exprs: List[Any], const_vals: List[float], _epsilon: fl
     return expr
 
 
-def _polars_multiply(col_exprs: List[Any], const_vals: List[float], _epsilon: float) -> Any:
+def _polars_multiply(col_exprs: list[Any], const_vals: list[float], _epsilon: float) -> Any:
     import polars as pl
 
     expr = pl.lit(1.0)
@@ -51,7 +58,7 @@ def _polars_multiply(col_exprs: List[Any], const_vals: List[float], _epsilon: fl
     return expr
 
 
-def _polars_divide(col_exprs: List[Any], const_vals: List[float], epsilon: float) -> Optional[Any]:
+def _polars_divide(col_exprs: list[Any], const_vals: list[float], epsilon: float) -> Any | None:
     import polars as pl
 
     if col_exprs:
@@ -65,7 +72,11 @@ def _polars_divide(col_exprs: List[Any], const_vals: List[float], epsilon: float
         return None
 
     def safe_denom(d: Any) -> Any:
-        return pl.when(d.abs() < epsilon).then(epsilon).otherwise(d)
+        # Preserve the sign of the original denominator when clamping its
+        # magnitude to epsilon, so a small negative denominator doesn't flip
+        # the sign of the result.
+        signed_epsilon = pl.when(d < 0).then(-epsilon).otherwise(epsilon)
+        return pl.when(d.abs() < epsilon).then(signed_epsilon).otherwise(d)
 
     for e in others:
         expr = expr / safe_denom(e)
@@ -74,7 +85,7 @@ def _polars_divide(col_exprs: List[Any], const_vals: List[float], epsilon: float
     return expr
 
 
-_POLARS_ARITH_BUILDERS: Dict[str, Callable[[List[Any], List[float], float], Optional[Any]]] = {
+_POLARS_ARITH_BUILDERS: dict[str, Callable[[list[Any], list[float], float], Any | None]] = {
     "add": _polars_add,
     "subtract": _polars_subtract,
     "multiply": _polars_multiply,
@@ -82,7 +93,7 @@ _POLARS_ARITH_BUILDERS: Dict[str, Callable[[List[Any], List[float], float], Opti
 }
 
 
-def _polars_arith(op: Dict[str, Any], existing: List[str], epsilon: float) -> Optional[Any]:
+def _polars_arith(op: dict[str, Any], existing: list[str], epsilon: float) -> Any | None:
     method = op.get("method")
     col_exprs, const_vals = _polars_arith_terms(op, existing)
     if not col_exprs and not const_vals:
@@ -91,7 +102,7 @@ def _polars_arith(op: Dict[str, Any], existing: List[str], epsilon: float) -> Op
     return builder(col_exprs, const_vals, epsilon) if builder else None
 
 
-def _polars_ratio(op: Dict[str, Any], existing: List[str], epsilon: float) -> Optional[Any]:
+def _polars_ratio(op: dict[str, Any], existing: list[str], epsilon: float) -> Any | None:
     import polars as pl
 
     nums = [
@@ -111,7 +122,7 @@ def _polars_ratio(op: Dict[str, Any], existing: List[str], epsilon: float) -> Op
     return num_sum / pl.when(den_sum.abs() < epsilon).then(epsilon).otherwise(den_sum)
 
 
-def _polars_similarity(op: Dict[str, Any], existing: List[str], _eps: float) -> Optional[Any]:
+def _polars_similarity(op: dict[str, Any], existing: list[str], _eps: float) -> Any | None:
     import polars as pl
 
     pair = _resolve_similarity_pair(op, existing)
@@ -138,7 +149,25 @@ def _polars_similarity(op: Dict[str, Any], existing: List[str], _eps: float) -> 
     )
 
 
-_POLARS_DT_FEATURES: Dict[str, Callable[[Any], Any]] = {}
+_POLARS_DT_FEATURES: dict[str, Callable[[Any], Any]] = {}
+
+
+def _polars_season(d: Any) -> Any:
+    """Map a datetime expr's month to its meteorological season name."""
+    import polars as pl
+
+    return d.dt.month().replace_strict(SEASON_BY_MONTH, return_dtype=pl.String)
+
+
+def _polars_time_of_day(d: Any) -> Any:
+    """Bucket a datetime expr's hour into a time-of-day label."""
+    import polars as pl
+
+    hour = d.dt.hour()
+    expr = pl.lit(TIME_OF_DAY_DEFAULT)
+    for lo, hi, label in reversed(TIME_OF_DAY_BUCKETS):
+        expr = pl.when((hour >= lo) & (hour <= hi)).then(pl.lit(label)).otherwise(expr)
+    return expr
 
 
 def _register_polars_dt() -> None:
@@ -161,13 +190,15 @@ def _register_polars_dt() -> None:
             "week": lambda d: d.dt.week(),
             "month_name": lambda d: d.dt.strftime("%B"),
             "day_name": lambda d: d.dt.strftime("%A"),
+            "season": _polars_season,
+            "time_of_day": _polars_time_of_day,
         }
     )
 
 
-def _build_polars_dt_exprs(col: str, base_dt: Any, features: List[str]) -> List[Any]:
+def _build_polars_dt_exprs(col: str, base_dt: Any, features: list[str]) -> list[Any]:
     """Return the per-feature Polars expressions for one datetime column."""
-    exprs: List[Any] = []
+    exprs: list[Any] = []
     for feat in features:
         builder = _POLARS_DT_FEATURES.get(feat)
         if builder is not None:
@@ -175,7 +206,7 @@ def _build_polars_dt_exprs(col: str, base_dt: Any, features: List[str]) -> List[
     return exprs
 
 
-def _polars_datetime_apply(op: Dict[str, Any], X_out: Any) -> Any:
+def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
     """Materialise datetime-extract feature columns onto ``X_out`` (Polars)."""
     import polars as pl
 
@@ -184,18 +215,20 @@ def _polars_datetime_apply(op: Dict[str, Any], X_out: Any) -> Any:
 
     valid = [c for c in op.get("input_columns", []) if c in X_out.columns]
     features = op.get("datetime_features", [])
-    dt_exprs: List[Any] = []
     for col in valid:
-        base_dt = pl.col(col)
-        if X_out.schema[col] == pl.String:
-            base_dt = pl.col(col).str.to_datetime(strict=False)
-        dt_exprs.extend(_build_polars_dt_exprs(col, base_dt, features))
-    if dt_exprs:
-        X_out = X_out.with_columns(dt_exprs)
+        try:
+            base_dt = pl.col(col)
+            if X_out.schema[col] == pl.String:
+                base_dt = pl.col(col).str.to_datetime(strict=False)
+            col_exprs = _build_polars_dt_exprs(col, base_dt, features)
+            if col_exprs:
+                X_out = X_out.with_columns(col_exprs)
+        except Exception as e:
+            logger.warning(f"Failed to extract datetime features for column {col}: {e}")
     return X_out
 
 
-_POLARS_AGG_BUILDERS: Dict[str, Callable[[Any], Any]] = {
+_POLARS_AGG_BUILDERS: dict[str, Callable[[Any], Any]] = {
     "mean": lambda c: c.mean(),
     "sum": lambda c: c.sum(),
     "count": lambda c: c.count(),
@@ -206,7 +239,7 @@ _POLARS_AGG_BUILDERS: Dict[str, Callable[[Any], Any]] = {
 }
 
 
-def _polars_group_agg(op: Dict[str, Any], existing: List[str], _epsilon: float) -> Optional[Any]:
+def _polars_group_agg(op: dict[str, Any], existing: list[str], _epsilon: float) -> Any | None:
     """Group-by aggregation broadcast back per row via Polars window ``over``."""
     import polars as pl
 
@@ -223,7 +256,7 @@ def _polars_group_agg(op: Dict[str, Any], existing: List[str], _epsilon: float) 
     return builder(target).over(group_col)
 
 
-_POLARS_OP_HANDLERS: Dict[str, Callable[[Dict[str, Any], List[str], float], Optional[Any]]] = {
+_POLARS_OP_HANDLERS: dict[str, Callable[[dict[str, Any], list[str], float], Any | None]] = {
     "arithmetic": _polars_arith,
     "ratio": _polars_ratio,
     "similarity": _polars_similarity,
@@ -231,7 +264,7 @@ _POLARS_OP_HANDLERS: Dict[str, Callable[[Dict[str, Any], List[str], float], Opti
 }
 
 
-def _featgen_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, Any]:
+def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     operations = params.get("operations", [])
     if not operations:
         return X, y
@@ -256,6 +289,6 @@ def _featgen_apply_polars(X: Any, y: Any, params: Dict[str, Any]) -> Tuple[Any, 
             if round_digits is not None:
                 expr = expr.round(round_digits)
             X_out = X_out.with_columns(expr.alias(output_col))
-        except Exception:
-            pass  # nosec B110 - skip a malformed op; other feature-generation ops still apply
+        except Exception as e:
+            logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
     return X_out, y

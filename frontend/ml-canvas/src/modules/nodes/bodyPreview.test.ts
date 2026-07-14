@@ -20,12 +20,12 @@ import { TextCleaningNode } from './processing/TextCleaningNode';
 import { ValueReplacementNode } from './processing/ValueReplacementNode';
 import { AliasReplacementNode } from './processing/AliasReplacementNode';
 import { InvalidValueReplacementNode } from './processing/InvalidValueReplacementNode';
-import { DataCleaningNode } from './processing/DataCleaningNode';
 import { MissingIndicatorNode } from './processing/MissingIndicatorNode';
 import { PolynomialFeaturesNode } from './processing/PolynomialFeaturesNode';
 import { TrainTestSplitNode } from './modeling/TrainTestSplitNode';
 import { FeatureTargetSplitNode } from './modeling/FeatureTargetSplitNode';
 import { BasicTrainingNode } from './modeling/BasicTrainingNode';
+import type { ModelTrainingConfig } from './modeling/BasicTrainingSettings';
 
 describe('bodyPreview functions', () => {
   it('DropColumnsNode shows count and threshold', () => {
@@ -134,11 +134,7 @@ describe('bodyPreview functions', () => {
     ).toBe('negative_to_nan · 2 cols');
   });
 
-  it('DataCleaningNode and MissingIndicatorNode show counts', () => {
-    expect(DataCleaningNode.bodyPreview!({ dropColumns: [], fillStrategy: 'mean' })).toBe('Fill missing: mean');
-    expect(DataCleaningNode.bodyPreview!({ dropColumns: ['a', 'b'], fillStrategy: 'median' })).toBe(
-      'Drop 2 cols · fill median'
-    );
+  it('MissingIndicatorNode shows counts', () => {
     expect(MissingIndicatorNode.bodyPreview!({ columns: [], flag_suffix: '_was_missing' })).toBeNull();
     expect(MissingIndicatorNode.bodyPreview!({ columns: ['a'], flag_suffix: '_was_missing' })).toBe(
       '1 col → flags'
@@ -165,12 +161,15 @@ describe('bodyPreview functions', () => {
   });
 
   it('createModelingNode default preview shows model and target', () => {
-    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier', target_column: 'y' })).toBe(
+    // bodyPreview's default fallback only ever reads model_type/target_column,
+    // so these deliberately test with partial configs — cast since the
+    // node's real config type (ModelTrainingConfig) requires more fields.
+    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier', target_column: 'y' } as ModelTrainingConfig)).toBe(
       'random_forest_classifier → y'
     );
-    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier' })).toBe(
+    expect(BasicTrainingNode.bodyPreview!({ model_type: 'random_forest_classifier' } as ModelTrainingConfig)).toBe(
       'random_forest_classifier'
     );
-    expect(BasicTrainingNode.bodyPreview!({})).toBeNull();
+    expect(BasicTrainingNode.bodyPreview!({} as ModelTrainingConfig)).toBeNull();
   });
 });

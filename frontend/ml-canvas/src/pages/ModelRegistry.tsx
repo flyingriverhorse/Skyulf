@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
 import { LoadingState, ErrorState, EmptyState, useConfirm } from '../components/shared';
 import { toast } from '../core/toast';
@@ -71,26 +71,21 @@ export const ModelRegistry: React.FC = () => {
     setViewingArtifacts(jobId);
   };
 
-  // Infinite scroll listener -> trigger React Query's `fetchNextPage`.
+  // Infinite scroll sentinel -> trigger React Query's `fetchNextPage` when it comes into view.
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const handleScroll = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.scrollTop + target.clientHeight >= target.scrollHeight - 100 &&
-        !modelsQuery.isFetchingNextPage &&
-        hasMore
-      ) {
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !modelsQuery.isFetchingNextPage && hasMore) {
         void modelsQuery.fetchNextPage();
       }
-    };
+    });
 
-    const mainElement = document.querySelector('main');
-    if (mainElement) {
-      mainElement.addEventListener('scroll', handleScroll);
-      return () => { mainElement.removeEventListener('scroll', handleScroll); };
-    }
-    window.addEventListener('scroll', handleScroll as unknown as EventListener);
-    return () => { window.removeEventListener('scroll', handleScroll as unknown as EventListener); };
+    observer.observe(sentinel);
+    return () => { observer.disconnect(); };
   }, [modelsQuery, hasMore]);
 
   const handleDeploy = async (jobId: string) => {
@@ -348,6 +343,10 @@ export const ModelRegistry: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Sentinel observed by the IntersectionObserver above to trigger
+          `fetchNextPage()` when it scrolls into view. */}
+      <div ref={loadMoreSentinelRef} className="h-1" aria-hidden="true" />
 
       {loading && models.length > 0 && (
         <div className="py-4 flex justify-center text-slate-500 dark:text-slate-400">

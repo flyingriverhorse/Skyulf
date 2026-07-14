@@ -73,6 +73,23 @@ def test_woe_non_binary_target_is_skipped():
     assert params == {}
 
 
+def test_woe_excludes_target_column_when_explicitly_selected():
+    """Regression test: _exclude_target_column previously no-op'd for WOEEncoder.
+
+    If a user misconfigures ``columns`` to include the target column itself,
+    WOE would fit/apply a mapping of the target against itself (a degenerate,
+    leaky encoding) and silently overwrite the target's own values. The guard
+    must strip the target column from ``columns`` just like it does for
+    OneHot/Dummy/Hash/TargetEncoder.
+    """
+    df = _woe_frame()
+    params = WOEEncoderCalculator().fit(
+        (df, None), {"columns": ["city", "target"], "target_column": "target"}
+    )
+    assert "target" not in params["mappings"]
+    assert "city" in params["mappings"]
+
+
 def test_woe_registered():
     assert "WOEEncoder" in NodeRegistry.get_all_metadata()
 

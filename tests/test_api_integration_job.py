@@ -1,5 +1,5 @@
-import os
 import shutil
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,8 +15,8 @@ def client():
 
 def test_run_pipeline_job(client):
     # Create a dummy CSV for testing
-    os.makedirs("temp_test_data", exist_ok=True)
-    csv_path = os.path.abspath("temp_test_data/iris_job.csv")
+    Path("temp_test_data").mkdir(parents=True, exist_ok=True)
+    csv_path = str(Path("temp_test_data/iris_job.csv").resolve())
 
     with open(csv_path, "w") as f:
         f.write("sepal_length,sepal_width,petal_length,petal_width,species\n")
@@ -64,5 +64,5 @@ def test_run_pipeline_job(client):
         assert status_data["pipeline_id"] == "test_job_001"
 
     finally:
-        if os.path.exists("temp_test_data"):
+        if Path("temp_test_data").exists():
             shutil.rmtree("temp_test_data")

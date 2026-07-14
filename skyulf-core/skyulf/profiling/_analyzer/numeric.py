@@ -1,7 +1,5 @@
 """Numeric column profiling + multicollinearity (VIF)."""
 
-from typing import Dict, List, Optional
-
 import numpy as np
 
 from ..schemas import NumericStats
@@ -27,7 +25,7 @@ class NumericMixin(_AnalyzerState):
             negatives_count=row.get(f"{col}__negatives", 0),
         )
 
-    def _calculate_vif(self, numeric_cols: List[str]) -> Optional[Dict[str, float]]:
+    def _calculate_vif(self, numeric_cols: list[str]) -> dict[str, float] | None:
         """Variance Inflation Factor via diagonal of the inverse correlation matrix.
 
         Equivalent to ``1 / (1 - R_i^2)`` where ``R_i^2`` is the R² of regressing
@@ -54,7 +52,7 @@ class NumericMixin(_AnalyzerState):
                 inv_corr = np.linalg.inv(corr_matrix)
             except np.linalg.LinAlgError:
                 # Singular matrix = perfect multicollinearity; flag everything.
-                return {col: 999.0 for col in numeric_cols}
+                return dict.fromkeys(numeric_cols, 999.0)
 
             return {col: max(1.0, float(inv_corr[i, i])) for i, col in enumerate(numeric_cols)}
         except Exception as e:

@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, Database, Search } from 'lucide-react';
+import { ChevronDown, Database, Search, X } from 'lucide-react';
 import type { DriftJobOption } from '../../core/api/monitoring';
 
 interface JobSelectorProps {
     jobs: DriftJobOption[];
     selectedJob: string;
     onSelect: (jobId: string) => void;
+    /** Shows a red outline + helper text when a reference job is required but missing. */
+    invalid?: boolean;
 }
 
 /**
@@ -13,10 +15,12 @@ interface JobSelectorProps {
  * model" picker for drift comparison. Self-contained: owns its own search
  * input, open/close state, and outside-click handler.
  */
-export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onSelect }) => {
+export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onSelect, invalid }) => {
     const [open, setOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const listboxId = 'job-selector-listbox';
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
@@ -27,6 +31,21 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Escape closes the dropdown and returns focus to the trigger button,
+    // matching standard combobox keyboard behavior.
+    useEffect(() => {
+        if (!open) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setOpen(false);
+                triggerRef.current?.focus();
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [open]);
+
 
     const filteredJobs = useMemo(() => {
         if (!searchTerm) return jobs;
@@ -59,16 +78,23 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
     return (
         <div ref={dropdownRef} className="relative flex-1 min-w-0">
             <button
+                ref={triggerRef}
                 type="button"
+                aria-haspopup="listbox"
+                aria-expanded={open}
+                aria-controls={listboxId}
                 onClick={() => {
                     setOpen(!open);
                     setSearchTerm('');
                 }}
                 className={`w-full flex items-center gap-2 px-3 py-2.5 border rounded-md text-sm transition-colors ${
-                    selectedJob
-                        ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
+                    invalid
+                        ? 'border-red-400 dark:border-red-500 hover:border-red-500'
+                        : selectedJob
+                            ? 'border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-900/20'
+                            : 'border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500'
                 }`}
+                aria-describedby={invalid ? 'job-selector-error' : undefined}
             >
                 <Database size={15} className="shrink-0 text-gray-400" />
                 <span className={`truncate ${selectedJob ? 'text-slate-800 dark:text-slate-200' : 'text-gray-400'}`}>
@@ -76,14 +102,45 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                         ? `${selectedJobData.dataset_name}  (${selectedJobData.job_id.slice(0, 8)})`
                         : 'Select reference model...'}
                 </span>
+                {selectedJob && (
+                    <span
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Clear selected reference model"
+                        title="Clear selection"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onSelect('');
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onSelect('');
+                            }
+                        }}
+                        className="ml-auto shrink-0 p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300"
+                    >
+                        <X size={13} />
+                    </span>
+                )}
                 <ChevronDown
                     size={14}
-                    className={`ml-auto shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+                    className={`${selectedJob ? '' : 'ml-auto'} shrink-0 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
                 />
             </button>
 
+            {invalid && !selectedJob && (
+                <span id="job-selector-error" className="block mt-1 text-[11px] text-red-600 dark:text-red-400">Reference job is required.</span>
+            )}
+
             {open && (
-                <div className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md shadow-lg overflow-hidden">
+                <div
+                    id={listboxId}
+                    role="listbox"
+                    aria-label="Reference model jobs"
+                    className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-md shadow-lg overflow-hidden"
+                >
                     <div className="p-2 border-b border-gray-100 dark:border-slate-700">
                         <div className="relative">
                             <Search
@@ -114,6 +171,8 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                                         <button
                                             key={job.job_id}
                                             type="button"
+                                            role="option"
+                                            aria-selected={selectedJob === job.job_id}
                                             onClick={() => {
                                                 onSelect(job.job_id);
                                                 setOpen(false);

@@ -1,7 +1,6 @@
 """Text column profiling: stats, common words, sentiment, PII heuristics."""
 
 import re
-from typing import Dict, Optional
 
 import polars as pl
 
@@ -28,13 +27,15 @@ class TextMixin(_AnalyzerState):
 
             word_counts = (
                 words.group_by("word")
-                .agg(pl.count().alias("count"))
+                .agg(pl.len().alias("count"))
                 .sort("count", descending=True)
                 .head(10)
             )
 
-            for row in word_counts.iter_rows(named=True):
-                common_words.append({"word": row["word"], "count": row["count"]})
+            common_words.extend(
+                {"word": row["word"], "count": row["count"]}
+                for row in word_counts.iter_rows(named=True)
+            )
         except Exception as e:
             print(f"Error calculating common words for {col}: {e}")
 
@@ -45,7 +46,7 @@ class TextMixin(_AnalyzerState):
             common_words=common_words,
         )
 
-    def _analyze_sentiment(self, text_series: pl.Series) -> Optional[Dict[str, float]]:
+    def _analyze_sentiment(self, text_series: pl.Series) -> dict[str, float] | None:
         """Return VADER sentiment distribution ratios, or ``None`` if unavailable."""
         if not VADER_AVAILABLE:
             return None
@@ -97,7 +98,4 @@ class TextMixin(_AnalyzerState):
         sample = self.df[col].drop_nulls().head(20).to_list()  # type: ignore[attr-defined]
         email_pattern = r"[^@]+@[^@]+\.[^@]+"
 
-        for val in sample:
-            if re.match(email_pattern, str(val)):
-                return True
-        return False
+        return any(re.match(email_pattern, str(val)) for val in sample)

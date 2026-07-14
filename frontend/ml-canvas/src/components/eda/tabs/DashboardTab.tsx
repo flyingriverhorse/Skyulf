@@ -111,6 +111,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:hover:text-gray-300'
                                                 }`}
                                                 title={isExcluded ? "Include Column" : "Exclude Column"}
+                                                aria-label={isExcluded ? "Include Column" : "Exclude Column"}
                                             >
                                                 {isExcluded ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                             </button>

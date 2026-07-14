@@ -1,5 +1,5 @@
-import os
 import shutil
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,10 +24,25 @@ def test_get_registry(client):
     assert any(item["id"] == "random_forest_classifier" for item in data)
 
 
+def test_get_registry_has_no_duplicate_ids(client):
+    """Regression test: aliased skyulf-core nodes (e.g. Split/TrainTestSplitter,
+    PolynomialFeatures/PolynomialFeaturesNode, FeatureGeneration/FeatureMath/
+    FeatureGenerationNode) previously produced a duplicate RegistryItem per
+    alias since NodeRegistry.get_all_metadata() is keyed by registration name,
+    not by the logical node id. That surfaced as duplicate cards in the
+    frontend node palette.
+    """
+    response = client.get("/api/pipeline/registry")
+    assert response.status_code == 200
+    data = response.json()
+    ids = [item["id"] for item in data]
+    assert len(ids) == len(set(ids)), f"Duplicate ids in /registry response: {ids}"
+
+
 def test_preview_pipeline(client):
     # Create a dummy CSV for testing
-    os.makedirs("temp_test_data", exist_ok=True)
-    csv_path = os.path.abspath("temp_test_data/iris.csv")
+    Path("temp_test_data").mkdir(parents=True, exist_ok=True)
+    csv_path = str(Path("temp_test_data/iris.csv").resolve())
 
     # Create a simple iris-like csv
     with open(csv_path, "w") as f:
@@ -76,14 +91,14 @@ def test_preview_pipeline(client):
         assert len(data["preview_data"]) > 0
 
     finally:
-        if os.path.exists("temp_test_data"):
+        if Path("temp_test_data").exists():
             shutil.rmtree("temp_test_data")
 
 
 def test_preview_recommendations(client):
     # Create a CSV with missing values to trigger recommendations
-    os.makedirs("temp_test_data_rec", exist_ok=True)
-    csv_path = os.path.abspath("temp_test_data_rec/missing.csv")
+    Path("temp_test_data_rec").mkdir(parents=True, exist_ok=True)
+    csv_path = str(Path("temp_test_data_rec/missing.csv").resolve())
 
     with open(csv_path, "w") as f:
         f.write("A,B,C\n")
@@ -126,14 +141,14 @@ def test_preview_recommendations(client):
         assert "A" in targets or "B" in targets or "C" in targets
 
     finally:
-        if os.path.exists("temp_test_data_rec"):
+        if Path("temp_test_data_rec").exists():
             shutil.rmtree("temp_test_data_rec")
 
 
 def test_cleaning_recommendations(client):
     # Create a CSV with duplicates and high missing values
-    os.makedirs("temp_test_data_clean", exist_ok=True)
-    csv_path = os.path.abspath("temp_test_data_clean/dirty.csv")
+    Path("temp_test_data_clean").mkdir(parents=True, exist_ok=True)
+    csv_path = str(Path("temp_test_data_clean/dirty.csv").resolve())
 
     with open(csv_path, "w") as f:
         f.write("A,B,C\n")
@@ -173,14 +188,14 @@ def test_cleaning_recommendations(client):
         assert "A" in targets and "B" in targets
 
     finally:
-        if os.path.exists("temp_test_data_clean"):
+        if Path("temp_test_data_clean").exists():
             shutil.rmtree("temp_test_data_clean")
 
 
 def test_encoding_outlier_recommendations(client):
     # Create a CSV with categorical data and skewed numeric data
-    os.makedirs("temp_test_data_adv", exist_ok=True)
-    csv_path = os.path.abspath("temp_test_data_adv/advanced.csv")
+    Path("temp_test_data_adv").mkdir(parents=True, exist_ok=True)
+    csv_path = str(Path("temp_test_data_adv/advanced.csv").resolve())
 
     with open(csv_path, "w") as f:
         f.write("cat_low,cat_high,skewed_num\n")
@@ -222,14 +237,14 @@ def test_encoding_outlier_recommendations(client):
         assert "skewed_num" in outlier_recs[0]["target_columns"]
 
     finally:
-        if os.path.exists("temp_test_data_adv"):
+        if Path("temp_test_data_adv").exists():
             shutil.rmtree("temp_test_data_adv")
 
 
 def test_transformation_recommendations(client):
     # Create a CSV with skewed data for Power Transform
-    os.makedirs("temp_test_data_trans", exist_ok=True)
-    csv_path = os.path.abspath("temp_test_data_trans/skewed.csv")
+    Path("temp_test_data_trans").mkdir(parents=True, exist_ok=True)
+    csv_path = str(Path("temp_test_data_trans/skewed.csv").resolve())
 
     with open(csv_path, "w") as f:
         f.write("pos_skew,neg_skew\n")
@@ -249,7 +264,7 @@ def test_transformation_recommendations(client):
         neg_skew = np.random.normal(0, 1, 100)
         neg_skew[0] = -100  # Extreme negative outlier creating skew
 
-        for p, n in zip(pos_skew, neg_skew):
+        for p, n in zip(pos_skew, neg_skew, strict=True):
             f.write(f"{p},{n}\n")
 
     try:
@@ -286,7 +301,7 @@ def test_transformation_recommendations(client):
             assert "pos_skew" in box_cox_recs[0]["target_columns"]
 
     finally:
-        if os.path.exists("temp_test_data_trans"):
+        if Path("temp_test_data_trans").exists():
             shutil.rmtree("temp_test_data_trans")
 
 
@@ -311,3 +326,12 @@ def test_run_pipeline_submission(client):
     data = response.json()
     assert data["message"] == "Pipeline execution started"
     assert data["pipeline_id"] == "test_run_001"
+
+
+def test_run_pipeline_rejects_empty_nodes(client):
+    """An empty node list used to fall through to `all_job_ids[0]` and raise
+    an unhandled IndexError (opaque 500) instead of a proper 400."""
+    payload = {"pipeline_id": "test_run_empty", "nodes": []}
+    response = client.post("/api/pipeline/run", json=payload)
+    assert response.status_code == 400
+    assert "no nodes" in response.json()["message"].lower()

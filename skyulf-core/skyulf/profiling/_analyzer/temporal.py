@@ -1,6 +1,6 @@
 """Time series analysis: trend, seasonality, autocorrelation, stationarity."""
 
-from typing import Any, List, Optional, cast
+from typing import Any, cast
 
 import numpy as np
 import polars as pl
@@ -14,10 +14,10 @@ class TemporalMixin(_AnalyzerState):
 
     def _analyze_timeseries(  # noqa: C901
         self,
-        numeric_cols: List[str],
-        target_col: Optional[str] = None,
-        date_col: Optional[str] = None,
-    ) -> Optional[TimeSeriesAnalysis]:
+        numeric_cols: list[str],
+        target_col: str | None = None,
+        date_col: str | None = None,
+    ) -> TimeSeriesAnalysis | None:
         """Trend (with adaptive resampling), DoW/MoY seasonality, ACF, ADF."""
         try:
             if not date_col:
@@ -86,7 +86,7 @@ class TemporalMixin(_AnalyzerState):
                 if not cols_to_track:
                     trend_df = _collect(
                         ts_df.group_by_dynamic(date_col, every=interval)
-                        .agg(pl.count().alias("count"))
+                        .agg(pl.len().alias("count"))
                         .sort(date_col)
                     )
                 else:
@@ -142,7 +142,7 @@ class TemporalMixin(_AnalyzerState):
             ]
 
             # ACF (lags 1..30) on the resampled trend.
-            acf_stats: List[dict] = []
+            acf_stats: list[dict] = []
             if cols_to_track:
                 target_metric = cols_to_track[0]
                 # .copy() avoids "assignment destination is read-only" — polars

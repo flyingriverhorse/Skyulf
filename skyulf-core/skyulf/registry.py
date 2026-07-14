@@ -1,16 +1,16 @@
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class NodeRegistry:
-    _calculators: Dict[str, Type] = {}
-    _appliers: Dict[str, Type] = {}
-    _metadata: Dict[str, Dict[str, Any]] = {}
+    _calculators: dict[str, type] = {}
+    _appliers: dict[str, type] = {}
+    _metadata: dict[str, dict[str, Any]] = {}
 
     @classmethod
-    def register(cls, name: str, applier_cls: Type, metadata: Optional[Dict[str, Any]] = None):
+    def register(cls, name: str, applier_cls: type, metadata: dict[str, Any] | None = None):
         """
         Decorator to register a Calculator/Applier pair.
 
@@ -30,11 +30,11 @@ class NodeRegistry:
             cls._appliers[name] = applier_cls
 
             # 1. Use passed metadata if available
-            if metadata:
+            if metadata is not None:
                 cls._metadata[name] = metadata
             # 2. Otherwise check for __node_meta__ (from @node_meta decorator)
             elif hasattr(calculator_cls, "__node_meta__"):
-                meta = getattr(calculator_cls, "__node_meta__")
+                meta = calculator_cls.__node_meta__
                 cls._metadata[name] = {
                     "id": meta.id,
                     "name": meta.name,
@@ -49,7 +49,7 @@ class NodeRegistry:
         return wrapper
 
     @classmethod
-    def get_calculator(cls, name: str) -> Type:
+    def get_calculator(cls, name: str) -> type:
         if name not in cls._calculators:
             raise ValueError(
                 f"Node '{name}' not found in registry. Available nodes: {list(cls._calculators.keys())}"
@@ -57,12 +57,12 @@ class NodeRegistry:
         return cls._calculators[name]
 
     @classmethod
-    def get_applier(cls, name: str) -> Type:
+    def get_applier(cls, name: str) -> type:
         if name not in cls._appliers:
             raise ValueError(f"Node '{name}' not found in registry.")
         return cls._appliers[name]
 
     @classmethod
-    def get_all_metadata(cls) -> Dict[str, Dict[str, Any]]:
+    def get_all_metadata(cls) -> dict[str, dict[str, Any]]:
         """Return a snapshot of all registered node metadata, keyed by node ID."""
         return dict(cls._metadata)

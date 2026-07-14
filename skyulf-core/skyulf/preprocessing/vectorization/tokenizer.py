@@ -9,7 +9,7 @@ vectorizer node downstream or be inspected directly.
 """
 
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
@@ -23,7 +23,7 @@ from ._common import apply_text_pandas_only
 logger = logging.getLogger(__name__)
 
 
-def _build_analyzer(params: Dict[str, Any]):
+def _build_analyzer(params: dict[str, Any]):
     """Construct an sklearn token analyzer callable from node params."""
     analyzer: str = params.get("analyzer", "word")
     lowercase: bool = params.get("lowercase", True)
@@ -43,9 +43,9 @@ def _build_analyzer(params: Dict[str, Any]):
 
 
 def _tokenizer_apply_pandas(
-    X: pd.DataFrame, y: Any, params: Dict[str, Any]
-) -> Tuple[pd.DataFrame, Any]:
-    cols: List[str] = params.get("columns", [])
+    X: pd.DataFrame, y: Any, params: dict[str, Any]
+) -> tuple[pd.DataFrame, Any]:
+    cols: list[str] = params.get("columns", [])
     drop_original: bool = params.get("drop_original", False)
     add_token_count: bool = params.get("add_token_count", False)
 
@@ -70,7 +70,7 @@ def _tokenizer_apply_pandas(
 
 class TokenizerApplier(BaseApplier):
     @apply_method
-    def apply(self, X: Any, _y: Any, params: Dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
+    def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_text_pandas_only(X, params, _tokenizer_apply_pandas)
 
 
@@ -101,12 +101,12 @@ class TokenizerApplier(BaseApplier):
     tags=["text", "nlp", "tokenizer"],
 )
 class TokenizerCalculator(BaseCalculator):
-    def infer_output_schema(self, input_schema: Any, config: Dict[str, Any]) -> None:
+    def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         return None
 
     @fit_method
-    def fit(self, X: Any, _y: Any, config: Dict[str, Any]) -> TokenizerArtifact:  # pylint: disable=arguments-differ
-        cols: List[str] = config.get("columns", [])
+    def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TokenizerArtifact:  # pylint: disable=arguments-differ
+        cols: list[str] = config.get("columns", [])
         if not cols:
             return {}
 
@@ -119,7 +119,7 @@ class TokenizerCalculator(BaseCalculator):
 
         add_token_count = config.get("add_token_count", False)
 
-        output_columns: List[str] = []
+        output_columns: list[str] = []
         for col in valid_cols:
             output_columns.append(f"{col}__tokens")
             if add_token_count:

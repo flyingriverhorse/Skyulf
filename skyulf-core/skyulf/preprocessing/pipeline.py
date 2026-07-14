@@ -1,7 +1,8 @@
 """Feature Engineering Pipeline Orchestrator."""
 
 import logging
-from typing import Any, Dict, List, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -22,17 +23,23 @@ class FeatureEngineer:
     Orchestrates a sequence of feature engineering steps.
     """
 
+    # Resampling steps (SMOTE/undersampling) must only ever run on the train
+    # split -- applying them to test/validation would fabricate synthetic rows
+    # or delete real held-out rows purely to balance classes, corrupting any
+    # metrics later computed on that "held-out" data. Kept as a single shared
+    # constant (rather than duplicated literals) so `transform()`, `_run_step`,
+    # and `_collect_step_metrics` can't drift out of sync with each other.
+    _RESAMPLING_TYPES = {"Oversampling", "Undersampling"}
+
     def __init__(
         self,
-        steps_config: Sequence[Union[PreprocessingStepConfig, Dict[str, Any]]],
+        steps_config: Sequence[PreprocessingStepConfig | dict[str, Any]],
     ):
         # `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].
         self.steps_config = steps_config
-        self.fitted_steps: List[Dict[str, Any]] = []
+        self.fitted_steps: list[dict[str, Any]] = []
 
-    def transform(
-        self, data: Union[pd.DataFrame, SkyulfDataFrame]
-    ) -> Union[pd.DataFrame, SkyulfDataFrame]:
+    def transform(self, data: pd.DataFrame | SkyulfDataFrame) -> pd.DataFrame | SkyulfDataFrame:
         """
         Apply fitted transformations to new data.
         """
@@ -48,8 +55,7 @@ class FeatureEngineer:
             if transformer_type in [
                 "TrainTestSplitter",
                 "feature_target_split",
-                "Oversampling",
-                "Undersampling",
+                *self._RESAMPLING_TYPES,
             ]:
                 continue
 
@@ -58,16 +64,14 @@ class FeatureEngineer:
 
         return current_data
 
-    def fit_transform(
-        self, data: Union[pd.DataFrame, SkyulfDataFrame, Any], node_id_prefix=""
-    ) -> Any:
+    def fit_transform(self, data: pd.DataFrame | SkyulfDataFrame | Any, node_id_prefix="") -> Any:
         """
         Runs the pipeline on data.
         Returns: (transformed_data, metrics_dict)
         """
         self.fitted_steps = []  # Reset fitted steps
         current_data = data
-        metrics: Dict[str, Any] = {}
+        metrics: dict[str, Any] = {}
 
         for i, step in enumerate(self.steps_config):
             name = step["name"]
@@ -134,7 +138,7 @@ class FeatureEngineer:
         applier: Any,
         step_node_id: str,
         current_data: Any,
-        params: Dict[str, Any],
+        params: dict[str, Any],
     ) -> tuple:  # Returns (data, params, transformer)
         """Execute one pipeline step. Returns (new_data, fitted_params).
 
@@ -142,8 +146,14 @@ class FeatureEngineer:
         so they bypass StatefulTransformer; everything else goes through the
         standard fit_transform wrapper and is appended to fitted_steps.
         """
-        transformer = StatefulTransformer(calculator, applier, step_node_id)
-        fitted_params: Dict[str, Any] = {}
+        transformer = StatefulTransformer(
+            calculator,
+            applier,
+            step_node_id,
+            apply_on_test=transformer_type not in self._RESAMPLING_TYPES,
+            apply_on_validation=transformer_type not in self._RESAMPLING_TYPES,
+        )
+        fitted_params: dict[str, Any] = {}
 
         if transformer_type == "TrainTestSplitter":
             logger.debug("Handling TrainTestSplitter")
@@ -219,16 +229,16 @@ class FeatureEngineer:
         self,
         *,
         transformer_type: str,
-        fitted_params: Dict[str, Any],
+        fitted_params: dict[str, Any],
         data_before: Any,
         current_data: Any,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         rows_before: int,
         cols_before: Any,
         rows_after: int,
         cols_after: Any,
         name: str,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
     ) -> None:
         """Aggregate per-step metrics into the running metrics dict."""
         try:
@@ -239,7 +249,7 @@ class FeatureEngineer:
         except Exception as e:
             logger.warning(f"Failed to retrieve metrics for step {name}: {e}")
 
-        if transformer_type in {"Oversampling", "Undersampling"}:
+        if transformer_type in self._RESAMPLING_TYPES:
             self._metrics_resampling(current_data, params, metrics)
 
         if rows_after > 0 or cols_after:
@@ -258,10 +268,10 @@ class FeatureEngineer:
     def _metrics_from_fitted_params(
         self,
         transformer_type: str,
-        fitted_params: Dict[str, Any],
+        fitted_params: dict[str, Any],
         data_before: Any,
         current_data: Any,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
     ) -> None:
         if transformer_type in self._IMPUTATION_TYPES:
             for key in ("missing_counts", "total_missing", "fill_values"):
@@ -295,9 +305,8 @@ class FeatureEngineer:
                 if key in fitted_params:
                     metrics[key] = fitted_params[key]
 
-        if transformer_type in self._OUTLIER_TYPES:
-            if "warnings" in fitted_params:
-                metrics["warnings"] = fitted_params["warnings"]
+        if transformer_type in self._OUTLIER_TYPES and "warnings" in fitted_params:
+            metrics["warnings"] = fitted_params["warnings"]
         if transformer_type in {"IQR", "Winsorize"} and "bounds" in fitted_params:
             metrics["bounds"] = fitted_params["bounds"]
         if transformer_type == "ZScore" and "stats" in fitted_params:
@@ -346,7 +355,7 @@ class FeatureEngineer:
         return None
 
     @staticmethod
-    def _extract_y_for_resampling(current_data: Any, params: Dict[str, Any]):
+    def _extract_y_for_resampling(current_data: Any, params: dict[str, Any]):
         """Pull the target Series out of whatever shape the resampler produced."""
         if isinstance(current_data, SplitDataset):
             if isinstance(current_data.train, tuple):
@@ -366,7 +375,7 @@ class FeatureEngineer:
         return None
 
     def _metrics_resampling(
-        self, current_data: Any, params: Dict[str, Any], metrics: Dict[str, Any]
+        self, current_data: Any, params: dict[str, Any], metrics: dict[str, Any]
     ) -> None:
         try:
             y_res: Any = self._extract_y_for_resampling(current_data, params)
@@ -413,7 +422,7 @@ class FeatureEngineer:
         return 0
 
     def _metrics_winsorize_clipped(
-        self, data_before: Any, current_data: Any, metrics: Dict[str, Any]
+        self, data_before: Any, current_data: Any, metrics: dict[str, Any]
     ) -> None:
         try:
             clipped_count = 0
@@ -436,12 +445,12 @@ class FeatureEngineer:
         transformer_type: str,
         data_before: Any,
         current_data: Any,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         rows_before: int,
         cols_before: Any,
         rows_after: int,
         cols_after: Any,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
     ) -> None:
         if transformer_type in self._ROW_DROP_TYPES:
             dropped = rows_before - rows_after
@@ -479,4 +488,4 @@ class FeatureEngineer:
                 NodeRegistry.get_applier(type_name)(),
             )
         except ValueError:
-            raise ValueError(f"Unknown transformer type: {type_name}")
+            raise ValueError(f"Unknown transformer type: {type_name}") from None

@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from typing import cast as type_cast
 
 from sqlalchemy import select
@@ -29,9 +29,9 @@ class AdvancedTuningManager:
         pipeline_id: str,
         node_id: str,
         dataset_id: str = "unknown",
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
         model_type: str = "unknown",
-        graph: Optional[Dict[str, Any]] = None,
+        graph: dict[str, Any] | None = None,
         branch_index: int = 0,
     ) -> str:
         """Creates a new tuning job in the database (Async)."""
@@ -56,7 +56,7 @@ class AdvancedTuningManager:
             search_strategy=search_strategy,
             graph=graph,
             job_metadata={"branch_index": branch_index},
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
         )
 
         session.add(job)
@@ -64,13 +64,13 @@ class AdvancedTuningManager:
         return job_id
 
     @staticmethod
-    def map_tuning_job_to_info(job: AdvancedTuningJob, dataset_name: Optional[str]) -> JobInfo:
+    def map_tuning_job_to_info(job: AdvancedTuningJob, dataset_name: str | None) -> JobInfo:
         # Extract details from graph
         (
             node_params,
             target_column,
             dropped_columns,
-        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), job.node_id)
+        ) = extract_job_details(type_cast(dict[str, Any], job.graph), job.node_id)
 
         # Extract hyperparameters (search space)
         # For display in Experiments table, users prefer to see the BEST params found
@@ -89,7 +89,7 @@ class AdvancedTuningManager:
             job_id=job.id,
             pipeline_id=job.pipeline_id,
             node_id=job.node_id,
-            dataset_id=type_cast(Optional[str], job.dataset_source_id),
+            dataset_id=type_cast(str | None, job.dataset_source_id),
             dataset_name=dataset_name,
             job_type=StepType.ADVANCED_TUNING.value,
             status=JobStatus(job.status),
@@ -105,15 +105,15 @@ class AdvancedTuningManager:
             },
             # Ensure metrics are in result too
             model_type=job.model_type,
-            hyperparameters=type_cast(Dict[str, Any], hyperparameters),
+            hyperparameters=type_cast(dict[str, Any], hyperparameters),
             created_at=type_cast(datetime, job.created_at),
-            metrics=type_cast(Optional[Dict[str, Any]], metrics),
-            search_strategy=type_cast(Optional[str], job.search_strategy),
-            version=type_cast(Optional[int], job.run_number),
+            metrics=type_cast(dict[str, Any] | None, metrics),
+            search_strategy=type_cast(str | None, job.search_strategy),
+            version=type_cast(int | None, job.run_number),
             target_column=target_column,
             dropped_columns=dropped_columns,
-            logs=type_cast(Optional[List[str]], job.logs),
-            graph=type_cast(Dict[str, Any], job.graph),
+            logs=type_cast(list[str] | None, job.logs),
+            graph=type_cast(dict[str, Any], job.graph),
             config=node_params,
             promoted_at=job.promoted_at,
             parent_pipeline_id=parse_branch_info(job.pipeline_id)[0],
@@ -136,7 +136,7 @@ class AdvancedTuningManager:
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
             job.status = JobStatus.CANCELLED.value
             job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
             meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
             task_id = meta.get("celery_task_id")
             if task_id:
@@ -152,7 +152,7 @@ class AdvancedTuningManager:
         return False
 
     @staticmethod
-    def _update_tuning_result(job: AdvancedTuningJob, result: Dict[str, Any]):
+    def _update_tuning_result(job: AdvancedTuningJob, result: dict[str, Any]):
         if "best_params" in result:
             job.best_params = result["best_params"]
         if "best_score" in result:
@@ -168,10 +168,10 @@ class AdvancedTuningManager:
     def update_status_sync(
         session: Session,
         job_id: str,
-        status: Optional[JobStatus] = None,
-        error: Optional[str] = None,
-        result: Optional[Dict[str, Any]] = None,
-        logs: Optional[List[str]] = None,
+        status: JobStatus | None = None,
+        error: str | None = None,
+        result: dict[str, Any] | None = None,
+        logs: list[str] | None = None,
     ) -> bool:
         """Updates tuning job status (Sync). Returns True if job found and updated."""
         job = session.query(AdvancedTuningJob).filter(AdvancedTuningJob.id == job_id).first()
@@ -183,7 +183,7 @@ class AdvancedTuningManager:
         # back to Completed.
         if job.status == JobStatus.CANCELLED.value:
             if logs:
-                current_logs: List[str] = job.logs or []
+                current_logs: list[str] = job.logs or []
                 job.logs = current_logs + logs
                 session.commit()
             return True
@@ -194,7 +194,7 @@ class AdvancedTuningManager:
             job.error_message = error
 
         if logs:
-            current_logs: List[str] = job.logs or []
+            current_logs: list[str] = job.logs or []
             job.logs = current_logs + logs
 
         if result:
@@ -205,13 +205,13 @@ class AdvancedTuningManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
 
         session.commit()
         return True
 
     @staticmethod
-    async def get_tuning_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
+    async def get_tuning_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves a tuning job by ID."""
         stmt = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
         result = await session.execute(stmt)
@@ -227,7 +227,7 @@ class AdvancedTuningManager:
         session: AsyncSession,
         limit: int = 50,
         skip: int = 0,
-    ) -> List[JobInfo]:
+    ) -> list[JobInfo]:
         """Lists recent tuning jobs (Async)."""
         # 1. Fetch all DataSources for robust name resolution
         ds_map = await get_dataset_map(session)
@@ -256,9 +256,7 @@ class AdvancedTuningManager:
         return jobs
 
     @staticmethod
-    async def get_latest_tuning_job_for_node(
-        session: AsyncSession, node_id: str
-    ) -> Optional[JobInfo]:
+    async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
         result = await session.execute(
             select(AdvancedTuningJob)
             .where(AdvancedTuningJob.node_id == node_id)
@@ -275,7 +273,7 @@ class AdvancedTuningManager:
     @staticmethod
     async def get_best_tuning_job_for_model(
         session: AsyncSession, model_type: str
-    ) -> Optional[JobInfo]:
+    ) -> JobInfo | None:
         result = await session.execute(
             select(AdvancedTuningJob)
             .where(AdvancedTuningJob.model_type == model_type)
@@ -292,7 +290,7 @@ class AdvancedTuningManager:
     @staticmethod
     async def get_tuning_jobs_for_model(
         session: AsyncSession, model_type: str, limit: int = 20
-    ) -> List[JobInfo]:
+    ) -> list[JobInfo]:
         result = await session.execute(
             select(AdvancedTuningJob)
             .where(AdvancedTuningJob.model_type == model_type)

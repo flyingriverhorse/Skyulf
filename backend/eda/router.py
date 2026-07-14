@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 import orjson
 import pandas as pd
@@ -50,10 +50,10 @@ class FilterRequest(BaseModel):
 
 
 class AnalyzeRequest(BaseModel):
-    target_col: Optional[str] = None
-    exclude_cols: Optional[List[str]] = None
-    filters: Optional[List[FilterRequest]] = None
-    task_type: Optional[Literal["Classification", "Regression"]] = None
+    target_col: str | None = None
+    exclude_cols: list[str] | None = None
+    filters: list[FilterRequest] | None = None
+    task_type: Literal["Classification", "Regression"] | None = None
 
 
 @router.get("/jobs/all")
@@ -96,7 +96,7 @@ async def trigger_analysis(
     dataset_id: int,
     request: Request,
     background_tasks: BackgroundTasks,
-    body: Optional[AnalyzeRequest] = None,
+    body: AnalyzeRequest | None = None,
     session: AsyncSession = Depends(get_db),
 ):
     """
@@ -239,10 +239,10 @@ async def get_report(report_id: int, session: AsyncSession = Depends(get_db)):
 
 
 class DecompositionRequest(BaseModel):
-    measure_col: Optional[str] = None
+    measure_col: str | None = None
     measure_agg: Literal["count", "sum", "mean", "min", "max", "median"] = "count"
-    split_col: Optional[str] = None
-    filters: Optional[List[FilterRequest]] = None
+    split_col: str | None = None
+    filters: list[FilterRequest] | None = None
 
 
 @router.post("/{dataset_id}/decomposition")
@@ -327,7 +327,7 @@ async def get_decomposition(
                     df = pl.from_pandas(pdf)
         except Exception:
             logger.exception("Failed to load dataset")
-            raise SkyulfException(message="Failed to load dataset")
+            raise SkyulfException(message="Failed to load dataset") from None
 
         # 5. Run Analysis
         analyzer = EDAAnalyzer(cast(Any, df))
@@ -351,4 +351,4 @@ async def get_decomposition(
         raise
     except Exception:
         logger.exception("Unexpected error in get_decomposition")
-        raise SkyulfException(message="Internal server error")
+        raise SkyulfException(message="Internal server error") from None

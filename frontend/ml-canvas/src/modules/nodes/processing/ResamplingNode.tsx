@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NodeDefinition, ValidationResult } from '../../../core/types/nodes';
 import { Activity, ChevronDown, ChevronUp } from 'lucide-react';
 import { useGraphStore } from '../../../core/store/useGraphStore';
@@ -8,6 +8,8 @@ import { Recommendation, ColumnProfile } from '../../../core/api/client';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
+import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 // --- Types ---
 
@@ -101,9 +103,8 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
   onChange,
   nodeId,
 }) => {
-  // Responsive Layout Logic
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = useState(false);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 400px.
+  const [containerRef, isWide] = useIsWideContainer(400);
   const [showRecommendations, setShowRecommendations] = useState(true);
 
   // Upstream Data for Target Column Suggestion
@@ -147,17 +148,6 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
           }
       }
     }, [schema, upstreamTarget, targetColumn, config.target_column, config, onChange]);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 400);
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
 
   // Recommendations
   const recommendations = useRecommendations(nodeId || '', {
@@ -284,7 +274,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     type="number"
                     className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     value={config.random_state}
-                    onChange={(e) => { handleChange('random_state', parseInt(e.target.value)); }}
+                    onChange={(e) => { handleChange('random_state', parseIntSafe(e.target.value, config.random_state)); }}
                 />
             </div>
 
@@ -303,7 +293,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.k_neighbors ?? 5}
-                                onChange={(e) => { handleChange('k_neighbors', parseInt(e.target.value)); }}
+                                onChange={(e) => { handleChange('k_neighbors', parseIntSafe(e.target.value, config.k_neighbors)); }}
                             />
                         </div>
                     )}
@@ -315,7 +305,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                                 type="number"
                                 className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                 value={config.m_neighbors ?? 10}
-                                onChange={(e) => { handleChange('m_neighbors', parseInt(e.target.value)); }}
+                                onChange={(e) => { handleChange('m_neighbors', parseIntSafe(e.target.value, config.m_neighbors)); }}
                             />
                         </div>
                     )}
@@ -394,7 +384,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                     <select
                         className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         value={config.version ?? 1}
-                        onChange={(e) => { handleChange('version', parseInt(e.target.value)); }}
+                        onChange={(e) => { handleChange('version', parseIntSafe(e.target.value, config.version)); }}
                     >
                         <option value="1">1</option>
                         <option value="2">2</option>
@@ -411,7 +401,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                             type="number"
                             className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             value={config.n_neighbors ?? 3}
-                            onChange={(e) => { handleChange('n_neighbors', parseInt(e.target.value)); }}
+                            onChange={(e) => { handleChange('n_neighbors', parseIntSafe(e.target.value, config.n_neighbors)); }}
                         />
                     </div>
                     <div className="space-y-2">

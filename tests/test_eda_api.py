@@ -30,15 +30,15 @@ def client():
 async def test_trigger_analysis_creates_report(client, db_session):
     # 1. Create a dummy data source
     # We need to use a unique source_id to avoid conflicts if DB is persistent
-    import os
     import uuid
+    from pathlib import Path
 
     unique_id = str(uuid.uuid4())
 
     # Create a dummy CSV file in temp
     temp_dir = "temp"
-    os.makedirs(temp_dir, exist_ok=True)
-    file_path = os.path.abspath(os.path.join(temp_dir, f"test_eda_{unique_id}.csv"))
+    Path(temp_dir).mkdir(parents=True, exist_ok=True)
+    file_path = str((Path(temp_dir) / f"test_eda_{unique_id}.csv").resolve())
     with open(file_path, "w") as f:
         f.write("col1,col2\n1,2\n3,4")
 

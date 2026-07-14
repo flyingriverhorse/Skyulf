@@ -6,8 +6,9 @@ subscribes to the Redis pub/sub channel and broadcasts every message.
 """
 
 import asyncio
+import contextlib
 import logging
-from typing import Any, Optional, Set
+from typing import Any
 
 import orjson
 from fastapi import WebSocket
@@ -31,9 +32,9 @@ class ConnectionManager:
     """Tracks live WebSocket clients and fans out Redis events to them."""
 
     def __init__(self) -> None:
-        self._clients: Set[WebSocket] = set()
+        self._clients: set[WebSocket] = set()
         self._lock = asyncio.Lock()
-        self._subscriber_task: Optional[asyncio.Task[None]] = None
+        self._subscriber_task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
 
     async def connect(self, ws: WebSocket) -> None:
@@ -79,19 +80,17 @@ class ConnectionManager:
         self._stop.set()
         if self._subscriber_task:
             self._subscriber_task.cancel()
-            try:
+            # best-effort task teardown during shutdown
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._subscriber_task
-            except (asyncio.CancelledError, Exception):
-                pass  # nosec B110 - best-effort task teardown during shutdown
             self._subscriber_task = None
         async with self._lock:
             clients = list(self._clients)
             self._clients.clear()
         for ws in clients:
-            try:
+            # best-effort socket close during shutdown
+            with contextlib.suppress(Exception):
                 await ws.close()
-            except Exception:
-                pass  # nosec B110 - best-effort socket close during shutdown
 
     async def _drain_pubsub(self, pubsub: Any) -> None:
         """Forward messages from a Redis pubsub stream until stop is set."""
@@ -113,6 +112,8 @@ class ConnectionManager:
         """
         backoff = 1.0
         while not self._stop.is_set():
+            client: Any = None
+            pubsub: Any = None
             try:
                 # Imported lazily — we don't want to fail app startup
                 # just because the optional realtime layer can't reach
@@ -130,11 +131,19 @@ class ConnectionManager:
                 raise
             except Exception as exc:
                 logger.warning("Realtime subscriber error: %s (retry in %.1fs)", exc, backoff)
-                try:
+                with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(self._stop.wait(), timeout=backoff)
-                except asyncio.TimeoutError:
-                    pass
                 backoff = min(backoff * 2, 30.0)
+            finally:
+                # Always release the pubsub/connection before reconnecting or
+                # exiting the loop — otherwise every retry (or shutdown) leaks
+                # a Redis connection.
+                if pubsub is not None:
+                    with contextlib.suppress(Exception):
+                        await pubsub.close()
+                if client is not None:
+                    with contextlib.suppress(Exception):
+                        await client.aclose()
 
     async def _local_loop(self) -> None:
         """Drain the in-process bus and broadcast (no-Celery mode)."""
@@ -146,7 +155,7 @@ class ConnectionManager:
             while not self._stop.is_set():
                 try:
                     raw = await asyncio.wait_for(queue.get(), timeout=1.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 try:
                     await self.broadcast(_wrap_payload(raw))

@@ -168,6 +168,29 @@ export const formatBytes = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
 
+/**
+ * Human-readable elapsed time between two ISO timestamps (e.g. job
+ * start/end). Returns `'-'` if either bound is missing. Consolidated here
+ * from three near-duplicate implementations (`JobCard`, `ExperimentsPage`,
+ * `Jobs` page) that had each drifted slightly — this is the most complete
+ * of the three (handles sub-second and hour-scale durations).
+ */
+export const formatDuration = (start: string | null, end: string | null): string => {
+  if (!start || !end) return '-';
+  const diff = new Date(end).getTime() - new Date(start).getTime();
+
+  if (diff < 1000) return '< 1s';
+
+  const seconds = Math.floor(diff / 1000);
+  if (seconds < 60) return `${seconds}s`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+};
+
 // --- Ensemble helpers -------------------------------------------------------
 
 /** Registry ids of the four ensemble meta-models (Voting / Stacking). */

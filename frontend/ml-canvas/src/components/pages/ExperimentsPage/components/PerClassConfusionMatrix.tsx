@@ -7,11 +7,11 @@
  * "multiclass with y_proba" precondition and renders nothing otherwise.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Loader2, Check, Download } from 'lucide-react';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationSplit, EvaluationData } from '../types';
-import { calculateConfusionMatrix } from '../utils/classificationCharts';
+import { applyThreshold } from '../utils/classificationCharts';
 
 interface Props {
   evaluationData: EvaluationData;
@@ -36,41 +36,22 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   downloadingChart,
   doneChart,
 }) => {
+  // Reassigning predictions via OvR threshold scans the full sample array
+  // for every split, so it's memoised on the split data + selected class +
+  // threshold to avoid recomputing on every unrelated re-render (e.g. every
+  // pixel of drag on the threshold slider would otherwise recompute this).
+  const matrixBySplit = useMemo(() => {
+    const result: Record<string, { classes: (string | number)[]; matrix: number[][] }> = {};
+    for (const [name, splitData] of Object.entries(evaluationData.splits)) {
+      result[name] = applyThreshold(splitData, selectedRocClass, threshold);
+    }
+    return result;
+  }, [evaluationData.splits, selectedRocClass, threshold]);
+
   if ((evaluationData.splits.train?.y_proba?.classes.length ?? 0) <= 2) return null;
 
-
-                            // Compute confusion matrix for a split with OvR threshold applied
-                            const getMatrix = (splitData: EvaluationSplit) => {
-                                const proba = splitData.y_proba;
-                                let yTrue: (string | number)[] = splitData.y_true;
-                                let yPred: (string | number)[] = splitData.y_pred;
-                                if (proba?.labels && proba.labels.length === proba.classes.length) {
-                                    const lm = new Map<string, string | number>();
-                                    proba.labels.forEach((l, i) => { const c = proba.classes[i]; if (c !== undefined) lm.set(String(l), c); });
-                                    yTrue = yTrue.map(y => lm.get(String(y)) ?? y);
-                                    yPred = yPred.map(y => lm.get(String(y)) ?? y);
-                                }
-                                if (proba && selectedRocClass) {
-                                    const ll = proba.labels?.length === proba.classes.length ? proba.labels : undefined;
-                                    const posIdx = (ll ?? proba.classes).findIndex(c => String(c) === selectedRocClass);
-                                    if (posIdx !== -1) {
-                                        const posVal = proba.classes[posIdx];
-                                        const orig = [...yPred];
-                                        if (posVal !== undefined) {
-                                            yPred = proba.values.map((v, i) => {
-                                                if ((v[posIdx] ?? 0) >= threshold) return posVal;
-                                                let bi = -1, bp = -Infinity;
-                                                v.forEach((p, idx) => { if (idx !== posIdx && p > bp) { bp = p; bi = idx; } });
-                                                return bi >= 0 ? (proba.classes[bi] ?? orig[i]!) : (orig[i]!);
-                                            });
-                                        }
-                                    }
-                                }
-                                return calculateConfusionMatrix(yTrue, yPred, proba?.classes);
-                            };
-
                             const renderSplitPerClass = (splitName: string, splitData: EvaluationSplit) => {
-                                const { classes, matrix } = getMatrix(splitData);
+                                const { classes, matrix } = matrixBySplit[splitName] ?? applyThreshold(splitData, selectedRocClass, threshold);
                                 const splitId = `per-class-${splitName}`;
                                 return (
                                     <div className="flex flex-col gap-2">

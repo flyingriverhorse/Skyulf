@@ -49,6 +49,7 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                         onClick={() => downloadChart('clustering-chart', 'clustering-analysis', 'Clustering Segmentation', `${analysis.n_clusters} Clusters Found`)}
                         className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
                         title="Download Chart"
+                        aria-label="Download Chart"
                     >
                         <Download className="w-4 h-4" />
                     </button>
@@ -93,7 +94,10 @@ export const ClusteringTab: React.FC<ClusteringTabProps> = ({ profile, downloadC
                                     </div>
 
                                     <div className="space-y-1">
-                                        {Object.entries(cluster.center).slice(0, 5).map(([col, val]) => (
+                                        {Object.entries(cluster.center)
+                                            .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+                                            .slice(0, 5)
+                                            .map(([col, val]) => (
                                             <div key={col} className="flex justify-between text-xs">
                                                 <span className="text-gray-500 dark:text-gray-400 truncate w-24" title={col}>{col}</span>
                                                 <span className="font-mono text-gray-700 dark:text-gray-200">{val.toFixed(2)}</span>

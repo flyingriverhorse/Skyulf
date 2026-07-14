@@ -13,6 +13,7 @@ from sklearn.preprocessing import LabelEncoder, TargetEncoder
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.core.schema import SkyulfSchema
 from skyulf.preprocessing.encoding.target import (
     TargetEncoderApplier,
     TargetEncoderCalculator,
@@ -274,10 +275,11 @@ def test_polars_apply_no_valid_columns_is_noop() -> None:
     assert list(y_out_pl) == list(y_pl)
 
 
-def test_polars_apply_exception_is_caught_and_returns_input(
+def test_polars_apply_exception_propagates(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform-time exception in the polars apply path is caught, logged, and X/y returned as-is."""
+    """A transform-time exception in the polars apply path propagates (raised), with
+    the dispatcher logging the failure."""
     X_pl = pl.DataFrame({"city": ["a", "b", "a"]})
     y_pl = pl.Series("target", [1, 0, 1])
 
@@ -286,18 +288,17 @@ def test_polars_apply_exception_is_caught_and_returns_input(
             raise ValueError("boom")
 
     params = {"columns": ["city"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level(logging.ERROR):
-        out_pl, y_out_pl = TargetEncoderApplier().apply((X_pl, y_pl), dict(params))
+    with caplog.at_level(logging.ERROR), pytest.raises(ValueError, match="boom"):
+        TargetEncoderApplier().apply((X_pl, y_pl), dict(params))
 
-    assert out_pl.equals(X_pl)
-    assert list(y_out_pl) == list(y_pl)
-    assert any("Target Encoding failed" in rec.message for rec in caplog.records)
+    assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
-def test_pandas_apply_exception_is_caught_and_logged(
+def test_pandas_apply_exception_propagates(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform-time exception in the pandas apply path is caught and logged."""
+    """A transform-time exception in the pandas apply path propagates (raised), with
+    the dispatcher logging the failure."""
     X_pd = pd.DataFrame({"city": ["a", "b", "a"]})
     y_pd = pd.Series([1, 0, 1], name="target")
 
@@ -306,11 +307,10 @@ def test_pandas_apply_exception_is_caught_and_logged(
             raise ValueError("boom")
 
     params = {"columns": ["city"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level(logging.ERROR):
-        out_pd, y_out_pd = TargetEncoderApplier().apply((X_pd, y_pd), dict(params))
+    with caplog.at_level(logging.ERROR), pytest.raises(ValueError, match="boom"):
+        TargetEncoderApplier().apply((X_pd, y_pd), dict(params))
 
-    pd.testing.assert_frame_equal(out_pd, X_pd)
-    assert any("Target Encoding failed" in rec.message for rec in caplog.records)
+    assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 def test_polars_fit_extracts_y_from_target_column() -> None:
@@ -392,6 +392,44 @@ def test_fit_target_encoder_reraises_unrelated_value_error() -> None:
     with pytest.raises(ValueError) as exc_info:
         _fit_target_encoder(X, y, config)
     assert "TargetEncoder failed" not in str(exc_info.value)
+
+
+def test_infer_output_schema_preserves_columns_for_binary_target() -> None:
+    """Binary/regression target encoding replaces values in place — schema unchanged."""
+    input_schema = SkyulfSchema.from_columns(["city", "target"])
+    output_schema = TargetEncoderCalculator().infer_output_schema(
+        input_schema, {"target_type": "binary", "columns": ["city"]}
+    )
+    assert output_schema is input_schema
+
+
+def test_infer_output_schema_returns_none_for_multiclass_target() -> None:
+    """Multiclass target encoding fans out into ``{col}_cls{i}`` columns and drops
+    the originals (see ``_target_apply_polars``/``_target_apply_pandas``), so the
+    output columns are data-dependent (unknown number of classes) and can't be
+    confidently predicted from config alone. Regression test for a bug where this
+    unconditionally returned ``input_schema`` unchanged, misleading downstream
+    schema consumers about the real output columns.
+    """
+    input_schema = SkyulfSchema.from_columns(["city", "target"])
+    output_schema = TargetEncoderCalculator().infer_output_schema(
+        input_schema, {"target_type": "multiclass", "columns": ["city"]}
+    )
+    assert output_schema is None
+
+
+def test_infer_output_schema_returns_none_for_default_auto_target_type() -> None:
+    """The default ``target_type="auto"`` resolves to multiclass at fit time
+    whenever y has more than two classes, so it must also be treated as
+    "unknown" — not confidently binary/regression. Regression test for a gap
+    where only the explicit "multiclass" string was handled, missing the
+    common default config that omits ``target_type`` entirely.
+    """
+    input_schema = SkyulfSchema.from_columns(["city", "target"])
+    output_schema = TargetEncoderCalculator().infer_output_schema(
+        input_schema, {"columns": ["city"]}
+    )
+    assert output_schema is None
 
 
 class TestRealShapedDataset:

@@ -6,7 +6,7 @@ similarity-fallback path (no rapidfuzz), the polynomial features node, and
 several `_common.py` helpers directly.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -79,9 +79,18 @@ def test_safe_divide_handles_nan_denominator() -> None:
     assert result.notna().all()
 
 
+def test_safe_divide_preserves_sign_of_negative_near_zero_denominator() -> None:
+    """A small negative denominator should yield a negative result, not flip sign."""
+    num = pd.Series([1.0])
+    den = pd.Series([-1e-15])
+    result = _safe_divide(num, den, epsilon=1e-9)
+    assert result.iloc[0] < 0
+    assert result.iloc[0] == pytest.approx(-1e9)
+
+
 @pytest.mark.parametrize(*_resolve_output_col_cases)
 def test_resolve_output_col(
-    op: Dict[str, Any], index: int, existing: list, allow_overwrite: bool, expected: str
+    op: dict[str, Any], index: int, existing: list, allow_overwrite: bool, expected: str
 ) -> None:
     """``_resolve_output_col`` picks explicit/default/prefixed names and dedupes collisions."""
     assert _resolve_output_col(op, index, existing, allow_overwrite=allow_overwrite) == expected
@@ -160,8 +169,11 @@ def test_pandas_datetime_apply_skips_unknown_feature() -> None:
 
 def test_pandas_datetime_apply_swallows_exception_on_bad_column(
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A conversion error inside the datetime block must be swallowed (lines 162-163)."""
+    import logging
+
     import skyulf.preprocessing.feature_generation._pandas_ops as pandas_ops_mod
 
     def _boom(*args: Any, **kwargs: Any) -> Any:
@@ -171,8 +183,36 @@ def test_pandas_datetime_apply_swallows_exception_on_bad_column(
     df = pd.DataFrame({"d": ["2024-01-01", "2024-06-15"]})
     op = {"input_columns": ["d"], "datetime_features": ["year"]}
     # Should not raise despite to_datetime blowing up internally.
-    pandas_ops_mod._pandas_datetime_apply(op, df)
+    with caplog.at_level(logging.WARNING):
+        pandas_ops_mod._pandas_datetime_apply(op, df)
     assert "d_year" not in df.columns
+    assert any("simulated to_datetime failure" in rec.message for rec in caplog.records)
+
+
+def test_featgen_apply_pandas_logs_warning_on_malformed_op(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A malformed operation (invalid round_digits) is skipped but must emit a warning log."""
+    import logging
+
+    from skyulf.preprocessing.feature_generation._pandas_ops import _featgen_apply_pandas
+
+    df = pd.DataFrame({"a": [1.0, 2.0], "b": [3.0, 4.0]})
+    params = {
+        "operations": [
+            {
+                "operation_type": "arithmetic",
+                "method": "add",
+                "input_columns": ["a", "b"],
+                "round_digits": "not-an-int",
+            }
+        ]
+    }
+    with caplog.at_level(logging.WARNING):
+        out, _ = _featgen_apply_pandas(df, None, params)
+    # The malformed op is skipped; original columns remain untouched.
+    assert list(out.columns) == ["a", "b"]
+    assert any("Failed to apply arithmetic operation" in rec.message for rec in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -437,7 +477,7 @@ def test_arithmetic_divide_by_only_constants() -> None:
 
 @pytest.mark.parametrize(*_noop_skip_cases)
 def test_feature_generation_noop_skips(
-    engine: str, data: Dict[str, list], operation: Dict[str, Any], expected_columns: list
+    engine: str, data: dict[str, list], operation: dict[str, Any], expected_columns: list
 ) -> None:
     """Unresolvable/unknown/malformed ops must be skipped silently (no-op), on both engines.
 

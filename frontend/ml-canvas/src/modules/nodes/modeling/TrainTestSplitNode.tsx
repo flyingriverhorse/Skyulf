@@ -3,6 +3,8 @@ import { NodeDefinition } from '../../../core/types/nodes';
 import { Split } from 'lucide-react';
 import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
+import { parseIntSafe } from '../../../core/utils/numberInput';
+import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface TrainTestSplitConfig {
   test_size: number;
@@ -56,27 +58,15 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
   const valSize = config.validation_size || 0;
   const trainSize = 1 - config.test_size - valSize;
 
-  // Responsive Layout Logic
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [isWide, setIsWide] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setIsWide(entry.contentRect.width > 450); // Switch to 2-column layout if wider than 450px
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => { observer.disconnect(); };
-  }, []);
+  // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
+  const [containerRef, isWide] = useIsWideContainer();
 
   return (
     <div ref={containerRef} className={`flex flex-col h-full w-full bg-background ${isWide ? 'overflow-hidden' : 'overflow-y-auto'}`}>
       {/* Top Status Bar (Always Visible) */}
       <div className="shrink-0 p-4 pb-0 space-y-2">
         {!upstreamDatasetId && !config.datasetId && (
-          <div className="p-2 bg-yellow-50 text-yellow-800 text-xs rounded border border-yellow-200">
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 text-xs rounded border border-yellow-200 dark:border-yellow-800">
             Connect a dataset node to see available columns.
           </div>
         )}
@@ -133,7 +123,7 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
               type="number"
               className="w-full p-2 border rounded bg-background text-sm"
               value={config.random_state}
-              onChange={(e) => onChange({ ...config, random_state: parseInt(e.target.value) })}
+              onChange={(e) => onChange({ ...config, random_state: parseIntSafe(e.target.value, config.random_state) })}
             />
           </div>
         </div>

@@ -17,7 +17,7 @@ from backend.config.environments import (
 )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """
     Get application settings based on ``FASTAPI_ENV``.

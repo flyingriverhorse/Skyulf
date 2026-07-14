@@ -7,7 +7,7 @@ sidesteps the partial-update problem.
 """
 
 import logging
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import orjson
 from pydantic import BaseModel
@@ -28,9 +28,9 @@ class JobEvent(BaseModel):
 
     event: JobEventType
     job_id: str
-    status: Optional[str] = None
-    progress: Optional[int] = None
-    current_step: Optional[str] = None
+    status: str | None = None
+    progress: int | None = None
+    current_step: str | None = None
 
 
 def _redis_client_sync() -> Any:

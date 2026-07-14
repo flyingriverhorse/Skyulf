@@ -6,7 +6,8 @@ Provides request/response logging for monitoring and debugging.
 
 import logging
 import time
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware

@@ -5,7 +5,7 @@ import pytest
 from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
-from backend.ml_pipeline.api import RegistryItem, _build_node_registry
+from backend.ml_pipeline.api import _build_node_registry
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 # Get all node IDs to ensure we cover them
@@ -60,7 +60,7 @@ async def test_all_transformers(sample_data, tmp_path):
     except ImportError:
         has_h3 = False
 
-    transformers = [nid for nid in ALL_NODES.keys() if nid not in excluded]
+    transformers = [nid for nid in ALL_NODES if nid not in excluded]
     if not has_h3:
         transformers = [nid for nid in transformers if nid != "H3Index"]
 

@@ -1,6 +1,7 @@
 """Cross-validation logic for V2 modeling."""
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
@@ -25,8 +26,8 @@ from ._evaluation.metrics import (
 
 
 def _aggregate_metrics(
-    fold_metrics: List[Dict[str, float]],
-) -> Dict[str, Dict[str, float]]:
+    fold_metrics: list[dict[str, float]],
+) -> dict[str, dict[str, float]]:
     """Aggregates metrics across folds (mean and std)."""
     if not fold_metrics:
         return {}
@@ -53,17 +54,17 @@ def _aggregate_metrics(
 def perform_cross_validation(
     calculator: "BaseModelCalculator",
     applier: "BaseModelApplier",
-    X: Union[pd.DataFrame, SkyulfDataFrame],
-    y: Union[pd.Series, Any],
-    config: Dict[str, Any],
+    X: pd.DataFrame | SkyulfDataFrame,
+    y: pd.Series | Any,
+    config: dict[str, Any],
     n_folds: int = 5,
     cv_type: str = "k_fold",  # k_fold, stratified_k_fold, time_series_split, shuffle_split, nested_cv
     shuffle: bool = True,
     random_state: int = 42,
-    time_column: Optional[str] = None,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
-    log_callback: Optional[Callable[[str], None]] = None,
-) -> Dict[str, Any]:
+    time_column: str | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
     """
     Performs K-Fold cross-validation.
 
@@ -188,7 +189,7 @@ def perform_cross_validation(
         )
 
     # 3. Aggregate
-    fold_metrics = [cast(Dict[str, float], r["metrics"]) for r in fold_results]
+    fold_metrics = [cast(dict[str, float], r["metrics"]) for r in fold_results]
     aggregated = _aggregate_metrics(fold_metrics)
 
     if log_callback:
@@ -209,8 +210,8 @@ def perform_cross_validation(
 def _sort_by_time(
     X: pd.DataFrame,
     y: Any,
-    time_column: Optional[str],
-    log_callback: Optional[Callable[[str], None]],
+    time_column: str | None,
+    log_callback: Callable[[str], None] | None,
     logger: Any,
 ) -> tuple:
     """Sort X and y by a time column for Time Series Split.
@@ -234,10 +235,7 @@ def _sort_by_time(
     if sort_col and sort_col in X.columns:
         sort_order = X[sort_col].argsort()
         X = X.iloc[sort_order].reset_index(drop=True)
-        if hasattr(y, "iloc"):
-            y = y.iloc[sort_order].reset_index(drop=True)
-        else:
-            y = y[sort_order]
+        y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
         msg = f"Time Series CV: data sorted by '{sort_col}'."
         if log_callback:
             log_callback(msg)
@@ -266,6 +264,10 @@ def _build_splitter(
     random_state: int = 42,
 ) -> Any:
     """Build a sklearn CV splitter from cv_type string."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+
     if cv_type == "time_series_split":
         return TimeSeriesSplit(n_splits=n_folds)
     elif cv_type == "shuffle_split":
@@ -277,6 +279,14 @@ def _build_splitter(
             random_state=random_state if shuffle else None,
         )
     else:
+        if cv_type == "stratified_k_fold":
+            logger.warning(
+                "stratified_k_fold requested for problem_type='%s' (not classification); "
+                "falling back to plain KFold.",
+                problem_type,
+            )
+        elif cv_type not in ("k_fold", "time_series_split", "shuffle_split", "stratified_k_fold"):
+            logger.warning("Unknown cv_type '%s'; falling back to plain KFold.", cv_type)
         return KFold(
             n_splits=n_folds,
             shuffle=shuffle,
@@ -287,15 +297,15 @@ def _build_splitter(
 def _perform_nested_cv(
     calculator: "BaseModelCalculator",
     applier: "BaseModelApplier",
-    X: Union[pd.DataFrame, SkyulfDataFrame],
-    y: Union[pd.Series, Any],
-    config: Dict[str, Any],
+    X: pd.DataFrame | SkyulfDataFrame,
+    y: pd.Series | Any,
+    config: dict[str, Any],
     n_folds: int = 5,
     shuffle: bool = True,
     random_state: int = 42,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
-    log_callback: Optional[Callable[[str], None]] = None,
-) -> Dict[str, Any]:
+    progress_callback: Callable[[int, int], None] | None = None,
+    log_callback: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
     """
     Performs nested cross-validation with an outer loop for evaluation
     and an inner loop for hyperparameter selection per fold.
@@ -329,7 +339,7 @@ def _perform_nested_cv(
 
     X_arr, y_arr = SklearnBridge.to_sklearn((X, y))
 
-    fold_results: List[Dict[str, Any]] = []
+    fold_results: list[dict[str, Any]] = []
 
     for fold_idx, (train_idx, val_idx) in enumerate(outer_splitter.split(X_arr, y_arr)):
         if progress_callback:
@@ -375,7 +385,7 @@ def _perform_nested_cv(
 
         # Inner CV: train on inner folds, collect inner scores for diagnostics
         X_train_arr, y_train_arr = SklearnBridge.to_sklearn((X_train_fold, y_train_fold))
-        inner_scores: List[float] = []
+        inner_scores: list[float] = []
         for inner_train_idx, inner_val_idx in inner_splitter.split(X_train_arr, y_train_arr):
             if hasattr(X_train_fold, "iloc"):
                 X_inner_train = X_train_fold.iloc[inner_train_idx]
@@ -434,7 +444,7 @@ def _perform_nested_cv(
         )
 
     # Aggregate outer fold metrics
-    fold_metrics = [cast(Dict[str, float], r["metrics"]) for r in fold_results]
+    fold_metrics = [cast(dict[str, float], r["metrics"]) for r in fold_results]
     aggregated = _aggregate_metrics(fold_metrics)
 
     if log_callback:

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Plot } from '../../core/plotly';
 
 /** A single point for the 3-D scatter; values are looked up by `xKey/yKey/zKey/labelKey`. */
@@ -29,55 +29,63 @@ export const ThreeDScatterPlot: React.FC<ThreeDScatterPlotProps> = ({
 }) => {
 
   // Plotly trace shapes are wide unions; we keep them loose intentionally.
-  const traces: any[] = [];
+  const traces: any[] = useMemo(() => {
+    const result: any[] = [];
 
-  if (labelKey) {
-    // Group by label
-    const groups: { [key: string]: ScatterPoint[] } = {};
-    data.forEach((d) => {
-      const label = String(d[labelKey] ?? 'Other');
-      if (!groups[label]) groups[label] = [];
-      groups[label]!.push(d);
-    });
+    if (labelKey) {
+      // Group by label
+      const groups: { [key: string]: ScatterPoint[] } = {};
+      data.forEach((d) => {
+        const label = String(d[labelKey] ?? 'Other');
+        if (!groups[label]) groups[label] = [];
+        groups[label]!.push(d);
+      });
 
-    Object.keys(groups).forEach((label) => {
-      const groupData = groups[label] ?? [];
-      traces.push({
-        x: groupData.map((d) => d[xKey]),
-        y: groupData.map((d) => d[yKey]),
-        z: groupData.map((d) => d[zKey]),
+      Object.keys(groups).forEach((label) => {
+        const groupData = groups[label] ?? [];
+        result.push({
+          x: groupData.map((d) => d[xKey]),
+          y: groupData.map((d) => d[yKey]),
+          z: groupData.map((d) => d[zKey]),
+          mode: 'markers',
+          type: 'scatter3d',
+          name: label,
+          marker: {
+            size: 3,
+            opacity: 0.8
+          },
+          hovertemplate:
+              `<b>${label}</b><br>` +
+              `${xLabel || xKey}: %{x}<br>` +
+              `${yLabel || yKey}: %{y}<br>` +
+              `${zLabel || zKey}: %{z}<extra></extra>`
+        });
+      });
+    } else {
+      result.push({
+        x: data.map((d) => d[xKey]),
+        y: data.map((d) => d[yKey]),
+        z: data.map((d) => d[zKey]),
         mode: 'markers',
         type: 'scatter3d',
-        name: label,
+        name: 'Data Points',
         marker: {
           size: 3,
+          color: '#8884d8',
           opacity: 0.8
         },
         hovertemplate:
-            `<b>${label}</b><br>` +
-            `${xLabel || xKey}: %{x}<br>` +
-            `${yLabel || yKey}: %{y}<br>` +
-            `${zLabel || zKey}: %{z}<extra></extra>`
+          `${xLabel || xKey}: %{x}<br>` +
+          `${yLabel || yKey}: %{y}<br>` +
+          `${zLabel || zKey}: %{z}<extra></extra>`
       });
-    });
-  } else {
-    traces.push({
-      x: data.map((d) => d[xKey]),
-      y: data.map((d) => d[yKey]),
-      z: data.map((d) => d[zKey]),
-      mode: 'markers',
-      type: 'scatter3d',
-      name: 'Data Points',
-      marker: {
-        size: 3,
-        color: '#8884d8',
-        opacity: 0.8
-      },
-      hovertemplate:
-        `${xLabel || xKey}: %{x}<br>` +
-        `${yLabel || yKey}: %{y}<br>` +
-        `${zLabel || zKey}: %{z}<extra></extra>`
-    });
+    }
+
+    return result;
+  }, [data, xKey, yKey, zKey, labelKey, xLabel, yLabel, zLabel]);
+
+  if (data.length === 0) {
+    return <div className="text-gray-500 text-sm italic p-4 text-center">No data points to display</div>;
   }
 
   return (

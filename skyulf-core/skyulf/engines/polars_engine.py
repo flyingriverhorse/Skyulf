@@ -1,4 +1,5 @@
-from typing import Any, List, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -25,13 +26,13 @@ class SkyulfPolarsWrapper:
         return self._df.columns
 
     @property
-    def shape(self) -> Tuple[int, int]:
+    def shape(self) -> tuple[int, int]:
         return self._df.shape
 
-    def select(self, columns: List[str]) -> "SkyulfDataFrame":
+    def select(self, columns: list[str]) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.select(columns))
 
-    def drop(self, columns: List[str]) -> "SkyulfDataFrame":
+    def drop(self, columns: list[str]) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.drop(columns))
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
@@ -54,7 +55,22 @@ class SkyulfPolarsWrapper:
         return self._df[key]
 
     def __setitem__(self, key, value):
-        self._df[key] = value
+        # polars.DataFrame supports scalar cell assignment via a (row, col)
+        # index tuple (e.g. ``df[0, "a"] = 99``), which mutates in place and
+        # works fine. It does NOT support pandas-style whole-column
+        # assignment (e.g. ``df["a"] = series``) — that raises a TypeError
+        # from polars internals. Delegate the supported case, and raise a
+        # clear, actionable error for the unsupported one instead of letting
+        # a confusing polars TypeError bubble up.
+        if isinstance(key, tuple):
+            self._df[key] = value
+            return
+        raise NotImplementedError(
+            "SkyulfPolarsWrapper does not support whole-column assignment "
+            "(polars.DataFrame has no pandas-style `df[col] = values`). "
+            "Use `with_column(name, values)` instead, which returns a new "
+            "wrapper with the column set/replaced."
+        )
 
     def __len__(self) -> int:
         return self._df.height

@@ -4,7 +4,7 @@ import hashlib
 import json
 import logging
 import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
-from typing import Any, Dict, Optional, Union, cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -58,7 +58,7 @@ class SkyulfPipeline:
     2. Modeling (Training/Inference)
     """
 
-    def __init__(self, config: Union[PipelineConfig, Dict[str, Any]]):
+    def __init__(self, config: PipelineConfig | dict[str, Any]):
         """
         Initialize the pipeline.
 
@@ -71,8 +71,8 @@ class SkyulfPipeline:
         self.modeling_config = config.get("modeling", {})
 
         self.feature_engineer = FeatureEngineer(self.preprocessing_steps)
-        self.model_estimator: Optional[StatefulEstimator] = None
-        self._fit_metrics: Optional[Dict[str, Any]] = None
+        self.model_estimator: StatefulEstimator | None = None
+        self._fit_metrics: dict[str, Any] | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -86,16 +86,21 @@ class SkyulfPipeline:
 
         node_id = self.modeling_config.get("node_id", "model_node")
 
-        calculator: Optional[BaseModelCalculator] = None
-        applier: Optional[BaseModelApplier] = None
+        calculator: BaseModelCalculator | None = None
+        applier: BaseModelApplier | None = None
 
         # Try Registry first
         if model_type:
             try:
                 calculator = NodeRegistry.get_calculator(model_type)()
                 applier = NodeRegistry.get_applier(model_type)()
-            except ValueError:
-                pass
+            except ValueError as e:
+                logger.debug(
+                    "Model type '%s' not found in NodeRegistry (%s); "
+                    "falling back to hardcoded type map.",
+                    model_type,
+                    e,
+                )
 
         if calculator is None:
             # Map model types to classes
@@ -116,16 +121,21 @@ class SkyulfPipeline:
                 base_model_config = self.modeling_config.get("base_model", {})
                 base_model_type = base_model_config.get("type")
 
-                base_calc: Optional[BaseModelCalculator] = None
-                base_applier: Optional[BaseModelApplier] = None
+                base_calc: BaseModelCalculator | None = None
+                base_applier: BaseModelApplier | None = None
 
                 # Try Registry for base model
                 if base_model_type:
                     try:
                         base_calc = NodeRegistry.get_calculator(base_model_type)()
                         base_applier = NodeRegistry.get_applier(base_model_type)()
-                    except ValueError:
-                        pass
+                    except ValueError as e:
+                        logger.debug(
+                            "Base model type '%s' not found in NodeRegistry (%s); "
+                            "falling back to hardcoded type map.",
+                            base_model_type,
+                            e,
+                        )
 
                 if base_calc is None:
                     if base_model_type == "logistic_regression":
@@ -155,8 +165,8 @@ class SkyulfPipeline:
         )
 
     def fit(
-        self, data: Union[pd.DataFrame, SkyulfDataFrame, SplitDataset], target_column: str
-    ) -> Dict[str, Any]:
+        self, data: pd.DataFrame | SkyulfDataFrame | SplitDataset, target_column: str
+    ) -> dict[str, Any]:
         """
         Fit the pipeline.
 
@@ -195,7 +205,7 @@ class SkyulfPipeline:
             _ = self.model_estimator.fit_predict(
                 dataset=dataset,
                 target_column=target_column,
-                config=cast(Dict[str, Any], self.modeling_config),
+                config=cast(dict[str, Any], self.modeling_config),
             )
 
             # Evaluate
@@ -212,7 +222,7 @@ class SkyulfPipeline:
         self._fit_metrics = metrics
         return metrics
 
-    def predict(self, data: Union[pd.DataFrame, SkyulfDataFrame]) -> Any:
+    def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
         """
         Generate predictions.
 
@@ -320,14 +330,14 @@ class SkyulfPipeline:
 
         return hasher.hexdigest()
 
-    def export_model_card(self) -> Dict[str, Any]:
+    def export_model_card(self) -> dict[str, Any]:
         """Return a structured, JSON-friendly summary of the pipeline.
 
         Captures lineage (preprocessing chain), the model and its hyperparameters,
         the reproducibility fingerprint, and the metrics from the last :meth:`fit`
         (``None`` if never fitted). Intended for audit logs and model registries.
         """
-        model: Optional[Dict[str, Any]] = None
+        model: dict[str, Any] | None = None
         if self.modeling_config:
             model = {
                 "type": self.modeling_config.get("type"),

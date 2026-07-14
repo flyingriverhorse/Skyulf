@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from typing import cast as t_cast
 from typing import cast as type_cast
 
@@ -27,9 +27,9 @@ class BasicTrainingManager:
         pipeline_id: str,
         node_id: str,
         dataset_id: str = "unknown",
-        user_id: Optional[int] = None,
+        user_id: int | None = None,
         model_type: str = "unknown",
-        graph: Optional[Dict[str, Any]] = None,
+        graph: dict[str, Any] | None = None,
         is_preview: bool = False,
         branch_index: int = 0,
     ) -> str:
@@ -57,7 +57,7 @@ class BasicTrainingManager:
             model_type=model_type_val,
             graph=graph,
             job_metadata={"branch_index": branch_index},
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
         )
 
         session.add(job)
@@ -65,13 +65,13 @@ class BasicTrainingManager:
         return job_id
 
     @staticmethod
-    def map_training_job_to_info(job: BasicTrainingJob, dataset_name: Optional[str]) -> JobInfo:
+    def map_training_job_to_info(job: BasicTrainingJob, dataset_name: str | None) -> JobInfo:
         # Extract details from graph
         (
             hyperparameters,
             target_column,
             dropped_columns,
-        ) = extract_job_details(type_cast(Dict[str, Any], job.graph), job.node_id)
+        ) = extract_job_details(type_cast(dict[str, Any], job.graph), job.node_id)
 
         # Also check job metrics for runtime dropped columns (e.g. from Feature Selection)
         if job.metrics and isinstance(job.metrics, dict) and "dropped_columns" in job.metrics:
@@ -84,13 +84,13 @@ class BasicTrainingManager:
 
         # Fallback for hyperparameters if not found in graph (though extract_job_details should find it)
         if not hyperparameters:
-            hyperparameters = type_cast(Optional[Dict[str, Any]], job.hyperparameters)
+            hyperparameters = type_cast(dict[str, Any] | None, job.hyperparameters)
 
         return JobInfo(
             job_id=job.id,
             pipeline_id=job.pipeline_id,
             node_id=job.node_id,
-            dataset_id=t_cast(Optional[str], job.dataset_source_id),
+            dataset_id=t_cast(str | None, job.dataset_source_id),
             dataset_name=dataset_name,
             job_type=StepType.BASIC_TRAINING.value,
             status=JobStatus(job.status),
@@ -99,14 +99,14 @@ class BasicTrainingManager:
             error=job.error_message,
             result={"metrics": job.metrics},
             model_type=job.model_type,
-            hyperparameters=t_cast(Dict[str, Any], hyperparameters),
+            hyperparameters=t_cast(dict[str, Any], hyperparameters),
             created_at=t_cast(datetime, job.created_at),
-            metrics=t_cast(Optional[Dict[str, Any]], job.metrics),
-            version=t_cast(Optional[int], job.version),
+            metrics=t_cast(dict[str, Any] | None, job.metrics),
+            version=t_cast(int | None, job.version),
             target_column=target_column,
             dropped_columns=dropped_columns,
-            logs=t_cast(Optional[List[str]], job.logs),
-            graph=type_cast(Dict[str, Any], job.graph),
+            logs=t_cast(list[str] | None, job.logs),
+            graph=type_cast(dict[str, Any], job.graph),
             promoted_at=job.promoted_at,
             parent_pipeline_id=parse_branch_info(job.pipeline_id)[0],
             branch_index=parse_branch_info(job.pipeline_id)[1],
@@ -131,7 +131,7 @@ class BasicTrainingManager:
         if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
             job.status = JobStatus.CANCELLED.value
             job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
             # Revoke the Celery task if we recorded its id at submission time.
             meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
             task_id = meta.get("celery_task_id")
@@ -150,7 +150,7 @@ class BasicTrainingManager:
         return False
 
     @staticmethod
-    def _update_training_result(job: BasicTrainingJob, result: Dict[str, Any]):
+    def _update_training_result(job: BasicTrainingJob, result: dict[str, Any]):
         if "metrics" in result:
             job.metrics = result["metrics"]
         if "artifact_uri" in result:
@@ -162,10 +162,10 @@ class BasicTrainingManager:
     def update_status_sync(
         session: Session,
         job_id: str,
-        status: Optional[JobStatus] = None,
-        error: Optional[str] = None,
-        result: Optional[Dict[str, Any]] = None,
-        logs: Optional[List[str]] = None,
+        status: JobStatus | None = None,
+        error: str | None = None,
+        result: dict[str, Any] | None = None,
+        logs: list[str] | None = None,
     ) -> bool:
         """Updates training job status (Sync). Returns True if job found and updated."""
         job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
@@ -179,7 +179,7 @@ class BasicTrainingManager:
         # preserved for debugging.
         if job.status == JobStatus.CANCELLED.value:
             if logs:
-                current_logs: List[str] = job.logs or []
+                current_logs: list[str] = job.logs or []
                 job.logs = current_logs + logs
                 session.commit()
             return True
@@ -190,7 +190,7 @@ class BasicTrainingManager:
             job.error_message = error
 
         if logs:
-            current_logs: List[str] = job.logs or []
+            current_logs: list[str] = job.logs or []
             job.logs = current_logs + logs
 
         if result:
@@ -201,13 +201,13 @@ class BasicTrainingManager:
             JobStatus.FAILED,
             JobStatus.SUCCEEDED,
         ]:
-            job.finished_at = datetime.now(timezone.utc)
+            job.finished_at = datetime.now(UTC)
 
         session.commit()
         return True
 
     @staticmethod
-    async def get_training_job(session: AsyncSession, job_id: str) -> Optional[JobInfo]:
+    async def get_training_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves a training job by ID."""
         # 1. Fetch Job
         stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
@@ -227,7 +227,7 @@ class BasicTrainingManager:
         session: AsyncSession,
         limit: int = 50,
         skip: int = 0,
-    ) -> List[JobInfo]:
+    ) -> list[JobInfo]:
         """Lists recent training jobs (Async)."""
         # 1. Fetch all DataSources for robust name resolution
         ds_map = await get_dataset_map(session)

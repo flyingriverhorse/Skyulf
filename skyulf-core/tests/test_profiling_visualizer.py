@@ -7,7 +7,7 @@ tree, PCA, clustering, alerts) instead of hand-built stub objects.
 """
 
 import builtins
-from typing import Mapping, Optional, Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 import polars as pl
@@ -18,16 +18,13 @@ matplotlib.use("Agg")  # Headless backend so plt.show() never blocks the test ru
 
 from skyulf.profiling.analyzer import EDAAnalyzer
 from skyulf.profiling.schemas import (
-    BoxPlotStats,
     CategoricalStats,
-    CategoryBoxPlot,
     ClusteringAnalysis,
     ClusteringPoint,
     ClusterStats,
     ColumnProfile,
     CorrelationMatrix,
     DatasetProfile,
-    GeoPoint,
     GeospatialStats,
     OutlierAnalysis,
     OutlierPoint,
@@ -164,9 +161,9 @@ def test_summary_prints_message_when_rich_missing(
 
     def fake_import(
         name: str,
-        globals: Optional[Mapping[str, object]] = None,
-        locals: Optional[Mapping[str, object]] = None,
-        fromlist: Optional[Sequence[str]] = (),
+        globals: Mapping[str, object] | None = None,
+        locals: Mapping[str, object] | None = None,
+        fromlist: Sequence[str] | None = (),
         level: int = 0,
     ) -> object:
         if name.startswith("rich"):
@@ -389,9 +386,9 @@ def test_plot_prints_message_when_matplotlib_missing(
 
     def fake_import(
         name: str,
-        globals: Optional[Mapping[str, object]] = None,
-        locals: Optional[Mapping[str, object]] = None,
-        fromlist: Optional[Sequence[str]] = (),
+        globals: Mapping[str, object] | None = None,
+        locals: Mapping[str, object] | None = None,
+        fromlist: Sequence[str] | None = (),
         level: int = 0,
     ) -> object:
         if name.startswith("matplotlib"):
@@ -478,9 +475,9 @@ def test_plot_scatter_matrix_returns_early_when_pandas_plotting_missing(
 
     def fake_import(
         name: str,
-        globals: Optional[Mapping[str, object]] = None,
-        locals: Optional[Mapping[str, object]] = None,
-        fromlist: Optional[Sequence[str]] = (),
+        globals: Mapping[str, object] | None = None,
+        locals: Mapping[str, object] | None = None,
+        fromlist: Sequence[str] | None = (),
         level: int = 0,
     ) -> object:
         if name == "pandas.plotting":
