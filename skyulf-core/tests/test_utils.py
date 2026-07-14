@@ -144,6 +144,27 @@ def test_pack_not_tuple_with_y_concatenates(capsys: pytest.CaptureFixture) -> No
     assert list(result["x"]) == [1, 2]
 
 
+def test_pack_raises_on_row_count_mismatch() -> None:
+    """Regression test: X and y with different row counts must raise instead
+    of silently NaN-padding/duplicating rows via a naive axis=1 concat."""
+    X = pd.DataFrame({"x": [1, 2, 3]})
+    y = pd.Series([10, 20], name="target")
+    with pytest.raises(ValueError, match="different row counts"):
+        pack_pipeline_output(X, y, False)
+
+
+def test_pack_realigns_mismatched_but_same_length_indices() -> None:
+    """Regression test: same row count but non-matching pandas indices (e.g. a
+    row-dropping step that reset X's index without resetting y's) must still
+    concatenate positionally rather than NaN-padding via index-based concat."""
+    X = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])
+    y = pd.Series([100, 200, 300], name="target", index=[0, 1, 2])
+    result = pack_pipeline_output(X, y, False)
+    assert isinstance(result, pd.DataFrame)
+    assert not result["target"].isna().any()
+    assert list(result["target"]) == [100, 200, 300]
+
+
 def test_pack_was_tuple_y_none_warns(caplog: pytest.LogCaptureFixture) -> None:
     """was_tuple=True but y=None must log a warning and return X."""
     import logging
