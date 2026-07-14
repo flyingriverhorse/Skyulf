@@ -2,7 +2,7 @@ import pytest
 from sqlalchemy import delete
 
 from backend.database import engine
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob
+from backend.database.models import AdvancedTuningJob, BasicTrainingJob, ModelVersionCounter
 from backend.ml_pipeline._execution.jobs import JobManager
 from backend.ml_pipeline.constants import StepType
 
@@ -24,6 +24,15 @@ async def test_unified_versioning():
         )
         await session.execute(
             delete(AdvancedTuningJob).where(AdvancedTuningJob.pipeline_id == pipeline_id)
+        )
+        # The version counter now lives in its own table (fixes the
+        # get_next_version race condition) - it must be reset too, since it's
+        # no longer derived purely from the job rows deleted above.
+        await session.execute(
+            delete(ModelVersionCounter).where(
+                ModelVersionCounter.dataset_source_id == dataset_id,
+                ModelVersionCounter.model_type == model_type,
+            )
         )
         await session.commit()
 
