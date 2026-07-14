@@ -1,6 +1,5 @@
 """Ordinal Encoder node (Calculator + Applier)."""
 
-import logging
 from collections.abc import Mapping
 from typing import Any, cast
 
@@ -17,8 +16,6 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
 from ._common import _parse_categories_order, detect_categorical_columns
-
-logger = logging.getLogger(__name__)
 
 
 # -----------------------------------------------------------------------------
@@ -38,57 +35,42 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
 def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     import polars as pl
 
-    try:
-        X_subset = X.select(valid_cols).select([pl.col(c).cast(pl.Utf8) for c in valid_cols])
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        encoded = encoder.transform(X_np)
-        new_cols_pl = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
-        return X.with_columns(new_cols_pl)
-    except Exception as e:
-        logger.error(f"Ordinal Encoding failed: {e}")
-        return X
+    X_subset = X.select(valid_cols).select([pl.col(c).cast(pl.Utf8) for c in valid_cols])
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    encoded = encoder.transform(X_np)
+    new_cols_pl = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
+    return X.with_columns(new_cols_pl)
 
 
 def _apply_features_pandas(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     X_out = X.copy()
-    try:
-        X_subset = X_out[valid_cols].astype(str)
-        X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
-        X_out[valid_cols] = encoder.transform(X_input)
-    except Exception as e:
-        logger.error(f"Ordinal Encoding failed: {e}")
+    X_subset = X_out[valid_cols].astype(str)
+    X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
+    X_out[valid_cols] = encoder.transform(X_input)
     return X_out
 
 
 def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
     import polars as pl
 
-    try:
-        y_arr = y.to_numpy().astype(str).reshape(-1, 1)
-        encoded = enc.transform(y_arr).flatten()
-        y_name = y.name if hasattr(y, "name") else "target"
-        return pl.Series(y_name, encoded.astype(np.float32))
-    except Exception as e:
-        logger.error(f"Ordinal Encoding target failed: {e}")
-        return y
+    y_arr = y.to_numpy().astype(str).reshape(-1, 1)
+    encoded = enc.transform(y_arr).flatten()
+    y_name = y.name if hasattr(y, "name") else "target"
+    return pl.Series(y_name, encoded.astype(np.float32))
 
 
 def _apply_target_pandas(y: Any, enc: OrdinalEncoder) -> Any:
-    try:
-        y_arr = (
-            y.to_numpy().astype(str).reshape(-1, 1)
-            if hasattr(y, "to_numpy")
-            else np.array(y).astype(str).reshape(-1, 1)
-        )
-        encoded = enc.transform(y_arr).flatten()
-        return pd.Series(
-            encoded,
-            index=y.index if hasattr(y, "index") else None,
-            name=y.name if hasattr(y, "name") else None,
-        )
-    except Exception as e:
-        logger.error(f"Ordinal Encoding target failed: {e}")
-        return y
+    y_arr = (
+        y.to_numpy().astype(str).reshape(-1, 1)
+        if hasattr(y, "to_numpy")
+        else np.array(y).astype(str).reshape(-1, 1)
+    )
+    encoded = enc.transform(y_arr).flatten()
+    return pd.Series(
+        encoded,
+        index=y.index if hasattr(y, "index") else None,
+        name=y.name if hasattr(y, "name") else None,
+    )
 
 
 def _ordinal_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:

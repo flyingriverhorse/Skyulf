@@ -11,7 +11,7 @@ from .._artifacts import DateFeaturesArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import DATE_FEATURE_ACCESSORS, resolve_columns
+from ._common import DATE_FEATURE_ACCESSORS, filter_existing_columns
 
 # Default calendar parts when the user does not specify any.
 DEFAULT_FEATURES: list[str] = ["year", "month", "day", "dayofweek"]
@@ -137,7 +137,7 @@ class DateFeaturesCalculator(BaseCalculator):
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
         # Calendar parts are integers; shape derivable from config alone.
-        cols = resolve_columns(config.get("columns", []), input_schema.column_list())
+        cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         features = _resolve_features(config)
         schema = input_schema
         for col in cols:

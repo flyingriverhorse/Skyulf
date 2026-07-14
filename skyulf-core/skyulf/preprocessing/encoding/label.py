@@ -151,7 +151,14 @@ def _maybe_pull_y_pandas(X: Any, y: Any, target_col: str | None) -> Any:
 def _maybe_fit_target(
     y: Any, cols: list[str] | None, encoders: dict[str, Any], counts: dict[str, int]
 ) -> None:
-    """Fit a LabelEncoder on ``y`` when columns is empty OR y's name is in cols."""
+    """Fit a LabelEncoder on ``y`` when columns is empty OR y's name is in cols.
+
+    Note: unlike its sibling encoders (Ordinal/OneHot/Target/Hash/Dummy), LabelEncoder
+    deliberately does NOT auto-detect feature columns when ``columns`` is empty/missing.
+    This mirrors sklearn's own convention: ``LabelEncoder`` is a 1-D label/target
+    transformer, while ``OrdinalEncoder`` is the intended tool for encoding multiple
+    feature columns. See ``_warn_if_no_encoders_fit`` for the no-op edge case this implies.
+    """
     if y is None:
         return
     if cols:
@@ -175,6 +182,24 @@ def _fit_feature_encoders(
         encoders[col] = le
         counts[col] = len(le.classes_)
     return encoders, counts
+
+
+def _warn_if_no_encoders_fit(encoders: dict[str, Any], cols: list[str] | None, y: Any) -> None:
+    """Warn when fit produces zero encoders (silent no-op edge case).
+
+    This happens when no feature ``columns`` are configured and no target ``y`` is
+    available to fall back to -- the node would otherwise do nothing without any
+    feedback to the user.
+    """
+    if encoders:
+        return
+    logger.warning(
+        "LabelEncoder.fit produced no encoders: no feature 'columns' were configured "
+        "(cols=%r) and no target 'y' was available to encode. This node will be a "
+        "no-op. To encode feature columns, configure 'columns' explicitly or use "
+        "OrdinalEncoder instead.",
+        cols,
+    )
 
 
 def _build_label_artifact(
@@ -203,6 +228,7 @@ def _label_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
         encoders, counts = _fit_feature_encoders(valid, lambda c: _polars_col_to_str_array(X, c))
 
     _maybe_fit_target(y, cols, encoders, counts)
+    _warn_if_no_encoders_fit(encoders, cols, y)
     return _build_label_artifact(encoders, cols, counts, config)
 
 
@@ -217,6 +243,7 @@ def _label_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
         encoders, counts = _fit_feature_encoders(valid, lambda c: X[c].astype(str))
 
     _maybe_fit_target(y, cols, encoders, counts)
+    _warn_if_no_encoders_fit(encoders, cols, y)
     return _build_label_artifact(encoders, cols, counts, config)
 
 

@@ -59,22 +59,18 @@ def _onehot_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     drop_original = params.get("drop_original", True)
     include_missing = params.get("include_missing", False)
 
-    try:
-        X_subset = X.select(valid_cols)
-        if include_missing:
-            X_subset = X_subset.fill_null(_MISSING_TOKEN)
+    X_subset = X.select(valid_cols)
+    if include_missing:
+        X_subset = X_subset.fill_null(_MISSING_TOKEN)
 
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        encoded = _to_dense(encoder.transform(X_np))
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    encoded = _to_dense(encoder.transform(X_np))
 
-        encoded_df = pl.DataFrame(encoded, schema=feature_names)
-        X_out = pl.concat([X, encoded_df], how="horizontal")
-        if drop_original:
-            X_out = X_out.drop(valid_cols)
-        return X_out, y
-    except Exception as e:
-        logger.error(f"OneHot Encoding failed: {e}")
-        return X, y
+    encoded_df = pl.DataFrame(encoded, schema=feature_names)
+    X_out = pl.concat([X, encoded_df], how="horizontal")
+    if drop_original:
+        X_out = X_out.drop(valid_cols)
+    return X_out, y
 
 
 def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -89,15 +85,12 @@ def _onehot_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     if include_missing:
         X_subset = X_subset.fillna(_MISSING_TOKEN)
 
-    try:
-        X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
-        encoded = _to_dense(encoder.transform(X_input))
-        encoded_df = pd.DataFrame(encoded, columns=feature_names, index=X_out.index)
-        X_out = pd.concat(cast(Any, [X_out, encoded_df]), axis=1)
-        if drop_original:
-            X_out = X_out.drop(columns=valid_cols)
-    except Exception as e:
-        logger.error(f"OneHot Encoding failed: {e}")
+    X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
+    encoded = _to_dense(encoder.transform(X_input))
+    encoded_df = pd.DataFrame(encoded, columns=feature_names, index=X_out.index)
+    X_out = pd.concat(cast(Any, [X_out, encoded_df]), axis=1)
+    if drop_original:
+        X_out = X_out.drop(columns=valid_cols)
     return X_out, y
 
 

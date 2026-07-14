@@ -11,7 +11,7 @@ from .._artifacts import LagFeaturesArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import coerce_lags, resolve_columns, sort_pandas
+from ._common import coerce_lags, filter_existing_columns, sort_pandas
 
 
 def _lag_name(col: str, lag: int) -> str:
@@ -108,7 +108,7 @@ class LagFeaturesCalculator(BaseCalculator):
     ) -> SkyulfSchema | None:
         # Lag columns mirror the dtype of their source column, so the output
         # schema is derivable from config alone (shape is data-independent).
-        cols = resolve_columns(config.get("columns", []), input_schema.column_list())
+        cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         lags = coerce_lags(config.get("lags", [1]))
         schema = input_schema
         for col in cols:

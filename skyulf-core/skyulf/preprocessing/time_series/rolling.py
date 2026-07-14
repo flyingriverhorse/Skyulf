@@ -11,7 +11,7 @@ from .._artifacts import RollingAggregateArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method
 from ..dispatcher import apply_dual_engine
-from ._common import coerce_aggregations, resolve_columns, sort_pandas
+from ._common import coerce_aggregations, filter_existing_columns, sort_pandas
 
 
 def _roll_name(col: str, agg: str, window: int) -> str:
@@ -155,7 +155,7 @@ class RollingAggregateCalculator(BaseCalculator):
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema | None:
         # Rolling outputs are float64 regardless of source dtype.
-        cols = resolve_columns(config.get("columns", []), input_schema.column_list())
+        cols = filter_existing_columns(config.get("columns", []), input_schema.column_list())
         aggs = coerce_aggregations(config.get("aggregations", ["mean"]))
         window = int(config.get("window", 3))
         schema = input_schema

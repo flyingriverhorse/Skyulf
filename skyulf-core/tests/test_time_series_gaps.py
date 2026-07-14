@@ -15,7 +15,7 @@ from tests.utils.test_case_loader import TestCaseLoader
 from skyulf.preprocessing.time_series._common import (
     coerce_aggregations,
     coerce_lags,
-    resolve_columns,
+    filter_existing_columns,
     sort_pandas,
 )
 from skyulf.preprocessing.time_series.date_features import (
@@ -64,7 +64,7 @@ def test_resolve_columns(
 
     Loaded from ``tests/test_cases/preprocessing/time_series_gaps.json`` (group ``resolve_columns``).
     """
-    assert resolve_columns(columns, available) == expected
+    assert filter_existing_columns(columns, available) == expected
 
 
 @pytest.mark.parametrize(*_coerce_lags_cases)

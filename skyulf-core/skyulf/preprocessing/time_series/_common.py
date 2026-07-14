@@ -31,8 +31,14 @@ DATE_FEATURE_ACCESSORS: dict[str, str] = {
 ROLLING_AGGREGATIONS: list[str] = ["mean", "sum", "min", "max", "std", "median"]
 
 
-def resolve_columns(columns: Any, available: list[str]) -> list[str]:
-    """Return configured columns that actually exist, preserving order."""
+def filter_existing_columns(columns: Any, available: list[str]) -> list[str]:
+    """Return configured columns that actually exist, preserving order.
+
+    Named distinctly from ``skyulf.utils.resolve_columns`` (a different,
+    unrelated function with a different signature/auto-detect semantics used
+    by the encoders) to avoid a naming collision that risks readers/refactors
+    conflating the two.
+    """
     if not columns:
         return []
     return [c for c in columns if c in available]

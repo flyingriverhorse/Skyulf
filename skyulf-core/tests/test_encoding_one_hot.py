@@ -213,16 +213,16 @@ def test_polars_apply_include_missing_fills_null_token() -> None:
     assert out_pl[missing_cols[0]][1] == 1
 
 
-class TestApplyExceptionIsCaught:
-    """A transform-time exception in the apply path is caught, logged, and X returned
-    as-is. Scenarios (pandas/polars) loaded from
+class TestApplyExceptionPropagates:
+    """A transform-time exception in the apply path propagates (raised), with the
+    dispatcher logging the failure. Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_one_hot.json`` (group ``apply_exception``).
     """
 
     @pytest.mark.parametrize(
         _apply_exception_cases[0], _apply_exception_cases[1], ids=_apply_exception_cases[2]
     )
-    def test_apply_exception_is_caught_and_returns_input(
+    def test_apply_exception_propagates(
         self, engine: str, caplog: pytest.LogCaptureFixture
     ) -> None:
         class _BrokenEncoder:
@@ -234,17 +234,15 @@ class TestApplyExceptionIsCaught:
             "encoder_object": _BrokenEncoder(),
             "feature_names": ["color_x"],
         }
-        with caplog.at_level("ERROR"):
+        with caplog.at_level("ERROR"), pytest.raises(ValueError, match="boom"):
             if engine == "polars":
                 df = pl.DataFrame({"color": ["red", "blue"]})
-                out = OneHotEncoderApplier().apply(df, dict(params))
-                assert out.equals(df)
+                OneHotEncoderApplier().apply(df, dict(params))
             else:
                 df = pd.DataFrame({"color": ["red", "blue"]})
-                out = OneHotEncoderApplier().apply(df, dict(params))
-                pd.testing.assert_frame_equal(out, df)
+                OneHotEncoderApplier().apply(df, dict(params))
 
-        assert any("OneHot Encoding failed" in rec.message for rec in caplog.records)
+        assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 def test_to_dense_handles_pandas_wrapped_output() -> None:

@@ -105,6 +105,18 @@ def test_empty_dataframe_with_no_columns_returns_empty_artifact() -> None:
     assert params["classes_count"] == {}
 
 
+def test_no_columns_and_no_target_warns_about_noop(caplog: pytest.LogCaptureFixture) -> None:
+    """Fitting with no configured columns and no y logs a warning about the no-op."""
+    df = pd.DataFrame({"category": ["a", "b", "c"]})
+    calc = LabelEncoderCalculator()
+
+    with caplog.at_level("WARNING", logger="skyulf.preprocessing.encoding.label"):
+        params = calc.fit(df, {"columns": None})
+
+    assert params["encoders"] == {}
+    assert any("no-op" in record.message for record in caplog.records)
+
+
 def test_single_row_dataframe() -> None:
     """A single-row frame produces exactly one class."""
     df = pd.DataFrame({"category": ["only"]})
