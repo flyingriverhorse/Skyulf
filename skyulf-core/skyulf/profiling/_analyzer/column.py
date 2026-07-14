@@ -257,5 +257,29 @@ class ColumnMixin(_AnalyzerState):
                         severity="error",
                     )
                 )
+        # `is_unique` (used by the "possible ID column" recommendation) is
+        # only ever set above for Categorical columns via categorical_stats.
+        # Text and Numeric columns never got a chance to be flagged even
+        # when every value is distinct (e.g. a numeric or free-text ID
+        # column), so the recommendation was silently dead for those dtypes.
+        # Compute it generically here from the batched `__unique` aggregate,
+        # using the same >50-unique-values threshold as the Categorical
+        # branch above to avoid over-flagging small tables.
+        if not profile.is_unique and semantic_type in ("Text", "Numeric"):
+            n_unique = basic_stats.get(f"{col}__unique", 0)
+            if (
+                n_unique > 50
+                and self.row_count > 0  # type: ignore[attr-defined]
+                and n_unique == self.row_count  # type: ignore[attr-defined]
+            ):
+                profile.is_unique = True
+                alerts.append(
+                    Alert(
+                        column=col,
+                        type="Possible ID",
+                        message=f"Column '{col}' appears to be an ID.",
+                        severity="info",
+                    )
+                )
 
         return profile, alerts

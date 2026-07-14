@@ -305,12 +305,18 @@ class EDAAnalyzer(
             if profile.dtype == "Numeric" or profile.dtype == "Categorical" and is_numeric_type:
                 numeric_cols.append(col)
 
-        # Encode string targets so they appear in causal graphs.
+        # Encode string/boolean targets so they appear in causal graphs.
         encoded_target_col: str | None = None
         if target_col and target_col in self.columns and target_col not in numeric_cols:
             encoded_target = f"{target_col}_encoded"
+            # `cast(pl.Categorical)` only accepts string-like columns directly;
+            # a Boolean target (a common binary-classification target dtype)
+            # must be cast to Utf8 first or polars raises InvalidOperationError.
+            target_expr = pl.col(target_col)
+            if self.df.schema[target_col] == pl.Boolean:  # type: ignore[attr-defined]
+                target_expr = target_expr.cast(pl.Utf8)
             self.df = self.df.with_columns(
-                pl.col(target_col).cast(pl.Categorical).to_physical().alias(encoded_target)
+                target_expr.cast(pl.Categorical).to_physical().alias(encoded_target)
             )
             self.lazy_df = self.df.lazy()
             encoded_target_col = encoded_target
@@ -393,7 +399,7 @@ class EDAAnalyzer(
                             target_col, cat_cols, is_target_numeric=True
                         )
 
-            elif target_semantic_type == "Categorical":
+            elif target_semantic_type in ("Categorical", "Boolean"):
                 target_correlations = self._calculate_categorical_target_associations(
                     target_col, feature_cols
                 )

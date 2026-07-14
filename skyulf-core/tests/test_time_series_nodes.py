@@ -118,6 +118,43 @@ def test_date_features_drop_original():
     assert "d_year" in out.columns
 
 
+def test_date_features_invalid_date_yields_null_not_nan_or_zero_pandas():
+    """Regression test: an unparseable date must yield a proper pandas
+    <NA> (nullable Int64) for every feature type - previously numeric
+    properties (year/month/dayofweek/...) widened to float64 NaN, and
+    boolean-derived features (is_weekend/is_month_start/is_month_end)
+    silently defaulted to 0/False instead of propagating a null, diverging
+    from polars' Int32/null semantics for the same input."""
+    df = pd.DataFrame({"d": ["2021-06-15", "not-a-date", "2021-12-25"]})
+    feats = ["year", "month", "dayofweek", "is_weekend", "is_month_start", "is_month_end"]
+    art = DateFeaturesCalculator().fit(df, {"columns": ["d"], "features": feats})
+    out = DateFeaturesApplier().apply(df, art)
+
+    for feat in feats:
+        col = f"d_{feat}"
+        assert str(out[col].dtype) == "Int64"
+        assert pd.isna(out[col].iloc[1]), (
+            f"{col} row 1 (invalid date) must be null, got {out[col].iloc[1]!r}"
+        )
+        assert not pd.isna(out[col].iloc[0])
+        assert not pd.isna(out[col].iloc[2])
+
+
+def test_date_features_invalid_date_null_parity_pandas_polars():
+    """Both engines must treat an unparseable date string identically: every
+    calendar feature is null for that row, not just some."""
+    pdf = pd.DataFrame({"d": ["2021-06-15", "garbage", "2021-12-25"]})
+    feats = ["year", "month", "is_weekend"]
+    art = DateFeaturesCalculator().fit(pdf, {"columns": ["d"], "features": feats})
+    pandas_out = DateFeaturesApplier().apply(pdf, art)
+    polars_out = DateFeaturesApplier().apply(pl.DataFrame({"d": pdf["d"].tolist()}), art)
+
+    for feat in feats:
+        col = f"d_{feat}"
+        assert pd.isna(pandas_out[col].iloc[1])
+        assert polars_out[col][1] is None
+
+
 def test_lag_infer_output_schema_extends_columns():
     schema = SkyulfSchema.from_columns(["v"], {"v": "float64"})
     out = LagFeaturesCalculator().infer_output_schema(schema, {"columns": ["v"], "lags": [1, 2]})
@@ -133,7 +170,9 @@ def test_date_features_infer_output_schema_drops_original():
     )
     assert out is not None
     assert "d" not in out
-    assert out.dtypes["d_year"] == "int64"
+    # Nullable "Int64" (not plain "int64"/"float64"), reflecting that an
+    # unparseable date now yields a proper null feature value on both engines.
+    assert out.dtypes["d_year"] == "Int64"
 
 
 # ---------------------------------------------------------------------------

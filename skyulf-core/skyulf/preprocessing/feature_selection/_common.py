@@ -217,6 +217,24 @@ def _build_model_selector(method: str, estimator: Any, config: dict[str, Any]) -
     return None
 
 
+def _fillna_zero_with_warning(X_pd: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    """Fill missing values with 0 before scoring, warning when this actually
+    changes data (unlike ``_maybe_chi2_rescale``'s already-existing warning
+    pattern, a silent ``fillna(0)`` can bias univariate/model-based feature
+    scores whenever 0 is itself a meaningful value, or missingness is
+    correlated with the target)."""
+    subset = X_pd[cols]
+    if subset.isna().any().any():
+        logger.warning(
+            "Feature selection: filling missing values with 0 before scoring "
+            "for columns %s. This may bias scores/importances if 0 is a "
+            "meaningful value for these columns or if missingness itself "
+            "correlates with the target; consider imputing upstream instead.",
+            [c for c in cols if subset[c].isna().any()],
+        )
+    return subset.fillna(0)
+
+
 def _maybe_chi2_rescale(X_np: np.ndarray, score_func_name: str | None) -> np.ndarray:
     """Apply MinMax rescale when chi2 is requested but features contain negatives."""
     if score_func_name != "chi2" or not (X_np < 0).any():

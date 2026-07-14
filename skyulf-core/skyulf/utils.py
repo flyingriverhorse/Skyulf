@@ -44,12 +44,28 @@ def get_data_stats(
         rows += r
         cols = c  # Assume columns are same
 
-        r, _ = get_data_stats(data.test)
+        r, test_cols = get_data_stats(data.test)
         rows += r
+        if test_cols and test_cols != cols:
+            logger.warning(
+                "get_data_stats: SplitDataset.test columns %s differ from "
+                "SplitDataset.train columns %s; reporting train's column set, "
+                "which may not reflect test/validation data actual shape.",
+                sorted(test_cols),
+                sorted(cols),
+            )
 
         if data.validation is not None:
-            r, _ = get_data_stats(data.validation)
+            r, val_cols = get_data_stats(data.validation)
             rows += r
+            if val_cols and val_cols != cols:
+                logger.warning(
+                    "get_data_stats: SplitDataset.validation columns %s differ "
+                    "from SplitDataset.train columns %s; reporting train's "
+                    "column set, which may not reflect validation data actual shape.",
+                    sorted(val_cols),
+                    sorted(cols),
+                )
 
     return rows, cols
 

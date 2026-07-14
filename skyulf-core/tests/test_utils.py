@@ -88,6 +88,61 @@ def test_get_data_stats_split_dataset_with_validation() -> None:
     assert rows == 6
 
 
+def test_get_data_stats_split_dataset_warns_on_test_column_mismatch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Regression test: get_data_stats() for a SplitDataset only ever reflected
+    train's column set, silently assuming test/validation match. Must now warn
+    when test's columns actually diverge from train's."""
+    import logging
+
+    train = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
+    test = pd.DataFrame({"a": [5], "c": [6]})  # different columns than train
+    ds = SplitDataset(train=train, test=test)
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.utils"):
+        rows, cols = get_data_stats(ds)
+
+    assert rows == 3
+    assert cols == {"a", "b"}  # still reports train's columns (documented behavior)
+    assert any("differ from" in rec.message for rec in caplog.records)
+
+
+def test_get_data_stats_split_dataset_warns_on_validation_column_mismatch(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Same regression as above but for the validation split."""
+    import logging
+
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [3]})
+    val = pd.DataFrame({"a": [4], "extra": [5]})  # different columns than train
+    ds = SplitDataset(train=train, test=test, validation=val)
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.utils"):
+        rows, _ = get_data_stats(ds)
+
+    assert rows == 4
+    assert any("differ from" in rec.message for rec in caplog.records)
+
+
+def test_get_data_stats_split_dataset_no_warning_when_columns_match(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Matching train/test/validation columns must not trigger the warning."""
+    import logging
+
+    train = pd.DataFrame({"a": [1, 2]})
+    test = pd.DataFrame({"a": [3]})
+    val = pd.DataFrame({"a": [4]})
+    ds = SplitDataset(train=train, test=test, validation=val)
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.utils"):
+        get_data_stats(ds)
+
+    assert not any("differ from" in rec.message for rec in caplog.records)
+
+
 # ---------------------------------------------------------------------------
 # unpack_pipeline_input
 # ---------------------------------------------------------------------------
