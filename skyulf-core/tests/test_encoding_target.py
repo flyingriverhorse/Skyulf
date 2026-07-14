@@ -275,10 +275,11 @@ def test_polars_apply_no_valid_columns_is_noop() -> None:
     assert list(y_out_pl) == list(y_pl)
 
 
-def test_polars_apply_exception_is_caught_and_returns_input(
+def test_polars_apply_exception_propagates(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform-time exception in the polars apply path is caught, logged, and X/y returned as-is."""
+    """A transform-time exception in the polars apply path propagates (raised), with
+    the dispatcher logging the failure."""
     X_pl = pl.DataFrame({"city": ["a", "b", "a"]})
     y_pl = pl.Series("target", [1, 0, 1])
 
@@ -287,18 +288,17 @@ def test_polars_apply_exception_is_caught_and_returns_input(
             raise ValueError("boom")
 
     params = {"columns": ["city"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level(logging.ERROR):
-        out_pl, y_out_pl = TargetEncoderApplier().apply((X_pl, y_pl), dict(params))
+    with caplog.at_level(logging.ERROR), pytest.raises(ValueError, match="boom"):
+        TargetEncoderApplier().apply((X_pl, y_pl), dict(params))
 
-    assert out_pl.equals(X_pl)
-    assert list(y_out_pl) == list(y_pl)
-    assert any("Target Encoding failed" in rec.message for rec in caplog.records)
+    assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
-def test_pandas_apply_exception_is_caught_and_logged(
+def test_pandas_apply_exception_propagates(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform-time exception in the pandas apply path is caught and logged."""
+    """A transform-time exception in the pandas apply path propagates (raised), with
+    the dispatcher logging the failure."""
     X_pd = pd.DataFrame({"city": ["a", "b", "a"]})
     y_pd = pd.Series([1, 0, 1], name="target")
 
@@ -307,11 +307,10 @@ def test_pandas_apply_exception_is_caught_and_logged(
             raise ValueError("boom")
 
     params = {"columns": ["city"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level(logging.ERROR):
-        out_pd, y_out_pd = TargetEncoderApplier().apply((X_pd, y_pd), dict(params))
+    with caplog.at_level(logging.ERROR), pytest.raises(ValueError, match="boom"):
+        TargetEncoderApplier().apply((X_pd, y_pd), dict(params))
 
-    pd.testing.assert_frame_equal(out_pd, X_pd)
-    assert any("Target Encoding failed" in rec.message for rec in caplog.records)
+    assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 def test_polars_fit_extracts_y_from_target_column() -> None:

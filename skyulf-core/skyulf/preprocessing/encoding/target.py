@@ -41,27 +41,23 @@ def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     if not valid_cols:
         return X, y
 
-    try:
-        X_subset = X.select(valid_cols)
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
-        encoded = encoder.transform(X_np)
-        n_feats = len(valid_cols)
-        if encoded.shape[1] == n_feats:
-            # Standard binary / regression: replace in-place.
-            new_cols = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
-        else:
-            # Multiclass: (n_samples, n_feats * n_classes) — create per-class cols.
-            n_classes = encoded.shape[1] // n_feats
-            new_cols = []
-            for fi, col in enumerate(valid_cols):
-                for ci in range(n_classes):
-                    new_cols.append(pl.Series(f"{col}_cls{ci}", encoded[:, fi * n_classes + ci]))
-            # Drop original columns to avoid schema conflict.
-            X = X.drop(valid_cols)
-        return X.with_columns(new_cols), y
-    except Exception as e:
-        logger.error("Target Encoding failed: %s", e)
-        return X, y
+    X_subset = X.select(valid_cols)
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+    encoded = encoder.transform(X_np)
+    n_feats = len(valid_cols)
+    if encoded.shape[1] == n_feats:
+        # Standard binary / regression: replace in-place.
+        new_cols = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
+    else:
+        # Multiclass: (n_samples, n_feats * n_classes) — create per-class cols.
+        n_classes = encoded.shape[1] // n_feats
+        new_cols = []
+        for fi, col in enumerate(valid_cols):
+            for ci in range(n_classes):
+                new_cols.append(pl.Series(f"{col}_cls{ci}", encoded[:, fi * n_classes + ci]))
+        # Drop original columns to avoid schema conflict.
+        X = X.drop(valid_cols)
+    return X.with_columns(new_cols), y
 
 
 def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -70,23 +66,20 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
         return X, y
 
     X_out = X.copy()
-    try:
-        X_subset = X_out[valid_cols]
-        X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
-        encoded = encoder.transform(X_input)
-        n_feats = len(valid_cols)
-        if encoded.shape[1] == n_feats:
-            # Standard binary / regression: replace in-place.
-            X_out[valid_cols] = encoded
-        else:
-            # Multiclass: (n_samples, n_feats * n_classes) — create per-class cols.
-            n_classes = encoded.shape[1] // n_feats
-            X_out = X_out.drop(columns=valid_cols)
-            for fi, col in enumerate(valid_cols):
-                for ci in range(n_classes):
-                    X_out[f"{col}_cls{ci}"] = encoded[:, fi * n_classes + ci]
-    except Exception as e:
-        logger.error("Target Encoding failed: %s", e)
+    X_subset = X_out[valid_cols]
+    X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
+    encoded = encoder.transform(X_input)
+    n_feats = len(valid_cols)
+    if encoded.shape[1] == n_feats:
+        # Standard binary / regression: replace in-place.
+        X_out[valid_cols] = encoded
+    else:
+        # Multiclass: (n_samples, n_feats * n_classes) — create per-class cols.
+        n_classes = encoded.shape[1] // n_feats
+        X_out = X_out.drop(columns=valid_cols)
+        for fi, col in enumerate(valid_cols):
+            for ci in range(n_classes):
+                X_out[f"{col}_cls{ci}"] = encoded[:, fi * n_classes + ci]
     return X_out, y
 
 

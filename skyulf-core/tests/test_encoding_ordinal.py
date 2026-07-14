@@ -234,9 +234,9 @@ def test_ordinal_apply_engine_parity_on_unseen_category() -> None:
 # ---------------------------------------------------------------------------
 
 
-class TestApplyFeaturesExceptionIsCaught:
-    """A transform-time exception in the feature-apply path is caught and logged.
-    Scenarios (pandas/polars) loaded from
+class TestApplyFeaturesExceptionPropagates:
+    """A transform-time exception in the feature-apply path propagates (raised),
+    with the dispatcher logging the failure. Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_features_exception``).
     """
 
@@ -245,7 +245,7 @@ class TestApplyFeaturesExceptionIsCaught:
         _apply_features_exception_cases[1],
         ids=_apply_features_exception_cases[2],
     )
-    def test_apply_features_exception_is_caught_and_returns_input(
+    def test_apply_features_exception_propagates(
         self, engine: str, caplog: pytest.LogCaptureFixture
     ) -> None:
         class _BrokenEncoder:
@@ -253,17 +253,15 @@ class TestApplyFeaturesExceptionIsCaught:
                 raise ValueError("boom")
 
         params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
-        with caplog.at_level("ERROR"):
+        with caplog.at_level("ERROR"), pytest.raises(ValueError, match="boom"):
             if engine == "polars":
                 X = pl.DataFrame({"category": ["a", "b"]})
-                out = OrdinalEncoderApplier().apply(X, dict(params))
-                assert out.equals(X)
+                OrdinalEncoderApplier().apply(X, dict(params))
             else:
                 X = pd.DataFrame({"category": ["a", "b"]})
-                out = OrdinalEncoderApplier().apply(X, dict(params))
-                pd.testing.assert_frame_equal(out, X)
+                OrdinalEncoderApplier().apply(X, dict(params))
 
-        assert any("Ordinal Encoding failed" in rec.message for rec in caplog.records)
+        assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 def test_apply_target_polars_encodes_y_correctly() -> None:
@@ -282,9 +280,9 @@ def test_apply_target_polars_encodes_y_correctly() -> None:
     assert list(X_out["category"]) == [0.0, 1.0]
 
 
-class TestApplyTargetExceptionIsCaught:
-    """A transform-time exception in the target-apply path is caught, logged, and y
-    returned unchanged. Scenarios (pandas/polars) loaded from
+class TestApplyTargetExceptionPropagates:
+    """A transform-time exception in the target-apply path propagates (raised),
+    with the dispatcher logging the failure. Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_target_exception``).
     """
 
@@ -293,7 +291,7 @@ class TestApplyTargetExceptionIsCaught:
         _apply_target_exception_cases[1],
         ids=_apply_target_exception_cases[2],
     )
-    def test_apply_target_exception_is_caught_and_returns_y(
+    def test_apply_target_exception_propagates(
         self, engine: str, caplog: pytest.LogCaptureFixture
     ) -> None:
         class _BrokenEncoder:
@@ -305,17 +303,16 @@ class TestApplyTargetExceptionIsCaught:
             "encoder_object": None,
             "encoders": {"__target__": _BrokenEncoder()},
         }
-        with caplog.at_level("ERROR"):
+        with caplog.at_level("ERROR"), pytest.raises(ValueError, match="boom"):
             if engine == "polars":
                 y = pl.Series("target", ["yes", "no"])
                 X = pl.DataFrame({"other": [1, 2]})
             else:
                 y = pd.Series(["yes", "no"], name="target")
                 X = pd.DataFrame({"other": [1, 2]})
-            _, y_out = OrdinalEncoderApplier().apply((X, y), dict(params))
+            OrdinalEncoderApplier().apply((X, y), dict(params))
 
-        assert list(y_out) == list(y)
-        assert any("Ordinal Encoding target failed" in rec.message for rec in caplog.records)
+        assert any("engine apply failed" in rec.message for rec in caplog.records)
 
 
 def test_polars_apply_returns_input_when_nothing_to_do() -> None:
