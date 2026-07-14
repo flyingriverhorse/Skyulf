@@ -797,8 +797,14 @@ class TuningApplier(BaseModelApplier):
         if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
             model, _ = model_artifact
             return self.base_applier.predict(df, model)
-        # Fallback if artifact is just the result (legacy)
-        return pd.Series(np.nan, index=df.index)
+        # Fallback: artifact isn't the expected (model, tuning_result) tuple
+        # (e.g. a plain fitted model, before it's wrapped by the tuner). Return
+        # an all-null placeholder of the right length/engine instead of
+        # crashing - `df.index` doesn't exist on a Polars DataFrame, so build
+        # the placeholder in an engine-aware way.
+        if hasattr(df, "index"):
+            return pd.Series(np.nan, index=df.index)
+        return pd.Series(np.full(len(df), np.nan))
 
     def predict_proba(
         self,
