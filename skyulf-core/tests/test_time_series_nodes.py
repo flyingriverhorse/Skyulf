@@ -161,3 +161,25 @@ class TestRealShapedDataset:
         assert pd_out["signup_date_year"].between(2018, 2023).all()
         # Polars and pandas paths must agree exactly.
         assert pl_out["signup_date_year"].to_list() == pd_out["signup_date_year"].tolist()
+
+    def test_date_features_on_raw_string_dates_polars_matches_pandas(self) -> None:
+        """Regression test: polars must not silently null out plain date strings.
+
+        Unlike the parity test above (which pre-converts the column via
+        ``pd.to_datetime`` before building the polars frame, masking the bug),
+        this builds the polars frame directly from raw ``YYYY-MM-DD`` strings
+        — the common shape of a column freshly loaded from CSV.
+        """
+        df = load_sample_dataset("customers")
+        assert df["signup_date"].dtype == object  # raw strings, not yet parsed
+        art = DateFeaturesCalculator().fit(
+            df, {"columns": ["signup_date"], "features": ["year", "month", "dayofweek"]}
+        )
+        pd_out = DateFeaturesApplier().apply(df, art)
+
+        pl_raw = pl.DataFrame({"signup_date": df["signup_date"].tolist()})
+        pl_out = DateFeaturesApplier().apply(pl_raw, art)
+
+        assert not pl_out["signup_date_year"].is_null().any()
+        assert pl_out["signup_date_year"].to_list() == pd_out["signup_date_year"].tolist()
+        assert pl_out["signup_date_month"].to_list() == pd_out["signup_date_month"].tolist()

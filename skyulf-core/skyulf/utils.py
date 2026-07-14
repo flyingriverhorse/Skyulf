@@ -292,8 +292,16 @@ def resolve_columns(
 
     # Case 1: Explicit columns provided
     if cols:
-        # Just filter for existence
-        return [c for c in cols if c in df.columns]
+        # Filter for existence, then dedupe while preserving first-occurrence
+        # order (a duplicated column name would otherwise be processed twice
+        # by stateful calculators like encoders/scalers).
+        seen: set[str] = set()
+        deduped = []
+        for c in cols:
+            if c in df.columns and c not in seen:
+                seen.add(c)
+                deduped.append(c)
+        return deduped
 
     # Case 2: Auto-detection
     if default_selection_func:

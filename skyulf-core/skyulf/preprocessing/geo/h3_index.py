@@ -37,6 +37,16 @@ def _import_h3() -> Any:
     return h3
 
 
+def _h3_cell_or_none(lat: Any, lon: Any, h3: Any, resolution: int) -> Any:
+    """Compute an H3 cell index for one row, returning ``None`` on missing/invalid input."""
+    if pd.isna(lat) or pd.isna(lon):
+        return None
+    try:
+        return h3.latlng_to_cell(float(lat), float(lon), resolution)
+    except (ValueError, TypeError):
+        return None
+
+
 def _h3_index_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     """Compute the H3 cell index per row and append it as a new pandas column."""
     lat_col, lon_col = params["lat_col"], params["lon_col"]
@@ -48,7 +58,7 @@ def _h3_index_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any
 
     out = X.copy()
     out[params.get("output_column", "h3_index")] = out.apply(
-        lambda row: h3.latlng_to_cell(float(row[lat_col]), float(row[lon_col]), resolution),
+        lambda row: _h3_cell_or_none(row[lat_col], row[lon_col], h3, resolution),
         axis=1,
     )
     return out, _y

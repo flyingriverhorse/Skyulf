@@ -95,6 +95,11 @@ class SkyulfPipeline:
                 calculator = NodeRegistry.get_calculator(model_type)()
                 applier = NodeRegistry.get_applier(model_type)()
             except ValueError as e:
+                # Registration may be partial (e.g. calculator resolved but
+                # applier didn't); reset both so the hardcoded fallback map
+                # below is not skipped for a working type.
+                calculator = None
+                applier = None
                 logger.debug(
                     "Model type '%s' not found in NodeRegistry (%s); "
                     "falling back to hardcoded type map.",
@@ -102,7 +107,7 @@ class SkyulfPipeline:
                     e,
                 )
 
-        if calculator is None:
+        if calculator is None or applier is None:
             # Map model types to classes
             if model_type == "logistic_regression":
                 calculator = LogisticRegressionCalculator()
@@ -130,6 +135,9 @@ class SkyulfPipeline:
                         base_calc = NodeRegistry.get_calculator(base_model_type)()
                         base_applier = NodeRegistry.get_applier(base_model_type)()
                     except ValueError as e:
+                        # Same partial-registration guard as above.
+                        base_calc = None
+                        base_applier = None
                         logger.debug(
                             "Base model type '%s' not found in NodeRegistry (%s); "
                             "falling back to hardcoded type map.",
@@ -137,7 +145,7 @@ class SkyulfPipeline:
                             e,
                         )
 
-                if base_calc is None:
+                if base_calc is None or base_applier is None:
                     if base_model_type == "logistic_regression":
                         base_calc = LogisticRegressionCalculator()
                         base_applier = LogisticRegressionApplier()

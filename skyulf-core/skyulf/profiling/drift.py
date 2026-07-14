@@ -87,7 +87,7 @@ class DriftCalculator:
 
         for col in self.common_columns:
             dtype = self.reference_df[col].dtype
-            is_numeric = dtype in [pl.Float32, pl.Float64, pl.Int32, pl.Int64]
+            is_numeric = dtype.is_numeric()
             is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Boolean]
 
             if is_categorical:

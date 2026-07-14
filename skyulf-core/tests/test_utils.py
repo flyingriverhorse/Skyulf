@@ -295,6 +295,16 @@ def test_resolve_columns_filters_nonexistent() -> None:
     assert result == ["a"]
 
 
+def test_resolve_columns_dedupes_explicit_duplicates_preserving_order() -> None:
+    """Regression test: duplicate column names in an explicit `columns` list
+    must be deduplicated (preserving first-occurrence order), otherwise
+    stateful calculators (encoders/scalers) would process the same column
+    twice, potentially corrupting fitted artifacts."""
+    df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
+    result = resolve_columns(df, {"columns": ["b", "a", "b", "c", "a"]})
+    assert result == ["b", "a", "c"]
+
+
 def test_resolve_columns_auto_detect_with_func() -> None:
     """Without explicit columns, the default_selection_func must be called."""
     df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})

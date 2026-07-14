@@ -194,6 +194,60 @@ def test_init_model_estimator_unknown_model_type_raises(force_registry_miss) -> 
         SkyulfPipeline({"modeling": {"type": "no_such_model_at_all"}})
 
 
+@pytest.fixture
+def force_partial_registration(monkeypatch):
+    """Simulate a partially-registered node: get_calculator resolves fine but
+    get_applier raises ValueError. Regression test for a bug where the
+    hardcoded fallback map was skipped whenever *any* calculator resolved
+    from the registry, even if its applier didn't, producing a misleading
+    "Unknown model type" error instead of falling back correctly.
+    """
+
+    def _raise_applier(_name):
+        raise ValueError("forced partial-registration miss for test")
+
+    monkeypatch.setattr(
+        NodeRegistry, "get_applier", classmethod(lambda cls, name: _raise_applier(name))
+    )
+
+
+def test_init_model_estimator_falls_back_when_applier_registry_lookup_fails(
+    force_partial_registration,
+) -> None:
+    """If the registry resolves a calculator but not its applier, the pipeline
+    must still fall back to the hardcoded type map instead of raising."""
+    import skyulf.pipeline as pipeline_module
+
+    pipeline = SkyulfPipeline({"modeling": {"type": "logistic_regression"}})
+    assert pipeline.model_estimator is not None
+    assert isinstance(
+        pipeline.model_estimator.calculator, pipeline_module.LogisticRegressionCalculator
+    )
+    assert isinstance(pipeline.model_estimator.applier, pipeline_module.LogisticRegressionApplier)
+
+
+def test_init_model_estimator_tuner_falls_back_when_base_applier_registry_lookup_fails(
+    force_partial_registration,
+) -> None:
+    """Same partial-registration guard for the hyperparameter_tuner base-model
+    resolution path."""
+    import skyulf.pipeline as pipeline_module
+
+    pipeline = SkyulfPipeline(
+        {
+            "modeling": {
+                "type": "hyperparameter_tuner",
+                "base_model": {"type": "ridge_regression"},
+            }
+        }
+    )
+    assert pipeline.model_estimator is not None
+    calculator = cast(TuningCalculator, pipeline.model_estimator.calculator)
+    applier = cast(TuningApplier, pipeline.model_estimator.applier)
+    assert isinstance(calculator.model_calculator, pipeline_module.RidgeRegressionCalculator)
+    assert isinstance(applier.base_applier, pipeline_module.RidgeRegressionApplier)
+
+
 # ---------------------------------------------------------------------------
 # fit(): SplitDataset passthrough + evaluation-failure branch
 # ---------------------------------------------------------------------------

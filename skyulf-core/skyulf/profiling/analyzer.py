@@ -157,11 +157,15 @@ class EDAAnalyzer(
             excluded_columns = [c for c in exclude_cols if c in self.columns]
             self.columns = [c for c in self.columns if c not in excluded_columns]
 
+        # Narrowed view used for frame-level stats/sample so excluded columns
+        # (e.g. PII) never leak into missing/duplicate counts or sample_data.
+        stats_df = self.df.select(self.columns) if excluded_columns else self.df
+
         # 2. Frame-level stats.
-        missing_cells = self.df.null_count().sum_horizontal()[0]
+        missing_cells = stats_df.null_count().sum_horizontal()[0]
         total_cells = self.row_count * len(self.columns)
         missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0.0
-        duplicate_rows = int(self.df.is_duplicated().sum())
+        duplicate_rows = int(stats_df.is_duplicated().sum())
         memory_usage = self.df.estimated_size("mb")
 
         col_profiles = {}
@@ -410,7 +414,7 @@ class EDAAnalyzer(
             )
 
         # 5. Sample (used for FE scatter plots).
-        sample_rows = self.df.head(5000).to_dicts()
+        sample_rows = stats_df.head(5000).to_dicts()
 
         # 6. Multivariate.
         pca_data = None

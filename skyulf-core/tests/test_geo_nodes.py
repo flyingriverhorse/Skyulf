@@ -327,6 +327,25 @@ class TestH3Index:
 
         assert result_pd["h3_index"].tolist() == result_pl["h3_index"].to_list()
 
+    def test_nan_coordinates_produce_none_instead_of_crashing(self) -> None:
+        """Regression test: a missing/NaN lat or lon must produce None for that
+        row (consistent with GeoDistance's NaN-propagation policy), not crash
+        the whole apply() as ``h3.latlng_to_cell`` does on invalid input."""
+        df = pd.DataFrame(
+            {
+                "lat": [_NYC_LAT, float("nan"), _LAX_LAT],
+                "lon": [_NYC_LON, _LAX_LON, float("nan")],
+            }
+        )
+        calc = H3IndexCalculator()
+        applier = H3IndexApplier()
+        params = calc.fit(df, {"lat_col": "lat", "lon_col": "lon", "resolution": 9})
+        result = applier.apply(df, params)
+
+        assert result["h3_index"].iloc[0] == h3.latlng_to_cell(_NYC_LAT, _NYC_LON, 9)
+        assert result["h3_index"].iloc[1] is None
+        assert result["h3_index"].iloc[2] is None
+
 
 class TestH3IndexValidation:
     """Config validation errors."""

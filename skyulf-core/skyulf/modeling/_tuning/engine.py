@@ -146,24 +146,36 @@ class TuningCalculator(BaseModelCalculator):
 
         # --- VALIDATION: Check for NaNs/Inf in Data ---
         # Many tuning errors ("No trials completed") are actually due to dirty data causing instant failures.
-        # We catch this early to give a clear message.
-        if isinstance(X_np, np.ndarray) and np.issubdtype(X_np.dtype, np.number):
-            if np.isnan(X_np).any():
+        # We catch this early to give a clear message. Object-dtype arrays (e.g. mixed dtypes or
+        # leftover categorical/string columns that were never encoded) are also scanned via
+        # pd.isna, since np.isnan/np.isinf raise on non-numeric dtypes.
+        if isinstance(X_np, np.ndarray):
+            if np.issubdtype(X_np.dtype, np.number):
+                if np.isnan(X_np).any():
+                    raise ValueError(
+                        "Input features (X) contain NaN values. Please use an 'Imputer' node before this model."
+                    )
+                if np.isinf(X_np).any():
+                    raise ValueError(
+                        "Input features (X) contain Infinite values. Please scale or clean your data."
+                    )
+            elif X_np.dtype == object and pd.isna(X_np).any():
                 raise ValueError(
-                    "Input features (X) contain NaN values. Please use an 'Imputer' node before this model."
-                )
-            if np.isinf(X_np).any():
-                raise ValueError(
-                    "Input features (X) contain Infinite values. Please scale or clean your data."
+                    "Input features (X) contain missing/NaN values. Please use an 'Imputer' node before this model."
                 )
 
-        if isinstance(y_np, np.ndarray) and np.issubdtype(y_np.dtype, np.number):
-            if np.isnan(y_np).any():
+        if isinstance(y_np, np.ndarray):
+            if np.issubdtype(y_np.dtype, np.number):
+                if np.isnan(y_np).any():
+                    raise ValueError(
+                        "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them."
+                    )
+                if np.isinf(y_np).any():
+                    raise ValueError("Target variable (y) contains Infinite values.")
+            elif y_np.dtype == object and pd.isna(y_np).any():
                 raise ValueError(
-                    "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them."
+                    "Target variable (y) contains missing/NaN values. Please drop rows with missing targets or impute them."
                 )
-            if np.isinf(y_np).any():
-                raise ValueError("Target variable (y) contains Infinite values.")
         # ----------------------------------------------
 
         validation_data_np = None
@@ -491,8 +503,15 @@ class TuningCalculator(BaseModelCalculator):
                 log_callback(f"Tuning Completed. Best Score: {best_score:.4f}")
                 log_callback(f"Best Params: {best_params}")
 
+            if best_params is None:
+                raise ValueError(
+                    "Hyperparameter tuning failed: All trials failed. "
+                    "This usually means the model failed to train with the provided hyperparameter combinations. "
+                    "Please check your search space and data."
+                )
+
             return TuningResult(
-                best_params=best_params if best_params is not None else {},
+                best_params=best_params,
                 best_score=best_score,
                 n_trials=total_candidates,
                 trials=trials,

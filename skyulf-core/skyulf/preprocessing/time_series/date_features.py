@@ -74,14 +74,27 @@ def _polars_feature(col_expr: Any, feature: str) -> Any:
     return builders[feature]()
 
 
-def _polars_date_exprs(columns: list[str], available: list[str], features: list[str]) -> list:
+def _polars_base_expr(col: str, dtype: Any) -> Any:
+    """Build the datetime expression for ``col``, dispatching on its source dtype.
+
+    Plain ``cast(pl.Datetime, strict=False)`` only parses columns that are already
+    temporal (or full ISO-8601 datetime strings); it silently returns null for
+    ordinary date strings like "2021-01-01". String/Utf8 columns must instead go
+    through ``str.to_datetime`` so common date formats are parsed correctly.
+    """
     import polars as pl
 
+    if dtype in (pl.Utf8, pl.String):
+        return pl.col(col).str.to_datetime(strict=False)
+    return pl.col(col).cast(pl.Datetime, strict=False)
+
+
+def _polars_date_exprs(columns: list[str], schema: dict[str, Any], features: list[str]) -> list:
     exprs = []
     for col in columns:
-        if col not in available:
+        if col not in schema:
             continue
-        base = pl.col(col).cast(pl.Datetime, strict=False)
+        base = _polars_base_expr(col, schema[col])
         exprs.extend(
             _polars_feature(base, feature).alias(_feat_name(col, feature)) for feature in features
         )
@@ -95,7 +108,7 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         return X, _y
 
     X_out = X
-    exprs = _polars_date_exprs(columns, list(X_out.columns), features)
+    exprs = _polars_date_exprs(columns, dict(X_out.schema), features)
     if exprs:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_original"):
