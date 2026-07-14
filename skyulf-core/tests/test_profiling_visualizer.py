@@ -121,6 +121,23 @@ def test_plot_runs_all_sections_with_agg_backend(rich_profile: DatasetProfile) -
     plt.close("all")
 
 
+def test_plot_closes_figures_it_creates(rich_profile: DatasetProfile) -> None:
+    """plot() must not leak matplotlib figures: every figure it creates should
+    be closed by the time it returns, regardless of any pre-existing figures."""
+    import matplotlib.pyplot as plt
+
+    plt.close("all")
+    # A figure opened before calling plot() must survive untouched.
+    pre_existing_fig = plt.figure()
+
+    df = _rich_dataset()
+    visualizer = EDAVisualizer(rich_profile, df=df)
+    visualizer.plot()
+
+    assert plt.get_fignums() == [pre_existing_fig.number]
+    plt.close("all")
+
+
 def test_render_clustering_table_uses_cluster_centers() -> None:
     """_render_clustering should format cluster center features without raising."""
     from rich.console import Console

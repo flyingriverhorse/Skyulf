@@ -444,6 +444,12 @@ class EDAVisualizer:
             print("Please install 'matplotlib' to use plotting: pip install matplotlib")
             return
 
+        # Track figures created by *this* call so we only close the ones we
+        # created (not any pre-existing figure a caller might still be
+        # holding open), avoiding an unbounded accumulation of figures in
+        # pyplot's global registry across repeated plot() calls.
+        existing_fignums = set(plt.get_fignums())
+
         self._plot_distributions()
         self._plot_correlations()
         self._plot_correlations_with_target()
@@ -453,8 +459,13 @@ class EDAVisualizer:
         self._plot_geospatial()
         self._plot_timeseries()
 
-        print("Displaying plots...")
-        plt.show()
+        new_fignums = [n for n in plt.get_fignums() if n not in existing_fignums]
+        try:
+            print("Displaying plots...")
+            plt.show()
+        finally:
+            for fignum in new_fignums:
+                plt.close(fignum)
 
     def _plot_distributions(self):
         import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
