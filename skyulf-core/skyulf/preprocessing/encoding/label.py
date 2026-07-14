@@ -95,11 +95,17 @@ def _label_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
         for col in cols:
             if col in X_out.columns and col in encoders:
                 mapping = _le_mapping(encoders[col])
-                X_out[col] = X_out[col].astype(str).map(mapping).fillna(missing_code)
+                # `.map()` returns float64 the moment any unseen value maps to
+                # NaN (even after `.fillna(missing_code)` the column stays
+                # float, since pandas never upcasts back to int) - explicit
+                # `.astype("int64")` matches the Polars path's `.cast(pl.Int64)`.
+                X_out[col] = (
+                    X_out[col].astype(str).map(mapping).fillna(missing_code).astype("int64")
+                )
 
     if y_out is not None and "__target__" in encoders:
         mapping = _le_mapping(encoders["__target__"])
-        y_out = y_out.astype(str).map(mapping).fillna(missing_code)
+        y_out = y_out.astype(str).map(mapping).fillna(missing_code).astype("int64")
 
     return X_out, y_out
 
