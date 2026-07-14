@@ -23,6 +23,14 @@ class FeatureEngineer:
     Orchestrates a sequence of feature engineering steps.
     """
 
+    # Resampling steps (SMOTE/undersampling) must only ever run on the train
+    # split -- applying them to test/validation would fabricate synthetic rows
+    # or delete real held-out rows purely to balance classes, corrupting any
+    # metrics later computed on that "held-out" data. Kept as a single shared
+    # constant (rather than duplicated literals) so `transform()`, `_run_step`,
+    # and `_collect_step_metrics` can't drift out of sync with each other.
+    _RESAMPLING_TYPES = {"Oversampling", "Undersampling"}
+
     def __init__(
         self,
         steps_config: Sequence[PreprocessingStepConfig | dict[str, Any]],
@@ -49,8 +57,7 @@ class FeatureEngineer:
             if transformer_type in [
                 "TrainTestSplitter",
                 "feature_target_split",
-                "Oversampling",
-                "Undersampling",
+                *self._RESAMPLING_TYPES,
             ]:
                 continue
 
@@ -143,7 +150,13 @@ class FeatureEngineer:
         so they bypass StatefulTransformer; everything else goes through the
         standard fit_transform wrapper and is appended to fitted_steps.
         """
-        transformer = StatefulTransformer(calculator, applier, step_node_id)
+        transformer = StatefulTransformer(
+            calculator,
+            applier,
+            step_node_id,
+            apply_on_test=transformer_type not in self._RESAMPLING_TYPES,
+            apply_on_validation=transformer_type not in self._RESAMPLING_TYPES,
+        )
         fitted_params: dict[str, Any] = {}
 
         if transformer_type == "TrainTestSplitter":
@@ -240,7 +253,7 @@ class FeatureEngineer:
         except Exception as e:
             logger.warning(f"Failed to retrieve metrics for step {name}: {e}")
 
-        if transformer_type in {"Oversampling", "Undersampling"}:
+        if transformer_type in self._RESAMPLING_TYPES:
             self._metrics_resampling(current_data, params, metrics)
 
         if rows_after > 0 or cols_after:

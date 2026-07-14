@@ -347,6 +347,116 @@ def test_pipeline_with_split_dataset_applies_to_train_and_test() -> None:
     assert abs(result.train["a"].mean()) < 1e-9
 
 
+def _make_imbalanced_df(n_major: int, n_minor: int) -> pd.DataFrame:
+    """Build a simple 2-feature frame with an imbalanced binary 'target' column."""
+    n = n_major + n_minor
+    return pd.DataFrame(
+        {
+            "f1": [float(i) for i in range(n)],
+            "f2": [float(i) * 2 for i in range(n)],
+            "target": [0] * n_major + [1] * n_minor,
+        }
+    )
+
+
+def test_fit_transform_does_not_oversample_test_or_validation() -> None:
+    """Oversampling must only ever run on train -- test/validation must pass
+    through fit_transform byte-for-byte unchanged, not be synthetically
+    resampled."""
+    train = _make_imbalanced_df(40, 8)
+    test = _make_imbalanced_df(10, 3)
+    validation = _make_imbalanced_df(10, 2)
+    ds = SplitDataset(train=train, test=test.copy(), validation=validation.copy())
+
+    steps = _steps(
+        _step(
+            "over",
+            "Oversampling",
+            method="smote",
+            target_column="target",
+            k_neighbors=1,
+        )
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    result, _ = fe.fit_transform(ds)
+
+    # Train IS resampled: balanced and grew in row count.
+    assert result.train.shape[0] > train.shape[0]
+    train_counts = result.train["target"].value_counts()
+    assert train_counts[0] == train_counts[1]
+
+    # Test/validation must be completely untouched -- no synthetic rows added.
+    pd.testing.assert_frame_equal(
+        result.test.reset_index(drop=True), test.reset_index(drop=True)
+    )
+    pd.testing.assert_frame_equal(
+        result.validation.reset_index(drop=True), validation.reset_index(drop=True)
+    )
+
+
+def test_fit_transform_does_not_undersample_test_or_validation() -> None:
+    """Undersampling must only ever run on train -- test/validation must pass
+    through fit_transform byte-for-byte unchanged, not have rows dropped."""
+    train = _make_imbalanced_df(40, 8)
+    test = _make_imbalanced_df(10, 3)
+    validation = _make_imbalanced_df(10, 2)
+    ds = SplitDataset(train=train, test=test.copy(), validation=validation.copy())
+
+    steps = _steps(
+        _step(
+            "under",
+            "Undersampling",
+            method="random_under_sampling",
+            target_column="target",
+            random_state=42,
+        )
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    result, _ = fe.fit_transform(ds)
+
+    # Train IS resampled: balanced and shrank in row count (majority undersampled).
+    assert result.train.shape[0] < train.shape[0]
+    train_counts = result.train["target"].value_counts()
+    assert train_counts[0] == train_counts[1]
+
+    # Test/validation must be completely untouched -- no rows dropped.
+    pd.testing.assert_frame_equal(
+        result.test.reset_index(drop=True), test.reset_index(drop=True)
+    )
+    pd.testing.assert_frame_equal(
+        result.validation.reset_index(drop=True), validation.reset_index(drop=True)
+    )
+
+
+def test_fit_transform_resampling_then_scaler_still_scales_all_splits() -> None:
+    """A step AFTER resampling (e.g. a scaler) must still apply to every split
+    normally -- the test/validation skip is resampling-specific, not global."""
+    train = _make_imbalanced_df(40, 8)
+    test = _make_imbalanced_df(10, 3)
+    validation = _make_imbalanced_df(10, 2)
+    ds = SplitDataset(train=train, test=test.copy(), validation=validation.copy())
+
+    steps = _steps(
+        _step(
+            "over",
+            "Oversampling",
+            method="smote",
+            target_column="target",
+            k_neighbors=1,
+        ),
+        _step("scale", "StandardScaler", columns=["f1", "f2"]),
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    result, _ = fe.fit_transform(ds)
+
+    # The scaler step still ran on test/validation (their row counts are
+    # unchanged from resampling, but their values are now standardized).
+    assert not np.allclose(result.test["f1"].to_numpy(), test["f1"].to_numpy())
+    assert not np.allclose(result.validation["f1"].to_numpy(), validation["f1"].to_numpy())
+    assert result.test.shape[0] == test.shape[0]
+    assert result.validation.shape[0] == validation.shape[0]
+
+
 # ---------------------------------------------------------------------------
 # TrainTestSplitter skip-on-already-split path (_run_step lines 154-155)
 # ---------------------------------------------------------------------------
