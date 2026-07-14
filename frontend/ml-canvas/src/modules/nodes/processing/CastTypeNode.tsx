@@ -13,7 +13,16 @@ interface CastTypeConfig {
 
 const TARGET_TYPES = [
   { value: 'float', label: 'Float (Decimal)' },
+  { value: 'float32', label: 'Float32' },
   { value: 'int', label: 'Integer' },
+  { value: 'int8', label: 'Int8' },
+  { value: 'int16', label: 'Int16' },
+  { value: 'int32', label: 'Int32' },
+  { value: 'int64', label: 'Int64' },
+  { value: 'uint8', label: 'UInt8' },
+  { value: 'uint16', label: 'UInt16' },
+  { value: 'uint32', label: 'UInt32' },
+  { value: 'uint64', label: 'UInt64' },
   { value: 'string', label: 'String (Text)' },
   { value: 'category', label: 'Category' },
   { value: 'bool', label: 'Boolean' },

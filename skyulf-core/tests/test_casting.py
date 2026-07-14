@@ -178,6 +178,30 @@ def test_casting_applier_narrow_int_dtype_out_of_range_not_silently_uncast() -> 
     assert result["a"].iloc[1] == 100
 
 
+def test_casting_applier_uint_dtype_out_of_range_masks_not_wraps() -> None:
+    """Regression test: casting to an unsigned narrow dtype (uint8) on
+    pandas must mask an out-of-range value to null (coerce) or raise
+    (strict) - not silently wrap around. `_cast_one_column` previously
+    dispatched only `int*`-prefixed target dtypes to `_cast_int()`;
+    `uint*` fell through to a bare `series.astype("uint8")`, which
+    silently WRAPS (300 -> 44 via mod 256) instead of erroring or nulling,
+    a data-corruption bug distinct from (and worse than) the narrow-int
+    silent-no-op bug."""
+    df = pd.DataFrame({"a": [300, 100]})
+
+    # Coerce mode: out-of-range value must become null, not wrap to 44.
+    coerce_params: dict[str, Any] = {"type_map": {"a": "uint8"}, "coerce_on_error": True}
+    coerced = CastingApplier().apply(df, coerce_params)
+    assert coerced["a"].dtype == pd.UInt8Dtype()
+    assert pd.isna(coerced["a"].iloc[0])
+    assert coerced["a"].iloc[1] == 100
+
+    # Strict mode: out-of-range value must raise, not silently wrap.
+    strict_params: dict[str, Any] = {"type_map": {"a": "uint8"}, "coerce_on_error": False}
+    with pytest.raises(OverflowError, match="out of range"):
+        CastingApplier().apply(df, strict_params)
+
+
 # ---------------------------------------------------------------------------
 # _drop_fractional_or_raise
 # ---------------------------------------------------------------------------
