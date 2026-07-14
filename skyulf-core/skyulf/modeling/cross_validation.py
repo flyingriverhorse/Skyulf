@@ -98,8 +98,10 @@ def perform_cross_validation(
     if log_callback:
         log_callback(f"Starting Cross-Validation (Folds: {n_folds}, Type: {cv_type})")
 
-    # For Time Series Split, sort data chronologically
-    if cv_type == "time_series_split" and isinstance(X, pd.DataFrame):
+    # For Time Series Split, sort data chronologically. Only applies to
+    # DataFrame-like X (pandas or Polars); a plain array has no columns to
+    # sort/drop by, so time_series_split relies on the caller's row order.
+    if cv_type == "time_series_split" and hasattr(X, "columns"):
         X, y = _sort_by_time(X, y, time_column, log_callback, logger)
 
     # Handle nested CV separately
@@ -204,7 +206,7 @@ def perform_cross_validation(
 
 
 def _sort_by_time(
-    X: pd.DataFrame,
+    X: Any,
     y: Any,
     time_column: str | None,
     log_callback: Callable[[str], None] | None,
@@ -215,12 +217,29 @@ def _sort_by_time(
     If time_column is provided, sort by that column (and drop it from features).
     If not provided, auto-detect the first datetime column.
     If no datetime column is found, log a warning and return data as-is.
+
+    Supports both pandas and Polars DataFrames - previously this only handled
+    pandas, so a Polars `time_series_split` run silently skipped chronological
+    sorting AND never dropped the time column from features, leaking it
+    directly into training.
     """
+    from ..engines import EngineName, get_engine
+
+    is_polars = get_engine(X).name == EngineName.POLARS
+
     sort_col = time_column
 
     if not sort_col:
-        # Auto-detect: find first datetime64 column
-        datetime_cols = X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
+        if is_polars:
+            import polars as pl
+
+            datetime_cols = [
+                col
+                for col, dtype in zip(X.columns, X.dtypes, strict=True)
+                if dtype in (pl.Datetime, pl.Date) or dtype.base_type() in (pl.Datetime, pl.Date)
+            ]
+        else:
+            datetime_cols = X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
         if datetime_cols:
             sort_col = datetime_cols[0]
             msg = f"Time Series CV: auto-detected datetime column '{sort_col}' for sorting."
@@ -229,15 +248,27 @@ def _sort_by_time(
             logger.info(msg)
 
     if sort_col and sort_col in X.columns:
-        sort_order = X[sort_col].argsort()
-        X = X.iloc[sort_order].reset_index(drop=True)
-        y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
         msg = f"Time Series CV: data sorted by '{sort_col}'."
+        if is_polars:
+            # Sort y in lockstep by attaching it as a temporary column so the
+            # same row order is applied to both X and y, then split apart.
+            import polars as pl
+
+            y_series = y if hasattr(y, "name") else pl.Series("__cv_y__", y)
+            y_name = getattr(y_series, "name", None) or "__cv_y__"
+            combined = X.with_columns(y_series.alias(y_name))
+            combined = combined.sort(sort_col)
+            y = combined[y_name]
+            X = combined.drop([y_name, sort_col])
+        else:
+            sort_order = X[sort_col].argsort()
+            X = X.iloc[sort_order].reset_index(drop=True)
+            y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
+            # Drop the time column from features so it doesn't leak into the model
+            X = X.drop(columns=[sort_col])
         if log_callback:
             log_callback(msg)
         logger.info(msg)
-        # Drop the time column from features so it doesn't leak into the model
-        X = X.drop(columns=[sort_col])
     elif sort_col:
         msg = f"Time Series CV: specified time column '{sort_col}' not found in data. Using row order."
         if log_callback:
