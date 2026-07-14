@@ -54,6 +54,16 @@ def test_wrapper_with_column_adds_new_column(pl_df):
     assert "c" not in pl_df.columns
 
 
+def test_wrapper_with_column_broadcasts_scalar(pl_df):
+    """with_column() must broadcast a bare scalar across all rows, matching
+    pandas' assign() semantics, instead of crashing on a length-1 Series
+    that can't broadcast against a taller frame (regression guard for r5
+    polars with_column scalar broadcast crash)."""
+    wrapper = SkyulfPolarsWrapper(pl_df)
+    result = wrapper.with_column("c", 42)
+    assert result.to_pandas()["c"].tolist() == [42, 42, 42]
+
+
 def test_wrapper_to_pandas_converts(pl_df):
     """to_pandas() should produce a pandas.DataFrame with matching values."""
     wrapper = SkyulfPolarsWrapper(pl_df)

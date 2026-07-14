@@ -77,6 +77,24 @@ def test_resolve_with_none_returns_active_default_engine():
     assert resolved is EngineRegistry.get(EngineRegistry._active_engine)
 
 
+def test_set_active_engine_changes_default(monkeypatch):
+    """set_active_engine() should change which engine resolve(None) returns
+    (regression guard for r5 EngineRegistry missing setter finding)."""
+    original = EngineRegistry._active_engine
+    try:
+        EngineRegistry.set_active_engine("polars")
+        assert EngineRegistry._active_engine == "polars"
+        assert EngineRegistry.resolve(None) is PolarsEngine
+    finally:
+        EngineRegistry.set_active_engine(original)
+
+
+def test_set_active_engine_raises_for_unknown_engine():
+    """set_active_engine() should validate the name against registered engines."""
+    with pytest.raises(ValueError, match="not found"):
+        EngineRegistry.set_active_engine("nonexistent_engine")
+
+
 def test_resolve_detects_pandas_dataframe():
     """resolve() should identify a pandas.DataFrame's module and return PandasEngine."""
     df = pd.DataFrame({"a": [1, 2]})

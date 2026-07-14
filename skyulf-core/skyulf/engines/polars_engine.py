@@ -29,16 +29,24 @@ class SkyulfPolarsWrapper:
     def shape(self) -> tuple[int, int]:
         return self._df.shape
 
-    def select(self, columns: list[str]) -> "SkyulfDataFrame":
+    def select(self, columns: list[str] | str) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.select(columns))
 
     def drop(self, columns: list[str]) -> "SkyulfDataFrame":
         return SkyulfPolarsWrapper(self._df.drop(columns))
 
     def with_column(self, name: str, values: Any) -> "SkyulfDataFrame":
-        # Polars with_columns takes expressions or series
-        # We need to ensure values is compatible
-        return SkyulfPolarsWrapper(self._df.with_columns(pl.Series(name, values)))
+        # Polars with_columns takes expressions or series. Passing a bare
+        # scalar to pl.Series(name, values) creates a length-1 Series, which
+        # then fails to broadcast against a taller frame (unlike pandas'
+        # assign(), which broadcasts scalars automatically). Use pl.lit()
+        # for scalars so polars broadcasts it across all rows, matching
+        # pandas semantics.
+        if isinstance(values, pl.Series | np.ndarray | list | tuple):
+            expr = pl.Series(name, values)
+        else:
+            expr = pl.lit(values).alias(name)
+        return SkyulfPolarsWrapper(self._df.with_columns(expr))
 
     def to_pandas(self) -> Any:
         return self._df.to_pandas()
