@@ -169,9 +169,7 @@ def _resolve_similarity_pair(op: dict[str, Any], existing: list[str]) -> tuple[s
     return col_a, col_b
 
 
-def _resolve_group_agg_cols(
-    op: dict[str, Any], existing: list[str]
-) -> tuple[str, str, str] | None:
+def _resolve_group_agg_cols(op: dict[str, Any], existing: list[str]) -> tuple[str, str, str] | None:
     """Return ``(group_col, target_col, method)`` if op is well-formed, else None."""
     group_cols = [c for c in op.get("input_columns", []) if c in existing]
     target_cols = [c for c in op.get("secondary_columns", []) if c in existing]

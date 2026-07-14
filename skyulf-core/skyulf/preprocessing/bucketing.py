@@ -39,7 +39,9 @@ def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any) -> Any:
     return pl.col(col).cut(breaks=breaks, labels=labels, left_closed=False, include_breaks=False)
 
 
-def _range_edge_labels(sorted_edges: list[float], include_lowest: bool, precision: int) -> list[str]:
+def _range_edge_labels(
+    sorted_edges: list[float], include_lowest: bool, precision: int
+) -> list[str]:
     """Build pandas-style ``'[a, b]'``/``'(a, b]'`` range labels directly from bin edges.
 
     Mirrors the pandas apply path (:func:`_format_one_interval`): the same

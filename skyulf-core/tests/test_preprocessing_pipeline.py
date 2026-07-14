@@ -386,9 +386,7 @@ def test_fit_transform_does_not_oversample_test_or_validation() -> None:
     assert train_counts[0] == train_counts[1]
 
     # Test/validation must be completely untouched -- no synthetic rows added.
-    pd.testing.assert_frame_equal(
-        result.test.reset_index(drop=True), test.reset_index(drop=True)
-    )
+    pd.testing.assert_frame_equal(result.test.reset_index(drop=True), test.reset_index(drop=True))
     pd.testing.assert_frame_equal(
         result.validation.reset_index(drop=True), validation.reset_index(drop=True)
     )
@@ -420,9 +418,7 @@ def test_fit_transform_does_not_undersample_test_or_validation() -> None:
     assert train_counts[0] == train_counts[1]
 
     # Test/validation must be completely untouched -- no rows dropped.
-    pd.testing.assert_frame_equal(
-        result.test.reset_index(drop=True), test.reset_index(drop=True)
-    )
+    pd.testing.assert_frame_equal(result.test.reset_index(drop=True), test.reset_index(drop=True))
     pd.testing.assert_frame_equal(
         result.validation.reset_index(drop=True), validation.reset_index(drop=True)
     )

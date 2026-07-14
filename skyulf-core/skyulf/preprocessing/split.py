@@ -191,9 +191,7 @@ class DataSplitter:
 
     # ---- public API ---------------------------------------------------------
 
-    def split_xy(
-        self, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
-    ) -> SplitDataset:
+    def split_xy(self, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any) -> SplitDataset:
         X_pd, was_polars = _to_pandas_remember_engine(X)
         y_pd, _ = _to_pandas_remember_engine(y)
 

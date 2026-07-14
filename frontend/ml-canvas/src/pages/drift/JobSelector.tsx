@@ -103,7 +103,6 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                         : 'Select reference model...'}
                 </span>
                 {selectedJob && (
-                    // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- span nested inside a real <button>; role="button" not needed for a native descendant handler
                     <span
                         role="button"
                         tabIndex={0}

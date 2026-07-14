@@ -22,6 +22,18 @@ from ..utils import pack_pipeline_output, unpack_pipeline_input
 
 logger = logging.getLogger(__name__)
 
+
+def _callable_name(func: Callable[..., Any]) -> str:
+    """Best-effort display name for a dispatch-target callable.
+
+    Not every callable used here is a plain function (some are
+    ``functools.partial``/lambdas/bound methods from tests and call sites),
+    so ``__qualname__`` isn't guaranteed to exist -- fall back to
+    ``__name__`` and finally ``repr`` for logging purposes only.
+    """
+    return getattr(func, "__qualname__", getattr(func, "__name__", repr(func)))
+
+
 # Type definitions for the processing functions
 # They receive (X, y, params)
 # Apply returns (X_transformed, y_transformed)
@@ -60,9 +72,7 @@ def apply_dual_engine(
         try:
             X_out, y_out = polars_func(X, y, params)
         except Exception:
-            logger.exception(
-                "Polars engine apply failed in %s", polars_func.__qualname__
-            )
+            logger.exception("Polars engine apply failed in %s", _callable_name(polars_func))
             raise
     else:
         # Pandas path
@@ -72,9 +82,7 @@ def apply_dual_engine(
         try:
             X_out, y_out = pandas_func(X_pd, y, params)
         except Exception:
-            logger.exception(
-                "Pandas engine apply failed in %s", pandas_func.__qualname__
-            )
+            logger.exception("Pandas engine apply failed in %s", _callable_name(pandas_func))
             raise
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
@@ -105,16 +113,12 @@ def fit_dual_engine(
         try:
             return dict(polars_func(X, y, params))
         except Exception:
-            logger.exception(
-                "Polars engine fit failed in %s", polars_func.__qualname__
-            )
+            logger.exception("Polars engine fit failed in %s", _callable_name(polars_func))
             raise
     else:
         X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:
             return dict(pandas_func(X_pd, y, params))
         except Exception:
-            logger.exception(
-                "Pandas engine fit failed in %s", pandas_func.__qualname__
-            )
+            logger.exception("Pandas engine fit failed in %s", _callable_name(pandas_func))
             raise
