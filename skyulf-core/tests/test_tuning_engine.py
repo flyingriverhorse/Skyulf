@@ -1044,3 +1044,78 @@ def test_tuning_applier_predict_proba_without_tuple_artifact_returns_none():
     X_df = pd.DataFrame({"a": [1, 2, 3]})
     proba = applier.predict_proba(X_df, "not-a-tuple-artifact")
     assert proba is None
+
+
+# ---------------------------------------------------------------------------
+# TuningCalculator.tune — cv_shuffle / cv_random_state honored in search phase
+# ---------------------------------------------------------------------------
+
+
+def test_tune_search_phase_honors_cv_random_state(monkeypatch):
+    """The search-phase CV splitter must use cv_random_state, not random_state."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    cfg = _clf_config(cv_random_state=123, random_state=999)  # default cv_type="k_fold"
+
+    captured: dict[str, Any] = {}
+    real_kfold = engine_mod.KFold
+
+    class _CapturingKFold(real_kfold):
+        def __init__(self, *args, **kwargs):
+            captured["shuffle"] = kwargs.get("shuffle")
+            captured["random_state"] = kwargs.get("random_state")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(engine_mod, "KFold", _CapturingKFold)
+
+    tuner.fit(X, y, config=cfg)
+
+    assert captured["random_state"] == 123
+    assert captured["shuffle"] is True
+
+
+def test_tune_search_phase_honors_cv_shuffle_false(monkeypatch):
+    """cv_shuffle=False must produce shuffle=False and random_state=None (sklearn
+    raises ValueError if random_state is set while shuffle=False)."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    cfg = _clf_config(cv_shuffle=False, cv_random_state=123)  # default cv_type="k_fold"
+
+    captured: dict[str, Any] = {}
+    real_kfold = engine_mod.KFold
+
+    class _CapturingKFold(real_kfold):
+        def __init__(self, *args, **kwargs):
+            captured["shuffle"] = kwargs.get("shuffle")
+            captured["random_state"] = kwargs.get("random_state")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(engine_mod, "KFold", _CapturingKFold)
+
+    # Should not raise despite cv_random_state being set, since shuffle=False
+    # must force random_state=None internally.
+    tuner.fit(X, y, config=cfg)
+
+    assert captured["shuffle"] is False
+    assert captured["random_state"] is None
+
+
+def test_tune_search_phase_shuffle_split_honors_cv_random_state(monkeypatch):
+    """The shuffle_split CV type must seed ShuffleSplit from cv_random_state."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    cfg = _clf_config(cv_type="shuffle_split", cv_random_state=77, random_state=999)
+
+    captured: dict[str, Any] = {}
+    real_shuffle_split = engine_mod.ShuffleSplit
+
+    class _CapturingShuffleSplit(real_shuffle_split):
+        def __init__(self, *args, **kwargs):
+            captured["random_state"] = kwargs.get("random_state")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(engine_mod, "ShuffleSplit", _CapturingShuffleSplit)
+
+    tuner.fit(X, y, config=cfg)
+
+    assert captured["random_state"] == 77
