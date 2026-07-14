@@ -26,7 +26,7 @@ def _invalid_rule_polars(
     """Apply a single invalid-value rule to a Polars expression."""
     import polars as pl
 
-    if rule == "negative":
+    if rule in ("negative", "negative_to_nan"):
         return pl.when(expr < 0).then(final_replacement).otherwise(expr)
     if rule == "zero":
         return pl.when(expr == 0).then(final_replacement).otherwise(expr)
@@ -127,12 +127,19 @@ class InvalidValueReplacementApplier(BaseApplier):
 
         df_out = X.copy()
         for col in valid:
-            df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
             to_replace = []
             if replace_inf:
                 to_replace.append(np.inf)
             if replace_neg_inf:
                 to_replace.append(-np.inf)
+            # Skip entirely when no rule/inf-replacement is configured for this
+            # column -- a true no-op, matching the polars path. Previously this
+            # unconditionally ran pd.to_numeric(..., errors="coerce"), which
+            # silently NaN'd out non-numeric columns even when nothing was
+            # actually configured to change.
+            if not to_replace and rule is None:
+                continue
+            df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
             if to_replace:
                 df_out[col] = df_out[col].replace(to_replace, final_replacement)
             mask = _invalid_rule_pandas_mask(df_out[col], rule, min_value, max_value)

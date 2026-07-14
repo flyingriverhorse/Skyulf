@@ -237,6 +237,36 @@ def test_applier_all_nan_column() -> None:
     assert result["v"].isna().all()
 
 
+def test_applier_pandas_no_op_config_preserves_non_numeric_column() -> None:
+    """When no rule/inf-replacement is configured, a non-numeric column must be
+    left completely untouched (not silently NaN'd by an unconditional
+    pd.to_numeric coercion)."""
+    df = pd.DataFrame({"v": ["a", "b", "c"]})
+    params: dict[str, Any] = {
+        "columns": ["v"],
+        "rule": None,
+        "replace_inf": False,
+        "replace_neg_inf": False,
+    }
+    result = InvalidValueReplacementApplier().apply(df, params)
+    pd.testing.assert_series_equal(result["v"], df["v"])
+
+
+def test_applier_polars_negative_to_nan_alias_replaces_negatives() -> None:
+    """The `negative_to_nan` rule alias must behave identically on the polars
+    engine to the pandas engine (both replace negative values)."""
+    df = pl.DataFrame({"v": [-2.0, 0.0, 3.0]})
+    params: dict[str, Any] = {
+        "columns": ["v"],
+        "rule": "negative_to_nan",
+        "replacement": 0.0,
+        "replace_inf": False,
+        "replace_neg_inf": False,
+    }
+    result = InvalidValueReplacementApplier().apply(df, params)
+    assert result["v"].to_list() == [0.0, 0.0, 3.0]
+
+
 # ---------------------------------------------------------------------------
 # fit → apply equivalence
 # ---------------------------------------------------------------------------
