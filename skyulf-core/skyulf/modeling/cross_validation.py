@@ -117,24 +117,15 @@ def perform_cross_validation(
             log_callback=log_callback,
         )
 
-    # 1. Setup Splitter
-    if cv_type == "time_series_split":
-        splitter = TimeSeriesSplit(n_splits=n_folds)
-    elif cv_type == "shuffle_split":
-        splitter = ShuffleSplit(n_splits=n_folds, test_size=0.2, random_state=random_state)
-    elif cv_type == "stratified_k_fold" and problem_type == "classification":
-        splitter = StratifiedKFold(
-            n_splits=n_folds,
-            shuffle=shuffle,
-            random_state=random_state if shuffle else None,
-        )
-    else:
-        # Default to KFold
-        splitter = KFold(
-            n_splits=n_folds,
-            shuffle=shuffle,
-            random_state=random_state if shuffle else None,
-        )
+    # 1. Setup Splitter (delegates to _build_splitter so unknown cv_type
+    # values get the same warning/fallback behavior in both call paths).
+    splitter = _build_splitter(
+        cv_type=cv_type,
+        n_folds=n_folds,
+        problem_type=problem_type,
+        shuffle=shuffle,
+        random_state=random_state,
+    )
 
     fold_results = []
 
@@ -312,12 +303,17 @@ def _perform_nested_cv(
     log_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """
-    Performs nested cross-validation with an outer loop for evaluation
-    and an inner loop for hyperparameter selection per fold.
+    Performs nested cross-validation with an outer loop for generalization
+    evaluation and an inner loop that produces a diagnostic stability signal.
 
     Outer loop: evaluates generalization (same as standard CV).
-    Inner loop: selects best hyperparameters via 3-fold CV within each
-    training fold (avoids overfitting to the validation set).
+    Inner loop: fits the *same* config across inner folds within each outer
+    training fold and reports the resulting score as ``inner_cv_mean`` - a
+    diagnostic of how stable/consistent the model is on sub-splits of the
+    training data. This does **not** perform hyperparameter search; the same
+    ``config`` passed by the caller is used unchanged for every inner and
+    outer fold. Real inner-loop hyperparameter selection is out of scope for
+    this function.
     """
     import logging
 
@@ -368,11 +364,12 @@ def _perform_nested_cv(
             y_train_fold = y[train_idx]
             y_val_fold = y[val_idx]
 
-        # --- Inner loop: quick hyperparameter selection ---
-        # Try each config variant with inner CV and pick the best
-        # For now, we just do a single inner CV to get a stable training signal,
-        # then evaluate on the held-out outer fold.
-        # This provides the key nested CV benefit: unbiased generalization estimate.
+        # --- Inner loop: diagnostic stability signal ---
+        # Fits the *same* config (no hyperparameter search) across inner
+        # folds of this outer training fold and records the resulting score.
+        # This measures how stable the model's performance is across
+        # sub-splits, not "the best hyperparameters" - it is purely
+        # diagnostic and does not influence the outer-fold model fit below.
 
         # Build inner splitter
         if problem_type == "classification":
@@ -420,9 +417,16 @@ def _perform_nested_cv(
                     inner_scores.append(inner_metrics.get("r2", 0.0))
             except Exception as e:
                 logger.warning(f"Inner fold failed: {e}")
-                inner_scores.append(0.0)
+                if log_callback:
+                    log_callback(f"Inner fold failed: {e}")
+                # Use NaN rather than 0.0: for regression, 0.0 is itself a
+                # meaningful R^2 value (not a neutral "no score" sentinel),
+                # so a hard failure must not silently corrupt inner_cv_mean.
+                # NaN is filtered out of the mean below.
+                inner_scores.append(float("nan"))
 
-        inner_mean = float(np.mean(inner_scores)) if inner_scores else 0.0
+        valid_inner_scores = [s for s in inner_scores if not np.isnan(s)]
+        inner_mean = float(np.mean(valid_inner_scores)) if valid_inner_scores else float("nan")
 
         # --- Outer evaluation: train on full outer train, evaluate on outer val ---
         model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
@@ -444,7 +448,9 @@ def _perform_nested_cv(
             {
                 "fold": fold_idx + 1,
                 "metrics": sanitize_metrics(metrics),
-                "inner_cv_mean": inner_mean,
+                # None (not NaN) when every inner fold failed, for JSON-safety
+                # parity with sanitize_metrics' non-finite-value handling.
+                "inner_cv_mean": inner_mean if not np.isnan(inner_mean) else None,
             }
         )
 
