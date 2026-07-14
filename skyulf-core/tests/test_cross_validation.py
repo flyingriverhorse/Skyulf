@@ -433,6 +433,26 @@ def test_perform_cv_kfold_with_numpy_arrays_no_iloc():
     assert "accuracy" in result["aggregated_metrics"]
 
 
+def test_perform_cross_validation_unknown_cv_type_warns_and_falls_back(caplog):
+    """Regression test: perform_cross_validation's splitter setup must go
+    through the same _build_splitter() helper as elsewhere, so an unknown
+    cv_type value warns (instead of silently falling back to KFold with no
+    signal) - previously this path duplicated the splitter branching inline
+    without the warning that _build_splitter already had."""
+    import logging
+
+    X, y = _make_classification_xy(n=60)
+    calc = LogisticRegressionCalculator()
+    appl = LogisticRegressionApplier()
+
+    with caplog.at_level(logging.WARNING, logger="skyulf.modeling.cross_validation"):
+        result = perform_cross_validation(
+            calc, appl, X, y, config={}, n_folds=3, cv_type="not_a_real_cv_type"
+        )
+    assert len(result["folds"]) == 3
+    assert any("Unknown cv_type" in rec.message for rec in caplog.records)
+
+
 class _FlakyInnerCalculator(BaseModelCalculator):
     """Wraps LogisticRegressionCalculator but fails fit() on small (inner-fold-sized) splits."""
 
@@ -453,7 +473,10 @@ class _FlakyInnerCalculator(BaseModelCalculator):
 
 
 def test_perform_nested_cv_inner_fold_failure_is_caught():
-    """A failing inner-fold fit should be caught and recorded as a 0.0 score, not raised."""
+    """A failing inner-fold fit must be caught (not raised) and must not
+    silently corrupt inner_cv_mean with a misleading 0.0 - for regression
+    0.0 is itself a meaningful R^2 value, so an all-failed fold's mean must
+    surface as None (JSON-safe NaN) instead."""
     X, y = _make_classification_xy(n=150)
     calc = _FlakyInnerCalculator()
     appl = LogisticRegressionApplier()
@@ -461,7 +484,46 @@ def test_perform_nested_cv_inner_fold_failure_is_caught():
     result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="nested_cv")
     assert len(result["folds"]) == 3
     for fold in result["folds"]:
-        assert fold["inner_cv_mean"] == 0.0
+        assert fold["inner_cv_mean"] is None
+
+
+class _FlakyOnceCalculator(BaseModelCalculator):
+    """Wraps LogisticRegressionCalculator but fails fit() exactly once per
+    outer fold (on the first inner-fold call), then succeeds for the rest."""
+
+    def __init__(self):
+        self._real = LogisticRegressionCalculator()
+        self._call_count = 0
+
+    @property
+    def problem_type(self) -> str:
+        """Report classification, matching the wrapped calculator."""
+        return "classification"
+
+    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+        """Raise on every 3rd call (the first inner-fold call per outer fold, since
+        each outer fold does 1 outer fit + inner_folds inner fits and inner_folds=2)."""
+        self._call_count += 1
+        if self._call_count % 3 == 1:
+            raise RuntimeError("Simulated single inner-fold failure")
+        return self._real.fit(X, y, config)
+
+
+def test_perform_nested_cv_partial_inner_failure_excludes_nan_from_mean():
+    """Regression test: when only some inner folds fail, inner_cv_mean must be
+    the mean of the *valid* scores only, not silently include the failed
+    fold as 0.0 (which would corrupt an otherwise-good mean)."""
+    X, y = _make_classification_xy(n=150)
+    calc = _FlakyOnceCalculator()
+    appl = LogisticRegressionApplier()
+
+    result = perform_cross_validation(calc, appl, X, y, config={}, n_folds=3, cv_type="nested_cv")
+    assert len(result["folds"]) == 3
+    for fold in result["folds"]:
+        # At least one inner fold succeeded per outer fold, so the mean must
+        # be a real (non-None) number, not corrupted toward 0 by the failure.
+        assert fold["inner_cv_mean"] is not None
+        assert fold["inner_cv_mean"] >= 0.0
 
 
 def test_perform_nested_cv_with_callbacks_and_numpy_arrays():
