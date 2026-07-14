@@ -54,6 +54,31 @@ def test_split_train_test_row_counts() -> None:
     assert result.validation is None
 
 
+def test_split_test_size_plus_validation_size_at_or_above_1_raises_clear_error() -> None:
+    """Regression test: previously test_size + validation_size >= 1 fell
+    through to sklearn's train_test_split with a cryptic internal error
+    (e.g. about a non-positive train size) instead of a clear, actionable
+    message at construction time."""
+    with pytest.raises(ValueError, match="must be less than 1"):
+        DataSplitter(test_size=0.7, validation_size=0.3)
+    with pytest.raises(ValueError, match="must be less than 1"):
+        DataSplitter(test_size=0.5, validation_size=0.5)
+
+
+def test_split_test_size_out_of_range_raises_clear_error() -> None:
+    """test_size must be strictly between 0 and 1."""
+    with pytest.raises(ValueError, match="test_size"):
+        DataSplitter(test_size=0.0)
+    with pytest.raises(ValueError, match="test_size"):
+        DataSplitter(test_size=1.0)
+
+
+def test_split_validation_size_out_of_range_raises_clear_error() -> None:
+    """validation_size must be in [0, 1); a negative value is invalid."""
+    with pytest.raises(ValueError, match="validation_size"):
+        DataSplitter(test_size=0.2, validation_size=-0.1)
+
+
 def test_split_with_validation_carves_correct_proportions() -> None:
     """test_size=0.2 and validation_size=0.1 of a 100-row frame yields 70/20/10."""
     df = _frame(100)
