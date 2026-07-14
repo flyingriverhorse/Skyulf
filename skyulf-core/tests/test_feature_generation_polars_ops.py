@@ -339,6 +339,23 @@ class TestPolarsDatetimeApply:
         out = _polars_datetime_apply(op, df)
         assert out["dt_is_weekend"].to_list() == [1, 0]
 
+    def test_bad_column_does_not_drop_good_column_features(self) -> None:
+        """A column that fails datetime extraction must not prevent other
+        columns in the same op from producing their features (per-column
+        isolation, matching the pandas engine's behaviour)."""
+        df = pl.DataFrame(
+            {
+                "good": pl.Series(["2024-01-15", "2024-07-04"]).str.to_datetime(),
+                "bad": [1, 2],
+            }
+        )
+        op = {"input_columns": ["bad", "good"], "datetime_features": ["year", "month"]}
+        out = _polars_datetime_apply(op, df)
+        assert "good_year" in out.columns
+        assert "good_month" in out.columns
+        assert out["good_year"].to_list() == [2024, 2024]
+        assert "bad_year" not in out.columns
+
     def test_register_polars_dt_idempotent(self) -> None:
         """Calling _register_polars_dt multiple times must not cause errors."""
         _register_polars_dt()
