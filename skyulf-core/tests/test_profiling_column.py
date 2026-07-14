@@ -344,3 +344,29 @@ def test_analyze_column_high_null_and_constant_alerts() -> None:
     assert profile.is_constant is True
     assert any(a.type == "High Null" for a in alerts)
     assert any(a.type == "Constant" for a in alerts)
+
+
+def test_analyze_categorical_handles_two_key_struct() -> None:
+    """The standard Polars value_counts() struct shape: {col_name: value, count: c}."""
+    df = pl.DataFrame({"cat": ["a", "b", "a"]})
+    analyzer = _basic_analyzer(df)
+    row = {"cat__top_k": [{"cat": "a", "count": 2}, {"cat": "b", "count": 1}]}
+    stats = analyzer._analyze_categorical("cat", row, {"cat__unique": 2})
+    assert stats.top_k == [{"value": "a", "count": 2}, {"value": "b", "count": 1}]
+
+
+def test_analyze_categorical_robust_to_extra_struct_keys() -> None:
+    """Regression test: previously assumed the struct always has exactly 2
+    keys and picked the value key by hard-coded position (keys[0] or
+    keys[1]), which would silently misassign the value or raise IndexError
+    if the struct ever carried extra keys. Now finds the non-'count' key by
+    name, robust to any number of additional keys."""
+    df = pl.DataFrame({"cat": ["a", "b"]})
+    analyzer = _basic_analyzer(df)
+    row = {
+        "cat__top_k": [
+            {"cat": "a", "count": 2, "extra_meta": "ignored"},
+        ]
+    }
+    stats = analyzer._analyze_categorical("cat", row, {"cat__unique": 1})
+    assert stats.top_k == [{"value": "a", "count": 2}]
