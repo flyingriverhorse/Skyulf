@@ -185,6 +185,48 @@ def test_calculator_fit_value_key_stored() -> None:
     assert params["value"] == 0
 
 
+def test_calculator_fit_zero_to_nan_alias_normalizes_to_zero_rule() -> None:
+    """The frontend's 'zero_to_nan' UI mode must normalize to the canonical
+    'zero' rule -- previously it fell through as an unrecognized rule string
+    and silently no-op'd on both engines."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "mode": "zero_to_nan"})
+    assert params["rule"] == "zero"
+
+
+def test_calculator_fit_percentage_bounds_normalizes_with_defaults() -> None:
+    """The frontend's 'percentage_bounds' UI mode must normalize to
+    'custom_range' with a 0-100 default when the user hasn't overridden it."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(
+        df, {"columns": ["x"], "mode": "percentage_bounds"}
+    )
+    assert params["rule"] == "custom_range"
+    assert params["min_value"] == 0.0
+    assert params["max_value"] == 100.0
+
+
+def test_calculator_fit_age_bounds_normalizes_with_defaults() -> None:
+    """The frontend's 'age_bounds' UI mode must normalize to 'custom_range'
+    with a 0-120 default when the user hasn't overridden it."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(df, {"columns": ["x"], "mode": "age_bounds"})
+    assert params["rule"] == "custom_range"
+    assert params["min_value"] == 0.0
+    assert params["max_value"] == 120.0
+
+
+def test_calculator_fit_percentage_bounds_respects_user_overrides() -> None:
+    """User-supplied min/max must take priority over the preset defaults."""
+    df = _basic_df()
+    params = InvalidValueReplacementCalculator().fit(
+        df, {"columns": ["x"], "mode": "percentage_bounds", "min_value": 10.0, "max_value": 90.0}
+    )
+    assert params["rule"] == "custom_range"
+    assert params["min_value"] == 10.0
+    assert params["max_value"] == 90.0
+
+
 # ---------------------------------------------------------------------------
 # Applier.apply — pandas path
 # ---------------------------------------------------------------------------
@@ -265,6 +307,17 @@ def test_applier_polars_negative_to_nan_alias_replaces_negatives() -> None:
     }
     result = InvalidValueReplacementApplier().apply(df, params)
     assert result["v"].to_list() == [0.0, 0.0, 3.0]
+
+
+def test_fit_then_apply_percentage_bounds_end_to_end() -> None:
+    """Full fit -> apply flow for the frontend's 'percentage_bounds' UI mode."""
+    df = pd.DataFrame({"v": [0.0, 50.0, 150.0, -10.0]})
+    calculator = InvalidValueReplacementCalculator()
+    applier = InvalidValueReplacementApplier()
+    artifact = calculator.fit(df, {"columns": ["v"], "mode": "percentage_bounds"})
+    result = applier.apply(df, artifact)
+    assert result["v"].isna().sum() == 2
+    assert result["v"].dropna().tolist() == [0.0, 50.0]
 
 
 # ---------------------------------------------------------------------------

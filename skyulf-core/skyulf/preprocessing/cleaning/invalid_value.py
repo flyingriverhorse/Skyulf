@@ -82,6 +82,34 @@ def _resolve_invalid_replacement(params: dict[str, Any]) -> Any:
     return value if value is not None else replacement
 
 
+# The frontend's "mode" dropdown offers a few convenience presets that don't
+# have a matching entry in `_invalid_rule_pandas_mask`/`_invalid_rule_polars`
+# (which only understand "negative"/"negative_to_nan", "zero", and
+# "custom_range"). Without this mapping, selecting "Zero to NaN",
+# "Percentage Bounds", or "Age Bounds" in the UI silently did nothing on
+# either engine. Normalize aliases to a canonical rule (+ default bounds when
+# the user hasn't overridden them) here, once, at fit-time.
+_RULE_ALIASES = {"zero_to_nan": "zero"}
+_RULE_DEFAULT_BOUNDS = {
+    "percentage_bounds": (0.0, 100.0),
+    "age_bounds": (0.0, 120.0),
+}
+
+
+def _normalize_rule(
+    raw_rule: str | None, min_value: Any, max_value: Any
+) -> tuple[str | None, Any, Any]:
+    """Map UI convenience mode aliases to a canonical rule + bounds."""
+    if raw_rule in _RULE_DEFAULT_BOUNDS:
+        default_min, default_max = _RULE_DEFAULT_BOUNDS[raw_rule]
+        return (
+            "custom_range",
+            min_value if min_value is not None else default_min,
+            max_value if max_value is not None else default_max,
+        )
+    return _RULE_ALIASES.get(raw_rule, raw_rule), min_value, max_value
+
+
 class InvalidValueReplacementApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -168,14 +196,19 @@ class InvalidValueReplacementCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
         cols = resolve_columns(X, config, _auto_detect_numeric_columns)
+        rule, min_value, max_value = _normalize_rule(
+            config.get("rule") or config.get("mode"),
+            config.get("min_value"),
+            config.get("max_value"),
+        )
         return {
             "type": "invalid_value_replacement",
             "columns": cols,
             "replace_inf": config.get("replace_inf", False),
             "replace_neg_inf": config.get("replace_neg_inf", False),
-            "rule": config.get("rule") or config.get("mode"),
+            "rule": rule,
             "replacement": config.get("replacement", np.nan),
             "value": config.get("value"),
-            "min_value": config.get("min_value"),
-            "max_value": config.get("max_value"),
+            "min_value": min_value,
+            "max_value": max_value,
         }
