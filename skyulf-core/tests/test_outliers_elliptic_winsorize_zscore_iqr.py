@@ -417,6 +417,32 @@ class TestEllipticEnvelopeCalculator:
         assert "val" not in params["models"]
         assert params["warnings"]
 
+    def test_fit_is_deterministic_across_repeated_calls(self) -> None:
+        """Regression test: EllipticEnvelope must set random_state so repeated
+        fits on identical data produce identical inlier/outlier decisions.
+        Previously no random_state was passed (unlike every other stochastic
+        estimator in this codebase), making results non-reproducible."""
+        rng = np.random.RandomState(0)
+        values = rng.normal(0, 1, 200).tolist()
+        df = pd.DataFrame({"val": values})
+
+        params_a = EllipticEnvelopeCalculator().fit(df, {"columns": ["val"], "contamination": 0.1})
+        params_b = EllipticEnvelopeCalculator().fit(df, {"columns": ["val"], "contamination": 0.1})
+
+        preds_a = params_a["models"]["val"].predict(df[["val"]].to_numpy())
+        preds_b = params_b["models"]["val"].predict(df[["val"]].to_numpy())
+        assert preds_a.tolist() == preds_b.tolist()
+
+    def test_fit_uses_configured_random_state(self) -> None:
+        """A caller-supplied random_state must be forwarded to EllipticEnvelope."""
+        rng = np.random.RandomState(0)
+        values = rng.normal(0, 1, 50).tolist()
+        df = pd.DataFrame({"val": values})
+        params = EllipticEnvelopeCalculator().fit(
+            df, {"columns": ["val"], "contamination": 0.1, "random_state": 7}
+        )
+        assert params["models"]["val"].random_state == 7
+
 
 class TestEllipticEnvelopeApplier:
     def test_extreme_outlier_row_removed(self) -> None:

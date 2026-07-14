@@ -1,4 +1,5 @@
 import logging
+from threading import Lock
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -8,6 +9,7 @@ class NodeRegistry:
     _calculators: dict[str, type] = {}
     _appliers: dict[str, type] = {}
     _metadata: dict[str, dict[str, Any]] = {}
+    _lock = Lock()
 
     @classmethod
     def register(cls, name: str, applier_cls: type, metadata: dict[str, Any] | None = None):
@@ -21,28 +23,29 @@ class NodeRegistry:
         """
 
         def wrapper(calculator_cls):
-            if name in cls._calculators:
-                logger.warning(
-                    f"Node '{name}' is being re-registered. Overwriting previous registration."
-                )
+            with cls._lock:
+                if name in cls._calculators:
+                    logger.warning(
+                        f"Node '{name}' is being re-registered. Overwriting previous registration."
+                    )
 
-            cls._calculators[name] = calculator_cls
-            cls._appliers[name] = applier_cls
+                cls._calculators[name] = calculator_cls
+                cls._appliers[name] = applier_cls
 
-            # 1. Use passed metadata if available
-            if metadata is not None:
-                cls._metadata[name] = metadata
-            # 2. Otherwise check for __node_meta__ (from @node_meta decorator)
-            elif hasattr(calculator_cls, "__node_meta__"):
-                meta = calculator_cls.__node_meta__
-                cls._metadata[name] = {
-                    "id": meta.id,
-                    "name": meta.name,
-                    "category": meta.category,
-                    "description": meta.description,
-                    "params": meta.params,
-                    "tags": meta.tags,
-                }
+                # 1. Use passed metadata if available
+                if metadata is not None:
+                    cls._metadata[name] = metadata
+                # 2. Otherwise check for __node_meta__ (from @node_meta decorator)
+                elif hasattr(calculator_cls, "__node_meta__"):
+                    meta = calculator_cls.__node_meta__
+                    cls._metadata[name] = {
+                        "id": meta.id,
+                        "name": meta.name,
+                        "category": meta.category,
+                        "description": meta.description,
+                        "params": meta.params,
+                        "tags": meta.tags,
+                    }
 
             return calculator_cls
 

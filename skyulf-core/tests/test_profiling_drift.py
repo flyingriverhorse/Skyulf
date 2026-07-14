@@ -26,6 +26,20 @@ def test_calculate_drift_detects_shifted_distribution() -> None:
     assert {"wasserstein_distance", "ks_test_p_value", "psi", "kl_divergence"} == metric_names
 
 
+def test_calculate_drift_detects_shift_in_small_int_dtypes() -> None:
+    """Regression test: Int8/Int16/UInt* columns must not be silently dropped
+    from the report — only the original Float32/Float64/Int32/Int64 allow-list
+    was checked previously, which skipped narrower integer dtypes entirely.
+    """
+    reference = pl.DataFrame({"feature": pl.Series("feature", list(range(0, 100)), dtype=pl.Int16)})
+    current = pl.DataFrame({"feature": pl.Series("feature", list(range(100, 200)), dtype=pl.Int16)})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "feature" in report.column_drifts
+    assert report.column_drifts["feature"].drift_detected is True
+
+
 def test_calculate_drift_no_drift_for_identical_distribution() -> None:
     """Sampling from the same distribution twice (large N) should not trigger drift."""
     rng = np.random.default_rng(1)

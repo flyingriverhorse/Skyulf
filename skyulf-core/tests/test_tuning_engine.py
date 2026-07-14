@@ -159,6 +159,25 @@ def test_fit_raises_on_inf_features():
         tuner.fit(X, y, config=_clf_config())
 
 
+def test_fit_raises_on_nan_in_object_dtype_features():
+    """Regression test: the NaN/Inf pre-flight check must also catch missing
+    values in object-dtype feature arrays (e.g. mixed numeric+string columns
+    from SklearnBridge), not only pure numeric-dtype arrays. Previously this
+    guard was skipped entirely via `np.issubdtype(dtype, np.number)`, so a
+    NaN buried in an object array silently reached the model and produced an
+    opaque downstream sklearn error instead of the clear upfront message."""
+    X = pd.DataFrame(
+        {
+            "num": [1.0, 2.0, float("nan"), 4.0] * 30,
+            "cat": (["x", "y", "z", "w"] * 30),
+        }
+    )
+    y = pd.Series([0, 1] * 60)
+    tuner = _tuner_clf()
+    with pytest.raises(ValueError, match="missing/NaN values"):
+        tuner.fit(X, y, config=_clf_config())
+
+
 def test_fit_raises_on_nan_target():
     """fit() should raise ValueError when y contains NaN values."""
     X, y = _reg_xy()
@@ -685,6 +704,20 @@ def test_fit_grid_search_handles_failing_candidate():
     scores = {t["params"]["C"]: t["score"] for t in result.trials}
     assert scores[-5] == -float("inf")
     assert any("Failed" in msg for msg in logs)
+
+
+def test_fit_grid_search_raises_when_all_candidates_fail():
+    """Regression test: if EVERY candidate fails on every fold, the tuner must
+    raise a clear error instead of silently refitting with untuned defaults
+    (previously best_params fell back to {} with best_score=-inf, matching
+    the halving/optuna strategies' behavior for "no trials completed")."""
+    X, y = _clf_xy()
+    tuner = _tuner_clf()
+    # Both C values are invalid for LogisticRegression -> every candidate fails.
+    cfg = _clf_config(search_space={"C": [-5, -10]}, cv_folds=3)
+
+    with pytest.raises(ValueError, match="All trials failed"):
+        tuner.fit(X, y, config=cfg)
 
 
 # ---------------------------------------------------------------------------

@@ -234,7 +234,16 @@ class MultivariateMixin(_AnalyzerState):
             from sklearn.impute import SimpleImputer
 
             limit = 50000
-            df_numeric = self.df.select(numeric_cols).head(limit)  # type: ignore[attr-defined]
+            row_count = self.df.height  # type: ignore[attr-defined]
+            if row_count > limit:
+                # Use a random (seeded) sample rather than the first N rows, matching
+                # the sampling strategy used elsewhere in this module (PCA/clustering),
+                # so ordering (e.g. by date) doesn't bias which rows get analyzed.
+                df_numeric = self.df.select(numeric_cols).sample(  # type: ignore[attr-defined]
+                    n=limit, with_replacement=False, seed=42
+                )
+            else:
+                df_numeric = self.df.select(numeric_cols)  # type: ignore[attr-defined]
 
             X = df_numeric.to_pandas().values
             imputer = SimpleImputer(strategy="mean")
