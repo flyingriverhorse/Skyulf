@@ -1,6 +1,7 @@
 """Pandas-engine op handlers for FeatureGeneration."""
 
 import builtins
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -14,6 +15,8 @@ from ._common import (
     _safe_divide,
     _vectorised_similarity,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _pandas_arith_terms(op: dict[str, Any], df_out: Any) -> tuple[list[pd.Series], list[float]]:
@@ -160,8 +163,8 @@ def _pandas_datetime_apply(op: dict[str, Any], df_out: Any) -> None:
                 if builder is None:
                     continue
                 df_out[f"{col}_{feat}"] = builder(dt)
-        except Exception:
-            pass  # nosec B110 - skip a column that fails datetime feature extraction
+        except Exception as e:
+            logger.warning(f"Failed to extract datetime features for column {col}: {e}")
 
 
 _PANDAS_AGG_METHODS = {"mean", "sum", "count", "min", "max", "std", "median"}
@@ -214,6 +217,6 @@ def _featgen_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
             if round_digits is not None:
                 result = result.round(round_digits)
             df_out[output_col] = result
-        except Exception:
-            pass  # nosec B110 - skip a malformed op; other feature-generation ops still apply
+        except Exception as e:
+            logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
     return df_out, y

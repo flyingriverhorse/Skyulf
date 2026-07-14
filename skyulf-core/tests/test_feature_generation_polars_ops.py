@@ -171,6 +171,15 @@ class TestPolarsDivide:
         val = pl.DataFrame({"dummy": [1]}).select(result.alias("r"))["r"][0]
         assert abs(val) < 1e18
 
+    def test_near_zero_negative_denominator_preserves_sign(self) -> None:
+        """A small negative denominator column must yield a negative result, not flip sign."""
+        result = _polars_divide([pl.col("a"), pl.col("b")], [], self._EPS)
+        assert result is not None
+        df = pl.DataFrame({"a": [1.0], "b": [-1e-15]})
+        val = df.select(result.alias("r"))["r"][0]
+        assert val < 0
+        assert val == pytest.approx(-1e9)
+
 
 # ---------------------------------------------------------------------------
 # _polars_ratio
@@ -447,6 +456,27 @@ class TestFeatgenApplyPolars:
         df = _make_pl()
         out, _ = _featgen_apply_polars(df, None, {"operations": [{"operation_type": None}]})
         assert "a" in out.columns
+
+    def test_malformed_op_logs_warning(self, caplog: pytest.LogCaptureFixture) -> None:
+        """An op that raises inside the loop (bad round_digits) is skipped but logged."""
+        import logging
+
+        df = _make_pl()
+        params = {
+            "operations": [
+                {
+                    "operation_type": "arithmetic",
+                    "method": "add",
+                    "input_columns": ["a", "b"],
+                    "round_digits": "not-an-int",
+                }
+            ]
+        }
+        with caplog.at_level(logging.WARNING):
+            out, _ = _featgen_apply_polars(df, None, params)
+        assert "a" in out.columns
+        assert any("Failed to apply arithmetic operation" in rec.message for rec in caplog.records)
+
 
 
 # ---------------------------------------------------------------------------

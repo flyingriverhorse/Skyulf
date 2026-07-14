@@ -33,7 +33,9 @@ def _polars_stat_for_strategy(strategy: str, fill_value: Any) -> Any:
     if strategy == "median":
         return lambda c: pl.col(c).median()
     if strategy == "most_frequent":
-        return lambda c: pl.col(c).mode().first()
+        # sklearn/scipy break ties by picking the smallest value; polars' .mode()
+        # has no guaranteed tie-break order, so sort ascending before taking first.
+        return lambda c: pl.col(c).mode().sort().first()
     raise ValueError(f"Unknown strategy: {strategy}")
 
 

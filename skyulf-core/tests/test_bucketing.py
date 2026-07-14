@@ -441,6 +441,21 @@ def test_apply_polars_range_label_format_keeps_categorical_alias() -> None:
     assert not pd.api.types.is_integer_dtype(result["x_binned"])
 
 
+def test_apply_range_label_format_matches_between_pandas_and_polars() -> None:
+    """The exact range-format label TEXT must be identical across engines
+    for the same fitted bin_edges artifact."""
+    df_pd = pd.DataFrame({"x": list(range(10))})
+    config = {"columns": ["x"], "strategy": "equal_width", "n_bins": 5, "label_format": "range"}
+    params = GeneralBinningCalculator().fit(df_pd, config)
+
+    result_pd = GeneralBinningApplier().apply(df_pd, params)
+    result_pl = GeneralBinningApplier().apply(pl.DataFrame({"x": list(range(10))}), params)
+    if hasattr(result_pl, "to_pandas"):
+        result_pl = result_pl.to_pandas()
+
+    assert result_pd["x_binned"].astype(str).tolist() == result_pl["x_binned"].astype(str).tolist()
+
+
 # ---------------------------------------------------------------------------
 # Pandas — missing-label formatting on categorical (range) output
 # ---------------------------------------------------------------------------

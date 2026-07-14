@@ -39,12 +39,30 @@ def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any) -> Any:
     return pl.col(col).cut(breaks=breaks, labels=labels, left_closed=False, include_breaks=False)
 
 
+def _range_edge_labels(sorted_edges: list[float], include_lowest: bool, precision: int) -> list[str]:
+    """Build pandas-style ``'[a, b]'``/``'(a, b]'`` range labels directly from bin edges.
+
+    Mirrors the pandas apply path (:func:`_format_one_interval`): the same
+    bracket character is used for every bin, chosen by ``include_lowest``, so
+    the label text is identical across engines for the same fitted edges.
+    """
+    bracket_l = "[" if include_lowest else "("
+    labels = []
+    for i in range(len(sorted_edges) - 1):
+        l_val = round(sorted_edges[i], precision)
+        r_val = round(sorted_edges[i + 1], precision)
+        labels.append(f"{bracket_l}{l_val}, {r_val}]")
+    return labels
+
+
 def _polars_one_col_expr(
     col: str,
     edges: list[float],
     output_suffix: str,
     label_format: str,
     custom_labels_map: dict[str, Any],
+    include_lowest: bool,
+    precision: int,
 ) -> Any:
     """Build the polars cut-expression for a single column, or ``None`` if degenerate."""
     import polars as pl
@@ -59,10 +77,14 @@ def _polars_one_col_expr(
         if col_custom_labels and len(col_custom_labels) == len(sorted_edges) - 1
         else None
     )
+    if labels is None and label_format == "range":
+        # Reconstruct the same bracket-string labels pandas produces, instead
+        # of relying on pl.cut()'s own default interval-label text.
+        labels = _range_edge_labels(sorted_edges, include_lowest, precision)
 
     cut_expr = _polars_cut_expr(col, sorted_edges, labels)
     target_col_name = f"{col}{output_suffix}"
-    if label_format in ("ordinal", "bin_index") and not labels:
+    if label_format in ("ordinal", "bin_index") and not col_custom_labels:
         # Polars cut returns Categorical; cast → physical index.
         return cut_expr.cast(pl.UInt32).alias(target_col_name)
     return cut_expr.alias(target_col_name)
@@ -75,13 +97,23 @@ def _build_polars_exprs(X: Any, params: dict[str, Any]) -> tuple[list[Any], list
     drop_original = params.get("drop_original", False)
     label_format = params.get("label_format", "ordinal")
     custom_labels_map = params.get("custom_labels", {})
+    include_lowest = params.get("include_lowest", True)
+    precision = params.get("precision", 3)
 
     exprs: list[Any] = []
     cols_to_drop: list[str] = []
     for col, edges in bin_edges_map.items():
         if col not in X.columns:
             continue
-        expr = _polars_one_col_expr(col, edges, output_suffix, label_format, custom_labels_map)
+        expr = _polars_one_col_expr(
+            col,
+            edges,
+            output_suffix,
+            label_format,
+            custom_labels_map,
+            include_lowest,
+            precision,
+        )
         if expr is not None:
             exprs.append(expr)
             if drop_original:

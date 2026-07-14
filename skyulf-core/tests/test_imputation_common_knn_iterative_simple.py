@@ -407,6 +407,23 @@ def test_simple_imputer_most_frequent_strategy_polars() -> None:
     assert out["cat"].null_count() == 0
 
 
+def test_simple_imputer_most_frequent_tie_picks_smallest_value_both_engines() -> None:
+    """On a genuine tie, both pandas and polars must pick the smallest value.
+
+    sklearn's SimpleImputer(strategy="most_frequent") and scipy.stats.mode
+    deterministically break ties by choosing the smallest value; polars'
+    .mode() has no guaranteed tie-break order, so we must force it.
+    """
+    df_pd = pd.DataFrame({"n": [2, 2, 1, 1, np.nan]})
+    calc = SimpleImputerCalculator()
+    params = calc.fit(df_pd, {"columns": ["n"], "strategy": "most_frequent"})
+    assert params["fill_values"]["n"] == 1
+
+    df_pl = pl.from_pandas(df_pd)
+    params_pl = calc.fit(df_pl, {"columns": ["n"], "strategy": "most_frequent"})
+    assert params_pl["fill_values"]["n"] == 1
+
+
 def test_simple_imputer_mode_alias_maps_to_most_frequent() -> None:
     """The 'mode' strategy alias is normalized to 'most_frequent'."""
     df = pd.DataFrame({"cat": ["x", "x", np.nan, "y"]})

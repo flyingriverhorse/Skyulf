@@ -4,6 +4,7 @@ import math
 from difflib import SequenceMatcher
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 # --- Optional Dependencies ---
@@ -63,11 +64,15 @@ def _coerce_float(value: Any) -> float | None:
 
 def _safe_divide(numerator: pd.Series, denominator: pd.Series, epsilon: float) -> pd.Series:
     adjusted = denominator.copy()
-    adjusted = adjusted.replace({0: epsilon, -0.0: epsilon})
-    adjusted = adjusted.fillna(epsilon)
-    mask = adjusted.abs() < epsilon
-    if mask.any():
-        adjusted[mask] = epsilon
+    near_zero = adjusted.isna() | (adjusted.abs() < epsilon)
+    if near_zero.any():
+        # Preserve the sign of the original denominator when clamping its
+        # magnitude to epsilon, so a small negative denominator doesn't flip
+        # the sign of the result. NaN defaults to positive epsilon.
+        signed_epsilon = pd.Series(
+            np.copysign(epsilon, adjusted.fillna(1.0).to_numpy()), index=adjusted.index
+        )
+        adjusted = adjusted.where(~near_zero, signed_epsilon)
     return numerator / adjusted
 
 
