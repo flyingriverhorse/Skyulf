@@ -7,6 +7,7 @@ SplitCalculator node contract (returns SplitDataset), and
 FeatureTargetSplitApplier/Calculator.
 """
 
+import logging
 import typing
 from typing import Any
 
@@ -368,6 +369,24 @@ def test_split_applier_stratify_true_without_target_column_uses_sentinel() -> No
     assert isinstance(result, SplitDataset)
     _, y_test = typing.cast(tuple[pd.DataFrame, pd.Series], result.test)
     assert y_test.mean() == pytest.approx(0.5, abs=0.05)
+
+
+def test_split_applier_frame_stratify_without_target_column_warns_and_splits(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """stratify=True with no target_column on a plain-frame input has no column
+    to stratify on; this must emit a warning (not fail silently) and still
+    complete as a plain (non-stratified) shuffle split."""
+    df = pd.DataFrame({"feature": range(100)})
+    params: dict[str, Any] = {"test_size": 0.2, "random_state": 42, "stratify": True}
+    with caplog.at_level(logging.WARNING):
+        result = SplitApplier().apply(df, params)
+    assert isinstance(result, SplitDataset)
+    assert isinstance(result.test, pd.DataFrame)
+    assert any(
+        "stratify" in record.message.lower() and "target_column" in record.message
+        for record in caplog.records
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 """Polars-engine op handlers for FeatureGeneration."""
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -10,6 +11,8 @@ from ._common import (
     _resolve_output_col,
     _resolve_similarity_pair,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _polars_arith_terms(op: dict[str, Any], existing: list[str]) -> tuple[list[Any], list[float]]:
@@ -66,7 +69,11 @@ def _polars_divide(col_exprs: list[Any], const_vals: list[float], epsilon: float
         return None
 
     def safe_denom(d: Any) -> Any:
-        return pl.when(d.abs() < epsilon).then(epsilon).otherwise(d)
+        # Preserve the sign of the original denominator when clamping its
+        # magnitude to epsilon, so a small negative denominator doesn't flip
+        # the sign of the result.
+        signed_epsilon = pl.when(d < 0).then(-epsilon).otherwise(epsilon)
+        return pl.when(d.abs() < epsilon).then(signed_epsilon).otherwise(d)
 
     for e in others:
         expr = expr / safe_denom(e)
@@ -193,8 +200,8 @@ def _polars_datetime_apply(op: dict[str, Any], X_out: Any) -> Any:
             col_exprs = _build_polars_dt_exprs(col, base_dt, features)
             if col_exprs:
                 X_out = X_out.with_columns(col_exprs)
-        except Exception:
-            pass  # nosec B110 - skip a column that fails datetime feature extraction
+        except Exception as e:
+            logger.warning(f"Failed to extract datetime features for column {col}: {e}")
     return X_out
 
 
@@ -259,6 +266,6 @@ def _featgen_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
             if round_digits is not None:
                 expr = expr.round(round_digits)
             X_out = X_out.with_columns(expr.alias(output_col))
-        except Exception:
-            pass  # nosec B110 - skip a malformed op; other feature-generation ops still apply
+        except Exception as e:
+            logger.warning(f"Failed to apply {op_type} operation (index {i}): {e}")
     return X_out, y

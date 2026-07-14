@@ -243,6 +243,13 @@ class DataSplitter:
     def _frame_stratify(self, df_pd: Any, label: str) -> Any:
         """Pick + sanity-check the stratify column on a frame split."""
         if not (self.stratify_col and self.stratify_col in df_pd.columns):
+            if self.stratify_col:
+                logger.warning(
+                    "%s requested but no target_column is configured for this "
+                    "plain-DataFrame input, so there is no column to stratify on. "
+                    "Stratification will be disabled.",
+                    label,
+                )
             return None
         return _safe_stratify(df_pd[self.stratify_col], label)
 

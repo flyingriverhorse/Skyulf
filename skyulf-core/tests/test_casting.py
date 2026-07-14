@@ -146,6 +146,22 @@ def test_drop_fractional_coerce_sets_nan() -> None:
     assert result.iloc[0] == 1.0
 
 
+def test_drop_fractional_large_magnitude_value_is_detected() -> None:
+    """A large-magnitude fractional value must not be masked by a scaling tolerance.
+
+    np.isclose's default rtol=1e-5 scales with magnitude, so 100000.001 would
+    incorrectly be treated as "close enough" to 100000.0 and silently pass
+    through un-flagged. A fixed absolute tolerance must catch it instead.
+    """
+    s = pd.Series([100000.001, 3.0])
+    result = _drop_fractional_or_raise(s, "col", coerce_on_error=True)
+    assert np.isnan(result.iloc[0])
+    assert result.iloc[1] == 3.0
+
+    with pytest.raises(ValueError, match="fractional"):
+        _drop_fractional_or_raise(pd.Series([100000.001, 3.0]), "col", coerce_on_error=False)
+
+
 # ---------------------------------------------------------------------------
 # _cast_bool
 # ---------------------------------------------------------------------------

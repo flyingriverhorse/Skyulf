@@ -132,7 +132,10 @@ def _cast_float(series: pd.Series, target_dtype: Any, coerce_on_error: bool) -> 
 def _drop_fractional_or_raise(numeric: pd.Series, col: str, coerce_on_error: bool) -> pd.Series:
     """Mask fractional values to NaN (coerce) or raise."""
     valid = numeric.notna()
-    fractional_mask = valid & ~np.isclose(numeric, np.round(numeric))
+    # Use a small FIXED absolute tolerance rather than np.isclose's default
+    # rtol=1e-5, which scales with magnitude and would let large fractional
+    # values (e.g. 100000.001) slip through as "close enough" to integral.
+    fractional_mask = valid & (np.abs(numeric - np.round(numeric)) >= 1e-9)
     if not fractional_mask.any():
         return numeric
     if not coerce_on_error:
