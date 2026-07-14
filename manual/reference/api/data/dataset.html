@@ -2981,7 +2981,11 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/data/dataset.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
 <span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
@@ -3009,15 +3013,11 @@
 <span class="normal">41</span>
 <span class="normal">42</span>
 <span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
+<span class="normal">44</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@dataclass</span>
 <span class="k">class</span><span class="w"> </span><span class="nc">SplitDataset</span><span class="p">:</span>
     <span class="n">train</span><span class="p">:</span> <span class="n">SplitPayload</span>
     <span class="n">test</span><span class="p">:</span> <span class="n">SplitPayload</span>
-    <span class="n">validation</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SplitPayload</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">validation</span><span class="p">:</span> <span class="n">SplitPayload</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SplitDataset&quot;</span><span class="p">:</span>
         <span class="k">def</span><span class="w"> </span><span class="nf">copy_data</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>

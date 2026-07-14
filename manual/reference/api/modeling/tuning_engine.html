@@ -3069,7 +3069,16 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">771</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">762</span>
+<span class="normal">763</span>
+<span class="normal">764</span>
+<span class="normal">765</span>
+<span class="normal">766</span>
+<span class="normal">767</span>
+<span class="normal">768</span>
+<span class="normal">769</span>
+<span class="normal">770</span>
+<span class="normal">771</span>
 <span class="normal">772</span>
 <span class="normal">773</span>
 <span class="normal">774</span>
@@ -3089,16 +3098,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">788</span>
 <span class="normal">789</span>
 <span class="normal">790</span>
-<span class="normal">791</span>
-<span class="normal">792</span>
-<span class="normal">793</span>
-<span class="normal">794</span>
-<span class="normal">795</span>
-<span class="normal">796</span>
-<span class="normal">797</span>
-<span class="normal">798</span>
-<span class="normal">799</span>
-<span class="normal">800</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">791</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3109,9 +3109,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
     <span class="k">def</span><span class="w"> </span><span class="nf">predict</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
         <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">:</span>
         <span class="c1"># model_artifact is (fitted_model, tuning_result)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="n">model</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">model_artifact</span>
@@ -3121,9 +3121,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
     <span class="k">def</span><span class="w"> </span><span class="nf">predict_proba</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
+        <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
         <span class="n">model_artifact</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">]]:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="n">model</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">model_artifact</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_applier</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">model</span><span class="p">)</span>
@@ -3180,8 +3180,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 70</span>
-<span class="normal"> 71</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
 <span class="normal"> 74</span>
@@ -3869,16 +3868,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">756</span>
 <span class="normal">757</span>
 <span class="normal">758</span>
-<span class="normal">759</span>
-<span class="normal">760</span>
-<span class="normal">761</span>
-<span class="normal">762</span>
-<span class="normal">763</span>
-<span class="normal">764</span>
-<span class="normal">765</span>
-<span class="normal">766</span>
-<span class="normal">767</span>
-<span class="normal">768</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="normal">759</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
@@ -3888,12 +3878,12 @@ Wraps the base model applier to provide predictions using the refitted best mode
     <span class="k">def</span><span class="w"> </span><span class="nf">problem_type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_clean_search_space</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">search_space</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_clean_search_space</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">search_space</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Recursively cleans the search space.</span>
 <span class="sd">        - Converts &quot;none&quot; string to None.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">cleaned</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cleaned</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">search_space</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
                 <span class="n">cleaned</span><span class="p">[</span><span class="n">k</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span> <span class="k">if</span> <span class="n">x</span> <span class="o">==</span> <span class="s2">&quot;none&quot;</span> <span class="k">else</span> <span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">v</span><span class="p">]</span>
@@ -3904,7 +3894,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="k">return</span> <span class="n">cleaned</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_instantiate_model</span><span class="p">(</span><span class="n">model_class</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_instantiate_model</span><span class="p">(</span><span class="n">model_class</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Build an estimator, routing nested ``a__b`` keys through ``set_params``.</span>
 
 <span class="sd">        Constructor args (no ``__``) are filtered to the model&#39;s signature</span>
@@ -3931,16 +3921,12 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
     <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
-        <span class="n">y</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-        <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-        <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-            <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">validation_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-            <span class="nb">tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+        <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Fits the tuner (runs tuning).</span>
@@ -4028,11 +4014,9 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">,</span>
-        <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-            <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span>
-        <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">validation_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningResult</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Runs hyperparameter tuning.</span>
@@ -4045,7 +4029,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Tuner currently only supports SklearnCalculator&quot;</span><span class="p">)</span>
 
         <span class="c1"># `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.</span>
-        <span class="n">model_class</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">&quot;model_class&quot;</span><span class="p">)</span>
+        <span class="n">model_class</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">model_class</span>
 
         <span class="c1"># ``default_params`` may carry structural args (e.g. an ensemble&#39;s</span>
         <span class="c1"># resolved ``estimators``); the instantiator filters/routes them safely.</span>
@@ -4129,33 +4113,32 @@ Wraps the base model applier to provide predictions using the refitted best mode
         <span class="c1"># --- VALIDATION: Metric Consistency Check ---</span>
         <span class="c1"># The schema defaults metric to &quot;accuracy&quot;. If the user is doing Regression but &quot;accuracy&quot;</span>
         <span class="c1"># (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span>
-                <span class="s2">&quot;accuracy&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;f1&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;precision&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;recall&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;f1_weighted&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;balanced_accuracy&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;log_loss&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;matthews_corrcoef&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;roc_auc_weighted&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;roc_auc_ovr&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;roc_auc_ovo&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;roc_auc_ovr_weighted&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;roc_auc_ovo_weighted&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;pr_auc&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;pr_auc_weighted&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;g_score&quot;</span><span class="p">,</span>
-            <span class="p">]:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, &quot;</span>
-                    <span class="s2">&quot;but this is a Regression model. &quot;</span>
-                    <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
-                    <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric &quot;</span>
-                    <span class="s2">&quot;(e.g., R2, RMSE, MAE).&quot;</span>
-                <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span> <span class="ow">and</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="s2">&quot;accuracy&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;f1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;precision&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;recall&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;f1_weighted&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;balanced_accuracy&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;log_loss&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;matthews_corrcoef&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roc_auc_weighted&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roc_auc_ovr&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roc_auc_ovo&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roc_auc_ovr_weighted&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;roc_auc_ovo_weighted&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pr_auc&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pr_auc_weighted&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;g_score&quot;</span><span class="p">,</span>
+        <span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, &quot;</span>
+                <span class="s2">&quot;but this is a Regression model. &quot;</span>
+                <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
+                <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric &quot;</span>
+                <span class="s2">&quot;(e.g., R2, RMSE, MAE).&quot;</span>
+            <span class="p">)</span>
         <span class="c1"># -----------------------------------------------</span>
 
         <span class="c1"># Map common user-friendly metrics to sklearn scoring strings</span>
@@ -4226,7 +4209,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
                 <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total candidates to evaluate: </span><span class="si">{</span><span class="n">total_candidates</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-            <span class="n">trials</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">trials</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="n">best_score</span> <span class="o">=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
             <span class="n">best_params</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -4289,10 +4272,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
                 <span class="c1"># Filter out failed folds for mean calculation if possible, or penalize</span>
                 <span class="n">valid_scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">fold_scores</span> <span class="k">if</span> <span class="n">s</span> <span class="o">!=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)]</span>
-                <span class="k">if</span> <span class="n">valid_scores</span><span class="p">:</span>
-                    <span class="n">mean_score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">mean_score</span> <span class="o">=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+                <span class="n">mean_score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">)</span> <span class="k">if</span> <span class="n">valid_scores</span> <span class="k">else</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
                     <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Candidate </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> Mean Score: </span><span class="si">{</span><span class="n">mean_score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -4610,8 +4590,7 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">121</span>
-<span class="normal">122</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">122</span>
 <span class="normal">123</span>
 <span class="normal">124</span>
 <span class="normal">125</span>
@@ -4699,21 +4678,14 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">207</span>
 <span class="normal">208</span>
 <span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
-    <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span>
-    <span class="n">y</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-        <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">log_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">validation_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-        <span class="nb">tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
+    <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Fits the tuner (runs tuning).</span>
@@ -4817,7 +4789,10 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">215</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
 <span class="normal">216</span>
 <span class="normal">217</span>
 <span class="normal">218</span>
@@ -5361,25 +5336,14 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">756</span>
 <span class="normal">757</span>
 <span class="normal">758</span>
-<span class="normal">759</span>
-<span class="normal">760</span>
-<span class="normal">761</span>
-<span class="normal">762</span>
-<span class="normal">763</span>
-<span class="normal">764</span>
-<span class="normal">765</span>
-<span class="normal">766</span>
-<span class="normal">767</span>
-<span class="normal">768</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
+<span class="normal">759</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">config</span><span class="p">:</span> <span class="n">TuningConfig</span><span class="p">,</span>
-    <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span>
-        <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]</span>
-    <span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">log_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">validation_data</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">validation_data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TuningResult</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Runs hyperparameter tuning.</span>
@@ -5392,7 +5356,7 @@ Adapts the generic fit interface to the specific tune method.</p>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Tuner currently only supports SklearnCalculator&quot;</span><span class="p">)</span>
 
     <span class="c1"># `model_class` only on SklearnCalculator; `Any` keeps call sites type-clean.</span>
-    <span class="n">model_class</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="p">,</span> <span class="s2">&quot;model_class&quot;</span><span class="p">)</span>
+    <span class="n">model_class</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">model_class</span>
 
     <span class="c1"># ``default_params`` may carry structural args (e.g. an ensemble&#39;s</span>
     <span class="c1"># resolved ``estimators``); the instantiator filters/routes them safely.</span>
@@ -5476,33 +5440,32 @@ Adapts the generic fit interface to the specific tune method.</p>
     <span class="c1"># --- VALIDATION: Metric Consistency Check ---</span>
     <span class="c1"># The schema defaults metric to &quot;accuracy&quot;. If the user is doing Regression but &quot;accuracy&quot;</span>
     <span class="c1"># (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.</span>
-    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span>
-            <span class="s2">&quot;accuracy&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;f1&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;precision&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;recall&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;f1_weighted&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;balanced_accuracy&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;log_loss&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;matthews_corrcoef&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;roc_auc_weighted&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;roc_auc_ovr&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;roc_auc_ovo&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;roc_auc_ovr_weighted&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;roc_auc_ovo_weighted&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;pr_auc&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;pr_auc_weighted&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;g_score&quot;</span><span class="p">,</span>
-        <span class="p">]:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, &quot;</span>
-                <span class="s2">&quot;but this is a Regression model. &quot;</span>
-                <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
-                <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric &quot;</span>
-                <span class="s2">&quot;(e.g., R2, RMSE, MAE).&quot;</span>
-            <span class="p">)</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span><span class="o">.</span><span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span> <span class="ow">and</span> <span class="n">metric</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="s2">&quot;accuracy&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;f1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;precision&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;recall&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roc_auc&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;f1_weighted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;balanced_accuracy&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;log_loss&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;matthews_corrcoef&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roc_auc_weighted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roc_auc_ovr&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roc_auc_ovo&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roc_auc_ovr_weighted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;roc_auc_ovo_weighted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;pr_auc&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;pr_auc_weighted&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;g_score&quot;</span><span class="p">,</span>
+    <span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Configuration Error: You selected &#39;</span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">&#39; as the tuning metric, &quot;</span>
+            <span class="s2">&quot;but this is a Regression model. &quot;</span>
+            <span class="s2">&quot;Accuracy/F1/AUC are for Classification only. &quot;</span>
+            <span class="s2">&quot;Please open &#39;Advanced Settings&#39; on this node and select a regression metric &quot;</span>
+            <span class="s2">&quot;(e.g., R2, RMSE, MAE).&quot;</span>
+        <span class="p">)</span>
     <span class="c1"># -----------------------------------------------</span>
 
     <span class="c1"># Map common user-friendly metrics to sklearn scoring strings</span>
@@ -5573,7 +5536,7 @@ Adapts the generic fit interface to the specific tune method.</p>
         <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
             <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total candidates to evaluate: </span><span class="si">{</span><span class="n">total_candidates</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-        <span class="n">trials</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">trials</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">best_score</span> <span class="o">=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
         <span class="n">best_params</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -5636,10 +5599,7 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <span class="c1"># Filter out failed folds for mean calculation if possible, or penalize</span>
             <span class="n">valid_scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">fold_scores</span> <span class="k">if</span> <span class="n">s</span> <span class="o">!=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)]</span>
-            <span class="k">if</span> <span class="n">valid_scores</span><span class="p">:</span>
-                <span class="n">mean_score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">mean_score</span> <span class="o">=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
+            <span class="n">mean_score</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">valid_scores</span><span class="p">)</span> <span class="k">if</span> <span class="n">valid_scores</span> <span class="k">else</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
                 <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Candidate </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> Mean Score: </span><span class="si">{</span><span class="n">mean_score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>

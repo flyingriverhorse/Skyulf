@@ -3057,8 +3057,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/pipeline.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 20</span>
-<span class="normal"> 21</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 21</span>
 <span class="normal"> 22</span>
 <span class="normal"> 23</span>
 <span class="normal"> 24</span>
@@ -3519,22 +3518,37 @@
 <span class="normal">479</span>
 <span class="normal">480</span>
 <span class="normal">481</span>
-<span class="normal">482</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Orchestrates a sequence of feature engineering steps.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="c1"># Resampling steps (SMOTE/undersampling) must only ever run on the train</span>
+    <span class="c1"># split -- applying them to test/validation would fabricate synthetic rows</span>
+    <span class="c1"># or delete real held-out rows purely to balance classes, corrupting any</span>
+    <span class="c1"># metrics later computed on that &quot;held-out&quot; data. Kept as a single shared</span>
+    <span class="c1"># constant (rather than duplicated literals) so `transform()`, `_run_step`,</span>
+    <span class="c1"># and `_collect_step_metrics` can&#39;t drift out of sync with each other.</span>
+    <span class="n">_RESAMPLING_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Oversampling&quot;</span><span class="p">,</span> <span class="s2">&quot;Undersampling&quot;</span><span class="p">}</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">steps_config</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PreprocessingStepConfig</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]],</span>
+        <span class="n">steps_config</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">PreprocessingStepConfig</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
     <span class="p">):</span>
         <span class="c1"># `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">steps_config</span> <span class="o">=</span> <span class="n">steps_config</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Apply fitted transformations to new data.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -3550,8 +3564,7 @@
             <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="p">[</span>
                 <span class="s2">&quot;TrainTestSplitter&quot;</span><span class="p">,</span>
                 <span class="s2">&quot;feature_target_split&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;Oversampling&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;Undersampling&quot;</span><span class="p">,</span>
+                <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_RESAMPLING_TYPES</span><span class="p">,</span>
             <span class="p">]:</span>
                 <span class="k">continue</span>
 
@@ -3560,16 +3573,14 @@
 
         <span class="k">return</span> <span class="n">current_data</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Runs the pipeline on data.</span>
 <span class="sd">        Returns: (transformed_data, metrics_dict)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Reset fitted steps</span>
         <span class="n">current_data</span> <span class="o">=</span> <span class="n">data</span>
-        <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps_config</span><span class="p">):</span>
             <span class="n">name</span> <span class="o">=</span> <span class="n">step</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
@@ -3636,7 +3647,7 @@
         <span class="n">applier</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">step_node_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>  <span class="c1"># Returns (data, params, transformer)</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Execute one pipeline step. Returns (new_data, fitted_params).</span>
 
@@ -3644,8 +3655,14 @@
 <span class="sd">        so they bypass StatefulTransformer; everything else goes through the</span>
 <span class="sd">        standard fit_transform wrapper and is appended to fitted_steps.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">transformer</span> <span class="o">=</span> <span class="n">StatefulTransformer</span><span class="p">(</span><span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">,</span> <span class="n">step_node_id</span><span class="p">)</span>
-        <span class="n">fitted_params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">transformer</span> <span class="o">=</span> <span class="n">StatefulTransformer</span><span class="p">(</span>
+            <span class="n">calculator</span><span class="p">,</span>
+            <span class="n">applier</span><span class="p">,</span>
+            <span class="n">step_node_id</span><span class="p">,</span>
+            <span class="n">apply_on_test</span><span class="o">=</span><span class="n">transformer_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_RESAMPLING_TYPES</span><span class="p">,</span>
+            <span class="n">apply_on_validation</span><span class="o">=</span><span class="n">transformer_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_RESAMPLING_TYPES</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="o">==</span> <span class="s2">&quot;TrainTestSplitter&quot;</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Handling TrainTestSplitter&quot;</span><span class="p">)</span>
@@ -3721,16 +3738,16 @@
         <span class="bp">self</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">transformer_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">fitted_params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">rows_before</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">cols_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">rows_after</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">cols_after</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Aggregate per-step metrics into the running metrics dict.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
@@ -3741,7 +3758,7 @@
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to retrieve metrics for step </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;Oversampling&quot;</span><span class="p">,</span> <span class="s2">&quot;Undersampling&quot;</span><span class="p">}:</span>
+        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_RESAMPLING_TYPES</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_metrics_resampling</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">metrics</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">rows_after</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">cols_after</span><span class="p">:</span>
@@ -3760,10 +3777,10 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_from_fitted_params</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">transformer_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">fitted_params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_IMPUTATION_TYPES</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;missing_counts&quot;</span><span class="p">,</span> <span class="s2">&quot;total_missing&quot;</span><span class="p">,</span> <span class="s2">&quot;fill_values&quot;</span><span class="p">):</span>
@@ -3797,9 +3814,8 @@
                 <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
                     <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
 
-        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_TYPES</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s2">&quot;warnings&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_TYPES</span> <span class="ow">and</span> <span class="s2">&quot;warnings&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;IQR&quot;</span><span class="p">,</span> <span class="s2">&quot;Winsorize&quot;</span><span class="p">}</span> <span class="ow">and</span> <span class="s2">&quot;bounds&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;bounds&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;bounds&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="o">==</span> <span class="s2">&quot;ZScore&quot;</span> <span class="ow">and</span> <span class="s2">&quot;stats&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
@@ -3848,7 +3864,7 @@
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_y_for_resampling</span><span class="p">(</span><span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_y_for_resampling</span><span class="p">(</span><span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Pull the target Series out of whatever shape the resampler produced.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -3868,7 +3884,7 @@
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_resampling</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">y_res</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_y_for_resampling</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
@@ -3915,7 +3931,7 @@
         <span class="k">return</span> <span class="mi">0</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_winsorize_clipped</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">clipped_count</span> <span class="o">=</span> <span class="mi">0</span>
@@ -3938,12 +3954,12 @@
         <span class="n">transformer_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">params</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">rows_before</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">cols_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">rows_after</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">cols_after</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
-        <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ROW_DROP_TYPES</span><span class="p">:</span>
             <span class="n">dropped</span> <span class="o">=</span> <span class="n">rows_before</span> <span class="o">-</span> <span class="n">rows_after</span>
@@ -3981,7 +3997,7 @@
                 <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_applier</span><span class="p">(</span><span class="n">type_name</span><span class="p">)(),</span>
             <span class="p">)</span>
         <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown transformer type: </span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown transformer type: </span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -4015,13 +4031,7 @@ Returns: (transformed_data, metrics_dict)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 67</span>
 <span class="normal"> 68</span>
 <span class="normal"> 69</span>
 <span class="normal"> 70</span>
@@ -4076,16 +4086,18 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">119</span>
 <span class="normal">120</span>
 <span class="normal">121</span>
-<span class="normal">122</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Runs the pipeline on data.</span>
 <span class="sd">    Returns: (transformed_data, metrics_dict)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Reset fitted steps</span>
     <span class="n">current_data</span> <span class="o">=</span> <span class="n">data</span>
-    <span class="n">metrics</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps_config</span><span class="p">):</span>
         <span class="n">name</span> <span class="o">=</span> <span class="n">step</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
@@ -4160,16 +4172,7 @@ Returns: (transformed_data, metrics_dict)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
 <span class="normal">43</span>
 <span class="normal">44</span>
 <span class="normal">45</span>
@@ -4186,9 +4189,13 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">56</span>
 <span class="normal">57</span>
 <span class="normal">58</span>
-<span class="normal">59</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span>
-    <span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">]</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">]:</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Apply fitted transformations to new data.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -4204,8 +4211,7 @@ Returns: (transformed_data, metrics_dict)</p>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="p">[</span>
             <span class="s2">&quot;TrainTestSplitter&quot;</span><span class="p">,</span>
             <span class="s2">&quot;feature_target_split&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;Oversampling&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;Undersampling&quot;</span><span class="p">,</span>
+            <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_RESAMPLING_TYPES</span><span class="p">,</span>
         <span class="p">]:</span>
             <span class="k">continue</span>
 

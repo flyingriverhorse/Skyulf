@@ -3983,12 +3983,8 @@ and <a href="http://127.0.0.1:8000/redoc"><code>/redoc</code></a> (ReDoc) when <
 <td>Model deployment &amp; inference</td>
 </tr>
 <tr>
-<td><code>/api/ml/registry/*</code></td>
-<td>Model registry (alternate mount)</td>
-</tr>
-<tr>
 <td><code>/api/registry/*</code></td>
-<td>Model registry (canonical mount)</td>
+<td>Model registry</td>
 </tr>
 <tr>
 <td><code>/api/monitoring/*</code></td>
@@ -4212,7 +4208,7 @@ Returns <code>503</code> if the ML dependencies are broken.</p>
 <p>Returns <code>404</code> if no deployment is active.</p>
 <hr />
 <h2 id="model-registry">Model Registry</h2>
-<p>The model registry is <strong>read-only</strong> — models are auto-registered when jobs complete and promoted via the jobs API. Both <code>/api/registry/*</code> (canonical) and <code>/api/ml/registry/*</code> (compatibility alias) are supported.</p>
+<p>The model registry is <strong>read-only</strong> — models are auto-registered when jobs complete and promoted via the jobs API.</p>
 <h3 id="get-apiregistrystats"><code>GET /api/registry/stats</code></h3>
 <p>Aggregate registry statistics (model counts by type, total versions, etc.).</p>
 <h3 id="get-apiregistrymodels"><code>GET /api/registry/models</code></h3>

@@ -3147,7 +3147,12 @@ both :class:<code>DataSplitter</code> methods and :class:<code>FeatureTargetSpli
 <span class="normal">279</span>
 <span class="normal">280</span>
 <span class="normal">281</span>
-<span class="normal">282</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataSplitter</span><span class="p">:</span>
+<span class="normal">282</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span>
+<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DataSplitter</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Split a DataFrame (or X/y pair) into Train, Test, and optional Validation.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
@@ -3156,7 +3161,7 @@ both :class:<code>DataSplitter</code> methods and :class:<code>FeatureTargetSpli
         <span class="n">validation_size</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
         <span class="n">random_state</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
         <span class="n">shuffle</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="n">stratify_col</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">stratify_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">test_size</span> <span class="o">=</span> <span class="n">test_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">validation_size</span> <span class="o">=</span> <span class="n">validation_size</span>
@@ -3166,9 +3171,7 @@ both :class:<code>DataSplitter</code> methods and :class:<code>FeatureTargetSpli
 
     <span class="c1"># ---- public API ---------------------------------------------------------</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">split_xy</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">],</span> <span class="n">y</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">split_xy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
         <span class="n">X_pd</span><span class="p">,</span> <span class="n">was_polars</span> <span class="o">=</span> <span class="n">_to_pandas_remember_engine</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
         <span class="n">y_pd</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_to_pandas_remember_engine</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
 
@@ -3194,7 +3197,7 @@ both :class:<code>DataSplitter</code> methods and :class:<code>FeatureTargetSpli
             <span class="p">)</span>
         <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">test</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">validation</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">split</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
         <span class="n">df_pd</span><span class="p">,</span> <span class="n">was_polars</span> <span class="o">=</span> <span class="n">_to_pandas_remember_engine</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
         <span class="n">stratify</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_frame_stratify</span><span class="p">(</span><span class="n">df_pd</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Stratified split&quot;</span><span class="p">)</span>
 
@@ -3218,10 +3221,17 @@ both :class:<code>DataSplitter</code> methods and :class:<code>FeatureTargetSpli
     <span class="k">def</span><span class="w"> </span><span class="nf">_frame_stratify</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df_pd</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Pick + sanity-check the stratify column on a frame split.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stratify_col</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">stratify_col</span> <span class="ow">in</span> <span class="n">df_pd</span><span class="o">.</span><span class="n">columns</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stratify_col</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> requested but no target_column is configured for this &quot;</span>
+                    <span class="s2">&quot;plain-DataFrame input, so there is no column to stratify on. &quot;</span>
+                    <span class="s2">&quot;Stratification will be disabled.&quot;</span><span class="p">,</span>
+                    <span class="n">label</span><span class="p">,</span>
+                <span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">return</span> <span class="n">_safe_stratify</span><span class="p">(</span><span class="n">df_pd</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">stratify_col</span><span class="p">],</span> <span class="n">label</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_split_validation_xy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X_tv</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y_tv</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_split_validation_xy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X_tv</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y_tv</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Carve a validation set off of (X_tv, y_tv); returns (val, X_train, y_train).&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">validation_size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">X_tv</span><span class="p">,</span> <span class="n">y_tv</span>
@@ -3240,7 +3250,7 @@ both :class:<code>DataSplitter</code> methods and :class:<code>FeatureTargetSpli
         <span class="p">)</span>
         <span class="k">return</span> <span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="n">y_val</span><span class="p">),</span> <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_split_validation_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">train_val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_maybe_split_validation_frame</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">train_val</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Carve a validation set off of ``train_val`` (frame mode); returns (val, train).&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">validation_size</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">train_val</span>
