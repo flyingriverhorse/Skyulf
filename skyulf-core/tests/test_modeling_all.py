@@ -729,6 +729,19 @@ class TestHyperparameterRegistry:
             space = get_default_search_space(key)
             assert len(space) > 0, f"No search space defined for {key!r}"
 
+    def test_logistic_regression_solver_options_include_newton_cholesky(self) -> None:
+        """Regression test: `LogisticRegressionCalculator` supports the
+        'newton-cholesky' solver (`_SOLVER_PENALTIES`), but the hyperparameter
+        UI options list didn't include it, so users had no way to select it
+        from the frontend dropdown (which is generated from this registry
+        via the backend's hyperparameters API)."""
+        from skyulf.modeling.hyperparameters import get_hyperparameters
+
+        params = get_hyperparameters("logistic_regression")
+        solver_field = next(p for p in params if p["name"] == "solver")
+        option_values = {opt["value"] for opt in solver_field["options"]}
+        assert "newton-cholesky" in option_values
+
 
 # ===========================================================================
 # Real-shaped dataset — integration check against customers.csv
