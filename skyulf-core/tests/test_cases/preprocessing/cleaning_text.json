@@ -113,12 +113,12 @@
           "repl": "",
           "expected": ["123", null, "42"]
         },
-        "normalize_slash_dates_is_noop_placeholder": {
-          "values": ["12/01/2024"],
+        "normalize_slash_dates_mm_dd_yyyy": {
+          "values": ["12/01/2024", "1/5/2023", "no date here", "5/9/2024 report"],
           "mode": "normalize_slash_dates",
           "pattern": null,
           "repl": "",
-          "expected": ["12/01/2024"]
+          "expected": ["2024-12-01", "2023-01-05", "no date here", "2024-05-09 report"]
         },
         "custom_with_pattern": {
           "values": ["foo123bar", "baz456qux"],
@@ -191,10 +191,10 @@
           "operation": {"op": "regex", "mode": "custom", "pattern": "\\d+", "repl": "NUM"},
           "expected": ["fooNUMbar"]
         },
-        "regex_normalize_slash_dates_is_noop_placeholder": {
-          "texts": ["12/01/2024"],
+        "regex_normalize_slash_dates_mm_dd_yyyy": {
+          "texts": ["12/01/2024", "1/5/2023"],
           "operation": {"op": "regex", "mode": "normalize_slash_dates"},
-          "expected": ["12/01/2024"]
+          "expected": ["2024-12-01", "2023-01-05"]
         },
         "regex_custom_without_pattern_is_noop": {
           "texts": ["hello"],
