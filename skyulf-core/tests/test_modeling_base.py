@@ -358,6 +358,44 @@ def test_evaluate_regression_returns_report():
     assert "mse" in report["splits"]["test"].metrics
 
 
+def test_evaluate_polars_test_and_validation_splits_are_not_silently_dropped():
+    """Regression test: evaluate() must include test/validation splits when the
+    SplitDataset holds bare Polars DataFrames (not pandas, not tuples).
+
+    Previously `has_test`/`has_val` only recognized `pd.DataFrame` and tuple
+    splits, so a Polars SplitDataset silently evaluated to just {"train": ...}
+    with no error - evaluate_split() also only special-cased tuple/pd.DataFrame
+    and returned None for a bare Polars frame.
+    """
+    import polars as pl
+
+    rng = np.random.RandomState(42)
+    a = rng.uniform(0, 100, size=200)
+    b = rng.uniform(0, 100, size=200)
+    df = pd.DataFrame({"a": a, "b": b})
+    df["target"] = (df["a"] + df["b"] > 100).astype(int)
+    train_pl = pl.from_pandas(df.iloc[:160])
+    test_pl = pl.from_pandas(df.iloc[160:180])
+    val_pl = pl.from_pandas(df.iloc[180:])
+    dataset = SplitDataset(
+        train=cast(Any, train_pl), test=cast(Any, test_pl), validation=cast(Any, val_pl)
+    )
+
+    estimator = StatefulEstimator(
+        calculator=LogisticRegressionCalculator(),
+        applier=LogisticRegressionApplier(),
+        node_id="e-polars-eval",
+    )
+    estimator.fit_predict(dataset, "target", config={})
+    report = estimator.evaluate(dataset, "target")
+
+    assert "train" in report["splits"]
+    assert "test" in report["splits"], "polars test split must not be silently dropped"
+    assert "validation" in report["splits"], "polars validation split must not be silently dropped"
+    assert "accuracy" in report["splits"]["test"].metrics
+    assert "accuracy" in report["splits"]["validation"].metrics
+
+
 # ---------------------------------------------------------------------------
 # StatefulEstimator.refit
 # ---------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 """Tests for skyulf.modeling.cross_validation."""
 
+from typing import Any, cast
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,6 +20,8 @@ from skyulf.modeling.cross_validation import (
     perform_cross_validation,
 )
 from skyulf.modeling.regression import (
+    LinearRegressionApplier,
+    LinearRegressionCalculator,
     RandomForestRegressorApplier,
     RandomForestRegressorCalculator,
 )
@@ -620,6 +624,61 @@ def test_sort_by_time_no_datetime_column_with_log_callback():
     _sort_by_time(X, y, None, messages.append, logger)
 
     assert any("no datetime column found" in m for m in messages)
+
+
+def test_sort_by_time_polars_sorts_and_drops_time_column():
+    """Regression test: _sort_by_time must sort Polars X/y in lockstep and
+    drop the time column from features - previously this function only
+    handled pandas, so a Polars X was returned completely unsorted with the
+    time column left in place (silently leaking into the model)."""
+    import logging
+
+    import polars as pl
+
+    logger = logging.getLogger(__name__)
+    X = pl.DataFrame({"ts": [3, 1, 2], "x": [30, 10, 20]})
+    y = pl.Series("target", [300, 100, 200])
+
+    X_sorted, y_sorted = _sort_by_time(X, y, "ts", None, logger)
+
+    assert "ts" not in X_sorted.columns
+    assert X_sorted["x"].to_list() == [10, 20, 30]
+    assert y_sorted.to_list() == [100, 200, 300]
+
+
+def test_perform_cv_time_series_split_polars_prevents_leakage():
+    """Regression test: time_series_split CV on a Polars X must chronologically
+    sort by time_column and drop it from features - previously the pandas-only
+    isinstance gate skipped this entirely for Polars, so an out-of-order time
+    column perfectly correlated with y leaked directly into training, and folds
+    were built on arbitrary (unsorted) row order instead of chronological order."""
+    import polars as pl
+
+    rng = np.random.RandomState(0)
+    n = 60
+    ts = np.arange(n)
+    perm = rng.permutation(n)
+    X = pl.DataFrame({"ts": ts[perm], "feat": rng.normal(size=n)})
+    y = pl.Series("target", ts[perm].astype(float))  # y perfectly matches true time order
+
+    calc = LinearRegressionCalculator()
+    appl = LinearRegressionApplier()
+
+    result = perform_cross_validation(
+        calc,
+        appl,
+        cast(Any, X),
+        y,
+        config={},
+        n_folds=3,
+        cv_type="time_series_split",
+        time_column="ts",
+    )
+    # If the time column leaked into features (or folds were unsorted), r2
+    # would be artificially ~1.0. With the leak fixed it must not be a
+    # (near-)perfect fit.
+    r2_mean = result["aggregated_metrics"]["r2"]["mean"]
+    assert r2_mean < 0.9
 
     """time_series_split should sort by datetime column when provided."""
     np.random.seed(1)
