@@ -556,7 +556,11 @@ async def get_error_timeline(
     one per hour slot, oldest first. Slots with zero events are included
     so the chart always has a complete x-axis.
     """
-    hours = min(max(1, hours), 168)  # cap at 7 days
+    from backend.config import get_settings as _get_settings
+
+    hours = min(
+        max(1, hours), _get_settings().MONITORING_MAX_TIMELINE_HOURS
+    )  # cap at configured max
     now = datetime.now(UTC)
     cutoff = now - timedelta(hours=hours)
 
@@ -678,8 +682,11 @@ async def list_slow_nodes(
     Returns the top `limit` step_types sorted by total cumulative seconds —
     the most useful "where to invest in optimisation" signal.
     """
-    days = max(1, min(days, 90))
-    limit = max(1, min(limit, 50))
+    from backend.config import get_settings as _get_settings
+
+    _settings = _get_settings()
+    days = max(1, min(days, _settings.MONITORING_MAX_SLOWNODES_DAYS))
+    limit = max(1, min(limit, _settings.MAX_PAGE_SIZE))
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 

@@ -74,7 +74,10 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
         try:
             import redis  # ty: ignore[unresolved-import]
 
-            r = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
+            r = redis.from_url(
+                settings.CELERY_BROKER_URL,
+                socket_connect_timeout=settings.REDIS_HEALTHCHECK_TIMEOUT_SECONDS,
+            )
             r.ping()
         except Exception:
             logging.getLogger(__name__).debug("Cache health check failed", exc_info=True)
