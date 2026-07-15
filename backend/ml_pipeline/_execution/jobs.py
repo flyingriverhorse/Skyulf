@@ -229,6 +229,81 @@ class JobManager:
         return await AdvancedTuningManager.get_latest_tuning_job_for_node(session, node_id)
 
     @staticmethod
+    def _latest_run_group_per_node(all_jobs: list[Any]) -> dict[str, str]:
+        """Pick the parent_pipeline_id of the most recent completed job for each node.
+
+        Treats a missing ``parent_pipeline_id`` as a single-branch run,
+        collapsing it on the job's own ``pipeline_id`` so single-terminal
+        runs still group together correctly.
+        """
+        latest_group: dict[str, str] = {}
+        for job in all_jobs:
+            if job.status != "completed" or not job.node_id:
+                continue
+            if job.node_id in latest_group:
+                continue
+            group_key = job.parent_pipeline_id or job.pipeline_id
+            if group_key:
+                latest_group[job.node_id] = group_key
+        return latest_group
+
+    @staticmethod
+    def _job_summary_entry(job: Any) -> dict[str, Any] | None:
+        """Build a single node-card summary entry for a completed job, or None if no summary."""
+        summary = (job.metrics or {}).get("summary") if job.metrics else None
+        if not isinstance(summary, str) or not summary.strip():
+            return None
+        entry: dict[str, Any] = {
+            "summary": summary.strip(),
+            "branch_index": job.branch_index,
+            "pipeline_id": job.pipeline_id,
+            "parent_pipeline_id": job.parent_pipeline_id,
+            "finished_at": job.end_time.isoformat() if job.end_time else None,
+        }
+        # Wall-clock duration for the L4 perf overlay. Computed
+        # from start/end timestamps so we don't depend on the
+        # engine writing it into ``metrics``. None when the job
+        # is missing either timestamp (legacy / partial rows).
+        if job.start_time and job.end_time:
+            entry["duration_ms"] = max(
+                0,
+                int((job.end_time - job.start_time).total_seconds() * 1000),
+            )
+        return entry
+
+    @staticmethod
+    def _collect_latest_group_summaries(
+        all_jobs: list[Any], latest_group: dict[str, str]
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Collect every completed job's summary entry belonging to its node's latest run group."""
+        out: dict[str, list[dict[str, Any]]] = {}
+        for job in all_jobs:
+            if job.status != "completed" or not job.node_id:
+                continue
+            target_group = latest_group.get(job.node_id)
+            if target_group is None:
+                continue
+            group_key = job.parent_pipeline_id or job.pipeline_id
+            if group_key != target_group:
+                continue
+            entry = JobManager._job_summary_entry(job)
+            if entry is None:
+                continue
+            out.setdefault(job.node_id, []).append(entry)
+        return out
+
+    @staticmethod
+    def _sort_node_summary_entries(out: dict[str, list[dict[str, Any]]]) -> None:
+        """Sort each node's entries by branch_index (None last), in place."""
+        for entries in out.values():
+            entries.sort(
+                key=lambda e: (
+                    e["branch_index"] is None,
+                    e["branch_index"] if e["branch_index"] is not None else 0,
+                )
+            )
+
+    @staticmethod
     async def get_node_summaries(
         session: AsyncSession, limit: int = 200
     ) -> dict[str, list[dict[str, Any]]]:
@@ -268,61 +343,14 @@ class JobManager:
             key=lambda j: j.start_time or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
-        # Phase 1: pick the parent_pipeline_id of the most recent
-        # completed job for each node. Treat a missing
-        # ``parent_pipeline_id`` as a single-branch run; collapse it on
-        # the job's own ``pipeline_id`` so single-terminal runs still
-        # group together correctly.
-        latest_group: dict[str, str] = {}
-        for job in all_jobs:
-            if job.status != "completed" or not job.node_id:
-                continue
-            if job.node_id in latest_group:
-                continue
-            group_key = job.parent_pipeline_id or job.pipeline_id
-            if group_key:
-                latest_group[job.node_id] = group_key
+        # Phase 1: pick the parent_pipeline_id of the most recent completed job for each node.
+        latest_group = JobManager._latest_run_group_per_node(all_jobs)
         # Phase 2: collect every completed job belonging to that group.
-        out: dict[str, list[dict[str, Any]]] = {}
-        for job in all_jobs:
-            if job.status != "completed" or not job.node_id:
-                continue
-            target_group = latest_group.get(job.node_id)
-            if target_group is None:
-                continue
-            group_key = job.parent_pipeline_id or job.pipeline_id
-            if group_key != target_group:
-                continue
-            summary = (job.metrics or {}).get("summary") if job.metrics else None
-            if not isinstance(summary, str) or not summary.strip():
-                continue
-            entry: dict[str, Any] = {
-                "summary": summary.strip(),
-                "branch_index": job.branch_index,
-                "pipeline_id": job.pipeline_id,
-                "parent_pipeline_id": job.parent_pipeline_id,
-                "finished_at": job.end_time.isoformat() if job.end_time else None,
-            }
-            # Wall-clock duration for the L4 perf overlay. Computed
-            # from start/end timestamps so we don't depend on the
-            # engine writing it into ``metrics``. None when the job
-            # is missing either timestamp (legacy / partial rows).
-            if job.start_time and job.end_time:
-                entry["duration_ms"] = max(
-                    0,
-                    int((job.end_time - job.start_time).total_seconds() * 1000),
-                )
-            out.setdefault(job.node_id, []).append(entry)
+        out = JobManager._collect_latest_group_summaries(all_jobs, latest_group)
         # Sort each node's entries by branch_index (None last) so the
         # frontend can render them in deterministic Path-A/B/C order
         # without re-sorting.
-        for entries in out.values():
-            entries.sort(
-                key=lambda e: (
-                    e["branch_index"] is None,
-                    e["branch_index"] if e["branch_index"] is not None else 0,
-                )
-            )
+        JobManager._sort_node_summary_entries(out)
         return out
 
     @staticmethod
