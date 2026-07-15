@@ -18,7 +18,7 @@ import logging
 import shutil
 import tempfile
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 from fastapi import APIRouter, Depends
@@ -147,6 +147,103 @@ def _pick_target_node_id(node_list: list[NodeConfig]) -> str | None:
     return target_id
 
 
+def _is_polars_dataframe(artifact: Any) -> bool:
+    """Return True if `artifact` is a polars DataFrame, tolerating a missing polars install."""
+    try:
+        import polars as pl
+
+        return isinstance(artifact, pl.DataFrame)
+    except ImportError:
+        return False
+
+
+def _extract_preview_frame(
+    artifact: Any, is_polars: bool
+) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
+    """Build preview output for a single polars/pandas DataFrame artifact."""
+    if is_polars:
+        preview_data = _to_records(artifact)
+        df_for_analysis = _to_pandas_safe(artifact)
+    else:
+        preview_data = json.loads(artifact.head(50).to_json(orient="records"))
+        df_for_analysis = artifact
+    totals = {"_total": _count_rows(artifact)}
+    return preview_data, totals, df_for_analysis
+
+
+def _extract_preview_split(
+    artifact: SplitDataset,
+) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
+    """Build preview output for a `SplitDataset` artifact (train/test/validation splits)."""
+    preview_data: dict[str, Any] = {}
+    totals: dict[str, int] = {}
+    df_for_analysis = None
+
+    train = artifact.train
+    if isinstance(train, tuple):
+        xy_train = cast(tuple[Any, Any], train)
+        preview_data.update(_process_xy(xy_train, "train"))
+        totals.update(_process_xy_totals(xy_train, "train"))
+        df_for_analysis = _to_pandas_safe(xy_train[0])
+    else:
+        preview_data["train"] = _to_records(train)
+        totals["train"] = _count_rows(train)
+        df_for_analysis = _to_pandas_safe(train)
+
+    test = artifact.test
+    if isinstance(test, tuple):
+        xy_test = cast(tuple[Any, Any], test)
+        preview_data.update(_process_xy(xy_test, "test"))
+        totals.update(_process_xy_totals(xy_test, "test"))
+    else:
+        preview_data["test"] = _to_records(test)
+        totals["test"] = _count_rows(test)
+
+    validation = artifact.validation
+    if validation is not None:
+        if isinstance(validation, tuple):
+            xy_validation = cast(tuple[Any, Any], validation)
+            preview_data.update(_process_xy(xy_validation, "validation"))
+            totals.update(_process_xy_totals(xy_validation, "validation"))
+        else:
+            preview_data["validation"] = _to_records(validation)
+            totals["validation"] = _count_rows(validation)
+
+    return preview_data, totals, df_for_analysis
+
+
+def _extract_preview_xy_tuple(
+    artifact: tuple[Any, Any],
+) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
+    """Build preview output for a raw (X, y) tuple artifact."""
+    X, y = artifact
+    preview_data = {"X": _to_records(X), "y": _to_records(y)}
+    totals = {"X": _count_rows(X), "y": _count_rows(y)}
+    df_for_analysis = _to_pandas_safe(X)
+    return preview_data, totals, df_for_analysis
+
+
+def _extract_preview_dict_train(
+    artifact: dict[str, Any],
+) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
+    """Build preview output for a dict artifact keyed by split name with (X, y) tuples."""
+    preview_data: dict[str, Any] = {}
+    totals: dict[str, int] = {}
+
+    preview_data.update(_process_xy(artifact["train"], "train"))
+    totals.update(_process_xy_totals(artifact["train"], "train"))
+    df_for_analysis = _to_pandas_safe(artifact["train"][0])
+
+    if "test" in artifact:
+        preview_data.update(_process_xy(artifact["test"], "test"))
+        totals.update(_process_xy_totals(artifact["test"], "test"))
+    if "validation" in artifact:
+        preview_data.update(_process_xy(artifact["validation"], "validation"))
+        totals.update(_process_xy_totals(artifact["validation"], "validation"))
+
+    return preview_data, totals, df_for_analysis
+
+
 def _extract_preview(
     artifact_store: LocalArtifactStore, target_node_id: str | None
 ) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
@@ -166,64 +263,16 @@ def _extract_preview(
     artifact = artifact_store.load(target_node_id)
     logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
 
-    is_polars = False
-    try:
-        import polars as pl
+    is_polars = _is_polars_dataframe(artifact)
 
-        if isinstance(artifact, pl.DataFrame):
-            is_polars = True
-    except ImportError:
-        pass
-
-    if is_polars:
-        preview_data = _to_records(artifact)
-        totals = {"_total": _count_rows(artifact)}
-        df_for_analysis = _to_pandas_safe(artifact)
-    elif isinstance(artifact, pd.DataFrame):
-        preview_data = json.loads(artifact.head(50).to_json(orient="records"))
-        totals = {"_total": _count_rows(artifact)}
-        df_for_analysis = artifact
-    elif isinstance(artifact, SplitDataset):
-        preview_data = {}
-        if isinstance(artifact.train, tuple):
-            preview_data.update(_process_xy(artifact.train, "train"))
-            totals.update(_process_xy_totals(artifact.train, "train"))
-            df_for_analysis = _to_pandas_safe(artifact.train[0])
-        else:
-            preview_data["train"] = _to_records(artifact.train)
-            totals["train"] = _count_rows(artifact.train)
-            df_for_analysis = _to_pandas_safe(artifact.train)
-        if isinstance(artifact.test, tuple):
-            preview_data.update(_process_xy(artifact.test, "test"))
-            totals.update(_process_xy_totals(artifact.test, "test"))
-        else:
-            preview_data["test"] = _to_records(artifact.test)
-            totals["test"] = _count_rows(artifact.test)
-        if artifact.validation is not None:
-            if isinstance(artifact.validation, tuple):
-                preview_data.update(_process_xy(artifact.validation, "validation"))
-                totals.update(_process_xy_totals(artifact.validation, "validation"))
-            else:
-                preview_data["validation"] = _to_records(artifact.validation)
-                totals["validation"] = _count_rows(artifact.validation)
-    elif isinstance(artifact, tuple) and len(artifact) == 2:
-        X, y = artifact
-        preview_data = {"X": _to_records(X), "y": _to_records(y)}
-        totals = {"X": _count_rows(X), "y": _count_rows(y)}
-        df_for_analysis = _to_pandas_safe(X)
-    elif (
-        isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple)
-    ):
-        preview_data = {}
-        preview_data.update(_process_xy(artifact["train"], "train"))
-        totals.update(_process_xy_totals(artifact["train"], "train"))
-        df_for_analysis = _to_pandas_safe(artifact["train"][0])
-        if "test" in artifact:
-            preview_data.update(_process_xy(artifact["test"], "test"))
-            totals.update(_process_xy_totals(artifact["test"], "test"))
-        if "validation" in artifact:
-            preview_data.update(_process_xy(artifact["validation"], "validation"))
-            totals.update(_process_xy_totals(artifact["validation"], "validation"))
+    if is_polars or isinstance(artifact, pd.DataFrame):
+        return _extract_preview_frame(artifact, is_polars)
+    if isinstance(artifact, SplitDataset):
+        return _extract_preview_split(artifact)
+    if isinstance(artifact, tuple) and len(artifact) == 2:
+        return _extract_preview_xy_tuple(artifact)
+    if isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple):
+        return _extract_preview_dict_train(artifact)
 
     return preview_data, totals, df_for_analysis
 

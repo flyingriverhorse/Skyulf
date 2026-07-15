@@ -33,6 +33,33 @@ class ArtifactsMixin:
     dataset_name: str | None
     log: Callable[[str], None]
 
+    def _feature_names_for_importance(self, data: Any, target_col: str) -> list[str]:
+        """Resolve the feature column names for `data`, excluding the target column."""
+        if isinstance(data, pd.DataFrame):
+            return [c for c in data.columns if c != target_col]
+        if hasattr(data, "train"):
+            train = data.train
+            if isinstance(train, pd.DataFrame):
+                return [c for c in train.columns if c != target_col]
+            if isinstance(train, tuple) and len(train) >= 1 and hasattr(train[0], "columns"):
+                return list(train[0].columns)
+            return []
+        if isinstance(data, tuple) and len(data) >= 1 and hasattr(data[0], "columns"):
+            return list(data[0].columns)
+        return []
+
+    def _model_importance_values(self, actual_model: Any) -> Any | None:
+        """Read raw importance/coefficient values off a trained sklearn-style model."""
+        if hasattr(actual_model, "feature_importances_"):
+            return actual_model.feature_importances_
+        if hasattr(actual_model, "coef_"):
+            coef = actual_model.coef_
+            # For multi-class, coef_ is 2D — take mean of absolute values
+            if hasattr(coef, "ndim") and coef.ndim > 1:
+                return abs(coef).mean(axis=0)
+            return abs(coef)
+        return None
+
     def _extract_feature_importances(
         self, model: Any, data: Any, target_col: str
     ) -> dict[str, float] | None:
@@ -41,33 +68,11 @@ class ArtifactsMixin:
             # Unwrap tuple (model, tuning_result) from advanced tuning
             actual_model = model[0] if isinstance(model, tuple) else model
 
-            # Get feature names from data
-            feature_names: list[str] = []
-            if isinstance(data, pd.DataFrame):
-                feature_names = [c for c in data.columns if c != target_col]
-            elif hasattr(data, "train"):
-                train = data.train
-                if isinstance(train, pd.DataFrame):
-                    feature_names = [c for c in train.columns if c != target_col]
-                elif isinstance(train, tuple) and len(train) >= 1 and hasattr(train[0], "columns"):
-                    feature_names = list(train[0].columns)
-            elif isinstance(data, tuple) and len(data) >= 1 and hasattr(data[0], "columns"):
-                feature_names = list(data[0].columns)
-
+            feature_names = self._feature_names_for_importance(data, target_col)
             if not feature_names:
                 return None
 
-            # Extract importances
-            importances: Any | None = None
-            if hasattr(actual_model, "feature_importances_"):
-                importances = actual_model.feature_importances_
-            elif hasattr(actual_model, "coef_"):
-                coef = actual_model.coef_
-                # For multi-class, coef_ is 2D — take mean of absolute values
-                if hasattr(coef, "ndim") and coef.ndim > 1:
-                    importances = abs(coef).mean(axis=0)
-                else:
-                    importances = abs(coef)
+            importances = self._model_importance_values(actual_model)
 
             if importances is not None and len(importances) == len(feature_names):
                 return {
