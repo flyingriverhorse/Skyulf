@@ -265,46 +265,19 @@ class FeatureEngineer:
                 metrics,
             )
 
-    def _metrics_from_fitted_params(
-        self,
-        transformer_type: str,
-        fitted_params: dict[str, Any],
-        data_before: Any,
-        current_data: Any,
-        metrics: dict[str, Any],
+    @staticmethod
+    def _copy_present_keys(
+        fitted_params: dict[str, Any], metrics: dict[str, Any], keys: tuple[str, ...]
     ) -> None:
-        if transformer_type in self._IMPUTATION_TYPES:
-            for key in ("missing_counts", "total_missing", "fill_values"):
-                if key in fitted_params:
-                    metrics[key] = fitted_params[key]
+        """Copy each key from fitted_params into metrics, skipping keys that aren't present."""
+        for key in keys:
+            if key in fitted_params:
+                metrics[key] = fitted_params[key]
 
-        if transformer_type in self._FEATURE_SELECTION_TYPES:
-            for key in (
-                "feature_scores",
-                "p_values",
-                "feature_importances",
-                "variances",
-                "ranking",
-                "selected_columns",
-            ):
-                if key in fitted_params:
-                    metrics[key] = fitted_params[key]
-
-        if transformer_type in self._SCALING_TYPES:
-            for key in (
-                "mean",
-                "scale",
-                "var",
-                "min",
-                "data_min",
-                "data_max",
-                "center",
-                "max_abs",
-                "columns",
-            ):
-                if key in fitted_params:
-                    metrics[key] = fitted_params[key]
-
+    def _apply_outlier_metrics(
+        self, transformer_type: str, fitted_params: dict[str, Any], metrics: dict[str, Any]
+    ) -> None:
+        """Populate outlier-detection related metrics (warnings/bounds/stats/contamination)."""
         if transformer_type in self._OUTLIER_TYPES and "warnings" in fitted_params:
             metrics["warnings"] = fitted_params["warnings"]
         if transformer_type in {"IQR", "Winsorize"} and "bounds" in fitted_params:
@@ -314,18 +287,72 @@ class FeatureEngineer:
         if transformer_type == "EllipticEnvelope" and "contamination" in fitted_params:
             metrics["contamination"] = fitted_params["contamination"]
 
+    def _apply_feature_gen_metrics(
+        self,
+        fitted_params: dict[str, Any],
+        data_before: Any,
+        current_data: Any,
+        metrics: dict[str, Any],
+    ) -> None:
+        """Populate operations count/list and newly generated feature columns metrics."""
+        if "operations" in fitted_params:
+            metrics["operations_count"] = len(fitted_params["operations"])
+            metrics["operations"] = fitted_params["operations"]
+        new_cols = self._diff_generated_columns(data_before, current_data)
+        if new_cols is not None:
+            metrics["generated_features"] = new_cols
+
+    def _metrics_from_fitted_params(
+        self,
+        transformer_type: str,
+        fitted_params: dict[str, Any],
+        data_before: Any,
+        current_data: Any,
+        metrics: dict[str, Any],
+    ) -> None:
+        if transformer_type in self._IMPUTATION_TYPES:
+            self._copy_present_keys(
+                fitted_params, metrics, ("missing_counts", "total_missing", "fill_values")
+            )
+
+        if transformer_type in self._FEATURE_SELECTION_TYPES:
+            self._copy_present_keys(
+                fitted_params,
+                metrics,
+                (
+                    "feature_scores",
+                    "p_values",
+                    "feature_importances",
+                    "variances",
+                    "ranking",
+                    "selected_columns",
+                ),
+            )
+
+        if transformer_type in self._SCALING_TYPES:
+            self._copy_present_keys(
+                fitted_params,
+                metrics,
+                (
+                    "mean",
+                    "scale",
+                    "var",
+                    "min",
+                    "data_min",
+                    "data_max",
+                    "center",
+                    "max_abs",
+                    "columns",
+                ),
+            )
+
+        self._apply_outlier_metrics(transformer_type, fitted_params, metrics)
+
         if transformer_type in self._BUCKETING_TYPES:
-            for key in ("bin_edges", "n_bins"):
-                if key in fitted_params:
-                    metrics[key] = fitted_params[key]
+            self._copy_present_keys(fitted_params, metrics, ("bin_edges", "n_bins"))
 
         if transformer_type in self._FEATURE_GEN_TYPES:
-            if "operations" in fitted_params:
-                metrics["operations_count"] = len(fitted_params["operations"])
-                metrics["operations"] = fitted_params["operations"]
-            new_cols = self._diff_generated_columns(data_before, current_data)
-            if new_cols is not None:
-                metrics["generated_features"] = new_cols
+            self._apply_feature_gen_metrics(fitted_params, data_before, current_data, metrics)
 
     @staticmethod
     def _diff_generated_columns(data_before: Any, current_data: Any):
@@ -390,35 +417,37 @@ class FeatureEngineer:
             logger.warning(f"Failed to calculate resampling metrics: {e}")
 
     @staticmethod
-    def _count_winsorize_diffs(d1: Any, d2: Any) -> int:
+    def _to_pandas_if_needed(obj: Any) -> Any:
+        """Convert obj to pandas via to_pandas() if it supports that, otherwise return as-is."""
+        return obj.to_pandas() if hasattr(obj, "to_pandas") else obj
+
+    @classmethod
+    def _count_diff_cells(cls, a: Any, b: Any, types: tuple[type, ...]) -> int:
+        """Count differing cells between two objects of the given types with matching shape."""
+        a = cls._to_pandas_if_needed(a)
+        b = cls._to_pandas_if_needed(b)
+        if isinstance(a, types) and isinstance(b, types) and a.shape == b.shape:
+            return int(a.ne(b).sum().sum())
+        return 0
+
+    @classmethod
+    def _count_winsorize_tuple_diffs(cls, d1: tuple, d2: tuple) -> int:
+        """Count differing cells across the X/y halves of two (X, y) tuple pairs."""
+        diffs = cls._count_diff_cells(d1[0], d2[0], (pd.DataFrame,))
+        diffs += cls._count_diff_cells(d1[1], d2[1], (pd.DataFrame, pd.Series))
+        return diffs
+
+    @classmethod
+    def _count_winsorize_diffs(cls, d1: Any, d2: Any) -> int:
         """Count cells that differ between two data objects, for Winsorize clipping metric."""
-        d1 = d1.to_pandas() if hasattr(d1, "to_pandas") else d1
-        d2 = d2.to_pandas() if hasattr(d2, "to_pandas") else d2
+        d1 = cls._to_pandas_if_needed(d1)
+        d2 = cls._to_pandas_if_needed(d2)
 
         if isinstance(d1, pd.DataFrame) and isinstance(d2, pd.DataFrame):
-            if d1.shape == d2.shape:
-                return int(d1.ne(d2).sum().sum())
-            return 0
+            return cls._count_diff_cells(d1, d2, (pd.DataFrame,))
 
         if isinstance(d1, tuple) and isinstance(d2, tuple) and len(d1) == 2 and len(d2) == 2:
-            diffs = 0
-            x1 = d1[0].to_pandas() if hasattr(d1[0], "to_pandas") else d1[0]
-            x2 = d2[0].to_pandas() if hasattr(d2[0], "to_pandas") else d2[0]
-            if (
-                isinstance(x1, pd.DataFrame)
-                and isinstance(x2, pd.DataFrame)
-                and x1.shape == x2.shape
-            ):
-                diffs += int(x1.ne(x2).sum().sum())
-            y1 = d1[1].to_pandas() if hasattr(d1[1], "to_pandas") else d1[1]
-            y2 = d2[1].to_pandas() if hasattr(d2[1], "to_pandas") else d2[1]
-            if (
-                isinstance(y1, (pd.DataFrame, pd.Series))
-                and isinstance(y2, (pd.DataFrame, pd.Series))
-                and y1.shape == y2.shape
-            ):
-                diffs += int(y1.ne(y2).sum().sum())
-            return diffs
+            return cls._count_winsorize_tuple_diffs(d1, d2)
         return 0
 
     def _metrics_winsorize_clipped(

@@ -90,6 +90,69 @@ def unpack_pipeline_input(
     return data, None, False
 
 
+def _pack_polars_output(X: Any, y: Any) -> Any:
+    """Re-attach y to a Polars-backed X (wrapped or raw), returning the same wrapper shape as X."""
+    import polars as pl
+
+    engine = get_engine(X)
+
+    y_series = y
+    if not isinstance(y, (pl.Series, pl.DataFrame)):
+        # Try to convert y to Series; let it fail or handle otherwise
+        with contextlib.suppress(Exception):
+            y_series = pl.Series(y)
+
+    # Helper to get raw df
+    raw_df = X
+    is_wrapped = False
+
+    if isinstance(X, pl.DataFrame):
+        raw_df = X
+        is_wrapped = False
+    elif hasattr(X, "_df"):
+        raw_df = X._df
+        is_wrapped = True
+
+    # Merge
+    if isinstance(y_series, pl.Series):
+        if y_series.name == "":
+            y_series = y_series.alias("target")
+        result = raw_df.with_columns(y_series)
+    elif isinstance(y_series, pl.DataFrame):
+        result = raw_df.hstack(y_series.get_columns())
+    else:
+        result = raw_df.hstack(y_series)
+
+    if is_wrapped:
+        return engine.wrap(result)
+    return result
+
+
+def _pack_pandas_output(X: Any, y: Any) -> pd.DataFrame:
+    """Re-attach y to a Pandas-backed X, aligning indices and validating matching row counts."""
+    X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
+    y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
+
+    # Concatenating on mismatched indices (e.g. a row-dropping step that
+    # updated X but not y) would otherwise silently NaN-pad/duplicate rows
+    # instead of raising. A row-count mismatch always indicates a real bug
+    # upstream, so fail loudly with a clear message. When counts match but
+    # indices differ (the common, benign case), reset both to a shared
+    # positional index before concatenating so rows still line up.
+    if len(X_pd) != len(y_pd):
+        raise ValueError(
+            "pack_pipeline_output: X and y have different row counts "
+            f"({len(X_pd)} vs {len(y_pd)}); cannot safely reattach y to X. "
+            "This usually means a preprocessing step dropped/added rows for "
+            "one but not the other."
+        )
+    if hasattr(X_pd, "index") and hasattr(y_pd, "index") and not X_pd.index.equals(y_pd.index):
+        X_pd = X_pd.reset_index(drop=True)
+        y_pd = y_pd.reset_index(drop=True)
+
+    return pd.concat([X_pd, y_pd], axis=1)
+
+
 def pack_pipeline_output(
     X: Any, y: Any | None, was_tuple: bool
 ) -> pd.DataFrame | SkyulfDataFrame | tuple[Any, Any]:
@@ -118,63 +181,10 @@ def pack_pipeline_output(
         engine = get_engine(X)
 
         if getattr(engine, "name", "") == "polars":
-            # Polars specific concat
-            import polars as pl
-
-            y_series = y
-            if not isinstance(y, (pl.Series, pl.DataFrame)):
-                # Try to convert y to Series; let it fail or handle otherwise
-                with contextlib.suppress(Exception):
-                    y_series = pl.Series(y)
-
-            # Helper to get raw df
-            raw_df = X
-            is_wrapped = False
-
-            if isinstance(X, pl.DataFrame):
-                raw_df = X
-                is_wrapped = False
-            elif hasattr(X, "_df"):
-                raw_df = X._df
-                is_wrapped = True
-
-            # Merge
-            if isinstance(y_series, pl.Series):
-                if y_series.name == "":
-                    y_series = y_series.alias("target")
-                result = raw_df.with_columns(y_series)
-            elif isinstance(y_series, pl.DataFrame):
-                result = raw_df.hstack(y_series.get_columns())
-            else:
-                result = raw_df.hstack(y_series)
-
-            if is_wrapped:
-                return engine.wrap(result)
-            return result
+            return _pack_polars_output(X, y)
 
         # Default to Pandas behavior (convert if needed or assume Pandas)
-        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
-
-        y_pd = y.to_pandas() if hasattr(y, "to_pandas") else y
-
-        # Concatenating on mismatched indices (e.g. a row-dropping step that
-        # updated X but not y) would otherwise silently NaN-pad/duplicate rows
-        # instead of raising. A row-count mismatch always indicates a real bug
-        # upstream, so fail loudly with a clear message. When counts match but
-        # indices differ (the common, benign case), reset both to a shared
-        # positional index before concatenating so rows still line up.
-        if len(X_pd) != len(y_pd):
-            raise ValueError(
-                "pack_pipeline_output: X and y have different row counts "
-                f"({len(X_pd)} vs {len(y_pd)}); cannot safely reattach y to X. "
-                "This usually means a preprocessing step dropped/added rows for "
-                "one but not the other."
-            )
-        if hasattr(X_pd, "index") and hasattr(y_pd, "index") and not X_pd.index.equals(y_pd.index):
-            X_pd = X_pd.reset_index(drop=True)
-            y_pd = y_pd.reset_index(drop=True)
-
-        return pd.concat([X_pd, y_pd], axis=1)
+        return _pack_pandas_output(X, y)
 
     return X
 
@@ -197,75 +207,62 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
     return all(np.isclose(val, 0) or np.isclose(val, 1) for val in unique_vals)
 
 
-def detect_numeric_columns(
-    frame: pd.DataFrame | SkyulfDataFrame,
-    exclude_binary: bool = True,
-    exclude_constant: bool = True,
+def _detect_numeric_columns_polars(
+    frame: Any, exclude_binary: bool, exclude_constant: bool
 ) -> list[str]:
-    """
-    Find numeric-like columns.
+    """Find numeric-like columns in a Polars frame, applying binary/constant exclusion rules."""
+    import polars as pl
 
-    Args:
-        frame: DataFrame to analyze
-        exclude_binary: If True, excludes columns with only 0/1 values.
-        exclude_constant: If True, excludes columns with 0 or 1 unique value.
-    """
-    engine = get_engine(frame)
+    detected: list[str] = []
 
-    # Polars Path
-    if engine.name == EngineName.POLARS:
-        import polars as pl
-
-        detected: list[str] = []
-
-        # Select numeric columns first
-        numeric_cols = [
-            c
-            for c, t in zip(frame.columns, frame.dtypes, strict=True)
-            if t
-            in [
-                pl.Float32,
-                pl.Float64,
-                pl.Int8,
-                pl.Int16,
-                pl.Int32,
-                pl.Int64,
-                pl.UInt8,
-                pl.UInt16,
-                pl.UInt32,
-                pl.UInt64,
-            ]
+    # Select numeric columns first
+    numeric_cols = [
+        c
+        for c, t in zip(frame.columns, frame.dtypes, strict=True)
+        if t
+        in [
+            pl.Float32,
+            pl.Float64,
+            pl.Int8,
+            pl.Int16,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt8,
+            pl.UInt16,
+            pl.UInt32,
+            pl.UInt64,
         ]
+    ]
 
-        for col in numeric_cols:
-            series = frame[col]
+    for col in numeric_cols:
+        series = frame[col]
 
-            # 1. Exclude explicit booleans (already filtered by type check above mostly, but good to be safe)
-            if series.dtype == pl.Boolean:
-                continue
+        # 1. Exclude explicit booleans (already filtered by type check above mostly, but good to be safe)
+        if series.dtype == pl.Boolean:
+            continue
 
-            # 2. Check for validity (non-nulls)
-            valid = series.drop_nulls()
-            if valid.is_empty():
-                continue
+        # 2. Check for validity (non-nulls)
+        valid = series.drop_nulls()
+        if valid.is_empty():
+            continue
 
-            # 3. Exclude 0/1 columns (Binary)
-            if exclude_binary and _is_binary_numeric(valid):
-                continue
+        # 3. Exclude 0/1 columns (Binary)
+        if exclude_binary and _is_binary_numeric(valid):
+            continue
 
-            # 4. Exclude constant columns
-            if exclude_constant and valid.n_unique() < 2:
-                continue
+        # 4. Exclude constant columns
+        if exclude_constant and valid.n_unique() < 2:
+            continue
 
-            detected.append(col)
+        detected.append(col)
 
-        return detected
+    return detected
 
-    # Pandas Path
-    # Convert to Pandas for analysis if not already
-    if not isinstance(frame, pd.DataFrame) and hasattr(frame, "to_pandas"):
-        frame = frame.to_pandas()
 
+def _detect_numeric_columns_pandas(
+    frame: pd.DataFrame, exclude_binary: bool, exclude_constant: bool
+) -> list[str]:
+    """Find numeric-like columns in a Pandas frame, applying binary/constant exclusion rules."""
     detected: list[str] = []
     seen: set[str] = set()
 
@@ -301,6 +298,31 @@ def detect_numeric_columns(
         seen.add(column)
 
     return detected
+
+
+def detect_numeric_columns(
+    frame: pd.DataFrame | SkyulfDataFrame,
+    exclude_binary: bool = True,
+    exclude_constant: bool = True,
+) -> list[str]:
+    """
+    Find numeric-like columns.
+
+    Args:
+        frame: DataFrame to analyze
+        exclude_binary: If True, excludes columns with only 0/1 values.
+        exclude_constant: If True, excludes columns with 0 or 1 unique value.
+    """
+    engine = get_engine(frame)
+
+    if engine.name == EngineName.POLARS:
+        return _detect_numeric_columns_polars(frame, exclude_binary, exclude_constant)
+
+    # Convert to Pandas for analysis if not already
+    if not isinstance(frame, pd.DataFrame) and hasattr(frame, "to_pandas"):
+        frame = frame.to_pandas()
+
+    return _detect_numeric_columns_pandas(frame, exclude_binary, exclude_constant)
 
 
 def resolve_columns(
