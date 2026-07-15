@@ -28,7 +28,83 @@ def get_primary_database(settings: Settings) -> str:
     return getattr(settings, "DB_PRIMARY", "sqlite").lower()
 
 
-async def create(settings: Settings, row: dict[str, Any]) -> Any:  # noqa: C901
+async def _lookup_existing_on_duplicate(
+    primary_mod: Any, primary_name: str, settings: Settings, row: dict[str, Any], error: Exception
+) -> tuple[Any, bool]:
+    """Check whether `error` looks like a duplicate-key error and, if so, look up the existing row.
+
+    Returns `(result, found)`. `found` is True only when the row already exists
+    in `primary_mod` and was located via lookup.
+    """
+    msg = str(error).lower()
+    if not ("unique" in msg or "duplicate" in msg or "constraint" in msg):
+        return None, False
+
+    try:
+        existing = await primary_mod.select_data_sources(settings, {"id": row.get("id")})
+        if isinstance(existing, list) and existing:
+            logger.info(f"Data source already exists in {primary_name}: {row.get('id')}")
+            return existing[0], True
+        if isinstance(existing, dict):
+            logger.info(f"Data source already exists in {primary_name}: {row.get('id')}")
+            return existing, True
+    except Exception:
+        # Ignore if check fails, try insert
+        logger.debug(f"Failed to check for existing data source in {primary_name}", exc_info=True)
+
+    return None, False
+
+
+async def _insert_primary_with_dup_check(
+    primary_mod: Any, primary_name: str, settings: Settings, row: dict[str, Any]
+) -> tuple[Any, bool]:
+    """Insert `row` into `primary_mod`, falling back to a lookup on duplicate-key errors.
+
+    Returns `(result, is_duplicate)`. `is_duplicate` is True when the insert failed
+    because the row already exists and `result` is the pre-existing row instead.
+    """
+    try:
+        res = await primary_mod.insert_data_source(settings, row)
+        logger.info(
+            f"Successfully inserted data source into {primary_name} (primary): {row.get('id', 'unknown')}"
+        )
+        return res, False
+    except Exception as e:
+        existing, found = await _lookup_existing_on_duplicate(
+            primary_mod, primary_name, settings, row, e
+        )
+        if found:
+            return existing, True
+
+        logger.exception(f"{primary_name} insert failed for data_sources")
+        raise RuntimeError(
+            f"Failed to persist data_sources row to primary database ({primary_name})"
+        ) from e
+
+
+async def _sync_secondary(
+    secondary_mod: Any, secondary_name: str, settings: Settings, row: dict[str, Any]
+) -> None:
+    """Best-effort sync of `row` into the secondary database; failures are logged, not raised."""
+    try:
+        await secondary_mod.insert_data_source(settings, row)
+        logger.info(
+            f"Successfully synced data source to {secondary_name} (secondary): {row.get('id', 'unknown')}"
+        )
+    except Exception:
+        logger.warning(
+            f"Failed to sync data source to {secondary_name} (non-critical): {row.get('id', 'unknown')}"
+        )
+
+
+# Maps primary DB name -> (primary_module, secondary_module, primary_label, secondary_label)
+_DB_PEERS: dict[str, tuple[Any, Any, str, str]] = {
+    "sqlite": (sqlite_q, pg_q, "SQLite", "PostgreSQL"),
+    "postgres": (pg_q, sqlite_q, "PostgreSQL", "SQLite"),
+}
+
+
+async def create(settings: Settings, row: dict[str, Any]) -> Any:
     """Create a new data source record with configurable primary database.
 
     Strategy: DB_PRIMARY-first approach
@@ -37,94 +113,21 @@ async def create(settings: Settings, row: dict[str, Any]) -> Any:  # noqa: C901
     """
 
     primary_db = get_primary_database(settings)
-
-    if primary_db == "sqlite":
-        # SQLite as primary
-        try:
-            sqlite_res = await sqlite_q.insert_data_source(settings, row)
-            logger.info(
-                f"Successfully inserted data source into SQLite (primary): {row.get('id', 'unknown')}"
-            )
-        except Exception as e:
-            # Handle duplicate key errors
-            msg = str(e).lower()
-            if "unique" in msg or "duplicate" in msg or "constraint" in msg:
-                try:
-                    existing = await sqlite_q.select_data_sources(settings, {"id": row.get("id")})
-                    if isinstance(existing, list) and existing:
-                        logger.info(f"Data source already exists in SQLite: {row.get('id')}")
-                        return existing[0]
-                    if isinstance(existing, dict):
-                        logger.info(f"Data source already exists in SQLite: {row.get('id')}")
-                        return existing
-                except Exception:
-                    # Ignore if check fails, try insert
-                    logger.debug(
-                        "Failed to check for existing data source in SQLite", exc_info=True
-                    )
-
-            logger.exception("SQLite insert failed for data_sources")
-            raise RuntimeError(
-                "Failed to persist data_sources row to primary database (SQLite)"
-            ) from e
-
-        # Secondary sync to PostgreSQL (best-effort)
-        try:
-            await pg_q.insert_data_source(settings, row)
-            logger.info(
-                f"Successfully synced data source to PostgreSQL (secondary): {row.get('id', 'unknown')}"
-            )
-        except Exception:
-            logger.warning(
-                f"Failed to sync data source to PostgreSQL (non-critical): {row.get('id', 'unknown')}"
-            )
-
-        return sqlite_res
-
-    elif primary_db == "postgres":
-        # PostgreSQL as primary
-        try:
-            pg_res = await pg_q.insert_data_source(settings, row)
-            logger.info(
-                f"Successfully inserted data source into PostgreSQL (primary): {row.get('id', 'unknown')}"
-            )
-        except Exception as e:
-            # Handle duplicate key errors
-            msg = str(e).lower()
-            if "unique" in msg or "duplicate" in msg or "constraint" in msg:
-                try:
-                    existing = await pg_q.select_data_sources(settings, {"id": row.get("id")})
-                    if isinstance(existing, list) and existing:
-                        logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
-                        return existing[0]
-                    if isinstance(existing, dict):
-                        logger.info(f"Data source already exists in PostgreSQL: {row.get('id')}")
-                        return existing
-                except Exception:
-                    logger.debug(
-                        "Failed to check for existing data source in PostgreSQL", exc_info=True
-                    )
-
-            logger.exception("PostgreSQL insert failed for data_sources")
-            raise RuntimeError(
-                "Failed to persist data_sources row to primary database (PostgreSQL)"
-            ) from e
-
-        # Secondary sync to SQLite (best-effort)
-        try:
-            await sqlite_q.insert_data_source(settings, row)
-            logger.info(
-                f"Successfully synced data source to SQLite (secondary): {row.get('id', 'unknown')}"
-            )
-        except Exception:
-            logger.warning(
-                f"Failed to sync data source to SQLite (non-critical): {row.get('id', 'unknown')}"
-            )
-
-        return pg_res
-
-    else:
+    peers = _DB_PEERS.get(primary_db)
+    if peers is None:
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
+    primary_mod, secondary_mod, primary_name, secondary_name = peers
+
+    result, is_duplicate = await _insert_primary_with_dup_check(
+        primary_mod, primary_name, settings, row
+    )
+    if is_duplicate:
+        return result
+
+    # Secondary sync (best-effort)
+    await _sync_secondary(secondary_mod, secondary_name, settings, row)
+
+    return result
 
 
 async def read(
