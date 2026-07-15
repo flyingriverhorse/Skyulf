@@ -18,13 +18,20 @@ class S3ArtifactStore(ArtifactStore):
         if not self.bucket_name:
             raise ValueError("S3 bucket name cannot be empty")
 
-        # Map standard AWS keys to s3fs keys if needed
+        self._remap_aws_credential_keys()
+        self._apply_endpoint_url()
+        self._apply_region_name()
+        self._init_filesystem()
+
+    def _remap_aws_credential_keys(self) -> None:
+        """Map standard AWS credential keys to the s3fs-expected keys, in place."""
         if "aws_access_key_id" in self.storage_options and "key" not in self.storage_options:
             self.storage_options["key"] = self.storage_options.pop("aws_access_key_id")
         if "aws_secret_access_key" in self.storage_options and "secret" not in self.storage_options:
             self.storage_options["secret"] = self.storage_options.pop("aws_secret_access_key")
 
-        # Handle endpoint_url
+    def _apply_endpoint_url(self) -> None:
+        """Move an endpoint_url/aws_endpoint_url option into ``client_kwargs``, in place."""
         endpoint = self.storage_options.pop("endpoint_url", None) or self.storage_options.pop(
             "aws_endpoint_url", None
         )
@@ -34,7 +41,8 @@ class S3ArtifactStore(ArtifactStore):
             if "endpoint_url" not in self.storage_options["client_kwargs"]:
                 self.storage_options["client_kwargs"]["endpoint_url"] = endpoint
 
-        # Handle region_name (passed by some callers)
+    def _apply_region_name(self) -> None:
+        """Move a region_name/region option into ``client_kwargs``, in place."""
         region = self.storage_options.pop("region_name", None) or self.storage_options.pop(
             "region", None
         )
@@ -44,6 +52,8 @@ class S3ArtifactStore(ArtifactStore):
             if "region_name" not in self.storage_options["client_kwargs"]:
                 self.storage_options["client_kwargs"]["region_name"] = region
 
+    def _init_filesystem(self) -> None:
+        """Create the s3fs filesystem client, raising a clear error on failure."""
         try:
             import s3fs  # ty: ignore[unresolved-import]
 
