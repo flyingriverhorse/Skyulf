@@ -64,23 +64,27 @@ class DataProfiler:
 
 
 class AdvisorEngine:
-    def analyze(self, profile: AnalysisProfile) -> list[Recommendation]:
+    @staticmethod
+    def _recommend_imputation(profile: AnalysisProfile) -> list[Recommendation]:
+        """Recommends imputation for columns that have any missing values."""
+        missing_cols = [col for col, stats in profile.columns.items() if stats["missing_count"] > 0]
+        if not missing_cols:
+            return []
+        return [
+            Recommendation(
+                type="imputation",
+                rule_id="imputation_mean",
+                target_columns=missing_cols,
+                message=f"Found {len(missing_cols)} columns with missing values.",
+                suggestion="Consider using SimpleImputer or KNNImputer.",
+            )
+        ]
+
+    @staticmethod
+    def _recommend_cleaning(profile: AnalysisProfile) -> list[Recommendation]:
+        """Recommends cleaning steps for duplicate rows and high-missing-ratio columns."""
         recs: list[Recommendation] = []
 
-        # 1. Imputation
-        missing_cols = [col for col, stats in profile.columns.items() if stats["missing_count"] > 0]
-        if missing_cols:
-            recs.append(
-                Recommendation(
-                    type="imputation",
-                    rule_id="imputation_mean",
-                    target_columns=missing_cols,
-                    message=f"Found {len(missing_cols)} columns with missing values.",
-                    suggestion="Consider using SimpleImputer or KNNImputer.",
-                )
-            )
-
-        # 2. Cleaning (Duplicates & High Missing)
         if profile.duplicate_row_count > 0:
             recs.append(
                 Recommendation(
@@ -108,26 +112,31 @@ class AdvisorEngine:
                 )
             )
 
-        # 3. Encoding (low-cardinality categorical → OHE candidates)
+        return recs
+
+    @staticmethod
+    def _recommend_encoding(profile: AnalysisProfile) -> list[Recommendation]:
+        """Recommends one-hot encoding for low-cardinality categorical columns."""
         cat_cols = [
             col
             for col, stats in profile.columns.items()
             if stats["column_type"] == "categorical" and stats["unique_count"] < 20
         ]
-        if cat_cols:
-            recs.append(
-                Recommendation(
-                    type="encoding",
-                    rule_id="one_hot_encoding",
-                    target_columns=cat_cols,
-                    message=(
-                        f"Found {len(cat_cols)} categorical columns suitable for OneHotEncoding."
-                    ),
-                    suggestion="Consider OneHotEncoder.",
-                )
+        if not cat_cols:
+            return []
+        return [
+            Recommendation(
+                type="encoding",
+                rule_id="one_hot_encoding",
+                target_columns=cat_cols,
+                message=(f"Found {len(cat_cols)} categorical columns suitable for OneHotEncoding."),
+                suggestion="Consider OneHotEncoder.",
             )
+        ]
 
-        # 4. Outliers (cheap proxy: any value > mean ± 3σ)
+    @staticmethod
+    def _find_outlier_columns(profile: AnalysisProfile) -> list[str]:
+        """Finds numeric columns with values beyond mean ± 3σ (cheap outlier proxy)."""
         outlier_cols = []
         for col, stats in profile.columns.items():
             if stats["column_type"] == "numeric" and stats["std_value"] and stats["std_value"] > 0:
@@ -135,19 +144,27 @@ class AdvisorEngine:
                 std = stats["std_value"]
                 if (stats["max_value"] > mean + 3 * std) or (stats["min_value"] < mean - 3 * std):
                     outlier_cols.append(col)
+        return outlier_cols
 
-        if outlier_cols:
-            recs.append(
-                Recommendation(
-                    type="outlier",
-                    rule_id="outlier_removal_iqr",
-                    target_columns=outlier_cols,
-                    message=f"Found {len(outlier_cols)} columns with potential outliers.",
-                    suggestion="Consider using IsolationForest or Z-score filtering.",
-                )
+    @staticmethod
+    def _recommend_outliers(profile: AnalysisProfile) -> list[Recommendation]:
+        """Recommends outlier removal for columns flagged by the mean ± 3σ proxy."""
+        outlier_cols = AdvisorEngine._find_outlier_columns(profile)
+        if not outlier_cols:
+            return []
+        return [
+            Recommendation(
+                type="outlier",
+                rule_id="outlier_removal_iqr",
+                target_columns=outlier_cols,
+                message=f"Found {len(outlier_cols)} columns with potential outliers.",
+                suggestion="Consider using IsolationForest or Z-score filtering.",
             )
+        ]
 
-        # 5. Transformation (skewness)
+    @staticmethod
+    def _find_skewed_columns(profile: AnalysisProfile) -> tuple[list[str], list[str]]:
+        """Splits numeric columns with |skewness| > 1.0 into positive- and non-positive-valued groups."""
         pos_skewed_cols = []
         neg_skewed_cols = []
         for col, stats in profile.columns.items():
@@ -160,6 +177,13 @@ class AdvisorEngine:
                     pos_skewed_cols.append(col)
                 else:
                     neg_skewed_cols.append(col)
+        return pos_skewed_cols, neg_skewed_cols
+
+    @staticmethod
+    def _recommend_transformations(profile: AnalysisProfile) -> list[Recommendation]:
+        """Recommends power transforms for skewed numeric columns."""
+        pos_skewed_cols, neg_skewed_cols = AdvisorEngine._find_skewed_columns(profile)
+        recs: list[Recommendation] = []
 
         if pos_skewed_cols:
             recs.append(
@@ -188,4 +212,14 @@ class AdvisorEngine:
                 )
             )
 
+        return recs
+
+    def analyze(self, profile: AnalysisProfile) -> list[Recommendation]:
+        """Runs all advisor rules against a profile and returns their combined recommendations."""
+        recs: list[Recommendation] = []
+        recs.extend(self._recommend_imputation(profile))
+        recs.extend(self._recommend_cleaning(profile))
+        recs.extend(self._recommend_encoding(profile))
+        recs.extend(self._recommend_outliers(profile))
+        recs.extend(self._recommend_transformations(profile))
         return recs
