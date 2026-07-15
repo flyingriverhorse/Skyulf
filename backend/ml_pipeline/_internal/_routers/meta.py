@@ -102,54 +102,52 @@ def get_node_registry():
     return _build_node_registry()
 
 
-@router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)
-async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(get_async_session)):
-    """Return the schema (columns, types, stats) of a dataset.
+def _column_type_from_dtype(dtype: str) -> str:
+    """Map a cached-profile dtype string to a coarse column_type bucket."""
+    if any(x in dtype for x in ["Int", "Float", "Decimal"]):
+        return "numeric"
+    if any(x in dtype for x in ["Utf8", "String", "Categorical", "Object"]):
+        return "categorical"
+    if "Date" in dtype or "Time" in dtype:
+        return "datetime"
+    if "Bool" in dtype:
+        return "boolean"
+    return "unknown"
 
-    Prefers the cached profile in `DataSource.source_metadata['profile']`
-    when present; falls back to a 1000-row sample profile.
-    """
-    ingestion_service = DataIngestionService(session)
-    ds = await ingestion_service.get_source(dataset_id)
-    if not ds:
-        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
 
-    if ds.source_metadata and "profile" in ds.source_metadata:
-        try:
-            cached_profile = ds.source_metadata["profile"]
-            columns = {}
-            for col_name, stats in cached_profile.get("columns", {}).items():
-                dtype = str(stats.get("type", "unknown"))
-                col_type = "unknown"
-                if any(x in dtype for x in ["Int", "Float", "Decimal"]):
-                    col_type = "numeric"
-                elif any(x in dtype for x in ["Utf8", "String", "Categorical", "Object"]):
-                    col_type = "categorical"
-                elif "Date" in dtype or "Time" in dtype:
-                    col_type = "datetime"
-                elif "Bool" in dtype:
-                    col_type = "boolean"
-                columns[col_name] = {
-                    "name": col_name,
-                    "dtype": dtype,
-                    "column_type": col_type,
-                    "missing_count": stats.get("null_count", 0),
-                    "missing_ratio": stats.get("null_percentage", 0) / 100.0,
-                    "unique_count": stats.get("unique_count", 0),
-                    "min_value": stats.get("min"),
-                    "max_value": stats.get("max"),
-                    "mean_value": stats.get("mean"),
-                    "std_value": stats.get("std"),
-                }
-            return {
-                "row_count": cached_profile.get("row_count", 0),
-                "column_count": cached_profile.get("column_count", 0),
-                "duplicate_row_count": cached_profile.get("duplicate_rows", 0),
-                "columns": columns,
-            }
-        except Exception as e:
-            logger.warning(f"Failed to parse cached profile for {dataset_id}: {e}")
+def _build_cached_column_profile(col_name: str, stats: dict[str, Any]) -> dict[str, Any]:
+    """Build a single column's profile entry from cached-metadata stats."""
+    dtype = str(stats.get("type", "unknown"))
+    return {
+        "name": col_name,
+        "dtype": dtype,
+        "column_type": _column_type_from_dtype(dtype),
+        "missing_count": stats.get("null_count", 0),
+        "missing_ratio": stats.get("null_percentage", 0) / 100.0,
+        "unique_count": stats.get("unique_count", 0),
+        "min_value": stats.get("min"),
+        "max_value": stats.get("max"),
+        "mean_value": stats.get("mean"),
+        "std_value": stats.get("std"),
+    }
 
+
+def _profile_from_cached_metadata(cached_profile: dict[str, Any]) -> dict[str, Any]:
+    """Build the full schema response from a cached `source_metadata['profile']` dict."""
+    columns = {
+        col_name: _build_cached_column_profile(col_name, stats)
+        for col_name, stats in cached_profile.get("columns", {}).items()
+    }
+    return {
+        "row_count": cached_profile.get("row_count", 0),
+        "column_count": cached_profile.get("column_count", 0),
+        "duplicate_row_count": cached_profile.get("duplicate_rows", 0),
+        "columns": columns,
+    }
+
+
+def _profile_from_sample(ds: Any, dataset_id: int) -> Any:
+    """Fall back to a fresh 1000-row sample profile when no cached profile exists."""
     try:
         ds_dict = {
             "connection_info": ds.config,
@@ -169,6 +167,27 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
     except Exception:
         logger.exception("Failed to profile dataset %s", dataset_id)
         raise SkyulfException(message="Failed to profile dataset") from None
+
+
+@router.get("/datasets/{dataset_id}/schema", response_model=AnalysisProfile)
+async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(get_async_session)):
+    """Return the schema (columns, types, stats) of a dataset.
+
+    Prefers the cached profile in `DataSource.source_metadata['profile']`
+    when present; falls back to a 1000-row sample profile.
+    """
+    ingestion_service = DataIngestionService(session)
+    ds = await ingestion_service.get_source(dataset_id)
+    if not ds:
+        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
+
+    if ds.source_metadata and "profile" in ds.source_metadata:
+        try:
+            return _profile_from_cached_metadata(ds.source_metadata["profile"])
+        except Exception as e:
+            logger.warning(f"Failed to parse cached profile for {dataset_id}: {e}")
+
+    return _profile_from_sample(ds, dataset_id)
 
 
 @router.get("/hyperparameters/{model_type}")

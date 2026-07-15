@@ -43,8 +43,73 @@ class DriftJobOption(BaseModel):
     best_metric: str | None = None
 
 
+async def _fetch_drift_job_rows(
+    db: AsyncSession, job_ids: list[str]
+) -> dict[str, BasicTrainingJob | AdvancedTuningJob]:
+    """Look up training/tuning job rows for the given ids across both job tables."""
+    db_jobs: dict[str, BasicTrainingJob | AdvancedTuningJob] = {}
+    try:
+        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
+            stmt = select(model_cls).where(model_cls.id.in_(job_ids))
+            result = await db.execute(stmt)
+            for row in result.scalars().all():
+                db_jobs[str(row.id)] = row
+    except Exception:
+        logger.warning("Could not enrich drift jobs from DB", exc_info=True)
+    return db_jobs
+
+
+def _extract_drift_target_column(db_row: BasicTrainingJob | AdvancedTuningJob) -> str | None:
+    """Resolve the target column for a job row from its stored graph, if possible."""
+    try:
+        graph: dict[str, Any] = cast(dict[str, Any], db_row.graph or {})
+        node_id: str = cast(str, db_row.node_id or "")
+        _, target_col, _ = extract_job_details(graph, node_id)
+        return target_col
+    except Exception:
+        return None  # nosec B110 - target column is optional metadata; job listing still succeeds
+
+
+def _build_drift_metric_summary(metrics: dict[str, Any]) -> str | None:
+    """Collapse the known test metrics present in `metrics` into a compact `key: value` summary."""
+    metric_parts: list[str] = []
+    for key, label in [
+        ("test_accuracy", "acc"),
+        ("test_f1_weighted", "f1"),
+        ("test_precision_weighted", "prec"),
+        ("test_recall_weighted", "recall"),
+        ("test_roc_auc", "auc"),
+        ("test_r2", "r2"),
+        ("test_rmse", "rmse"),
+        ("test_mae", "mae"),
+    ]:
+        if key in metrics:
+            val = metrics[key]
+            if isinstance(val, (int, float)):
+                metric_parts.append(f"{label}: {val:.4f}")
+    return " | ".join(metric_parts) if metric_parts else None
+
+
+def _enrich_drift_job(job: DriftJobOption, db_row: BasicTrainingJob | AdvancedTuningJob) -> None:
+    """Fill in `job`'s model/target/description/metric fields from its DB row, in place."""
+    job.model_type = db_row.model_type
+    job.target_column = _extract_drift_target_column(db_row)
+
+    meta: dict[str, Any] = cast(dict[str, Any], db_row.job_metadata or {})
+    if isinstance(meta, dict):
+        job.description = meta.get("description")
+
+    metrics: dict[str, Any] = cast(dict[str, Any], db_row.metrics or {})
+    if isinstance(metrics, dict):
+        if "n_rows" in metrics:
+            job.n_rows = int(metrics["n_rows"])
+        if "n_features" in metrics:
+            job.n_features = int(metrics["n_features"])
+        job.best_metric = _build_drift_metric_summary(metrics)
+
+
 @router.get("/jobs", response_model=list[DriftJobOption])
-async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
+async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """
     List all jobs that have reference data available for drift calculation.
     Scans subdirectories in the artifact folder, enriched with DB metadata.
@@ -67,63 +132,12 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
 
     # Enrich from database
     job_ids = [j.job_id for j in found_jobs]
-    db_jobs: dict[str, BasicTrainingJob | AdvancedTuningJob] = {}
-    try:
-        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model_cls).where(model_cls.id.in_(job_ids))
-            result = await db.execute(stmt)
-            for row in result.scalars().all():
-                db_jobs[str(row.id)] = row
-    except Exception:
-        logger.warning("Could not enrich drift jobs from DB", exc_info=True)
+    db_jobs = await _fetch_drift_job_rows(db, job_ids)
 
     for job in found_jobs:
         db_row = db_jobs.get(job.job_id)
         if db_row:
-            job.model_type = db_row.model_type
-
-            # Extract target column from graph
-            try:
-                graph: dict[str, Any] = cast(dict[str, Any], db_row.graph or {})
-                node_id: str = cast(str, db_row.node_id or "")
-                _, target_col, _ = extract_job_details(graph, node_id)
-                job.target_column = target_col
-            except Exception:
-                pass  # nosec B110 - target column is optional metadata; job listing still succeeds
-
-            # Description from job_metadata
-            meta: dict[str, Any] = cast(dict[str, Any], db_row.job_metadata or {})
-            if isinstance(meta, dict):
-                job.description = meta.get("description")
-
-            # Best metric from metrics dict
-            metrics: dict[str, Any] = cast(dict[str, Any], db_row.metrics or {})
-            if isinstance(metrics, dict):
-                # Data shape
-                if "n_rows" in metrics:
-                    job.n_rows = int(metrics["n_rows"])
-                if "n_features" in metrics:
-                    job.n_features = int(metrics["n_features"])
-
-                # Collect all test metrics into a compact summary
-                metric_parts: list[str] = []
-                for key, label in [
-                    ("test_accuracy", "acc"),
-                    ("test_f1_weighted", "f1"),
-                    ("test_precision_weighted", "prec"),
-                    ("test_recall_weighted", "recall"),
-                    ("test_roc_auc", "auc"),
-                    ("test_r2", "r2"),
-                    ("test_rmse", "rmse"),
-                    ("test_mae", "mae"),
-                ]:
-                    if key in metrics:
-                        val = metrics[key]
-                        if isinstance(val, (int, float)):
-                            metric_parts.append(f"{label}: {val:.4f}")
-                if metric_parts:
-                    job.best_metric = " | ".join(metric_parts)
-
+            _enrich_drift_job(job, db_row)
         jobs.append(job)
 
     jobs.sort(key=lambda x: x.created_at or "", reverse=True)
