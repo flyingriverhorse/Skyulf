@@ -13,6 +13,84 @@ logger = logging.getLogger(__name__)
 class CausalMixin(_AnalyzerState):
     """Causal-discovery helpers for :class:`EDAAnalyzer`."""
 
+    def _select_target_correlated_columns(
+        self, numeric_cols: list[str], primary_target: str
+    ) -> list[str]:
+        """Keep `primary_target` plus the 14 columns most correlated with it (by |corr|)."""
+        corrs = []
+        for col in numeric_cols:
+            if col == primary_target:
+                continue
+            c = self.df.select(pl.corr(col, primary_target)).item()  # type: ignore[attr-defined]
+            if c is not None:
+                corrs.append((col, abs(c)))
+        corrs.sort(key=lambda x: x[1], reverse=True)
+        selected_cols = [x[0] for x in corrs[:14]]
+        selected_cols.append(primary_target)
+        return selected_cols
+
+    def _select_highest_variance_columns(self, numeric_cols: list[str]) -> list[str]:
+        """Keep the 15 highest-variance columns when no target hint is available."""
+        variances = []
+        for col in numeric_cols:
+            var = self.df.select(pl.col(col).var()).item()  # type: ignore[attr-defined]
+            if var is not None:
+                variances.append((col, var))
+        variances.sort(key=lambda x: x[1], reverse=True)
+        return [x[0] for x in variances[:15]]
+
+    def _limit_columns_for_pc(self, numeric_cols: list[str]) -> list[str]:
+        """Cap the column set to 15 columns since PC is O(2^p) in the number of variables.
+
+        With a target-like column present we pick "target + top-14 by |corr|";
+        otherwise we fall back to the 15 highest-variance columns.
+        """
+        if len(numeric_cols) <= 15:
+            return numeric_cols
+
+        # Heuristic: if any column name looks like a target, keep it + top-14 by |corr|.
+        target_candidates = [
+            c for c in numeric_cols if "target" in c.lower() or "label" in c.lower()
+        ]
+        primary_target = target_candidates[0] if target_candidates else None
+
+        if primary_target:
+            return self._select_target_correlated_columns(numeric_cols, primary_target)
+        # No target hint → keep highest-variance columns.
+        return self._select_highest_variance_columns(numeric_cols)
+
+    def _classify_causal_edge(
+        self, source: str, target: str, end_i: int, end_j: int
+    ) -> CausalEdge | None:
+        """Classify a single (source, target) pair's edge type from its PC endpoints.
+
+        causal-learn endpoint encoding: -1 = tail, 1 = arrowhead.
+        """
+        if end_j == 0 and end_i == 0:
+            return None
+        if end_i == -1 and end_j == 1:
+            return CausalEdge(source=source, target=target, type="directed")
+        if end_i == 1 and end_j == -1:
+            return CausalEdge(source=target, target=source, type="directed")
+        if end_i == -1 and end_j == -1:
+            return CausalEdge(source=source, target=target, type="undirected")
+        if end_i == 1 and end_j == 1:
+            return CausalEdge(source=source, target=target, type="bidirected")
+        return None
+
+    def _build_causal_edges(self, adj_matrix, numeric_cols: list[str]) -> list[CausalEdge]:
+        """Translate the causal-learn adjacency matrix into `CausalEdge` objects."""
+        edges = []
+        num_vars = len(numeric_cols)
+        for i in range(num_vars):
+            for j in range(i + 1, num_vars):
+                edge = self._classify_causal_edge(
+                    numeric_cols[i], numeric_cols[j], adj_matrix[j, i], adj_matrix[i, j]
+                )
+                if edge is not None:
+                    edges.append(edge)
+        return edges
+
     def _discover_causal_graph(self, numeric_cols: list[str]) -> CausalGraph | None:
         """Run the PC algorithm and return a directed/undirected/bidirected graph.
 
@@ -21,36 +99,7 @@ class CausalMixin(_AnalyzerState):
         we fall back to the 15 highest-variance columns.
         """
         try:
-            if len(numeric_cols) > 15:
-                # Heuristic: if any column name looks like a target, keep it + top-14 by |corr|.
-                target_candidates = [
-                    c for c in numeric_cols if "target" in c.lower() or "label" in c.lower()
-                ]
-                primary_target = target_candidates[0] if target_candidates else None
-
-                if primary_target:
-                    corrs = []
-                    for col in numeric_cols:
-                        if col == primary_target:
-                            continue
-                        c = self.df.select(  # type: ignore[attr-defined]
-                            pl.corr(col, primary_target)
-                        ).item()
-                        if c is not None:
-                            corrs.append((col, abs(c)))
-                    corrs.sort(key=lambda x: x[1], reverse=True)
-                    selected_cols = [x[0] for x in corrs[:14]]
-                    selected_cols.append(primary_target)
-                    numeric_cols = selected_cols
-                else:
-                    # No target hint → keep highest-variance columns.
-                    variances = []
-                    for col in numeric_cols:
-                        var = self.df.select(pl.col(col).var()).item()  # type: ignore[attr-defined]
-                        if var is not None:
-                            variances.append((col, var))
-                    variances.sort(key=lambda x: x[1], reverse=True)
-                    numeric_cols = [x[0] for x in variances[:15]]
+            numeric_cols = self._limit_columns_for_pc(numeric_cols)
 
             # Cap rows for runtime budget; PC is O(n) in samples but O(2^p) in vars.
             limit = 5000
@@ -70,30 +119,7 @@ class CausalMixin(_AnalyzerState):
             cg = pc(data, alpha=0.05, indep_test="fisherz", show_progress=False)
 
             nodes = [CausalNode(id=col, label=col) for col in numeric_cols]
-            edges = []
-
-            adj_matrix = cg.G.graph
-            num_vars = len(numeric_cols)
-
-            # causal-learn endpoint encoding: -1 = tail, 1 = arrowhead.
-            for i in range(num_vars):
-                for j in range(i + 1, num_vars):
-                    end_j = adj_matrix[i, j]
-                    end_i = adj_matrix[j, i]
-
-                    source = numeric_cols[i]
-                    target = numeric_cols[j]
-
-                    if end_j == 0 and end_i == 0:
-                        continue
-                    if end_i == -1 and end_j == 1:
-                        edges.append(CausalEdge(source=source, target=target, type="directed"))
-                    elif end_i == 1 and end_j == -1:
-                        edges.append(CausalEdge(source=target, target=source, type="directed"))
-                    elif end_i == -1 and end_j == -1:
-                        edges.append(CausalEdge(source=source, target=target, type="undirected"))
-                    elif end_i == 1 and end_j == 1:
-                        edges.append(CausalEdge(source=source, target=target, type="bidirected"))
+            edges = self._build_causal_edges(cg.G.graph, numeric_cols)
 
             return CausalGraph(nodes=nodes, edges=edges)
 
