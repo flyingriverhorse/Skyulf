@@ -209,6 +209,59 @@ class S3Catalog(DataCatalog):
         safe_name = s3_path.replace("s3://", "").replace("/", "_")
         return str(Path(self.cache_dir) / safe_name)
 
+    def _load_from_cache_if_fresh(
+        self, path: str, cache_path: str, limit: int | None, kwargs: dict
+    ) -> pd.DataFrame | None:
+        """Return a cached DataFrame if a local cache file exists and is newer than S3.
+
+        Returns None if there is no usable cache (missing, stale, custom creds, or
+        validation failure), in which case the caller should load from source.
+        """
+        if not Path(cache_path).exists():
+            return None
+        try:
+            # If custom credentials are provided, skip cache validation to avoid auth issues.
+            # Otherwise, check if the S3 file is newer than the cache.
+            if "storage_options" not in kwargs:
+                s3_info = self.fs.info(path)
+                local_mtime = Path(cache_path).stat().st_mtime
+
+                if s3_info["LastModified"].timestamp() < local_mtime:
+                    logger.info(f"Cache hit for {path}")
+                    if path.endswith(".csv"):
+                        return pd.read_csv(cache_path, nrows=limit)
+                    df = pd.read_parquet(cache_path)
+                    return df.head(limit) if limit else df
+        except Exception as e:
+            logger.warning(f"Cache validation failed for {path}: {e}")
+        return None
+
+    @staticmethod
+    def _read_from_source(path: str, limit: int | None, storage_options: dict) -> pd.DataFrame:
+        """Read `path` from S3 as a DataFrame, dispatching on file extension."""
+        if path.endswith(".csv"):
+            return pd.read_csv(path, nrows=limit, storage_options=storage_options)
+        if path.endswith(".parquet"):
+            df = pd.read_parquet(path, storage_options=storage_options)
+        elif path.endswith(".json"):
+            df = pd.read_json(path, storage_options=storage_options)
+        else:
+            df = pd.read_parquet(path, storage_options=storage_options)
+        if limit:
+            df = df.head(limit)
+        return df
+
+    @staticmethod
+    def _write_to_cache(df: pd.DataFrame, cache_path: str, path: str) -> None:
+        """Best-effort write of `df` to the local cache path; failures are logged only."""
+        try:
+            if path.endswith(".csv"):
+                df.to_csv(cache_path, index=False)
+            else:
+                df.to_parquet(cache_path, index=False)
+        except Exception as e:
+            logger.warning(f"Failed to write to cache {cache_path}: {e}")
+
     def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
         path = self._get_s3_path(dataset_id)
         limit = kwargs.get("limit")
@@ -225,50 +278,16 @@ class S3Catalog(DataCatalog):
 
         # Check local cache first
         cache_path = self._get_cache_path(path)
-        if Path(cache_path).exists():
-            try:
-                # If custom credentials are provided, skip cache validation to avoid auth issues.
-                # Otherwise, check if the S3 file is newer than the cache.
-                if "storage_options" not in kwargs:
-                    s3_info = self.fs.info(path)
-                    local_mtime = Path(cache_path).stat().st_mtime
-
-                    if s3_info["LastModified"].timestamp() < local_mtime:
-                        logger.info(f"Cache hit for {path}")
-                        if path.endswith(".csv"):
-                            return pd.read_csv(cache_path, nrows=limit)
-                        else:
-                            df = pd.read_parquet(cache_path)
-                            return df.head(limit) if limit else df
-            except Exception as e:
-                logger.warning(f"Cache validation failed for {path}: {e}")
+        cached = self._load_from_cache_if_fresh(path, cache_path, limit, kwargs)
+        if cached is not None:
+            return cached
 
         try:
-            # Load from S3
-            if path.endswith(".csv"):
-                df = pd.read_csv(path, nrows=limit, storage_options=storage_options)
-            elif path.endswith(".parquet"):
-                df = pd.read_parquet(path, storage_options=storage_options)
-                if limit:
-                    df = df.head(limit)
-            elif path.endswith(".json"):
-                df = pd.read_json(path, storage_options=storage_options)
-                if limit:
-                    df = df.head(limit)
-            else:
-                df = pd.read_parquet(path, storage_options=storage_options)
-                if limit:
-                    df = df.head(limit)
+            df = self._read_from_source(path, limit, storage_options)
 
             # Save to cache (only if full load and no custom creds for now)
             if not limit and "storage_options" not in kwargs:
-                try:
-                    if path.endswith(".csv"):
-                        df.to_csv(cache_path, index=False)
-                    else:
-                        df.to_parquet(cache_path, index=False)
-                except Exception as e:
-                    logger.warning(f"Failed to write to cache {cache_path}: {e}")
+                self._write_to_cache(df, cache_path, path)
 
             return df
 

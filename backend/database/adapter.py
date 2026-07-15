@@ -107,9 +107,127 @@ def build_connection_config(settings: Settings) -> dict[str, Any]:
 
 
 @asynccontextmanager
-async def async_session_or_connection(  # noqa: C901
-    settings: Settings, config: dict[str, Any] | None = None
-):
+async def _postgres_sqlite_session(settings: Settings, cfg: dict[str, Any]):
+    """Yield the shared SQLAlchemy AsyncSession used for PostgreSQL/SQLite backends."""
+    # Use our main async engine and session
+    from .engine import get_async_session
+
+    async for session in get_async_session():
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
+
+
+@asynccontextmanager
+async def _mysql_connection(settings: Settings, cfg: dict[str, Any]):
+    """Yield an aiomysql connection for MySQL/MariaDB backends."""
+    # MySQL async connection
+    try:
+        import aiomysql  # type: ignore
+    except ImportError:
+        raise RuntimeError("aiomysql package required for MySQL async support") from None
+
+    # Parse connection details from URL or config
+    import urllib.parse as urlparse
+
+    parsed = urlparse.urlparse(cfg["database_url"])
+
+    conn = await aiomysql.connect(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 3306,
+        user=parsed.username,
+        password=parsed.password,
+        db=parsed.path.lstrip("/") if parsed.path else None,
+        autocommit=False,
+    )
+
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@asynccontextmanager
+async def _mongo_database(settings: Settings, cfg: dict[str, Any]):
+    """Yield an AsyncIOMotorDatabase for MongoDB backends."""
+    # MongoDB async connection
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient  # type: ignore
+    except ImportError:
+        raise RuntimeError("motor package required for MongoDB async support") from None
+
+    client = AsyncIOMotorClient(cfg["database_url"])
+
+    try:
+        # Extract database name from URL or config
+        import urllib.parse as urlparse
+
+        parsed = urlparse.urlparse(cfg["database_url"])
+        db_name = parsed.path.lstrip("/") if parsed.path else "default"
+
+        database = client[db_name]
+        yield database
+    finally:
+        client.close()
+
+
+@asynccontextmanager
+async def _snowflake_connection(settings: Settings, cfg: dict[str, Any]):
+    """Yield an AsyncSnowflakeConnection, running the sync driver in a thread pool."""
+    # Snowflake async wrapper (Snowflake doesn't have native async support)
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    try:
+        import snowflake.connector  # type: ignore
+    except ImportError:
+        raise RuntimeError(
+            "snowflake-connector-python package required for Snowflake support"
+        ) from None
+
+    # Create connection in thread pool since Snowflake is sync-only
+    executor = ThreadPoolExecutor(max_workers=settings.DB_SYNC_EXECUTOR_WORKERS)
+
+    def create_snowflake_connection():
+        return snowflake.connector.connect(
+            account=cfg.get("snowflake_account"),
+            user=cfg.get("snowflake_user"),
+            password=cfg.get("snowflake_password"),
+            database=cfg.get("snowflake_database"),
+            schema=cfg.get("snowflake_schema"),
+            warehouse=cfg.get("snowflake_warehouse"),
+        )
+
+    conn = await asyncio.get_running_loop().run_in_executor(executor, create_snowflake_connection)
+
+    try:
+        # Wrap connection with async interface
+        yield AsyncSnowflakeConnection(conn, executor)
+    finally:
+        await asyncio.get_running_loop().run_in_executor(executor, conn.close)
+        executor.shutdown(wait=True)
+
+
+# Maps a db_type identifier to the async context manager factory that
+# yields the appropriate session/connection object for that backend.
+_CONNECTION_FACTORIES = {
+    DatabaseType.POSTGRES: _postgres_sqlite_session,
+    DatabaseType.POSTGRESQL: _postgres_sqlite_session,
+    DatabaseType.SQLITE: _postgres_sqlite_session,
+    DatabaseType.MYSQL: _mysql_connection,
+    DatabaseType.MARIADB: _mysql_connection,
+    DatabaseType.MONGODB: _mongo_database,
+    DatabaseType.MONGO: _mongo_database,
+    DatabaseType.SNOWFLAKE: _snowflake_connection,
+}
+
+
+@asynccontextmanager
+async def async_session_or_connection(settings: Settings, config: dict[str, Any] | None = None):
     """
     Async context manager that yields appropriate database connection/session.
 
@@ -129,104 +247,12 @@ async def async_session_or_connection(  # noqa: C901
     db_type = get_db_type(settings)
     cfg = config or build_connection_config(settings)
 
-    if db_type in (DatabaseType.POSTGRES, DatabaseType.POSTGRESQL, DatabaseType.SQLITE):
-        # Use our main async engine and session
-        from .engine import get_async_session
-
-        async for session in get_async_session():
-            try:
-                yield session
-            except Exception:
-                await session.rollback()
-                raise
-            finally:
-                await session.close()
-
-    elif db_type in (DatabaseType.MYSQL, DatabaseType.MARIADB):
-        # MySQL async connection
-        try:
-            import aiomysql  # type: ignore
-        except ImportError:
-            raise RuntimeError("aiomysql package required for MySQL async support") from None
-
-        # Parse connection details from URL or config
-        import urllib.parse as urlparse
-
-        parsed = urlparse.urlparse(cfg["database_url"])
-
-        conn = await aiomysql.connect(
-            host=parsed.hostname or "localhost",
-            port=parsed.port or 3306,
-            user=parsed.username,
-            password=parsed.password,
-            db=parsed.path.lstrip("/") if parsed.path else None,
-            autocommit=False,
-        )
-
-        try:
-            yield conn
-        finally:
-            conn.close()
-
-    elif db_type in (DatabaseType.MONGODB, DatabaseType.MONGO):
-        # MongoDB async connection
-        try:
-            from motor.motor_asyncio import AsyncIOMotorClient  # type: ignore
-        except ImportError:
-            raise RuntimeError("motor package required for MongoDB async support") from None
-
-        client = AsyncIOMotorClient(cfg["database_url"])
-
-        try:
-            # Extract database name from URL or config
-            import urllib.parse as urlparse
-
-            parsed = urlparse.urlparse(cfg["database_url"])
-            db_name = parsed.path.lstrip("/") if parsed.path else "default"
-
-            database = client[db_name]
-            yield database
-        finally:
-            client.close()
-
-    elif db_type == DatabaseType.SNOWFLAKE:
-        # Snowflake async wrapper (Snowflake doesn't have native async support)
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-
-        try:
-            import snowflake.connector  # type: ignore
-        except ImportError:
-            raise RuntimeError(
-                "snowflake-connector-python package required for Snowflake support"
-            ) from None
-
-        # Create connection in thread pool since Snowflake is sync-only
-        executor = ThreadPoolExecutor(max_workers=settings.DB_SYNC_EXECUTOR_WORKERS)
-
-        def create_snowflake_connection():
-            return snowflake.connector.connect(
-                account=cfg.get("snowflake_account"),
-                user=cfg.get("snowflake_user"),
-                password=cfg.get("snowflake_password"),
-                database=cfg.get("snowflake_database"),
-                schema=cfg.get("snowflake_schema"),
-                warehouse=cfg.get("snowflake_warehouse"),
-            )
-
-        conn = await asyncio.get_running_loop().run_in_executor(
-            executor, create_snowflake_connection
-        )
-
-        try:
-            # Wrap connection with async interface
-            yield AsyncSnowflakeConnection(conn, executor)
-        finally:
-            await asyncio.get_running_loop().run_in_executor(executor, conn.close)
-            executor.shutdown(wait=True)
-
-    else:
+    factory = _CONNECTION_FACTORIES.get(db_type)
+    if factory is None:
         raise RuntimeError(f"Unsupported database type: {db_type}")
+
+    async with factory(settings, cfg) as resource:
+        yield resource
 
 
 class AsyncSnowflakeConnection:
