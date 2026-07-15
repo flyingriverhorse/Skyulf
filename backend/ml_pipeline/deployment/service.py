@@ -153,61 +153,66 @@ class DeploymentService:
         await session.commit()
 
     @staticmethod
-    async def predict(session: AsyncSession, data: list[dict]) -> list:  # noqa: C901
-        # 1. Get active deployment
-        deployment = await DeploymentService.get_active_deployment(session)
-        if not deployment:
-            raise ValueError("No active model deployed")
+    def _resolve_predict_store_and_key(uri: str) -> tuple[str, str]:
+        """Resolves an artifact URI into (store_uri, artifact_key) for the predict artifact loader.
 
-        # 2. Load Artifact
-        try:
-            from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+        Handles S3 URIs (with or without a .joblib/.pkl suffix) and local paths
+        (absolute, relative with a separator, or bare "pipeline_id/node_id" strings).
+        """
+        store_uri = ""
+        artifact_key = ""
 
-            uri = deployment.artifact_uri
-            store_uri = ""
-            artifact_key = ""
-
-            if uri.startswith("s3://"):
-                if uri.endswith(".joblib"):
-                    store_uri = uri.rsplit("/", 1)[0]
-                    artifact_key = uri.rsplit("/", 1)[1].replace(".joblib", "")
-                else:
-                    parts = uri.replace("s3://", "").split("/")
-                    bucket = parts[0]
-                    artifact_key = "/".join(parts[1:])
-                    store_uri = f"s3://{bucket}"
+        if uri.startswith("s3://"):
+            if uri.endswith(".joblib"):
+                store_uri = uri.rsplit("/", 1)[0]
+                artifact_key = uri.rsplit("/", 1)[1].replace(".joblib", "")
             else:
-                # Local path handling
-                if Path(uri).is_absolute():
-                    store_uri = str(Path(uri).parent)
-                    artifact_key = Path(uri).name
-                elif "/" in uri or "\\" in uri:
-                    if not Path(uri).exists() and not Path(uri).parent.exists():
-                        parts = uri.replace("\\", "/").split("/")
-                        if len(parts) == 2:
-                            pipeline_id = parts[0]
-                            node_id = parts[1]
-                            store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
-                            artifact_key = node_id
-                        else:
-                            store_uri = str(Path(uri).parent)
-                            artifact_key = Path(uri).name
-                    else:
-                        store_uri = str(Path(uri).parent)
-                        artifact_key = Path(uri).name
-                else:
-                    parts = uri.split("/")
-                    if len(parts) >= 2:
+                parts = uri.replace("s3://", "").split("/")
+                bucket = parts[0]
+                artifact_key = "/".join(parts[1:])
+                store_uri = f"s3://{bucket}"
+        else:
+            # Local path handling
+            if Path(uri).is_absolute():
+                store_uri = str(Path(uri).parent)
+                artifact_key = Path(uri).name
+            elif "/" in uri or "\\" in uri:
+                if not Path(uri).exists() and not Path(uri).parent.exists():
+                    parts = uri.replace("\\", "/").split("/")
+                    if len(parts) == 2:
                         pipeline_id = parts[0]
                         node_id = parts[1]
                         store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
                         artifact_key = node_id
                     else:
-                        raise ValueError(f"Invalid artifact URI format: {uri}")
+                        store_uri = str(Path(uri).parent)
+                        artifact_key = Path(uri).name
+                else:
+                    store_uri = str(Path(uri).parent)
+                    artifact_key = Path(uri).name
+            else:
+                parts = uri.split("/")
+                if len(parts) >= 2:
+                    pipeline_id = parts[0]
+                    node_id = parts[1]
+                    store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
+                    artifact_key = node_id
+                else:
+                    raise ValueError(f"Invalid artifact URI format: {uri}")
 
+        return store_uri, artifact_key
+
+    @staticmethod
+    def _load_predict_artifact(deployment: Deployment) -> Any:
+        """Loads and unwraps the deployed artifact used by predict(), wrapping load failures in ValueError."""
+        try:
+            from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+
+            store_uri, artifact_key = DeploymentService._resolve_predict_store_and_key(
+                deployment.artifact_uri
+            )
             store = ArtifactFactory.get_artifact_store(store_uri)
             artifact = store.load(artifact_key)
-
         except Exception as e:
             logger.error(f"Failed to load artifact: {e}")
             raise ValueError(f"Could not load model artifact: {deployment.artifact_uri}") from e
@@ -217,89 +222,219 @@ class DeploymentService:
             logger.info("Artifact is a tuple, using the first element as the model.")
             artifact = artifact[0]
 
+        return artifact
+
+    @staticmethod
+    def _predict_with_bundled_artifact(artifact: dict, df: pd.DataFrame) -> list:
+        """Predicts using the new SDK bundled artifact format: {"feature_engineer": ..., "model": ...}."""
+        feature_engineer = artifact["feature_engineer"]
+        estimator = artifact["model"]
+
+        # Clean Data
+        target_col = artifact.get("target_column")
+        dropped_cols = artifact.get("dropped_columns", [])
+
+        if target_col and target_col in df.columns:
+            logger.info(f"Dropping target column '{target_col}' from inference data")
+            df = df.drop(columns=[target_col])
+
+        if dropped_cols:
+            # Ensure dropped_cols is a list of strings
+            if isinstance(dropped_cols, str):
+                dropped_cols = [dropped_cols]
+
+            existing_dropped = [c for c in dropped_cols if c in df.columns]
+            if existing_dropped:
+                logger.info(
+                    f"Dropping explicitly dropped columns {existing_dropped} from inference data"
+                )
+                df = df.drop(columns=existing_dropped)
+
+        # Handle tuple estimator inside dict (e.g. from TunerCalculator)
+        if isinstance(estimator, tuple) and len(estimator) >= 1:
+            logger.info("Estimator inside artifact is a tuple, using the first element.")
+            estimator = estimator[0]
+
+        # Transform (use config_context so sklearn returns
+        # DataFrames with feature names during inference only)
+        try:
+            with sklearn.config_context(transform_output="pandas"):
+                X_transformed = feature_engineer.transform(df)
+        except Exception as e:
+            logger.error(f"Feature engineering failed: {e}")
+            raise ValueError(f"Feature engineering failed: {str(e)}") from e
+
+        # Predict
+        try:
+            predictions = estimator.predict(X_transformed)
+            predictions = _maybe_decode_predictions(
+                predictions, feature_engineer, target_column=target_col
+            )
+            if hasattr(predictions, "tolist"):
+                return cast(list[Any], predictions.tolist())
+            return list(predictions)
+        except Exception as e:
+            logger.error(f"Prediction failed: {e}")
+            raise ValueError(f"Prediction failed: {str(e)}") from e
+
+    @staticmethod
+    def _predict_with_legacy_artifact(artifact: Any, df: pd.DataFrame) -> list:
+        """Predicts using a legacy artifact that is directly a fitted predictor (no bundled feature engineer)."""
+        # Log columns for debugging
+        if isinstance(df, pd.DataFrame):
+            logger.info(f"Predicting with columns: {df.columns.tolist()}")
+            # Check if model has feature names and if they match
+            if hasattr(artifact, "feature_names_in_"):
+                model_cols = artifact.feature_names_in_.tolist()
+                missing_in_df = set(model_cols) - set(df.columns)
+                if missing_in_df:
+                    logger.warning(f"Missing columns in input DataFrame: {missing_in_df}")
+                    for c in missing_in_df:
+                        df[c] = 0
+                # Reorder columns to match model
+                df = df[model_cols]
+
+        predictions = artifact.predict(df)
+        if hasattr(predictions, "tolist"):
+            return cast(list[Any], predictions.tolist())
+        return list(predictions)
+
+    @staticmethod
+    async def predict(session: AsyncSession, data: list[dict]) -> list:
+        # 1. Get active deployment
+        deployment = await DeploymentService.get_active_deployment(session)
+        if not deployment:
+            raise ValueError("No active model deployed")
+
+        # 2. Load Artifact
+        artifact = DeploymentService._load_predict_artifact(deployment)
+
         # 3. Prepare Data
         df = pd.DataFrame(data)
 
         # 4. Predict
         # Check for new SDK format: {"feature_engineer": ..., "model": ...}
         if isinstance(artifact, dict) and "feature_engineer" in artifact and "model" in artifact:
-            feature_engineer = artifact["feature_engineer"]
-            estimator = artifact["model"]
-
-            # Clean Data
-            target_col = artifact.get("target_column")
-            dropped_cols = artifact.get("dropped_columns", [])
-
-            if target_col and target_col in df.columns:
-                logger.info(f"Dropping target column '{target_col}' from inference data")
-                df = df.drop(columns=[target_col])
-
-            if dropped_cols:
-                # Ensure dropped_cols is a list of strings
-                if isinstance(dropped_cols, str):
-                    dropped_cols = [dropped_cols]
-
-                existing_dropped = [c for c in dropped_cols if c in df.columns]
-                if existing_dropped:
-                    logger.info(
-                        f"Dropping explicitly dropped columns {existing_dropped} from inference data"
-                    )
-                    df = df.drop(columns=existing_dropped)
-
-            # Handle tuple estimator inside dict (e.g. from TunerCalculator)
-            if isinstance(estimator, tuple) and len(estimator) >= 1:
-                logger.info("Estimator inside artifact is a tuple, using the first element.")
-                estimator = estimator[0]
-
-            # Transform (use config_context so sklearn returns
-            # DataFrames with feature names during inference only)
-            try:
-                with sklearn.config_context(transform_output="pandas"):
-                    X_transformed = feature_engineer.transform(df)
-            except Exception as e:
-                logger.error(f"Feature engineering failed: {e}")
-                raise ValueError(f"Feature engineering failed: {str(e)}") from e
-
-            # Predict
-            try:
-                predictions = estimator.predict(X_transformed)
-                predictions = _maybe_decode_predictions(
-                    predictions, feature_engineer, target_column=target_col
-                )
-                if hasattr(predictions, "tolist"):
-                    return cast(list[Any], predictions.tolist())
-                return list(predictions)
-            except Exception as e:
-                logger.error(f"Prediction failed: {e}")
-                raise ValueError(f"Prediction failed: {str(e)}") from e
-
+            return DeploymentService._predict_with_bundled_artifact(artifact, df)
         # Legacy support or direct model loading (if artifact is just the model)
         elif hasattr(artifact, "predict"):
-            # Log columns for debugging
-            if isinstance(df, pd.DataFrame):
-                logger.info(f"Predicting with columns: {df.columns.tolist()}")
-                # Check if model has feature names and if they match
-                if hasattr(artifact, "feature_names_in_"):
-                    model_cols = artifact.feature_names_in_.tolist()
-                    missing_in_df = set(model_cols) - set(df.columns)
-                    if missing_in_df:
-                        logger.warning(f"Missing columns in input DataFrame: {missing_in_df}")
-                        for c in missing_in_df:
-                            df[c] = 0
-                    # Reorder columns to match model
-                    df = df[model_cols]
-
-            predictions = artifact.predict(df)
-            if hasattr(predictions, "tolist"):
-                return cast(list[Any], predictions.tolist())
-            return list(predictions)
+            return DeploymentService._predict_with_legacy_artifact(artifact, df)
         else:
             raise ValueError(
                 "Loaded artifact is not a valid predictor or recognized pipeline format"
             )
 
     @staticmethod
-    async def get_deployment_details(  # noqa: C901  # orchestrator: aggregates many optional fields
+    def _load_artifact_for_details(artifact_uri: str) -> Any:
+        """Loads the deployed artifact for schema inspection, mirroring predict()'s URI resolution.
+
+        Unlike predict(), this instantiates S3ArtifactStore/LocalArtifactStore directly and
+        returns None (rather than raising) when the artifact does not exist locally.
+        """
+        store: S3ArtifactStore | LocalArtifactStore
+
+        if artifact_uri.startswith("s3://"):
+            # Parse bucket and key: s3://bucket/key
+            parts = artifact_uri.replace("s3://", "").split("/")
+            bucket_name = parts[0]
+            key = "/".join(parts[1:])
+
+            settings = get_settings()
+            storage_options = {
+                "key": settings.AWS_ACCESS_KEY_ID,
+                "secret": settings.AWS_SECRET_ACCESS_KEY,
+                "endpoint_url": settings.AWS_ENDPOINT_URL,
+                "region_name": settings.AWS_DEFAULT_REGION,
+            }
+            # Filter None values
+            storage_options = {k: v for k, v in storage_options.items() if v is not None}
+
+            store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
+            return store.load(key)
+
+        elif Path(artifact_uri).is_absolute():
+            base_path = str(Path(artifact_uri).parent)
+            node_id = Path(artifact_uri).name
+            store = LocalArtifactStore(base_path)
+            return store.load(node_id) if store.exists(node_id) else None
+        elif "/" in artifact_uri or "\\" in artifact_uri:
+            if not Path(artifact_uri).exists() and not Path(artifact_uri).parent.exists():
+                parts = artifact_uri.replace("\\", "/").split("/")
+                if len(parts) == 2:
+                    pipeline_id = parts[0]
+                    node_id = parts[1]
+                    base_path = str(Path.cwd() / "exports" / "models" / pipeline_id)
+                else:
+                    base_path = str(Path(artifact_uri).parent)
+                    node_id = Path(artifact_uri).name
+            else:
+                base_path = str(Path(artifact_uri).parent)
+                node_id = Path(artifact_uri).name
+
+            store = LocalArtifactStore(base_path)
+            return store.load(node_id) if store.exists(node_id) else None
+        else:
+            # Fallback
+            base_path = str(Path.cwd())
+            node_id = artifact_uri
+            store = LocalArtifactStore(base_path)
+            return store.load(node_id) if store.exists(node_id) else None
+
+    @staticmethod
+    def _extract_input_features(artifact: Any) -> Any:
+        """Best-effort extraction of the input feature name list from an artifact's feature engineer or model."""
+        input_features = []
+
+        # Check dict format
+        if isinstance(artifact, dict) and "feature_engineer" in artifact:
+            fe = artifact["feature_engineer"]
+            # Try to get features from FeatureEngineer
+            if hasattr(fe, "feature_names_in_"):
+                input_features = fe.feature_names_in_
+            elif hasattr(fe, "steps") and fe.steps:
+                # Try first step
+                first_step = fe.steps[0]
+                # If it's a tuple (name, transformer)
+                if isinstance(first_step, tuple) and len(first_step) > 1:
+                    transformer = first_step[1]
+                    if hasattr(transformer, "feature_names_in_"):
+                        input_features = transformer.feature_names_in_
+
+            # If still empty, try model
+            if not input_features and "model" in artifact:
+                model = artifact["model"]
+                if isinstance(model, tuple):
+                    model = model[0]
+                if hasattr(model, "feature_names_in_"):
+                    input_features = model.feature_names_in_
+
+        # Check direct model
+        elif hasattr(artifact, "feature_names_in_"):
+            input_features = artifact.feature_names_in_
+
+        if hasattr(input_features, "tolist"):
+            input_features = cast(Any, input_features).tolist()
+
+        return input_features
+
+    @staticmethod
+    def _extract_target_column_from_graph(graph: dict) -> str | None:
+        """Finds the first `target_column` param among a job graph's nodes, or None if not found."""
+        nodes = graph.get("nodes", [])
+        for node in nodes:
+            # Handle both dict and object (though graph is usually dict from DB)
+            if isinstance(node, dict):
+                params = node.get("params", {})
+                if "target_column" in params:
+                    return cast(str, params["target_column"])
+            elif hasattr(node, "params"):
+                params = getattr(node, "params", {})
+                if "target_column" in params:
+                    return cast(str, params["target_column"])
+        return None
+
+    @staticmethod
+    async def get_deployment_details(
         session: AsyncSession, deployment: Deployment
     ) -> dict[str, Any]:
         """
@@ -310,95 +445,15 @@ class DeploymentService:
         info["output_schema"] = None
 
         try:
-            # Load Artifact (Reuse logic from predict - simplified)
             artifact_uri = str(deployment.artifact_uri)
-            store: S3ArtifactStore | LocalArtifactStore
-
-            if artifact_uri.startswith("s3://"):
-                # Parse bucket and key: s3://bucket/key
-                parts = artifact_uri.replace("s3://", "").split("/")
-                bucket_name = parts[0]
-                key = "/".join(parts[1:])
-
-                settings = get_settings()
-                storage_options = {
-                    "key": settings.AWS_ACCESS_KEY_ID,
-                    "secret": settings.AWS_SECRET_ACCESS_KEY,
-                    "endpoint_url": settings.AWS_ENDPOINT_URL,
-                    "region_name": settings.AWS_DEFAULT_REGION,
-                }
-                # Filter None values
-                storage_options = {k: v for k, v in storage_options.items() if v is not None}
-
-                store = S3ArtifactStore(bucket_name=bucket_name, storage_options=storage_options)
-                artifact = store.load(key)
-
-            elif Path(artifact_uri).is_absolute():
-                base_path = str(Path(artifact_uri).parent)
-                node_id = Path(artifact_uri).name
-                store = LocalArtifactStore(base_path)
-                artifact = store.load(node_id) if store.exists(node_id) else None
-            elif "/" in artifact_uri or "\\" in artifact_uri:
-                if not Path(artifact_uri).exists() and not Path(artifact_uri).parent.exists():
-                    parts = artifact_uri.replace("\\", "/").split("/")
-                    if len(parts) == 2:
-                        pipeline_id = parts[0]
-                        node_id = parts[1]
-                        base_path = str(Path.cwd() / "exports" / "models" / pipeline_id)
-                    else:
-                        base_path = str(Path(artifact_uri).parent)
-                        node_id = Path(artifact_uri).name
-                else:
-                    base_path = str(Path(artifact_uri).parent)
-                    node_id = Path(artifact_uri).name
-
-                store = LocalArtifactStore(base_path)
-                artifact = store.load(node_id) if store.exists(node_id) else None
-            else:
-                # Fallback
-                base_path = str(Path.cwd())
-                node_id = artifact_uri
-                store = LocalArtifactStore(base_path)
-                artifact = store.load(node_id) if store.exists(node_id) else None
+            artifact = DeploymentService._load_artifact_for_details(artifact_uri)
 
             if artifact:
                 # Handle tuple
                 if isinstance(artifact, tuple) and len(artifact) >= 1:
                     artifact = artifact[0]
 
-                # Extract Schema
-                input_features = []
-
-                # Check dict format
-                if isinstance(artifact, dict) and "feature_engineer" in artifact:
-                    fe = artifact["feature_engineer"]
-                    # Try to get features from FeatureEngineer
-                    if hasattr(fe, "feature_names_in_"):
-                        input_features = fe.feature_names_in_
-                    elif hasattr(fe, "steps") and fe.steps:
-                        # Try first step
-                        first_step = fe.steps[0]
-                        # If it's a tuple (name, transformer)
-                        if isinstance(first_step, tuple) and len(first_step) > 1:
-                            transformer = first_step[1]
-                            if hasattr(transformer, "feature_names_in_"):
-                                input_features = transformer.feature_names_in_
-
-                    # If still empty, try model
-                    if not input_features and "model" in artifact:
-                        model = artifact["model"]
-                        if isinstance(model, tuple):
-                            model = model[0]
-                        if hasattr(model, "feature_names_in_"):
-                            input_features = model.feature_names_in_
-
-                # Check direct model
-                elif hasattr(artifact, "feature_names_in_"):
-                    input_features = artifact.feature_names_in_
-
-                if hasattr(input_features, "tolist"):
-                    input_features = cast(Any, input_features).tolist()
-
+                input_features = DeploymentService._extract_input_features(artifact)
                 if input_features:
                     info["input_schema"] = [
                         {"name": str(f), "type": "unknown"} for f in input_features
@@ -409,19 +464,9 @@ class DeploymentService:
 
             job = await JobManager.get_job(session, str(deployment.job_id))
             if job and job.graph:
-                nodes = job.graph.get("nodes", [])
-                for node in nodes:
-                    # Handle both dict and object (though graph is usually dict from DB)
-                    if isinstance(node, dict):
-                        params = node.get("params", {})
-                        if "target_column" in params:
-                            info["target_column"] = params["target_column"]
-                            break
-                    elif hasattr(node, "params"):
-                        params = getattr(node, "params", {})
-                        if "target_column" in params:
-                            info["target_column"] = params["target_column"]
-                            break
+                target_column = DeploymentService._extract_target_column_from_graph(job.graph)
+                if target_column is not None:
+                    info["target_column"] = target_column
 
         except Exception as e:
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
