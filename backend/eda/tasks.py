@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,120 @@ from backend.utils.file_utils import extract_file_path_from_source
 from skyulf.profiling.analyzer import EDAAnalyzer
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_file_path(data_source: DataSource) -> str | Path | None:
+    """Resolve the file path for a DataSource, falling back to source_id if it looks like a CSV/Parquet path."""
+    source_data_dict = {
+        "config": data_source.config or {},
+        "connection_info": data_source.source_metadata or {},
+        "file_path": (data_source.config or {}).get("file_path"),
+        "source_id": data_source.source_id,
+    }
+
+    file_path: str | Path | None = extract_file_path_from_source(source_data_dict)
+
+    # Debug logging
+    logger.info(
+        f"Resolving path for DataSource {data_source.id} ({data_source.type}). Found: {file_path}"
+    )
+
+    # Last resort: check if source_id looks like a path
+    if (
+        not file_path
+        and data_source.source_id
+        and (
+            str(data_source.source_id).endswith(".csv")
+            or str(data_source.source_id).endswith(".parquet")
+        )
+    ):
+        file_path = data_source.source_id
+
+    return file_path
+
+
+def _resolve_s3_credentials(data_source: DataSource) -> dict:
+    """Resolve raw S3 credentials for a DataSource, trying explicit creds, then config, then env settings."""
+    # 1. Try explicit credentials field
+    creds = data_source.credentials or {}
+
+    # 2. If empty, try config (sometimes stored there)
+    if not creds:
+        config_creds = data_source.config or {}
+        creds = {
+            "aws_access_key_id": config_creds.get("aws_access_key_id"),
+            "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
+            "aws_session_token": config_creds.get("aws_session_token"),
+            "endpoint_url": config_creds.get("endpoint_url"),
+        }
+
+    # 3. If still empty, try system environment variables (via Settings)
+    if not creds.get("aws_access_key_id"):
+        settings = get_settings()
+        creds = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+            "aws_session_token": settings.AWS_SESSION_TOKEN,
+            "endpoint_url": None,  # Usually standard AWS
+        }
+        if creds.get("aws_access_key_id"):
+            logger.info("Using AWS credentials from environment variables.")
+
+    return creds
+
+
+def _build_s3_storage_options(data_source: DataSource) -> dict:
+    """Resolve S3 credentials for a DataSource into storage_options, mapped to the boto3/s3fs key names."""
+    creds = _resolve_s3_credentials(data_source)
+
+    # Map common boto3 keys to s3fs keys if necessary
+    storage_options = {
+        "key": creds.get("aws_access_key_id") or creds.get("key"),
+        "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
+        "token": creds.get("aws_session_token") or creds.get("token"),
+        "endpoint_url": creds.get("endpoint_url"),
+    }
+    # Remove None values
+    storage_options = {k: v for k, v in storage_options.items() if v is not None}
+
+    if storage_options:
+        logger.info(f"Using S3 credentials with keys: {list(storage_options.keys())}")
+    else:
+        logger.warning(
+            "S3 path detected but no credentials found in DataSource (credentials or config)."
+        )
+
+    return storage_options
+
+
+def _run_eda_analyzer(df, report_config: dict | None):
+    """Run EDAAnalyzer.analyze using the target/exclude/filter/task_type settings from the report config."""
+    exclude_cols = report_config.get("exclude_cols") if report_config else None
+    filters = report_config.get("filters") if report_config else None
+    target_col = report_config.get("target_col") if report_config else None
+    task_type = report_config.get("task_type") if report_config else None
+
+    analyzer = EDAAnalyzer(df)
+    return analyzer.analyze(
+        target_col=target_col,
+        exclude_cols=exclude_cols,
+        filters=filters,
+        task_type=task_type,
+    )
+
+
+async def _fail_report_safely(
+    session: AsyncSession, report: EDAReport | None, report_id: int, error: Exception
+):
+    """Roll back the session and best-effort mark the report FAILED after an unexpected error."""
+    try:
+        await session.rollback()
+        if report:
+            report.status = "FAILED"
+            report.error_message = str(error)
+            await session.commit()
+    except Exception:
+        logger.warning("Failed to update report %s status to FAILED", report_id, exc_info=True)
 
 
 async def run_eda_analysis(report_id: int, session: AsyncSession):
@@ -35,82 +150,22 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
 
         # 2. Load Data
         # Use the robust file path extraction logic from file_utils
-        # Construct a dict that mimics the structure expected by extract_file_path_from_source
-        source_data_dict = {
-            "config": data_source.config or {},
-            "connection_info": data_source.source_metadata or {},
-            "file_path": (data_source.config or {}).get("file_path"),
-            "source_id": data_source.source_id,
-        }
-
-        file_path = extract_file_path_from_source(source_data_dict)
-
-        # Debug logging
-        logger.info(
-            f"Resolving path for DataSource {data_source.id} ({data_source.type}). Found: {file_path}"
-        )
+        file_path = _resolve_file_path(data_source)
 
         if not file_path:
-            # Last resort: check if source_id looks like a path
-            if data_source.source_id and (
-                str(data_source.source_id).endswith(".csv")
-                or str(data_source.source_id).endswith(".parquet")
-            ):
-                file_path = data_source.source_id
-            else:
-                report.status = "FAILED"
-                report.error_message = (
-                    f"File path not found for source {data_source.id}. Type: {data_source.type}"
-                )
-                await session.commit()
-                return
+            report.status = "FAILED"
+            report.error_message = (
+                f"File path not found for source {data_source.id}. Type: {data_source.type}"
+            )
+            await session.commit()
+            return
 
         data_service = DataService()
 
         # Prepare storage options (credentials) for S3
         storage_options = None
         if file_path and str(file_path).startswith("s3://"):
-            # 1. Try explicit credentials field
-            creds = data_source.credentials or {}
-
-            # 2. If empty, try config (sometimes stored there)
-            if not creds:
-                config_creds = data_source.config or {}
-                creds = {
-                    "aws_access_key_id": config_creds.get("aws_access_key_id"),
-                    "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
-                    "aws_session_token": config_creds.get("aws_session_token"),
-                    "endpoint_url": config_creds.get("endpoint_url"),
-                }
-
-            # 3. If still empty, try system environment variables (via Settings)
-            if not creds.get("aws_access_key_id"):
-                settings = get_settings()
-                creds = {
-                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                    "aws_session_token": settings.AWS_SESSION_TOKEN,
-                    "endpoint_url": None,  # Usually standard AWS
-                }
-                if creds.get("aws_access_key_id"):
-                    logger.info("Using AWS credentials from environment variables.")
-
-            # Map common boto3 keys to s3fs keys if necessary
-            storage_options = {
-                "key": creds.get("aws_access_key_id") or creds.get("key"),
-                "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
-                "token": creds.get("aws_session_token") or creds.get("token"),
-                "endpoint_url": creds.get("endpoint_url"),
-            }
-            # Remove None values
-            storage_options = {k: v for k, v in storage_options.items() if v is not None}
-
-            if storage_options:
-                logger.info(f"Using S3 credentials with keys: {list(storage_options.keys())}")
-            else:
-                logger.warning(
-                    "S3 path detected but no credentials found in DataSource (credentials or config)."
-                )
+            storage_options = _build_s3_storage_options(data_source)
 
         # load_file is async
         try:
@@ -126,21 +181,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
         # 3. Run Analysis
         # Run in thread pool if CPU bound? Polars releases GIL mostly, so it's fine.
         try:
-            # Check for excluded columns
-            exclude_cols = report.config.get("exclude_cols") if report.config else None
-            filters = report.config.get("filters") if report.config else None
-
-            analyzer = EDAAnalyzer(df)
-            target_col = report.config.get("target_col") if report.config else None
-            task_type = report.config.get("task_type") if report.config else None
-
-            profile = analyzer.analyze(
-                target_col=target_col,
-                exclude_cols=exclude_cols,
-                filters=filters,
-                task_type=task_type,
-            )
-
+            profile = _run_eda_analyzer(df, report.config)
         except Exception as e:
             report.status = "FAILED"
             report.error_message = f"Analysis failed: {str(e)}"
@@ -156,15 +197,7 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
 
     except Exception as e:
         logger.error(f"EDA Analysis failed for report {report_id}: {e}")
-        # Try to update status if possible
-        try:
-            await session.rollback()
-            if report:
-                report.status = "FAILED"
-                report.error_message = str(e)
-                await session.commit()
-        except Exception:
-            logger.warning("Failed to update report %s status to FAILED", report_id, exc_info=True)
+        await _fail_report_safely(session, report, report_id, e)
 
 
 async def run_eda_background(report_id: int):
