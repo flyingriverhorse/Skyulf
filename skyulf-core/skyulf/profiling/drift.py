@@ -68,155 +68,19 @@ class DriftCalculator:
         if not SCIPY_AVAILABLE:
             raise ImportError("scipy is required for drift calculation")
 
-        default_thresholds = {
-            "psi": 0.2,
-            "ks": 0.05,  # p-value < 0.05 means distributions are different
-            "wasserstein": 0.1,  # Heuristic, depends on scale
-            "kl_divergence": 0.1,
-        }
-        thresholds = {**default_thresholds, **(thresholds or {})}
+        thresholds = self._merge_thresholds(thresholds)
+        missing_columns, new_columns = self._detect_schema_drift()
 
         column_drifts = {}
         drifted_count = 0
 
-        # Schema Drift Detection
-        ref_cols = set(self.reference_df.columns)
-        curr_cols = set(self.current_df.columns)
-        missing_columns = list(ref_cols - curr_cols)
-        new_columns = list(curr_cols - ref_cols)
-
         for col in self.common_columns:
-            dtype = self.reference_df[col].dtype
-            is_numeric = dtype.is_numeric()
-            is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Boolean]
-
-            if is_categorical:
-                col_drift = self._calculate_categorical_drift(col, thresholds)
-                if col_drift is not None:
-                    column_drifts[col] = col_drift
-                    if col_drift.drift_detected:
-                        drifted_count += 1
+            col_drift = self._calculate_column_drift(col, thresholds)
+            if col_drift is None:
                 continue
 
-            if not is_numeric:
-                # Unsupported dtype (e.g. nested/struct columns) — skip.
-                continue
-
-            # Ensure current data is also numeric or castable to the reference type
-            curr_series = self.current_df[col]
-            if curr_series.dtype != dtype:
-                try:
-                    # Try to cast current to match reference (e.g. Int to Float, or String to Float)
-                    curr_series = curr_series.cast(dtype, strict=False)
-                except Exception:
-                    # If casting fails completely (unlikely with strict=False), skip
-                    continue  # nosec B112
-
-            ref_data = self.reference_df[col].drop_nulls().to_numpy()
-            curr_data = curr_series.drop_nulls().to_numpy()
-
-            if len(ref_data) == 0 or len(curr_data) == 0:
-                continue
-
-            metrics = []
-            is_drifted = False
-
-            # 1. Wasserstein Distance
-            wd = wasserstein_distance(ref_data, curr_data)
-            # Normalize WD? It's scale dependent.
-            # Simple normalization: divide by std of reference
-            std_ref = np.std(ref_data)
-            norm_wd = wd / std_ref if std_ref > 0 else wd
-
-            wd_drift = norm_wd > thresholds["wasserstein"]
-            metrics.append(
-                DriftMetric(
-                    metric="wasserstein_distance",
-                    value=float(wd),
-                    has_drift=wd_drift,
-                    threshold=thresholds["wasserstein"],
-                )
-            )
-            if wd_drift:
-                is_drifted = True
-
-            # 2. KS Test
-            ks_stat, ks_p = ks_2samp(ref_data, curr_data)
-            ks_drift = ks_p < thresholds["ks"]
-            metrics.append(
-                DriftMetric(
-                    metric="ks_test_p_value",
-                    value=float(ks_p),
-                    has_drift=ks_drift,
-                    threshold=thresholds["ks"],
-                )
-            )
-            if ks_drift:
-                is_drifted = True
-
-            # 3. PSI (Population Stability Index)
-            psi_val = self._calculate_psi(ref_data, curr_data)
-            psi_drift = psi_val > thresholds["psi"]
-            metrics.append(
-                DriftMetric(
-                    metric="psi",
-                    value=float(psi_val),
-                    has_drift=psi_drift,
-                    threshold=thresholds["psi"],
-                )
-            )
-            if psi_drift:
-                is_drifted = True
-
-            # 4. KL Divergence
-            kl_val = self._calculate_kl(ref_data, curr_data)
-            kl_drift = kl_val > thresholds["kl_divergence"]
-            metrics.append(
-                DriftMetric(
-                    metric="kl_divergence",
-                    value=float(kl_val),
-                    has_drift=kl_drift,
-                    threshold=thresholds["kl_divergence"],
-                )
-            )
-            if kl_drift:
-                is_drifted = True
-
-            # Generate Suggestions
-            suggestions = []
-            if is_drifted:
-                if psi_val > 0.25:
-                    suggestions.append(
-                        "Critical population shift detected (PSI > 0.25). Immediate model retraining is recommended."
-                    )
-                elif psi_val > 0.1:
-                    suggestions.append(
-                        "Moderate population shift detected. Monitor model performance closely."
-                    )
-
-                if ks_drift and not psi_drift:
-                    suggestions.append(
-                        "Statistical distribution has changed, but population stability "
-                        "is acceptable. Check for outliers."
-                    )
-
-                if wd_drift:
-                    suggestions.append(
-                        "Significant change in feature scale or shape detected. Verify data preprocessing steps."
-                    )
-
-            # Calculate Distribution (Histogram)
-            distribution = self._calculate_distribution(ref_data, curr_data)
-
-            column_drifts[col] = ColumnDrift(
-                column=col,
-                metrics=metrics,
-                drift_detected=is_drifted,
-                suggestions=suggestions,
-                distribution=distribution,
-            )
-
-            if is_drifted:
+            column_drifts[col] = col_drift
+            if col_drift.drift_detected:
                 drifted_count += 1
 
         return DriftReport(
@@ -227,6 +91,188 @@ class DriftCalculator:
             missing_columns=missing_columns,
             new_columns=new_columns,
         )
+
+    def _calculate_column_drift(self, col: str, thresholds: dict[str, float]) -> ColumnDrift | None:
+        """Dispatch drift calculation for a single column based on its dtype."""
+        dtype = self.reference_df[col].dtype
+        is_categorical = dtype in [pl.Utf8, pl.String, pl.Categorical, pl.Boolean]
+
+        if is_categorical:
+            return self._calculate_categorical_drift(col, thresholds)
+
+        if not dtype.is_numeric():
+            # Unsupported dtype (e.g. nested/struct columns) — skip.
+            return None
+
+        return self._calculate_numeric_column_drift(col, dtype, thresholds)
+
+    def _merge_thresholds(self, thresholds: dict[str, float] | None) -> dict[str, float]:
+        """Merge user-supplied drift thresholds over the defaults."""
+        default_thresholds = {
+            "psi": 0.2,
+            "ks": 0.05,  # p-value < 0.05 means distributions are different
+            "wasserstein": 0.1,  # Heuristic, depends on scale
+            "kl_divergence": 0.1,
+        }
+        return {**default_thresholds, **(thresholds or {})}
+
+    def _detect_schema_drift(self) -> tuple[list[str], list[str]]:
+        """Return columns present only in the reference set and only in the current set."""
+        ref_cols = set(self.reference_df.columns)
+        curr_cols = set(self.current_df.columns)
+        missing_columns = list(ref_cols - curr_cols)
+        new_columns = list(curr_cols - ref_cols)
+        return missing_columns, new_columns
+
+    def _calculate_numeric_column_drift(
+        self, col: str, dtype: pl.DataType, thresholds: dict[str, float]
+    ) -> ColumnDrift | None:
+        """Compute drift metrics, suggestions, and distribution for a numeric column."""
+        # Ensure current data is also numeric or castable to the reference type
+        curr_series = self.current_df[col]
+        if curr_series.dtype != dtype:
+            try:
+                # Try to cast current to match reference (e.g. Int to Float, or String to Float)
+                curr_series = curr_series.cast(dtype, strict=False)
+            except Exception:
+                # If casting fails completely (unlikely with strict=False), skip
+                return None  # nosec B112
+
+        ref_data = self.reference_df[col].drop_nulls().to_numpy()
+        curr_data = curr_series.drop_nulls().to_numpy()
+
+        if len(ref_data) == 0 or len(curr_data) == 0:
+            return None
+
+        metrics, is_drifted, drift_flags = self._compute_numeric_metrics(
+            ref_data, curr_data, thresholds
+        )
+        suggestions = self._numeric_drift_suggestions(is_drifted, drift_flags)
+        distribution = self._calculate_distribution(ref_data, curr_data)
+
+        return ColumnDrift(
+            column=col,
+            metrics=metrics,
+            drift_detected=is_drifted,
+            suggestions=suggestions,
+            distribution=distribution,
+        )
+
+    def _compute_numeric_metrics(
+        self, ref_data: np.ndarray, curr_data: np.ndarray, thresholds: dict[str, float]
+    ) -> tuple[list[DriftMetric], bool, dict[str, float | bool]]:
+        """Compute Wasserstein distance, KS test, PSI, and KL divergence for a numeric column.
+
+        Returns the metric list, an overall drift flag, and a dict of raw
+        values/flags (``psi_val``, ``ks_drift``, ``psi_drift``, ``wd_drift``)
+        used downstream to generate suggestions.
+        """
+        metrics = []
+        is_drifted = False
+
+        # 1. Wasserstein Distance
+        wd = wasserstein_distance(ref_data, curr_data)
+        # Normalize WD? It's scale dependent.
+        # Simple normalization: divide by std of reference
+        std_ref = np.std(ref_data)
+        norm_wd = wd / std_ref if std_ref > 0 else wd
+
+        wd_drift = norm_wd > thresholds["wasserstein"]
+        metrics.append(
+            DriftMetric(
+                metric="wasserstein_distance",
+                value=float(wd),
+                has_drift=wd_drift,
+                threshold=thresholds["wasserstein"],
+            )
+        )
+        if wd_drift:
+            is_drifted = True
+
+        # 2. KS Test
+        ks_stat, ks_p = ks_2samp(ref_data, curr_data)
+        ks_drift = ks_p < thresholds["ks"]
+        metrics.append(
+            DriftMetric(
+                metric="ks_test_p_value",
+                value=float(ks_p),
+                has_drift=ks_drift,
+                threshold=thresholds["ks"],
+            )
+        )
+        if ks_drift:
+            is_drifted = True
+
+        # 3. PSI (Population Stability Index)
+        psi_val = self._calculate_psi(ref_data, curr_data)
+        psi_drift = psi_val > thresholds["psi"]
+        metrics.append(
+            DriftMetric(
+                metric="psi",
+                value=float(psi_val),
+                has_drift=psi_drift,
+                threshold=thresholds["psi"],
+            )
+        )
+        if psi_drift:
+            is_drifted = True
+
+        # 4. KL Divergence
+        kl_val = self._calculate_kl(ref_data, curr_data)
+        kl_drift = kl_val > thresholds["kl_divergence"]
+        metrics.append(
+            DriftMetric(
+                metric="kl_divergence",
+                value=float(kl_val),
+                has_drift=kl_drift,
+                threshold=thresholds["kl_divergence"],
+            )
+        )
+        if kl_drift:
+            is_drifted = True
+
+        drift_flags: dict[str, float | bool] = {
+            "psi_val": psi_val,
+            "ks_drift": ks_drift,
+            "psi_drift": psi_drift,
+            "wd_drift": wd_drift,
+        }
+        return metrics, is_drifted, drift_flags
+
+    def _numeric_drift_suggestions(
+        self, is_drifted: bool, drift_flags: dict[str, float | bool]
+    ) -> list[str]:
+        """Generate human-readable remediation suggestions from computed drift flags."""
+        suggestions = []
+        if not is_drifted:
+            return suggestions
+
+        psi_val = drift_flags["psi_val"]
+        ks_drift = drift_flags["ks_drift"]
+        psi_drift = drift_flags["psi_drift"]
+        wd_drift = drift_flags["wd_drift"]
+
+        if psi_val > 0.25:
+            suggestions.append(
+                "Critical population shift detected (PSI > 0.25). Immediate model retraining is recommended."
+            )
+        elif psi_val > 0.1:
+            suggestions.append(
+                "Moderate population shift detected. Monitor model performance closely."
+            )
+
+        if ks_drift and not psi_drift:
+            suggestions.append(
+                "Statistical distribution has changed, but population stability "
+                "is acceptable. Check for outliers."
+            )
+
+        if wd_drift:
+            suggestions.append(
+                "Significant change in feature scale or shape detected. Verify data preprocessing steps."
+            )
+
+        return suggestions
 
     def _calculate_distribution(
         self, ref_data: np.ndarray, curr_data: np.ndarray, bins: int = 20

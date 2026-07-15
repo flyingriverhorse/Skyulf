@@ -22,92 +22,19 @@ class GeoMixin(_AnalyzerState):
     ) -> GeospatialStats | None:
         """Detect lat/lon columns by name, then return bbox + sample points."""
         try:
-            if not lat_col or not lon_col:
-                # Check ALL columns (may have been inferred as strings).
-                candidates = {c.lower(): c for c in self.columns}  # type: ignore[attr-defined]
-                if not lat_col:
-                    if "latitude" in candidates:
-                        lat_col = candidates["latitude"]
-                    elif "lat" in candidates:
-                        lat_col = candidates["lat"]
-                if not lon_col:
-                    if "longitude" in candidates:
-                        lon_col = candidates["longitude"]
-                    elif "lng" in candidates:
-                        lon_col = candidates["lng"]
-                    elif "lon" in candidates:
-                        lon_col = candidates["lon"]
-                    elif "long" in candidates:
-                        lon_col = candidates["long"]
-
+            lat_col, lon_col = self._resolve_lat_lon_columns(lat_col, lon_col)
             if not lat_col or not lon_col:
                 return None
 
-            geo_df = self.lazy_df.select(  # type: ignore[attr-defined]
-                [
-                    pl.col(lat_col).cast(pl.Float64, strict=False).alias("lat"),
-                    pl.col(lon_col).cast(pl.Float64, strict=False).alias("lon"),
-                ]
-            )
-
-            stats = _collect(
-                geo_df.select(
-                    [
-                        pl.col("lat").min().alias("min_lat"),
-                        pl.col("lat").max().alias("max_lat"),
-                        pl.col("lat").mean().alias("mean_lat"),
-                        pl.col("lon").min().alias("min_lon"),
-                        pl.col("lon").max().alias("max_lon"),
-                        pl.col("lon").mean().alias("mean_lon"),
-                    ]
-                )
-            ).row(0)
-
+            stats = self._compute_geo_bounds(lat_col, lon_col)
             # All casts failed → not actually geospatial.
             if stats[0] is None or stats[3] is None:
                 return None
 
-            # Guard against false-positive lat/lon detection: a column merely
-            # named "lat"/"lon" that holds unrelated numeric data (an ID,
-            # a percentage, etc.) would otherwise be reported as valid
-            # geospatial bounds. Valid latitudes/longitudes must fall within
-            # [-90, 90] / [-180, 180].
-            min_lat, max_lat = stats[0], stats[1]
-            min_lon, max_lon = stats[3], stats[4]
-            if not (-90.0 <= min_lat <= 90.0 and -90.0 <= max_lat <= 90.0):
-                logger.warning(
-                    f"Column '{lat_col}' detected as latitude but values are out of "
-                    f"range [-90, 90] (min={min_lat}, max={max_lat}); skipping."
-                )
-                return None
-            if not (-180.0 <= min_lon <= 180.0 and -180.0 <= max_lon <= 180.0):
-                logger.warning(
-                    f"Column '{lon_col}' detected as longitude but values are out of "
-                    f"range [-180, 180] (min={min_lon}, max={max_lon}); skipping."
-                )
+            if not self._geo_bounds_are_valid(lat_col, lon_col, stats):
                 return None
 
-            sample_size = min(5000, self.row_count)  # type: ignore[attr-defined]
-
-            cols_to_fetch = [
-                pl.col(lat_col).cast(pl.Float64, strict=False).alias("lat"),
-                pl.col(lon_col).cast(pl.Float64, strict=False).alias("lon"),
-            ]
-            if target_col and target_col in self.columns:  # type: ignore[attr-defined]
-                cols_to_fetch.append(pl.col(target_col).alias("target"))
-
-            sample_df = _collect(self.lazy_df.select(cols_to_fetch)).sample(  # type: ignore[attr-defined]
-                n=sample_size, with_replacement=False, seed=42
-            )
-
-            points = []
-            for row in sample_df.to_dicts():
-                if row["lat"] is None or row["lon"] is None:
-                    continue
-                label = (
-                    str(row["target"]) if "target" in row and row["target"] is not None else None
-                )
-                points.append(GeoPoint(lat=row["lat"], lon=row["lon"], label=label))
+            points = self._sample_geo_points(lat_col, lon_col, target_col)
 
             return GeospatialStats(
                 lat_col=lat_col,
@@ -123,3 +50,110 @@ class GeoMixin(_AnalyzerState):
         except Exception as e:
             logger.warning(f"Error in geospatial analysis: {e}")
             return None
+
+    def _resolve_lat_lon_columns(
+        self, lat_col: str | None, lon_col: str | None
+    ) -> tuple[str | None, str | None]:
+        """Infer latitude/longitude column names from common aliases when not given."""
+        if lat_col and lon_col:
+            return lat_col, lon_col
+
+        # Check ALL columns (may have been inferred as strings).
+        candidates = {c.lower(): c for c in self.columns}  # type: ignore[attr-defined]
+        if not lat_col:
+            lat_col = self._infer_lat_column(candidates)
+        if not lon_col:
+            lon_col = self._infer_lon_column(candidates)
+
+        return lat_col, lon_col
+
+    def _infer_lat_column(self, candidates: dict[str, str]) -> str | None:
+        """Match a latitude column name against known aliases."""
+        if "latitude" in candidates:
+            return candidates["latitude"]
+        if "lat" in candidates:
+            return candidates["lat"]
+        return None
+
+    def _infer_lon_column(self, candidates: dict[str, str]) -> str | None:
+        """Match a longitude column name against known aliases."""
+        if "longitude" in candidates:
+            return candidates["longitude"]
+        if "lng" in candidates:
+            return candidates["lng"]
+        if "lon" in candidates:
+            return candidates["lon"]
+        if "long" in candidates:
+            return candidates["long"]
+        return None
+
+    def _compute_geo_bounds(self, lat_col: str, lon_col: str) -> tuple:
+        """Compute min/max/mean for the candidate lat/lon columns cast to floats."""
+        geo_df = self.lazy_df.select(  # type: ignore[attr-defined]
+            [
+                pl.col(lat_col).cast(pl.Float64, strict=False).alias("lat"),
+                pl.col(lon_col).cast(pl.Float64, strict=False).alias("lon"),
+            ]
+        )
+
+        return _collect(
+            geo_df.select(
+                [
+                    pl.col("lat").min().alias("min_lat"),
+                    pl.col("lat").max().alias("max_lat"),
+                    pl.col("lat").mean().alias("mean_lat"),
+                    pl.col("lon").min().alias("min_lon"),
+                    pl.col("lon").max().alias("max_lon"),
+                    pl.col("lon").mean().alias("mean_lon"),
+                ]
+            )
+        ).row(0)
+
+    def _geo_bounds_are_valid(self, lat_col: str, lon_col: str, stats: tuple) -> bool:
+        """Guard against false-positive lat/lon detection via out-of-range bounds.
+
+        A column merely named "lat"/"lon" that holds unrelated numeric data
+        (an ID, a percentage, etc.) would otherwise be reported as valid
+        geospatial bounds. Valid latitudes/longitudes must fall within
+        [-90, 90] / [-180, 180].
+        """
+        min_lat, max_lat = stats[0], stats[1]
+        min_lon, max_lon = stats[3], stats[4]
+        if not (-90.0 <= min_lat <= 90.0 and -90.0 <= max_lat <= 90.0):
+            logger.warning(
+                f"Column '{lat_col}' detected as latitude but values are out of "
+                f"range [-90, 90] (min={min_lat}, max={max_lat}); skipping."
+            )
+            return False
+        if not (-180.0 <= min_lon <= 180.0 and -180.0 <= max_lon <= 180.0):
+            logger.warning(
+                f"Column '{lon_col}' detected as longitude but values are out of "
+                f"range [-180, 180] (min={min_lon}, max={max_lon}); skipping."
+            )
+            return False
+        return True
+
+    def _sample_geo_points(
+        self, lat_col: str, lon_col: str, target_col: str | None
+    ) -> list[GeoPoint]:
+        """Sample up to 5000 rows and build labeled GeoPoint instances."""
+        sample_size = min(5000, self.row_count)  # type: ignore[attr-defined]
+
+        cols_to_fetch = [
+            pl.col(lat_col).cast(pl.Float64, strict=False).alias("lat"),
+            pl.col(lon_col).cast(pl.Float64, strict=False).alias("lon"),
+        ]
+        if target_col and target_col in self.columns:  # type: ignore[attr-defined]
+            cols_to_fetch.append(pl.col(target_col).alias("target"))
+
+        sample_df = _collect(self.lazy_df.select(cols_to_fetch)).sample(  # type: ignore[attr-defined]
+            n=sample_size, with_replacement=False, seed=42
+        )
+
+        points = []
+        for row in sample_df.to_dicts():
+            if row["lat"] is None or row["lon"] is None:
+                continue
+            label = str(row["target"]) if "target" in row and row["target"] is not None else None
+            points.append(GeoPoint(lat=row["lat"], lon=row["lon"], label=label))
+        return points
