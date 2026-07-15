@@ -120,6 +120,32 @@ def _normalize(step_type: Any) -> str:
     return str(raw or "").lower().replace(" ", "").replace("-", "").replace("_", "")
 
 
+# Ordered keyword fallback rules used when a step_type isn't in `_FAMILY`
+# verbatim. Checked in order; first match wins (mirrors the previous
+# if/elif chain).
+_FAMILY_KEYWORD_RULES: list[tuple[str, Callable[[str], bool]]] = [
+    ("tune", lambda low: "tuning" in low),
+    ("train", lambda low: "training" in low or "regress" in low or "classif" in low),
+    ("split", lambda low: "split" in low and "feature" not in low),
+    ("encode", lambda low: "encod" in low),
+    ("impute", lambda low: "impute" in low),
+    ("outlier", lambda low: "outlier" in low),
+    ("select", lambda low: "select" in low),
+    ("bin", lambda low: "bin" in low or "discret" in low),
+    ("scale", lambda low: "scal" in low or "transform" in low),
+    ("loader", lambda low: "loader" in low),
+    ("snapshot", lambda low: "snapshot" in low or "profile" in low),
+]
+
+
+def _keyword_family_of(low: str) -> str:
+    """Classify a lowercased step_type string via the keyword fallback rules."""
+    for family, matches in _FAMILY_KEYWORD_RULES:
+        if matches(low):
+            return family
+    return "generic"
+
+
 def _family_of(step_type: Any) -> str:
     """Classify a step_type into one of the known families."""
     raw = getattr(step_type, "value", step_type)
@@ -127,30 +153,7 @@ def _family_of(step_type: Any) -> str:
     key = _normalize(raw_str)
     if key in _FAMILY:
         return _FAMILY[key]
-    low = raw_str.lower()
-    if "tuning" in low:
-        return "tune"
-    if "training" in low or "regress" in low or "classif" in low:
-        return "train"
-    if "split" in low and "feature" not in low:
-        return "split"
-    if "encod" in low:
-        return "encode"
-    if "impute" in low:
-        return "impute"
-    if "outlier" in low:
-        return "outlier"
-    if "select" in low:
-        return "select"
-    if "bin" in low or "discret" in low:
-        return "bin"
-    if "scal" in low or "transform" in low:
-        return "scale"
-    if "loader" in low:
-        return "loader"
-    if "snapshot" in low or "profile" in low:
-        return "snapshot"
-    return "generic"
+    return _keyword_family_of(raw_str.lower())
 
 
 # ---------------------------------------------------------------------------

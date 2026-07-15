@@ -89,66 +89,52 @@ class MergeMixin:
             return "last_wins"
         return strat
 
-    def _merge_frames(
+    def _merge_frames_columnwise(
         self,
         frames: list[pd.DataFrame],
         node_id: str,
-        part_label: str = "",
+        strategy: str,
+        prefix: str,
     ) -> pd.DataFrame:
-        """Concatenate a list of DataFrames column-wise (preferred) or row-wise.
+        """Merge same-row-count frames column-wise, applying the merge strategy on overlap.
 
-        ``part_label`` is only used in log messages (``"train"``, ``"test"``...)
-        to make multi-split merges easier to follow in job logs.
-
-        Column-overlap behaviour is governed by the per-node merge strategy
-        (see :meth:`_get_merge_strategy`):
-
-        * ``last_wins`` (default) — later inputs overwrite earlier ones on
-          shared columns. Matches topological "downstream wins".
-        * ``first_wins`` — earlier inputs are kept; later inputs only add
-          new columns. Useful when an upstream branch is the source of truth.
+        Iterates frames in the order dictated by the strategy. The dict update
+        semantics give us "later writes win", so iterating forward yields
+        last_wins and reversed yields first_wins.
         """
-        if not frames:
-            return pd.DataFrame()
-        if len(frames) == 1:
-            return frames[0]
+        iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
+        result_cols: dict[str, pd.Series] = {}
+        overwrites: list[str] = []
+        new_only: list[str] = []
+        for df in iter_frames:
+            df_aligned = df.reset_index(drop=True)
+            for col in df.columns:
+                if col in result_cols:
+                    overwrites.append(col)
+                else:
+                    new_only.append(col)
+                result_cols[col] = df_aligned[col]
+        merged = pd.DataFrame(result_cols)
+        shape_log = " + ".join(str(df.shape) for df in frames)
+        if overwrites:
+            self.log(
+                f"{prefix}: column-wise merge {shape_log} -> {merged.shape} "
+                f"({strategy} overwrote {sorted(set(overwrites))})"
+            )
+        else:
+            self.log(f"{prefix}: column-wise merge {shape_log} -> {merged.shape}")
+        return merged
 
-        prefix = f"Node {node_id}"
-        if part_label:
-            prefix = f"{prefix} [{part_label}]"
-
-        row_counts = [len(df) for df in frames]
-        col_sets = [set(df.columns) for df in frames]
-        same_rows = all(rc == row_counts[0] for rc in row_counts)
-        strategy = self._get_merge_strategy(node_id)
-
-        if same_rows:
-            # Iterate frames in the order dictated by the strategy. The dict
-            # update semantics give us "later writes win", so iterating
-            # forward yields last_wins and reversed yields first_wins.
-            iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
-            result_cols: dict[str, pd.Series] = {}
-            overwrites: list[str] = []
-            new_only: list[str] = []
-            for df in iter_frames:
-                df_aligned = df.reset_index(drop=True)
-                for col in df.columns:
-                    if col in result_cols:
-                        overwrites.append(col)
-                    else:
-                        new_only.append(col)
-                    result_cols[col] = df_aligned[col]
-            merged = pd.DataFrame(result_cols)
-            shape_log = " + ".join(str(df.shape) for df in frames)
-            if overwrites:
-                self.log(
-                    f"{prefix}: column-wise merge {shape_log} -> {merged.shape} "
-                    f"({strategy} overwrote {sorted(set(overwrites))})"
-                )
-            else:
-                self.log(f"{prefix}: column-wise merge {shape_log} -> {merged.shape}")
-            return merged
-
+    def _merge_frames_rowwise(
+        self,
+        frames: list[pd.DataFrame],
+        node_id: str,
+        part_label: str,
+        prefix: str,
+        row_counts: list[int],
+        col_sets: list[set[str]],
+    ) -> pd.DataFrame:
+        """Merge frames row-wise on their common columns, warning about any dropped ones."""
         common_cols = col_sets[0]
         for cs in col_sets[1:]:
             common_cols = common_cols & cs
@@ -186,6 +172,44 @@ class MergeMixin:
             f"{' + '.join(str(rc) for rc in row_counts)} rows → {len(merged)} rows"
         )
         return merged
+
+    def _merge_frames(
+        self,
+        frames: list[pd.DataFrame],
+        node_id: str,
+        part_label: str = "",
+    ) -> pd.DataFrame:
+        """Concatenate a list of DataFrames column-wise (preferred) or row-wise.
+
+        ``part_label`` is only used in log messages (``"train"``, ``"test"``...)
+        to make multi-split merges easier to follow in job logs.
+
+        Column-overlap behaviour is governed by the per-node merge strategy
+        (see :meth:`_get_merge_strategy`):
+
+        * ``last_wins`` (default) — later inputs overwrite earlier ones on
+          shared columns. Matches topological "downstream wins".
+        * ``first_wins`` — earlier inputs are kept; later inputs only add
+          new columns. Useful when an upstream branch is the source of truth.
+        """
+        if not frames:
+            return pd.DataFrame()
+        if len(frames) == 1:
+            return frames[0]
+
+        prefix = f"Node {node_id}"
+        if part_label:
+            prefix = f"{prefix} [{part_label}]"
+
+        row_counts = [len(df) for df in frames]
+        col_sets = [set(df.columns) for df in frames]
+        same_rows = all(rc == row_counts[0] for rc in row_counts)
+        strategy = self._get_merge_strategy(node_id)
+
+        if same_rows:
+            return self._merge_frames_columnwise(frames, node_id, strategy, prefix)
+
+        return self._merge_frames_rowwise(frames, node_id, part_label, prefix, row_counts, col_sets)
 
     def _artifact_columns(self, art: Any) -> list[str]:
         """Best-effort extraction of column names from a single resolved artifact."""

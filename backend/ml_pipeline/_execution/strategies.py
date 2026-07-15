@@ -27,6 +27,61 @@ class JobStrategy(ABC):
     def get_initial_log(self, job: MLJob) -> str:
         """Returns the initial log message for the job."""
 
+    def _collect_node_timings(self, result: PipelineExecutionResult) -> list[dict]:
+        """Roll up per-node execution times, surfacing the same slow-step info
+        the engine already collected for the Top-N slowest nodes admin view.
+        """
+        node_timings = []
+        for node_res in result.node_results.values():
+            if node_res.execution_time is None:
+                continue
+            node_timings.append(
+                {
+                    "node_id": node_res.node_id,
+                    "step_type": node_res.step_type or "unknown",
+                    "execution_time": float(node_res.execution_time),
+                    "status": node_res.status,
+                }
+            )
+        return node_timings
+
+    def _collect_dropped_columns(self, result: PipelineExecutionResult) -> list:
+        """Collect and de-duplicate dropped columns reported across all nodes' metrics."""
+        all_dropped_columns = []
+        for node_res in result.node_results.values():
+            if node_res.metrics and "dropped_columns" in node_res.metrics:
+                cols = node_res.metrics["dropped_columns"]
+                if isinstance(cols, list):
+                    all_dropped_columns.extend(cols)
+
+        if all_dropped_columns:
+            return list(set(all_dropped_columns))
+        return all_dropped_columns
+
+    def _resolve_job_summary(self, job: MLJob, last_result, final_metrics: dict) -> str | None:
+        """Resolve the one-line card summary for the trainer/tuner job.
+
+        The engine builds `metadata.summary` for every node, but trainer/tuner
+        jobs run via Celery and only `job.metrics` is persisted to the DB —
+        the per-node metadata never reaches the FE store. Forwarding the
+        already-computed summary here keeps the trainer card in sync with the
+        rest of the canvas after `/pipeline/run`. Falls back to rebuilding
+        from this job's own metrics so even legacy runs (where the engine
+        didn't stamp metadata) still render a card line.
+        """
+        summary = (last_result.metadata or {}).get("summary") if last_result.metadata else None
+        if not summary:
+            step_type = getattr(job, "step_type", None) or "training"
+            try:
+                summary = build_summary(
+                    step_type=step_type,
+                    output=None,
+                    metrics=final_metrics,
+                )
+            except Exception:
+                summary = None
+        return summary
+
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
         """
         Updates the job with results from a successful pipeline execution.
@@ -44,54 +99,18 @@ class JobStrategy(ABC):
             # (Top-N slowest nodes admin view) reads this off completed
             # jobs to aggregate workspace-wide; if missing the page just
             # shows an empty state for legacy jobs.
-            node_timings = []
-            for node_res in result.node_results.values():
-                if node_res.execution_time is None:
-                    continue
-                node_timings.append(
-                    {
-                        "node_id": node_res.node_id,
-                        "step_type": node_res.step_type or "unknown",
-                        "execution_time": float(node_res.execution_time),
-                        "status": node_res.status,
-                    }
-                )
+            node_timings = self._collect_node_timings(result)
             if node_timings:
                 final_metrics["node_timings"] = node_timings
 
             # Collect dropped columns from all nodes
-            all_dropped_columns = []
-            for node_res in result.node_results.values():
-                if node_res.metrics and "dropped_columns" in node_res.metrics:
-                    cols = node_res.metrics["dropped_columns"]
-                    if isinstance(cols, list):
-                        all_dropped_columns.extend(cols)
-
+            all_dropped_columns = self._collect_dropped_columns(result)
             if all_dropped_columns:
-                all_dropped_columns = list(set(all_dropped_columns))
                 final_metrics["dropped_columns"] = all_dropped_columns
 
             # Stamp a one-line summary the canvas can render on the
-            # trainer node card. The engine builds `metadata.summary`
-            # for every node, but trainer/tuner jobs run via Celery and
-            # only `job.metrics` is persisted to the DB — the per-node
-            # metadata never reaches the FE store. Forwarding the
-            # already-computed summary here keeps the trainer card in
-            # sync with the rest of the canvas after `/pipeline/run`.
-            summary = (last_result.metadata or {}).get("summary") if last_result.metadata else None
-            if not summary:
-                # Fallback: rebuild from this job's own metrics so even
-                # legacy runs (where the engine didn't stamp metadata)
-                # still render a card line.
-                step_type = getattr(job, "step_type", None) or "training"
-                try:
-                    summary = build_summary(
-                        step_type=step_type,
-                        output=None,
-                        metrics=final_metrics,
-                    )
-                except Exception:
-                    summary = None
+            # trainer node card.
+            summary = self._resolve_job_summary(job, last_result, final_metrics)
             if summary:
                 final_metrics["summary"] = summary
 

@@ -110,6 +110,84 @@ class FeatureEngMixin:
         composite.fitted_steps = merged_steps
         return composite
 
+    def _resolve_bundle_feature_engineer(
+        self,
+        feature_engineer_override: Any | None,
+        feature_engineer_artifact_key: str | None,
+    ) -> Any | None:
+        """Resolve the FeatureEngineer to bundle with the model, if any.
+
+        Prefers an explicit override, then falls back to loading an explicit
+        FeatureEngineer artifact key (derived from the pipeline graph) rather
+        than scanning the whole artifacts directory, since scanning can pick
+        a pipeline from a different run and cause incorrect transforms and
+        label decoding.
+        """
+        feature_engineer = None
+
+        if feature_engineer_override is not None and hasattr(
+            feature_engineer_override, "transform"
+        ):
+            feature_engineer = feature_engineer_override
+
+        if feature_engineer_artifact_key:
+            try:
+                obj = self.artifact_store.load(feature_engineer_artifact_key)
+                if hasattr(obj, "transform"):
+                    feature_engineer = obj
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load feature engineer artifact {feature_engineer_artifact_key}: {e}"
+                )
+
+        return feature_engineer
+
+    def _build_legacy_transformer_bundle(
+        self,
+        model_artifact: Any,
+        job_id: str,
+        target_column: str | None,
+        dropped_columns: list[str] | None,
+    ) -> dict[str, Any]:
+        """Fallback bundle assembled from ``self.executed_transformers`` (manual steps).
+
+        Used when no FeatureEngineer artifact was found for the run.
+        """
+        transformers = []
+        transformer_plan = []
+
+        for t_info in self.executed_transformers:
+            try:
+                fitted_t = self.artifact_store.load(t_info["artifact_key"])
+                if fitted_t:
+                    transformers.append(
+                        {
+                            "node_id": t_info["node_id"],
+                            "transformer_name": t_info["transformer_name"],
+                            "column_name": t_info["column_name"],
+                            "transformer": fitted_t,
+                        }
+                    )
+                    transformer_plan.append(
+                        {
+                            "node_id": t_info["node_id"],
+                            "transformer_name": t_info["transformer_name"],
+                            "column_name": t_info["column_name"],
+                            "transformer_type": t_info["transformer_type"],
+                        }
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to load transformer artifact {t_info['artifact_key']}: {e}")
+
+        return {
+            "model": model_artifact,
+            "transformers": transformers,
+            "transformer_plan": transformer_plan,
+            "job_id": job_id,
+            "target_column": target_column,
+            "dropped_columns": dropped_columns or [],
+        }
+
     def _bundle_transformers_with_model(
         self,
         model_artifact_key: str,
@@ -130,26 +208,9 @@ class FeatureEngMixin:
             # Collect fitted transformer objects
             # In the new SDK, the FeatureEngineer object contains all steps.
             # We should look for the FeatureEngineer artifact.
-
-            feature_engineer = None
-
-            if feature_engineer_override is not None and hasattr(
-                feature_engineer_override, "transform"
-            ):
-                feature_engineer = feature_engineer_override
-
-            # Prefer an explicit FeatureEngineer artifact key (derived from the pipeline graph)
-            # rather than scanning the whole artifacts directory. Scanning can pick a pipeline
-            # from a different run and cause incorrect transforms and label decoding.
-            if feature_engineer_artifact_key:
-                try:
-                    obj = self.artifact_store.load(feature_engineer_artifact_key)
-                    if hasattr(obj, "transform"):
-                        feature_engineer = obj
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to load feature engineer artifact {feature_engineer_artifact_key}: {e}"
-                    )
+            feature_engineer = self._resolve_bundle_feature_engineer(
+                feature_engineer_override, feature_engineer_artifact_key
+            )
 
             if feature_engineer:
                 # Create the new bundle format
@@ -162,42 +223,9 @@ class FeatureEngMixin:
                 }
             else:
                 # Fallback to old logic if no FeatureEngineer found (e.g. manual steps)
-                transformers = []
-                transformer_plan = []
-
-                for t_info in self.executed_transformers:
-                    try:
-                        fitted_t = self.artifact_store.load(t_info["artifact_key"])
-                        if fitted_t:
-                            transformers.append(
-                                {
-                                    "node_id": t_info["node_id"],
-                                    "transformer_name": t_info["transformer_name"],
-                                    "column_name": t_info["column_name"],
-                                    "transformer": fitted_t,
-                                }
-                            )
-                            transformer_plan.append(
-                                {
-                                    "node_id": t_info["node_id"],
-                                    "transformer_name": t_info["transformer_name"],
-                                    "column_name": t_info["column_name"],
-                                    "transformer_type": t_info["transformer_type"],
-                                }
-                            )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to load transformer artifact {t_info['artifact_key']}: {e}"
-                        )
-
-                full_artifact = {
-                    "model": model_artifact,
-                    "transformers": transformers,
-                    "transformer_plan": transformer_plan,
-                    "job_id": job_id,
-                    "target_column": target_column,
-                    "dropped_columns": dropped_columns or [],
-                }
+                full_artifact = self._build_legacy_transformer_bundle(
+                    model_artifact, job_id, target_column, dropped_columns
+                )
 
             # Save to job_id key if available - this is the final artifact for the job
             if job_id and job_id != "unknown":
