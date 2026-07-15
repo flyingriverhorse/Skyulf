@@ -119,92 +119,49 @@ class TuningCalculator(BaseModelCalculator):
             model.set_params(**nested)
         return model
 
-    def fit(
-        self,
-        X: pd.DataFrame | SkyulfDataFrame,
-        y: pd.Series | Any,
-        config: dict[str, Any],
-        progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
-        log_callback: Callable[[str], None] | None = None,
-        validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
-    ) -> Any:
-        """
-        Fits the tuner (runs tuning).
-        Adapts the generic fit interface to the specific tune method.
-        """
-        # Convert config dict to TuningConfig
+    @staticmethod
+    def _build_tuning_config(config: dict[str, Any] | TuningConfig) -> TuningConfig:
+        """Convert a raw config dict (or an already-built TuningConfig) into a TuningConfig."""
         if isinstance(config, TuningConfig):
-            tuning_config = config
-        else:
-            # Extract valid keys for TuningConfig
-            valid_keys = TuningConfig.__annotations__.keys()
-            filtered_config = {k: v for k, v in config.items() if k in valid_keys}
-            tuning_config = TuningConfig(**filtered_config)
+            return config
+        # Extract valid keys for TuningConfig
+        valid_keys = TuningConfig.__annotations__.keys()
+        filtered_config = {k: v for k, v in config.items() if k in valid_keys}
+        return TuningConfig(**filtered_config)
 
-        # For Time Series Split, sort data chronologically (and drop the time
-        # column from features) before converting to numpy below - numpy has
-        # no column names, so this must happen while X still carries them.
-        # Mirrors the same fix already applied to perform_cross_validation();
-        # without it, tuning with cv_type="time_series_split" silently leaks
-        # the time column and evaluates folds out of chronological order.
-        if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
-            from ..cross_validation import _sort_by_time
+    @staticmethod
+    def _validate_no_nan_inf(
+        arr: Any,
+        nan_msg: str,
+        inf_msg: str,
+        object_nan_msg: str,
+    ) -> None:
+        """Raise ValueError if a numpy array contains NaN/Inf (numeric) or NaN (object dtype).
 
-            X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+        Many tuning errors ("No trials completed") are actually due to dirty data causing
+        instant failures. We catch this early to give a clear message. Object-dtype arrays
+        (e.g. mixed dtypes or leftover categorical/string columns that were never encoded)
+        are also scanned via pd.isna, since np.isnan/np.isinf raise on non-numeric dtypes.
+        """
+        if not isinstance(arr, np.ndarray):
+            return
+        if np.issubdtype(arr.dtype, np.number):
+            if np.isnan(arr).any():
+                raise ValueError(nan_msg)
+            if np.isinf(arr).any():
+                raise ValueError(inf_msg)
+        elif arr.dtype == object and pd.isna(arr).any():
+            raise ValueError(object_nan_msg)
 
-        # Convert data to Numpy for tuning
-        X_np, y_np = SklearnBridge.to_sklearn((X, y))
-
-        # --- VALIDATION: Check for NaNs/Inf in Data ---
-        # Many tuning errors ("No trials completed") are actually due to dirty data causing instant failures.
-        # We catch this early to give a clear message. Object-dtype arrays (e.g. mixed dtypes or
-        # leftover categorical/string columns that were never encoded) are also scanned via
-        # pd.isna, since np.isnan/np.isinf raise on non-numeric dtypes.
-        if isinstance(X_np, np.ndarray):
-            if np.issubdtype(X_np.dtype, np.number):
-                if np.isnan(X_np).any():
-                    raise ValueError(
-                        "Input features (X) contain NaN values. Please use an 'Imputer' node before this model."
-                    )
-                if np.isinf(X_np).any():
-                    raise ValueError(
-                        "Input features (X) contain Infinite values. Please scale or clean your data."
-                    )
-            elif X_np.dtype == object and pd.isna(X_np).any():
-                raise ValueError(
-                    "Input features (X) contain missing/NaN values. Please use an 'Imputer' node before this model."
-                )
-
-        if isinstance(y_np, np.ndarray):
-            if np.issubdtype(y_np.dtype, np.number):
-                if np.isnan(y_np).any():
-                    raise ValueError(
-                        "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them."
-                    )
-                if np.isinf(y_np).any():
-                    raise ValueError("Target variable (y) contains Infinite values.")
-            elif y_np.dtype == object and pd.isna(y_np).any():
-                raise ValueError(
-                    "Target variable (y) contains missing/NaN values. Please drop rows with missing targets or impute them."
-                )
-        # ----------------------------------------------
-
-        validation_data_np = None
-        if validation_data:
-            X_val, y_val = validation_data
-            X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
-            validation_data_np = (X_val_np, y_val_np)
-
-        tuning_result = self.tune(
-            X_np,
-            y_np,
-            tuning_config,
-            progress_callback=progress_callback,
-            log_callback=log_callback,
-            validation_data=validation_data_np,
-        )
-
-        # Refit the best model on the full dataset
+    def _refit_best_model(
+        self,
+        tuning_result: TuningResult,
+        tuning_config: TuningConfig,
+        X_np: Any,
+        y_np: Any,
+        log_callback: Callable[[str], None] | None,
+    ) -> Any:
+        """Build and fit the final model on the full dataset using the tuned best params."""
         best_params = tuning_result.best_params
         final_params = {**self.model_calculator.default_params, **best_params}
 
@@ -229,6 +186,70 @@ class TuningCalculator(BaseModelCalculator):
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*valid feature names.*")
             model.fit(X_np, y_np)
+
+        return model
+
+    def fit(
+        self,
+        X: pd.DataFrame | SkyulfDataFrame,
+        y: pd.Series | Any,
+        config: dict[str, Any],
+        progress_callback: Callable[[int, int, float | None, dict | None], None] | None = None,
+        log_callback: Callable[[str], None] | None = None,
+        validation_data: tuple[pd.DataFrame | SkyulfDataFrame, pd.Series | Any] | None = None,
+    ) -> Any:
+        """
+        Fits the tuner (runs tuning).
+        Adapts the generic fit interface to the specific tune method.
+        """
+        tuning_config = self._build_tuning_config(config)
+
+        # For Time Series Split, sort data chronologically (and drop the time
+        # column from features) before converting to numpy below - numpy has
+        # no column names, so this must happen while X still carries them.
+        # Mirrors the same fix already applied to perform_cross_validation();
+        # without it, tuning with cv_type="time_series_split" silently leaks
+        # the time column and evaluates folds out of chronological order.
+        if tuning_config.cv_type == "time_series_split" and hasattr(X, "columns"):
+            from ..cross_validation import _sort_by_time
+
+            X, y = _sort_by_time(X, y, tuning_config.cv_time_column, log_callback, logger)
+
+        # Convert data to Numpy for tuning
+        X_np, y_np = SklearnBridge.to_sklearn((X, y))
+
+        # --- VALIDATION: Check for NaNs/Inf in Data ---
+        self._validate_no_nan_inf(
+            X_np,
+            "Input features (X) contain NaN values. Please use an 'Imputer' node before this model.",
+            "Input features (X) contain Infinite values. Please scale or clean your data.",
+            "Input features (X) contain missing/NaN values. Please use an 'Imputer' node before this model.",
+        )
+        self._validate_no_nan_inf(
+            y_np,
+            "Target variable (y) contains NaN values. Please drop rows with missing targets or impute them.",
+            "Target variable (y) contains Infinite values.",
+            "Target variable (y) contains missing/NaN values. Please drop rows with missing targets or impute them.",
+        )
+        # ----------------------------------------------
+
+        validation_data_np = None
+        if validation_data:
+            X_val, y_val = validation_data
+            X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
+            validation_data_np = (X_val_np, y_val_np)
+
+        tuning_result = self.tune(
+            X_np,
+            y_np,
+            tuning_config,
+            progress_callback=progress_callback,
+            log_callback=log_callback,
+            validation_data=validation_data_np,
+        )
+
+        # Refit the best model on the full dataset
+        model = self._refit_best_model(tuning_result, tuning_config, X_np, y_np, log_callback)
 
         return (model, tuning_result)
 

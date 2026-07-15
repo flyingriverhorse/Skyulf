@@ -30,6 +30,16 @@ from .types import PipelineConfig
 
 logger = logging.getLogger(__name__)
 
+# Hardcoded fallback map from model_type -> (calculator_cls, applier_cls), used
+# when NodeRegistry doesn't (yet) have a full calculator+applier registration
+# for that type. Mirrors EngineRegistry.resolve()'s dispatch-table style.
+_HARDCODED_MODEL_MAP: dict[str, tuple[type[BaseModelCalculator], type[BaseModelApplier]]] = {
+    "logistic_regression": (LogisticRegressionCalculator, LogisticRegressionApplier),
+    "random_forest_classifier": (RandomForestClassifierCalculator, RandomForestClassifierApplier),
+    "ridge_regression": (RidgeRegressionCalculator, RidgeRegressionApplier),
+    "random_forest_regressor": (RandomForestRegressorCalculator, RandomForestRegressorApplier),
+}
+
 
 def _mermaid_escape(text: str) -> str:
     """Escape characters that would break a Mermaid node label."""
@@ -78,6 +88,55 @@ class SkyulfPipeline:
         if self.modeling_config:
             self._init_model_estimator()
 
+    @staticmethod
+    def _resolve_from_registry(
+        model_type: str | None,
+    ) -> tuple[BaseModelCalculator | None, BaseModelApplier | None]:
+        """Try resolving a calculator/applier pair for model_type from NodeRegistry.
+
+        Returns (None, None) if model_type is falsy, or if the registry lookup
+        fails (e.g. partial registration where only one of the two resolves).
+        """
+        if not model_type:
+            return None, None
+        try:
+            calculator = NodeRegistry.get_calculator(model_type)()
+            applier = NodeRegistry.get_applier(model_type)()
+            return calculator, applier
+        except ValueError as e:
+            logger.debug(
+                "Model type '%s' not found in NodeRegistry (%s); "
+                "falling back to hardcoded type map.",
+                model_type,
+                e,
+            )
+            return None, None
+
+    @staticmethod
+    def _resolve_from_hardcoded_map(
+        model_type: str | None,
+    ) -> tuple[BaseModelCalculator | None, BaseModelApplier | None]:
+        """Look up a plain (non-tuner) model_type in the hardcoded fallback map."""
+        entry = _HARDCODED_MODEL_MAP.get(model_type) if model_type else None
+        if entry is None:
+            return None, None
+        calculator_cls, applier_cls = entry
+        return calculator_cls(), applier_cls()
+
+    def _build_tuning_estimator(self) -> tuple[BaseModelCalculator, BaseModelApplier]:
+        """Build the TuningCalculator/TuningApplier pair wrapping the configured base model."""
+        base_model_config = self.modeling_config.get("base_model", {})
+        base_model_type = base_model_config.get("type")
+
+        base_calc, base_applier = self._resolve_from_registry(base_model_type)
+        if base_calc is None or base_applier is None:
+            base_calc, base_applier = self._resolve_from_hardcoded_map(base_model_type)
+
+        if base_calc and base_applier:
+            return TuningCalculator(base_calc), TuningApplier(base_applier)
+
+        raise ValueError(f"Unknown base model type for tuner: {base_model_type}")
+
     def _init_model_estimator(self):
         """Initialize the StatefulEstimator based on config."""
         model_type = self.modeling_config.get("type")
@@ -86,84 +145,15 @@ class SkyulfPipeline:
 
         node_id = self.modeling_config.get("node_id", "model_node")
 
-        calculator: BaseModelCalculator | None = None
-        applier: BaseModelApplier | None = None
-
         # Try Registry first
-        if model_type:
-            try:
-                calculator = NodeRegistry.get_calculator(model_type)()
-                applier = NodeRegistry.get_applier(model_type)()
-            except ValueError as e:
-                # Registration may be partial (e.g. calculator resolved but
-                # applier didn't); reset both so the hardcoded fallback map
-                # below is not skipped for a working type.
-                calculator = None
-                applier = None
-                logger.debug(
-                    "Model type '%s' not found in NodeRegistry (%s); "
-                    "falling back to hardcoded type map.",
-                    model_type,
-                    e,
-                )
+        calculator, applier = self._resolve_from_registry(model_type)
 
         if calculator is None or applier is None:
-            # Map model types to classes
-            if model_type == "logistic_regression":
-                calculator = LogisticRegressionCalculator()
-                applier = LogisticRegressionApplier()
-            elif model_type == "random_forest_classifier":
-                calculator = RandomForestClassifierCalculator()
-                applier = RandomForestClassifierApplier()
-            elif model_type == "ridge_regression":
-                calculator = RidgeRegressionCalculator()
-                applier = RidgeRegressionApplier()
-            elif model_type == "random_forest_regressor":
-                calculator = RandomForestRegressorCalculator()
-                applier = RandomForestRegressorApplier()
-            elif model_type == "hyperparameter_tuner":
+            if model_type == "hyperparameter_tuner":
                 # Tuner wraps another model
-                base_model_config = self.modeling_config.get("base_model", {})
-                base_model_type = base_model_config.get("type")
-
-                base_calc: BaseModelCalculator | None = None
-                base_applier: BaseModelApplier | None = None
-
-                # Try Registry for base model
-                if base_model_type:
-                    try:
-                        base_calc = NodeRegistry.get_calculator(base_model_type)()
-                        base_applier = NodeRegistry.get_applier(base_model_type)()
-                    except ValueError as e:
-                        # Same partial-registration guard as above.
-                        base_calc = None
-                        base_applier = None
-                        logger.debug(
-                            "Base model type '%s' not found in NodeRegistry (%s); "
-                            "falling back to hardcoded type map.",
-                            base_model_type,
-                            e,
-                        )
-
-                if base_calc is None or base_applier is None:
-                    if base_model_type == "logistic_regression":
-                        base_calc = LogisticRegressionCalculator()
-                        base_applier = LogisticRegressionApplier()
-                    elif base_model_type == "random_forest_classifier":
-                        base_calc = RandomForestClassifierCalculator()
-                        base_applier = RandomForestClassifierApplier()
-                    elif base_model_type == "ridge_regression":
-                        base_calc = RidgeRegressionCalculator()
-                        base_applier = RidgeRegressionApplier()
-                    elif base_model_type == "random_forest_regressor":
-                        base_calc = RandomForestRegressorCalculator()
-                        base_applier = RandomForestRegressorApplier()
-
-                if base_calc and base_applier:
-                    calculator = TuningCalculator(base_calc)
-                    applier = TuningApplier(base_applier)
-                else:
-                    raise ValueError(f"Unknown base model type for tuner: {base_model_type}")
+                calculator, applier = self._build_tuning_estimator()
+            else:
+                calculator, applier = self._resolve_from_hardcoded_map(model_type)
 
         if calculator is None or applier is None:
             raise ValueError(f"Unknown model type: {model_type}")
