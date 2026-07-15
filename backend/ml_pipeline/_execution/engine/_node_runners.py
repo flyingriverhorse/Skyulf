@@ -135,16 +135,9 @@ class NodeRunnersMixin:
 
         return node.node_id
 
-    def _run_basic_training(  # noqa: C901
-        self, node: NodeConfig, job_id: str = "unknown"
-    ) -> tuple[str, dict[str, Any]]:
-        # Input: SplitDataset (from Feature Engineering) or DataFrame
-        # Supports multiple inputs — merges them before training.
-
-        target_col = node.params["target_column"]
-
+    def _get_training_input(self, node: NodeConfig, target_col: str) -> Any:
+        """Resolve upstream input for a training node, rejecting Model artifacts."""
         data = self._get_input(node, target_col)
-
         # Safety check: Ensure data is not a model artifact
         if hasattr(data, "predict") or hasattr(data, "fit"):
             raise ValueError(
@@ -152,8 +145,128 @@ class NodeRunnersMixin:
                 "Check your pipeline connections. "
                 "Did you connect a Tuning/Training node output to a Training node input?"
             )
+        return data
+
+    def _to_split_dataset(self, data: Any, target_col: str) -> Any:
+        """Coerce a DataFrame or (train, test)/(X, y) tuple into a SplitDataset.
+
+        Returns ``data`` unchanged when it's neither a DataFrame nor tuple
+        (e.g. already a SplitDataset).
+        """
+        if isinstance(data, pd.DataFrame):
+            return SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+        if isinstance(data, tuple):
+            # Check if it's (train_df, test_df) or (X, y)
+            elem0 = data[0]
+            if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+                train_df, test_df = data
+                return SplitDataset(train=train_df, test=test_df, validation=None)
+            return SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+        return data
+
+    def _aggregate_cv_metrics(self, cv_results: dict[str, Any]) -> dict[str, Any]:
+        """Flatten a ``cross_validate()`` result's per-metric mean/std into a flat dict.
+
+        cv_results structure: ``{"aggregated_metrics": {"accuracy": {"mean": 0.9, ...}}, "folds": [...]}``
+        """
+        cv_metrics: dict[str, Any] = {}
+        agg_metrics = cv_results.get("aggregated_metrics", cv_results)
+        for metric_name, stats in agg_metrics.items():
+            if isinstance(stats, dict) and "mean" in stats:
+                cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
+                cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
+        return cv_metrics
+
+    def _run_basic_training_cv(
+        self,
+        estimator: Any,
+        data: Any,
+        target_col: str,
+        hyperparameters: dict[str, Any],
+        node: NodeConfig,
+    ) -> dict[str, Any]:
+        """Run optional cross-validation for basic training and return ``cv_`` metrics."""
+        if not node.params.get("cv_enabled", False):
+            return {}
+        cv_data = self._to_split_dataset(data, target_col)
+        cv_results = estimator.cross_validate(
+            cv_data,
+            target_col,
+            hyperparameters,
+            n_folds=node.params.get("cv_folds", 5),
+            cv_type=node.params.get("cv_type", "k_fold"),
+            shuffle=node.params.get("cv_shuffle", True),
+            random_state=node.params.get("cv_random_state", 42),
+            time_column=node.params.get("cv_time_column") or None,
+            log_callback=self.log,
+        )
+        return self._aggregate_cv_metrics(cv_results)
+
+    def _bundle_model_with_transformers(
+        self, node: NodeConfig, job_id: str, target_col: str
+    ) -> None:
+        """Attach fitted transformers to the trained model artifact for inference."""
+        composite_feature_engineer = self._build_composite_feature_engineer(node)
+        feature_engineer_key = None
+        if composite_feature_engineer is None:
+            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
+
+        self._bundle_transformers_with_model(
+            node.node_id,
+            job_id=job_id,
+            feature_engineer_artifact_key=feature_engineer_key,
+            feature_engineer_override=composite_feature_engineer,
+            target_column=target_col,
+        )
+
+    def _flatten_split_metrics(self, splits: dict[str, Any], metrics: dict[str, Any]) -> None:
+        """Copy per-split metrics into ``metrics`` with train_/test_/val_ prefixes."""
+        for split_name, prefix in (("train", "train"), ("test", "test"), ("validation", "val")):
+            split = splits.get(split_name)
+            if not split:
+                continue
+            for k, v in split.metrics.items():
+                metrics[f"{prefix}_{k}"] = v
+
+    def _evaluate_and_save_report(
+        self, estimator: Any, data: Any, target_col: str, job_id: str, metrics: dict[str, Any]
+    ) -> None:
+        """Evaluate ``estimator`` on ``data``, save the raw eval artifact, flatten metrics.
+
+        Mutates ``metrics`` in place with the ``train_``/``test_``/``val_`` prefixed
+        metrics from the evaluation report.
+        """
+        report = estimator.evaluate(data, target_col, job_id=job_id)
+
+        # Save evaluation data artifact for API
+        if "raw_data" in report:
+            eval_key = f"{job_id}_evaluation_data"
+            uri = self.artifact_store.get_artifact_uri(eval_key)
+            self.log(f"Saving evaluation data to {uri}")
+            self.artifact_store.save(eval_key, report["raw_data"])
+
+        # Flatten metrics for summary with prefixes
+        # SDK report is a dict, but splits contain Pydantic models
+        self._flatten_split_metrics(report["splits"], metrics)
+
+    def _safe_record_data_shape_metrics(
+        self, metrics: dict[str, Any], data: Any, target_col: str, node_id: str
+    ) -> None:
+        """Best-effort recording of data shape metrics; failures are logged, not raised."""
+        try:
+            self._record_data_shape_metrics(metrics, data, target_col)
+        except Exception:
+            logger.debug("Failed to record data shape metrics for node %s", node_id, exc_info=True)
+
+    def _run_basic_training(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, dict[str, Any]]:
+        # Input: SplitDataset (from Feature Engineering) or DataFrame
+        # Supports multiple inputs — merges them before training.
 
         target_col = node.params["target_column"]
+        data = self._get_training_input(node, target_col)
+
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
@@ -166,40 +279,7 @@ class NodeRunnersMixin:
         estimator = StatefulEstimator(calculator, applier, node.node_id)
 
         # 1. Cross-Validation (Optional)
-        cv_metrics = {}
-        if node.params.get("cv_enabled", False):
-            # Handle DataFrame vs SplitDataset
-            cv_data = data
-            if isinstance(data, pd.DataFrame):
-                cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
-            elif isinstance(data, tuple):
-                # Check if it's (train_df, test_df) or (X, y)
-                elem0 = data[0]
-                if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
-                    train_df, test_df = data
-                    cv_data = SplitDataset(train=train_df, test=test_df, validation=None)
-                else:
-                    cv_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
-
-            cv_results = estimator.cross_validate(
-                cv_data,
-                target_col,
-                hyperparameters,
-                n_folds=node.params.get("cv_folds", 5),
-                cv_type=node.params.get("cv_type", "k_fold"),
-                shuffle=node.params.get("cv_shuffle", True),
-                random_state=node.params.get("cv_random_state", 42),
-                time_column=node.params.get("cv_time_column") or None,
-                log_callback=self.log,
-            )
-
-            # Aggregate metrics for the return value
-            # cv_results structure: {"aggregated_metrics": {"accuracy": {"mean": 0.9, ...}}, "folds": [...]}
-            agg_metrics = cv_results.get("aggregated_metrics", cv_results)
-            for metric_name, stats in agg_metrics.items():
-                if isinstance(stats, dict) and "mean" in stats:
-                    cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
-                    cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
+        cv_metrics = self._run_basic_training_cv(estimator, data, target_col, hyperparameters, node)
 
         # 2. Train Final Model
         self.log(f"Starting model training with algorithm: {algorithm}")
@@ -220,62 +300,14 @@ class NodeRunnersMixin:
         self.log("Model training finished.")
 
         # Bundle transformers with the model for inference
-        composite_feature_engineer = self._build_composite_feature_engineer(node)
-        feature_engineer_key = None
-        if composite_feature_engineer is None:
-            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
-
-        self._bundle_transformers_with_model(
-            node.node_id,
-            job_id=job_id,
-            feature_engineer_artifact_key=feature_engineer_key,
-            feature_engineer_override=composite_feature_engineer,
-            target_column=target_col,
-        )
+        self._bundle_model_with_transformers(node, job_id, target_col)
 
         # Optional: Evaluate immediately
-        metrics = {}
+        metrics: dict[str, Any] = {}
         if node.params.get("evaluate", True):
             # Ensure data is SplitDataset for evaluation
-            eval_data = data
-            if isinstance(data, pd.DataFrame):
-                eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
-            elif isinstance(data, tuple):
-                # Check if it's (train_df, test_df) or (X, y)
-                elem0 = data[0]
-                if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
-                    train_df, test_df = data
-                    eval_data = SplitDataset(train=train_df, test=test_df, validation=None)
-                else:
-                    eval_data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
-
-            report = estimator.evaluate(eval_data, target_col, job_id=job_id)
-
-            # Save evaluation data artifact for API
-            if "raw_data" in report:
-                eval_key = f"{job_id}_evaluation_data"
-                uri = self.artifact_store.get_artifact_uri(eval_key)
-                self.log(f"Saving evaluation data to {uri}")
-                self.artifact_store.save(eval_key, report["raw_data"])
-
-            # Flatten metrics for summary with prefixes
-            # SDK report is a dict, but splits contain Pydantic models
-
-            splits = report["splits"]
-            if "train" in splits and splits["train"]:
-                train_metrics = splits["train"].metrics
-                for k, v in train_metrics.items():
-                    metrics[f"train_{k}"] = v
-
-            if "test" in splits and splits["test"]:
-                test_metrics = splits["test"].metrics
-                for k, v in test_metrics.items():
-                    metrics[f"test_{k}"] = v
-
-            if "validation" in splits and splits["validation"]:
-                val_metrics = splits["validation"].metrics
-                for k, v in val_metrics.items():
-                    metrics[f"val_{k}"] = v
+            eval_data = self._to_split_dataset(data, target_col)
+            self._evaluate_and_save_report(estimator, eval_data, target_col, job_id, metrics)
 
         # Merge CV metrics
         metrics.update(cv_metrics)
@@ -286,31 +318,24 @@ class NodeRunnersMixin:
             metrics["feature_importances"] = fi
 
         # Persist data shape for monitoring
-        try:
-            self._record_data_shape_metrics(metrics, data, target_col)
-        except Exception:
-            logger.debug(
-                "Failed to record data shape metrics for node %s", node.node_id, exc_info=True
-            )
+        self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
 
         return node.node_id, metrics
 
-    def _run_advanced_tuning(  # noqa: C901
-        self, node: NodeConfig, job_id: str = "unknown"
-    ) -> tuple[str, dict[str, Any]]:
-        # Input: SplitDataset — supports multiple inputs via merge.
-        target_col = node.params["target_column"]
+    def _prepare_tuning_config(self, node: NodeConfig) -> tuple[Any, Any, dict[str, Any]]:
+        """Resolve model components and build the ``tuning_params`` dict for a tuning node.
 
-        data = self._get_input(node, target_col)
-
+        Injects server-side parallelism settings and auto-builds a nested
+        search space for structural (ensemble) models when the UI sent none.
+        """
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
         if not algorithm:
             raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
         tuning_params = dict(node.params["tuning_config"])  # Dict matching TuningConfig
         # Inject server-side parallelism from settings (not user-configurable via the UI)
-        _settings = get_settings()
-        tuning_params["n_jobs"] = _settings.TUNING_N_JOBS
-        tuning_params["parallel_backend"] = _settings.TUNING_PARALLEL_BACKEND
+        settings = get_settings()
+        tuning_params["n_jobs"] = settings.TUNING_N_JOBS
+        tuning_params["parallel_backend"] = settings.TUNING_PARALLEL_BACKEND
 
         calculator, applier = self._get_model_components(algorithm)
 
@@ -326,6 +351,93 @@ class NodeRunnersMixin:
             if auto_space:
                 tuning_params["search_space"] = auto_space
 
+        return calculator, applier, tuning_params
+
+    def _extract_tuning_metrics(
+        self, estimator: Any, tuning_params: dict[str, Any]
+    ) -> tuple[Any, dict[str, Any]]:
+        """Extract the TuningResult (if present) and its summary metrics from the estimator.
+
+        ``estimator.model`` is expected to be a ``(model, tuning_result)`` tuple
+        for a Tuner; returns ``(None, {})`` when that shape isn't present.
+        """
+        model_artifact = estimator.model
+        if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
+            _, tuning_result = model_artifact
+        else:
+            tuning_result = None
+
+        if tuning_result:
+            metrics = {
+                "best_score": tuning_result.best_score,
+                "best_params": tuning_result.best_params,
+                "trials": tuning_result.trials,
+                "scoring_metric": tuning_result.scoring_metric
+                or tuning_params.get("tuning_config", {}).get("metric")
+                or tuning_params.get("metric"),
+            }
+        else:
+            metrics = {}
+        return tuning_result, metrics
+
+    def _run_tuned_cv(
+        self,
+        calculator: Any,
+        applier: Any,
+        data: Any,
+        target_col: str,
+        tuning_params: dict[str, Any],
+        tuning_result: Any,
+        node: NodeConfig,
+    ) -> dict[str, Any]:
+        """Run post-tuning cross-validation with the tuned model's best params.
+
+        For ``nested_cv``, the inner CV loop already ran during the search, so
+        post-tuning CV only needs the outer evaluation and downgrades to
+        ``stratified_k_fold`` (classification) or ``k_fold`` (regression).
+        """
+        if not tuning_params.get("cv_enabled", False):
+            return {}
+        best_params: dict[str, Any] = tuning_result.best_params if tuning_result else {}
+        cv_estimator = StatefulEstimator(calculator, applier, node.node_id)
+
+        post_cv_type = tuning_params.get("cv_type", "k_fold")
+        if post_cv_type == "nested_cv":
+            is_classification = getattr(calculator, "problem_type", "") == "classification"
+            post_cv_type = "stratified_k_fold" if is_classification else "k_fold"
+            self.log(
+                "Nested CV inner loop already ran during tuning. "
+                f"Using {post_cv_type} for post-tuning evaluation."
+            )
+
+        self.log("Running cross-validation on tuned model with best parameters...")
+        try:
+            cv_results = cv_estimator.cross_validate(
+                data,
+                target_col,
+                {"params": best_params},
+                n_folds=tuning_params.get("cv_folds", 5),
+                cv_type=post_cv_type,
+                shuffle=tuning_params.get("cv_shuffle", True),
+                random_state=tuning_params.get("cv_random_state", 42),
+                time_column=tuning_params.get("cv_time_column") or None,
+                log_callback=self.log,
+            )
+            return self._aggregate_cv_metrics(cv_results)
+        except Exception:
+            logger.exception("Cross-validation failed for tuned model")
+            return {}
+
+    def _run_advanced_tuning(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, dict[str, Any]]:
+        # Input: SplitDataset — supports multiple inputs via merge.
+        target_col = node.params["target_column"]
+
+        data = self._get_input(node, target_col)
+
+        calculator, applier, tuning_params = self._prepare_tuning_config(node)
+
         # Create Tuner components
         tuner_calc = TuningCalculator(calculator)
         tuner_applier = TuningApplier(applier)
@@ -340,16 +452,7 @@ class NodeRunnersMixin:
         )
 
         # Ensure data is SplitDataset
-        if isinstance(data, pd.DataFrame):
-            data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
-        elif isinstance(data, tuple):
-            # Check if it's (train_df, test_df) or (X, y)
-            elem0 = data[0]
-            if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
-                train_df, test_df = data
-                data = SplitDataset(train=train_df, test=test_df, validation=None)
-            else:
-                data = SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+        data = self._to_split_dataset(data, target_col)
 
         def progress_callback(current, total, score=None, params=None):
             msg = f"Tuning progress: Trial {current}/{total}"
@@ -377,103 +480,19 @@ class NodeRunnersMixin:
         self.log("Tuning and final model retraining finished.")
 
         # Bundle transformers with the model for inference
-        composite_feature_engineer = self._build_composite_feature_engineer(node)
-        feature_engineer_key = None
-        if composite_feature_engineer is None:
-            feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
-
-        self._bundle_transformers_with_model(
-            node.node_id,
-            job_id=job_id,
-            feature_engineer_artifact_key=feature_engineer_key,
-            feature_engineer_override=composite_feature_engineer,
-            target_column=target_col,
-        )
+        self._bundle_model_with_transformers(node, job_id, target_col)
 
         # Extract metrics from tuning result
-        # estimator.model is expected to be a tuple (model, tuning_result) for Tuner
-        model_artifact = estimator.model
-        if isinstance(model_artifact, tuple) and len(model_artifact) == 2:
-            _, tuning_result = model_artifact
-        else:
-            tuning_result = None
-
-        if tuning_result:
-            metrics = {
-                "best_score": tuning_result.best_score,
-                "best_params": tuning_result.best_params,
-                "trials": tuning_result.trials,
-                "scoring_metric": tuning_result.scoring_metric
-                or tuning_params.get("tuning_config", {}).get("metric")
-                or tuning_params.get("metric"),
-            }
-        else:
-            metrics = {}
+        tuning_result, metrics = self._extract_tuning_metrics(estimator, tuning_params)
 
         # Cross-Validation on the tuned model (using best params)
-        cv_metrics: dict[str, Any] = {}
-        if tuning_params.get("cv_enabled", False):
-            best_params: dict[str, Any] = tuning_result.best_params if tuning_result else {}
-            cv_estimator = StatefulEstimator(calculator, applier, node.node_id)
-
-            # For advanced tuning, nested_cv's inner loop already ran during
-            # the search. Post-tuning CV only needs the outer evaluation, so
-            # downgrade to stratified_k_fold (classification) or k_fold (regression).
-            post_cv_type = tuning_params.get("cv_type", "k_fold")
-            if post_cv_type == "nested_cv":
-                is_classification = getattr(calculator, "problem_type", "") == "classification"
-                post_cv_type = "stratified_k_fold" if is_classification else "k_fold"
-                self.log(
-                    "Nested CV inner loop already ran during tuning. "
-                    f"Using {post_cv_type} for post-tuning evaluation."
-                )
-
-            self.log("Running cross-validation on tuned model with best parameters...")
-            try:
-                cv_results = cv_estimator.cross_validate(
-                    data,
-                    target_col,
-                    {"params": best_params},
-                    n_folds=tuning_params.get("cv_folds", 5),
-                    cv_type=post_cv_type,
-                    shuffle=tuning_params.get("cv_shuffle", True),
-                    random_state=tuning_params.get("cv_random_state", 42),
-                    time_column=tuning_params.get("cv_time_column") or None,
-                    log_callback=self.log,
-                )
-
-                agg_metrics = cv_results.get("aggregated_metrics", cv_results)
-                for metric_name, stats in agg_metrics.items():
-                    if isinstance(stats, dict) and "mean" in stats:
-                        cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
-                        cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
-            except Exception:
-                logger.exception("Cross-validation failed for tuned model")
+        cv_metrics = self._run_tuned_cv(
+            calculator, applier, data, target_col, tuning_params, tuning_result, node
+        )
 
         # Evaluate the tuned model
         try:
-            report = estimator.evaluate(data, target_col, job_id=job_id)
-
-            # Save evaluation data artifact for API
-            if "raw_data" in report:
-                eval_key = f"{job_id}_evaluation_data"
-                uri = self.artifact_store.get_artifact_uri(eval_key)
-                self.log(f"Saving evaluation data to {uri}")
-                self.artifact_store.save(eval_key, report["raw_data"])
-
-            splits = report["splits"]
-
-            if "train" in splits and splits["train"]:
-                for k, v in splits["train"].metrics.items():
-                    metrics[f"train_{k}"] = v
-
-            if "test" in splits and splits["test"]:
-                for k, v in splits["test"].metrics.items():
-                    metrics[f"test_{k}"] = v
-
-            if "validation" in splits and splits["validation"]:
-                for k, v in splits["validation"].metrics.items():
-                    metrics[f"val_{k}"] = v
+            self._evaluate_and_save_report(estimator, data, target_col, job_id, metrics)
         except Exception:
             logger.exception("Failed to evaluate tuned model")
 
@@ -486,12 +505,7 @@ class NodeRunnersMixin:
             metrics["feature_importances"] = fi
 
         # Persist data shape for monitoring
-        try:
-            self._record_data_shape_metrics(metrics, data, target_col)
-        except Exception:
-            logger.debug(
-                "Failed to record data shape metrics for node %s", node.node_id, exc_info=True
-            )
+        self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
 
         return node.node_id, metrics
 
