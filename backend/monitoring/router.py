@@ -169,23 +169,8 @@ class EnrichedDriftReport(BaseModel):
     feature_importances: dict[str, float] | None = None
 
 
-@router.post("/drift/calculate", response_model=EnrichedDriftReport)
-@limiter.limit("20/minute")
-async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load ref → load curr → compute → persist
-    request: Request,
-    job_id: str = Form(...),
-    file: UploadFile = File(...),
-    dataset_name: str | None = Form(None),
-    threshold_psi: float | None = Form(None),
-    threshold_ks: float | None = Form(None),
-    threshold_wasserstein: float | None = Form(None),
-    threshold_kl: float | None = Form(None),
-    db: AsyncSession = Depends(get_db),
-) -> EnrichedDriftReport:
-    # 1. Find the job folder (via the storage seam) and its artifact store.
-    artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
-
-    # 2. Find Reference Data
+def _find_reference_key(artifact_store, dataset_name: str | None, job_id: str) -> str | None:
+    """Locate the reference-data artifact key for a job, preferring an exact dataset_name match."""
     reference_key = None
     if dataset_name:
         # Sanitize as done in engine.py
@@ -204,23 +189,25 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
                 reference_key = key
                 break
 
-    if not reference_key:
-        raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
+    return reference_key
 
-    # 3. Load Reference Data
+
+def _load_reference_dataframe(artifact_store, reference_key: str, job_id: str) -> pl.DataFrame:
+    """Load and convert the reference-data artifact to a Polars DataFrame."""
     try:
         ref_data = artifact_store.load(reference_key)
         # Convert to Polars
         if isinstance(ref_data, pd.DataFrame):
-            ref_df = pl.from_pandas(ref_data)
-        else:
-            # Assume it's already compatible or fail
-            ref_df = pl.DataFrame(ref_data)
+            return pl.from_pandas(ref_data)
+        # Assume it's already compatible or fail
+        return pl.DataFrame(ref_data)
     except Exception:
         logger.exception("Failed to load reference data for job %s", job_id)
         raise SkyulfException(message="Failed to load reference data") from None
 
-    # 3. Load Current Data
+
+async def _load_current_dataframe(file: UploadFile) -> pl.DataFrame:
+    """Read the uploaded file (bounded by MAX_UPLOAD_SIZE) and parse it as CSV/Parquet into Polars."""
     try:
         from backend.config import get_settings as _get_settings
 
@@ -233,48 +220,56 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
                 detail=f"File too large. Maximum allowed size is {_max_size // (1024 * 1024)} MB.",
             )
         filename = (file.filename or "").lower()
-        if filename.endswith(".csv"):
-            curr_df = pl.read_csv(io.BytesIO(content))
-        elif filename.endswith(".parquet"):
-            curr_df = pl.read_parquet(io.BytesIO(content))
-        else:
-            # Default to CSV
-            curr_df = pl.read_csv(io.BytesIO(content))
+        if filename.endswith(".parquet"):
+            return pl.read_parquet(io.BytesIO(content))
+        # Default to CSV (also used for .csv and any other extension)
+        return pl.read_csv(io.BytesIO(content))
     except Exception as e:
         logger.warning("Failed to parse uploaded file: %s", e)
         raise HTTPException(status_code=400, detail="Failed to parse uploaded file") from e
 
-    # 4. Calculate Drift
-    try:
-        custom_thresholds: dict[str, float] = {}
-        if threshold_psi is not None:
-            custom_thresholds["psi"] = threshold_psi
-        if threshold_ks is not None:
-            custom_thresholds["ks"] = threshold_ks
-        if threshold_wasserstein is not None:
-            custom_thresholds["wasserstein"] = threshold_wasserstein
-        if threshold_kl is not None:
-            custom_thresholds["kl_divergence"] = threshold_kl
-        calculator = DriftCalculator(ref_df, curr_df)
-        report = calculator.calculate_drift(thresholds=custom_thresholds or None)
-    except Exception:
-        logger.exception("Drift calculation failed for job %s", job_id)
-        raise SkyulfException(message="Drift calculation failed") from None
 
-    # 5. Save drift check result to DB for history
+def _build_drift_thresholds(
+    threshold_psi: float | None,
+    threshold_ks: float | None,
+    threshold_wasserstein: float | None,
+    threshold_kl: float | None,
+) -> dict[str, float]:
+    """Assemble the custom drift-metric thresholds dict from the individual per-metric overrides."""
+    custom_thresholds: dict[str, float] = {}
+    if threshold_psi is not None:
+        custom_thresholds["psi"] = threshold_psi
+    if threshold_ks is not None:
+        custom_thresholds["ks"] = threshold_ks
+    if threshold_wasserstein is not None:
+        custom_thresholds["wasserstein"] = threshold_wasserstein
+    if threshold_kl is not None:
+        custom_thresholds["kl_divergence"] = threshold_kl
+    return custom_thresholds
+
+
+def _build_drift_column_summary(report) -> dict[str, Any]:
+    """Build a compact per-column drift summary (drifted flag + PSI/Wasserstein/KS p-value)."""
+    col_summary: dict[str, Any] = {}
+    for col_name, col_drift in report.column_drifts.items():
+        metrics_map: dict[str, float] = {}
+        for m in col_drift.metrics:
+            metrics_map[m.metric] = m.value
+        col_summary[col_name] = {
+            "drifted": col_drift.drift_detected,
+            "psi": metrics_map.get("psi"),
+            "wasserstein": metrics_map.get("wasserstein_distance"),
+            "ks_p_value": metrics_map.get("ks_test_p_value"),
+        }
+    return col_summary
+
+
+async def _save_drift_check_result(
+    db: AsyncSession, report, job_id: str, dataset_name: str | None
+) -> None:
+    """Persist a DriftCheckResult row for history; failures are logged but non-fatal."""
     try:
-        # Build per-column summary (PSI + Wasserstein, compact)
-        col_summary: dict[str, Any] = {}
-        for col_name, col_drift in report.column_drifts.items():
-            metrics_map: dict[str, float] = {}
-            for m in col_drift.metrics:
-                metrics_map[m.metric] = m.value
-            col_summary[col_name] = {
-                "drifted": col_drift.drift_detected,
-                "psi": metrics_map.get("psi"),
-                "wasserstein": metrics_map.get("wasserstein_distance"),
-                "ks_p_value": metrics_map.get("ks_test_p_value"),
-            }
+        col_summary = _build_drift_column_summary(report)
 
         check = DriftCheckResult(
             job_id=job_id,
@@ -299,7 +294,9 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
     except Exception:
         logger.warning("Failed to save drift check result", exc_info=True)
 
-    # 6. Load feature importances from training job
+
+async def _load_feature_importances(db: AsyncSession, job_id: str) -> dict[str, float] | None:
+    """Look up feature importances recorded on the training job's metrics, if any."""
     feature_importances: dict[str, float] | None = None
     try:
         for model_cls in (BasicTrainingJob, AdvancedTuningJob):
@@ -313,6 +310,52 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
                 break
     except Exception:
         logger.warning("Could not load feature importances for job %s", job_id)
+    return feature_importances
+
+
+@router.post("/drift/calculate", response_model=EnrichedDriftReport)
+@limiter.limit("20/minute")
+async def calculate_drift(
+    request: Request,
+    job_id: str = Form(...),
+    file: UploadFile = File(...),
+    dataset_name: str | None = Form(None),
+    threshold_psi: float | None = Form(None),
+    threshold_ks: float | None = Form(None),
+    threshold_wasserstein: float | None = Form(None),
+    threshold_kl: float | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+) -> EnrichedDriftReport:
+    # 1. Find the job folder (via the storage seam) and its artifact store.
+    artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
+
+    # 2. Find Reference Data
+    reference_key = _find_reference_key(artifact_store, dataset_name, job_id)
+    if not reference_key:
+        raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
+
+    # 3. Load Reference Data
+    ref_df = _load_reference_dataframe(artifact_store, reference_key, job_id)
+
+    # 3. Load Current Data
+    curr_df = await _load_current_dataframe(file)
+
+    # 4. Calculate Drift
+    try:
+        custom_thresholds = _build_drift_thresholds(
+            threshold_psi, threshold_ks, threshold_wasserstein, threshold_kl
+        )
+        calculator = DriftCalculator(ref_df, curr_df)
+        report = calculator.calculate_drift(thresholds=custom_thresholds or None)
+    except Exception:
+        logger.exception("Drift calculation failed for job %s", job_id)
+        raise SkyulfException(message="Drift calculation failed") from None
+
+    # 5. Save drift check result to DB for history
+    await _save_drift_check_result(db, report, job_id, dataset_name)
+
+    # 6. Load feature importances from training job
+    feature_importances = await _load_feature_importances(db, job_id)
 
     return EnrichedDriftReport(
         reference_rows=report.reference_rows,

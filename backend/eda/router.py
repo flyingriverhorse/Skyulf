@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Any, Literal, cast
 
 import orjson
@@ -245,6 +246,88 @@ class DecompositionRequest(BaseModel):
     filters: list[FilterRequest] | None = None
 
 
+def _resolve_decomposition_file_path(ds: DataSource) -> str | Path:
+    """Resolve the file path for a DataSource, raising HTTPException if it cannot be found."""
+    source_data_dict = {
+        "config": ds.config or {},
+        "connection_info": ds.source_metadata or {},
+        "file_path": (ds.config or {}).get("file_path"),
+        "source_id": ds.source_id,
+    }
+    file_path = extract_file_path_from_source(source_data_dict)
+
+    if not file_path:
+        # Fallback
+        if ds.source_id and (
+            str(ds.source_id).endswith(".csv") or str(ds.source_id).endswith(".parquet")
+        ):
+            file_path = ds.source_id
+        else:
+            raise HTTPException(status_code=400, detail="File path not found")
+
+    return file_path
+
+
+def _resolve_decomposition_s3_credentials(ds: DataSource) -> dict:
+    """Resolve raw S3 credentials for a DataSource, trying explicit creds, then config, then env settings."""
+    creds = ds.credentials or {}
+    if not creds:
+        config_creds = ds.config or {}
+        creds = {
+            "aws_access_key_id": config_creds.get("aws_access_key_id"),
+            "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
+            "aws_session_token": config_creds.get("aws_session_token"),
+            "endpoint_url": config_creds.get("endpoint_url"),
+        }
+
+    if not creds.get("aws_access_key_id"):
+        settings = get_settings()
+        creds = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+            "aws_session_token": settings.AWS_SESSION_TOKEN,
+            "endpoint_url": None,
+        }
+
+    return creds
+
+
+def _build_decomposition_storage_options(ds: DataSource) -> dict | None:
+    """Resolve S3 credentials for a DataSource into storage_options (simplified from tasks.py)."""
+    creds = _resolve_decomposition_s3_credentials(ds)
+
+    storage_options = {
+        "key": creds.get("aws_access_key_id") or creds.get("key"),
+        "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
+        "token": creds.get("aws_session_token") or creds.get("token"),
+        "endpoint_url": creds.get("endpoint_url"),
+    }
+    return {k: v for k, v in storage_options.items() if v is not None}
+
+
+async def _load_decomposition_dataframe(
+    data_service: DataService, file_path: str | Path, storage_options: dict | None
+) -> pl.DataFrame:
+    """Load a dataset and ensure it is returned as a Polars DataFrame, converting from pandas if needed."""
+    try:
+        df = await data_service.load_file(file_path, storage_options=storage_options)
+        # Ensure Polars DataFrame
+        if isinstance(df, pd.DataFrame):
+            try:
+                df = pl.from_pandas(df)
+            except Exception:
+                # Fallback: convert object cols to string to handle mixed types
+                pdf = cast(Any, df)
+                for col in pdf.columns:
+                    if pdf[col].dtype == "object":
+                        pdf[col] = pdf[col].astype(str)
+                df = pl.from_pandas(pdf)
+    except Exception:
+        logger.exception("Failed to load dataset")
+        raise SkyulfException(message="Failed to load dataset") from None
+    return df
+
+
 @router.post("/{dataset_id}/decomposition")
 @limiter.limit("20/minute")
 async def get_decomposition(
@@ -263,71 +346,16 @@ async def get_decomposition(
             raise HTTPException(status_code=404, detail="Dataset not found")
 
         # 2. Resolve File Path
-        source_data_dict = {
-            "config": ds.config or {},
-            "connection_info": ds.source_metadata or {},
-            "file_path": (ds.config or {}).get("file_path"),
-            "source_id": ds.source_id,
-        }
-        file_path = extract_file_path_from_source(source_data_dict)
-
-        if not file_path:
-            # Fallback
-            if ds.source_id and (
-                str(ds.source_id).endswith(".csv") or str(ds.source_id).endswith(".parquet")
-            ):
-                file_path = ds.source_id
-            else:
-                raise HTTPException(status_code=400, detail="File path not found")
+        file_path = _resolve_decomposition_file_path(ds)
 
         # 3. Prepare Storage Options (Simplified from tasks.py)
         storage_options = None
         if file_path and str(file_path).startswith("s3://"):
-            creds = ds.credentials or {}
-            if not creds:
-                config_creds = ds.config or {}
-                creds = {
-                    "aws_access_key_id": config_creds.get("aws_access_key_id"),
-                    "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
-                    "aws_session_token": config_creds.get("aws_session_token"),
-                    "endpoint_url": config_creds.get("endpoint_url"),
-                }
-
-            if not creds.get("aws_access_key_id"):
-                settings = get_settings()
-                creds = {
-                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                    "aws_session_token": settings.AWS_SESSION_TOKEN,
-                    "endpoint_url": None,
-                }
-
-            storage_options = {
-                "key": creds.get("aws_access_key_id") or creds.get("key"),
-                "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
-                "token": creds.get("aws_session_token") or creds.get("token"),
-                "endpoint_url": creds.get("endpoint_url"),
-            }
-            storage_options = {k: v for k, v in storage_options.items() if v is not None}
+            storage_options = _build_decomposition_storage_options(ds)
 
         # 4. Load Data
         data_service = DataService()
-        try:
-            df = await data_service.load_file(file_path, storage_options=storage_options)
-            # Ensure Polars DataFrame
-            if isinstance(df, pd.DataFrame):
-                try:
-                    df = pl.from_pandas(df)
-                except Exception:
-                    # Fallback: convert object cols to string to handle mixed types
-                    pdf = cast(Any, df)
-                    for col in pdf.columns:
-                        if pdf[col].dtype == "object":
-                            pdf[col] = pdf[col].astype(str)
-                    df = pl.from_pandas(pdf)
-        except Exception:
-            logger.exception("Failed to load dataset")
-            raise SkyulfException(message="Failed to load dataset") from None
+        df = await _load_decomposition_dataframe(data_service, file_path, storage_options)
 
         # 5. Run Analysis
         analyzer = EDAAnalyzer(cast(Any, df))
