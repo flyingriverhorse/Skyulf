@@ -84,6 +84,30 @@ class ColumnMixin(_AnalyzerState):
                 )
             )
 
+    @staticmethod
+    def _run_normality_test(sample_data: np.ndarray) -> NormalityTestResult | None:
+        """Run Shapiro-Wilk (small samples) or Kolmogorov-Smirnov (large samples) on prepared sample data."""
+        from scipy.stats import kstest, shapiro
+
+        if not (len(sample_data) > 20 and np.std(sample_data) > 1e-10):
+            return None
+
+        if len(sample_data) < 5000:
+            stat, p_value = shapiro(sample_data)
+            test_name = "Shapiro-Wilk"
+        else:
+            # Fit normal to data first; otherwise KS would test against N(0,1).
+            mean, std = np.mean(sample_data), np.std(sample_data)
+            stat, p_value = kstest(sample_data, "norm", args=(mean, std))
+            test_name = "Kolmogorov-Smirnov"
+
+        return NormalityTestResult(
+            test_name=test_name,
+            statistic=float(stat),
+            p_value=float(p_value),
+            is_normal=float(p_value) > 0.05,
+        )
+
     def _add_normality_test(self, col: str, profile: ColumnProfile) -> None:
         """Run Shapiro-Wilk (small samples) or Kolmogorov-Smirnov (large samples) normality test."""
         if not (
@@ -94,55 +118,43 @@ class ColumnMixin(_AnalyzerState):
         ):
             return
         try:
-            from scipy.stats import kstest, shapiro
-
             sample_data = self.df[col].drop_nulls().head(5000).to_numpy()  # type: ignore[attr-defined]
-
-            if len(sample_data) > 20 and np.std(sample_data) > 1e-10:
-                if len(sample_data) < 5000:
-                    stat, p_value = shapiro(sample_data)
-                    test_name = "Shapiro-Wilk"
-                else:
-                    # Fit normal to data first; otherwise KS would test against N(0,1).
-                    mean, std = np.mean(sample_data), np.std(sample_data)
-                    stat, p_value = kstest(sample_data, "norm", args=(mean, std))
-                    test_name = "Kolmogorov-Smirnov"
-
-                profile.normality_test = NormalityTestResult(
-                    test_name=test_name,
-                    statistic=float(stat),
-                    p_value=float(p_value),
-                    is_normal=float(p_value) > 0.05,
-                )
+            result = self._run_normality_test(sample_data)
+            if result is not None:
+                profile.normality_test = result
         except Exception as e:
             logger.warning(f"Normality test failed for {col}: {e}")
 
+    @staticmethod
+    def _has_iqr_outliers(numeric_stats: NumericStats) -> bool:
+        """Check whether min/max lie outside the 1.5*IQR whiskers derived from q25/q75."""
+        if not (numeric_stats.q25 is not None and numeric_stats.q75 is not None):
+            return False
+        iqr = numeric_stats.q75 - numeric_stats.q25
+        if iqr <= 0:
+            return False
+        lower_bound = numeric_stats.q25 - 1.5 * iqr
+        upper_bound = numeric_stats.q75 + 1.5 * iqr
+        return (
+            numeric_stats.min is not None
+            and numeric_stats.max is not None
+            and (numeric_stats.min < lower_bound or numeric_stats.max > upper_bound)
+        )
+
     def _add_outlier_alert(self, col: str, profile: ColumnProfile, alerts: list[Alert]) -> None:
         """IQR-based outlier hint (cheap; just looks at min/max vs whiskers)."""
-        if not (
-            profile.numeric_stats
-            and profile.numeric_stats.q25 is not None
-            and profile.numeric_stats.q75 is not None
-        ):
+        if not profile.numeric_stats:
             return
-        iqr = profile.numeric_stats.q75 - profile.numeric_stats.q25
-        if iqr <= 0:
+        if not self._has_iqr_outliers(profile.numeric_stats):
             return
-        lower_bound = profile.numeric_stats.q25 - 1.5 * iqr
-        upper_bound = profile.numeric_stats.q75 + 1.5 * iqr
-        if (
-            profile.numeric_stats.min is not None
-            and profile.numeric_stats.max is not None
-            and (profile.numeric_stats.min < lower_bound or profile.numeric_stats.max > upper_bound)
-        ):
-            alerts.append(
-                Alert(
-                    column=col,
-                    type="Outlier",
-                    message=f"Column '{col}' contains significant outliers.",
-                    severity="info",
-                )
+        alerts.append(
+            Alert(
+                column=col,
+                type="Outlier",
+                message=f"Column '{col}' contains significant outliers.",
+                severity="info",
             )
+        )
 
     def _add_constant_alert(
         self, col: str, profile: ColumnProfile, alerts: list[Alert], numeric_stats: NumericStats

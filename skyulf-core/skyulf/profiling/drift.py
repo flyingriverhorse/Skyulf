@@ -308,26 +308,11 @@ class DriftCalculator:
         except Exception:
             return DriftDistribution(bins=[])
 
-    def _calculate_categorical_drift(
-        self, col: str, thresholds: dict[str, float]
-    ) -> "ColumnDrift | None":
-        """
-        Calculates PSI-based drift for a categorical/text/boolean column using
-        the category frequency distribution (union of categories seen in
-        either dataset). Returns ``None`` if the column looks like free-text
-        or a high-cardinality identifier (not a meaningful categorical
-        distribution), or if either side has no non-null values.
-        """
-        ref_data = self.reference_df[col].cast(pl.Utf8, strict=False).drop_nulls()
-        curr_data = self.current_df[col].cast(pl.Utf8, strict=False).drop_nulls()
-
-        if len(ref_data) == 0 or len(curr_data) == 0:
-            return None
-
-        ref_n_unique = ref_data.n_unique()
-        if ref_n_unique > self._MAX_CATEGORICAL_CARDINALITY:
-            return None
-
+    @staticmethod
+    def _categorical_percent_arrays(
+        ref_data: pl.Series, curr_data: pl.Series, col: str
+    ) -> tuple[list, np.ndarray, np.ndarray] | None:
+        """Build per-category expected/actual percent arrays (union of categories), or None if <2 categories."""
         ref_counts = ref_data.value_counts()
         curr_counts = curr_data.value_counts()
 
@@ -354,6 +339,49 @@ class DriftCalculator:
         expected_percents = np.where(expected_percents == 0, eps_ref, expected_percents)
         actual_percents = np.where(actual_percents == 0, eps_curr, actual_percents)
 
+        return categories, expected_percents, actual_percents
+
+    @staticmethod
+    def _categorical_drift_suggestions(psi_drift: bool, psi_val: float) -> list[str]:
+        """Build the user-facing suggestion messages for a categorical PSI drift result."""
+        suggestions: list[str] = []
+        if psi_drift:
+            if psi_val > 0.25:
+                suggestions.append(
+                    "Critical category-distribution shift detected (PSI > 0.25). "
+                    "Immediate model retraining is recommended."
+                )
+            else:
+                suggestions.append(
+                    "Moderate category-distribution shift detected. Monitor model performance closely."
+                )
+        return suggestions
+
+    def _calculate_categorical_drift(
+        self, col: str, thresholds: dict[str, float]
+    ) -> "ColumnDrift | None":
+        """
+        Calculates PSI-based drift for a categorical/text/boolean column using
+        the category frequency distribution (union of categories seen in
+        either dataset). Returns ``None`` if the column looks like free-text
+        or a high-cardinality identifier (not a meaningful categorical
+        distribution), or if either side has no non-null values.
+        """
+        ref_data = self.reference_df[col].cast(pl.Utf8, strict=False).drop_nulls()
+        curr_data = self.current_df[col].cast(pl.Utf8, strict=False).drop_nulls()
+
+        if len(ref_data) == 0 or len(curr_data) == 0:
+            return None
+
+        ref_n_unique = ref_data.n_unique()
+        if ref_n_unique > self._MAX_CATEGORICAL_CARDINALITY:
+            return None
+
+        percents = self._categorical_percent_arrays(ref_data, curr_data, col)
+        if percents is None:
+            return None
+        _categories, expected_percents, actual_percents = percents
+
         psi_val = float(
             np.sum(
                 (actual_percents - expected_percents) * np.log(actual_percents / expected_percents)
@@ -370,17 +398,7 @@ class DriftCalculator:
             )
         ]
 
-        suggestions: list[str] = []
-        if psi_drift:
-            if psi_val > 0.25:
-                suggestions.append(
-                    "Critical category-distribution shift detected (PSI > 0.25). "
-                    "Immediate model retraining is recommended."
-                )
-            else:
-                suggestions.append(
-                    "Moderate category-distribution shift detected. Monitor model performance closely."
-                )
+        suggestions = self._categorical_drift_suggestions(psi_drift, psi_val)
 
         return ColumnDrift(
             column=col,

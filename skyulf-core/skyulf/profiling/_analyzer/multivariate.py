@@ -23,6 +23,43 @@ logger = logging.getLogger(__name__)
 class MultivariateMixin(_AnalyzerState):
     """Multivariate helpers for :class:`EDAAnalyzer`."""
 
+    def _sample_matrix_df(
+        self, numeric_cols: list[str], target_col: str | None, limit: int
+    ) -> pl.DataFrame:
+        """Select the numeric cols (+ target if present) and sample down to `limit` rows."""
+        cols_to_fetch = list(numeric_cols)
+        if (
+            target_col
+            and target_col in self.columns  # type: ignore[attr-defined]
+            and target_col not in cols_to_fetch
+        ):
+            cols_to_fetch.append(target_col)
+
+        if self.row_count > limit:  # type: ignore[attr-defined]
+            return self.df.select(cols_to_fetch).sample(  # type: ignore[attr-defined]
+                n=limit, with_replacement=False, seed=42
+            )
+        return self.df.select(cols_to_fetch)  # type: ignore[attr-defined]
+
+    @staticmethod
+    def _impute_matrix(X_df: pl.DataFrame) -> np.ndarray:
+        """Mean-impute (Polars fast path, sklearn fallback) and return a finite numpy matrix."""
+        from sklearn.impute import SimpleImputer
+
+        try:
+            # Polars fill_null is faster than sklearn's imputer; fall back if it errors.
+            # Trailing fill_null(0) covers all-null columns where mean is also null.
+            X_df = X_df.fill_null(strategy="mean").fill_null(0)
+            X = X_df.to_numpy()
+            if not np.isfinite(X).all():
+                X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+        except Exception:
+            X = X_df.to_pandas().values
+            imputer = SimpleImputer(strategy="mean")
+            X = imputer.fit_transform(X)
+            X = np.nan_to_num(X, nan=0.0)
+        return X
+
     def _prepare_matrix_sample(
         self,
         numeric_cols: list[str],
@@ -37,41 +74,15 @@ class MultivariateMixin(_AnalyzerState):
         if not SKLEARN_AVAILABLE:
             return None, None, None
         try:
-            from sklearn.impute import SimpleImputer
             from sklearn.preprocessing import StandardScaler
 
-            cols_to_fetch = list(numeric_cols)
-            if (
-                target_col
-                and target_col in self.columns  # type: ignore[attr-defined]
-                and target_col not in cols_to_fetch
-            ):
-                cols_to_fetch.append(target_col)
-
-            if self.row_count > limit:  # type: ignore[attr-defined]
-                sample_df = self.df.select(cols_to_fetch).sample(  # type: ignore[attr-defined]
-                    n=limit, with_replacement=False, seed=42
-                )
-            else:
-                sample_df = self.df.select(cols_to_fetch)  # type: ignore[attr-defined]
+            sample_df = self._sample_matrix_df(numeric_cols, target_col, limit)
 
             if sample_df.height < 5:
                 return None, None, None
 
             X_df = sample_df.select(numeric_cols)
-
-            try:
-                # Polars fill_null is faster than sklearn's imputer; fall back if it errors.
-                # Trailing fill_null(0) covers all-null columns where mean is also null.
-                X_df = X_df.fill_null(strategy="mean").fill_null(0)
-                X = X_df.to_numpy()
-                if not np.isfinite(X).all():
-                    X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-            except Exception:
-                X = X_df.to_pandas().values
-                imputer = SimpleImputer(strategy="mean")
-                X = imputer.fit_transform(X)
-                X = np.nan_to_num(X, nan=0.0)
+            X = self._impute_matrix(X_df)
 
             scaler = StandardScaler()
             X_scaled = scaler.fit_transform(X)
