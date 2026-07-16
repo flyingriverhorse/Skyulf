@@ -16,6 +16,10 @@ export interface ClusterCentroid {
   size: number;
   percentage: number;
   center: Record<string, number>;
+  /** Auto-generated human-readable label (e.g. "High petal_length, Low
+   * petal_width") describing what numerically distinguishes this cluster.
+   * Not a real-world name — just a description of the centroid. */
+  profile?: string;
 }
 
 /** Cluster-size/centroid summary for a clustering split (no ground-truth target). */
@@ -23,6 +27,11 @@ export interface ClusteringSummary {
   n_clusters: number;
   cluster_sizes: Record<string, number>;
   centroids: ClusterCentroid[];
+  /** Optional: if a "reference column" (e.g. a known label like species
+   * name) was set aside during training, this is cluster_id -> {label:
+   * row_count}, letting the user see e.g. "Cluster 0 is 92% setosa". */
+  reference_crosstab?: Record<string, Record<string, number>> | null;
+  reference_column?: string | null;
 }
 
 /** Raw split payload for an unsupervised clustering job — no y_true/y_pred,

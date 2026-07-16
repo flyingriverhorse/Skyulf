@@ -76,7 +76,7 @@ export const SegmentationView: React.FC<Props> = ({
           Segmentation
         </h3>
         <InfoTooltip
-          text="Cluster quality metrics, sizes, and per-cluster centroids (mean feature values) for this K-Means run. There is no ground truth here — these metrics describe how well-separated the discovered groups are, not prediction accuracy."
+          text="Cluster quality metrics, sizes, per-cluster centroids (mean feature values), and an auto-generated characteristic profile for this run. There is no ground truth here — these metrics describe how well-separated the discovered groups are, not prediction accuracy. If you set a Reference Column, its breakdown per cluster is shown below to help you interpret what each cluster represents."
           align="center"
         />
       </div>
@@ -237,10 +237,59 @@ export const SegmentationView: React.FC<Props> = ({
                       </div>
                     )}
                   </div>
+                  {cluster.profile && (
+                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 italic">
+                      {cluster.profile}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Reference column breakdown, if the user set one aside for interpretation */}
+          {currentSplit.clustering.reference_crosstab && currentSplit.clustering.reference_column && (
+            <div>
+              <div className="flex items-center gap-1.5 mb-3">
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Reference Column Breakdown ({currentSplit.clustering.reference_column})
+                </h4>
+                <InfoTooltip
+                  text={`How rows are distributed across "${currentSplit.clustering.reference_column}" within each cluster. This column was excluded from training — it's shown here only to help you interpret which cluster corresponds to which real-world group.`}
+                  align="center"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(currentSplit.clustering.reference_crosstab)
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([clusterId, counts]) => {
+                    const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+                    const sortedCounts = Object.entries(counts).sort(([, a], [, b]) => b - a);
+                    return (
+                      <div key={clusterId} className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center mb-2">
+                          <span
+                            className="w-3 h-3 rounded-full mr-2"
+                            style={{ backgroundColor: CLUSTER_COLORS[Number(clusterId) % CLUSTER_COLORS.length] }}
+                          />
+                          <span className="font-bold text-gray-900 dark:text-white">Cluster {clusterId}</span>
+                        </div>
+                        <div className="space-y-1">
+                          {sortedCounts.map(([label, count]) => (
+                            <div key={label} className="flex justify-between text-xs">
+                              <span className="text-gray-500 dark:text-gray-400 truncate w-24" title={label}>{label}</span>
+                              <span className="font-mono text-gray-700 dark:text-gray-200">
+                                {count} ({total ? ((count / total) * 100).toFixed(0) : 0}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

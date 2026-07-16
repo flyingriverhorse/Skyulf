@@ -3,6 +3,7 @@ import { Play, Loader2, Settings2, AlertCircle, ChevronDown, X } from 'lucide-re
 import { jobsApi } from '../../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../../core/api/registry';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
+import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
@@ -23,6 +24,11 @@ export interface SegmentationConfig {
   model_type: string;
   hyperparameters: Record<string, unknown>;
   execution_mode?: ExecutionMode;
+  /** Optional column (e.g. a known label like species name) excluded from
+   * training but kept around purely to help interpret which cluster
+   * corresponds to which real-world group afterward (see the "Reference
+   * Column" breakdown on the Segmentation results). */
+  reference_column?: string | undefined;
 }
 
 /**
@@ -89,6 +95,8 @@ export const SegmentationSettings: React.FC<{
   };
 
   const datasetId = findUpstreamDatasetId(nodeId || '');
+  const { data: schema } = useDatasetSchema(datasetId);
+  const availableColumns = schema ? Object.values(schema.columns) : [];
 
   const [containerRef, isWide] = useIsWideContainer();
   const [activeTab, setActiveTab] = useState<'model' | 'params'>('model');
@@ -226,6 +234,27 @@ export const SegmentationSettings: React.FC<{
                   )}
                 </div>
               )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Reference Column (optional)</span>
+                <HelpTooltip text="A column with a known real-world label (e.g. a species/customer-type name) that you want excluded from clustering, but kept around afterward to see which cluster corresponds to which group — e.g. 'Cluster 0 is 92% setosa'. The model never sees this column." />
+              </div>
+              <div className="relative">
+                <select
+                  value={config.reference_column ?? ''}
+                  onChange={(e) => onChange({ ...config, reference_column: e.target.value || undefined })}
+                  className="w-full appearance-none border border-gray-300 dark:border-gray-600 rounded-lg p-2.5 text-sm bg-white dark:bg-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                  disabled={availableColumns.length === 0}
+                >
+                  <option value="">None</option>
+                  {availableColumns.map((col) => (
+                    <option key={col.name} value={col.name}>{col.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>

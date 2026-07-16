@@ -234,7 +234,11 @@ class NodeRunnersMixin:
         return data
 
     def _resolve_train_feature_columns(
-        self, data: Any, target_col: str, numeric_only: bool = False
+        self,
+        data: Any,
+        target_col: str,
+        numeric_only: bool = False,
+        exclude_columns: list[str] | None = None,
     ) -> list[str] | None:
         """Best-effort list of the exact feature column names used to fit the model.
 
@@ -248,7 +252,9 @@ class NodeRunnersMixin:
         ``numeric_only`` mirrors clustering models (e.g. K-Means) dropping
         non-numeric columns before fitting — see ``_select_numeric_features``
         in ``skyulf.modeling.clustering`` — so the persisted list matches
-        exactly what the model was fit on.
+        exactly what the model was fit on. ``exclude_columns`` additionally
+        drops named columns (e.g. a clustering "reference column") regardless
+        of dtype, since those are excluded by name, not by numeric-ness.
         """
         train_frame = self._resolve_train_frame(data)
         if not hasattr(train_frame, "columns"):
@@ -259,6 +265,8 @@ class NodeRunnersMixin:
         if numeric_only and hasattr(train_frame, "select_dtypes"):
             numeric_cols = set(train_frame.select_dtypes(include=["number", "bool"]).columns)
             columns = [c for c in columns if c in numeric_cols]
+        if exclude_columns:
+            columns = [c for c in columns if c not in exclude_columns]
         return columns
 
     def _bundle_model_with_transformers(
@@ -268,6 +276,7 @@ class NodeRunnersMixin:
         target_col: str,
         data: Any = None,
         numeric_only: bool = False,
+        exclude_columns: list[str] | None = None,
     ) -> None:
         """Attach fitted transformers to the trained model artifact for inference."""
         composite_feature_engineer = self._build_composite_feature_engineer(node)
@@ -276,7 +285,9 @@ class NodeRunnersMixin:
             feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
 
         feature_columns = (
-            self._resolve_train_feature_columns(data, target_col, numeric_only=numeric_only)
+            self._resolve_train_feature_columns(
+                data, target_col, numeric_only=numeric_only, exclude_columns=exclude_columns
+            )
             if data is not None
             else None
         )
@@ -300,14 +311,23 @@ class NodeRunnersMixin:
                 metrics[f"{prefix}_{k}"] = v
 
     def _evaluate_and_save_report(
-        self, estimator: Any, data: Any, target_col: str, job_id: str, metrics: dict[str, Any]
+        self,
+        estimator: Any,
+        data: Any,
+        target_col: str,
+        job_id: str,
+        metrics: dict[str, Any],
+        reference_column: str = "",
     ) -> None:
         """Evaluate ``estimator`` on ``data``, save the raw eval artifact, flatten metrics.
 
         Mutates ``metrics`` in place with the ``train_``/``test_``/``val_`` prefixed
-        metrics from the evaluation report.
+        metrics from the evaluation report. ``reference_column`` is clustering-only
+        (see ``StatefulEstimator.evaluate``).
         """
-        report = estimator.evaluate(data, target_col, job_id=job_id)
+        report = estimator.evaluate(
+            data, target_col, job_id=job_id, reference_column=reference_column
+        )
 
         # Save evaluation data artifact for API
         if "raw_data" in report:
@@ -350,6 +370,12 @@ class NodeRunnersMixin:
         calculator, applier = self._get_model_components(algorithm)
         is_clustering = getattr(calculator, "problem_type", "") == "clustering"
 
+        # Clustering-only: an optional column (e.g. a known label like species
+        # name) excluded from training features but kept around purely so the
+        # user can cross-check "which cluster is which real-world group"
+        # after the fact (see `reference_crosstab` in the evaluation report).
+        reference_col = (node.params.get("reference_column") or "") if is_clustering else ""
+
         # SDK StatefulEstimator(calculator, applier, node_id)
         estimator = StatefulEstimator(calculator, applier, node.node_id)
 
@@ -367,7 +393,9 @@ class NodeRunnersMixin:
         # config expects {"params": ...} usually
         # Ensure hyperparameters are passed correctly.
         # If hyperparameters is already a dict of params, wrap it.
-        fit_config = {"params": hyperparameters}
+        fit_config: dict[str, Any] = {"params": hyperparameters}
+        if reference_col:
+            fit_config["reference_column"] = reference_col
 
         # Debug log
         self.log(f"Fit config params: {fit_config}")
@@ -381,7 +409,12 @@ class NodeRunnersMixin:
 
         # Bundle transformers with the model for inference
         self._bundle_model_with_transformers(
-            node, job_id, target_col, data, numeric_only=is_clustering
+            node,
+            job_id,
+            target_col,
+            data,
+            numeric_only=is_clustering,
+            exclude_columns=[reference_col] if reference_col else None,
         )
 
         # Optional: Evaluate immediately
@@ -389,7 +422,9 @@ class NodeRunnersMixin:
         if node.params.get("evaluate", True):
             # Ensure data is SplitDataset for evaluation
             eval_data = self._to_split_dataset(data, target_col)
-            self._evaluate_and_save_report(estimator, eval_data, target_col, job_id, metrics)
+            self._evaluate_and_save_report(
+                estimator, eval_data, target_col, job_id, metrics, reference_column=reference_col
+            )
 
         # Merge CV metrics
         metrics.update(cv_metrics)

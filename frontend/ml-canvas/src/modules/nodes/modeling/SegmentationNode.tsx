@@ -9,10 +9,10 @@ import { createModelingNode } from '../../../core/factories/nodeFactory';
  * algorithms only), its own hyperparameter handling (always visible/editable,
  * no "Customize" toggle — there's nothing to load best-params from, since
  * Advanced Tuning excludes clustering models), and no target-column/CV UI at
- * all, since neither applies to unsupervised clustering. Currently K-Means
- * only; the backend's `problem_type == "clustering"` dispatch is
- * engine-agnostic, so future algorithms with genuine out-of-sample
- * `.predict()` support can be added without further node-level changes.
+ * all, since neither applies to unsupervised clustering. Ships with K-Means,
+ * Mini-Batch K-Means, Gaussian Mixture, and Birch — all genuinely support
+ * out-of-sample `.predict()`, so they're deployable for inference (unlike
+ * DBSCAN/Agglomerative/OPTICS, which only implement `fit_predict()`).
  */
 export const SegmentationNode = createModelingNode<SegmentationConfig>({
   type: 'SegmentationNode',
