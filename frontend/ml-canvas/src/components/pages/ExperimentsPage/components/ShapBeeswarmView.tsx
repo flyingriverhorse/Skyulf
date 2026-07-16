@@ -12,8 +12,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
-import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
-import { getChartTheme } from '../../../eda/constants';
+import { useChartTheme } from '../../../../core/hooks/useChartTheme';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
@@ -74,7 +73,7 @@ export const ShapBeeswarmView: React.FC<Props> = ({
   doneChart,
 }) => {
   const chartId = `shap-beeswarm-chart-${jobId}`;
-  const chartTheme = getChartTheme();
+  const chartTheme = useChartTheme();
 
   const { points, topFeatures } = useMemo(() => {
     const { samples, mean_abs_importance: meanAbs } = shapExplanation;
@@ -155,7 +154,7 @@ export const ShapBeeswarmView: React.FC<Props> = ({
               <ZAxis range={[20, 20]} />
               <ReferenceLine x={0} stroke="#94a3b8" strokeDasharray="3 3" />
               <Tooltip
-                contentStyle={getTooltipContentStyle()}
+                contentStyle={chartTheme.tooltipContentStyle}
                 formatter={(value: number, name: string) => [value.toFixed(3), name]}
                 labelFormatter={() => ''}
               />

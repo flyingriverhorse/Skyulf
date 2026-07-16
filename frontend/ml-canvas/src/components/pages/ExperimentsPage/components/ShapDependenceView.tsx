@@ -11,8 +11,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
-import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
-import { getChartTheme } from '../../../eda/constants';
+import { useChartTheme } from '../../../../core/hooks/useChartTheme';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
@@ -33,7 +32,7 @@ export const ShapDependenceView: React.FC<Props> = ({
   doneChart,
 }) => {
   const chartId = `shap-dependence-chart-${jobId}`;
-  const chartTheme = getChartTheme();
+  const chartTheme = useChartTheme();
 
   const rankedFeatures = useMemo(
     () => Object.entries(shapExplanation.mean_abs_importance).sort((a, b) => b[1] - a[1]).map(([name]) => name),
@@ -104,7 +103,7 @@ export const ShapDependenceView: React.FC<Props> = ({
               />
               <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
               <Tooltip
-                contentStyle={getTooltipContentStyle()}
+                contentStyle={chartTheme.tooltipContentStyle}
                 formatter={(value: number, name: string) => [value.toFixed(3), name]}
               />
               <Scatter data={points} fill="#8884d8" fillOpacity={0.7} />

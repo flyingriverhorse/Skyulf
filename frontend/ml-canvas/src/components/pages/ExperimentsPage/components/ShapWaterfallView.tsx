@@ -12,8 +12,7 @@ import {
   Cell,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
-import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
-import { getChartTheme } from '../../../eda/constants';
+import { useChartTheme } from '../../../../core/hooks/useChartTheme';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
@@ -46,7 +45,7 @@ export const ShapWaterfallView: React.FC<Props> = ({
   doneChart,
 }) => {
   const chartId = `shap-waterfall-chart-${jobId}`;
-  const chartTheme = getChartTheme();
+  const chartTheme = useChartTheme();
   const { samples } = shapExplanation;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -135,7 +134,7 @@ export const ShapWaterfallView: React.FC<Props> = ({
               <ReferenceLine x={baseValue} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: 'Base', position: 'top', fontSize: 11, fill: chartTheme.axisColor }} />
               <ReferenceLine x={outputValue} stroke="#6366f1" strokeDasharray="3 3" label={{ value: 'Prediction', position: 'top', fontSize: 11, fill: chartTheme.axisColor }} />
               <Tooltip
-                contentStyle={getTooltipContentStyle()}
+                contentStyle={chartTheme.tooltipContentStyle}
                 formatter={(_value: number, _name: string, entry) => {
                   const row = entry?.payload as WaterfallRow | undefined;
                   if (!row) return ['', ''];

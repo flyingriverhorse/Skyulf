@@ -19,8 +19,7 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
-import { getChartTheme } from '../constants';
-import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
+import { useChartTheme } from '../../../core/hooks/useChartTheme';
 
 interface TimeSeriesTabProps {
     // Profile shape varies across EDA payloads; consumers read many
@@ -33,7 +32,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
     profile,
     downloadChart
 }) => {
-    const chartTheme = getChartTheme();
+    const chartTheme = useChartTheme();
     return (
         <div className="mt-4 space-y-6">
             {/* Trend Chart */}
@@ -84,7 +83,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             />
                             <YAxis tick={{ fill: chartTheme.axisColor }} />
                             <Tooltip
-                                contentStyle={getTooltipContentStyle()}
+                                contentStyle={chartTheme.tooltipContentStyle}
                                 labelStyle={{ color: '#9ca3af' }}
                             />
                             <Legend />
@@ -132,7 +131,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 <XAxis dataKey="day" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                                 <YAxis tick={{ fill: chartTheme.axisColor }} />
                                 <Tooltip
-                                    contentStyle={getTooltipContentStyle()}
+                                    contentStyle={chartTheme.tooltipContentStyle}
                                     cursor={{fill: 'transparent'}}
                                 />
                                 <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
@@ -165,7 +164,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             <XAxis dataKey="month" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                             <YAxis tick={{ fill: chartTheme.axisColor }} />
                             <Tooltip
-                                contentStyle={getTooltipContentStyle()}
+                                contentStyle={chartTheme.tooltipContentStyle}
                                 cursor={{fill: 'transparent'}}
                             />
                             <Bar dataKey="count" fill="#82ca9d" radius={[4, 4, 0, 0]} />
@@ -209,7 +208,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                     />
                                     <YAxis domain={[-1, 1]} tick={{ fill: chartTheme.axisColor }} />
                                     <Tooltip
-                                        contentStyle={getTooltipContentStyle()}
+                                        contentStyle={chartTheme.tooltipContentStyle}
                                         cursor={{fill: 'transparent'}}
                                         formatter={(value: number) => [value.toFixed(3), 'Correlation']}
                                     />
