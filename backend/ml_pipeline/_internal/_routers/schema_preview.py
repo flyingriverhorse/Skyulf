@@ -73,6 +73,40 @@ def _to_pipeline_config(model: PipelineConfigModel) -> PipelineConfig:
     )
 
 
+async def _resolve_data_source_row(session: AsyncSession, dataset_id: Any) -> DataSource | None:
+    """Look up a DataSource by integer id, falling back to source_id UUID lookup."""
+    try:
+        return await session.scalar(select(DataSource).where(DataSource.id == int(dataset_id)))
+    except (ValueError, TypeError):
+        # dataset_id is not an integer — try source_id UUID fallback
+        return await session.scalar(
+            select(DataSource).where(DataSource.source_id == str(dataset_id))
+        )
+
+
+async def _seed_loader_schema_for_node(
+    node: NodeConfig, session: AsyncSession
+) -> SkyulfSchema | None:
+    """Build the seeded schema for a single data_loader node, or None if it can't be seeded."""
+    raw = node.step_type
+    step = raw.value if hasattr(raw, "value") else str(raw)
+    if step != "data_loader":
+        return None
+    dataset_id = node.params.get("dataset_id")
+    if not dataset_id:
+        return None
+
+    row = await _resolve_data_source_row(session, dataset_id)
+    if row is None or not row.source_metadata:
+        return None
+
+    schema_meta: dict[str, str] = row.source_metadata.get("schema", {})
+    if not schema_meta:
+        return None
+
+    return SkyulfSchema.from_columns(list(schema_meta.keys()), dict(schema_meta))
+
+
 async def _seed_loader_schemas(
     config: PipelineConfig,
     session: AsyncSession,
@@ -88,26 +122,9 @@ async def _seed_loader_schemas(
     """
     seeds: dict[str, SkyulfSchema] = {}
     for node in config.nodes:
-        raw = node.step_type
-        step = raw.value if hasattr(raw, "value") else str(raw)
-        if step != "data_loader":
-            continue
-        dataset_id = node.params.get("dataset_id")
-        if not dataset_id:
-            continue
-        try:
-            row = await session.scalar(select(DataSource).where(DataSource.id == int(dataset_id)))
-        except (ValueError, TypeError):
-            # dataset_id is not an integer — try source_id UUID fallback
-            row = await session.scalar(
-                select(DataSource).where(DataSource.source_id == str(dataset_id))
-            )
-        if row is None or not row.source_metadata:
-            continue
-        schema_meta: dict[str, str] = row.source_metadata.get("schema", {})
-        if not schema_meta:
-            continue
-        seeds[node.node_id] = SkyulfSchema.from_columns(list(schema_meta.keys()), dict(schema_meta))
+        schema = await _seed_loader_schema_for_node(node, session)
+        if schema is not None:
+            seeds[node.node_id] = schema
     return seeds
 
 

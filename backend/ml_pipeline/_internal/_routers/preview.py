@@ -244,6 +244,59 @@ def _extract_preview_dict_train(
     return preview_data, totals, df_for_analysis
 
 
+def _load_target_artifact(
+    artifact_store: LocalArtifactStore, target_node_id: str | None
+) -> Any | None:
+    """Load the artifact for `target_node_id`, or None if there's nothing to preview."""
+    if not target_node_id or not artifact_store.exists(target_node_id):
+        return None
+    artifact = artifact_store.load(target_node_id)
+    logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
+    return artifact
+
+
+def _preview_frame_predicate(artifact: Any) -> bool:
+    """True when `artifact` is a polars or pandas DataFrame."""
+    return _is_polars_dataframe(artifact) or isinstance(artifact, pd.DataFrame)
+
+
+def _preview_frame_handler(artifact: Any) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
+    """Dispatch handler wrapping `_extract_preview_frame` with the polars flag re-derived."""
+    return _extract_preview_frame(artifact, _is_polars_dataframe(artifact))
+
+
+def _preview_xy_tuple_predicate(artifact: Any) -> bool:
+    """True when `artifact` is a raw (X, y) tuple."""
+    return isinstance(artifact, tuple) and len(artifact) == 2
+
+
+def _preview_dict_train_predicate(artifact: Any) -> bool:
+    """True when `artifact` is a dict keyed by split name with a train (X, y) tuple."""
+    return (
+        isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple)
+    )
+
+
+_PREVIEW_EXTRACTORS: list[
+    tuple[Callable[[Any], bool], Callable[[Any], tuple[Any, dict[str, int], pd.DataFrame | None]]]
+] = [
+    (_preview_frame_predicate, _preview_frame_handler),
+    (lambda artifact: isinstance(artifact, SplitDataset), _extract_preview_split),
+    (_preview_xy_tuple_predicate, _extract_preview_xy_tuple),
+    (_preview_dict_train_predicate, _extract_preview_dict_train),
+]
+
+
+def _dispatch_preview_extractor(
+    artifact: Any,
+) -> tuple[Any, dict[str, int], pd.DataFrame | None] | None:
+    """Route `artifact` to the extractor matching its type, or None if unsupported."""
+    for predicate, handler in _PREVIEW_EXTRACTORS:
+        if predicate(artifact):
+            return handler(artifact)
+    return None
+
+
 def _extract_preview(
     artifact_store: LocalArtifactStore, target_node_id: str | None
 ) -> tuple[Any, dict[str, int], pd.DataFrame | None]:
@@ -254,27 +307,14 @@ def _extract_preview(
     - a single int wrapped under the `_total` key when `preview_data`
       is a list (single-frame case).
     """
-    preview_data: Any = {}
-    totals: dict[str, int] = {}
-    df_for_analysis = None
-    if not target_node_id or not artifact_store.exists(target_node_id):
-        return preview_data, totals, df_for_analysis
+    empty_result: tuple[Any, dict[str, int], pd.DataFrame | None] = ({}, {}, None)
 
-    artifact = artifact_store.load(target_node_id)
-    logger.debug(f"Loaded artifact for node {target_node_id}. Type: {type(artifact)}")
+    artifact = _load_target_artifact(artifact_store, target_node_id)
+    if artifact is None:
+        return empty_result
 
-    is_polars = _is_polars_dataframe(artifact)
-
-    if is_polars or isinstance(artifact, pd.DataFrame):
-        return _extract_preview_frame(artifact, is_polars)
-    if isinstance(artifact, SplitDataset):
-        return _extract_preview_split(artifact)
-    if isinstance(artifact, tuple) and len(artifact) == 2:
-        return _extract_preview_xy_tuple(artifact)
-    if isinstance(artifact, dict) and "train" in artifact and isinstance(artifact["train"], tuple):
-        return _extract_preview_dict_train(artifact)
-
-    return preview_data, totals, df_for_analysis
+    result = _dispatch_preview_extractor(artifact)
+    return result if result is not None else empty_result
 
 
 def _build_preview_nodes(config_nodes: list[Any]) -> list[NodeConfig]:

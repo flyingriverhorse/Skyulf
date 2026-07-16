@@ -171,54 +171,53 @@ class DeploymentService:
         await session.commit()
 
     @staticmethod
+    def _resolve_predict_store_and_key_s3(uri: str) -> tuple[str, str]:
+        """Resolves an s3:// artifact URI into (store_uri, artifact_key)."""
+        if uri.endswith(".joblib"):
+            store_uri = uri.rsplit("/", 1)[0]
+            artifact_key = uri.rsplit("/", 1)[1].replace(".joblib", "")
+        else:
+            parts = uri.replace("s3://", "").split("/")
+            bucket = parts[0]
+            artifact_key = "/".join(parts[1:])
+            store_uri = f"s3://{bucket}"
+        return store_uri, artifact_key
+
+    @staticmethod
+    def _resolve_pipeline_node_path(pipeline_id: str, node_id: str) -> tuple[str, str]:
+        """Builds the default exports/models store path for a pipeline_id/node_id pair."""
+        store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
+        return store_uri, node_id
+
+    @staticmethod
+    def _resolve_predict_store_and_key_local(uri: str) -> tuple[str, str]:
+        """Resolves a local artifact path (absolute, relative, or bare "pipeline_id/node_id") into (store_uri, artifact_key)."""
+        if Path(uri).is_absolute():
+            return str(Path(uri).parent), Path(uri).name
+
+        if "/" in uri or "\\" in uri:
+            if not Path(uri).exists() and not Path(uri).parent.exists():
+                parts = uri.replace("\\", "/").split("/")
+                if len(parts) == 2:
+                    return DeploymentService._resolve_pipeline_node_path(parts[0], parts[1])
+                return str(Path(uri).parent), Path(uri).name
+            return str(Path(uri).parent), Path(uri).name
+
+        parts = uri.split("/")
+        if len(parts) >= 2:
+            return DeploymentService._resolve_pipeline_node_path(parts[0], parts[1])
+        raise ValueError(f"Invalid artifact URI format: {uri}")
+
+    @staticmethod
     def _resolve_predict_store_and_key(uri: str) -> tuple[str, str]:
         """Resolves an artifact URI into (store_uri, artifact_key) for the predict artifact loader.
 
         Handles S3 URIs (with or without a .joblib/.pkl suffix) and local paths
         (absolute, relative with a separator, or bare "pipeline_id/node_id" strings).
         """
-        store_uri = ""
-        artifact_key = ""
-
         if uri.startswith("s3://"):
-            if uri.endswith(".joblib"):
-                store_uri = uri.rsplit("/", 1)[0]
-                artifact_key = uri.rsplit("/", 1)[1].replace(".joblib", "")
-            else:
-                parts = uri.replace("s3://", "").split("/")
-                bucket = parts[0]
-                artifact_key = "/".join(parts[1:])
-                store_uri = f"s3://{bucket}"
-        else:
-            # Local path handling
-            if Path(uri).is_absolute():
-                store_uri = str(Path(uri).parent)
-                artifact_key = Path(uri).name
-            elif "/" in uri or "\\" in uri:
-                if not Path(uri).exists() and not Path(uri).parent.exists():
-                    parts = uri.replace("\\", "/").split("/")
-                    if len(parts) == 2:
-                        pipeline_id = parts[0]
-                        node_id = parts[1]
-                        store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
-                        artifact_key = node_id
-                    else:
-                        store_uri = str(Path(uri).parent)
-                        artifact_key = Path(uri).name
-                else:
-                    store_uri = str(Path(uri).parent)
-                    artifact_key = Path(uri).name
-            else:
-                parts = uri.split("/")
-                if len(parts) >= 2:
-                    pipeline_id = parts[0]
-                    node_id = parts[1]
-                    store_uri = str(Path.cwd() / "exports" / "models" / pipeline_id)
-                    artifact_key = node_id
-                else:
-                    raise ValueError(f"Invalid artifact URI format: {uri}")
-
-        return store_uri, artifact_key
+            return DeploymentService._resolve_predict_store_and_key_s3(uri)
+        return DeploymentService._resolve_predict_store_and_key_local(uri)
 
     @staticmethod
     def _load_predict_artifact(deployment: Deployment) -> Any:
@@ -487,6 +486,32 @@ class DeploymentService:
         return None
 
     @staticmethod
+    def _build_input_schema_from_artifact(artifact_uri: str) -> list[dict[str, str]] | None:
+        """Loads the artifact and extracts its input schema, unwrapping tuple artifacts first."""
+        artifact = DeploymentService._load_artifact_for_details(artifact_uri)
+        if not artifact:
+            return None
+
+        if isinstance(artifact, tuple) and len(artifact) >= 1:
+            artifact = artifact[0]
+
+        input_features = DeploymentService._extract_input_features(artifact)
+        if not input_features:
+            return None
+
+        return [{"name": str(f), "type": "unknown"} for f in input_features]
+
+    @staticmethod
+    async def _lookup_target_column(session: AsyncSession, job_id: Any) -> str | None:
+        """Looks up the job graph for a deployment's job and extracts its target column, if any."""
+        from backend.ml_pipeline._execution.jobs import JobManager
+
+        job = await JobManager.get_job(session, str(job_id))
+        if job and job.graph:
+            return DeploymentService._extract_target_column_from_graph(job.graph)
+        return None
+
+    @staticmethod
     async def get_deployment_details(
         session: AsyncSession, deployment: Deployment
     ) -> dict[str, Any]:
@@ -499,27 +524,15 @@ class DeploymentService:
 
         try:
             artifact_uri = str(deployment.artifact_uri)
-            artifact = DeploymentService._load_artifact_for_details(artifact_uri)
+            input_schema = DeploymentService._build_input_schema_from_artifact(artifact_uri)
+            if input_schema:
+                info["input_schema"] = input_schema
 
-            if artifact:
-                # Handle tuple
-                if isinstance(artifact, tuple) and len(artifact) >= 1:
-                    artifact = artifact[0]
-
-                input_features = DeploymentService._extract_input_features(artifact)
-                if input_features:
-                    info["input_schema"] = [
-                        {"name": str(f), "type": "unknown"} for f in input_features
-                    ]
-
-            # Extract Target Column from Job Graph
-            from backend.ml_pipeline._execution.jobs import JobManager
-
-            job = await JobManager.get_job(session, str(deployment.job_id))
-            if job and job.graph:
-                target_column = DeploymentService._extract_target_column_from_graph(job.graph)
-                if target_column is not None:
-                    info["target_column"] = target_column
+            target_column = await DeploymentService._lookup_target_column(
+                session, deployment.job_id
+            )
+            if target_column is not None:
+                info["target_column"] = target_column
 
         except Exception as e:
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
