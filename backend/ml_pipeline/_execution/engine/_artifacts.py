@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.modeling._explainability import compute_shap_summary
+from skyulf.modeling._explainability import compute_shap_explanation
 
 if TYPE_CHECKING:
     from ...artifacts.store import ArtifactStore
@@ -103,24 +103,28 @@ class ArtifactsMixin:
             return None
         return train_df.drop(columns=[target_col], errors="ignore")
 
-    def _extract_shap_summary(
+    def _extract_shap_explanation(
         self, model: Any, data: Any, target_col: str, max_samples: int = 200
-    ) -> dict[str, float] | None:
-        """Compute a mean(|SHAP value|) summary per feature for a trained model.
+    ) -> dict[str, Any] | None:
+        """Compute a SHAP explanation for a trained model.
 
         Resolves the pipeline-specific data shape (`SplitDataset`, `(X, y)`
         tuple, or plain DataFrame) into a feature-only DataFrame, then
         delegates the actual SHAP computation to
-        :func:`skyulf.modeling._explainability.compute_shap_summary`.
+        :func:`skyulf.modeling._explainability.compute_shap_explanation`.
         Best-effort: returns `None` if `shap` isn't installed, the model
         type is unsupported, or computation fails for any reason.
+
+        Returns a dict with `feature_names`, `mean_abs_importance` (for the
+        cross-run comparison bar chart) and `samples` (per-row feature/SHAP
+        values for beeswarm, dependence, and waterfall plots of a single run).
         """
         X = self._shap_input_frame(data, target_col)
         if X is None:
             return None
 
         actual_model = model[0] if isinstance(model, tuple) else model
-        return compute_shap_summary(actual_model, X, max_samples=max_samples)
+        return compute_shap_explanation(actual_model, X, max_samples=max_samples)
 
     def _finalize_training_artifacts(
         self, data: Any, job_id: str, target_col: str, node_id: str, model_artifact: Any

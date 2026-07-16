@@ -97,7 +97,7 @@ export const ShapSummaryView: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">SHAP Explainability</h3>
+        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">SHAP Summary — All Runs</h3>
         <InfoTooltip
           text="Top 15 features by average mean(|SHAP value|) across the selected runs. Values are normalised per-run (each run's largest feature = 1.0) so runs with different output scales can be compared. Higher bar = stronger average impact on the model's prediction within that run."
           align="center"

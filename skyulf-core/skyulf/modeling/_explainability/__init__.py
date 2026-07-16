@@ -1,7 +1,7 @@
 """Explainability module for Skyulf models."""
 
-from .shap_summary import compute_shap_summary
+from .shap_explanation import compute_shap_explanation
 
 __all__ = [
-    "compute_shap_summary",
+    "compute_shap_explanation",
 ]
