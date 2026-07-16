@@ -548,6 +548,30 @@ class DataTypeConverter:
     """Utility class for data type conversions and validations."""
 
     @staticmethod
+    @staticmethod
+    def _infer_object_column_type(series: pd.Series) -> str:
+        """Infer the semantic type of an object-dtype column (dates, numeric/boolean strings, or text)."""
+        non_null = series.dropna()
+        if non_null.apply(lambda x: isinstance(x, (datetime, date))).all():
+            return "datetime"
+        if non_null.str.match(r"^-?\d+\.?\d*$").all():
+            return "numeric_string"
+        if non_null.str.lower().isin(["true", "false", "yes", "no", "1", "0"]).all():
+            return "boolean_string"
+        return "text"
+
+    @staticmethod
+    def _infer_non_object_column_type(series: pd.Series) -> str:
+        """Infer the semantic type of a non-object-dtype column based on its pandas dtype."""
+        if pd.api.types.is_numeric_dtype(series):
+            return "integer" if pd.api.types.is_integer_dtype(series) else "float"
+        if pd.api.types.is_datetime64_any_dtype(series):
+            return "datetime"
+        if pd.api.types.is_bool_dtype(series):
+            return "boolean"
+        return str(series.dtype)
+
+    @staticmethod
     def infer_column_types(df: pd.DataFrame) -> dict[str, str]:
         """
         Infer semantic data types for DataFrame columns.
@@ -565,32 +589,26 @@ class DataTypeConverter:
             col_str = str(col)
 
             if series.dtype == "object":
-                # Check for dates
-                if series.dropna().apply(lambda x: isinstance(x, (datetime, date))).all():
-                    type_mapping[col_str] = "datetime"
-                # Check for numeric strings
-                elif series.dropna().str.match(r"^-?\d+\.?\d*$").all():
-                    type_mapping[col_str] = "numeric_string"
-                # Check for boolean-like strings
-                elif (
-                    series.dropna().str.lower().isin(["true", "false", "yes", "no", "1", "0"]).all()
-                ):
-                    type_mapping[col_str] = "boolean_string"
-                else:
-                    type_mapping[col_str] = "text"
-            elif pd.api.types.is_numeric_dtype(series):
-                if pd.api.types.is_integer_dtype(series):
-                    type_mapping[col_str] = "integer"
-                else:
-                    type_mapping[col_str] = "float"
-            elif pd.api.types.is_datetime64_any_dtype(series):
-                type_mapping[col_str] = "datetime"
-            elif pd.api.types.is_bool_dtype(series):
-                type_mapping[col_str] = "boolean"
+                type_mapping[col_str] = DataTypeConverter._infer_object_column_type(series)
             else:
-                type_mapping[col_str] = str(series.dtype)
+                type_mapping[col_str] = DataTypeConverter._infer_non_object_column_type(series)
 
         return type_mapping
+
+    @staticmethod
+    def _convert_column(series: pd.Series, target_type: str) -> pd.Series:
+        """Convert a single column to the requested target type, returning it unchanged if unrecognized."""
+        if target_type == "integer":
+            return pd.to_numeric(series, errors="coerce").astype("Int64")
+        elif target_type == "float":
+            return pd.to_numeric(series, errors="coerce")
+        elif target_type == "datetime":
+            return pd.to_datetime(series, errors="coerce")
+        elif target_type == "boolean":
+            return series.astype("boolean")
+        elif target_type == "text":
+            return series.astype("string")
+        return series
 
     @staticmethod
     async def convert_dataframe_types(
@@ -613,17 +631,7 @@ class DataTypeConverter:
                 continue
 
             try:
-                if target_type == "integer":
-                    result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype("Int64")
-                elif target_type == "float":
-                    result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
-                elif target_type == "datetime":
-                    result_df[col] = pd.to_datetime(result_df[col], errors="coerce")
-                elif target_type == "boolean":
-                    result_df[col] = result_df[col].astype("boolean")
-                elif target_type == "text":
-                    result_df[col] = result_df[col].astype("string")
-
+                result_df[col] = DataTypeConverter._convert_column(result_df[col], target_type)
             except Exception as e:
                 logger.warning(f"Failed to convert column {col} to {target_type}: {e}")
 

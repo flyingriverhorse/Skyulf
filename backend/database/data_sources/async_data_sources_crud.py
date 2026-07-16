@@ -160,6 +160,58 @@ async def read(
         raise RuntimeError(f"Unsupported primary database: {primary_db}")
 
 
+def _normalize_filter(filter_dict: dict[str, Any] | None) -> dict[str, Any]:
+    """Normalize a data_sources filter dict, mapping the legacy 'source_id' key to 'id'."""
+    normalized: dict[str, Any] = {}
+    for k, v in (filter_dict or {}).items():
+        normalized["id" if k == "source_id" else k] = v
+    return normalized
+
+
+def _get_db_peers(settings: Settings) -> tuple[Any, Any, str, str]:
+    """Resolve the (primary_module, secondary_module, primary_name, secondary_name) peers.
+
+    Raises RuntimeError if the configured primary database is unsupported.
+    """
+    primary_db = get_primary_database(settings)
+    peers = _DB_PEERS.get(primary_db)
+    if peers is None:
+        raise RuntimeError(f"Unsupported primary database: {primary_db}")
+    return peers
+
+
+async def _update_primary(
+    primary_mod: Any,
+    primary_name: str,
+    settings: Settings,
+    filter_dict: dict[str, Any],
+    update_data: dict[str, Any],
+):
+    """Update the primary database, raising RuntimeError if the update fails."""
+    try:
+        rows = await primary_mod.update_data_source(settings, filter_dict, update_data)
+        logger.info(f"Successfully updated data source in {primary_name} (primary): {filter_dict}")
+        return rows
+    except Exception:
+        logger.exception(f"{primary_name} update failed for data_sources")
+        raise RuntimeError(f"Failed to update in primary database ({primary_name})") from None
+
+
+async def _sync_secondary_update(
+    secondary_mod: Any,
+    secondary_name: str,
+    settings: Settings,
+    filter_dict: dict[str, Any],
+    update_data: dict[str, Any],
+) -> None:
+    """Best-effort sync of an update to the secondary database; failures are logged, not raised."""
+    try:
+        await secondary_mod.update_data_source(settings, filter_dict, update_data)
+        logger.info(f"Successfully synced update to {secondary_name} (secondary): {filter_dict}")
+    except Exception:
+        logger.warning(f"Failed to sync update to {secondary_name} (non-critical): {filter_dict}")
+
+
 async def update(settings: Settings, filter_dict: dict[str, Any], update_data: dict[str, Any]):
     """Update data sources with configurable primary database.
 
@@ -167,58 +219,38 @@ async def update(settings: Settings, filter_dict: dict[str, Any], update_data: d
     1) Update primary database (SQLite or PostgreSQL)
     2) Optionally sync to secondary database if available (best-effort, non-blocking)
     """
+    filter_dict = _normalize_filter(filter_dict)
+    primary_mod, secondary_mod, primary_name, secondary_name = _get_db_peers(settings)
 
-    # Normalize filter (map 'source_id' -> 'id')
-    if filter_dict is None:
-        filter_dict = {}
-    normalized_filter = {}
-    for k, v in (filter_dict or {}).items():
-        if k == "source_id":
-            normalized_filter["id"] = v
-        else:
-            normalized_filter[k] = v
-    filter_dict = normalized_filter
+    rows = await _update_primary(primary_mod, primary_name, settings, filter_dict, update_data)
+    await _sync_secondary_update(secondary_mod, secondary_name, settings, filter_dict, update_data)
+    return rows
 
-    primary_db = get_primary_database(settings)
 
-    if primary_db == "sqlite":
-        # Primary update in SQLite
-        try:
-            sqlite_rows = await sqlite_q.update_data_source(settings, filter_dict, update_data)
-            logger.info(f"Successfully updated data source in SQLite (primary): {filter_dict}")
-        except Exception:
-            logger.exception("SQLite update failed for data_sources")
-            raise RuntimeError("Failed to update in primary database (SQLite)") from None
+async def _delete_primary(
+    primary_mod: Any, primary_name: str, settings: Settings, filter_dict: dict[str, Any]
+):
+    """Delete from the primary database, raising RuntimeError if the delete fails."""
+    try:
+        rows = await primary_mod.delete_data_source(settings, filter_dict)
+        logger.info(
+            f"Successfully deleted data source from {primary_name} (primary): {filter_dict}"
+        )
+        return rows
+    except Exception:
+        logger.exception(f"{primary_name} delete failed for data_sources")
+        raise RuntimeError(f"Failed to delete from primary database ({primary_name})") from None
 
-        # Optional PostgreSQL sync (best-effort, non-blocking)
-        try:
-            await pg_q.update_data_source(settings, filter_dict, update_data)
-            logger.info(f"Successfully synced update to PostgreSQL (secondary): {filter_dict}")
-        except Exception:
-            logger.warning(f"Failed to sync update to PostgreSQL (non-critical): {filter_dict}")
 
-        return sqlite_rows
-
-    elif primary_db == "postgres":
-        # Primary update in PostgreSQL
-        try:
-            pg_rows = await pg_q.update_data_source(settings, filter_dict, update_data)
-            logger.info(f"Successfully updated data source in PostgreSQL (primary): {filter_dict}")
-        except Exception:
-            logger.exception("PostgreSQL update failed for data_sources")
-            raise RuntimeError("Failed to update in primary database (PostgreSQL)") from None
-
-        # Optional SQLite sync (best-effort, non-blocking)
-        try:
-            await sqlite_q.update_data_source(settings, filter_dict, update_data)
-            logger.info(f"Successfully synced update to SQLite (secondary): {filter_dict}")
-        except Exception:
-            logger.warning(f"Failed to sync update to SQLite (non-critical): {filter_dict}")
-
-        return pg_rows
-
-    else:
-        raise RuntimeError(f"Unsupported primary database: {primary_db}")
+async def _sync_secondary_delete(
+    secondary_mod: Any, secondary_name: str, settings: Settings, filter_dict: dict[str, Any]
+) -> None:
+    """Best-effort sync of a delete to the secondary database; failures are logged, not raised."""
+    try:
+        await secondary_mod.delete_data_source(settings, filter_dict)
+        logger.info(f"Successfully synced delete to {secondary_name} (secondary): {filter_dict}")
+    except Exception:
+        logger.warning(f"Failed to sync delete to {secondary_name} (non-critical): {filter_dict}")
 
 
 async def delete(settings: Settings, filter_dict: dict[str, Any]):
@@ -228,60 +260,23 @@ async def delete(settings: Settings, filter_dict: dict[str, Any]):
     1) Delete from primary database (SQLite or PostgreSQL)
     2) Optionally sync to secondary database if available (best-effort, non-blocking)
     """
+    filter_dict = _normalize_filter(filter_dict)
+    primary_mod, secondary_mod, primary_name, secondary_name = _get_db_peers(settings)
 
-    # Normalize filter (map 'source_id' -> 'id')
-    if filter_dict is None:
-        filter_dict = {}
-    normalized_filter = {}
-    for k, v in (filter_dict or {}).items():
-        if k == "source_id":
-            normalized_filter["id"] = v
-        else:
-            normalized_filter[k] = v
-    filter_dict = normalized_filter
+    rows = await _delete_primary(primary_mod, primary_name, settings, filter_dict)
+    await _sync_secondary_delete(secondary_mod, secondary_name, settings, filter_dict)
+    return rows
 
-    primary_db = get_primary_database(settings)
 
-    if primary_db == "sqlite":
-        # Primary delete from SQLite
-        try:
-            sqlite_rows = await sqlite_q.delete_data_source(settings, filter_dict)
-            logger.info(f"Successfully deleted data source from SQLite (primary): {filter_dict}")
-        except Exception:
-            logger.exception("SQLite delete failed for data_sources")
-            raise RuntimeError("Failed to delete from primary database (SQLite)") from None
-
-        # Optional PostgreSQL sync (best-effort, non-blocking)
-        try:
-            await pg_q.delete_data_source(settings, filter_dict)
-            logger.info(f"Successfully synced delete to PostgreSQL (secondary): {filter_dict}")
-        except Exception:
-            logger.warning(f"Failed to sync delete to PostgreSQL (non-critical): {filter_dict}")
-
-        return sqlite_rows
-
-    elif primary_db == "postgres":
-        # Primary delete from PostgreSQL
-        try:
-            pg_rows = await pg_q.delete_data_source(settings, filter_dict)
-            logger.info(
-                f"Successfully deleted data source from PostgreSQL (primary): {filter_dict}"
-            )
-        except Exception:
-            logger.exception("PostgreSQL delete failed for data_sources")
-            raise RuntimeError("Failed to delete from primary database (PostgreSQL)") from None
-
-        # Optional SQLite sync (best-effort, non-blocking)
-        try:
-            await sqlite_q.delete_data_source(settings, filter_dict)
-            logger.info(f"Successfully synced delete to SQLite (secondary): {filter_dict}")
-        except Exception:
-            logger.warning(f"Failed to sync delete to SQLite (non-critical): {filter_dict}")
-
-        return pg_rows
-
-    else:
-        raise RuntimeError(f"Unsupported primary database: {primary_db}")
+async def _lookup_by_hash(
+    mod: Any, mod_label: str, settings: Settings, file_hash: str
+) -> dict[str, Any] | None:
+    """Try a file-hash lookup against `mod`; return None (and log a warning) on failure."""
+    try:
+        return await mod.select_data_source_by_file_hash(settings, file_hash)
+    except Exception:
+        logger.warning(f"{mod_label} file-hash lookup failed", exc_info=True)
+        return None
 
 
 async def get_by_file_hash(settings: Settings, file_hash: str) -> dict[str, Any] | None:
@@ -289,38 +284,13 @@ async def get_by_file_hash(settings: Settings, file_hash: str) -> dict[str, Any]
     if not file_hash:
         return None
 
-    primary_db = get_primary_database(settings)
+    primary_mod, secondary_mod, primary_name, secondary_name = _get_db_peers(settings)
 
-    if primary_db == "sqlite":
-        try:
-            row = await sqlite_q.select_data_source_by_file_hash(settings, file_hash)
-            if row:
-                return row
-        except Exception:
-            logger.warning("Primary SQLite file-hash lookup failed", exc_info=True)
+    row = await _lookup_by_hash(primary_mod, f"Primary {primary_name}", settings, file_hash)
+    if row:
+        return row
 
-        try:
-            return await pg_q.select_data_source_by_file_hash(settings, file_hash)
-        except Exception:
-            logger.warning("Secondary PostgreSQL file-hash lookup failed", exc_info=True)
-            return None
-
-    elif primary_db == "postgres":
-        try:
-            row = await pg_q.select_data_source_by_file_hash(settings, file_hash)
-            if row:
-                return row
-        except Exception:
-            logger.warning("Primary PostgreSQL file-hash lookup failed", exc_info=True)
-
-        try:
-            return await sqlite_q.select_data_source_by_file_hash(settings, file_hash)
-        except Exception:
-            logger.warning("Secondary SQLite file-hash lookup failed", exc_info=True)
-            return None
-
-    else:
-        raise RuntimeError(f"Unsupported primary database: {primary_db}")
+    return await _lookup_by_hash(secondary_mod, f"Secondary {secondary_name}", settings, file_hash)
 
 
 async def migrate_to_postgres(settings: Settings) -> dict[str, int]:

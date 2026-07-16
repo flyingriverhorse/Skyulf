@@ -43,6 +43,15 @@ class DatabaseType:
     SNOWFLAKE = "snowflake"
 
 
+# Maps DB type -> tuple of recognized URL prefixes, checked in order.
+_URL_PREFIX_TYPES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    (DatabaseType.POSTGRES, ("postgresql://", "postgresql+asyncpg://")),
+    (DatabaseType.SQLITE, ("sqlite://", "sqlite+aiosqlite://")),
+    (DatabaseType.MYSQL, ("mysql://", "mysql+aiomysql://")),
+    (DatabaseType.MONGODB, ("mongodb://", "mongodb+srv://")),
+)
+
+
 def get_db_type_from_url(database_url: str) -> str:
     """
     Extract database type from connection URL.
@@ -53,19 +62,15 @@ def get_db_type_from_url(database_url: str) -> str:
     Returns:
         str: Database type identifier
     """
-    if database_url.startswith("postgresql://") or database_url.startswith("postgresql+asyncpg://"):
-        return DatabaseType.POSTGRES
-    elif database_url.startswith("sqlite://") or database_url.startswith("sqlite+aiosqlite://"):
-        return DatabaseType.SQLITE
-    elif database_url.startswith("mysql://") or database_url.startswith("mysql+aiomysql://"):
-        return DatabaseType.MYSQL
-    elif database_url.startswith("mongodb://") or database_url.startswith("mongodb+srv://"):
-        return DatabaseType.MONGODB
-    elif "snowflake" in database_url.lower():
+    for db_type, prefixes in _URL_PREFIX_TYPES:
+        if database_url.startswith(prefixes):
+            return db_type
+
+    if "snowflake" in database_url.lower():
         return DatabaseType.SNOWFLAKE
-    else:
-        # Default fallback
-        return DatabaseType.SQLITE
+
+    # Default fallback
+    return DatabaseType.SQLITE
 
 
 def get_db_type(settings: Settings) -> str:
