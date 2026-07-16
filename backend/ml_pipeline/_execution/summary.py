@@ -287,6 +287,75 @@ def _loader_or_snapshot(out: pd.DataFrame) -> str:
     return f"{head} ({breakdown})" if breakdown else head
 
 
+def _scale_same_shape_label(step_type: Any, out_cols: int, params: Mapping[str, Any]) -> str:
+    """Same-shape phrasing for the ``scale`` family."""
+    return f"{_scaler_label(step_type)} · {out_cols} cols"
+
+
+def _impute_same_shape_label(step_type: Any, out_cols: int, params: Mapping[str, Any]) -> str:
+    """Same-shape phrasing for the ``impute`` family."""
+    strat = _strategy_label(params, "strategy", "method")
+    base = f"{strat} imputer" if strat else "imputed"
+    return f"{base} · {out_cols} cols"
+
+
+def _bin_same_shape_label(step_type: Any, out_cols: int, params: Mapping[str, Any]) -> str:
+    """Same-shape phrasing for the ``bin`` family."""
+    n = params.get("n_bins") or params.get("bins")
+    head = f"binned ({n} bins)" if isinstance(n, int) else "binned"
+    return f"{head} · {out_cols} cols"
+
+
+def _replace_same_shape_label(step_type: Any, out_cols: int, params: Mapping[str, Any]) -> str:
+    """Same-shape phrasing for the ``replace`` family."""
+    return f"cleaned · {out_cols} cols"
+
+
+def _encode_same_shape_label(step_type: Any, out_cols: int, params: Mapping[str, Any]) -> str:
+    """Same-shape phrasing for the ``encode`` family."""
+    return f"encoded · {out_cols} cols"
+
+
+# Family → same-shape renderer. Mirrors the family-renderer registry below —
+# a one-line table edit instead of a growing if/elif chain.
+_SAME_SHAPE_RENDERERS: dict[str, Callable[[Any, int, Mapping[str, Any]], str]] = {
+    "scale": _scale_same_shape_label,
+    "impute": _impute_same_shape_label,
+    "bin": _bin_same_shape_label,
+    "replace": _replace_same_shape_label,
+    "encode": _encode_same_shape_label,
+}
+
+
+def _same_shape_label(
+    family: str, step_type: Any, out_cols: int, params: Mapping[str, Any]
+) -> str | None:
+    """Name what a same-shape transform did, with strategy detail when known.
+
+    Returns ``None`` when ``family`` has no dedicated same-shape phrasing.
+    """
+    renderer = _SAME_SHAPE_RENDERERS.get(family)
+    if renderer is None:
+        return None
+    return renderer(step_type, out_cols, params)
+
+
+def _delta_baseline_phrase(
+    family: str, in_shape: tuple[int, int], out_shape: tuple[int, int]
+) -> str | None:
+    """Render a row/col delta phrase when a baseline shape is available.
+
+    Returns ``None`` when there is no baseline delta (same shape).
+    """
+    delta = _delta_phrase(in_shape, out_shape)
+    if not delta:
+        return None
+    out_cols = out_shape[1]
+    if family in {"select", "encode", "generate", "bin"}:
+        return f"{delta} → {out_cols} cols"
+    return delta
+
+
 def _frame_branch(
     family: str,
     step_type: Any,
@@ -304,27 +373,14 @@ def _frame_branch(
 
     # Prefer a row/col delta when we have a baseline.
     if in_shape is not None:
-        delta = _delta_phrase(in_shape, out.shape)
+        delta = _delta_baseline_phrase(family, in_shape, out.shape)
         if delta:
-            if family in {"select", "encode", "generate", "bin"}:
-                return f"{delta} → {out_cols} cols"
             return delta
 
         # Same shape — name what we did, with strategy detail when known.
-        if family == "scale":
-            return f"{_scaler_label(step_type)} · {out_cols} cols"
-        if family == "impute":
-            strat = _strategy_label(params, "strategy", "method")
-            base = f"{strat} imputer" if strat else "imputed"
-            return f"{base} · {out_cols} cols"
-        if family == "bin":
-            n = params.get("n_bins") or params.get("bins")
-            head = f"binned ({n} bins)" if isinstance(n, int) else "binned"
-            return f"{head} · {out_cols} cols"
-        if family == "replace":
-            return f"cleaned · {out_cols} cols"
-        if family == "encode":
-            return f"encoded · {out_cols} cols"
+        same_shape = _same_shape_label(family, step_type, out_cols, params)
+        if same_shape is not None:
+            return same_shape
 
     # No baseline available — fall back to plain shape line.
     return f"{_fmt_int(out_rows)} rows × {out_cols} cols"
@@ -393,21 +449,8 @@ def _gap_suffix(test_v: float, train_v: float | None, higher_is_better: bool) ->
     return f" · ▲{diff:.2f}"
 
 
-def _training_summary(metrics: Mapping[str, Any]) -> str | None:
-    """Build the headline metric line for a trained model.
-
-    Strategy: probe for classification metrics first (acc / f1 / auc),
-    then regression (r² / rmse / mae). For each headline, append a
-    train→test overfit gap badge when both splits exist and the gap is
-    meaningful (≥ 0.05).
-    """
-    inner: Mapping[str, Any]
-    nested = metrics.get("metrics") if isinstance(metrics, Mapping) else None
-    inner = nested if isinstance(nested, Mapping) else metrics
-    if not isinstance(inner, Mapping):
-        return None
-
-    # ---- Classification ----
+def _classification_headline(inner: Mapping[str, Any]) -> str | None:
+    """Build the classification headline (acc / f1 / auc), or ``None`` if absent."""
     acc = _first_finite(inner, _expand("accuracy"))
     f1 = _first_finite(inner, _F1_KEYS)
     if acc is not None and f1 is not None:
@@ -419,8 +462,11 @@ def _training_summary(metrics: Mapping[str, Any]) -> str | None:
     auc = _first_finite(inner, _AUC_KEYS)
     if auc is not None:
         return f"auc {auc:.2f}"
+    return None
 
-    # ---- Regression ----
+
+def _regression_headline(inner: Mapping[str, Any]) -> str | None:
+    """Build the regression headline (r² / rmse / mae / mse), or ``None`` if absent."""
     r2 = _first_finite(inner, _R2_KEYS)
     rmse = _first_finite(inner, _RMSE_KEYS)
     if r2 is not None and rmse is not None:
@@ -435,8 +481,28 @@ def _training_summary(metrics: Mapping[str, Any]) -> str | None:
     mse = _first_finite(inner, _MSE_KEYS)
     if mse is not None:
         return f"mse {mse:.3g}"
-
     return None
+
+
+def _training_summary(metrics: Mapping[str, Any]) -> str | None:
+    """Build the headline metric line for a trained model.
+
+    Strategy: probe for classification metrics first (acc / f1 / auc),
+    then regression (r² / rmse / mae). For each headline, append a
+    train→test overfit gap badge when both splits exist and the gap is
+    meaningful (≥ 0.05).
+    """
+    inner: Mapping[str, Any]
+    nested = metrics.get("metrics") if isinstance(metrics, Mapping) else None
+    inner = nested if isinstance(nested, Mapping) else metrics
+    if not isinstance(inner, Mapping):
+        return None
+
+    classification = _classification_headline(inner)
+    if classification is not None:
+        return classification
+
+    return _regression_headline(inner)
 
 
 # Short labels used in the tuning headline. Mirrors what the JobsDrawer
@@ -467,6 +533,32 @@ _SCORING_LABEL: dict[str, str] = {
 }
 
 
+def _n_trials(metrics: Mapping[str, Any]) -> int | None:
+    """Return the trial count from either a list of trials or an int field."""
+    trials = metrics.get("trials")
+    if isinstance(trials, list):
+        return len(trials)
+    if isinstance(trials, int):
+        return trials
+    return None
+
+
+def _best_score_headline(metrics: Mapping[str, Any], n_trials: int | None) -> str | None:
+    """Render the "<label> <value>" headline from ``best_score``, or ``None`` if absent."""
+    best = metrics.get("best_score")
+    if not isinstance(best, (int, float)) or isinstance(best, bool):
+        return None
+    scoring_raw = str(metrics.get("scoring_metric") or "").strip()
+    # Most sklearn losses are reported as `neg_*` (higher is better).
+    # Flip the sign so the card shows the natural magnitude.
+    value = float(best)
+    if scoring_raw.startswith("neg_") and value <= 0:
+        value = -value
+    label = _SCORING_LABEL.get(scoring_raw) or (scoring_raw.replace("_", " ") or "score")
+    head = f"{label} {value:.3f}"
+    return f"{head} · {n_trials} trials" if n_trials else head
+
+
 def _tuning_summary(metrics: Mapping[str, Any]) -> str | None:
     """Hyperparameter-tuning summary.
 
@@ -483,24 +575,11 @@ def _tuning_summary(metrics: Mapping[str, Any]) -> str | None:
     Falls back to the eval headline when no ``best_score`` is present
     (e.g. legacy job rows), then to nothing.
     """
-    trials = metrics.get("trials")
-    n_trials: int | None = None
-    if isinstance(trials, list):
-        n_trials = len(trials)
-    elif isinstance(trials, int):
-        n_trials = trials
+    n_trials = _n_trials(metrics)
 
-    best = metrics.get("best_score")
-    if isinstance(best, (int, float)) and not isinstance(best, bool):
-        scoring_raw = str(metrics.get("scoring_metric") or "").strip()
-        # Most sklearn losses are reported as `neg_*` (higher is better).
-        # Flip the sign so the card shows the natural magnitude.
-        value = float(best)
-        if scoring_raw.startswith("neg_") and value <= 0:
-            value = -value
-        label = _SCORING_LABEL.get(scoring_raw) or (scoring_raw.replace("_", " ") or "score")
-        head = f"{label} {value:.3f}"
-        return f"{head} · {n_trials} trials" if n_trials else head
+    headline = _best_score_headline(metrics, n_trials)
+    if headline is not None:
+        return headline
 
     # Legacy fallback: no best_score recorded — use eval headline.
     base = _training_summary(metrics)

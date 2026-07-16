@@ -92,13 +92,10 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         if self.log_callback:
             self.log_callback(message)
 
-    def run(
-        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
-    ) -> PipelineExecutionResult:
-        """
-        Executes the pipeline defined by the configuration.
-        """
-        self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+    def _init_run_state(
+        self, config: PipelineConfig, dataset_name: str
+    ) -> tuple[datetime, PipelineExecutionResult]:
+        """Reset per-run engine state and build the optimistic result shell."""
         self.dataset_name = dataset_name
         start_time = datetime.now(UTC)
         self.executed_transformers = []  # Reset for new run
@@ -106,7 +103,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
         # Per-run merge advisories surfaced to API/UI so the user understands
         # what fan-in semantics were applied (column union, last-wins, etc.).
-        self.merge_warnings: list[dict[str, Any]] = []
+        self.merge_warnings = []
 
         self._current_pipeline_id = config.pipeline_id
         pipeline_result = PipelineExecutionResult(
@@ -114,19 +111,16 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             status="success",  # Optimistic default
             start_time=start_time,
         )
+        return start_time, pipeline_result
 
-        # C7 Phase B: walk the topology once and ask each Calculator's
-        # ``infer_output_schema`` what its output columns/dtypes will be.
-        # Pure addition — does not change runtime behaviour. Loaders are
-        # opaque without a catalog seed, so downstream entries will be
-        # ``None`` until Phase C wires in dataset-catalog seeding.
-        pipeline_result.predicted_schemas = self._predict_schemas_safe(config)
+    def _run_node_loop(
+        self, config: PipelineConfig, job_id: str, pipeline_result: PipelineExecutionResult
+    ) -> None:
+        """Execute each node in order, updating `pipeline_result` in place.
 
-        # Capture per-node `logger.warning(...)` calls (e.g. TargetEncoder
-        # coercion notices, OneHotEncoder degenerate-category warnings) so
-        # the UI can surface them as toasts / a notification panel instead
-        # of silently dropping them in the server log. Tagged with the
-        # currently-executing node id via `set_current_node`.
+        Captures per-node warnings via `WarningCaptureHandler` and stops at
+        the first failed/erroring node, marking the pipeline as failed.
+        """
         warn_handler = WarningCaptureHandler().attach()
         try:
             for node in config.nodes:
@@ -158,12 +152,15 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             pipeline_result.node_warnings = warn_handler.drain()
             warn_handler.detach()
 
-        pipeline_result.end_time = datetime.now(UTC)
-        # Dedup advisories: a merge node executed in multiple branches/parts
-        # (e.g. FeatureTargetSplit hit once per parallel branch) re-appends
-        # the same advisory each pass. Collapse on (node_id, kind, inputs,
-        # overlap_columns, dropped_columns, part) so the UI shows one row
-        # per logically distinct merge instead of N copies.
+    def _dedup_merge_warnings(self) -> list[dict[str, Any]]:
+        """Collapse repeated merge advisories from multi-pass branch execution.
+
+        A merge node executed in multiple branches/parts (e.g.
+        FeatureTargetSplit hit once per parallel branch) re-appends the same
+        advisory each pass. Collapse on (node_id, kind, inputs,
+        overlap_columns, dropped_columns, part) so the UI shows one row per
+        logically distinct merge instead of N copies.
+        """
         seen_keys: set = set()
         deduped: list[dict[str, Any]] = []
         for w in self.merge_warnings:
@@ -179,7 +176,33 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 continue
             seen_keys.add(key)
             deduped.append(w)
-        pipeline_result.merge_warnings = deduped
+        return deduped
+
+    def run(
+        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
+    ) -> PipelineExecutionResult:
+        """
+        Executes the pipeline defined by the configuration.
+        """
+        self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+        _, pipeline_result = self._init_run_state(config, dataset_name)
+
+        # C7 Phase B: walk the topology once and ask each Calculator's
+        # ``infer_output_schema`` what its output columns/dtypes will be.
+        # Pure addition — does not change runtime behaviour. Loaders are
+        # opaque without a catalog seed, so downstream entries will be
+        # ``None`` until Phase C wires in dataset-catalog seeding.
+        pipeline_result.predicted_schemas = self._predict_schemas_safe(config)
+
+        # Capture per-node `logger.warning(...)` calls (e.g. TargetEncoder
+        # coercion notices, OneHotEncoder degenerate-category warnings) so
+        # the UI can surface them as toasts / a notification panel instead
+        # of silently dropping them in the server log. Tagged with the
+        # currently-executing node id via `set_current_node`.
+        self._run_node_loop(config, job_id, pipeline_result)
+
+        pipeline_result.end_time = datetime.now(UTC)
+        pipeline_result.merge_warnings = self._dedup_merge_warnings()
         return pipeline_result
 
     def _dispatch_node(self, node: NodeConfig, job_id: str) -> tuple[str | None, dict[str, Any]]:

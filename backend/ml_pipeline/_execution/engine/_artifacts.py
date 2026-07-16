@@ -33,20 +33,27 @@ class ArtifactsMixin:
     dataset_name: str | None
     log: Callable[[str], None]
 
+    def _feature_names_from_split_train(self, train: Any, target_col: str) -> list[str]:
+        """Resolve feature names from the `.train` side of a split dataset."""
+        if isinstance(train, pd.DataFrame):
+            return [c for c in train.columns if c != target_col]
+        if isinstance(train, tuple) and len(train) >= 1 and hasattr(train[0], "columns"):
+            return list(train[0].columns)
+        return []
+
+    def _feature_names_from_tuple(self, data: Any) -> list[str]:
+        """Resolve feature names from an (X, y)-style tuple, or `[]` if not shaped that way."""
+        if isinstance(data, tuple) and len(data) >= 1 and hasattr(data[0], "columns"):
+            return list(data[0].columns)
+        return []
+
     def _feature_names_for_importance(self, data: Any, target_col: str) -> list[str]:
         """Resolve the feature column names for `data`, excluding the target column."""
         if isinstance(data, pd.DataFrame):
             return [c for c in data.columns if c != target_col]
         if hasattr(data, "train"):
-            train = data.train
-            if isinstance(train, pd.DataFrame):
-                return [c for c in train.columns if c != target_col]
-            if isinstance(train, tuple) and len(train) >= 1 and hasattr(train[0], "columns"):
-                return list(train[0].columns)
-            return []
-        if isinstance(data, tuple) and len(data) >= 1 and hasattr(data[0], "columns"):
-            return list(data[0].columns)
-        return []
+            return self._feature_names_from_split_train(data.train, target_col)
+        return self._feature_names_from_tuple(data)
 
     def _model_importance_values(self, actual_model: Any) -> Any | None:
         """Read raw importance/coefficient values off a trained sklearn-style model."""
@@ -112,6 +119,38 @@ class ArtifactsMixin:
             self.log(f"Saving model artifact to job key: {job_id}")
             self.artifact_store.save(job_id, model_artifact)
 
+    def _normalize_train_frame(self, data: Any, target_col: str) -> pd.DataFrame | None:
+        """Extract and normalize training data to a DataFrame, or `None` if not derivable.
+
+        Handles `SplitDataset` (extracts `.train`) and DataFrame/(X, y)-tuple formats.
+        """
+        raw_train = data.train if isinstance(data, SplitDataset) else data
+
+        if isinstance(raw_train, pd.DataFrame):
+            return raw_train
+        if isinstance(raw_train, tuple) and len(raw_train) == 2:
+            # (X, y) tuple
+            X, y = raw_train
+            if isinstance(X, pd.DataFrame):
+                train_df = X.copy()
+                # Add target column back if y is compatible
+                if isinstance(y, (pd.Series, np.ndarray, list)):
+                    train_df[target_col] = y
+                return train_df
+        return None
+
+    def _persist_reference_frame(self, train_df: pd.DataFrame | None, job_id: str) -> None:
+        """Save `train_df` as the reference dataset for `job_id`, or warn if it's unusable."""
+        if train_df is not None and not train_df.empty:
+            # Sanitize dataset name
+            safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name or "")
+            key = f"reference_data_{safe_name}_{job_id}"
+
+            self.log(f"Saving reference training data for drift detection: {key}")
+            self.artifact_store.save(key, train_df)
+        else:
+            logger.warning(f"Could not extract reference data for job {job_id}")
+
     def _save_reference_data(self, data: Any, job_id: str, target_col: str):
         """
         Saves the training data as a reference dataset for future drift detection.
@@ -121,34 +160,7 @@ class ArtifactsMixin:
             return
 
         try:
-            train_df = None
-
-            # 1. Extract Training Data
-            # Assume it's the full dataset if not split
-            raw_train = data.train if isinstance(data, SplitDataset) else data
-
-            # 2. Normalize to DataFrame
-            if isinstance(raw_train, pd.DataFrame):
-                train_df = raw_train
-            elif isinstance(raw_train, tuple) and len(raw_train) == 2:
-                # (X, y) tuple
-                X, y = raw_train
-                if isinstance(X, pd.DataFrame):
-                    train_df = X.copy()
-                    # Add target column back if y is compatible
-                    if isinstance(y, (pd.Series, np.ndarray, list)):
-                        train_df[target_col] = y
-
-            # 3. Save if valid
-            if train_df is not None and not train_df.empty:
-                # Sanitize dataset name
-                safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", self.dataset_name or "")
-                key = f"reference_data_{safe_name}_{job_id}"
-
-                self.log(f"Saving reference training data for drift detection: {key}")
-                self.artifact_store.save(key, train_df)
-            else:
-                logger.warning(f"Could not extract reference data for job {job_id}")
-
+            train_df = self._normalize_train_frame(data, target_col)
+            self._persist_reference_frame(train_df, job_id)
         except Exception as e:
             logger.warning(f"Failed to save reference data: {e}")
