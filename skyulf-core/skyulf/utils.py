@@ -14,6 +14,54 @@ from .engines import SkyulfDataFrame, get_engine
 logger = logging.getLogger(__name__)
 
 
+def _data_stats_from_tuple(data: tuple[Any, Any]) -> tuple[int, set[str]]:
+    """Extract row count and column set from an (X, y) tuple's X element."""
+    rows = 0
+    cols: set[str] = set()
+    first = cast(Any, data[0])
+    if hasattr(first, "shape"):
+        rows = int(first.shape[0])
+        if hasattr(first, "columns"):
+            cols = set(first.columns)
+    return rows, cols
+
+
+def _warn_split_columns_mismatch(
+    label: str, split_cols: set[str], train_cols: set[str], reflect_text: str
+) -> None:
+    """Log a warning when a SplitDataset split's columns differ from train's."""
+    if split_cols and split_cols != train_cols:
+        logger.warning(
+            "get_data_stats: SplitDataset.%s columns %s differ from "
+            "SplitDataset.train columns %s; reporting train's column set, "
+            "which may not reflect %s actual shape.",
+            label,
+            sorted(split_cols),
+            sorted(train_cols),
+            reflect_text,
+        )
+
+
+def _data_stats_from_split_dataset(data: SplitDataset) -> tuple[int, set[str]]:
+    """Sum row counts across a SplitDataset's train/test/validation splits.
+
+    Warns if test/validation columns differ from train's (train's columns are
+    always the ones reported).
+    """
+    rows, cols = get_data_stats(data.train)
+
+    r, test_cols = get_data_stats(data.test)
+    rows += r
+    _warn_split_columns_mismatch("test", test_cols, cols, "test/validation data")
+
+    if data.validation is not None:
+        r, val_cols = get_data_stats(data.validation)
+        rows += r
+        _warn_split_columns_mismatch("validation", val_cols, cols, "validation data")
+
+    return rows, cols
+
+
 def get_data_stats(
     data: pd.DataFrame | SkyulfDataFrame | tuple[Any, Any] | SplitDataset,
 ) -> tuple[int, set[str]]:
@@ -21,53 +69,16 @@ def get_data_stats(
     Calculates row count and column set for various data structures.
     Supports DataFrame, (X, y) tuple, and SplitDataset.
     """
-    rows: int = 0
-    cols: set[str] = set()
-
-    # Cast to Any so the hasattr-driven duck-typed access below type-checks.
-    payload = cast(Any, data)
-
     # Check for DataFrame-like object (Pandas, Polars, Wrapper)
     if hasattr(data, "shape") and hasattr(data, "columns") and not isinstance(data, tuple):
-        rows = int(payload.shape[0])
-        cols = set(payload.columns)
-    elif isinstance(data, tuple) and len(data) == 2:
-        # Handle (X, y) tuple
-        first = cast(Any, data[0])
-        if hasattr(first, "shape"):
-            rows = int(first.shape[0])
-            if hasattr(first, "columns"):
-                cols = set(first.columns)
-    elif isinstance(data, SplitDataset):
-        # Sum rows from all splits
-        r, c = get_data_stats(data.train)
-        rows += r
-        cols = c  # Assume columns are same
+        payload = cast(Any, data)
+        return int(payload.shape[0]), set(payload.columns)
+    if isinstance(data, tuple) and len(data) == 2:
+        return _data_stats_from_tuple(data)
+    if isinstance(data, SplitDataset):
+        return _data_stats_from_split_dataset(data)
 
-        r, test_cols = get_data_stats(data.test)
-        rows += r
-        if test_cols and test_cols != cols:
-            logger.warning(
-                "get_data_stats: SplitDataset.test columns %s differ from "
-                "SplitDataset.train columns %s; reporting train's column set, "
-                "which may not reflect test/validation data actual shape.",
-                sorted(test_cols),
-                sorted(cols),
-            )
-
-        if data.validation is not None:
-            r, val_cols = get_data_stats(data.validation)
-            rows += r
-            if val_cols and val_cols != cols:
-                logger.warning(
-                    "get_data_stats: SplitDataset.validation columns %s differ "
-                    "from SplitDataset.train columns %s; reporting train's "
-                    "column set, which may not reflect validation data actual shape.",
-                    sorted(val_cols),
-                    sorted(cols),
-                )
-
-    return rows, cols
+    return 0, set()
 
 
 def unpack_pipeline_input(
@@ -325,6 +336,39 @@ def detect_numeric_columns(
     return _detect_numeric_columns_pandas(frame, exclude_binary, exclude_constant)
 
 
+def _resolve_explicit_columns(df: pd.DataFrame | SkyulfDataFrame, cols: list[str]) -> list[str]:
+    """Filter an explicit column list to those existing in df, deduping while preserving order.
+
+    A duplicated column name would otherwise be processed twice by stateful
+    calculators like encoders/scalers.
+    """
+    seen: set[str] = set()
+    deduped = []
+    for c in cols:
+        if c in df.columns and c not in seen:
+            seen.add(c)
+            deduped.append(c)
+    return deduped
+
+
+def _resolve_auto_detected_columns(
+    df: pd.DataFrame | SkyulfDataFrame,
+    config: dict[str, Any],
+    default_selection_func: Callable[[pd.DataFrame | SkyulfDataFrame], list[str]],
+    target_column_key: str,
+) -> list[str]:
+    """Auto-detect columns via default_selection_func, excluding the target column."""
+    cols = default_selection_func(df)
+
+    # Exclude target column during auto-detection
+    target_col = config.get(target_column_key)
+    if target_col and target_col in cols:
+        cols = [c for c in cols if c != target_col]
+
+    # Filter for existence (though auto-detect usually returns existing cols)
+    return [c for c in cols if c in df.columns]
+
+
 def resolve_columns(
     df: pd.DataFrame | SkyulfDataFrame,
     config: dict[str, Any],
@@ -346,28 +390,11 @@ def resolve_columns(
 
     # Case 1: Explicit columns provided
     if cols:
-        # Filter for existence, then dedupe while preserving first-occurrence
-        # order (a duplicated column name would otherwise be processed twice
-        # by stateful calculators like encoders/scalers).
-        seen: set[str] = set()
-        deduped = []
-        for c in cols:
-            if c in df.columns and c not in seen:
-                seen.add(c)
-                deduped.append(c)
-        return deduped
+        return _resolve_explicit_columns(df, cols)
 
     # Case 2: Auto-detection
     if default_selection_func:
-        cols = default_selection_func(df)
-
-        # Exclude target column during auto-detection
-        target_col = config.get(target_column_key)
-        if target_col and target_col in cols:
-            cols = [c for c in cols if c != target_col]
-
-        # Filter for existence (though auto-detect usually returns existing cols)
-        return [c for c in cols if c in df.columns]
+        return _resolve_auto_detected_columns(df, config, default_selection_func, target_column_key)
 
     return []
 
