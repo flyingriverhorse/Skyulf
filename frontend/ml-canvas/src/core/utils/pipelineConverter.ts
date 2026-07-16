@@ -350,6 +350,17 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               cv_time_column: node.data.cv_time_column,
               execution_mode: node.data.execution_mode
           };
+      } else if (node.data.definitionType === 'SegmentationNode') {
+          stepType = BackendStepType.BASIC_TRAINING;
+          params = {
+              // No target_column — clustering is unsupervised. The backend
+              // treats an empty string as the "no target" sentinel.
+              target_column: '',
+              model_type: node.data.model_type,
+              hyperparameters: node.data.hyperparameters,
+              cv_enabled: false,
+              execution_mode: node.data.execution_mode
+          };
       } else if (node.data.definitionType === 'EnsembleNode') {
           // Phase 2: auto-detect base learners wired into the ensemble's input.
           // Model nodes (training/tuning) connected here act as base-learner spec

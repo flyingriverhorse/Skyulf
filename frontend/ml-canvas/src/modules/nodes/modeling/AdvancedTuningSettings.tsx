@@ -157,8 +157,15 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
           setIsLoadingModels(true);
           try {
               const nodes = await registryApi.getAllNodes();
-              // Accept both "Model" (old) and "Modeling" (new skyulf-core)
-              const models = nodes.filter(n => n.category === 'Model' || n.category === 'Modeling');
+              // Accept both "Model" (old) and "Modeling" (new skyulf-core).
+              // Clustering algorithms (e.g. K-Means) are excluded: Advanced
+              // Tuning hard-requires a target column and runs supervised
+              // cross_validate() with a scorer, neither of which applies to
+              // unsupervised clustering (use the Segmentation node instead).
+              const models = nodes.filter(n =>
+                  (n.category === 'Model' || n.category === 'Modeling') &&
+                  !(n.tags?.includes('clustering') ?? false)
+              );
               setAvailableModels(models);
           } catch (error) {
               console.error("Failed to fetch models:", error);

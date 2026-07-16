@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type ExperimentsView = 'charts' | 'table' | 'evaluation' | 'importance' | 'shap' | 'diff';
+export type ExperimentsView = 'charts' | 'table' | 'evaluation' | 'importance' | 'shap' | 'diff' | 'segmentation';
 
 interface HeaderProps {
   datasets: { id: string; name: string }[];
@@ -51,6 +51,7 @@ interface TabsProps {
   setActiveView: (v: ExperimentsView) => void;
   hasFeatureImportances: boolean;
   hasShapSummary: boolean;
+  hasSegmentation: boolean;
 }
 
 const TAB_BASE = 'px-4 py-2 text-sm font-medium border-b-2 transition-colors';
@@ -60,7 +61,7 @@ const tabClass = (active: boolean) => `${TAB_BASE} ${
     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
 }`;
 
-export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFeatureImportances, hasShapSummary }) => (
+export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFeatureImportances, hasShapSummary, hasSegmentation }) => (
   <div className="flex border-b border-gray-200 dark:border-gray-700">
     <button className={tabClass(activeView === 'charts')} onClick={() => { setActiveView('charts'); }}>
       Visual Comparison
@@ -86,6 +87,15 @@ export const ViewTabs: React.FC<TabsProps> = ({ activeView, setActiveView, hasFe
     {hasShapSummary && (
       <button className={tabClass(activeView === 'shap')} onClick={() => { setActiveView('shap'); }}>
         SHAP Explainability
+      </button>
+    )}
+    {hasSegmentation && (
+      <button
+        className={tabClass(activeView === 'segmentation')}
+        onClick={() => { setActiveView('segmentation'); }}
+        data-testid="experiments-tab-segmentation"
+      >
+        Segmentation
       </button>
     )}
   </div>

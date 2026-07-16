@@ -14,7 +14,7 @@ import type { EvaluationSplit, EvaluationData } from '../types';
 import { applyThreshold } from '../utils/classificationCharts';
 
 interface Props {
-  evaluationData: EvaluationData;
+  evaluationData: Extract<EvaluationData, { problem_type: 'classification' | 'regression' }>;
   selectedRocClass: string | null;
   threshold: number;
   showTrainMetrics: boolean;
