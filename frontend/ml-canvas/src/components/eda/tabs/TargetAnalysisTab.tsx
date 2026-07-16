@@ -42,6 +42,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
     report
 }) => {
     const [dlAllState, setDlAllState] = useState<'idle' | 'downloading' | 'done'>('idle');
+    const chartTheme = getChartTheme();
 
     const showDone = useCallback(() => {
         setDlAllState('done');
@@ -174,9 +175,9 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                         layout="vertical"
                                         margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                                     >
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                        <XAxis type="number" domain={[0, 1]} />
-                                        <YAxis type="category" dataKey="name" width={120} tick={{fontSize: 12}} />
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={chartTheme.gridColor} />
+                                        <XAxis type="number" domain={[0, 1]} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
+                                        <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                                         <Tooltip
                                             contentStyle={getTooltipContentStyle()}
                                             formatter={(value: number) => [value.toFixed(3), 'Association']}
@@ -272,9 +273,9 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                 }))}
                                                 margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
                                             >
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: chartTheme.axisColor }} />
+                                                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11, fill: chartTheme.axisColor }} />
                                                 <Tooltip
                                                     cursor={{ fill: 'transparent' }}
                                                     content={({ active, payload }) => {

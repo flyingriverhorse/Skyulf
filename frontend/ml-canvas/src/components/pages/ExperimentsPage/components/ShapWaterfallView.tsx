@@ -12,6 +12,8 @@ import {
   Cell,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
+import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
+import { getChartTheme } from '../../../eda/constants';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
@@ -44,6 +46,7 @@ export const ShapWaterfallView: React.FC<Props> = ({
   doneChart,
 }) => {
   const chartId = `shap-waterfall-chart-${jobId}`;
+  const chartTheme = getChartTheme();
   const { samples } = shapExplanation;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -126,13 +129,13 @@ export const ShapWaterfallView: React.FC<Props> = ({
         <div className="h-[500px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={rows} layout="vertical" margin={{ top: 5, right: 30, bottom: 5, left: 140 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-              <XAxis type="number" tick={{ fontSize: 12 }} />
-              <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={130} />
-              <ReferenceLine x={baseValue} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: 'Base', position: 'top', fontSize: 11 }} />
-              <ReferenceLine x={outputValue} stroke="#1f2937" strokeDasharray="3 3" label={{ value: 'Prediction', position: 'top', fontSize: 11 }} />
+              <CartesianGrid strokeDasharray="3 3" opacity={0.1} stroke={chartTheme.gridColor} />
+              <XAxis type="number" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
+              <YAxis type="category" dataKey="label" tick={{ fontSize: 11, fill: chartTheme.axisColor }} width={130} />
+              <ReferenceLine x={baseValue} stroke="#94a3b8" strokeDasharray="3 3" label={{ value: 'Base', position: 'top', fontSize: 11, fill: chartTheme.axisColor }} />
+              <ReferenceLine x={outputValue} stroke="#6366f1" strokeDasharray="3 3" label={{ value: 'Prediction', position: 'top', fontSize: 11, fill: chartTheme.axisColor }} />
               <Tooltip
-                contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                contentStyle={getTooltipContentStyle()}
                 formatter={(_value: number, _name: string, entry) => {
                   const row = entry?.payload as WaterfallRow | undefined;
                   if (!row) return ['', ''];

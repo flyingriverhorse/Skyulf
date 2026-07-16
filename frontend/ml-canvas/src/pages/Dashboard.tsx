@@ -12,6 +12,7 @@ import {
 import { apiClient } from '../core/api/client';
 import { jobsApi } from '../core/api/jobs';
 import { LoadingState, EmptyState, ErrorState, StatusBadge } from '../components/shared';
+import { getChartTheme } from '../components/eda/constants';
 
 interface SystemStats {
   total_jobs: number;
@@ -36,6 +37,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 export const Dashboard: React.FC = () => {
+  const chartTheme = getChartTheme();
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [jobs, setJobs] = useState<TrainingJobSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -162,16 +164,16 @@ export const Dashboard: React.FC = () => {
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData.dailyActivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.gridColor} vertical={false} />
                 <XAxis
                   dataKey="date"
-                  stroke="#64748b"
+                  stroke={chartTheme.axisColor}
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
-                  stroke="#64748b"
+                  stroke={chartTheme.axisColor}
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
@@ -179,7 +181,7 @@ export const Dashboard: React.FC = () => {
                 />
                 <Tooltip
                   contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }}
-                  cursor={{ fill: '#f1f5f9' }}
+                  cursor={{ fill: chartTheme.gridColor }}
                 />
                 <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={30} />
               </BarChart>

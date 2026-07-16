@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { COLORS } from '../constants';
+import { getChartTheme } from '../constants';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 
 interface TimeSeriesTabProps {
@@ -32,6 +33,7 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
     profile,
     downloadChart
 }) => {
+    const chartTheme = getChartTheme();
     return (
         <div className="mt-4 space-y-6">
             {/* Trend Chart */}
@@ -74,13 +76,13 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 <div className="h-80 w-full" id="trend-chart">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={profile.timeseries.trend}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
                             <XAxis
                                 dataKey="date"
-                                tick={{ fontSize: 12 }}
+                                tick={{ fontSize: 12, fill: chartTheme.axisColor }}
                                 minTickGap={30}
                             />
-                            <YAxis />
+                            <YAxis tick={{ fill: chartTheme.axisColor }} />
                             <Tooltip
                                 contentStyle={getTooltipContentStyle()}
                                 labelStyle={{ color: '#9ca3af' }}
@@ -126,9 +128,9 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     <div className="h-64 w-full" id="day-seasonality-chart">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={profile.timeseries.seasonality.day_of_week}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-                                <YAxis />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
+                                <XAxis dataKey="day" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
+                                <YAxis tick={{ fill: chartTheme.axisColor }} />
                                 <Tooltip
                                     contentStyle={getTooltipContentStyle()}
                                     cursor={{fill: 'transparent'}}
@@ -159,9 +161,9 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                 <div className="h-64 w-full" id="month-seasonality-chart">
                     <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={profile.timeseries.seasonality.month_of_year}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                            <YAxis />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
+                            <XAxis dataKey="month" tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
+                            <YAxis tick={{ fill: chartTheme.axisColor }} />
                             <Tooltip
                                 contentStyle={getTooltipContentStyle()}
                                 cursor={{fill: 'transparent'}}
@@ -199,13 +201,13 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                     <div className="h-80 w-full pb-6" id="autocorrelation-chart">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={profile.timeseries.autocorrelation} margin={{ bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={chartTheme.gridColor} />
                                     <XAxis
                                         dataKey="lag"
-                                        tick={{ fontSize: 12 }}
-                                        label={{ value: 'Lag (Days)', position: 'insideBottom', offset: -15, fontSize: 12 }}
+                                        tick={{ fontSize: 12, fill: chartTheme.axisColor }}
+                                        label={{ value: 'Lag (Days)', position: 'insideBottom', offset: -15, fontSize: 12, fill: chartTheme.axisColor }}
                                     />
-                                    <YAxis domain={[-1, 1]} />
+                                    <YAxis domain={[-1, 1]} tick={{ fill: chartTheme.axisColor }} />
                                     <Tooltip
                                         contentStyle={getTooltipContentStyle()}
                                         cursor={{fill: 'transparent'}}
