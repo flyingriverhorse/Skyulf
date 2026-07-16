@@ -11,7 +11,7 @@ sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
 ``self._build_composite_feature_engineer``,
 ``self._resolve_feature_engineer_artifact_key``,
 ``self._bundle_transformers_with_model``, ``self._extract_feature_importances``,
-``self._extract_shap_summary``.
+``self._extract_shap_explanation``.
 """
 
 import logging
@@ -54,7 +54,7 @@ class NodeRunnersMixin:
     _resolve_feature_engineer_artifact_key: Any
     _bundle_transformers_with_model: Any
     _extract_feature_importances: Any
-    _extract_shap_summary: Any
+    _extract_shap_explanation: Any
     _pipeline_has_training_node: Any
 
     def _record_split_dataset_shape_metrics(
@@ -336,9 +336,9 @@ class NodeRunnersMixin:
             metrics["feature_importances"] = fi
 
         # Persist SHAP explainability summary
-        shap_summary = self._extract_shap_summary(estimator.model, data, target_col)
-        if shap_summary:
-            metrics["shap_summary"] = shap_summary
+        shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
+        if shap_explanation:
+            metrics["shap_explanation"] = shap_explanation
 
         # Persist data shape for monitoring
         self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
@@ -528,9 +528,9 @@ class NodeRunnersMixin:
             metrics["feature_importances"] = fi
 
         # Persist SHAP explainability summary
-        shap_summary = self._extract_shap_summary(estimator.model, data, target_col)
-        if shap_summary:
-            metrics["shap_summary"] = shap_summary
+        shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
+        if shap_explanation:
+            metrics["shap_explanation"] = shap_explanation
 
         # Persist data shape for monitoring
         self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)

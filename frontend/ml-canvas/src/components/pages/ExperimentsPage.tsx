@@ -8,12 +8,12 @@ import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 import { formatDuration } from '../../core/utils/format';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
-import type { EvaluationData } from './ExperimentsPage/types';
+import type { EvaluationData, ShapExplanationData } from './ExperimentsPage/types';
 import { getJobScoringMetric, shortRunId } from './ExperimentsPage/utils/jobMeta';
 import { findBestF1Threshold } from './ExperimentsPage/utils/classificationCharts';
 import { ComparisonTableView } from './ExperimentsPage/components/ComparisonTableView';
 import { FeatureImportanceView } from './ExperimentsPage/components/FeatureImportanceView';
-import { ShapSummaryView } from './ExperimentsPage/components/ShapSummaryView';
+import { ShapExplainabilityView } from './ExperimentsPage/components/ShapExplainabilityView';
 import { BranchComparisonCard } from './ExperimentsPage/components/BranchComparisonCard';
 import { MetricsComparisonChart } from './ExperimentsPage/components/MetricsComparisonChart';
 import { JobListSidebar } from './ExperimentsPage/components/JobListSidebar';
@@ -272,16 +272,16 @@ export const ExperimentsPage: React.FC = () => {
     [featureImportancesByJob]
   );
 
-  // SHAP explainability summaries across selected jobs
-  const shapSummaryByJob = useMemo(() => selectedJobs.map(job => {
+  // SHAP explanations across selected jobs (summary + per-sample data)
+  const shapExplanationByJob = useMemo(() => selectedJobs.map(job => {
     const result = (job.result ?? {}) as Record<string, unknown>;
     const metrics = result.metrics as Record<string, unknown> | undefined;
-    const raw = (metrics?.shap_summary ?? result.shap_summary) as Record<string, number> | undefined;
-    return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', shapSummary: raw ?? null };
+    const raw = (metrics?.shap_explanation ?? result.shap_explanation) as ShapExplanationData | undefined;
+    return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', shapExplanation: raw ?? null };
   }), [selectedJobs]);
   const hasShapSummary = useMemo(
-    () => shapSummaryByJob.some(j => j.shapSummary !== null),
-    [shapSummaryByJob]
+    () => shapExplanationByJob.some(j => j.shapExplanation !== null),
+    [shapExplanationByJob]
   );
 
   return (
@@ -403,8 +403,8 @@ export const ExperimentsPage: React.FC = () => {
               )}
 
               {activeView === 'shap' && hasShapSummary && (
-                <ShapSummaryView
-                  shapSummaryByJob={shapSummaryByJob}
+                <ShapExplainabilityView
+                  shapExplanationByJob={shapExplanationByJob}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
