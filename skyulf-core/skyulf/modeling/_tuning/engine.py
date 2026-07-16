@@ -94,6 +94,28 @@ class TuningCalculator(BaseModelCalculator):
         return cleaned
 
     @staticmethod
+    def _split_flat_and_nested_params(
+        params: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Splits ``params`` into flat constructor args and nested ``a__b`` keys."""
+        flat = {k: v for k, v in params.items() if "__" not in str(k)}
+        nested = {k: v for k, v in params.items() if "__" in str(k)}
+        return flat, nested
+
+    @staticmethod
+    def _filter_params_to_signature(model_class: Any, flat: dict[str, Any]) -> dict[str, Any]:
+        """Filters ``flat`` down to ``model_class``'s constructor params, unless it accepts ``**kwargs``."""
+        import inspect
+
+        sig = inspect.signature(model_class)
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+        if accepts_kwargs:
+            return flat
+        return {k: v for k, v in flat.items() if k in sig.parameters}
+
+    @staticmethod
     def _instantiate_model(model_class: Any, params: dict[str, Any]) -> Any:
         """Build an estimator, routing nested ``a__b`` keys through ``set_params``.
 
@@ -102,17 +124,8 @@ class TuningCalculator(BaseModelCalculator):
         ``random_forest__n_estimators`` — are applied afterwards via
         ``set_params`` because sklearn estimators only accept them that way.
         """
-        import inspect
-
-        flat = {k: v for k, v in params.items() if "__" not in str(k)}
-        nested = {k: v for k, v in params.items() if "__" in str(k)}
-
-        sig = inspect.signature(model_class)
-        accepts_kwargs = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-        )
-        if not accepts_kwargs:
-            flat = {k: v for k, v in flat.items() if k in sig.parameters}
+        flat, nested = TuningCalculator._split_flat_and_nested_params(params)
+        flat = TuningCalculator._filter_params_to_signature(model_class, flat)
 
         model = model_class(**flat)
         if nested:
@@ -300,13 +313,45 @@ class TuningCalculator(BaseModelCalculator):
         cv = PredefinedSplit(test_fold)
         return cv, X_for_search, y_for_search
 
+    @staticmethod
+    def _build_holdout_cv(config: TuningConfig) -> Any:
+        """Builds the single-split (20% holdout) CV used when ``cv_enabled`` is False."""
+        return ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.cv_random_state)
+
+    @staticmethod
+    def _build_shuffle_split_cv(config: TuningConfig) -> Any:
+        """Builds a repeated shuffle-split CV splitter for ``cv_type == "shuffle_split"``."""
+        return ShuffleSplit(
+            n_splits=config.cv_folds,
+            test_size=0.2,
+            random_state=config.cv_random_state,
+        )
+
+    @staticmethod
+    def _build_stratified_kfold_cv(config: TuningConfig) -> Any:
+        """Builds a StratifiedKFold splitter for ``cv_type == "stratified_k_fold"``."""
+        return StratifiedKFold(
+            n_splits=config.cv_folds,
+            shuffle=config.cv_shuffle,
+            random_state=config.cv_random_state if config.cv_shuffle else None,
+        )
+
+    @staticmethod
+    def _build_kfold_cv(config: TuningConfig) -> Any:
+        """Builds the default plain KFold splitter (also the regression fallback for stratified)."""
+        return KFold(
+            n_splits=config.cv_folds,
+            shuffle=config.cv_shuffle,
+            random_state=config.cv_random_state if config.cv_shuffle else None,
+        )
+
     def _select_cv_by_type(self, config: TuningConfig) -> Any:
         """Picks a CV splitter from ``config`` (holdout, nested CV inner folds, time series,
         shuffle, stratified, or plain K-fold), based on ``cv_enabled``/``cv_type``.
         """
         if not config.cv_enabled:
             # Single split validation (20% holdout)
-            return ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.cv_random_state)
+            return self._build_holdout_cv(config)
 
         if config.cv_type == "nested_cv":
             # Nested CV during tuning: use fewer inner folds for
@@ -318,28 +363,16 @@ class TuningCalculator(BaseModelCalculator):
             return TimeSeriesSplit(n_splits=config.cv_folds)
 
         if config.cv_type == "shuffle_split":
-            return ShuffleSplit(
-                n_splits=config.cv_folds,
-                test_size=0.2,
-                random_state=config.cv_random_state,
-            )
+            return self._build_shuffle_split_cv(config)
 
         if (
             config.cv_type == "stratified_k_fold"
             and self.model_calculator.problem_type == "classification"
         ):
-            return StratifiedKFold(
-                n_splits=config.cv_folds,
-                shuffle=config.cv_shuffle,
-                random_state=config.cv_random_state if config.cv_shuffle else None,
-            )
+            return self._build_stratified_kfold_cv(config)
 
         # Default to KFold (also fallback for stratified if regression)
-        return KFold(
-            n_splits=config.cv_folds,
-            shuffle=config.cv_shuffle,
-            random_state=config.cv_random_state if config.cv_shuffle else None,
-        )
+        return self._build_kfold_cv(config)
 
     def _build_nested_inner_cv(self, config: TuningConfig) -> Any:
         """Builds the inner-fold CV splitter used for candidate scoring during nested CV tuning."""
@@ -357,16 +390,8 @@ class TuningCalculator(BaseModelCalculator):
             random_state=inner_cv_random_state,
         )
 
-    def _resolve_metric(self, config: TuningConfig, y: Any) -> str:
-        """Validates the metric against the problem type, maps friendly aliases to sklearn
-        scoring strings, and switches binary-default metrics to weighted for multiclass targets.
-        """
-        metric = config.metric
-
-        # --- VALIDATION: Metric Consistency Check ---
-        # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy"
-        # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
-        if self.model_calculator.problem_type == "regression" and metric in [
+    _INVALID_REGRESSION_METRICS = frozenset(
+        {
             "accuracy",
             "f1",
             "precision",
@@ -384,7 +409,34 @@ class TuningCalculator(BaseModelCalculator):
             "pr_auc",
             "pr_auc_weighted",
             "g_score",
-        ]:
+        }
+    )
+
+    _METRIC_ALIAS_MAP = {
+        "mse": "neg_mean_squared_error",
+        "mae": "neg_mean_absolute_error",
+        "rmse": "neg_root_mean_squared_error",
+        "r2": "r2",
+        "explained_variance": "explained_variance",
+        "accuracy": "accuracy",
+        "balanced_accuracy": "balanced_accuracy",
+        "f1": "f1",
+        "f1_weighted": "f1_weighted",
+        "precision": "precision",
+        "recall": "recall",
+        "roc_auc": "roc_auc",
+        "roc_auc_ovr": "roc_auc_ovr",
+        "roc_auc_ovo": "roc_auc_ovo",
+        "roc_auc_ovr_weighted": "roc_auc_ovr_weighted",
+        "roc_auc_ovo_weighted": "roc_auc_ovo_weighted",
+        "log_loss": "neg_log_loss",
+        "matthews_corrcoef": "matthews_corrcoef",
+    }
+
+    @classmethod
+    def _validate_metric_for_problem_type(cls, problem_type: str, metric: str) -> None:
+        """Raises a clear ``ValueError`` if a classification-only metric is used for regression."""
+        if problem_type == "regression" and metric in cls._INVALID_REGRESSION_METRICS:
             raise ValueError(
                 f"Configuration Error: You selected '{metric}' as the tuning metric, "
                 "but this is a Regression model. "
@@ -392,48 +444,49 @@ class TuningCalculator(BaseModelCalculator):
                 "Please open 'Advanced Settings' on this node and select a regression metric "
                 "(e.g., R2, RMSE, MAE)."
             )
+
+    @staticmethod
+    def _is_multiclass_target(y: Any) -> bool:
+        """Returns whether ``y`` (a Series or ndarray) has more than 2 unique classes."""
+        if isinstance(y, pd.Series):
+            return y.nunique() > 2
+        if isinstance(y, np.ndarray):
+            return len(np.unique(y)) > 2
+        return False
+
+    @staticmethod
+    def _weight_metric_for_multiclass(metric: str, original_metric: str) -> str:
+        """Switches a binary-default metric to its weighted variant for multiclass targets."""
+        weighted = f"{metric}_weighted"
+        # roc_auc needs special handling (ovr/ovo) usually, but weighted often works for simple cases
+        if original_metric == "roc_auc":  # Check original config metric name just in case
+            return "roc_auc_ovr_weighted"
+        return weighted
+
+    def _resolve_metric(self, config: TuningConfig, y: Any) -> str:
+        """Validates the metric against the problem type, maps friendly aliases to sklearn
+        scoring strings, and switches binary-default metrics to weighted for multiclass targets.
+        """
+        metric = config.metric
+
+        # --- VALIDATION: Metric Consistency Check ---
+        # The schema defaults metric to "accuracy". If the user is doing Regression but "accuracy"
+        # (or another classification metric) is selected, we raise a clear error instead of crashing deeply in sklearn.
+        self._validate_metric_for_problem_type(self.model_calculator.problem_type, metric)
         # -----------------------------------------------
 
         # Map common user-friendly metrics to sklearn scoring strings
-        metric_map = {
-            "mse": "neg_mean_squared_error",
-            "mae": "neg_mean_absolute_error",
-            "rmse": "neg_root_mean_squared_error",
-            "r2": "r2",
-            "explained_variance": "explained_variance",
-            "accuracy": "accuracy",
-            "balanced_accuracy": "balanced_accuracy",
-            "f1": "f1",
-            "f1_weighted": "f1_weighted",
-            "precision": "precision",
-            "recall": "recall",
-            "roc_auc": "roc_auc",
-            "roc_auc_ovr": "roc_auc_ovr",
-            "roc_auc_ovo": "roc_auc_ovo",
-            "roc_auc_ovr_weighted": "roc_auc_ovr_weighted",
-            "roc_auc_ovo_weighted": "roc_auc_ovo_weighted",
-            "log_loss": "neg_log_loss",
-            "matthews_corrcoef": "matthews_corrcoef",
-        }
-
-        if metric in metric_map:
-            metric = metric_map[metric]
+        if metric in self._METRIC_ALIAS_MAP:
+            metric = self._METRIC_ALIAS_MAP[metric]
 
         if self.model_calculator.problem_type == "classification":
             # Check if target is multiclass
-            is_multiclass = False
-            if isinstance(y, pd.Series):
-                is_multiclass = y.nunique() > 2
-            elif isinstance(y, np.ndarray):
-                is_multiclass = len(np.unique(y)) > 2
+            is_multiclass = self._is_multiclass_target(y)
 
             # If multiclass and metric is binary-default, switch to weighted
             # Note: We check against the mapped names now (e.g. "f1", "precision")
             if is_multiclass and metric in ["f1", "precision", "recall", "roc_auc"]:
-                metric = f"{metric}_weighted"
-                # roc_auc needs special handling (ovr/ovo) usually, but weighted often works for simple cases
-                if config.metric == "roc_auc":  # Check original config metric name just in case
-                    metric = "roc_auc_ovr_weighted"
+                metric = self._weight_metric_for_multiclass(metric, config.metric)
 
         return metric
 
@@ -539,50 +592,40 @@ class TuningCalculator(BaseModelCalculator):
                 )
             return -float("inf")
 
-    def _run_grid_or_random_search(
+    def _generate_search_candidates(self, config: TuningConfig) -> list[dict[str, Any]]:
+        """Generates the list of hyperparameter candidates for grid or random search."""
+        param_space = self._clean_search_space(config.search_space)
+        if config.strategy == "grid":
+            return list(ParameterGrid(param_space))
+        # Random Search
+        return list(
+            ParameterSampler(
+                param_space,
+                n_iter=config.n_trials,
+                random_state=config.random_state,
+            )
+        )
+
+    def _evaluate_search_candidates(
         self,
+        candidates: list[dict[str, Any]],
         X_for_search: Any,
         y_for_search: Any,
-        config: TuningConfig,
         model_class: Any,
         cv: Any,
         metric: str,
         progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
         log_callback: Callable[[str], None] | None,
-    ) -> TuningResult:
-        """Runs a custom grid/random search loop (instead of sklearn's searchers) so
-        per-candidate and per-fold progress/log callbacks can be emitted during tuning.
+    ) -> tuple[list[dict[str, Any]], float, dict[str, Any] | None]:
+        """Evaluates every candidate via CV, emitting progress/log callbacks, and tracks the best.
+
+        Returns the collected trials, the best score, and the best params (or ``None`` if all failed).
         """
-        if log_callback:
-            log_callback(
-                f"Starting {config.strategy} search with custom loop for detailed logging..."
-            )
-
-        # 1. Generate Candidates
-        param_space = self._clean_search_space(config.search_space)
-        candidates = []
-
-        if config.strategy == "grid":
-            candidates = list(ParameterGrid(param_space))
-        else:
-            # Random Search
-            candidates = list(
-                ParameterSampler(
-                    param_space,
-                    n_iter=config.n_trials,
-                    random_state=config.random_state,
-                )
-            )
-
         total_candidates = len(candidates)
-        if log_callback:
-            log_callback(f"Total candidates to evaluate: {total_candidates}")
-
         trials: list[dict[str, Any]] = []
         best_score = -float("inf")
         best_params = None
 
-        # 2. Iterate Candidates
         for i, params in enumerate(candidates):
             if log_callback:
                 log_callback(f"Evaluating Candidate {i + 1}/{total_candidates}: {params}")
@@ -605,6 +648,45 @@ class TuningCalculator(BaseModelCalculator):
             if mean_score > best_score:
                 best_score = mean_score
                 best_params = params
+
+        return trials, best_score, best_params
+
+    def _run_grid_or_random_search(
+        self,
+        X_for_search: Any,
+        y_for_search: Any,
+        config: TuningConfig,
+        model_class: Any,
+        cv: Any,
+        metric: str,
+        progress_callback: Callable[[int, int, float | None, dict | None], None] | None,
+        log_callback: Callable[[str], None] | None,
+    ) -> TuningResult:
+        """Runs a custom grid/random search loop (instead of sklearn's searchers) so
+        per-candidate and per-fold progress/log callbacks can be emitted during tuning.
+        """
+        if log_callback:
+            log_callback(
+                f"Starting {config.strategy} search with custom loop for detailed logging..."
+            )
+
+        # 1. Generate Candidates
+        candidates = self._generate_search_candidates(config)
+        total_candidates = len(candidates)
+        if log_callback:
+            log_callback(f"Total candidates to evaluate: {total_candidates}")
+
+        # 2. Iterate Candidates
+        trials, best_score, best_params = self._evaluate_search_candidates(
+            candidates,
+            X_for_search,
+            y_for_search,
+            model_class,
+            cv,
+            metric,
+            progress_callback,
+            log_callback,
+        )
 
         if log_callback:
             log_callback(f"Tuning Completed. Best Score: {best_score:.4f}")
@@ -697,6 +779,37 @@ class TuningCalculator(BaseModelCalculator):
         )
 
     @staticmethod
+    def _is_use_cmaes_numeric_list(v: Any, use_cmaes: bool) -> bool:
+        """Returns whether ``v`` is a non-empty numeric list that should become a continuous range."""
+        return (
+            isinstance(v, list)
+            and use_cmaes
+            and bool(v)
+            and all(isinstance(x, (int, float)) for x in v)
+        )
+
+    @staticmethod
+    def _numeric_range_distribution(v: list) -> Any:
+        """Builds an Optuna Int/FloatDistribution spanning the min/max of a numeric list."""
+        lo, hi = min(v), max(v)
+        if all(isinstance(x, int) for x in v):
+            return optuna.distributions.IntDistribution(lo, hi)
+        return optuna.distributions.FloatDistribution(float(lo), float(hi))
+
+    @staticmethod
+    def _distribution_for_value(k: str, v: Any, use_cmaes: bool) -> Any:
+        """Builds the Optuna distribution for a single search-space entry.
+
+        Numeric lists become continuous ``IntDistribution``/``FloatDistribution`` under
+        CMA-ES (so it samples the full range); everything else stays categorical.
+        """
+        if TuningCalculator._is_use_cmaes_numeric_list(v, use_cmaes):
+            return TuningCalculator._numeric_range_distribution(v)
+        if isinstance(v, list):
+            return optuna.distributions.CategoricalDistribution(v)
+        return v
+
+    @staticmethod
     def _build_optuna_distributions(
         search_space: dict[str, Any], use_cmaes: bool
     ) -> dict[str, Any]:
@@ -705,24 +818,10 @@ class TuningCalculator(BaseModelCalculator):
         Numeric lists become continuous ``IntDistribution``/``FloatDistribution`` under
         CMA-ES (so it samples the full range); everything else stays categorical.
         """
-        distributions = {}
-        for k, v in search_space.items():
-            if (
-                isinstance(v, list)
-                and use_cmaes
-                and v
-                and all(isinstance(x, (int, float)) for x in v)
-            ):
-                lo, hi = min(v), max(v)
-                if all(isinstance(x, int) for x in v):
-                    distributions[k] = optuna.distributions.IntDistribution(lo, hi)
-                else:
-                    distributions[k] = optuna.distributions.FloatDistribution(float(lo), float(hi))
-            elif isinstance(v, list):
-                distributions[k] = optuna.distributions.CategoricalDistribution(v)
-            else:
-                distributions[k] = v
-        return distributions
+        return {
+            k: TuningCalculator._distribution_for_value(k, v, use_cmaes)
+            for k, v in search_space.items()
+        }
 
     @staticmethod
     def _build_optuna_sampler(sampler_name: str, random_state: Any) -> Any:

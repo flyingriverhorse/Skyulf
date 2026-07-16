@@ -25,6 +25,24 @@ from ._evaluation.metrics import (
 )
 
 
+def _aggregate_single_metric(
+    key: str, fold_metrics: list[dict[str, float]]
+) -> dict[str, float] | None:
+    """Aggregates one metric's values across folds into mean/std/min/max, dropping non-finite values."""
+    values = [m.get(key, np.nan) for m in fold_metrics]
+    # Filter nans
+    values = [v for v in values if np.isfinite(v)]
+
+    if not values:
+        return None
+    return {
+        "mean": float(np.mean(values)),
+        "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
+        "min": float(np.min(values)),
+        "max": float(np.max(values)),
+    }
+
+
 def _aggregate_metrics(
     fold_metrics: list[dict[str, float]],
 ) -> dict[str, dict[str, float]]:
@@ -41,17 +59,9 @@ def _aggregate_metrics(
     aggregated = {}
 
     for key in keys:
-        values = [m.get(key, np.nan) for m in fold_metrics]
-        # Filter nans
-        values = [v for v in values if np.isfinite(v)]
-
-        if values:
-            aggregated[key] = {
-                "mean": float(np.mean(values)),
-                "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
-                "min": float(np.min(values)),
-                "max": float(np.max(values)),
-            }
+        result = _aggregate_single_metric(key, fold_metrics)
+        if result is not None:
+            aggregated[key] = result
 
     return aggregated
 
@@ -295,6 +305,15 @@ def _sort_pandas_by_column(X: Any, y: Any, sort_col: str) -> tuple:
     return X, y
 
 
+def _log_time_sort_message(
+    msg: str, level: str, log_callback: Callable[[str], None] | None, logger: Any
+) -> None:
+    """Emits a Time Series CV sorting message to both the log callback and the logger."""
+    if log_callback:
+        log_callback(msg)
+    getattr(logger, level)(msg)
+
+
 def _sort_by_time(
     X: Any,
     y: Any,
@@ -322,26 +341,41 @@ def _sort_by_time(
         sort_col = _auto_detect_sort_column(X, is_polars, log_callback, logger)
 
     if sort_col and sort_col in X.columns:
-        msg = f"Time Series CV: data sorted by '{sort_col}'."
         if is_polars:
             X, y = _sort_polars_by_column(X, y, sort_col)
         else:
             X, y = _sort_pandas_by_column(X, y, sort_col)
-        if log_callback:
-            log_callback(msg)
-        logger.info(msg)
+        _log_time_sort_message(
+            f"Time Series CV: data sorted by '{sort_col}'.", "info", log_callback, logger
+        )
     elif sort_col:
-        msg = f"Time Series CV: specified time column '{sort_col}' not found in data. Using row order."
-        if log_callback:
-            log_callback(msg)
-        logger.warning(msg)
+        _log_time_sort_message(
+            f"Time Series CV: specified time column '{sort_col}' not found in data. Using row order.",
+            "warning",
+            log_callback,
+            logger,
+        )
     else:
-        msg = "Time Series CV: no datetime column found. Assuming data is already sorted chronologically."
-        if log_callback:
-            log_callback(msg)
-        logger.warning(msg)
+        _log_time_sort_message(
+            "Time Series CV: no datetime column found. Assuming data is already sorted chronologically.",
+            "warning",
+            log_callback,
+            logger,
+        )
 
     return X, y
+
+
+def _log_splitter_fallback(cv_type: str, problem_type: str, logger: Any) -> None:
+    """Logs a warning when falling back to plain KFold for an unsupported/mismatched cv_type."""
+    if cv_type == "stratified_k_fold":
+        logger.warning(
+            "stratified_k_fold requested for problem_type='%s' (not classification); "
+            "falling back to plain KFold.",
+            problem_type,
+        )
+    elif cv_type not in ("k_fold", "time_series_split", "shuffle_split", "stratified_k_fold"):
+        logger.warning("Unknown cv_type '%s'; falling back to plain KFold.", cv_type)
 
 
 def _build_splitter(
@@ -367,14 +401,7 @@ def _build_splitter(
             random_state=random_state if shuffle else None,
         )
     else:
-        if cv_type == "stratified_k_fold":
-            logger.warning(
-                "stratified_k_fold requested for problem_type='%s' (not classification); "
-                "falling back to plain KFold.",
-                problem_type,
-            )
-        elif cv_type not in ("k_fold", "time_series_split", "shuffle_split", "stratified_k_fold"):
-            logger.warning("Unknown cv_type '%s'; falling back to plain KFold.", cv_type)
+        _log_splitter_fallback(cv_type, problem_type, logger)
         return KFold(
             n_splits=n_folds,
             shuffle=shuffle,

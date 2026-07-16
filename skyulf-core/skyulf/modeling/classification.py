@@ -109,6 +109,28 @@ class LogisticRegressionCalculator(SklearnCalculator):
         return super().fit(X, y, config, progress_callback, log_callback, validation_data)
 
     @classmethod
+    def _extract_solver_penalty_params(cls, config: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Returns the params dict from config, or None if unavailable/not a dict."""
+        if not config:
+            return None
+        params = config.get("params", config)
+        if not isinstance(params, dict):
+            return None
+        return params
+
+    @classmethod
+    def _raise_incompatible_solver_penalty(cls, solver: Any, penalty: Any) -> None:
+        """Raises a ValueError listing solvers compatible with the requested penalty."""
+        compatible_solvers = sorted(
+            s for s, penalties in cls._SOLVER_PENALTIES.items() if penalty in penalties
+        )
+        raise ValueError(
+            f"Logistic Regression: solver={solver!r} does not support "
+            f"penalty={penalty!r}. Solvers compatible with this penalty: "
+            f"{compatible_solvers or 'none'}."
+        )
+
+    @classmethod
     def _validate_solver_penalty(cls, config: dict[str, Any] | None) -> None:
         """Raise a clear, actionable error for an invalid solver/penalty pair.
 
@@ -117,10 +139,8 @@ class LogisticRegressionCalculator(SklearnCalculator):
         after data has already been split/validated upstream. Failing fast
         here with the full list of compatible solvers is more actionable.
         """
-        if not config:
-            return
-        params = config.get("params", config)
-        if not isinstance(params, dict):
+        params = cls._extract_solver_penalty_params(config)
+        if params is None:
             return
         solver = params.get("solver")
         penalty = params.get("penalty")
@@ -128,14 +148,7 @@ class LogisticRegressionCalculator(SklearnCalculator):
             return
         compatible = cls._SOLVER_PENALTIES.get(solver)
         if compatible is not None and penalty not in compatible:
-            compatible_solvers = sorted(
-                s for s, penalties in cls._SOLVER_PENALTIES.items() if penalty in penalties
-            )
-            raise ValueError(
-                f"Logistic Regression: solver={solver!r} does not support "
-                f"penalty={penalty!r}. Solvers compatible with this penalty: "
-                f"{compatible_solvers or 'none'}."
-            )
+            cls._raise_incompatible_solver_penalty(solver, penalty)
 
 
 # --- Calibrated Classifier ---

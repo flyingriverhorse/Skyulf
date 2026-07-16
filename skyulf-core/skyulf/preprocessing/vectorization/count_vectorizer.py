@@ -51,28 +51,6 @@ class CountVectorizerApplier(BaseApplier):
 # ── Calculate ─────────────────────────────────────────────────────────────────
 
 
-@NodeRegistry.register("count_vectorizer", CountVectorizerApplier)
-@node_meta(
-    id="count_vectorizer",
-    name="Count Vectorizer",
-    category="Text",
-    description=(
-        "Convert text columns to token-count feature columns (bag-of-words). "
-        "Fits a vocabulary on training data; apply uses that vocabulary."
-    ),
-    params={
-        "columns": [],
-        "max_features": None,
-        "min_df": 1,
-        "max_df": 1.0,
-        "ngram_range": [1, 1],
-        "lowercase": True,
-        "stop_words": None,
-        "binary": False,
-        "drop_original": False,
-    },
-    tags=["text", "nlp", "vectorizer", "bag-of-words"],
-)
 def _build_count_artifact(
     config: dict[str, Any], X: pd.DataFrame, valid_cols: list[str]
 ) -> CountVectorizerArtifact:
@@ -120,6 +98,28 @@ def _build_count_artifact(
     }
 
 
+@NodeRegistry.register("count_vectorizer", CountVectorizerApplier)
+@node_meta(
+    id="count_vectorizer",
+    name="Count Vectorizer",
+    category="Text",
+    description=(
+        "Convert text columns to token-count feature columns (bag-of-words). "
+        "Fits a vocabulary on training data; apply uses that vocabulary."
+    ),
+    params={
+        "columns": [],
+        "max_features": None,
+        "min_df": 1,
+        "max_df": 1.0,
+        "ngram_range": [1, 1],
+        "lowercase": True,
+        "stop_words": None,
+        "binary": False,
+        "drop_original": False,
+    },
+    tags=["text", "nlp", "vectorizer", "bag-of-words"],
+)
 class CountVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         # Vocabulary size is data-dependent — return None to signal unknown.
