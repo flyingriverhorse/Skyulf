@@ -22,6 +22,28 @@ logger = logging.getLogger(__name__)
 class ColumnMixin(_AnalyzerState):
     """Single-column analysis dispatch."""
 
+    @staticmethod
+    def _cardinality_ratio(series: pl.Series) -> float:
+        """Compute the ratio of unique values to total values in a series."""
+        n_unique = series.n_unique()
+        count = len(series)
+        return n_unique / count if count > 0 else 0
+
+    def _int_semantic_type(self, series: pl.Series) -> str:
+        """Classify an integer series as Categorical (low-cardinality) or Numeric."""
+        # Low-cardinality ints behave more like categories (better for plotting).
+        ratio = self._cardinality_ratio(series)
+        if ratio < 0.05 and series.n_unique() < 20:
+            return "Categorical"
+        return "Numeric"
+
+    def _string_semantic_type(self, series: pl.Series) -> str:
+        """Classify a string series as Categorical (low-cardinality) or Text."""
+        ratio = self._cardinality_ratio(series)
+        if ratio < 0.05:
+            return "Categorical"
+        return "Text"
+
     def _get_semantic_type(self, series: pl.Series) -> str:
         """Map polars dtype + cardinality heuristics to a semantic bucket."""
         dtype = series.dtype
@@ -38,24 +60,13 @@ class ColumnMixin(_AnalyzerState):
             pl.UInt32,
             pl.UInt64,
         ]:
-            # Low-cardinality ints behave more like categories (better for plotting).
-            n_unique = series.n_unique()
-            count = len(series)
-            ratio = n_unique / count if count > 0 else 0
-            if ratio < 0.05 and n_unique < 20:
-                return "Categorical"
-            return "Numeric"
+            return self._int_semantic_type(series)
         if dtype == pl.Boolean:
             return "Boolean"
         if dtype in [pl.Date, pl.Datetime, pl.Duration]:
             return "DateTime"
         if dtype == pl.Utf8 or dtype == pl.String:
-            n_unique = series.n_unique()
-            count = len(series)
-            ratio = n_unique / count if count > 0 else 0
-            if ratio < 0.05:
-                return "Categorical"
-            return "Text"
+            return self._string_semantic_type(series)
         if dtype == pl.Categorical:
             return "Categorical"
 

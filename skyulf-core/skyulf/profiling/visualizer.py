@@ -57,6 +57,28 @@ class EDAVisualizer:
                 dq_table.add_row("Task Type", self.profile.task_type)
         console.print(dq_table)
 
+    @staticmethod
+    def _numeric_stats_row(col_name, col_profile):
+        """Build a single formatted numeric-stats table row for a column, or None if not numeric."""
+        if not (col_profile.dtype == "Numeric" and col_profile.numeric_stats):
+            return None
+        stats = col_profile.numeric_stats
+
+        mean = f"{stats.mean:.2f}" if stats.mean is not None else "-"
+        std = f"{stats.std:.2f}" if stats.std is not None else "-"
+        min_val = f"{stats.min:.2f}" if stats.min is not None else "-"
+        max_val = f"{stats.max:.2f}" if stats.max is not None else "-"
+        skew = f"{stats.skewness:.2f}" if stats.skewness is not None else "-"
+        kurt = f"{stats.kurtosis:.2f}" if stats.kurtosis is not None else "-"
+
+        is_normal = "-"
+        if col_profile.normality_test:
+            is_normal = (
+                "[green]Yes[/green]" if col_profile.normality_test.is_normal else "[red]No[/red]"
+            )
+
+        return (col_name, mean, std, min_val, max_val, skew, kurt, is_normal)
+
     def _render_numeric_stats(self, console, Table):
         console.print("\n[bold]2. Numeric Statistics[/bold]")
         stats_table = Table(show_header=True, header_style="bold cyan")
@@ -71,26 +93,10 @@ class EDAVisualizer:
 
         has_numeric = False
         for col_name, col_profile in self.profile.columns.items():
-            if col_profile.dtype == "Numeric" and col_profile.numeric_stats:
+            row = self._numeric_stats_row(col_name, col_profile)
+            if row is not None:
                 has_numeric = True
-                stats = col_profile.numeric_stats
-
-                mean = f"{stats.mean:.2f}" if stats.mean is not None else "-"
-                std = f"{stats.std:.2f}" if stats.std is not None else "-"
-                min_val = f"{stats.min:.2f}" if stats.min is not None else "-"
-                max_val = f"{stats.max:.2f}" if stats.max is not None else "-"
-                skew = f"{stats.skewness:.2f}" if stats.skewness is not None else "-"
-                kurt = f"{stats.kurtosis:.2f}" if stats.kurtosis is not None else "-"
-
-                is_normal = "-"
-                if col_profile.normality_test:
-                    is_normal = (
-                        "[green]Yes[/green]"
-                        if col_profile.normality_test.is_normal
-                        else "[red]No[/red]"
-                    )
-
-                stats_table.add_row(col_name, mean, std, min_val, max_val, skew, kurt, is_normal)
+                stats_table.add_row(*row)
 
         if has_numeric:
             console.print(stats_table)
@@ -246,53 +252,62 @@ class EDAVisualizer:
             # Schema exposes day_of_week and month_of_year lists rather than period/strength.
             console.print("Seasonality Analysis: Available (Day of Week, Month of Year)")
 
+    def _render_target_correlations_table(self, console, Table):
+        """Render the top target-correlation table if correlations are available."""
+        if not self.profile.target_correlations:
+            return
+        corr_table = Table(show_header=True, header_style="bold green", title="Top Correlations")
+        corr_table.add_column("Feature")
+        corr_table.add_column("Correlation", justify="right")
+
+        sorted_corrs = sorted(
+            self.profile.target_correlations.items(),
+            key=lambda x: abs(x[1]),
+            reverse=True,
+        )
+        for col, corr in sorted_corrs[:5]:
+            corr_table.add_row(col, f"{corr:.4f}")
+        console.print(corr_table)
+
+    def _render_target_interactions_table(self, console, Table):
+        """Render the top ANOVA feature-association table if boxplot interactions are available."""
+        if not self.profile.target_interactions:
+            return
+        interactions = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
+        if not interactions:
+            return
+        int_table = Table(
+            show_header=True,
+            header_style="bold green",
+            title="Top Feature Associations (ANOVA)",
+        )
+        int_table.add_column("Feature")
+        int_table.add_column("p-value", justify="right")
+        int_table.add_column("Significance", justify="center")
+
+        interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
+
+        for interaction in interactions[:5]:
+            p_val = interaction.p_value
+            p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
+            sig = (
+                "[green]High[/green]"
+                if p_val is not None and p_val < 0.05
+                else "[yellow]Low[/yellow]"
+            )
+            int_table.add_row(interaction.feature, p_str, sig)
+        console.print(int_table)
+
     def _render_target_analysis(self, console, Table):
         if not self.profile.target_col:
             return
         console.print(f"\n[bold]9. Target Analysis (Target: {self.profile.target_col})[/bold]")
 
         # Numeric Target: Correlations
-        if self.profile.target_correlations:
-            corr_table = Table(
-                show_header=True, header_style="bold green", title="Top Correlations"
-            )
-            corr_table.add_column("Feature")
-            corr_table.add_column("Correlation", justify="right")
-
-            sorted_corrs = sorted(
-                self.profile.target_correlations.items(),
-                key=lambda x: abs(x[1]),
-                reverse=True,
-            )
-            for col, corr in sorted_corrs[:5]:
-                corr_table.add_row(col, f"{corr:.4f}")
-            console.print(corr_table)
+        self._render_target_correlations_table(console, Table)
 
         # Categorical Target: Interactions (ANOVA, boxplot only)
-        if self.profile.target_interactions:
-            interactions = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
-            if interactions:
-                int_table = Table(
-                    show_header=True,
-                    header_style="bold green",
-                    title="Top Feature Associations (ANOVA)",
-                )
-                int_table.add_column("Feature")
-                int_table.add_column("p-value", justify="right")
-                int_table.add_column("Significance", justify="center")
-
-                interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
-
-                for interaction in interactions[:5]:
-                    p_val = interaction.p_value
-                    p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
-                    sig = (
-                        "[green]High[/green]"
-                        if p_val is not None and p_val < 0.05
-                        else "[yellow]Low[/yellow]"
-                    )
-                    int_table.add_row(interaction.feature, p_str, sig)
-                console.print(int_table)
+        self._render_target_interactions_table(console, Table)
 
     def _detect_regression_tree(self) -> bool:
         """Heuristic: a leaf with a numeric class_name implies regression."""
@@ -626,6 +641,16 @@ class EDAVisualizer:
         scatter_matrix(pdf, alpha=0.8, figsize=(10, 10), diagonal="kde", c=colors, cmap="viridis")
         plt.suptitle("Scatter Matrix")
 
+    @staticmethod
+    def _pca_color_values(labels):
+        """Convert PCA point labels to numeric color values, falling back to a categorical mapping."""
+        try:
+            return [float(lbl) for lbl in labels if lbl is not None]
+        except (ValueError, TypeError):
+            unique_labels = list({lbl for lbl in labels if lbl is not None})
+            label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
+            return [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
+
     def _plot_pca(self):
         if not self.profile.pca_data:
             return
@@ -636,12 +661,7 @@ class EDAVisualizer:
         y = [p.y for p in self.profile.pca_data]
         labels = [p.label for p in self.profile.pca_data]
 
-        try:
-            c_values = [float(lbl) for lbl in labels if lbl is not None]
-        except (ValueError, TypeError):
-            unique_labels = list({lbl for lbl in labels if lbl is not None})
-            label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
-            c_values = [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
+        c_values = self._pca_color_values(labels)
 
         plt.figure(figsize=(8, 6))
         scatter = plt.scatter(x, y, c=c_values, cmap="viridis", alpha=0.8)
@@ -650,6 +670,18 @@ class EDAVisualizer:
         plt.xlabel("PC1")
         plt.ylabel("PC2")
         plt.grid(True, alpha=0.3)
+
+    @staticmethod
+    def _geospatial_color_values(labels):
+        """Convert geospatial point labels to numeric color values, or None if no labels present."""
+        if not any(labels):
+            return None
+        try:
+            return [float(lbl) if lbl is not None else -1 for lbl in labels]
+        except (ValueError, TypeError):
+            unique_labels = list({lbl for lbl in labels if lbl is not None})
+            label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
+            return [label_map.get(lbl, -1) if lbl is not None else -1 for lbl in labels]
 
     def _plot_geospatial(self):
         if not self.profile.geospatial or not self.profile.geospatial.sample_points:
@@ -662,14 +694,7 @@ class EDAVisualizer:
         labels = [p.label for p in self.profile.geospatial.sample_points]
 
         # Color by label if available
-        c_values = None
-        if any(labels):
-            try:
-                c_values = [float(lbl) if lbl is not None else -1 for lbl in labels]
-            except (ValueError, TypeError):
-                unique_labels = list({lbl for lbl in labels if lbl is not None})
-                label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
-                c_values = [label_map.get(lbl, -1) if lbl is not None else -1 for lbl in labels]
+        c_values = self._geospatial_color_values(labels)
 
         plt.figure(figsize=(10, 6))
         scatter = plt.scatter(lons, lats, c=c_values, cmap="viridis", alpha=0.6, s=10)
