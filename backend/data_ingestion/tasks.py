@@ -35,6 +35,107 @@ def get_db_session():
     return _sync_session_factory()
 
 
+def _mark_ingestion_processing(session, data_source) -> dict:
+    """Set the data source's ingestion status to 'processing', persist it, and return the metadata dict."""
+    metadata = dict(data_source.source_metadata or {})
+    metadata["ingestion_status"] = {
+        "status": "processing",
+        "progress": 0.1,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    data_source.source_metadata = metadata
+    session.commit()
+    return metadata
+
+
+def _build_ingestion_connector(data_source) -> BaseConnector:
+    """Select and construct the connector matching the data source's type."""
+    config = data_source.config or {}
+
+    if data_source.type == "file":
+        file_path = config.get("file_path")
+        if not file_path:
+            raise ValueError("Missing file_path in config")
+        return LocalFileConnector(file_path)
+
+    elif data_source.type == "s3":
+        path = config.get("path")
+        if not path:
+            raise ValueError("Missing path in config")
+
+        # Optional: Pass credentials if stored in config (be careful with security)
+        # For now, assume env vars or IAM roles
+        storage_options = config.get("storage_options", {})
+
+        return S3Connector(path, storage_options=storage_options)
+    else:
+        raise ValueError(f"Unsupported source type: {data_source.type}")
+
+
+def _run_ingestion_sync(connector: BaseConnector) -> dict:
+    """Connect, fetch data, and profile it via connector, running the async pipeline on a fresh event loop."""
+
+    async def run_ingestion():
+        await connector.connect()
+        # Load full data to get accurate counts
+        # Note: For very large SQL tables, we might want to avoid fetching everything just for metadata.
+        # But for now, we follow the pattern.
+        df = await connector.fetch_data()
+
+        # Run Profiling
+        profile = DataProfiler.profile(df)
+
+        return profile
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(run_ingestion())
+    finally:
+        loop.close()
+
+
+def _mark_ingestion_completed(session, data_source, metadata: dict, profile: dict) -> None:
+    """Flatten the profile into metadata, mark ingestion as completed, and persist the data source."""
+    metadata["ingestion_status"] = {
+        "status": "completed",
+        "progress": 1.0,
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    # Flatten profile into metadata for easy access
+    metadata["schema"] = {col: stats["type"] for col, stats in profile["columns"].items()}
+    metadata["row_count"] = profile["row_count"]
+    metadata["column_count"] = profile["column_count"]
+    metadata["profile"] = profile  # Store full profile
+
+    data_source.source_metadata = metadata
+    data_source.test_status = "success"
+    data_source.last_tested = datetime.now(UTC)
+
+    session.commit()
+
+
+def _handle_ingestion_failure(session, source_id: int, error: Exception) -> None:
+    """Log the ingestion failure and, if possible, persist a 'failed' ingestion status."""
+    logger.error(f"Ingestion failed for source {source_id}: {str(error)}")
+    if session:
+        # Roll back first: if the exception came from a DB error (e.g. a
+        # failed commit above), the session is left in a rolled-back/
+        # invalid state and the re-query below would itself raise.
+        session.rollback()
+        data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
+        if data_source:
+            metadata = dict(data_source.source_metadata or {})
+            metadata["ingestion_status"] = {
+                "status": "failed",
+                "error": str(error),
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+            data_source.source_metadata = metadata
+            data_source.test_status = "failed"
+            session.commit()
+
+
 @shared_task(name="core.data_ingestion.tasks.ingest_data_task")
 def ingest_data_task(source_id: int):
     """
@@ -50,95 +151,20 @@ def ingest_data_task(source_id: int):
             logger.error(f"DataSource {source_id} not found")
             return
 
-        # Update status to processing
-        metadata = dict(data_source.source_metadata or {})
-        metadata["ingestion_status"] = {
-            "status": "processing",
-            "progress": 0.1,
-            "updated_at": datetime.now(UTC).isoformat(),
-        }
-        data_source.source_metadata = metadata
-        session.commit()
+        # 2. Update status to processing
+        metadata = _mark_ingestion_processing(session, data_source)
 
-        # 2. Select Connector
-        config = data_source.config or {}
-        connector: BaseConnector
+        # 3. Select Connector
+        connector = _build_ingestion_connector(data_source)
 
-        if data_source.type == "file":
-            file_path = config.get("file_path")
-            if not file_path:
-                raise ValueError("Missing file_path in config")
-            connector = LocalFileConnector(file_path)
+        # 4. Run Ingestion (Async wrapper)
+        profile = _run_ingestion_sync(connector)
 
-        elif data_source.type == "s3":
-            path = config.get("path")
-            if not path:
-                raise ValueError("Missing path in config")
-
-            # Optional: Pass credentials if stored in config (be careful with security)
-            # For now, assume env vars or IAM roles
-            storage_options = config.get("storage_options", {})
-
-            connector = S3Connector(path, storage_options=storage_options)
-        else:
-            raise ValueError(f"Unsupported source type: {data_source.type}")
-
-        # 3. Run Ingestion (Async wrapper)
-        async def run_ingestion():
-            await connector.connect()
-            # Load full data to get accurate counts
-            # Note: For very large SQL tables, we might want to avoid fetching everything just for metadata.
-            # But for now, we follow the pattern.
-            df = await connector.fetch_data()
-
-            # Run Profiling
-            profile = DataProfiler.profile(df)
-
-            return profile
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            profile = loop.run_until_complete(run_ingestion())
-        finally:
-            loop.close()
-
-        # 4. Update Metadata with Success
-        metadata["ingestion_status"] = {
-            "status": "completed",
-            "progress": 1.0,
-            "updated_at": datetime.now(UTC).isoformat(),
-        }
-        # Flatten profile into metadata for easy access
-        metadata["schema"] = {col: stats["type"] for col, stats in profile["columns"].items()}
-        metadata["row_count"] = profile["row_count"]
-        metadata["column_count"] = profile["column_count"]
-        metadata["profile"] = profile  # Store full profile
-
-        data_source.source_metadata = metadata
-        data_source.test_status = "success"
-        data_source.last_tested = datetime.now(UTC)
-
-        session.commit()
+        # 5. Update Metadata with Success
+        _mark_ingestion_completed(session, data_source, metadata, profile)
         logger.info(f"Ingestion completed for source {source_id}")
 
     except Exception as e:
-        logger.error(f"Ingestion failed for source {source_id}: {str(e)}")
-        if session:
-            # Roll back first: if the exception came from a DB error (e.g. a
-            # failed commit above), the session is left in a rolled-back/
-            # invalid state and the re-query below would itself raise.
-            session.rollback()
-            data_source = session.query(DataSource).filter(DataSource.id == source_id).first()
-            if data_source:
-                metadata = dict(data_source.source_metadata or {})
-                metadata["ingestion_status"] = {
-                    "status": "failed",
-                    "error": str(e),
-                    "updated_at": datetime.now(UTC).isoformat(),
-                }
-                data_source.source_metadata = metadata
-                data_source.test_status = "failed"
-                session.commit()
+        _handle_ingestion_failure(session, source_id, e)
     finally:
         session.close()

@@ -61,9 +61,19 @@ class FileSystemCatalog(DataCatalog):
         return resolved
 
     def load(self, dataset_id: str, **kwargs) -> Any:
+        path = self._resolve_dataset_path(dataset_id)
+        limit = kwargs.get("limit")
+
+        try:
+            return self._read_dataframe(path, dataset_id, limit)
+        except Exception as e:
+            logger.error(f"Error loading dataset {dataset_id}: {e}")
+            raise e
+
+    def _resolve_dataset_path(self, dataset_id: str) -> str:
+        """Resolve dataset_id to an on-disk path, auto-resolving the extension for legacy IDs."""
         path = self._get_path(dataset_id)
 
-        # Auto-resolve extension if not found (legacy support for simple IDs)
         if not Path(path).exists():
             if Path(path + ".parquet").exists():
                 path += ".parquet"
@@ -72,31 +82,29 @@ class FileSystemCatalog(DataCatalog):
             else:
                 raise FileNotFoundError(f"Dataset {dataset_id} not found at {path}")
 
-        # Handle sampling if requested
-        limit = kwargs.get("limit")
+        return path
 
+    def _read_dataframe(self, path: str, dataset_id: str, limit: int | None) -> Any:
+        """Dispatch to the pandas reader matching the file's extension, applying the row limit."""
+        if path.endswith(".csv"):
+            return pd.read_csv(path, nrows=limit)
+        elif path.endswith(".parquet"):
+            df = pd.read_parquet(path)
+            return df.head(limit) if limit else df
+        elif path.endswith(".json"):
+            return pd.read_json(path).head(limit) if limit else pd.read_json(path)
+        elif path.endswith(".xlsx") or path.endswith(".xls"):
+            return pd.read_excel(path).head(limit) if limit else pd.read_excel(path)
+        else:
+            return self._read_fallback_parquet(path, dataset_id, limit)
+
+    def _read_fallback_parquet(self, path: str, dataset_id: str, limit: int | None) -> Any:
+        """Try reading a file with no recognized extension as parquet, or raise ValueError."""
         try:
-            if path.endswith(".csv"):
-                return pd.read_csv(path, nrows=limit)
-            elif path.endswith(".parquet"):
-                df = pd.read_parquet(path)
-                return df.head(limit) if limit else df
-            elif path.endswith(".json"):
-                return pd.read_json(path).head(limit) if limit else pd.read_json(path)
-            elif path.endswith(".xlsx") or path.endswith(".xls"):
-                return pd.read_excel(path).head(limit) if limit else pd.read_excel(path)
-            else:
-                # Fallback: try reading as parquet if no extension
-                try:
-                    df = pd.read_parquet(path)
-                    return df.head(limit) if limit else df
-                except Exception:
-                    raise ValueError(
-                        f"Unsupported format or file not found: {dataset_id}"
-                    ) from None
-        except Exception as e:
-            logger.error(f"Error loading dataset {dataset_id}: {e}")
-            raise e
+            df = pd.read_parquet(path)
+            return df.head(limit) if limit else df
+        except Exception:
+            raise ValueError(f"Unsupported format or file not found: {dataset_id}") from None
 
     def save(self, dataset_id: str, data: Any, **kwargs) -> None:
         path = self._get_path(dataset_id)
@@ -164,13 +172,21 @@ class S3Catalog(DataCatalog):
         """
         opts = options.copy()
 
-        # Map credentials
+        self._map_s3_credentials(opts)
+        self._apply_s3_region(opts)
+        self._apply_s3_endpoint(opts)
+
+        return opts
+
+    def _map_s3_credentials(self, opts: dict) -> None:
+        """Map aws_access_key_id/aws_secret_access_key to the s3fs key/secret options, in place."""
         if "aws_access_key_id" in opts:
             opts["key"] = opts.pop("aws_access_key_id")
         if "aws_secret_access_key" in opts:
             opts["secret"] = opts.pop("aws_secret_access_key")
 
-        # Handle region
+    def _apply_s3_region(self, opts: dict) -> None:
+        """Move region/aws_region/aws_default_region into client_kwargs['region_name'], in place."""
         # Check for various region keys that might be passed
         region = (
             opts.pop("region", None)
@@ -185,7 +201,8 @@ class S3Catalog(DataCatalog):
             if "region_name" not in opts["client_kwargs"]:
                 opts["client_kwargs"]["region_name"] = region
 
-        # Handle endpoint_url
+    def _apply_s3_endpoint(self, opts: dict) -> None:
+        """Move endpoint_url/aws_endpoint_url into client_kwargs['endpoint_url'], in place."""
         # s3fs expects endpoint_url in client_kwargs usually, or top level in newer versions
         # To be safe, put it in client_kwargs if present
         endpoint = opts.pop("endpoint_url", None) or opts.pop("aws_endpoint_url", None)
@@ -194,8 +211,6 @@ class S3Catalog(DataCatalog):
                 opts["client_kwargs"] = {}
             if "endpoint_url" not in opts["client_kwargs"]:
                 opts["client_kwargs"]["endpoint_url"] = endpoint
-
-        return opts
 
     def _get_s3_path(self, dataset_id: str) -> str:
         # If it already starts with s3://, use it

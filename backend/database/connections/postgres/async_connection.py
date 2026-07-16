@@ -30,6 +30,52 @@ except ImportError:
 #     aws = azure = gcp = None
 
 
+def _normalize_raw_database_url(raw: str) -> str:
+    """Convert a sync-style DATABASE_URL to its async-driver equivalent."""
+    if raw.startswith("postgresql://") or raw.startswith("postgresql+psycopg2://"):
+        return raw.replace("postgresql", "postgresql+asyncpg", 1)
+    elif raw.startswith("sqlite://"):
+        return raw.replace("sqlite://", "sqlite+aiosqlite://", 1)
+    return raw
+
+
+def _build_database_query_string() -> str:
+    """Build the optional '?ssl=...&...' query string from DB_SSLMODE/DB_EXTRA_PARAMS."""
+    # Optional SSL mode and extra params
+    sslmode = os.environ.get("DB_SSLMODE")  # e.g. require, verify-full
+    extra = os.environ.get("DB_EXTRA_PARAMS")  # e.g. application_name=mlops&connect_timeout=10
+
+    query_parts = []
+    if sslmode:
+        query_parts.append(f"ssl={sslmode}")  # asyncpg uses ssl instead of sslmode
+    if extra:
+        query_parts.append(extra)
+
+    return f"?{'&'.join(query_parts)}" if query_parts else ""
+
+
+def _build_database_url_from_components(
+    user: str | None, password: str | None, host: str | None, port: str | None, dbname: str | None
+) -> str:
+    """Assemble an asyncpg SQLAlchemy URL from discrete DB_USER/DB_PASSWORD/DB_HOST/DB_PORT/DB_NAME."""
+    # Use asyncpg dialect for PostgreSQL async
+    scheme = "postgresql+asyncpg"
+
+    # Percent-encode user and password when present
+    user_enc = quote_plus(user) if user else ""
+    pwd_enc = quote_plus(password) if password else ""
+
+    host_part = host or "localhost"
+    port_part = f":{port}" if port else ""
+    db_part = f"/{dbname}" if dbname else ""
+
+    query = _build_database_query_string()
+
+    # Construct URL
+    auth = f"{user_enc}:{pwd_enc}@" if user_enc or pwd_enc else ""
+    return f"{scheme}://{auth}{host_part}{port_part}{db_part}{query}"
+
+
 def build_async_database_url_from_env() -> str:
     """
     Build an async SQLAlchemy database URL from environment variables.
@@ -49,12 +95,7 @@ def build_async_database_url_from_env() -> str:
 
     raw = os.environ.get("DATABASE_URL")
     if raw:
-        # Convert sync URL to async equivalent
-        if raw.startswith("postgresql://") or raw.startswith("postgresql+psycopg2://"):
-            return raw.replace("postgresql", "postgresql+asyncpg", 1)
-        elif raw.startswith("sqlite://"):
-            return raw.replace("sqlite://", "sqlite+aiosqlite://", 1)
-        return raw
+        return _normalize_raw_database_url(raw)
 
     user = os.environ.get("DB_USER")
     password = os.environ.get("DB_PASSWORD")
@@ -67,34 +108,7 @@ def build_async_database_url_from_env() -> str:
         logger.warning("No DB connection info found in environment; using async SQLite fallback.")
         return "sqlite+aiosqlite:///mlops_postgres_fallback.db"
 
-    # Use asyncpg dialect for PostgreSQL async
-    scheme = "postgresql+asyncpg"
-
-    # Percent-encode user and password when present
-    user_enc = quote_plus(user) if user else ""
-    pwd_enc = quote_plus(password) if password else ""
-
-    host_part = host or "localhost"
-    port_part = f":{port}" if port else ""
-    db_part = f"/{dbname}" if dbname else ""
-
-    # Optional SSL mode and extra params
-    sslmode = os.environ.get("DB_SSLMODE")  # e.g. require, verify-full
-    extra = os.environ.get("DB_EXTRA_PARAMS")  # e.g. application_name=mlops&connect_timeout=10
-
-    query_parts = []
-    if sslmode:
-        query_parts.append(f"ssl={sslmode}")  # asyncpg uses ssl instead of sslmode
-    if extra:
-        query_parts.append(extra)
-
-    query = f"?{'&'.join(query_parts)}" if query_parts else ""
-
-    # Construct URL
-    auth = f"{user_enc}:{pwd_enc}@" if user_enc or pwd_enc else ""
-    url = f"{scheme}://{auth}{host_part}{port_part}{db_part}{query}"
-
-    return url
+    return _build_database_url_from_components(user, password, host, port, dbname)
 
 
 # Compose the final async DATABASE_URL and create async SQLAlchemy engine/session

@@ -174,6 +174,62 @@ class AsyncJSONSafeSerializer:
             return None
 
     @staticmethod
+    async def _handle_polars_dataframe(df: Any, records_format: bool, max_rows: int | None) -> Any:
+        """Convert df to JSON-safe format if it is a Polars DataFrame, else return _NOT_HANDLED."""
+        try:
+            import polars as pl
+        except ImportError:
+            return AsyncJSONSafeSerializer._NOT_HANDLED
+
+        if not isinstance(df, pl.DataFrame):
+            return AsyncJSONSafeSerializer._NOT_HANDLED
+
+        if max_rows and df.height > max_rows:
+            df = df.head(max_rows)
+        # Convert to Pandas for now as the rest of the logic assumes Pandas
+        # Or use write_json/to_dicts directly
+        if records_format:
+            return df.to_dicts()
+        else:
+            return df.to_dict(as_series=False)
+
+    @staticmethod
+    async def _prepare_dataframe_for_serialization(
+        df: pd.DataFrame, max_rows: int | None
+    ) -> pd.DataFrame:
+        """Truncate to max_rows, yield control for large frames, and fill NaN before serialization."""
+        # Limit rows if specified
+        if max_rows and len(df) > max_rows:
+            df = df.head(max_rows)
+            logger.info(f"Truncated DataFrame to {max_rows} rows for serialization")
+
+        # Yield control for large DataFrames
+        if len(df) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
+            await asyncio.sleep(0)
+
+        # Clean the DataFrame
+        return df.fillna(None)
+
+    @staticmethod
+    async def _dataframe_to_records(clean_df: pd.DataFrame) -> list[Any]:
+        """Convert a cleaned pandas DataFrame to a JSON-safe list of record dicts."""
+        records = clean_df.to_dict("records")
+        cleaned_records: list[Any] = []
+        for record in records:
+            clean_record = await AsyncJSONSafeSerializer.clean_for_json(record)
+            cleaned_records.append(clean_record)
+        return cleaned_records
+
+    @staticmethod
+    async def _dataframe_to_columns(clean_df: pd.DataFrame) -> dict[str, Any]:
+        """Convert a cleaned pandas DataFrame to a JSON-safe dict of column name -> values."""
+        column_result: dict[str, Any] = {}
+        for col in clean_df.columns:
+            column_data = clean_df[col].tolist()
+            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
+        return column_result
+
+    @staticmethod
     async def safe_dict_from_dataframe(
         df: pd.DataFrame | Any, records_format: bool = True, max_rows: int | None = None
     ) -> list[dict] | dict:
@@ -189,51 +245,21 @@ class AsyncJSONSafeSerializer:
             JSON-safe dictionary representation
         """
         # Handle Polars
-        try:
-            import polars as pl
-
-            if isinstance(df, pl.DataFrame):
-                if max_rows and df.height > max_rows:
-                    df = df.head(max_rows)
-                # Convert to Pandas for now as the rest of the logic assumes Pandas
-                # Or use write_json/to_dicts directly
-                if records_format:
-                    return df.to_dicts()
-                else:
-                    return df.to_dict(as_series=False)
-        except ImportError:
-            pass
+        polars_result = await AsyncJSONSafeSerializer._handle_polars_dataframe(
+            df, records_format, max_rows
+        )
+        if polars_result is not AsyncJSONSafeSerializer._NOT_HANDLED:
+            return polars_result
 
         if df.empty:
             return [] if records_format else {}
 
-        # Limit rows if specified
-        if max_rows and len(df) > max_rows:
-            df = df.head(max_rows)
-            logger.info(f"Truncated DataFrame to {max_rows} rows for serialization")
-
-        # Yield control for large DataFrames
-        if len(df) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
-            await asyncio.sleep(0)
-
-        # Clean the DataFrame
-        clean_df = df.fillna(None)
+        clean_df = await AsyncJSONSafeSerializer._prepare_dataframe_for_serialization(df, max_rows)
 
         if records_format:
-            # Convert to list of records
-            records = clean_df.to_dict("records")
-            cleaned_records: list[Any] = []
-            for record in records:
-                clean_record = await AsyncJSONSafeSerializer.clean_for_json(record)
-                cleaned_records.append(clean_record)
-            return cleaned_records
+            return await AsyncJSONSafeSerializer._dataframe_to_records(clean_df)
 
-        # Convert to dict of columns
-        column_result: dict[str, Any] = {}
-        for col in clean_df.columns:
-            column_data = clean_df[col].tolist()
-            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
-        return column_result
+        return await AsyncJSONSafeSerializer._dataframe_to_columns(clean_df)
 
     @staticmethod
     async def serialize_dataframe_metadata(df: pd.DataFrame) -> dict[str, Any]:
