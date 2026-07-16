@@ -136,54 +136,20 @@ def perform_cross_validation(
 
     # 2. Iterate Folds
     for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X_arr, y_arr)):
-        if progress_callback:
-            progress_callback(fold_idx + 1, n_folds)
-
-        if log_callback:
-            log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
-
-        # Split Data
-        # We slice the original X/y to preserve their type (Pandas/Polars) for the calculator
-        # Polars supports slicing with numpy arrays via __getitem__
-        # Pandas supports slicing via iloc
-
-        if hasattr(X, "iloc"):
-            X_train_fold = X.iloc[train_idx]
-            X_val_fold = X.iloc[val_idx]
-        else:
-            # Polars or other
-            X_train_fold = X[train_idx]
-            X_val_fold = X[val_idx]
-
-        if hasattr(y, "iloc"):
-            y_train_fold = y.iloc[train_idx]
-            y_val_fold = y.iloc[val_idx]
-        else:
-            # Polars Series or numpy array
-            y_train_fold = y[train_idx]
-            y_val_fold = y[val_idx]
-
-        # Fit
-        model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
-
-        # Evaluate
-        if problem_type == "classification":
-            metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
-        else:
-            metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
-
-        if log_callback:
-            # Log a key metric for the fold
-            key_metric = "accuracy" if problem_type == "classification" else "r2"
-            score = metrics.get(key_metric, 0.0)
-            log_callback(f"Fold {fold_idx + 1} completed. {key_metric}: {score:.4f}")
-
         fold_results.append(
-            {
-                "fold": fold_idx + 1,
-                "metrics": sanitize_metrics(metrics),
-                # We could store predictions here if needed, but might be too heavy
-            }
+            _run_cv_fold(
+                calculator=calculator,
+                X=X,
+                y=y,
+                train_idx=train_idx,
+                val_idx=val_idx,
+                config=config,
+                problem_type=problem_type,
+                fold_idx=fold_idx,
+                n_folds=n_folds,
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+            )
         )
 
     # 3. Aggregate
@@ -202,6 +168,74 @@ def perform_cross_validation(
             "shuffle": shuffle,
             "random_state": random_state,
         },
+    }
+
+
+def _slice_fold_data(X: Any, y: Any, train_idx: Any, val_idx: Any) -> tuple[Any, Any, Any, Any]:
+    """Slice X/y into train/val subsets for a single fold, preserving their original type."""
+    # We slice the original X/y to preserve their type (Pandas/Polars) for the calculator
+    # Polars supports slicing with numpy arrays via __getitem__
+    # Pandas supports slicing via iloc
+    if hasattr(X, "iloc"):
+        X_train_fold = X.iloc[train_idx]
+        X_val_fold = X.iloc[val_idx]
+    else:
+        # Polars or other
+        X_train_fold = X[train_idx]
+        X_val_fold = X[val_idx]
+
+    if hasattr(y, "iloc"):
+        y_train_fold = y.iloc[train_idx]
+        y_val_fold = y.iloc[val_idx]
+    else:
+        # Polars Series or numpy array
+        y_train_fold = y[train_idx]
+        y_val_fold = y[val_idx]
+
+    return X_train_fold, X_val_fold, y_train_fold, y_val_fold
+
+
+def _run_cv_fold(
+    calculator: "BaseModelCalculator",
+    X: Any,
+    y: Any,
+    train_idx: Any,
+    val_idx: Any,
+    config: dict[str, Any],
+    problem_type: str,
+    fold_idx: int,
+    n_folds: int,
+    progress_callback: Callable[[int, int], None] | None,
+    log_callback: Callable[[str], None] | None,
+) -> dict[str, Any]:
+    """Fit and evaluate a single CV fold, reporting progress/logging, and return its result entry."""
+    if progress_callback:
+        progress_callback(fold_idx + 1, n_folds)
+
+    if log_callback:
+        log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
+
+    X_train_fold, X_val_fold, y_train_fold, y_val_fold = _slice_fold_data(X, y, train_idx, val_idx)
+
+    # Fit
+    model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
+
+    # Evaluate
+    if problem_type == "classification":
+        metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
+    else:
+        metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
+
+    if log_callback:
+        # Log a key metric for the fold
+        key_metric = "accuracy" if problem_type == "classification" else "r2"
+        score = metrics.get(key_metric, 0.0)
+        log_callback(f"Fold {fold_idx + 1} completed. {key_metric}: {score:.4f}")
+
+    return {
+        "fold": fold_idx + 1,
+        "metrics": sanitize_metrics(metrics),
+        # We could store predictions here if needed, but might be too heavy
     }
 
 

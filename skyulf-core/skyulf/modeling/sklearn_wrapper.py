@@ -46,36 +46,7 @@ class SklearnCalculator(BaseModelCalculator):
     ) -> Any:
         """Fit the Scikit-Learn model."""
         # 1. Merge Config with Defaults
-        params = self.default_params.copy()
-        if config:
-            # We support two configuration structures:
-            # 1. Nested: {'params': {'C': 1.0, ...}} - Preferred
-            # 2. Flat: {'C': 1.0, 'type': '...', ...} - Legacy/Simple support
-
-            # Check for explicit 'params' dictionary first
-            overrides = config.get("params", {})
-
-            # If 'params' key exists but is None or empty, check if there are other keys at top level
-            # that might be params. But be careful not to mix them.
-            # If config has 'params', we assume it's the source of truth.
-
-            if not overrides and "params" not in config:
-                # Fallback to flat config if 'params' key is completely missing
-                reserved_keys = {
-                    "type",
-                    "target_column",
-                    "node_id",
-                    "step_type",
-                    "inputs",
-                }
-                overrides = {
-                    k: v
-                    for k, v in config.items()
-                    if k not in reserved_keys and not isinstance(v, dict)
-                }
-
-            if overrides:
-                params.update(overrides)
+        params = self._resolve_fit_params(config)
 
         msg = f"Initializing {self.model_class.__name__} with params: {params}"
         logger.info(msg)
@@ -83,26 +54,7 @@ class SklearnCalculator(BaseModelCalculator):
             log_callback(msg)
 
         # 2. Instantiate Model
-        # Filter params to only include those accepted by the model_class constructor.
-        # Skip filtering when the constructor uses **kwargs (e.g. XGBoost 2.x) because
-        # every named param would fail the membership check even though it is valid.
-        import inspect
-
-        sig = inspect.signature(self.model_class)
-        accepts_kwargs = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
-        )
-
-        if accepts_kwargs:
-            valid_params = params
-        else:
-            valid_params = {k: v for k, v in params.items() if k in sig.parameters}
-            dropped = set(params.keys()) - set(valid_params.keys())
-            if dropped:
-                logger.warning(
-                    f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}"
-                )
-
+        valid_params = self._filter_supported_params(params)
         model = self.model_class(**valid_params)
 
         # 3. Fit
@@ -112,6 +64,72 @@ class SklearnCalculator(BaseModelCalculator):
         model.fit(X_np, y_np)
 
         return model
+
+    def _resolve_fit_params(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Merges ``default_params`` with overrides from ``config``.
+
+        Supports two configuration structures: a nested ``{'params': {...}}`` dict
+        (preferred), or a flat legacy dict where non-reserved, non-dict keys are
+        treated as params.
+        """
+        params = self.default_params.copy()
+        if not config:
+            return params
+
+        # We support two configuration structures:
+        # 1. Nested: {'params': {'C': 1.0, ...}} - Preferred
+        # 2. Flat: {'C': 1.0, 'type': '...', ...} - Legacy/Simple support
+
+        # Check for explicit 'params' dictionary first
+        overrides = config.get("params", {})
+
+        # If 'params' key exists but is None or empty, check if there are other keys at top level
+        # that might be params. But be careful not to mix them.
+        # If config has 'params', we assume it's the source of truth.
+
+        if not overrides and "params" not in config:
+            # Fallback to flat config if 'params' key is completely missing
+            reserved_keys = {
+                "type",
+                "target_column",
+                "node_id",
+                "step_type",
+                "inputs",
+            }
+            overrides = {
+                k: v
+                for k, v in config.items()
+                if k not in reserved_keys and not isinstance(v, dict)
+            }
+
+        if overrides:
+            params.update(overrides)
+
+        return params
+
+    def _filter_supported_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Filters ``params`` down to those accepted by the model class constructor.
+
+        Skips filtering when the constructor accepts ``**kwargs`` (e.g. XGBoost 2.x),
+        since every named param would otherwise fail the membership check even though valid.
+        """
+        import inspect
+
+        sig = inspect.signature(self.model_class)
+        accepts_kwargs = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+
+        if accepts_kwargs:
+            return params
+
+        valid_params = {k: v for k, v in params.items() if k in sig.parameters}
+        dropped = set(params.keys()) - set(valid_params.keys())
+        if dropped:
+            logger.warning(
+                f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}"
+            )
+        return valid_params
 
 
 class SklearnApplier(BaseModelApplier):

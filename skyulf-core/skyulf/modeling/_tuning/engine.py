@@ -267,73 +267,95 @@ class TuningCalculator(BaseModelCalculator):
         Otherwise a CV splitter is chosen from ``config`` (holdout, nested CV inner folds,
         time series, shuffle, stratified, or plain K-fold).
         """
-        # `Any` — reassigned to np.concatenate output below; keeps branches type-clean.
-        X_for_search: Any = X
-        y_for_search: Any = y
-
         if validation_data is not None:
-            from sklearn.model_selection import PredefinedSplit
+            return self._build_predefined_split_cv(X, y, validation_data)
 
-            X_val, y_val = validation_data
+        return self._select_cv_by_type(config), X, y
 
-            # Concatenate Train and Val (Numpy arrays)
-            X_for_search = np.concatenate([X, X_val], axis=0)
-            y_for_search = np.concatenate([y, y_val], axis=0)
+    def _build_predefined_split_cv(
+        self,
+        X: Any,
+        y: Any,
+        validation_data: tuple[Any, Any],
+    ) -> tuple[Any, Any, Any]:
+        """Concatenates train/val data and builds a ``PredefinedSplit`` over it.
 
-            # Create test_fold array: -1 for train, 0 for val
-            # -1 means "never in test set" (so always in training set)
-            # 0 means "in test set for fold 0"
-            test_fold = np.concatenate([np.full(len(X), -1), np.full(len(X_val), 0)])
+        The search treats ``X`` (train) as always-in-training-set (-1) and the concatenated
+        ``validation_data`` as the single test fold (0), so the searcher trains on ``X`` and
+        validates on ``validation_data``.
+        """
+        from sklearn.model_selection import PredefinedSplit
 
-            cv = PredefinedSplit(test_fold)
-        else:
-            if not config.cv_enabled:
-                # Single split validation (20% holdout)
-                cv = ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.cv_random_state)
-            elif config.cv_type == "nested_cv":
-                # Nested CV during tuning: use fewer inner folds for
-                # candidate scoring. The outer evaluation loop runs
-                # post-tuning in engine.py (as stratified_k_fold).
-                inner_folds = min(3, config.cv_folds - 1) if config.cv_folds > 2 else 2
-                inner_cv_random_state = config.cv_random_state if config.cv_shuffle else None
-                if self.model_calculator.problem_type == "classification":
-                    cv = StratifiedKFold(
-                        n_splits=inner_folds,
-                        shuffle=config.cv_shuffle,
-                        random_state=inner_cv_random_state,
-                    )
-                else:
-                    cv = KFold(
-                        n_splits=inner_folds,
-                        shuffle=config.cv_shuffle,
-                        random_state=inner_cv_random_state,
-                    )
-            elif config.cv_type == "time_series_split":
-                cv = TimeSeriesSplit(n_splits=config.cv_folds)
-            elif config.cv_type == "shuffle_split":
-                cv = ShuffleSplit(
-                    n_splits=config.cv_folds,
-                    test_size=0.2,
-                    random_state=config.cv_random_state,
-                )
-            elif (
-                config.cv_type == "stratified_k_fold"
-                and self.model_calculator.problem_type == "classification"
-            ):
-                cv = StratifiedKFold(
-                    n_splits=config.cv_folds,
-                    shuffle=config.cv_shuffle,
-                    random_state=config.cv_random_state if config.cv_shuffle else None,
-                )
-            else:
-                # Default to KFold (also fallback for stratified if regression)
-                cv = KFold(
-                    n_splits=config.cv_folds,
-                    shuffle=config.cv_shuffle,
-                    random_state=config.cv_random_state if config.cv_shuffle else None,
-                )
+        X_val, y_val = validation_data
 
+        # Concatenate Train and Val (Numpy arrays)
+        X_for_search = np.concatenate([X, X_val], axis=0)
+        y_for_search = np.concatenate([y, y_val], axis=0)
+
+        # Create test_fold array: -1 for train, 0 for val
+        # -1 means "never in test set" (so always in training set)
+        # 0 means "in test set for fold 0"
+        test_fold = np.concatenate([np.full(len(X), -1), np.full(len(X_val), 0)])
+
+        cv = PredefinedSplit(test_fold)
         return cv, X_for_search, y_for_search
+
+    def _select_cv_by_type(self, config: TuningConfig) -> Any:
+        """Picks a CV splitter from ``config`` (holdout, nested CV inner folds, time series,
+        shuffle, stratified, or plain K-fold), based on ``cv_enabled``/``cv_type``.
+        """
+        if not config.cv_enabled:
+            # Single split validation (20% holdout)
+            return ShuffleSplit(n_splits=1, test_size=0.2, random_state=config.cv_random_state)
+
+        if config.cv_type == "nested_cv":
+            # Nested CV during tuning: use fewer inner folds for
+            # candidate scoring. The outer evaluation loop runs
+            # post-tuning in engine.py (as stratified_k_fold).
+            return self._build_nested_inner_cv(config)
+
+        if config.cv_type == "time_series_split":
+            return TimeSeriesSplit(n_splits=config.cv_folds)
+
+        if config.cv_type == "shuffle_split":
+            return ShuffleSplit(
+                n_splits=config.cv_folds,
+                test_size=0.2,
+                random_state=config.cv_random_state,
+            )
+
+        if (
+            config.cv_type == "stratified_k_fold"
+            and self.model_calculator.problem_type == "classification"
+        ):
+            return StratifiedKFold(
+                n_splits=config.cv_folds,
+                shuffle=config.cv_shuffle,
+                random_state=config.cv_random_state if config.cv_shuffle else None,
+            )
+
+        # Default to KFold (also fallback for stratified if regression)
+        return KFold(
+            n_splits=config.cv_folds,
+            shuffle=config.cv_shuffle,
+            random_state=config.cv_random_state if config.cv_shuffle else None,
+        )
+
+    def _build_nested_inner_cv(self, config: TuningConfig) -> Any:
+        """Builds the inner-fold CV splitter used for candidate scoring during nested CV tuning."""
+        inner_folds = min(3, config.cv_folds - 1) if config.cv_folds > 2 else 2
+        inner_cv_random_state = config.cv_random_state if config.cv_shuffle else None
+        if self.model_calculator.problem_type == "classification":
+            return StratifiedKFold(
+                n_splits=inner_folds,
+                shuffle=config.cv_shuffle,
+                random_state=inner_cv_random_state,
+            )
+        return KFold(
+            n_splits=inner_folds,
+            shuffle=config.cv_shuffle,
+            random_state=inner_cv_random_state,
+        )
 
     def _resolve_metric(self, config: TuningConfig, y: Any) -> str:
         """Validates the metric against the problem type, maps friendly aliases to sklearn
@@ -440,44 +462,82 @@ class TuningCalculator(BaseModelCalculator):
         y_arr = y_any.to_numpy() if hasattr(y_any, "to_numpy") else y_any
 
         for fold_idx, (train_idx, val_idx) in enumerate(cv.split(X_arr, y_arr)):
-            # Split
-            X_train_fold = X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
-            y_train_fold = y_any.iloc[train_idx] if hasattr(y_any, "iloc") else y_any[train_idx]
-            X_val_fold = X_any.iloc[val_idx] if hasattr(X_any, "iloc") else X_any[val_idx]
-            y_val_fold = y_any.iloc[val_idx] if hasattr(y_any, "iloc") else y_any[val_idx]
-
-            # Instantiate and Fit
-            # Note: We must handle potential errors (e.g. incompatible params)
-            try:
-                model = self._instantiate_model(
-                    model_class,
-                    {**self.model_calculator.default_params, **params},
-                )
-                model.fit(X_train_fold, y_train_fold)
-
-                # Score
-                from sklearn.metrics import get_scorer
-
-                scorer = get_scorer(metric)
-                score = scorer(model, X_val_fold, y_val_fold)
-                fold_scores.append(score)
-
-                if log_callback:
-                    n_splits = cv.get_n_splits(X_arr, y_arr)
-                    log_callback(
-                        f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
-                    )
-            except Exception as e:
-                if log_callback:
-                    n_splits = cv.get_n_splits(X_arr, y_arr)
-                    log_callback(
-                        f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Failed: {str(e)}"
-                    )
-                fold_scores.append(-float("inf"))
+            score = self._fit_and_score_candidate_fold(
+                candidate_idx=candidate_idx,
+                fold_idx=fold_idx,
+                params=params,
+                model_class=model_class,
+                cv=cv,
+                X_any=X_any,
+                y_any=y_any,
+                X_arr=X_arr,
+                y_arr=y_arr,
+                train_idx=train_idx,
+                val_idx=val_idx,
+                metric=metric,
+                log_callback=log_callback,
+            )
+            fold_scores.append(score)
 
         # Filter out failed folds for mean calculation if possible, or penalize
         valid_scores = [s for s in fold_scores if s != -float("inf")]
-        return np.mean(valid_scores) if valid_scores else -float("inf")
+        return float(np.mean(valid_scores)) if valid_scores else -float("inf")
+
+    def _fit_and_score_candidate_fold(
+        self,
+        candidate_idx: int,
+        fold_idx: int,
+        params: dict[str, Any],
+        model_class: Any,
+        cv: Any,
+        X_any: Any,
+        y_any: Any,
+        X_arr: Any,
+        y_arr: Any,
+        train_idx: Any,
+        val_idx: Any,
+        metric: str,
+        log_callback: Callable[[str], None] | None,
+    ) -> float:
+        """Fits one candidate on a single CV fold and returns its score, or ``-inf`` on failure.
+
+        Errors (e.g. incompatible params) are caught and logged rather than raised, so a single
+        bad fold doesn't abort the whole candidate evaluation.
+        """
+        # Split
+        X_train_fold = X_any.iloc[train_idx] if hasattr(X_any, "iloc") else X_any[train_idx]
+        y_train_fold = y_any.iloc[train_idx] if hasattr(y_any, "iloc") else y_any[train_idx]
+        X_val_fold = X_any.iloc[val_idx] if hasattr(X_any, "iloc") else X_any[val_idx]
+        y_val_fold = y_any.iloc[val_idx] if hasattr(y_any, "iloc") else y_any[val_idx]
+
+        # Instantiate and Fit
+        # Note: We must handle potential errors (e.g. incompatible params)
+        try:
+            model = self._instantiate_model(
+                model_class,
+                {**self.model_calculator.default_params, **params},
+            )
+            model.fit(X_train_fold, y_train_fold)
+
+            # Score
+            from sklearn.metrics import get_scorer
+
+            scorer = get_scorer(metric)
+            score = scorer(model, X_val_fold, y_val_fold)
+
+            if log_callback:
+                n_splits = cv.get_n_splits(X_arr, y_arr)
+                log_callback(
+                    f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Score: {score:.4f}"
+                )
+            return score
+        except Exception as e:
+            if log_callback:
+                n_splits = cv.get_n_splits(X_arr, y_arr)
+                log_callback(
+                    f"  [Candidate {candidate_idx + 1}] CV Fold {fold_idx + 1}/{n_splits} Failed: {str(e)}"
+                )
+            return -float("inf")
 
     def _run_grid_or_random_search(
         self,
