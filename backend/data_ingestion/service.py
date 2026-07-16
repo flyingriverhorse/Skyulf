@@ -256,6 +256,23 @@ class DataIngestionService:
         storage_options = config.get("storage_options", {})
         return await self._fetch_s3_sample(file_path, storage_options, limit)
 
+    async def _route_sample(
+        self, source: Any, file_path: Any, config: dict[str, Any], limit: int
+    ) -> list[dict]:
+        """Dispatch sample fetching to the strategy matching the file path / source type."""
+        if file_path and str(file_path).startswith("s3://"):
+            storage_options = config.get("storage_options", {})
+            return await self._fetch_s3_sample(file_path, storage_options, limit, log_exc_info=True)
+
+        if source.type in ["file", "csv", "txt"]:
+            return await self._sample_local_file(file_path, limit)
+
+        if source.type in ["s3", "parquet"]:
+            return await self._sample_s3_or_parquet(file_path, config, limit)
+
+        # TODO: Handle other source types (SQL, etc.)
+        return []
+
     async def get_sample(self, source_id: int | str, limit: int | None = None) -> list[dict]:
         """
         Get a sample of data from the source.
@@ -270,21 +287,7 @@ class DataIngestionService:
         # Normalize path retrieval: check 'file_path' then 'path'
         file_path = config.get("file_path") or config.get("path")
 
-        # Check for S3 path first, regardless of source type
-        if file_path and str(file_path).startswith("s3://"):
-            storage_options = config.get("storage_options", {})
-            return await self._fetch_s3_sample(
-                file_path, storage_options, effective_limit, log_exc_info=True
-            )
-
-        if source.type in ["file", "csv", "txt"]:
-            return await self._sample_local_file(file_path, effective_limit)
-
-        if source.type in ["s3", "parquet"]:
-            return await self._sample_s3_or_parquet(file_path, config, effective_limit)
-
-        # TODO: Handle other source types (SQL, etc.)
-        return []
+        return await self._route_sample(source, file_path, config, effective_limit)
 
     # Source types created via `handle_create_source` (inline config, no file
     # upload). "file" sources go through `handle_file_upload` instead.

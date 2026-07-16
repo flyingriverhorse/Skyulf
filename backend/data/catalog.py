@@ -84,19 +84,41 @@ class FileSystemCatalog(DataCatalog):
 
         return path
 
+    @staticmethod
+    def _read_csv(path: str, limit: int | None) -> Any:
+        """Read a CSV file, applying the row limit at read time."""
+        return pd.read_csv(path, nrows=limit)
+
+    @staticmethod
+    def _read_parquet(path: str, limit: int | None) -> Any:
+        """Read a parquet file and apply the row limit afterwards."""
+        df = pd.read_parquet(path)
+        return df.head(limit) if limit else df
+
+    @staticmethod
+    def _read_json(path: str, limit: int | None) -> Any:
+        """Read a JSON file and apply the row limit afterwards."""
+        return pd.read_json(path).head(limit) if limit else pd.read_json(path)
+
+    @staticmethod
+    def _read_excel(path: str, limit: int | None) -> Any:
+        """Read an Excel file and apply the row limit afterwards."""
+        return pd.read_excel(path).head(limit) if limit else pd.read_excel(path)
+
+    _EXTENSION_READERS = (
+        (".csv", _read_csv),
+        (".parquet", _read_parquet),
+        (".json", _read_json),
+        (".xlsx", _read_excel),
+        (".xls", _read_excel),
+    )
+
     def _read_dataframe(self, path: str, dataset_id: str, limit: int | None) -> Any:
         """Dispatch to the pandas reader matching the file's extension, applying the row limit."""
-        if path.endswith(".csv"):
-            return pd.read_csv(path, nrows=limit)
-        elif path.endswith(".parquet"):
-            df = pd.read_parquet(path)
-            return df.head(limit) if limit else df
-        elif path.endswith(".json"):
-            return pd.read_json(path).head(limit) if limit else pd.read_json(path)
-        elif path.endswith(".xlsx") or path.endswith(".xls"):
-            return pd.read_excel(path).head(limit) if limit else pd.read_excel(path)
-        else:
-            return self._read_fallback_parquet(path, dataset_id, limit)
+        for suffix, reader in self._EXTENSION_READERS:
+            if path.endswith(suffix):
+                return reader(path, limit)
+        return self._read_fallback_parquet(path, dataset_id, limit)
 
     def _read_fallback_parquet(self, path: str, dataset_id: str, limit: int | None) -> Any:
         """Try reading a file with no recognized extension as parquet, or raise ValueError."""
@@ -468,26 +490,27 @@ class SmartCatalog(DataCatalog):
         return None
 
 
+def _find_s3_bucket_in_nodes(nodes: list | None) -> str | None:
+    """Scan pipeline nodes for a path/dataset_id pointing at S3 and return its bucket name."""
+    if not nodes:
+        return None
+    for node in nodes:
+        # Handle both Pydantic models and objects/dicts
+        params = node.get("params", {}) if isinstance(node, dict) else getattr(node, "params", {})
+
+        path = params.get("path") or params.get("dataset_id")
+        if path and str(path).startswith("s3://"):
+            return str(path).split("/")[2]
+    return None
+
+
 def create_catalog_from_options(
     storage_options: dict | None, nodes: list | None = None, session=None
 ) -> DataCatalog:
     """
     Factory to create the appropriate DataCatalog based on storage options and node paths.
     """
-    # Try to find S3 bucket from nodes
-    bucket = None
-    if nodes:
-        for node in nodes:
-            # Handle both Pydantic models and objects/dicts
-            if isinstance(node, dict):
-                params = node.get("params", {})
-            else:
-                params = getattr(node, "params", {})
-
-            path = params.get("path") or params.get("dataset_id")
-            if path and str(path).startswith("s3://"):
-                bucket = str(path).split("/")[2]
-                break
+    bucket = _find_s3_bucket_in_nodes(nodes)
 
     if bucket:
         s3_catalog = S3Catalog(bucket_name=bucket, storage_options=storage_options)

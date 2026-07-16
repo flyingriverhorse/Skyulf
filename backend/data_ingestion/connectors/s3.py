@@ -35,15 +35,10 @@ class S3Connector(BaseConnector):
                 return "redacted sensitive S3 error"
         return message
 
-    def _get_storage_options(self) -> dict[str, str]:
-        """
-        Ensure all storage options are strings for Polars and map common keys.
-        """
-        options = self.storage_options.copy() if self.storage_options else {}
-
-        # Map s3fs/boto3 keys to Polars/object_store keys
+    @staticmethod
+    def _map_storage_option_keys(options: dict) -> dict:
+        """Map s3fs/boto3 option keys to the Polars/object_store equivalents, in place."""
         # Polars expects: aws_access_key_id, aws_secret_access_key, region, endpoint_url
-
         if "key" in options and "aws_access_key_id" not in options:
             options["aws_access_key_id"] = options.pop("key")
 
@@ -52,6 +47,15 @@ class S3Connector(BaseConnector):
 
         if "region_name" in options and "region" not in options:
             options["region"] = options.pop("region_name")
+
+        return options
+
+    def _get_storage_options(self) -> dict[str, str]:
+        """
+        Ensure all storage options are strings for Polars and map common keys.
+        """
+        options = self.storage_options.copy() if self.storage_options else {}
+        options = self._map_storage_option_keys(options)
 
         # Convert to strings for Polars
         return {k: str(v) for k, v in options.items() if v is not None}
@@ -71,50 +75,60 @@ class S3Connector(BaseConnector):
             )
             raise ConnectionError(f"Failed to connect to S3 path {self.path}") from e
 
+    @staticmethod
+    def _scan_schema(scan_fn, path: str, options: dict[str, str]) -> dict[str, str]:
+        """Lazily scan `path` with the given Polars scan function and collect its schema."""
+        lf = scan_fn(path, storage_options=options)
+        return {name: str(dtype) for name, dtype in lf.collect_schema().items()}
+
+    def _try_csv_schema(self, options: dict[str, str]) -> dict[str, str] | None:
+        """Attempt to read the schema via scan_csv, returning None instead of raising on failure."""
+        try:
+            return self._scan_schema(pl.scan_csv, self.path, options)
+        except Exception:
+            return None  # nosec B110 - Expected fallback: CSV extension but try standard flow next
+
+    def _raise_classified_schema_error(self, e: Exception) -> None:
+        """Classify a schema-scan failure and raise the corresponding typed exception."""
+        msg = str(e)
+        if "169.254.169.254" in msg:
+            raise ValueError(
+                "S3 Connection Error: Could not find AWS credentials. "
+                "If running locally, ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
+                "are set or passed in storage_options."
+            ) from e
+        # Classify into typed exceptions so callers (e.g.
+        # DataIngestionService.get_sample) can use isinstance checks
+        # instead of substring-matching on the raw error message.
+        if _HTTP_403_RE.search(msg):
+            raise ForbiddenException(message=f"Access denied reading S3 path {self.path}") from e
+        if _HTTP_404_RE.search(msg):
+            raise ResourceNotFoundException(message=f"S3 resource not found: {self.path}") from e
+        raise ValueError(
+            f"Could not infer schema for {self.path}. Ensure it is a valid Parquet or CSV file "
+            "and that the configured S3 credentials have access."
+        ) from e
+
     async def get_schema(self) -> dict[str, str]:
         options = self._get_storage_options()
 
         # Optimization: Check extension first
         if self.path.lower().endswith(".csv"):
-            try:
-                lf = pl.scan_csv(self.path, storage_options=options)
-                return {name: str(dtype) for name, dtype in lf.collect_schema().items()}
-            except Exception:
-                pass  # nosec B110 - Expected fallback: CSV extension but try standard flow next
+            schema = self._try_csv_schema(options)
+            if schema is not None:
+                return schema
 
         # Try Parquet first, then CSV
         try:
             # Use read_parquet_schema if available or scan
             # scan_parquet is lazy and efficient
-            lf = pl.scan_parquet(self.path, storage_options=options)
-            return {name: str(dtype) for name, dtype in lf.collect_schema().items()}
+            return self._scan_schema(pl.scan_parquet, self.path, options)
         except Exception:
             try:
-                lf = pl.scan_csv(self.path, storage_options=options)
-                return {name: str(dtype) for name, dtype in lf.collect_schema().items()}
+                return self._scan_schema(pl.scan_csv, self.path, options)
             except Exception as e:
-                msg = str(e)
-                if "169.254.169.254" in msg:
-                    raise ValueError(
-                        "S3 Connection Error: Could not find AWS credentials. "
-                        "If running locally, ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY "
-                        "are set or passed in storage_options."
-                    ) from e
-                # Classify into typed exceptions so callers (e.g.
-                # DataIngestionService.get_sample) can use isinstance checks
-                # instead of substring-matching on the raw error message.
-                if _HTTP_403_RE.search(msg):
-                    raise ForbiddenException(
-                        message=f"Access denied reading S3 path {self.path}"
-                    ) from e
-                if _HTTP_404_RE.search(msg):
-                    raise ResourceNotFoundException(
-                        message=f"S3 resource not found: {self.path}"
-                    ) from e
-                raise ValueError(
-                    f"Could not infer schema for {self.path}. Ensure it is a valid Parquet or CSV file "
-                    "and that the configured S3 credentials have access."
-                ) from e
+                self._raise_classified_schema_error(e)
+                raise  # pragma: no cover - _raise_classified_schema_error always raises
 
     async def fetch_data(self, query: str | None = None, limit: int | None = None) -> pl.DataFrame:
         options = self._get_storage_options()
