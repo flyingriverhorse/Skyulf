@@ -69,15 +69,30 @@ def calculate_classification_metrics(
         "matthews_corrcoef": float(matthews_corrcoef(y_arr, predictions)),
     }
 
-    # Add unweighted metrics for binary classification
+    _add_binary_unweighted_metrics(metrics, model, y_arr, predictions)
+
+    if geometric_mean_score is not None:
+        with contextlib.suppress(Exception):
+            metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
+
+    _add_probability_based_metrics(metrics, model, X_np, y_arr)
+
+    return metrics
+
+
+def _add_binary_unweighted_metrics(
+    metrics: dict[str, float], model: Any, y_arr: Any, predictions: Any
+) -> None:
+    """Adds unweighted precision/recall/f1 to ``metrics`` in-place for binary classification.
+
+    Determines the actual positive-class label rather than relying on sklearn's default
+    pos_label=1, which raises (silently swallowed below) for non-{0,1} binary labels
+    (e.g. "yes"/"no", {1,2}, {-1,1}) — mirrors the pos_label resolution already used in
+    _evaluation/classification.py. No-op (and swallows errors) outside binary classification.
+    """
     try:
         unique_classes = np.unique(y_arr)
         if len(unique_classes) == 2:
-            # Determine the actual positive-class label rather than relying on
-            # sklearn's default pos_label=1, which raises (silently swallowed
-            # below) for non-{0,1} binary labels (e.g. "yes"/"no", {1,2},
-            # {-1,1}) — mirrors the pos_label resolution already used in
-            # _evaluation/classification.py.
             classes_ = getattr(model, "classes_", None)
             pos_label = (
                 classes_[1] if classes_ is not None and len(classes_) == 2 else unique_classes[1]
@@ -98,10 +113,68 @@ def calculate_classification_metrics(
     except Exception:
         pass
 
-    if geometric_mean_score is not None:
-        with contextlib.suppress(Exception):
-            metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
 
+def _add_multiclass_roc_pr_auc_metrics(
+    metrics: dict[str, float], y_arr: Any, proba: Any, classes: Any, class_count: int
+) -> None:
+    """Adds OVR/OVO ROC-AUC variants and weighted PR-AUC to ``metrics`` in-place for multiclass proba."""
+    # OVR variants
+    ovr_weighted = float(
+        roc_auc_score(y_arr, proba, multi_class="ovr", average="weighted", labels=classes)
+    )
+    metrics["roc_auc_weighted"] = ovr_weighted  # kept for backward compat
+    metrics["roc_auc_ovr_weighted"] = ovr_weighted
+    metrics["roc_auc_ovr"] = float(
+        roc_auc_score(y_arr, proba, multi_class="ovr", average="macro", labels=classes)
+    )
+    # OVO variants
+    metrics["roc_auc_ovo"] = float(
+        roc_auc_score(y_arr, proba, multi_class="ovo", average="macro", labels=classes)
+    )
+    metrics["roc_auc_ovo_weighted"] = float(
+        roc_auc_score(y_arr, proba, multi_class="ovo", average="weighted", labels=classes)
+    )
+    y_indicator = label_binarize(y_arr, classes=classes)
+    metrics["pr_auc_weighted"] = float(
+        average_precision_score(y_indicator, proba, average="weighted")
+    )
+
+
+def _add_roc_pr_auc_metrics(
+    metrics: dict[str, float], model: Any, y_arr: Any, proba: Any, class_count: int
+) -> None:
+    """Adds ROC-AUC/PR-AUC metrics (binary or multiclass OVR/OVO) to ``metrics`` in-place.
+
+    Swallows errors so a single failing metric doesn't drop the others already computed.
+    """
+    try:
+        if class_count == 2:
+            metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
+            metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
+        else:
+            # Explicitly pass the full label set the model was trained on
+            # (`classes`, resolved below) so a CV fold whose validation
+            # split happens not to contain every trained class doesn't
+            # raise "Number of classes in y_true not equal to columns
+            # in y_score" — previously swallowed silently by the
+            # surrounding except, dropping these metrics entirely.
+            classes = getattr(model, "classes_", None)
+            if classes is None or len(classes) != class_count:
+                classes = np.arange(class_count)
+
+            _add_multiclass_roc_pr_auc_metrics(metrics, y_arr, proba, classes, class_count)
+    except Exception:
+        pass  # nosec B110 - weighted PR-AUC is an optional extra metric
+
+
+def _add_probability_based_metrics(
+    metrics: dict[str, float], model: Any, X_np: Any, y_arr: Any
+) -> None:
+    """Adds log-loss, ROC-AUC and PR-AUC metrics to ``metrics`` in-place, using ``predict_proba``.
+
+    No-op if the model doesn't expose ``predict_proba``, or any of these optional metrics
+    fail to compute (errors are swallowed so other metrics are still returned).
+    """
     try:
         if hasattr(model, "predict_proba"):
             with warnings.catch_warnings():
@@ -111,55 +184,9 @@ def calculate_classification_metrics(
                 class_count = proba.shape[1]
                 with contextlib.suppress(Exception):
                     metrics["log_loss"] = float(log_loss(y_arr, proba))
-                try:
-                    if class_count == 2:
-                        metrics["roc_auc"] = float(roc_auc_score(y_arr, proba[:, 1]))
-                        metrics["pr_auc"] = float(average_precision_score(y_arr, proba[:, 1]))
-                    else:
-                        # Explicitly pass the full label set the model was trained on
-                        # (`classes`, resolved below) so a CV fold whose validation
-                        # split happens not to contain every trained class doesn't
-                        # raise "Number of classes in y_true not equal to columns
-                        # in y_score" — previously swallowed silently by the
-                        # surrounding except, dropping these metrics entirely.
-                        classes = getattr(model, "classes_", None)
-                        if classes is None or len(classes) != class_count:
-                            classes = np.arange(class_count)
-
-                        # OVR variants
-                        ovr_weighted = float(
-                            roc_auc_score(
-                                y_arr, proba, multi_class="ovr", average="weighted", labels=classes
-                            )
-                        )
-                        metrics["roc_auc_weighted"] = ovr_weighted  # kept for backward compat
-                        metrics["roc_auc_ovr_weighted"] = ovr_weighted
-                        metrics["roc_auc_ovr"] = float(
-                            roc_auc_score(
-                                y_arr, proba, multi_class="ovr", average="macro", labels=classes
-                            )
-                        )
-                        # OVO variants
-                        metrics["roc_auc_ovo"] = float(
-                            roc_auc_score(
-                                y_arr, proba, multi_class="ovo", average="macro", labels=classes
-                            )
-                        )
-                        metrics["roc_auc_ovo_weighted"] = float(
-                            roc_auc_score(
-                                y_arr, proba, multi_class="ovo", average="weighted", labels=classes
-                            )
-                        )
-                        y_indicator = label_binarize(y_arr, classes=classes)
-                        metrics["pr_auc_weighted"] = float(
-                            average_precision_score(y_indicator, proba, average="weighted")
-                        )
-                except Exception:
-                    pass  # nosec B110 - weighted PR-AUC is an optional extra metric
+                _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
     except Exception:
         pass  # nosec B110 - multiclass PR-AUC block is optional; other metrics still returned
-
-    return metrics
 
 
 def calculate_regression_metrics(
