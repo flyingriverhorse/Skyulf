@@ -27,10 +27,19 @@ export interface ShapSample {
   shap_values: Record<string, number>;
 }
 
+/** Global SHAP feature-interaction summary (tree models only). Mean(|interaction
+ * value|) matrix over the top-K features by interaction strength; `matrix[i][j]`
+ * lines up with `feature_names[i]` / `feature_names[j]`. */
+export interface ShapInteractionData {
+  feature_names: string[];
+  matrix: number[][];
+}
+
 /** The `shap_explanation` metric stored on a completed training job. */
 export interface ShapExplanationData {
   feature_names: string[];
   mean_abs_importance: Record<string, number>;
   samples: ShapSample[];
+  interactions?: ShapInteractionData | null;
 }
 

@@ -205,3 +205,69 @@ def test_returns_none_when_shap_not_installed(classification_data, monkeypatch: 
     result = compute_shap_explanation(model, X)
 
     assert result is None
+
+
+def test_tree_model_includes_interaction_matrix(classification_data):
+    """Tree-based models get a square, symmetric interaction matrix over all features."""
+    X, y = classification_data
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    interactions = result["interactions"]
+    assert interactions is not None
+    assert interactions["feature_names"] == ["a", "b", "c"]
+    matrix = interactions["matrix"]
+    assert len(matrix) == 3
+    assert all(len(row) == 3 for row in matrix)
+    assert all(v >= 0 for row in matrix for v in row)
+    # Symmetric: interaction(a, b) == interaction(b, a).
+    for i in range(3):
+        for j in range(3):
+            assert matrix[i][j] == pytest.approx(matrix[j][i], abs=1e-9)
+
+
+def test_tree_model_interaction_matrix_capped_to_top_features():
+    """With more features than the cap, only the top-K by interaction strength are kept."""
+    rng = np.random.default_rng(0)
+    n_features = 12
+    X = pd.DataFrame(
+        {f"f{i}": rng.random(80) for i in range(n_features)},
+    )
+    y = (X["f0"] + X["f1"] > 1).astype(int)
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    interactions = result["interactions"]
+    assert interactions is not None
+    assert len(interactions["feature_names"]) == 8
+    assert len(interactions["matrix"]) == 8
+    assert all(len(row) == 8 for row in interactions["matrix"])
+
+
+def test_linear_model_has_no_interaction_matrix(regression_data):
+    """`TreeExplainer` isn't supported for linear models, so `interactions` is `None`."""
+    X, y = regression_data
+    model = LinearRegression().fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    assert result["interactions"] is None
+
+
+def test_multiclass_tree_model_includes_interaction_matrix(multiclass_data):
+    """Multi-class tree models also produce a valid interaction matrix (averaged over classes)."""
+    X, y = multiclass_data
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    interactions = result["interactions"]
+    assert interactions is not None
+    assert interactions["feature_names"] == ["a", "b", "c"]
+    assert len(interactions["matrix"]) == 3
