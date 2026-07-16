@@ -2,7 +2,7 @@
 
 [project]
 name = "skyulf"
-version = "0.6.10"
+version = "0.7.0"
 description = "MLOps web application for privacy-preserving ML workflows"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -42,9 +42,10 @@ dependencies = [
     "uvicorn[standard]>=0.24.0,<1.0.0",
     "xgboost>=2.1.4",
     "lightgbm>=4.0.0",
+    "shap>=0.46.0,<1.0.0",
     "optuna>=4.0,<5",
     "optuna-integration>=4.0,<5",
-    "skyulf-core>=0.1.2",
+    "skyulf-core>=0.5.0",
     "rich>=13.0.0",
     "tqdm>=4.67.1",
     "cmaes>=0.10",
@@ -176,7 +177,7 @@ known-first-party = ["skyulf", "backend"]
 
 [tool.ty.rules]
 # Optional dependencies (s3fs, redis, xgboost, optuna, rich, matplotlib,
-# vaderSentiment, causallearn, rapidfuzz) are guarded by try/except
+# vaderSentiment, causallearn, rapidfuzz, shap) are guarded by try/except
 # ImportError. They're present in some dev environments and missing in CI,
 # so per-line `# ty: ignore[unresolved-import]` ignores would be flagged
 # as unused locally and required in CI. Silence the unused-ignore noise.
