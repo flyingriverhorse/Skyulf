@@ -69,6 +69,21 @@ class FeatureEngMixin:
 
         return keys
 
+    def _merge_fitted_steps(self, artifact_keys: list[str]) -> list[dict[str, Any]]:
+        """Load each artifact key's FeatureEngineer and concatenate their fitted steps in order."""
+        merged_steps: list[dict[str, Any]] = []
+        for key in artifact_keys:
+            try:
+                fe = self.artifact_store.load(key)
+            except Exception as e:
+                logger.debug(f"Failed to load pipeline artifact {key}: {e}")
+                continue
+
+            fitted_steps = getattr(fe, "fitted_steps", None)
+            if isinstance(fitted_steps, list) and fitted_steps:
+                merged_steps.extend(fitted_steps)
+        return merged_steps
+
     def _build_composite_feature_engineer(self, node: NodeConfig) -> FeatureEngineer | None:
         """Build a single, ordered FeatureEngineer from all upstream pipeline artifacts.
 
@@ -91,17 +106,7 @@ class FeatureEngMixin:
         if not artifact_keys:
             return None
 
-        merged_steps: list[dict[str, Any]] = []
-        for key in artifact_keys:
-            try:
-                fe = self.artifact_store.load(key)
-            except Exception as e:
-                logger.debug(f"Failed to load pipeline artifact {key}: {e}")
-                continue
-
-            fitted_steps = getattr(fe, "fitted_steps", None)
-            if isinstance(fitted_steps, list) and fitted_steps:
-                merged_steps.extend(fitted_steps)
+        merged_steps = self._merge_fitted_steps(artifact_keys)
 
         if not merged_steps:
             return None

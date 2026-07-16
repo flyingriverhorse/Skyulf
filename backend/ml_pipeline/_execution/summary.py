@@ -203,6 +203,17 @@ def _dtype_breakdown(df: pd.DataFrame) -> str | None:
         return None
 
 
+def _split_ratio_str(train_n: int, test_n: int, val_n: int, total: int) -> str:
+    """Format train/test[/val] percentages, rounded to int and normalized to sum to 100."""
+    pcts = [round(train_n / total * 100), round(test_n / total * 100)]
+    if val_n:
+        pcts.append(round(val_n / total * 100))
+    drift = 100 - sum(pcts)
+    if drift:
+        pcts[pcts.index(max(pcts))] += drift
+    return "/".join(str(p) for p in pcts) + "%"
+
+
 def _split_summary(data: SplitDataset) -> str | None:
     """Format ``train / test [/ val]`` row counts with ratio + column count."""
     train = _shape_of(data.train)
@@ -226,15 +237,8 @@ def _split_summary(data: SplitDataset) -> str | None:
     abs_str = " / ".join(parts)
 
     # Ratio percentages — the single most useful piece of context the
-    # absolute numbers are missing. Round to nearest int and ensure they
-    # add to 100 by adjusting the largest bucket.
-    pcts = [round(train_n / total * 100), round(test_n / total * 100)]
-    if val_n:
-        pcts.append(round(val_n / total * 100))
-    drift = 100 - sum(pcts)
-    if drift:
-        pcts[pcts.index(max(pcts))] += drift
-    ratio_str = "/".join(str(p) for p in pcts) + "%"
+    # absolute numbers are missing.
+    ratio_str = _split_ratio_str(train_n, test_n, val_n, total)
 
     return f"{ratio_str} · {abs_str} × {train[1]} cols"
 
@@ -543,11 +547,8 @@ def _n_trials(metrics: Mapping[str, Any]) -> int | None:
     return None
 
 
-def _best_score_headline(metrics: Mapping[str, Any], n_trials: int | None) -> str | None:
-    """Render the "<label> <value>" headline from ``best_score``, or ``None`` if absent."""
-    best = metrics.get("best_score")
-    if not isinstance(best, (int, float)) or isinstance(best, bool):
-        return None
+def _best_score_value_and_label(metrics: Mapping[str, Any], best: float) -> tuple[float, str]:
+    """Compute the display value (sign-flipped for neg_* scorers) and label for best_score."""
     scoring_raw = str(metrics.get("scoring_metric") or "").strip()
     # Most sklearn losses are reported as `neg_*` (higher is better).
     # Flip the sign so the card shows the natural magnitude.
@@ -555,6 +556,15 @@ def _best_score_headline(metrics: Mapping[str, Any], n_trials: int | None) -> st
     if scoring_raw.startswith("neg_") and value <= 0:
         value = -value
     label = _SCORING_LABEL.get(scoring_raw) or (scoring_raw.replace("_", " ") or "score")
+    return value, label
+
+
+def _best_score_headline(metrics: Mapping[str, Any], n_trials: int | None) -> str | None:
+    """Render the "<label> <value>" headline from ``best_score``, or ``None`` if absent."""
+    best = metrics.get("best_score")
+    if not isinstance(best, (int, float)) or isinstance(best, bool):
+        return None
+    value, label = _best_score_value_and_label(metrics, best)
     head = f"{label} {value:.3f}"
     return f"{head} · {n_trials} trials" if n_trials else head
 

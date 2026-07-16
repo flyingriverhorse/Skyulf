@@ -31,6 +31,18 @@ class MergeMixin:
     _ancestors_of: Any
     """Frame coercion + multi-input merging split out of :class:`PipelineEngine`."""
 
+    def _coerce_tuple_to_frame(self, payload: tuple, target_col: str) -> pd.DataFrame | None:
+        """Coerce an ``(X, y)``-shaped tuple payload to a DataFrame, or ``None`` if empty/unusable."""
+        if len(payload) < 1:
+            return None
+        first = payload[0]
+        if not isinstance(first, pd.DataFrame):
+            return None
+        df = first.copy()
+        if len(payload) == 2 and target_col:
+            df[target_col] = payload[1]
+        return df if not df.empty else None
+
     def _coerce_to_frame(self, payload: Any, target_col: str = "") -> pd.DataFrame | None:
         """Best-effort coercion of a single payload to a DataFrame.
 
@@ -41,13 +53,8 @@ class MergeMixin:
             return None
         if isinstance(payload, pd.DataFrame):
             return payload if not payload.empty else None
-        if isinstance(payload, tuple) and len(payload) >= 1:
-            first = payload[0]
-            if isinstance(first, pd.DataFrame):
-                df = first.copy()
-                if len(payload) == 2 and target_col:
-                    df[target_col] = payload[1]
-                return df if not df.empty else None
+        if isinstance(payload, tuple):
+            return self._coerce_tuple_to_frame(payload, target_col)
         return None
 
     def _to_dataframe(self, artifact: Any, target_col: str = "") -> pd.DataFrame:
@@ -211,15 +218,21 @@ class MergeMixin:
 
         return self._merge_frames_rowwise(frames, node_id, part_label, prefix, row_counts, col_sets)
 
+    def _split_dataset_train_columns(self, art: SplitDataset) -> list[str]:
+        """Best-effort extraction of column names from a ``SplitDataset``'s train slot."""
+        if isinstance(art.train, pd.DataFrame):
+            return list(art.train.columns)
+        if isinstance(art.train, tuple):
+            X = art.train[0]
+            return list(X.columns) if hasattr(X, "columns") else []
+        return []
+
     def _artifact_columns(self, art: Any) -> list[str]:
         """Best-effort extraction of column names from a single resolved artifact."""
         if isinstance(art, pd.DataFrame):
             return list(art.columns)
-        if isinstance(art, SplitDataset) and isinstance(art.train, pd.DataFrame):
-            return list(art.train.columns)
-        if isinstance(art, SplitDataset) and isinstance(art.train, tuple):
-            X = art.train[0]
-            return list(X.columns) if hasattr(X, "columns") else []
+        if isinstance(art, SplitDataset):
+            return self._split_dataset_train_columns(art)
         if isinstance(art, tuple) and len(art) == 2 and hasattr(art[0], "columns"):
             return list(art[0].columns)
         return []
@@ -237,6 +250,49 @@ class MergeMixin:
             if cnt > 1:
                 overlap.append(c)
         return overlap
+
+    def _has_redundant_ancestor_edge(
+        self, unique_inputs: list[str], ancestors_per_input: list[set[str]]
+    ) -> bool:
+        """Return True if any input is itself an ancestor of another input (redundant edge)."""
+        return any(
+            other in ancestors_per_input[i]
+            for i, this in enumerate(unique_inputs)
+            for j, other in enumerate(unique_inputs)
+            if i != j
+        )
+
+    def _build_sibling_fan_in_advisory(
+        self,
+        node: NodeConfig,
+        unique_inputs: list[str],
+        shared: set[str],
+        artifacts: list[Any],
+    ) -> dict[str, Any]:
+        """Build the sibling fan-in warning advisory payload for the UI banner."""
+        # Compute concrete overlap columns + winner per artifact pair so
+        # the UI banner can show "Tx overrides DMC on [Id, SepalLengthCm]"
+        # instead of vague "last-wins on overlap".
+        overlap = self._sibling_fan_in_overlap_columns(artifacts)
+
+        strategy = self._get_merge_strategy(node.node_id)
+        winner_id = unique_inputs[-1] if strategy == "last_wins" else unique_inputs[0]
+        return {
+            "node_id": node.node_id,
+            "kind": "sibling_fan_in",
+            "inputs": unique_inputs,
+            "common_ancestors": sorted(shared),
+            "overlap_columns": sorted(overlap),
+            "winner_input": winner_id,
+            "strategy": strategy,
+            "message": (
+                f"Node '{node.node_id}' merges {len(unique_inputs)} sibling "
+                f"branches that share ancestor(s) {sorted(shared)}. "
+                f"Columns are unioned; on overlap ({len(overlap)} column(s)) "
+                f"the {strategy} input '{winner_id}' wins. If you wanted sequential "
+                "application, chain the transformers linearly instead."
+            ),
+        }
 
     def _warn_sibling_fan_in(self, node: NodeConfig, artifacts: list[Any]) -> None:
         """Warn when a node fans in true sibling branches sharing a common ancestor.
@@ -257,39 +313,12 @@ class MergeMixin:
         shared = set.intersection(*ancestors_per_input) if ancestors_per_input else set()
 
         # Skip when any input is an ancestor of another input (redundant edge).
-        redundant_edge = any(
-            other in ancestors_per_input[i]
-            for i, this in enumerate(unique_inputs)
-            for j, other in enumerate(unique_inputs)
-            if i != j
-        )
+        redundant_edge = self._has_redundant_ancestor_edge(unique_inputs, ancestors_per_input)
 
         if not shared or redundant_edge:
             return
 
-        # Compute concrete overlap columns + winner per artifact pair so
-        # the UI banner can show "Tx overrides DMC on [Id, SepalLengthCm]"
-        # instead of vague "last-wins on overlap".
-        overlap = self._sibling_fan_in_overlap_columns(artifacts)
-
-        strategy = self._get_merge_strategy(node.node_id)
-        winner_id = unique_inputs[-1] if strategy == "last_wins" else unique_inputs[0]
-        advisory = {
-            "node_id": node.node_id,
-            "kind": "sibling_fan_in",
-            "inputs": unique_inputs,
-            "common_ancestors": sorted(shared),
-            "overlap_columns": sorted(overlap),
-            "winner_input": winner_id,
-            "strategy": strategy,
-            "message": (
-                f"Node '{node.node_id}' merges {len(unique_inputs)} sibling "
-                f"branches that share ancestor(s) {sorted(shared)}. "
-                f"Columns are unioned; on overlap ({len(overlap)} column(s)) "
-                f"the {strategy} input '{winner_id}' wins. If you wanted sequential "
-                "application, chain the transformers linearly instead."
-            ),
-        }
+        advisory = self._build_sibling_fan_in_advisory(node, unique_inputs, shared, artifacts)
         self.merge_warnings.append(advisory)
         self.log(f"WARN: {advisory['message']}")
 
@@ -343,6 +372,17 @@ class MergeMixin:
         merged_x = self._merge_frames(x_frames, node.node_id, part_label)
         return (merged_x, non_empty[0][1])
 
+    def _merge_split_dataset_frame_part(
+        self, node: NodeConfig, part_label: str, non_empty: list[Any], target_col: str
+    ) -> pd.DataFrame | None:
+        """Flatten mixed or pure-DataFrame parts and merge them as frames."""
+        frames = [
+            df for df in (self._coerce_to_frame(p, target_col) for p in non_empty) if df is not None
+        ]
+        if not frames:
+            return None
+        return self._merge_frames(frames, node.node_id, part_label)
+
     def _merge_split_dataset_part(
         self, node: NodeConfig, part_label: str, parts: list[Any], target_col: str
     ) -> Any:
@@ -358,12 +398,7 @@ class MergeMixin:
         if all(isinstance(p, tuple) and len(p) == 2 for p in non_empty):
             return self._merge_split_dataset_xy_part(node, part_label, non_empty)
         # Mixed or pure DataFrame parts → flatten and merge as frames.
-        frames = [
-            df for df in (self._coerce_to_frame(p, target_col) for p in non_empty) if df is not None
-        ]
-        if not frames:
-            return None
-        return self._merge_frames(frames, node.node_id, part_label)
+        return self._merge_split_dataset_frame_part(node, part_label, non_empty, target_col)
 
     def _merge_split_datasets(
         self, node: NodeConfig, artifacts: list[Any], target_col: str
