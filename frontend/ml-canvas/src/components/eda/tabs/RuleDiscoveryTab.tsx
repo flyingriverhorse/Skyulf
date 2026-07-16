@@ -4,6 +4,7 @@ import { AlertCircle, GitBranch, BarChart3 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../ui/tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
+import { getChartTheme } from '../constants';
 
 interface RuleTreeShape {
     nodes: Array<{
@@ -29,6 +30,7 @@ interface RuleDiscoveryTabProps {
 
 export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) => {
     const ruleTree = profile?.rule_tree;
+    const chartTheme = getChartTheme();
 
     if (!ruleTree) {
         return (
@@ -98,13 +100,13 @@ export const RuleDiscoveryTab: React.FC<RuleDiscoveryTabProps> = ({ profile }) =
                                 layout="vertical"
                                 margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
                             >
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke={chartTheme.gridColor} />
                                 <XAxis type="number" domain={[0, 'auto']} hide />
                                 <YAxis
                                     dataKey="feature"
                                     type="category"
                                     width={150}
-                                    tick={{ fontSize: 12, fill: '#6b7280' }}
+                                    tick={{ fontSize: 12, fill: chartTheme.axisColor }}
                                     interval={0}
                                 />
                                 <RechartsTooltip

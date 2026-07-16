@@ -11,6 +11,8 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
+import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
+import { getChartTheme } from '../../../eda/constants';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
@@ -31,6 +33,7 @@ export const ShapDependenceView: React.FC<Props> = ({
   doneChart,
 }) => {
   const chartId = `shap-dependence-chart-${jobId}`;
+  const chartTheme = getChartTheme();
 
   const rankedFeatures = useMemo(
     () => Object.entries(shapExplanation.mean_abs_importance).sort((a, b) => b[1] - a[1]).map(([name]) => name),
@@ -84,24 +87,24 @@ export const ShapDependenceView: React.FC<Props> = ({
         <div className="h-[500px]">
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 5, right: 30, bottom: 20, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+              <CartesianGrid strokeDasharray="3 3" opacity={0.1} stroke={chartTheme.gridColor} />
               <XAxis
                 type="number"
                 dataKey="featureValue"
                 name={activeFeature}
-                tick={{ fontSize: 12 }}
-                label={{ value: activeFeature, position: 'insideBottom', offset: -10, fontSize: 12 }}
+                tick={{ fontSize: 12, fill: chartTheme.axisColor }}
+                label={{ value: activeFeature, position: 'insideBottom', offset: -10, fontSize: 12, fill: chartTheme.axisColor }}
               />
               <YAxis
                 type="number"
                 dataKey="shapValue"
                 name="SHAP value"
-                tick={{ fontSize: 12 }}
-                label={{ value: 'SHAP value', angle: -90, position: 'insideLeft', fontSize: 12 }}
+                tick={{ fontSize: 12, fill: chartTheme.axisColor }}
+                label={{ value: 'SHAP value', angle: -90, position: 'insideLeft', fontSize: 12, fill: chartTheme.axisColor }}
               />
               <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
               <Tooltip
-                contentStyle={{ backgroundColor: 'rgba(0,0,0,0.85)', border: 'none', borderRadius: '8px', color: '#fff' }}
+                contentStyle={getTooltipContentStyle()}
                 formatter={(value: number, name: string) => [value.toFixed(3), name]}
               />
               <Scatter data={points} fill="#8884d8" fillOpacity={0.7} />
