@@ -3,6 +3,8 @@ import { ShapSummaryView } from './ShapSummaryView';
 import { ShapBeeswarmView } from './ShapBeeswarmView';
 import { ShapDependenceView } from './ShapDependenceView';
 import { ShapWaterfallView } from './ShapWaterfallView';
+import { ShapForceView } from './ShapForceView';
+import { ShapInteractionView } from './ShapInteractionView';
 import type { ShapExplanationData } from '../types';
 
 export interface ShapExplanationEntry {
@@ -18,13 +20,15 @@ interface Props {
   doneChart: string | null;
 }
 
-type ShapSubView = 'summary' | 'beeswarm' | 'dependence' | 'waterfall';
+type ShapSubView = 'summary' | 'beeswarm' | 'dependence' | 'waterfall' | 'force' | 'interaction';
 
 const SUB_TABS: { key: ShapSubView; label: string }[] = [
   { key: 'summary', label: 'Summary' },
   { key: 'beeswarm', label: 'Beeswarm' },
   { key: 'dependence', label: 'Dependence' },
   { key: 'waterfall', label: 'Waterfall' },
+  { key: 'force', label: 'Force Plot' },
+  { key: 'interaction', label: 'Interaction' },
 ];
 
 const SUB_TAB_BASE = 'px-3 py-1.5 text-sm font-medium rounded-md transition-colors';
@@ -124,6 +128,28 @@ export const ShapExplainabilityView: React.FC<Props> = ({
 
       {subView === 'waterfall' && activeJob && (
         <ShapWaterfallView
+          jobId={activeJob.jobId}
+          modelType={activeJob.modelType}
+          shapExplanation={activeJob.shapExplanation}
+          handleDownload={handleDownload}
+          downloadingChart={downloadingChart}
+          doneChart={doneChart}
+        />
+      )}
+
+      {subView === 'force' && activeJob && (
+        <ShapForceView
+          jobId={activeJob.jobId}
+          modelType={activeJob.modelType}
+          shapExplanation={activeJob.shapExplanation}
+          handleDownload={handleDownload}
+          downloadingChart={downloadingChart}
+          doneChart={doneChart}
+        />
+      )}
+
+      {subView === 'interaction' && activeJob && (
+        <ShapInteractionView
           jobId={activeJob.jobId}
           modelType={activeJob.modelType}
           shapExplanation={activeJob.shapExplanation}

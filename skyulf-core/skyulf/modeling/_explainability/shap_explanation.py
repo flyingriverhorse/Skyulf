@@ -28,6 +28,11 @@ logger = logging.getLogger(__name__)
 # stored payload small.
 _DEFAULT_MAX_DISPLAY_SAMPLES = 50
 
+# Interaction values are O(features^2) per row, so the returned matrix is
+# capped to the top-K features (by total interaction strength) to keep the
+# payload small regardless of how many columns the dataset has.
+_DEFAULT_MAX_INTERACTION_FEATURES = 8
+
 
 def _mean_abs_per_feature(shap_values: Any, feature_names: list[str]) -> dict[str, float] | None:
     """Reduce a raw SHAP values array to mean(|value|) per feature.
@@ -134,6 +139,72 @@ def _per_sample_shap_and_base(
     return None
 
 
+def _compute_interaction_summary(
+    model: Any,
+    sample: pd.DataFrame,
+    feature_names: list[str],
+    max_interaction_features: int = _DEFAULT_MAX_INTERACTION_FEATURES,
+) -> dict[str, Any] | None:
+    """Best-effort global SHAP feature-interaction summary for tree models.
+
+    `shap.TreeExplainer.shap_interaction_values` is only implemented for
+    tree-based estimators (RandomForest, GradientBoosting, XGBoost, etc.) —
+    it raises for anything else (linear/kernel models), which is caught here
+    and treated as "unavailable" rather than an error.
+
+    Interaction values are O(features^2) per row, so this returns a single
+    mean(|value|) matrix aggregated over all sampled rows (and, for
+    multi-class models, over classes too), capped to the top-K features by
+    total interaction strength to keep the payload small.
+
+    Returns `None` if the model isn't tree-based or computation fails.
+    """
+    try:
+        import shap
+
+        explainer = shap.TreeExplainer(model)
+        raw = explainer.shap_interaction_values(sample)
+    except Exception:
+        logger.debug(
+            "SHAP interaction values unavailable for model_type=%s",
+            type(model).__name__,
+            exc_info=True,
+        )
+        return None
+
+    values = np.asarray(raw)
+    n_features = len(feature_names)
+
+    if values.ndim == 4:
+        # Multi-class: (n_samples, n_features, n_features, n_classes).
+        if values.shape[1] != n_features or values.shape[2] != n_features:
+            return None
+        mean_abs = np.abs(values).mean(axis=(0, 3))
+    elif values.ndim == 3:
+        # Binary/regression: (n_samples, n_features, n_features).
+        if values.shape[1] != n_features or values.shape[2] != n_features:
+            return None
+        mean_abs = np.abs(values).mean(axis=0)
+    else:
+        return None
+
+    if n_features > max_interaction_features:
+        # Keep the top-K features by total interaction strength (row sums),
+        # preserving a square, symmetric matrix over the reduced feature set.
+        strength = mean_abs.sum(axis=1)
+        top_idx = np.argsort(strength)[::-1][:max_interaction_features]
+        top_idx = np.sort(top_idx)
+        mean_abs = mean_abs[np.ix_(top_idx, top_idx)]
+        selected_names = [feature_names[i] for i in top_idx]
+    else:
+        selected_names = feature_names
+
+    return {
+        "feature_names": selected_names,
+        "matrix": [[round(float(v), 6) for v in row] for row in mean_abs],
+    }
+
+
 def compute_shap_explanation(
     model: Any,
     X: pd.DataFrame,
@@ -158,6 +229,10 @@ def compute_shap_explanation(
                 },
                 ...
             ],
+            "interactions": {
+                "feature_names": [...],  # top-K features, or None if unavailable
+                "matrix": [[...], ...],  # mean(|interaction value|), same order as feature_names
+            } | None,
         }
     """
     try:
@@ -205,10 +280,13 @@ def compute_shap_explanation(
                     }
                 )
 
+        interactions = _compute_interaction_summary(model, sample, feature_names)
+
         return {
             "feature_names": feature_names,
             "mean_abs_importance": mean_abs_importance,
             "samples": samples,
+            "interactions": interactions,
         }
     except Exception:
         logger.debug(
