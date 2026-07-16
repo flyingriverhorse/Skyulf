@@ -36,8 +36,11 @@ const BUDGETS = [
   { prefix: 'vendor-flow',   maxGzipBytes: 80 * 1024,   label: 'vendor-flow',   kind: 'vendor' },
   { prefix: 'vendor-react',  maxGzipBytes: 70 * 1024,   label: 'vendor-react',  kind: 'vendor' },
   { prefix: 'vendor-utils',  maxGzipBytes: 90 * 1024,   label: 'vendor-utils',  kind: 'vendor' },
-  // App entry — bumped 220→240 KB for Ensemble modeling node panel components (v0.6.0)
-  { prefix: 'index',         maxGzipBytes: 240 * 1024,  label: 'index (main)',  kind: 'vendor' },
+  // App entry — bumped 220→240 KB for Ensemble modeling node panel components (v0.6.0),
+  // then 240→260 KB for the SHAP Explainability tab (Summary/Beeswarm/Dependence/
+  // Waterfall/Force/Interaction) + Segmentation (4 clustering algorithms, auto-profile
+  // labeling, reference-column UI/crosstab) shipped in v0.7.0.
+  { prefix: 'index',         maxGzipBytes: 260 * 1024,  label: 'index (main)',  kind: 'vendor' },
   // Lazy route chunks — keep tight so an EDA-only regression surfaces
   // here rather than getting absorbed by the global index ceiling.
   { prefix: 'EDAPage',       maxGzipBytes: 140 * 1024,  label: 'route:EDA',         kind: 'route' },
