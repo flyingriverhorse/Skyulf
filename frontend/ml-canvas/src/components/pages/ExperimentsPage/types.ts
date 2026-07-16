@@ -10,11 +10,33 @@ export interface EvaluationSplit {
   metrics?: Record<string, number>;
 }
 
-/** Top-level evaluation response from the backend. */
-export interface EvaluationData {
-  problem_type: 'classification' | 'regression';
-  splits: Record<string, EvaluationSplit>;
+/** Per-cluster size/percentage/mean-feature-value ("centroid") stats. */
+export interface ClusterCentroid {
+  cluster_id: number;
+  size: number;
+  percentage: number;
+  center: Record<string, number>;
 }
+
+/** Cluster-size/centroid summary for a clustering split (no ground-truth target). */
+export interface ClusteringSummary {
+  n_clusters: number;
+  cluster_sizes: Record<string, number>;
+  centroids: ClusterCentroid[];
+}
+
+/** Raw split payload for an unsupervised clustering job — no y_true/y_pred,
+ * only the predicted cluster label per row plus the centroid summary. */
+export interface ClusteringSplit {
+  labels: number[];
+  clustering?: ClusteringSummary;
+  metrics?: Record<string, number>;
+}
+
+/** Top-level evaluation response from the backend. */
+export type EvaluationData =
+  | { problem_type: 'classification' | 'regression'; splits: Record<string, EvaluationSplit> }
+  | { problem_type: 'clustering'; splits: Record<string, ClusteringSplit> };
 
 /** Convenience alias: the y_proba shape used by every classification chart helper. */
 export type YProba = NonNullable<EvaluationSplit['y_proba']>;

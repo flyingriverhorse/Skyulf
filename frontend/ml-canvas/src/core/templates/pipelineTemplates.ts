@@ -14,7 +14,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import { registry } from '../registry/NodeRegistry';
-import { Layers, LineChart, FileText } from 'lucide-react';
+import { Layers, LineChart, FileText, Boxes } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** A node entry inside a template — just enough to materialise via `addNode`. */
@@ -39,7 +39,7 @@ export interface PipelineTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'classification' | 'regression' | 'forecast' | 'text';
+  category: 'classification' | 'regression' | 'forecast' | 'text' | 'clustering';
   icon: LucideIcon;
   nodes: TemplateNode[];
   edges: TemplateEdge[];
@@ -183,8 +183,29 @@ const TEXT_CLASSIFICATION: PipelineTemplate = {
   ],
 };
 
+const CUSTOMER_SEGMENTATION: PipelineTemplate = {
+  id: 'customer_segmentation',
+  name: 'Customer Segmentation',
+  description:
+    'Unsupervised clustering starter: dataset → impute → scale → Segmentation (K-Means). No target column needed — set the number of clusters on the Segmentation node, then Run All. View results in the Experiments page\u2019s Segmentation tab.',
+  category: 'clustering',
+  icon: Boxes,
+  nodes: [
+    { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
+    { localId: 'imp', type: 'imputation_node', position: { x: col(1), y: row(0) } },
+    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(2), y: row(0) } },
+    { localId: 'train', type: 'SegmentationNode', position: { x: col(3), y: row(0) } },
+  ],
+  edges: [
+    { source: 'ds', target: 'imp' },
+    { source: 'imp', target: 'scl' },
+    { source: 'scl', target: 'train' },
+  ],
+};
+
 export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
   TABULAR_CLASSIFICATION,
   TABULAR_REGRESSION,
   TEXT_CLASSIFICATION,
+  CUSTOMER_SEGMENTATION,
 ];

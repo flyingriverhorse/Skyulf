@@ -21,7 +21,7 @@ class BaseModelCalculator(ABC):
     @property
     @abstractmethod
     def problem_type(self) -> str:
-        """Returns 'classification' or 'regression'."""
+        """Returns 'classification', 'regression', or 'clustering'."""
 
     @property
     def default_params(self) -> dict[str, Any]:
@@ -120,7 +120,20 @@ class StatefulEstimator:
             return False
 
     def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
-        """Helper to extract X and y from DataFrame or Tuple."""
+        """Helper to extract X and y from DataFrame or Tuple.
+
+        An empty/falsy ``target_column`` is the established "no target"
+        sentinel already used elsewhere in this codebase (see
+        ``_node_runners.py``'s ``target_col=""`` for data-preview-only
+        inputs). Unsupervised calculators (e.g. clustering) rely on this to
+        get the whole frame back as ``X`` with ``y=None``, without touching
+        the existing "raise on missing target" contract that classification/
+        regression depend on below.
+        """
+        if not target_column:
+            X = data[0] if isinstance(data, tuple) else data
+            return X, None
+
         if isinstance(data, tuple) and len(data) == 2:
             return self._extract_xy_from_tuple(data, target_column)
 
@@ -348,14 +361,17 @@ class StatefulEstimator:
         X_train, y_train = self._extract_xy(dataset.train, target_column)
         X_val, y_val = self._extract_xy(dataset.validation, target_column)
 
+        # y_train/y_val are None for unsupervised calculators (e.g. clustering,
+        # see `_extract_xy`'s "no target" sentinel) — skip the y-concat rather
+        # than crash trying to concatenate `None`.
         if get_engine(X_train).name == EngineName.POLARS:
             import polars as pl
 
             X_combined = pl.concat([X_train, X_val])
-            y_combined = pl.concat([y_train, y_val])
+            y_combined = None if y_train is None else pl.concat([y_train, y_val])
         else:
             X_combined = pd.concat([X_train, X_val], axis=0)
-            y_combined = pd.concat([y_train, y_val], axis=0)
+            y_combined = None if y_train is None else pd.concat([y_train, y_val], axis=0)
 
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
@@ -426,14 +442,30 @@ class StatefulEstimator:
             X, y = self._extract_xy(data, target_column)
         except ValueError:
             return None  # Cannot evaluate without target
-        if X is None or y is None:
+        if X is None:
+            return None
+        if problem_type != "clustering" and y is None:
             return None
 
         y_pred = self.applier.predict(X, self.model)
+        model_to_evaluate = self._unwrap_tuned_model()
+
+        if problem_type == "clustering":
+            # Unsupervised: there is no y_true, only the cluster label
+            # assigned to each row. KMeans genuinely supports out-of-sample
+            # `.predict()`, so (unlike DBSCAN/Agglomerative) evaluating each
+            # split independently with its own predicted labels is valid.
+            split_report = self._evaluate_split_with_model(
+                model_to_evaluate, split_name, X, y_pred, problem_type
+            )
+            evaluation_data["splits"][split_name] = self._build_clustering_split_raw_data(
+                y_pred, split_report
+            )
+            return split_report
+
         y_proba = self._predict_proba_payload(X, problem_type)
         evaluation_data["splits"][split_name] = self._build_split_raw_data(y, y_pred, y_proba)
 
-        model_to_evaluate = self._unwrap_tuned_model()
         return self._evaluate_split_with_model(model_to_evaluate, split_name, X, y, problem_type)
 
     @staticmethod
@@ -448,6 +480,27 @@ class StatefulEstimator:
         if y_proba:
             split_data["y_proba"] = y_proba
         return split_data
+
+    @staticmethod
+    def _build_clustering_split_raw_data(labels: Any, split_report: Any = None) -> dict[str, Any]:
+        """Builds the raw ``labels`` (+ clustering summary/metrics) payload for a clustering split.
+
+        ``split_report`` is the ``ModelEvaluationReport`` for this split, if evaluation
+        succeeded; its ``clustering`` field (cluster sizes/centroids) and quality
+        ``metrics`` (silhouette/Calinski-Harabasz/Davies-Bouldin) are embedded so the
+        API doesn't need a second round-trip to expose them.
+        """
+        raw: dict[str, Any] = {
+            "labels": labels.tolist() if hasattr(labels, "tolist") else list(labels)
+        }
+        if split_report is not None:
+            clustering = getattr(split_report, "clustering", None)
+            if clustering is not None:
+                raw["clustering"] = clustering.model_dump()
+            metrics = getattr(split_report, "metrics", None)
+            if metrics is not None:
+                raw["metrics"] = dict(metrics)
+        return raw
 
     def _unwrap_tuned_model(self) -> Any:
         """Unpacks ``self.model`` if it's a ``(model, ...)`` tuple, as produced by the Tuner."""
@@ -473,9 +526,15 @@ class StatefulEstimator:
     def _evaluate_split_with_model(
         model_to_evaluate: Any, split_name: str, X: Any, y: Any, problem_type: str
     ) -> Any:
-        """Dispatches to the classification or regression evaluator based on ``problem_type``."""
+        """Dispatches to the classification, regression, or clustering evaluator.
+
+        For clustering, ``y`` is the *predicted* cluster labels for this split
+        (there is no ground-truth target), computed by the caller via
+        ``self.applier.predict(X, self.model)``.
+        """
         # Import here to avoid circular dependency
         from ._evaluation.classification import evaluate_classification_model
+        from ._evaluation.clustering import evaluate_clustering_model
         from ._evaluation.regression import evaluate_regression_model
 
         if problem_type == "classification":
@@ -485,6 +544,10 @@ class StatefulEstimator:
         elif problem_type == "regression":
             return evaluate_regression_model(
                 model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
+            )
+        elif problem_type == "clustering":
+            return evaluate_clustering_model(
+                model=model_to_evaluate, X=X, labels=y, dataset_name=split_name
             )
         else:
             raise ValueError(f"Unknown problem type: {problem_type}")

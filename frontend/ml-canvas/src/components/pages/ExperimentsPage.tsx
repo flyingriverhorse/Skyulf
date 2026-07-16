@@ -18,7 +18,11 @@ import { BranchComparisonCard } from './ExperimentsPage/components/BranchCompari
 import { MetricsComparisonChart } from './ExperimentsPage/components/MetricsComparisonChart';
 import { JobListSidebar } from './ExperimentsPage/components/JobListSidebar';
 import { EvaluationView } from './ExperimentsPage/components/EvaluationView';
+import { SegmentationView } from './ExperimentsPage/components/SegmentationView';
 import { ExperimentsHeader, ViewTabs, type ExperimentsView } from './ExperimentsPage/components/HeaderAndTabs';
+
+// Model types whose jobs are unsupervised clustering runs (Segmentation tab).
+const CLUSTERING_MODEL_TYPES = ['kmeans'];
 
 // Local helper: split a metric key into split-prefix and base name.
 const parseMetricKey = (key: string) => {
@@ -67,7 +71,7 @@ export const ExperimentsPage: React.FC = () => {
 
   // Best F1 threshold — recomputed only when class or evaluation data changes, not on every slider drag
   const bestF1Info = useMemo(() => {
-    if (!evaluationData || !selectedRocClass) return null;
+    if (!evaluationData || !selectedRocClass || evaluationData.problem_type === 'clustering') return null;
     const splits = evaluationData.splits;
     const refSplit = splits.val ?? splits.test ?? splits.train;
     const splitLabel = splits.val ? 'val' : splits.test ? 'test' : 'train';
@@ -85,7 +89,7 @@ export const ExperimentsPage: React.FC = () => {
   }, [fetchJobs]);
 
   useEffect(() => {
-    if (evaluationData?.splits.train?.y_proba?.classes && evaluationData.splits.train.y_proba.classes.length > 0) {
+    if (evaluationData?.problem_type !== 'clustering' && evaluationData?.splits.train?.y_proba?.classes && evaluationData.splits.train.y_proba.classes.length > 0) {
       const proba = evaluationData.splits.train.y_proba;
       const first = proba.labels?.[0] ?? proba.classes[0];
       setSelectedRocClass(String(first));
@@ -181,7 +185,7 @@ export const ExperimentsPage: React.FC = () => {
 
   // Effect to fetch evaluation data when view changes or selection changes
   useEffect(() => {
-    if (activeView === 'evaluation') {
+    if (activeView === 'evaluation' || activeView === 'segmentation') {
       if (!evalJobId && selectedJobIds.length > 0) {
         void fetchEvaluationData(selectedJobIds[0]!);
       } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
@@ -284,6 +288,14 @@ export const ExperimentsPage: React.FC = () => {
     [shapExplanationByJob]
   );
 
+  // Segmentation (clustering) jobs — detected from job.model_type rather
+  // than fetching evaluation data for every selected job, since the model
+  // type is already available in the job list.
+  const hasSegmentation = useMemo(
+    () => selectedJobs.some(j => CLUSTERING_MODEL_TYPES.includes(j.model_type ?? '')),
+    [selectedJobs]
+  );
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       <ExperimentsHeader
@@ -323,6 +335,7 @@ export const ExperimentsPage: React.FC = () => {
                 setActiveView={setActiveView}
                 hasFeatureImportances={hasFeatureImportances}
                 hasShapSummary={hasShapSummary}
+                hasSegmentation={hasSegmentation}
               />
 
               <BranchComparisonCard selectedJobs={selectedJobs} getDuration={formatDuration} />
@@ -405,6 +418,20 @@ export const ExperimentsPage: React.FC = () => {
               {activeView === 'shap' && hasShapSummary && (
                 <ShapExplainabilityView
                   shapExplanationByJob={shapExplanationByJob}
+                  handleDownload={handleDownload}
+                  downloadingChart={downloadingChart}
+                  doneChart={doneChart}
+                />
+              )}
+
+              {activeView === 'segmentation' && hasSegmentation && (
+                <SegmentationView
+                  selectedJobIds={selectedJobIds}
+                  evalJobId={evalJobId}
+                  fetchEvaluationData={fetchEvaluationData}
+                  isEvalLoading={isEvalLoading}
+                  evalError={evalError}
+                  evaluationData={evaluationData}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}

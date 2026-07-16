@@ -11,6 +11,7 @@ from .classification import (
     SGDClassifierApplier,
     SGDClassifierCalculator,
 )
+from .clustering import KMeansApplier, KMeansCalculator
 from .cross_validation import perform_cross_validation
 from .ensemble import (
     StackingClassifierApplier,
@@ -75,6 +76,8 @@ __all__ = [
     "MultinomialNBApplier",
     "BernoulliNBCalculator",
     "BernoulliNBApplier",
+    "KMeansCalculator",
+    "KMeansApplier",
 ]
 
 # NOTE: Imports above are intentionally explicit. Every node module is imported

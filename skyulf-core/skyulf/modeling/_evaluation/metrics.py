@@ -213,3 +213,34 @@ def calculate_regression_metrics(
     }
 
     return metrics
+
+
+def calculate_clustering_metrics(
+    X: pd.DataFrame | SkyulfDataFrame, labels: Any
+) -> dict[str, float]:
+    """Compute unsupervised clustering-quality metrics for a fitted model's labels.
+
+    All three metrics only need the feature matrix and the cluster labels
+    (no ground-truth target), so they can be computed on any split a KMeans
+    model has genuinely predicted on (train/test/validation alike).
+    """
+    from sklearn.metrics import (
+        calinski_harabasz_score,
+        davies_bouldin_score,
+        silhouette_score,
+    )
+
+    X_np, _ = SklearnBridge.to_sklearn((X, None))
+    labels_np = np.asarray(labels)
+
+    n_unique = len(np.unique(labels_np))
+    metrics: dict[str, float] = {"n_clusters": float(n_unique)}
+
+    # These metrics are undefined for fewer than 2 clusters, or when the
+    # cluster count reaches the sample count — guard rather than let sklearn raise.
+    if 1 < n_unique < len(labels_np):
+        metrics["silhouette_score"] = float(silhouette_score(X_np, labels_np))
+        metrics["calinski_harabasz_score"] = float(calinski_harabasz_score(X_np, labels_np))
+        metrics["davies_bouldin_score"] = float(davies_bouldin_score(X_np, labels_np))
+
+    return metrics

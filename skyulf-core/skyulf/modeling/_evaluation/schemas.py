@@ -50,6 +50,23 @@ class RegressionEvaluation(BaseModel):
     prediction_error: Any | None = None
 
 
+class ClusterCentroid(BaseModel):
+    """A single cluster's centroid (mean feature values) and size."""
+
+    cluster_id: int
+    size: int
+    percentage: float
+    center: dict[str, float]
+
+
+class ClusteringEvaluation(BaseModel):
+    """Clustering (unsupervised) specific evaluation data."""
+
+    n_clusters: int
+    cluster_sizes: dict[str, int] = Field(default_factory=dict)
+    centroids: list[ClusterCentroid] = Field(default_factory=list)
+
+
 class ModelEvaluationReport(BaseModel):
     """Evaluation report for a single dataset."""
 
@@ -57,3 +74,4 @@ class ModelEvaluationReport(BaseModel):
     metrics: dict[str, float]
     classification: ClassificationEvaluation | None = None
     regression: RegressionEvaluation | None = None
+    clustering: ClusteringEvaluation | None = None

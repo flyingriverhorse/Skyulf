@@ -4,6 +4,7 @@ from typing import Any
 
 from ._bayes import BERNOULLI_NB_PARAMS, GAUSSIAN_NB_PARAMS, MULTINOMIAL_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
+from ._clustering import KMEANS_PARAMS
 from ._ensemble import (
     STACKING_CLASSIFIER_PARAMS,
     STACKING_REGRESSOR_PARAMS,
@@ -69,6 +70,7 @@ MODEL_HYPERPARAMETERS = {
     "stacking_classifier": STACKING_CLASSIFIER_PARAMS,
     "voting_regressor": VOTING_REGRESSOR_PARAMS,
     "stacking_regressor": STACKING_REGRESSOR_PARAMS,
+    "kmeans": KMEANS_PARAMS,
 }
 
 
