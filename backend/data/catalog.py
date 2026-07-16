@@ -243,8 +243,12 @@ class S3Catalog(DataCatalog):
 
     def _get_cache_path(self, s3_path: str) -> str:
         # Create a safe filename from the S3 path
-        safe_name = s3_path.replace("s3://", "").replace("/", "_")
-        return str(Path(self.cache_dir) / safe_name)
+        safe_name = s3_path.replace("s3://", "").replace("/", "_").replace("\\", "_")
+        resolved = os.path.realpath(os.path.join(self.cache_dir, safe_name))
+        base = os.path.realpath(self.cache_dir)
+        if not resolved.startswith(base + os.sep) and resolved != base:
+            raise PermissionError(f"Cache path for '{s3_path}' resolves outside the cache dir")
+        return resolved
 
     def _load_from_cache_if_fresh(
         self, path: str, cache_path: str, limit: int | None, kwargs: dict

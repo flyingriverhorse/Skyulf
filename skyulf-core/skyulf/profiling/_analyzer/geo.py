@@ -122,13 +122,13 @@ class GeoMixin(_AnalyzerState):
         if not (-90.0 <= min_lat <= 90.0 and -90.0 <= max_lat <= 90.0):
             logger.warning(
                 f"Column '{lat_col}' detected as latitude but values are out of "
-                f"range [-90, 90] (min={min_lat}, max={max_lat}); skipping."
+                "range [-90, 90]; skipping."
             )
             return False
         if not (-180.0 <= min_lon <= 180.0 and -180.0 <= max_lon <= 180.0):
             logger.warning(
                 f"Column '{lon_col}' detected as longitude but values are out of "
-                f"range [-180, 180] (min={min_lon}, max={max_lon}); skipping."
+                "range [-180, 180]; skipping."
             )
             return False
         return True
