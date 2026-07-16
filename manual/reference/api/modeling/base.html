@@ -4066,7 +4066,45 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="normal">449</span>
 <span class="normal">450</span>
 <span class="normal">451</span>
-<span class="normal">452</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulEstimator</span><span class="p">:</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulEstimator</span><span class="p">:</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">:</span> <span class="n">BaseModelApplier</span><span class="p">,</span> <span class="n">node_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">calculator</span> <span class="o">=</span> <span class="n">calculator</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">applier</span> <span class="o">=</span> <span class="n">applier</span>
@@ -4098,22 +4136,35 @@ the tuner can construct a valid meta-estimator.</p>
     <span class="k">def</span><span class="w"> </span><span class="nf">_extract_xy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper to extract X and y from DataFrame or Tuple.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-            <span class="c1"># If y is None but X is a DataFrame containing the target, extract it</span>
-            <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy_from_tuple</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
 
         <span class="n">engine</span> <span class="o">=</span> <span class="n">get_engine</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">EngineName</span><span class="o">.</span><span class="n">POLARS</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">target_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target column &#39;</span><span class="si">{</span><span class="n">target_column</span><span class="si">}</span><span class="s2">&#39; not found in data&quot;</span><span class="p">)</span>
-            <span class="n">X</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-            <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">target_column</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
-            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy_polars</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
 
-        <span class="c1"># Pandas / Default</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy_pandas_like</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_xy_from_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extracts X/y from a ``(X, y)`` tuple, pulling ``y`` out of ``X`` if it&#39;s missing.&quot;&quot;&quot;</span>
+        <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="c1"># If y is None but X is a DataFrame containing the target, extract it</span>
+        <span class="k">if</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_xy_polars</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extracts X/y from a Polars DataFrame by dropping/selecting ``target_column``.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">target_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target column &#39;</span><span class="si">{</span><span class="n">target_column</span><span class="si">}</span><span class="s2">&#39; not found in data&quot;</span><span class="p">)</span>
+        <span class="n">X</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">target_column</span><span class="p">)</span><span class="o">.</span><span class="n">to_series</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_xy_pandas_like</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extracts X/y from a pandas or generic DataFrame-like object.&quot;&quot;&quot;</span>
         <span class="c1"># Check for DataFrame-like</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">target_column</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
@@ -4172,6 +4223,68 @@ the tuner can construct a valid meta-estimator.</p>
             <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
         <span class="p">)</span>
 
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_drop_target_column</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Drop target_column from data, handling pandas (kwarg) and Polars (list-arg) APIs.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="c1"># Polars</span>
+            <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_split_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">split_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract the feature matrix from a test/validation split, dropping the target if present.</span>
+
+<span class="sd">        Handles both the ``(X, y)`` tuple form and the plain DataFrame form</span>
+<span class="sd">        (pandas or Polars), so the same logic can be reused for the test and</span>
+<span class="sd">        validation splits of ``fit_predict``.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">split_data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">y_split</span> <span class="o">=</span> <span class="n">split_data</span>
+            <span class="n">X</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X</span><span class="p">)</span>
+            <span class="c1"># If y is None, the target may still be in X — drop it</span>
+            <span class="k">if</span> <span class="n">y_split</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">X</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drop_target_column</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">X</span>
+
+        <span class="k">if</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">split_data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_drop_target_column</span><span class="p">(</span><span class="n">split_data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">split_data</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_fit_predict_dataset</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span>
+        <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+        <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">]</span>
+        <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">],</span>
+        <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Wrap raw DataFrame/tuple ``fit_predict`` input into a SplitDataset.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="c1"># Check if it&#39;s (train_df, test_df) or (X, y)</span>
+            <span class="n">elem0</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">elem0</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">elem0</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="c1"># It&#39;s (train_df, test_df)</span>
+                <span class="n">train_df</span><span class="p">,</span> <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span>
+                <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train_df</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">test_df</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+
+            <span class="c1"># Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="s2">&quot;WARNING: No test set provided. Using entire input as training data. &quot;</span>
+                <span class="s2">&quot;Ensure data was split BEFORE preprocessing to avoid data leakage.&quot;</span>
+            <span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
+                <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">dataset</span><span class="p">),</span> <span class="n">test</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">dataset</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span>
@@ -4188,28 +4301,7 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="sd">        Fits the model on training data and returns predictions for all splits.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
-            <span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-            <span class="c1"># Check if it&#39;s (train_df, test_df) or (X, y)</span>
-            <span class="n">elem0</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">elem0</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">elem0</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                <span class="c1"># It&#39;s (train_df, test_df)</span>
-                <span class="n">train_df</span><span class="p">,</span> <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span>
-                <span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train_df</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">test_df</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="c1"># Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.</span>
-                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="s2">&quot;WARNING: No test set provided. Using entire input as training data. &quot;</span>
-                    <span class="s2">&quot;Ensure data was split BEFORE preprocessing to avoid data leakage.&quot;</span>
-                <span class="p">)</span>
-                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
-                    <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-
-                <span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
-                    <span class="n">train</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">dataset</span><span class="p">),</span> <span class="n">test</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span>
-                <span class="p">)</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_fit_predict_dataset</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">)</span>
 
         <span class="c1"># 1. Prepare Data</span>
         <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
@@ -4236,62 +4328,17 @@ the tuner can construct a valid meta-estimator.</p>
         <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
 
         <span class="c1"># Test Predictions</span>
-        <span class="n">is_test_empty</span> <span class="o">=</span> <span class="kc">False</span>
-        <span class="n">test_df</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-
         <span class="c1"># is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`</span>
         <span class="n">is_test_empty</span> <span class="o">=</span> <span class="n">test_df</span><span class="o">.</span><span class="n">empty</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="s2">&quot;empty&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">test_df</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">is_test_empty</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-                <span class="n">X_test</span><span class="p">,</span> <span class="n">y_test_split</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-                <span class="n">X_test</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X_test</span><span class="p">)</span>
-                <span class="c1"># If y is None, the target may still be in X — drop it</span>
-                <span class="k">if</span> <span class="p">(</span>
-                    <span class="n">y_test_split</span> <span class="ow">is</span> <span class="kc">None</span>
-                    <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span>
-                    <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X_test</span><span class="o">.</span><span class="n">columns</span>
-                <span class="p">):</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">X_test</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                        <span class="n">X_test</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">X_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                        <span class="c1"># Polars</span>
-                        <span class="n">X_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">X_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
+            <span class="n">X_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_split_features</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
             <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
 
         <span class="c1"># Validation Predictions</span>
         <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-                <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val_split</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span>
-                <span class="n">X_val</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X_val</span><span class="p">)</span>
-                <span class="c1"># If y is None, the target may still be in X — drop it</span>
-                <span class="k">if</span> <span class="p">(</span>
-                    <span class="n">y_val_split</span> <span class="ow">is</span> <span class="kc">None</span>
-                    <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span>
-                    <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X_val</span><span class="o">.</span><span class="n">columns</span>
-                <span class="p">):</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">X_val</span> <span class="o">=</span> <span class="n">X_val</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                        <span class="n">X_val</span> <span class="o">=</span> <span class="n">X_val</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">X_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                        <span class="c1"># Polars</span>
-                        <span class="n">X_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">X_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span>
+            <span class="n">X_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_split_features</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
             <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">predictions</span>
@@ -4327,16 +4374,10 @@ the tuner can construct a valid meta-estimator.</p>
         <span class="c1"># 2. Train Model</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_combined</span><span class="p">,</span> <span class="n">y_combined</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Evaluates the model on all splits and returns a detailed report.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Import here to avoid circular dependency</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
-
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model has not been trained yet. Call fit_predict() first.&quot;</span><span class="p">)</span>
 
@@ -4352,73 +4393,27 @@ the tuner can construct a valid meta-estimator.</p>
             <span class="s2">&quot;splits&quot;</span><span class="p">:</span> <span class="p">{},</span>
         <span class="p">}</span>
 
-        <span class="c1"># Helper to evaluate a single split</span>
-        <span class="k">def</span><span class="w"> </span><span class="nf">evaluate_split</span><span class="p">(</span><span class="n">split_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-            <span class="c1"># Delegate to the same engine-agnostic (pandas/polars/tuple) X/y</span>
-            <span class="c1"># extraction used by fit_predict, instead of duplicating</span>
-            <span class="c1"># ad-hoc pandas-only logic that silently dropped polars splits.</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
-            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-                <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># Cannot evaluate without target</span>
-            <span class="k">if</span> <span class="n">X</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">return</span> <span class="kc">None</span>
-
-            <span class="n">y_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
-
-            <span class="c1"># Try to get probabilities for classification</span>
-            <span class="n">y_proba</span> <span class="o">=</span> <span class="kc">None</span>
-            <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-                <span class="n">y_proba_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">y_proba_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">y_proba</span> <span class="o">=</span> <span class="p">{</span>
-                        <span class="s2">&quot;classes&quot;</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
-                        <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
-                    <span class="p">}</span>
-
-            <span class="n">split_data</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="s2">&quot;y_true&quot;</span><span class="p">:</span> <span class="n">y</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="s2">&quot;tolist&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">y</span><span class="p">),</span>
-                <span class="s2">&quot;y_pred&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">y_pred</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="s2">&quot;tolist&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">y_pred</span><span class="p">)),</span>
-            <span class="p">}</span>
-
-            <span class="k">if</span> <span class="n">y_proba</span><span class="p">:</span>
-                <span class="n">split_data</span><span class="p">[</span><span class="s2">&quot;y_proba&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_proba</span>
-
-            <span class="n">evaluation_data</span><span class="p">[</span><span class="s2">&quot;splits&quot;</span><span class="p">][</span><span class="n">split_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">split_data</span>
-
-            <span class="c1"># Unpack model if it&#39;s a tuple (from Tuner)</span>
-            <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-                <span class="c1"># Check if first element looks like a model (has fit/predict)</span>
-                <span class="c1"># or if it&#39;s just a convention from TuningCalculator</span>
-                <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-            <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">evaluate_classification_model</span><span class="p">(</span>
-                    <span class="n">model</span><span class="o">=</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">dataset_name</span><span class="o">=</span><span class="n">split_name</span><span class="p">,</span> <span class="n">X_test</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y_test</span><span class="o">=</span><span class="n">y</span>
-                <span class="p">)</span>
-            <span class="k">elif</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">evaluate_regression_model</span><span class="p">(</span>
-                    <span class="n">model</span><span class="o">=</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">dataset_name</span><span class="o">=</span><span class="n">split_name</span><span class="p">,</span> <span class="n">X_test</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y_test</span><span class="o">=</span><span class="n">y</span>
-                <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown problem type: </span><span class="si">{</span><span class="n">problem_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
         <span class="c1"># 2. Evaluate Train</span>
-        <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">evaluate_split</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">)</span>
+        <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split</span><span class="p">(</span>
+            <span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">,</span> <span class="n">evaluation_data</span>
+        <span class="p">)</span>
 
         <span class="c1"># 3. Evaluate Test</span>
         <span class="n">has_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_non_empty_split</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">has_test</span><span class="p">:</span>
-            <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">evaluate_split</span><span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
+            <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split</span><span class="p">(</span>
+                <span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">,</span> <span class="n">evaluation_data</span>
+            <span class="p">)</span>
 
         <span class="c1"># 4. Evaluate Validation</span>
         <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">has_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_non_empty_split</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">has_val</span><span class="p">:</span>
-                <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">evaluate_split</span><span class="p">(</span><span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">)</span>
+                <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split</span><span class="p">(</span>
+                    <span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">,</span> <span class="n">evaluation_data</span>
+                <span class="p">)</span>
 
         <span class="c1"># Return report object (simplified for now, assuming schema matches)</span>
         <span class="k">return</span> <span class="p">{</span>
@@ -4426,6 +4421,87 @@ the tuner can construct a valid meta-estimator.</p>
             <span class="s2">&quot;splits&quot;</span><span class="p">:</span> <span class="n">splits_payload</span><span class="p">,</span>
             <span class="s2">&quot;raw_data&quot;</span><span class="p">:</span> <span class="n">evaluation_data</span><span class="p">,</span>
         <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_split</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">split_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">problem_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">evaluation_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluates a single dataset split, recording raw predictions into ``evaluation_data``</span>
+<span class="sd">        and returning the split&#39;s evaluation report (or ``None`` if it can&#39;t be evaluated).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Delegate to the same engine-agnostic (pandas/polars/tuple) X/y</span>
+        <span class="c1"># extraction used by fit_predict, instead of duplicating</span>
+        <span class="c1"># ad-hoc pandas-only logic that silently dropped polars splits.</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># Cannot evaluate without target</span>
+        <span class="k">if</span> <span class="n">X</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+        <span class="n">y_proba</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_predict_proba_payload</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">)</span>
+        <span class="n">evaluation_data</span><span class="p">[</span><span class="s2">&quot;splits&quot;</span><span class="p">][</span><span class="n">split_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_split_raw_data</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">,</span> <span class="n">y_proba</span><span class="p">)</span>
+
+        <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unwrap_tuned_model</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split_with_model</span><span class="p">(</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">split_name</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_split_raw_data</span><span class="p">(</span>
+        <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y_proba</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Builds the raw ``y_true``/``y_pred``/(optional) ``y_proba`` payload for a split.&quot;&quot;&quot;</span>
+        <span class="n">split_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;y_true&quot;</span><span class="p">:</span> <span class="n">y</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="s2">&quot;tolist&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">y</span><span class="p">),</span>
+            <span class="s2">&quot;y_pred&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">y_pred</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="s2">&quot;tolist&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">y_pred</span><span class="p">)),</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="n">y_proba</span><span class="p">:</span>
+            <span class="n">split_data</span><span class="p">[</span><span class="s2">&quot;y_proba&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_proba</span>
+        <span class="k">return</span> <span class="n">split_data</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_unwrap_tuned_model</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Unpacks ``self.model`` if it&#39;s a ``(model, ...)`` tuple, as produced by the Tuner.&quot;&quot;&quot;</span>
+        <span class="c1"># Check if first element looks like a model (has fit/predict)</span>
+        <span class="c1"># or if it&#39;s just a convention from TuningCalculator</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_predict_proba_payload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the ``{&quot;classes&quot;, &quot;values&quot;}`` probability payload for classification splits.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">problem_type</span> <span class="o">!=</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">y_proba_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">y_proba_df</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;classes&quot;</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+            <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="p">}</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_split_with_model</span><span class="p">(</span>
+        <span class="n">model_to_evaluate</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">split_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Dispatches to the classification or regression evaluator based on ``problem_type``.&quot;&quot;&quot;</span>
+        <span class="c1"># Import here to avoid circular dependency</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
+
+        <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">evaluate_classification_model</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">dataset_name</span><span class="o">=</span><span class="n">split_name</span><span class="p">,</span> <span class="n">X_test</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y_test</span><span class="o">=</span><span class="n">y</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">evaluate_regression_model</span><span class="p">(</span>
+                <span class="n">model</span><span class="o">=</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">dataset_name</span><span class="o">=</span><span class="n">split_name</span><span class="p">,</span> <span class="n">X_test</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y_test</span><span class="o">=</span><span class="n">y</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown problem type: </span><span class="si">{</span><span class="n">problem_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -4458,20 +4534,7 @@ the tuner can construct a valid meta-estimator.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">176</span>
 <span class="normal">177</span>
 <span class="normal">178</span>
 <span class="normal">179</span>
@@ -4492,7 +4555,20 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="normal">194</span>
 <span class="normal">195</span>
 <span class="normal">196</span>
-<span class="normal">197</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cross_validate</span><span class="p">(</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">cross_validate</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -4549,16 +4625,7 @@ the tuner can construct a valid meta-estimator.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">354</span>
-<span class="normal">355</span>
-<span class="normal">356</span>
-<span class="normal">357</span>
-<span class="normal">358</span>
-<span class="normal">359</span>
-<span class="normal">360</span>
-<span class="normal">361</span>
-<span class="normal">362</span>
-<span class="normal">363</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">363</span>
 <span class="normal">364</span>
 <span class="normal">365</span>
 <span class="normal">366</span>
@@ -4604,59 +4671,10 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="normal">406</span>
 <span class="normal">407</span>
 <span class="normal">408</span>
-<span class="normal">409</span>
-<span class="normal">410</span>
-<span class="normal">411</span>
-<span class="normal">412</span>
-<span class="normal">413</span>
-<span class="normal">414</span>
-<span class="normal">415</span>
-<span class="normal">416</span>
-<span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
-<span class="normal">421</span>
-<span class="normal">422</span>
-<span class="normal">423</span>
-<span class="normal">424</span>
-<span class="normal">425</span>
-<span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
-<span class="normal">430</span>
-<span class="normal">431</span>
-<span class="normal">432</span>
-<span class="normal">433</span>
-<span class="normal">434</span>
-<span class="normal">435</span>
-<span class="normal">436</span>
-<span class="normal">437</span>
-<span class="normal">438</span>
-<span class="normal">439</span>
-<span class="normal">440</span>
-<span class="normal">441</span>
-<span class="normal">442</span>
-<span class="normal">443</span>
-<span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
-<span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span>  <span class="c1"># noqa: C901</span>
-    <span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">409</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Evaluates the model on all splits and returns a detailed report.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="c1"># Import here to avoid circular dependency</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.classification</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_classification_model</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">._evaluation.regression</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate_regression_model</span>
-
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Model has not been trained yet. Call fit_predict() first.&quot;</span><span class="p">)</span>
 
@@ -4672,73 +4690,27 @@ the tuner can construct a valid meta-estimator.</p>
         <span class="s2">&quot;splits&quot;</span><span class="p">:</span> <span class="p">{},</span>
     <span class="p">}</span>
 
-    <span class="c1"># Helper to evaluate a single split</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">evaluate_split</span><span class="p">(</span><span class="n">split_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-        <span class="c1"># Delegate to the same engine-agnostic (pandas/polars/tuple) X/y</span>
-        <span class="c1"># extraction used by fit_predict, instead of duplicating</span>
-        <span class="c1"># ad-hoc pandas-only logic that silently dropped polars splits.</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">X</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># Cannot evaluate without target</span>
-        <span class="k">if</span> <span class="n">X</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">y</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">None</span>
-
-        <span class="n">y_pred</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
-
-        <span class="c1"># Try to get probabilities for classification</span>
-        <span class="n">y_proba</span> <span class="o">=</span> <span class="kc">None</span>
-        <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-            <span class="n">y_proba_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict_proba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">y_proba_df</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">y_proba</span> <span class="o">=</span> <span class="p">{</span>
-                    <span class="s2">&quot;classes&quot;</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
-                    <span class="s2">&quot;values&quot;</span><span class="p">:</span> <span class="n">y_proba_df</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
-                <span class="p">}</span>
-
-        <span class="n">split_data</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;y_true&quot;</span><span class="p">:</span> <span class="n">y</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="s2">&quot;tolist&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">y</span><span class="p">),</span>
-            <span class="s2">&quot;y_pred&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">y_pred</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y_pred</span><span class="p">,</span> <span class="s2">&quot;tolist&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">list</span><span class="p">(</span><span class="n">y_pred</span><span class="p">)),</span>
-        <span class="p">}</span>
-
-        <span class="k">if</span> <span class="n">y_proba</span><span class="p">:</span>
-            <span class="n">split_data</span><span class="p">[</span><span class="s2">&quot;y_proba&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">y_proba</span>
-
-        <span class="n">evaluation_data</span><span class="p">[</span><span class="s2">&quot;splits&quot;</span><span class="p">][</span><span class="n">split_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">split_data</span>
-
-        <span class="c1"># Unpack model if it&#39;s a tuple (from Tuner)</span>
-        <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="c1"># Check if first element looks like a model (has fit/predict)</span>
-            <span class="c1"># or if it&#39;s just a convention from TuningCalculator</span>
-            <span class="n">model_to_evaluate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">evaluate_classification_model</span><span class="p">(</span>
-                <span class="n">model</span><span class="o">=</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">dataset_name</span><span class="o">=</span><span class="n">split_name</span><span class="p">,</span> <span class="n">X_test</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y_test</span><span class="o">=</span><span class="n">y</span>
-            <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;regression&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">evaluate_regression_model</span><span class="p">(</span>
-                <span class="n">model</span><span class="o">=</span><span class="n">model_to_evaluate</span><span class="p">,</span> <span class="n">dataset_name</span><span class="o">=</span><span class="n">split_name</span><span class="p">,</span> <span class="n">X_test</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y_test</span><span class="o">=</span><span class="n">y</span>
-            <span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown problem type: </span><span class="si">{</span><span class="n">problem_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
     <span class="c1"># 2. Evaluate Train</span>
-    <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">evaluate_split</span><span class="p">(</span><span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">)</span>
+    <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split</span><span class="p">(</span>
+        <span class="s2">&quot;train&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">,</span> <span class="n">evaluation_data</span>
+    <span class="p">)</span>
 
     <span class="c1"># 3. Evaluate Test</span>
     <span class="n">has_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_non_empty_split</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">has_test</span><span class="p">:</span>
-        <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">evaluate_split</span><span class="p">(</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">)</span>
+        <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split</span><span class="p">(</span>
+            <span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">,</span> <span class="n">evaluation_data</span>
+        <span class="p">)</span>
 
     <span class="c1"># 4. Evaluate Validation</span>
     <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">has_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_non_empty_split</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">has_val</span><span class="p">:</span>
-            <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">evaluate_split</span><span class="p">(</span><span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">)</span>
+            <span class="n">splits_payload</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_split</span><span class="p">(</span>
+                <span class="s2">&quot;validation&quot;</span><span class="p">,</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">problem_type</span><span class="p">,</span> <span class="n">evaluation_data</span>
+            <span class="p">)</span>
 
     <span class="c1"># Return report object (simplified for now, assuming schema matches)</span>
     <span class="k">return</span> <span class="p">{</span>
@@ -4768,82 +4740,7 @@ the tuner can construct a valid meta-estimator.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span>
-<span class="normal">217</span>
-<span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span>
-<span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span>
-<span class="normal">273</span>
-<span class="normal">274</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
 <span class="normal">275</span>
 <span class="normal">276</span>
 <span class="normal">277</span>
@@ -4890,7 +4787,16 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="normal">318</span>
 <span class="normal">319</span>
 <span class="normal">320</span>
-<span class="normal">321</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_predict</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span>
     <span class="o">|</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
@@ -4906,28 +4812,7 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="sd">    Fits the model on training data and returns predictions for all splits.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
-        <span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-        <span class="c1"># Check if it&#39;s (train_df, test_df) or (X, y)</span>
-        <span class="n">elem0</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">elem0</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">elem0</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-            <span class="c1"># It&#39;s (train_df, test_df)</span>
-            <span class="n">train_df</span><span class="p">,</span> <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span>
-            <span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">train_df</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">test_df</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.</span>
-            <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="s2">&quot;WARNING: No test set provided. Using entire input as training data. &quot;</span>
-                <span class="s2">&quot;Ensure data was split BEFORE preprocessing to avoid data leakage.&quot;</span>
-            <span class="p">)</span>
-            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
-                <span class="n">log_callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-
-            <span class="n">dataset</span> <span class="o">=</span> <span class="n">SplitDataset</span><span class="p">(</span>
-                <span class="n">train</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">dataset</span><span class="p">),</span> <span class="n">test</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(),</span> <span class="n">validation</span><span class="o">=</span><span class="kc">None</span>
-            <span class="p">)</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_normalize_fit_predict_dataset</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">target_column</span><span class="p">,</span> <span class="n">log_callback</span><span class="p">)</span>
 
     <span class="c1"># 1. Prepare Data</span>
     <span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_xy</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
@@ -4954,62 +4839,17 @@ the tuner can construct a valid meta-estimator.</p>
     <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;train&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
 
     <span class="c1"># Test Predictions</span>
-    <span class="n">is_test_empty</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="n">test_df</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">test_df</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-
     <span class="c1"># is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`</span>
     <span class="n">is_test_empty</span> <span class="o">=</span> <span class="n">test_df</span><span class="o">.</span><span class="n">empty</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">test_df</span><span class="p">,</span> <span class="s2">&quot;empty&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">test_df</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">is_test_empty</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-            <span class="n">X_test</span><span class="p">,</span> <span class="n">y_test_split</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-            <span class="n">X_test</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X_test</span><span class="p">)</span>
-            <span class="c1"># If y is None, the target may still be in X — drop it</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="n">y_test_split</span> <span class="ow">is</span> <span class="kc">None</span>
-                <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X_test</span><span class="o">.</span><span class="n">columns</span>
-            <span class="p">):</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">X_test</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                    <span class="n">X_test</span> <span class="o">=</span> <span class="n">X_test</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">X_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                    <span class="c1"># Polars</span>
-                    <span class="n">X_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">X_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
+        <span class="n">X_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_split_features</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
         <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_test</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
 
     <span class="c1"># Validation Predictions</span>
     <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-            <span class="n">X_val</span><span class="p">,</span> <span class="n">y_val_split</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span>
-            <span class="n">X_val</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Any</span><span class="p">,</span> <span class="n">X_val</span><span class="p">)</span>
-            <span class="c1"># If y is None, the target may still be in X — drop it</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="n">y_val_split</span> <span class="ow">is</span> <span class="kc">None</span>
-                <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">X_val</span><span class="o">.</span><span class="n">columns</span>
-            <span class="p">):</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">X_val</span> <span class="o">=</span> <span class="n">X_val</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                    <span class="n">X_val</span> <span class="o">=</span> <span class="n">X_val</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">target_column</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">X_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="n">target_column</span><span class="p">])</span>
-                <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
-                    <span class="c1"># Polars</span>
-                    <span class="n">X_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="n">target_column</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">X_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span>
+        <span class="n">X_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_split_features</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">target_column</span><span class="p">)</span>
         <span class="n">predictions</span><span class="p">[</span><span class="s2">&quot;validation&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_val</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">predictions</span>
@@ -5035,16 +4875,7 @@ the tuner can construct a valid meta-estimator.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/base.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">323</span>
-<span class="normal">324</span>
-<span class="normal">325</span>
-<span class="normal">326</span>
-<span class="normal">327</span>
-<span class="normal">328</span>
-<span class="normal">329</span>
-<span class="normal">330</span>
-<span class="normal">331</span>
-<span class="normal">332</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">332</span>
 <span class="normal">333</span>
 <span class="normal">334</span>
 <span class="normal">335</span>
@@ -5064,7 +4895,16 @@ the tuner can construct a valid meta-estimator.</p>
 <span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
-<span class="normal">352</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refit</span><span class="p">(</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">refit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span>
     <span class="n">target_column</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>

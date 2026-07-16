@@ -3260,17 +3260,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/cross_validation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 59</span>
-<span class="normal"> 60</span>
-<span class="normal"> 61</span>
-<span class="normal"> 62</span>
-<span class="normal"> 63</span>
-<span class="normal"> 64</span>
-<span class="normal"> 65</span>
-<span class="normal"> 66</span>
-<span class="normal"> 67</span>
-<span class="normal"> 68</span>
-<span class="normal"> 69</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 69</span>
 <span class="normal"> 70</span>
 <span class="normal"> 71</span>
 <span class="normal"> 72</span>
@@ -3382,31 +3372,7 @@
 <span class="normal">178</span>
 <span class="normal">179</span>
 <span class="normal">180</span>
-<span class="normal">181</span>
-<span class="normal">182</span>
-<span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
+<span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
     <span class="n">calculator</span><span class="p">:</span> <span class="s2">&quot;BaseModelCalculator&quot;</span><span class="p">,</span>
     <span class="n">applier</span><span class="p">:</span> <span class="s2">&quot;BaseModelApplier&quot;</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
@@ -3486,54 +3452,20 @@
 
     <span class="c1"># 2. Iterate Folds</span>
     <span class="k">for</span> <span class="n">fold_idx</span><span class="p">,</span> <span class="p">(</span><span class="n">train_idx</span><span class="p">,</span> <span class="n">val_idx</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">splitter</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">X_arr</span><span class="p">,</span> <span class="n">y_arr</span><span class="p">)):</span>
-        <span class="k">if</span> <span class="n">progress_callback</span><span class="p">:</span>
-            <span class="n">progress_callback</span><span class="p">(</span><span class="n">fold_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_folds</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
-            <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing Fold </span><span class="si">{</span><span class="n">fold_idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">n_folds</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
-
-        <span class="c1"># Split Data</span>
-        <span class="c1"># We slice the original X/y to preserve their type (Pandas/Polars) for the calculator</span>
-        <span class="c1"># Polars supports slicing with numpy arrays via __getitem__</span>
-        <span class="c1"># Pandas supports slicing via iloc</span>
-
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="s2">&quot;iloc&quot;</span><span class="p">):</span>
-            <span class="n">X_train_fold</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span>
-            <span class="n">X_val_fold</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">val_idx</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Polars or other</span>
-            <span class="n">X_train_fold</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span>
-            <span class="n">X_val_fold</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">val_idx</span><span class="p">]</span>
-
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="s2">&quot;iloc&quot;</span><span class="p">):</span>
-            <span class="n">y_train_fold</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span>
-            <span class="n">y_val_fold</span> <span class="o">=</span> <span class="n">y</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">val_idx</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># Polars Series or numpy array</span>
-            <span class="n">y_train_fold</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">train_idx</span><span class="p">]</span>
-            <span class="n">y_val_fold</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">val_idx</span><span class="p">]</span>
-
-        <span class="c1"># Fit</span>
-        <span class="n">model_artifact</span> <span class="o">=</span> <span class="n">calculator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train_fold</span><span class="p">,</span> <span class="n">y_train_fold</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
-
-        <span class="c1"># Evaluate</span>
-        <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span><span class="p">:</span>
-            <span class="n">metrics</span> <span class="o">=</span> <span class="n">calculate_classification_metrics</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">metrics</span> <span class="o">=</span> <span class="n">calculate_regression_metrics</span><span class="p">(</span><span class="n">model_artifact</span><span class="p">,</span> <span class="n">X_val_fold</span><span class="p">,</span> <span class="n">y_val_fold</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">log_callback</span><span class="p">:</span>
-            <span class="c1"># Log a key metric for the fold</span>
-            <span class="n">key_metric</span> <span class="o">=</span> <span class="s2">&quot;accuracy&quot;</span> <span class="k">if</span> <span class="n">problem_type</span> <span class="o">==</span> <span class="s2">&quot;classification&quot;</span> <span class="k">else</span> <span class="s2">&quot;r2&quot;</span>
-            <span class="n">score</span> <span class="o">=</span> <span class="n">metrics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_metric</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-            <span class="n">log_callback</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Fold </span><span class="si">{</span><span class="n">fold_idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> completed. </span><span class="si">{</span><span class="n">key_metric</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">score</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
         <span class="n">fold_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-            <span class="p">{</span>
-                <span class="s2">&quot;fold&quot;</span><span class="p">:</span> <span class="n">fold_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
-                <span class="s2">&quot;metrics&quot;</span><span class="p">:</span> <span class="n">sanitize_metrics</span><span class="p">(</span><span class="n">metrics</span><span class="p">),</span>
-                <span class="c1"># We could store predictions here if needed, but might be too heavy</span>
-            <span class="p">}</span>
+            <span class="n">_run_cv_fold</span><span class="p">(</span>
+                <span class="n">calculator</span><span class="o">=</span><span class="n">calculator</span><span class="p">,</span>
+                <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span>
+                <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+                <span class="n">train_idx</span><span class="o">=</span><span class="n">train_idx</span><span class="p">,</span>
+                <span class="n">val_idx</span><span class="o">=</span><span class="n">val_idx</span><span class="p">,</span>
+                <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span>
+                <span class="n">problem_type</span><span class="o">=</span><span class="n">problem_type</span><span class="p">,</span>
+                <span class="n">fold_idx</span><span class="o">=</span><span class="n">fold_idx</span><span class="p">,</span>
+                <span class="n">n_folds</span><span class="o">=</span><span class="n">n_folds</span><span class="p">,</span>
+                <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span>
+                <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="p">)</span>
 
     <span class="c1"># 3. Aggregate</span>

@@ -3597,27 +3597,7 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
 <span class="normal">240</span>
 <span class="normal">241</span>
 <span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span>
-<span class="normal">254</span>
-<span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulTransformer</span><span class="p">:</span>
+<span class="normal">243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">StatefulTransformer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Fits + applies one pipeline step.</span>
 
 <span class="sd">    Accepts anything satisfying :class:`~skyulf.core.protocols.CalculatorProtocol` /</span>
@@ -3696,29 +3676,30 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
         <span class="bp">self</span><span class="o">.</span><span class="n">params</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">calculator</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">config</span><span class="p">))</span>
 
         <span class="c1"># 2. Apply to all splits</span>
-        <span class="n">new_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_train</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_to_split_dataset</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_guarded</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply the applier to `data` and raise if it produces a nested SplitDataset.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
                 <span class="s2">&quot;Applier returned SplitDataset inside StatefulTransformer, which is not supported.&quot;</span>
             <span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_to_split_dataset</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SplitDataset</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply the applier to each split (train/test/validation) of a SplitDataset.&quot;&quot;&quot;</span>
+        <span class="n">new_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_guarded</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
 
         <span class="n">new_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_on_test</span><span class="p">:</span>
-            <span class="n">new_test_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_test_res</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;Applier returned SplitDataset inside StatefulTransformer, which is not supported.&quot;</span>
-                <span class="p">)</span>
-            <span class="n">new_test</span> <span class="o">=</span> <span class="n">new_test_res</span>
+            <span class="n">new_test</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_guarded</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
 
         <span class="n">new_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_on_validation</span> <span class="ow">and</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">new_val_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_val_res</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;Applier returned SplitDataset inside StatefulTransformer, which is not supported.&quot;</span>
-                <span class="p">)</span>
-            <span class="n">new_val</span> <span class="o">=</span> <span class="n">new_val_res</span>
+            <span class="n">new_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_guarded</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">new_train</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">new_test</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">new_val</span><span class="p">)</span>
 
@@ -3735,31 +3716,10 @@ exposing matching <code>fit</code>/<code>apply</code> methods, works without sub
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
 
         <span class="c1"># 2. Apply</span>
-        <span class="n">new_train</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_train</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                <span class="s2">&quot;Applier returned SplitDataset inside StatefulTransformer, which is not supported.&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">new_test</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">test</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_on_test</span><span class="p">:</span>
-            <span class="n">new_test_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">test</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_test_res</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;Applier returned SplitDataset inside StatefulTransformer, which is not supported.&quot;</span>
-                <span class="p">)</span>
-            <span class="n">new_test</span> <span class="o">=</span> <span class="n">new_test_res</span>
-
-        <span class="n">new_val</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">apply_on_validation</span> <span class="ow">and</span> <span class="n">dataset</span><span class="o">.</span><span class="n">validation</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">new_val_res</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">applier</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">validation</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_val_res</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                    <span class="s2">&quot;Applier returned SplitDataset inside StatefulTransformer, which is not supported.&quot;</span>
-                <span class="p">)</span>
-            <span class="n">new_val</span> <span class="o">=</span> <span class="n">new_val_res</span>
-
-        <span class="k">return</span> <span class="n">SplitDataset</span><span class="p">(</span><span class="n">train</span><span class="o">=</span><span class="n">new_train</span><span class="p">,</span> <span class="n">test</span><span class="o">=</span><span class="n">new_test</span><span class="p">,</span> <span class="n">validation</span><span class="o">=</span><span class="n">new_val</span><span class="p">)</span>
+        <span class="c1"># ty can&#39;t narrow SplitDataset out of the SkyulfDataFrame branch of this</span>
+        <span class="c1"># Union via isinstance alone (mirrors the `frame = cast(Any, dataset)`</span>
+        <span class="c1"># note in `_fit_transform_inner` above).</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_to_split_dataset</span><span class="p">(</span><span class="n">cast</span><span class="p">(</span><span class="n">SplitDataset</span><span class="p">,</span> <span class="n">dataset</span><span class="p">),</span> <span class="n">params</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
               </details>
 

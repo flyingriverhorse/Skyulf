@@ -2302,6 +2302,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="cleaning">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.cleaning.InvalidValueReplacementApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        InvalidValueReplacementApplier
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -2988,6 +3005,229 @@ shared alias-mapping constants for backward compatibility.</p>
 
 
 
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.cleaning.InvalidValueReplacementApplier" class="doc doc-heading">
+            <code>InvalidValueReplacementApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseApplier (skyulf.preprocessing.base.BaseApplier)" href="base.html#skyulf.preprocessing.base.BaseApplier">BaseApplier</a></code></p>
+
+
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/cleaning/invalid_value.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">InvalidValueReplacementApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+    <span class="nd">@apply_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_polars</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">resolve_valid_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;columns&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">_y</span>
+
+        <span class="n">replace_inf</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;replace_inf&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">replace_neg_inf</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;replace_neg_inf&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">rule</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rule&quot;</span><span class="p">)</span>
+        <span class="n">final_replacement</span> <span class="o">=</span> <span class="n">_resolve_invalid_replacement</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+        <span class="n">min_value</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_value&quot;</span><span class="p">)</span>
+        <span class="n">max_value</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_value&quot;</span><span class="p">)</span>
+
+        <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">valid</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">_invalid_inf_replacement_polars</span><span class="p">(</span>
+                <span class="n">expr</span><span class="p">,</span> <span class="n">replace_inf</span><span class="p">,</span> <span class="n">replace_neg_inf</span><span class="p">,</span> <span class="n">final_replacement</span>
+            <span class="p">)</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">_invalid_rule_polars</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">rule</span><span class="p">,</span> <span class="n">final_replacement</span><span class="p">,</span> <span class="n">min_value</span><span class="p">,</span> <span class="n">max_value</span><span class="p">)</span>
+            <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">X</span><span class="o">.</span><span class="n">with_columns</span><span class="p">(</span><span class="n">exprs</span><span class="p">),</span> <span class="n">_y</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_pandas_column</span><span class="p">(</span>
+        <span class="n">df_out</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">replace_inf</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">replace_neg_inf</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">rule</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">final_replacement</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">min_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">max_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Coerce, replace inf/-inf, and apply the invalid-value rule for a single column in-place.&quot;&quot;&quot;</span>
+        <span class="n">to_replace</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="n">replace_inf</span><span class="p">:</span>
+            <span class="n">to_replace</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">replace_neg_inf</span><span class="p">:</span>
+            <span class="n">to_replace</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
+        <span class="c1"># Skip entirely when no rule/inf-replacement is configured for this</span>
+        <span class="c1"># column -- a true no-op, matching the polars path. Previously this</span>
+        <span class="c1"># unconditionally ran pd.to_numeric(..., errors=&quot;coerce&quot;), which</span>
+        <span class="c1"># silently NaN&#39;d out non-numeric columns even when nothing was</span>
+        <span class="c1"># actually configured to change.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">to_replace</span> <span class="ow">and</span> <span class="n">rule</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">df_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">df_out</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s2">&quot;coerce&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">to_replace</span><span class="p">:</span>
+            <span class="n">df_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">df_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">to_replace</span><span class="p">,</span> <span class="n">final_replacement</span><span class="p">)</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">_invalid_rule_pandas_mask</span><span class="p">(</span><span class="n">df_out</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">rule</span><span class="p">,</span> <span class="n">min_value</span><span class="p">,</span> <span class="n">max_value</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">df_out</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">mask</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">final_replacement</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">valid</span> <span class="o">=</span> <span class="n">resolve_valid_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;columns&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">_y</span>
+
+        <span class="n">replace_inf</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;replace_inf&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">replace_neg_inf</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;replace_neg_inf&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">rule</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rule&quot;</span><span class="p">)</span>
+        <span class="n">final_replacement</span> <span class="o">=</span> <span class="n">_resolve_invalid_replacement</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+        <span class="n">min_value</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;min_value&quot;</span><span class="p">)</span>
+        <span class="n">max_value</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_value&quot;</span><span class="p">)</span>
+
+        <span class="n">df_out</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">valid</span><span class="p">:</span>
+            <span class="n">InvalidValueReplacementApplier</span><span class="o">.</span><span class="n">_apply_pandas_column</span><span class="p">(</span>
+                <span class="n">df_out</span><span class="p">,</span>
+                <span class="n">col</span><span class="p">,</span>
+                <span class="n">replace_inf</span><span class="p">,</span>
+                <span class="n">replace_neg_inf</span><span class="p">,</span>
+                <span class="n">rule</span><span class="p">,</span>
+                <span class="n">final_replacement</span><span class="p">,</span>
+                <span class="n">min_value</span><span class="p">,</span>
+                <span class="n">max_value</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">df_out</span><span class="p">,</span> <span class="n">_y</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 
 

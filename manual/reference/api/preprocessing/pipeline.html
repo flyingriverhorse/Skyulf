@@ -3527,7 +3527,60 @@
 <span class="normal">488</span>
 <span class="normal">489</span>
 <span class="normal">490</span>
-<span class="normal">491</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span>
+<span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Orchestrates a sequence of feature engineering steps.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -3774,6 +3827,49 @@
                 <span class="n">metrics</span><span class="p">,</span>
             <span class="p">)</span>
 
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_copy_present_keys</span><span class="p">(</span>
+        <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">keys</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Copy each key from fitted_params into metrics, skipping keys that aren&#39;t present.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="c1"># Each rule maps a set of transformer types to the fitted_params/metrics key</span>
+    <span class="c1"># to copy over when that transformer type produced it. Keys are the same on</span>
+    <span class="c1"># both sides for every current rule.</span>
+    <span class="n">_OUTLIER_METRIC_RULES</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">str</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="nb">frozenset</span><span class="p">({</span><span class="s2">&quot;IQR&quot;</span><span class="p">,</span> <span class="s2">&quot;Winsorize&quot;</span><span class="p">}),</span> <span class="s2">&quot;bounds&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="nb">frozenset</span><span class="p">({</span><span class="s2">&quot;ZScore&quot;</span><span class="p">}),</span> <span class="s2">&quot;stats&quot;</span><span class="p">),</span>
+        <span class="p">(</span><span class="nb">frozenset</span><span class="p">({</span><span class="s2">&quot;EllipticEnvelope&quot;</span><span class="p">}),</span> <span class="s2">&quot;contamination&quot;</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_outlier_metrics</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">transformer_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate outlier-detection related metrics (warnings/bounds/stats/contamination).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_TYPES</span> <span class="ow">and</span> <span class="s2">&quot;warnings&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">types</span><span class="p">,</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_METRIC_RULES</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="n">types</span> <span class="ow">and</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
+                <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_feature_gen_metrics</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate operations count/list and newly generated feature columns metrics.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s2">&quot;operations&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;operations_count&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">])</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">]</span>
+        <span class="n">new_cols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_diff_generated_columns</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="n">current_data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">new_cols</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;generated_features&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_cols</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_from_fitted_params</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">transformer_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -3783,101 +3879,109 @@
         <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_IMPUTATION_TYPES</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;missing_counts&quot;</span><span class="p">,</span> <span class="s2">&quot;total_missing&quot;</span><span class="p">,</span> <span class="s2">&quot;fill_values&quot;</span><span class="p">):</span>
-                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-                    <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_copy_present_keys</span><span class="p">(</span>
+                <span class="n">fitted_params</span><span class="p">,</span> <span class="n">metrics</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;missing_counts&quot;</span><span class="p">,</span> <span class="s2">&quot;total_missing&quot;</span><span class="p">,</span> <span class="s2">&quot;fill_values&quot;</span><span class="p">)</span>
+            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_FEATURE_SELECTION_TYPES</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span>
-                <span class="s2">&quot;feature_scores&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;p_values&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;feature_importances&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;variances&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;ranking&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;selected_columns&quot;</span><span class="p">,</span>
-            <span class="p">):</span>
-                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-                    <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_copy_present_keys</span><span class="p">(</span>
+                <span class="n">fitted_params</span><span class="p">,</span>
+                <span class="n">metrics</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="s2">&quot;feature_scores&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;p_values&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;feature_importances&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;variances&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;ranking&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;selected_columns&quot;</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_SCALING_TYPES</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span>
-                <span class="s2">&quot;mean&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;scale&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;var&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;min&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;data_min&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;data_max&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;center&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;max_abs&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;columns&quot;</span><span class="p">,</span>
-            <span class="p">):</span>
-                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-                    <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_copy_present_keys</span><span class="p">(</span>
+                <span class="n">fitted_params</span><span class="p">,</span>
+                <span class="n">metrics</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="s2">&quot;mean&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;scale&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;var&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;min&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;data_min&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;data_max&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;center&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;max_abs&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;columns&quot;</span><span class="p">,</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_TYPES</span> <span class="ow">and</span> <span class="s2">&quot;warnings&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;IQR&quot;</span><span class="p">,</span> <span class="s2">&quot;Winsorize&quot;</span><span class="p">}</span> <span class="ow">and</span> <span class="s2">&quot;bounds&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;bounds&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;bounds&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">transformer_type</span> <span class="o">==</span> <span class="s2">&quot;ZScore&quot;</span> <span class="ow">and</span> <span class="s2">&quot;stats&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;stats&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">transformer_type</span> <span class="o">==</span> <span class="s2">&quot;EllipticEnvelope&quot;</span> <span class="ow">and</span> <span class="s2">&quot;contamination&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;contamination&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;contamination&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_outlier_metrics</span><span class="p">(</span><span class="n">transformer_type</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">,</span> <span class="n">metrics</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_BUCKETING_TYPES</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;bin_edges&quot;</span><span class="p">,</span> <span class="s2">&quot;n_bins&quot;</span><span class="p">):</span>
-                <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-                    <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_copy_present_keys</span><span class="p">(</span><span class="n">fitted_params</span><span class="p">,</span> <span class="n">metrics</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;bin_edges&quot;</span><span class="p">,</span> <span class="s2">&quot;n_bins&quot;</span><span class="p">))</span>
 
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_FEATURE_GEN_TYPES</span><span class="p">:</span>
-            <span class="k">if</span> <span class="s2">&quot;operations&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;operations_count&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">])</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">]</span>
-            <span class="n">new_cols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_diff_generated_columns</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="n">current_data</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">new_cols</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;generated_features&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_cols</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_apply_feature_gen_metrics</span><span class="p">(</span><span class="n">fitted_params</span><span class="p">,</span> <span class="n">data_before</span><span class="p">,</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">metrics</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_diff_generated_columns</span><span class="p">(</span><span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_columns_diff_if_dataframes</span><span class="p">(</span><span class="n">before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">after</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the column-set difference if both objects are DataFrames, else None.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">before</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">after</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">after</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">before</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_diff_generated_columns_split_dataset</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">data_before</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">SplitDataset</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Diff columns for the SplitDataset case, handling both DataFrame and (X, y) train shapes.&quot;&quot;&quot;</span>
+        <span class="n">before_train</span><span class="p">,</span> <span class="n">after_train</span> <span class="o">=</span> <span class="n">data_before</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span>
+        <span class="n">diff</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_columns_diff_if_dataframes</span><span class="p">(</span><span class="n">before_train</span><span class="p">,</span> <span class="n">after_train</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">diff</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">diff</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">before_train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">after_train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">x_before</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">before_train</span>
+            <span class="n">x_after</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">after_train</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_columns_diff_if_dataframes</span><span class="p">(</span><span class="n">x_before</span><span class="p">,</span> <span class="n">x_after</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_diff_generated_columns</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the set of newly added columns between two pipeline data objects.</span>
 
 <span class="sd">        Handles plain DataFrames, SplitDatasets of DataFrames, and (X, y) tuple variants.</span>
 <span class="sd">        Returns None if the structures don&#39;t allow a meaningful diff.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-            <span class="n">current_data</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span>
-        <span class="p">):</span>
-            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">current_data</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">data_before</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
+        <span class="n">diff</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_columns_diff_if_dataframes</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="n">current_data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">diff</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">diff</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-            <span class="n">before_train</span><span class="p">,</span> <span class="n">after_train</span> <span class="o">=</span> <span class="n">data_before</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">before_train</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-                <span class="n">after_train</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span>
-            <span class="p">):</span>
-                <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">after_train</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">before_train</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">before_train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">after_train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-                <span class="n">x_before</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">before_train</span>
-                <span class="n">x_after</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">after_train</span>
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x_before</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-                    <span class="n">x_after</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span>
-                <span class="p">):</span>
-                    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">x_after</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">x_before</span><span class="o">.</span><span class="n">columns</span><span class="p">))</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_diff_generated_columns_split_dataset</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="n">current_data</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_y_for_resampling</span><span class="p">(</span><span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_y_from_split_dataset</span><span class="p">(</span><span class="n">current_data</span><span class="p">:</span> <span class="n">SplitDataset</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pull the target Series out of a SplitDataset&#39;s train split (tuple or DataFrame form).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">y_res</span> <span class="o">=</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span>
+            <span class="k">return</span> <span class="n">y_res</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">)):</span>
+            <span class="n">target_col</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_column&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">target_col</span> <span class="ow">and</span> <span class="n">target_col</span> <span class="ow">in</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_extract_y_for_resampling</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Pull the target Series out of whatever shape the resampler produced.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">SplitDataset</span><span class="p">):</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
-                <span class="n">_</span><span class="p">,</span> <span class="n">y_res</span> <span class="o">=</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span>
-                <span class="k">return</span> <span class="n">y_res</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">)):</span>
-                <span class="n">target_col</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_column&quot;</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">target_col</span> <span class="ow">and</span> <span class="n">target_col</span> <span class="ow">in</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">current_data</span><span class="o">.</span><span class="n">train</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_extract_y_from_split_dataset</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
             <span class="n">_</span><span class="p">,</span> <span class="n">y_res</span> <span class="o">=</span> <span class="n">current_data</span>
             <span class="k">return</span> <span class="n">y_res</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">):</span>
             <span class="n">target_col</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_column&quot;</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">target_col</span> <span class="ow">and</span> <span class="n">target_col</span> <span class="ow">in</span> <span class="n">current_data</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">current_data</span><span class="p">[</span><span class="n">target_col</span><span class="p">]</span>
@@ -3899,35 +4003,37 @@
             <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to calculate resampling metrics: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_count_winsorize_diffs</span><span class="p">(</span><span class="n">d1</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">d2</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_pandas_if_needed</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert obj to pandas via to_pandas() if it supports that, otherwise return as-is.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">obj</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_count_diff_cells</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">types</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">type</span><span class="p">,</span> <span class="o">...</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Count differing cells between two objects of the given types with matching shape.&quot;&quot;&quot;</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_to_pandas_if_needed</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_to_pandas_if_needed</span><span class="p">(</span><span class="n">b</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">types</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">types</span><span class="p">)</span> <span class="ow">and</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+        <span class="k">return</span> <span class="mi">0</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_count_winsorize_tuple_diffs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d1</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">d2</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Count differing cells across the X/y halves of two (X, y) tuple pairs.&quot;&quot;&quot;</span>
+        <span class="n">diffs</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_count_diff_cells</span><span class="p">(</span><span class="n">d1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">d2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,))</span>
+        <span class="n">diffs</span> <span class="o">+=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_count_diff_cells</span><span class="p">(</span><span class="n">d1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">d2</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">diffs</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_count_winsorize_diffs</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">d1</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">d2</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Count cells that differ between two data objects, for Winsorize clipping metric.&quot;&quot;&quot;</span>
-        <span class="n">d1</span> <span class="o">=</span> <span class="n">d1</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">d1</span>
-        <span class="n">d2</span> <span class="o">=</span> <span class="n">d2</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">d2</span><span class="p">,</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">d2</span>
+        <span class="n">d1</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_to_pandas_if_needed</span><span class="p">(</span><span class="n">d1</span><span class="p">)</span>
+        <span class="n">d2</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_to_pandas_if_needed</span><span class="p">(</span><span class="n">d2</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d2</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">d1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">d2</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-                <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">d1</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="n">d2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
-            <span class="k">return</span> <span class="mi">0</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_count_diff_cells</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="n">d2</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,))</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">d2</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">d1</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">d2</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">diffs</span> <span class="o">=</span> <span class="mi">0</span>
-            <span class="n">x1</span> <span class="o">=</span> <span class="n">d1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">d1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">d1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="n">x2</span> <span class="o">=</span> <span class="n">d2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">d2</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">d2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="nb">isinstance</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x2</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">x1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">x2</span><span class="o">.</span><span class="n">shape</span>
-            <span class="p">):</span>
-                <span class="n">diffs</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">x1</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="n">x2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
-            <span class="n">y1</span> <span class="o">=</span> <span class="n">d1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">d1</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">d1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-            <span class="n">y2</span> <span class="o">=</span> <span class="n">d2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to_pandas</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">d2</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;to_pandas&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">d2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="nb">isinstance</span><span class="p">(</span><span class="n">y1</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">))</span>
-                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">y2</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">))</span>
-                <span class="ow">and</span> <span class="n">y1</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">y2</span><span class="o">.</span><span class="n">shape</span>
-            <span class="p">):</span>
-                <span class="n">diffs</span> <span class="o">+=</span> <span class="nb">int</span><span class="p">(</span><span class="n">y1</span><span class="o">.</span><span class="n">ne</span><span class="p">(</span><span class="n">y2</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
-            <span class="k">return</span> <span class="n">diffs</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_count_winsorize_tuple_diffs</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="n">d2</span><span class="p">)</span>
         <span class="k">return</span> <span class="mi">0</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_winsorize_clipped</span><span class="p">(</span>
