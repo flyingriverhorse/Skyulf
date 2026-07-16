@@ -97,24 +97,6 @@ class SentenceEmbedderApplier(BaseApplier):
 # ── Calculate ─────────────────────────────────────────────────────────────────
 
 
-@NodeRegistry.register("sentence_embedder", SentenceEmbedderApplier)
-@node_meta(
-    id="sentence_embedder",
-    name="Sentence Embedder",
-    category="Text",
-    description=(
-        "Encode text columns into dense semantic embeddings using a "
-        "sentence-transformers model (default all-MiniLM-L6-v2). Requires the "
-        "optional 'sentence-transformers' package."
-    ),
-    params={
-        "columns": [],
-        "model_name": "all-MiniLM-L6-v2",
-        "normalize": True,
-        "drop_original": False,
-    },
-    tags=["text", "nlp", "embeddings", "transformers"],
-)
 def _build_sentence_embedder_artifact(
     config: dict[str, Any], valid_cols: list[str]
 ) -> SentenceEmbedderArtifact:
@@ -137,6 +119,24 @@ def _build_sentence_embedder_artifact(
     }
 
 
+@NodeRegistry.register("sentence_embedder", SentenceEmbedderApplier)
+@node_meta(
+    id="sentence_embedder",
+    name="Sentence Embedder",
+    category="Text",
+    description=(
+        "Encode text columns into dense semantic embeddings using a "
+        "sentence-transformers model (default all-MiniLM-L6-v2). Requires the "
+        "optional 'sentence-transformers' package."
+    ),
+    params={
+        "columns": [],
+        "model_name": "all-MiniLM-L6-v2",
+        "normalize": True,
+        "drop_original": False,
+    },
+    tags=["text", "nlp", "embeddings", "transformers"],
+)
 class SentenceEmbedderCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         return None

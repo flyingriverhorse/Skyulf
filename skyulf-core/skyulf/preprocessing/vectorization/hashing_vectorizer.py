@@ -48,27 +48,6 @@ class HashingVectorizerApplier(BaseApplier):
 # ── Calculate ─────────────────────────────────────────────────────────────────
 
 
-@NodeRegistry.register("hashing_vectorizer", HashingVectorizerApplier)
-@node_meta(
-    id="hashing_vectorizer",
-    name="Hashing Vectorizer",
-    category="Text",
-    description=(
-        "Stateless text vectorizer using the hashing trick. "
-        "No vocabulary is stored — tokens are hashed directly to column indices. "
-        "Suitable for very large or streaming datasets."
-    ),
-    params={
-        "columns": [],
-        "n_features": _DEFAULT_N_FEATURES,
-        "norm": "l2",
-        "alternate_sign": True,
-        "lowercase": True,
-        "stop_words": None,
-        "drop_original": False,
-    },
-    tags=["text", "nlp", "hashing", "vectorizer", "stateless"],
-)
 def _build_hashing_artifact(
     config: dict[str, Any], valid_cols: list[str]
 ) -> HashingVectorizerArtifact:
@@ -107,6 +86,27 @@ def _build_hashing_artifact(
     }
 
 
+@NodeRegistry.register("hashing_vectorizer", HashingVectorizerApplier)
+@node_meta(
+    id="hashing_vectorizer",
+    name="Hashing Vectorizer",
+    category="Text",
+    description=(
+        "Stateless text vectorizer using the hashing trick. "
+        "No vocabulary is stored — tokens are hashed directly to column indices. "
+        "Suitable for very large or streaming datasets."
+    ),
+    params={
+        "columns": [],
+        "n_features": _DEFAULT_N_FEATURES,
+        "norm": "l2",
+        "alternate_sign": True,
+        "lowercase": True,
+        "stop_words": None,
+        "drop_original": False,
+    },
+    tags=["text", "nlp", "hashing", "vectorizer", "stateless"],
+)
 class HashingVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         # n_features is fixed by config, but we still return None because the

@@ -45,28 +45,6 @@ class TfidfVectorizerApplier(BaseApplier):
 # ── Calculate ─────────────────────────────────────────────────────────────────
 
 
-@NodeRegistry.register("tfidf_vectorizer", TfidfVectorizerApplier)
-@node_meta(
-    id="tfidf_vectorizer",
-    name="TF-IDF Vectorizer",
-    category="Text",
-    description=(
-        "Convert text columns to TF-IDF weighted feature columns. "
-        "Penalises very common tokens and rewards rare-but-informative ones."
-    ),
-    params={
-        "columns": [],
-        "max_features": None,
-        "min_df": 1,
-        "max_df": 1.0,
-        "ngram_range": [1, 1],
-        "sublinear_tf": False,
-        "lowercase": True,
-        "stop_words": None,
-        "drop_original": False,
-    },
-    tags=["text", "nlp", "tfidf", "vectorizer"],
-)
 def _build_tfidf_artifact(
     config: dict[str, Any], X: pd.DataFrame, valid_cols: list[str]
 ) -> TfidfVectorizerArtifact:
@@ -114,6 +92,28 @@ def _build_tfidf_artifact(
     }
 
 
+@NodeRegistry.register("tfidf_vectorizer", TfidfVectorizerApplier)
+@node_meta(
+    id="tfidf_vectorizer",
+    name="TF-IDF Vectorizer",
+    category="Text",
+    description=(
+        "Convert text columns to TF-IDF weighted feature columns. "
+        "Penalises very common tokens and rewards rare-but-informative ones."
+    ),
+    params={
+        "columns": [],
+        "max_features": None,
+        "min_df": 1,
+        "max_df": 1.0,
+        "ngram_range": [1, 1],
+        "sublinear_tf": False,
+        "lowercase": True,
+        "stop_words": None,
+        "drop_original": False,
+    },
+    tags=["text", "nlp", "tfidf", "vectorizer"],
+)
 class TfidfVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         return None

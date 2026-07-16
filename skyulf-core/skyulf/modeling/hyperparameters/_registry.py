@@ -521,6 +521,37 @@ _BASE_KEY_TO_REGISTRY_REG: dict[str, str] = {
 }
 
 
+def _add_base_estimator_search_space(
+    space: dict[str, Any],
+    key: str,
+    mapping: dict[str, str],
+    strategy: str,
+    base_infix: str,
+) -> None:
+    """Adds one base learner's ``<name>__<param>`` (or ``<name>__estimator__<param>``) entries to space."""
+    reg_key = mapping.get(key)
+    if not reg_key:
+        return
+    for param, values in get_default_search_space(reg_key, strategy).items():
+        space[f"{key}__{base_infix}{param}"] = values
+
+
+def _add_final_estimator_search_space(
+    space: dict[str, Any],
+    final_estimator: str,
+    mapping: dict[str, str],
+    strategy: str,
+) -> None:
+    """Adds the stacking final estimator's ``final_estimator__<param>`` entries to space."""
+    if not final_estimator:
+        return
+    reg_key = mapping.get(final_estimator)
+    if not reg_key:
+        return
+    for param, values in get_default_search_space(reg_key, strategy).items():
+        space[f"final_estimator__{param}"] = values
+
+
 def build_ensemble_search_space(
     ensemble_key: str,
     base_estimators: list[str],
@@ -549,14 +580,6 @@ def build_ensemble_search_space(
     calibrated = calibrate_base_models and problem_type == "classification"
     base_infix = "estimator__" if calibrated else ""
     for key in base_estimators or []:
-        reg_key = mapping.get(key)
-        if not reg_key:
-            continue
-        for param, values in get_default_search_space(reg_key, strategy).items():
-            space[f"{key}__{base_infix}{param}"] = values
-    if final_estimator:
-        reg_key = mapping.get(final_estimator)
-        if reg_key:
-            for param, values in get_default_search_space(reg_key, strategy).items():
-                space[f"final_estimator__{param}"] = values
+        _add_base_estimator_search_space(space, key, mapping, strategy, base_infix)
+    _add_final_estimator_search_space(space, final_estimator, mapping, strategy)
     return space

@@ -251,6 +251,27 @@ class _BaseEnsembleCalculator(SklearnCalculator):
 
     # --- structural helpers -------------------------------------------------
 
+    def _resolve_single_estimator(
+        self,
+        key: Any,
+        seen: set,
+        params_map: dict[str, Any],
+        calibration: dict[str, Any] | None,
+    ) -> tuple[str, BaseEstimator] | None:
+        """Resolves one base-estimator key into a ``(name, instance)`` tuple, or ``None`` to skip it."""
+        if not isinstance(key, str) or key in seen:
+            return None
+        factory = self.BASE_ESTIMATORS.get(key)
+        if factory is None:
+            logger.warning("Unknown base estimator '%s'; skipping.", key)
+            return None
+        est = self._apply_params(factory(), params_map.get(key), key)
+        return key, self._maybe_calibrate(est, calibration)
+
+    def _default_estimators(self) -> list[tuple[str, BaseEstimator]]:
+        """Builds the fallback list of estimators from ``DEFAULT_KEYS``."""
+        return [(k, self.BASE_ESTIMATORS[k]()) for k in self.DEFAULT_KEYS]
+
     def _build_estimators(
         self,
         keys: Any,
@@ -271,22 +292,18 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         estimators: list[tuple[str, BaseEstimator]] = []
         seen: set = set()
         for key in keys:
-            if not isinstance(key, str) or key in seen:
+            resolved = self._resolve_single_estimator(key, seen, params_map, calibration)
+            if resolved is None:
                 continue
-            factory = self.BASE_ESTIMATORS.get(key)
-            if factory is None:
-                logger.warning("Unknown base estimator '%s'; skipping.", key)
-                continue
-            est = self._apply_params(factory(), params_map.get(key), key)
-            estimators.append((key, self._maybe_calibrate(est, calibration)))
-            seen.add(key)
+            estimators.append(resolved)
+            seen.add(resolved[0])
         if not estimators:
             logger.warning(
                 "No valid base estimators resolved from %s; falling back to defaults %s.",
                 keys,
                 self.DEFAULT_KEYS,
             )
-            estimators = [(k, self.BASE_ESTIMATORS[k]()) for k in self.DEFAULT_KEYS]
+            estimators = self._default_estimators()
         return estimators
 
     def _maybe_calibrate(
@@ -334,44 +351,57 @@ class _BaseEnsembleCalculator(SklearnCalculator):
             key = self.DEFAULT_FINAL_KEY
         return self._apply_params(factory(), params, str(key))
 
-    def _clean_meta_keys(self, bucket: dict[str, Any], final_params: Any = None) -> None:
-        """Keep only the meta-keys valid for this estimator family."""
-        # ``n_jobs`` (parallel base-model fitting) is valid for every family;
-        # coerce to int and drop anything malformed so sklearn never sees junk.
+    @staticmethod
+    def _coerce_n_jobs(bucket: dict[str, Any]) -> None:
+        """Coerces ``bucket["n_jobs"]`` to int, dropping it if malformed."""
         if "n_jobs" in bucket:
             try:
                 bucket["n_jobs"] = int(bucket["n_jobs"])
             except (TypeError, ValueError):
                 bucket.pop("n_jobs", None)
-        if self.IS_STACKING:
-            bucket["final_estimator"] = self._resolve_final_estimator(
-                bucket.pop("final_estimator", None), final_params
-            )
+
+    def _clean_stacking_meta_keys(self, bucket: dict[str, Any], final_params: Any) -> None:
+        """Keeps/normalizes the meta-keys valid for Stacking (final_estimator, passthrough)."""
+        bucket["final_estimator"] = self._resolve_final_estimator(
+            bucket.pop("final_estimator", None), final_params
+        )
+        bucket.pop("voting", None)
+        bucket.pop("weights", None)
+        # ``passthrough`` (let the meta-learner also see the raw features) is
+        # a valid Stacking-only param; coerce to bool and keep it.
+        if "passthrough" in bucket:
+            bucket["passthrough"] = bool(bucket["passthrough"])
+
+    def _clean_voting_meta_keys(self, bucket: dict[str, Any]) -> None:
+        """Keeps/normalizes the meta-keys valid for Voting (voting, weights)."""
+        bucket.pop("final_estimator", None)
+        bucket.pop("cv", None)
+        # ``passthrough`` is meaningless for Voting — drop it so the sklearn
+        # constructor does not reject an unexpected keyword.
+        bucket.pop("passthrough", None)
+        if not self.HAS_VOTING:
             bucket.pop("voting", None)
+        # ``weights`` (per-base-model relative weight) is Voting-only. Keep it
+        # only when it is a list/tuple matching the estimator count; otherwise
+        # drop it so sklearn falls back to equal weighting instead of raising.
+        weights = bucket.get("weights")
+        estimators = bucket.get("estimators") or []
+        if not (
+            isinstance(weights, (list, tuple))
+            and len(weights) == len(estimators)
+            and len(weights) > 0
+        ):
             bucket.pop("weights", None)
-            # ``passthrough`` (let the meta-learner also see the raw features) is
-            # a valid Stacking-only param; coerce to bool and keep it.
-            if "passthrough" in bucket:
-                bucket["passthrough"] = bool(bucket["passthrough"])
+
+    def _clean_meta_keys(self, bucket: dict[str, Any], final_params: Any = None) -> None:
+        """Keep only the meta-keys valid for this estimator family."""
+        # ``n_jobs`` (parallel base-model fitting) is valid for every family;
+        # coerce to int and drop anything malformed so sklearn never sees junk.
+        self._coerce_n_jobs(bucket)
+        if self.IS_STACKING:
+            self._clean_stacking_meta_keys(bucket, final_params)
         else:
-            bucket.pop("final_estimator", None)
-            bucket.pop("cv", None)
-            # ``passthrough`` is meaningless for Voting — drop it so the sklearn
-            # constructor does not reject an unexpected keyword.
-            bucket.pop("passthrough", None)
-            if not self.HAS_VOTING:
-                bucket.pop("voting", None)
-            # ``weights`` (per-base-model relative weight) is Voting-only. Keep it
-            # only when it is a list/tuple matching the estimator count; otherwise
-            # drop it so sklearn falls back to equal weighting instead of raising.
-            weights = bucket.get("weights")
-            estimators = bucket.get("estimators") or []
-            if not (
-                isinstance(weights, (list, tuple))
-                and len(weights) == len(estimators)
-                and len(weights) > 0
-            ):
-                bucket.pop("weights", None)
+            self._clean_voting_meta_keys(bucket)
 
     @staticmethod
     def _absorb_nested_keys(

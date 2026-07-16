@@ -77,29 +77,6 @@ class TokenizerApplier(BaseApplier):
 # ── Calculate ─────────────────────────────────────────────────────────────────
 
 
-@NodeRegistry.register("tokenizer", TokenizerApplier)
-@node_meta(
-    id="tokenizer",
-    name="Tokenizer",
-    category="Text",
-    description=(
-        "Split text columns into tokens (word, char, or char_wb). "
-        "Outputs a space-joined token string column per source column, "
-        "optionally with a token-count column. Stateless — no vocabulary fitted. "
-        "Inspection / intermediate tool only: do NOT chain before a vectorizer "
-        "(Count / TF-IDF / Hashing already tokenize internally)."
-    ),
-    params={
-        "columns": [],
-        "analyzer": "word",
-        "lowercase": True,
-        "stop_words": None,
-        "ngram_range": [1, 1],
-        "add_token_count": False,
-        "drop_original": False,
-    },
-    tags=["text", "nlp", "tokenizer"],
-)
 def _build_tokenizer_artifact(config: dict[str, Any], valid_cols: list[str]) -> TokenizerArtifact:
     """Build the tokenizer artifact dict (config only — no vocabulary is fitted)."""
     add_token_count = config.get("add_token_count", False)
@@ -125,6 +102,29 @@ def _build_tokenizer_artifact(config: dict[str, Any], valid_cols: list[str]) -> 
     }
 
 
+@NodeRegistry.register("tokenizer", TokenizerApplier)
+@node_meta(
+    id="tokenizer",
+    name="Tokenizer",
+    category="Text",
+    description=(
+        "Split text columns into tokens (word, char, or char_wb). "
+        "Outputs a space-joined token string column per source column, "
+        "optionally with a token-count column. Stateless — no vocabulary fitted. "
+        "Inspection / intermediate tool only: do NOT chain before a vectorizer "
+        "(Count / TF-IDF / Hashing already tokenize internally)."
+    ),
+    params={
+        "columns": [],
+        "analyzer": "word",
+        "lowercase": True,
+        "stop_words": None,
+        "ngram_range": [1, 1],
+        "add_token_count": False,
+        "drop_original": False,
+    },
+    tags=["text", "nlp", "tokenizer"],
+)
 class TokenizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         return None
