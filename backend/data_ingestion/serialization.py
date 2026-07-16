@@ -550,7 +550,6 @@ class DataTypeConverter:
     """Utility class for data type conversions and validations."""
 
     @staticmethod
-    @staticmethod
     def _infer_object_column_type(series: pd.Series) -> str:
         """Infer the semantic type of an object-dtype column (dates, numeric/boolean strings, or text)."""
         non_null = series.dropna()

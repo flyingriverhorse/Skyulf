@@ -691,7 +691,6 @@ class EDAVisualizer:
         plt.suptitle("Scatter Matrix")
 
     @staticmethod
-    @staticmethod
     def _label_color_map(labels):
         """Build a mapping from unique non-null labels to sequential integer color codes."""
         unique_labels = list({lbl for lbl in labels if lbl is not None})
