@@ -109,6 +109,33 @@ def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[
     return X.with_columns(exprs), _y
 
 
+def _validate_interaction_columns(X_pd: pd.DataFrame, cols: list[str]) -> None:
+    """Raise ValueError if any configured column is missing from X_pd or non-numeric."""
+    missing = [c for c in cols if c not in X_pd.columns]
+    if missing:
+        raise ValueError(f"FeatureInteraction: columns not found in data: {missing}")
+
+    non_numeric = [c for c in cols if not pd.api.types.is_numeric_dtype(X_pd[c])]
+    if non_numeric:
+        raise ValueError(f"FeatureInteraction requires numeric columns; non-numeric: {non_numeric}")
+
+
+def _validate_interaction_degree(degree: int) -> None:
+    """Raise ValueError if degree is not one of the supported interaction degrees."""
+    if degree not in _SUPPORTED_DEGREES:
+        raise ValueError(f"FeatureInteraction only supports degree 2, 3 or 4, got {degree}")
+
+
+def _build_interaction_feature_names(
+    combos: list[tuple[str, ...]], include_bias: bool
+) -> list[str]:
+    """Build output feature names for the given combinations, appending the bias column if set."""
+    feature_names = [_interaction_name(c) for c in combos]
+    if include_bias:
+        feature_names.append(_BIAS_COLUMN)
+    return feature_names
+
+
 class FeatureInteractionApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -132,28 +159,17 @@ class FeatureInteractionCalculator(BaseCalculator):
         X_pd = to_pandas(X)
         cols = list(config.get("columns", []))
 
-        missing = [c for c in cols if c not in X_pd.columns]
-        if missing:
-            raise ValueError(f"FeatureInteraction: columns not found in data: {missing}")
-
-        non_numeric = [c for c in cols if not pd.api.types.is_numeric_dtype(X_pd[c])]
-        if non_numeric:
-            raise ValueError(
-                f"FeatureInteraction requires numeric columns; non-numeric: {non_numeric}"
-            )
+        _validate_interaction_columns(X_pd, cols)
 
         degree = config.get("degree", 2)
-        if degree not in _SUPPORTED_DEGREES:
-            raise ValueError(f"FeatureInteraction only supports degree 2, 3 or 4, got {degree}")
+        _validate_interaction_degree(degree)
         interaction_only = config.get("interaction_only", True)
         include_bias = config.get("include_bias", False)
 
         combos = (
             _resolve_combinations(cols, degree, interaction_only) if len(cols) >= degree else []
         )
-        feature_names = [_interaction_name(c) for c in combos]
-        if include_bias:
-            feature_names.append(_BIAS_COLUMN)
+        feature_names = _build_interaction_feature_names(combos, include_bias)
 
         return cast(
             FeatureInteractionArtifact,

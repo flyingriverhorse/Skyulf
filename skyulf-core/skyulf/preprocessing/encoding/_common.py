@@ -26,6 +26,20 @@ _COLUMN_DESTROYING_ENCODERS = frozenset(
 _SUPERVISED_INPLACE_ENCODERS = frozenset(["WOEEncoder"])
 
 
+def _normalize_categories_lines(raw: Any) -> list[str]:
+    """Split raw string/list input into non-empty stripped lines; empty list if unsupported type."""
+    if isinstance(raw, str):
+        return [ln.strip() for ln in raw.strip().splitlines() if ln.strip()]
+    if isinstance(raw, list):
+        return [str(ln).strip() for ln in raw if str(ln).strip()]
+    return []
+
+
+def _split_category_line(line: str) -> list[str]:
+    """Split a single comma-separated category line into stripped non-empty values."""
+    return [v.strip() for v in line.split(",") if v.strip()]
+
+
 def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """Convert the frontend categories_order string/list into sklearn-compatible categories.
 
@@ -36,17 +50,14 @@ def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """
     if not raw:
         return "auto"
-    if isinstance(raw, str):
-        lines = [ln.strip() for ln in raw.strip().splitlines() if ln.strip()]
-    elif isinstance(raw, list):
-        lines = [str(ln).strip() for ln in raw if str(ln).strip()]
-    else:
+    if not isinstance(raw, (str, list)):
         return "auto"
 
+    lines = _normalize_categories_lines(raw)
     if not lines or len(lines) != n_cols:
         return "auto"
 
-    return [[v.strip() for v in line.split(",") if v.strip()] for line in lines]
+    return [_split_category_line(line) for line in lines]
 
 
 def _exclude_target_column(
