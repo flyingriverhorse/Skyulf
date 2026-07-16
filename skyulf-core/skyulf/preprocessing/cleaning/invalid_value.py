@@ -141,6 +141,37 @@ class InvalidValueReplacementApplier(BaseApplier):
         return X.with_columns(exprs), _y
 
     @staticmethod
+    def _apply_pandas_column(
+        df_out: Any,
+        col: str,
+        replace_inf: bool,
+        replace_neg_inf: bool,
+        rule: Any,
+        final_replacement: Any,
+        min_value: Any,
+        max_value: Any,
+    ) -> None:
+        """Coerce, replace inf/-inf, and apply the invalid-value rule for a single column in-place."""
+        to_replace = []
+        if replace_inf:
+            to_replace.append(np.inf)
+        if replace_neg_inf:
+            to_replace.append(-np.inf)
+        # Skip entirely when no rule/inf-replacement is configured for this
+        # column -- a true no-op, matching the polars path. Previously this
+        # unconditionally ran pd.to_numeric(..., errors="coerce"), which
+        # silently NaN'd out non-numeric columns even when nothing was
+        # actually configured to change.
+        if not to_replace and rule is None:
+            return
+        df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
+        if to_replace:
+            df_out[col] = df_out[col].replace(to_replace, final_replacement)
+        mask = _invalid_rule_pandas_mask(df_out[col], rule, min_value, max_value)
+        if mask is not None:
+            df_out.loc[mask, col] = final_replacement
+
+    @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
         valid = resolve_valid_columns(X, params.get("columns", []))
         if not valid:
@@ -155,24 +186,16 @@ class InvalidValueReplacementApplier(BaseApplier):
 
         df_out = X.copy()
         for col in valid:
-            to_replace = []
-            if replace_inf:
-                to_replace.append(np.inf)
-            if replace_neg_inf:
-                to_replace.append(-np.inf)
-            # Skip entirely when no rule/inf-replacement is configured for this
-            # column -- a true no-op, matching the polars path. Previously this
-            # unconditionally ran pd.to_numeric(..., errors="coerce"), which
-            # silently NaN'd out non-numeric columns even when nothing was
-            # actually configured to change.
-            if not to_replace and rule is None:
-                continue
-            df_out[col] = pd.to_numeric(df_out[col], errors="coerce")
-            if to_replace:
-                df_out[col] = df_out[col].replace(to_replace, final_replacement)
-            mask = _invalid_rule_pandas_mask(df_out[col], rule, min_value, max_value)
-            if mask is not None:
-                df_out.loc[mask, col] = final_replacement
+            InvalidValueReplacementApplier._apply_pandas_column(
+                df_out,
+                col,
+                replace_inf,
+                replace_neg_inf,
+                rule,
+                final_replacement,
+                min_value,
+                max_value,
+            )
         return df_out, _y
 
 

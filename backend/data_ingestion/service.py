@@ -153,13 +153,131 @@ class DataIngestionService:
         # already holds, so the cancel is a successful no-op.
         return True
 
+    @staticmethod
+    async def _fetch_s3_sample(
+        file_path: str, storage_options: dict[str, Any], limit: int, *, log_exc_info: bool = False
+    ) -> list[dict]:
+        """Fetch a sample of rows from an S3-hosted file via S3Connector."""
+        from backend.data_ingestion.connectors.s3 import S3Connector
+
+        # Ensure options are strings for Polars — it expects
+        # 'aws_access_key_id', NOT 'key', so no remapping is needed here.
+        str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
+        try:
+            logger.info(
+                f"Fetching S3 sample from {file_path} with options keys: {list(str_options.keys())}"
+            )
+            connector = S3Connector(file_path, storage_options=str_options)
+            await connector.connect()
+            df = await connector.fetch_data(limit=limit)
+            return df.to_dicts()
+        except (ForbiddenException, ResourceNotFoundException) as e:
+            # Typed exceptions raised by S3Connector for 403/404 provider
+            # responses — classified there rather than string-matched here.
+            logger.error(f"Failed to get S3 sample: {e}", exc_info=log_exc_info)
+            raise HTTPException(
+                status_code=400, detail="S3 access denied or resource not found"
+            ) from e
+        except Exception as e:
+            logger.error(f"Failed to get S3 sample: {e}", exc_info=log_exc_info)
+            raise SkyulfException(message="Failed to read S3 data sample") from e
+
+    async def _sample_local_file(self, file_path: Any, limit: int) -> list[dict]:
+        """Sample rows from a source whose type is 'file', 'csv' or 'txt'."""
+        from backend.data_ingestion.connectors.file import LocalFileConnector
+
+        if not file_path:
+            raise HTTPException(status_code=400, detail="Missing file path")
+
+        # Defense-in-depth: this branch calls `data_service.get_sample`
+        # directly instead of going through `LocalFileConnector`, so it
+        # does NOT automatically benefit from the connector's
+        # `resolve_safe_path` containment guard. Apply the same guard
+        # explicitly here so a crafted/attacker-influenced `file_path`
+        # (e.g. via source config) cannot resolve outside the configured
+        # upload directory, even if this call site is ever reached with
+        # an unvalidated path.
+        try:
+            abs_path = LocalFileConnector.resolve_safe_path(str(file_path))
+        except PermissionError as e:
+            logger.warning("Rejected out-of-bounds file path for sample: %s", file_path)
+            raise HTTPException(status_code=400, detail="Invalid file path") from e
+
+        try:
+            if not abs_path.exists():
+                # Try relative to workspace if absolute fails
+                abs_path = LocalFileConnector.resolve_safe_path(str(Path.cwd() / file_path))
+
+            return await self.data_service.get_sample(abs_path, limit=limit)
+        except HTTPException:
+            raise
+        except PermissionError as e:
+            logger.warning("Rejected out-of-bounds file path for sample: %s", file_path)
+            raise HTTPException(status_code=400, detail="Invalid file path") from e
+        except Exception as e:
+            logger.error(f"Failed to get sample: {e}")
+            raise SkyulfException(message="Failed to read data sample") from e
+
+    @staticmethod
+    async def _sample_local_parquet(file_path: Any, limit: int) -> list[dict]:
+        """Sample rows from a local (non-s3://) parquet file via LocalFileConnector."""
+        from backend.data_ingestion.connectors.file import LocalFileConnector
+
+        try:
+            abs_path = Path(file_path).absolute()
+            connector = LocalFileConnector(str(abs_path))
+            await connector.connect()
+            df = await connector.fetch_data(limit=limit)
+            return df.to_dicts()
+        except PermissionError as e:
+            # Raised by LocalFileConnector's containment guard when
+            # `abs_path` resolves outside the configured upload dir.
+            logger.warning("Rejected out-of-bounds parquet path for sample: %s", file_path)
+            raise HTTPException(status_code=400, detail="Invalid file path") from e
+        except Exception:
+            logger.exception("Failed to read local parquet: %s", file_path)
+            raise SkyulfException(message="Failed to read local parquet file") from None
+
+    async def _sample_s3_or_parquet(
+        self, file_path: Any, config: dict[str, Any], limit: int
+    ) -> list[dict]:
+        """Sample rows from a source whose type is 's3' or 'parquet'.
+
+        Kept for cases where type is explicit but path might not be a
+        standard s3:// URI (unlikely), or for local parquet files.
+        """
+        if not file_path:
+            raise HTTPException(status_code=400, detail="Missing path")
+
+        # If it's local parquet
+        if not str(file_path).startswith("s3://"):
+            return await self._sample_local_parquet(file_path, limit)
+
+        storage_options = config.get("storage_options", {})
+        return await self._fetch_s3_sample(file_path, storage_options, limit)
+
+    async def _route_sample(
+        self, source: Any, file_path: Any, config: dict[str, Any], limit: int
+    ) -> list[dict]:
+        """Dispatch sample fetching to the strategy matching the file path / source type."""
+        if file_path and str(file_path).startswith("s3://"):
+            storage_options = config.get("storage_options", {})
+            return await self._fetch_s3_sample(file_path, storage_options, limit, log_exc_info=True)
+
+        if source.type in ["file", "csv", "txt"]:
+            return await self._sample_local_file(file_path, limit)
+
+        if source.type in ["s3", "parquet"]:
+            return await self._sample_s3_or_parquet(file_path, config, limit)
+
+        # TODO: Handle other source types (SQL, etc.)
+        return []
+
     async def get_sample(self, source_id: int | str, limit: int | None = None) -> list[dict]:
         """
         Get a sample of data from the source.
         """
         effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
-        from backend.data_ingestion.connectors.file import LocalFileConnector
-        from backend.data_ingestion.connectors.s3 import S3Connector
 
         source = await self.get_source(source_id)
         if not source:
@@ -169,121 +287,33 @@ class DataIngestionService:
         # Normalize path retrieval: check 'file_path' then 'path'
         file_path = config.get("file_path") or config.get("path")
 
-        connector: S3Connector | LocalFileConnector
-
-        # Check for S3 path first, regardless of source type
-        if file_path and str(file_path).startswith("s3://"):
-            storage_options = config.get("storage_options", {})
-
-            # Ensure options are strings for Polars
-            # Polars expects 'aws_access_key_id', NOT 'key'
-            # So we don't need to remap here, but we need to ensure they are strings
-            str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
-
-            try:
-                logger.info(
-                    f"Fetching S3 sample from {file_path} with options keys: {list(str_options.keys())}"
-                )
-                connector = S3Connector(file_path, storage_options=str_options)
-                await connector.connect()
-                df = await connector.fetch_data(limit=effective_limit)
-                return df.to_dicts()
-            except (ForbiddenException, ResourceNotFoundException) as e:
-                # Typed exceptions raised by S3Connector for 403/404 provider
-                # responses — classified there rather than string-matched here.
-                logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=400, detail="S3 access denied or resource not found"
-                ) from e
-            except Exception as e:
-                logger.error(f"Failed to get S3 sample: {e}", exc_info=True)
-                raise SkyulfException(message="Failed to read S3 data sample") from e
-
-        if source.type in ["file", "csv", "txt"]:
-            if not file_path:
-                raise HTTPException(status_code=400, detail="Missing file path")
-
-            # Defense-in-depth: this branch calls `data_service.get_sample`
-            # directly instead of going through `LocalFileConnector`, so it
-            # does NOT automatically benefit from the connector's
-            # `resolve_safe_path` containment guard. Apply the same guard
-            # explicitly here so a crafted/attacker-influenced `file_path`
-            # (e.g. via source config) cannot resolve outside the configured
-            # upload directory, even if this call site is ever reached with
-            # an unvalidated path.
-            try:
-                abs_path = LocalFileConnector.resolve_safe_path(str(file_path))
-            except PermissionError as e:
-                logger.warning("Rejected out-of-bounds file path for sample: %s", file_path)
-                raise HTTPException(status_code=400, detail="Invalid file path") from e
-
-            try:
-                if not abs_path.exists():
-                    # Try relative to workspace if absolute fails
-                    abs_path = LocalFileConnector.resolve_safe_path(str(Path.cwd() / file_path))
-
-                return await self.data_service.get_sample(abs_path, limit=effective_limit)
-            except HTTPException:
-                raise
-            except PermissionError as e:
-                logger.warning("Rejected out-of-bounds file path for sample: %s", file_path)
-                raise HTTPException(status_code=400, detail="Invalid file path") from e
-            except Exception as e:
-                logger.error(f"Failed to get sample: {e}")
-                raise SkyulfException(message="Failed to read data sample") from e
-
-        elif source.type in ["s3", "parquet"]:
-            # This block might be redundant now if file_path starts with s3://,
-            # but kept for cases where type is explicit but path might not be standard s3:// (unlikely)
-            # or for parquet files that are local.
-
-            storage_options = config.get("storage_options", {})
-
-            if not file_path:
-                raise HTTPException(status_code=400, detail="Missing path")
-
-            # If it's local parquet
-            if not str(file_path).startswith("s3://"):
-                try:
-                    abs_path = Path(file_path).absolute()
-                    connector = LocalFileConnector(str(abs_path))
-                    await connector.connect()
-                    df = await connector.fetch_data(limit=effective_limit)
-                    return df.to_dicts()
-                except PermissionError as e:
-                    # Raised by LocalFileConnector's containment guard when
-                    # `abs_path` resolves outside the configured upload dir.
-                    logger.warning("Rejected out-of-bounds parquet path for sample: %s", file_path)
-                    raise HTTPException(status_code=400, detail="Invalid file path") from e
-                except Exception:
-                    logger.exception("Failed to read local parquet: %s", file_path)
-                    raise SkyulfException(message="Failed to read local parquet file") from None
-
-            try:
-                logger.info(
-                    f"Fetching S3 sample from {file_path} with options keys: {list(storage_options.keys())}"
-                )
-                # Ensure options are strings for Polars
-                str_options = {k: str(v) for k, v in storage_options.items() if v is not None}
-                connector = S3Connector(file_path, storage_options=str_options)
-                await connector.connect()
-                df = await connector.fetch_data(limit=effective_limit)
-                return df.to_dicts()
-            except (ForbiddenException, ResourceNotFoundException) as e:
-                logger.error(f"Failed to get S3 sample: {e}")
-                raise HTTPException(
-                    status_code=400, detail="S3 access denied or resource not found"
-                ) from e
-            except Exception as e:
-                logger.error(f"Failed to get S3 sample: {e}")
-                raise SkyulfException(message="Failed to read S3 data sample") from e
-
-        # TODO: Handle other source types (SQL, etc.)
-        return []
+        return await self._route_sample(source, file_path, config, effective_limit)
 
     # Source types created via `handle_create_source` (inline config, no file
     # upload). "file" sources go through `handle_file_upload` instead.
     _INLINE_SOURCE_TYPES = frozenset({"s3"})
+
+    def _trigger_ingestion(
+        self, settings: Any, source_id: int, background_tasks: BackgroundTasks | None
+    ) -> None:
+        """Kick off ingestion for `source_id` via Celery, BackgroundTasks, or a thread fallback."""
+        if settings.USE_CELERY:
+            ingest_data_task.delay(source_id)
+        elif background_tasks:
+            background_tasks.add_task(ingest_data_task, source_id)
+        else:
+            # Fallback: Run in thread — retain a strong reference so the
+            # task is not garbage-collected before it finishes.
+            import asyncio
+
+            _task = asyncio.create_task(asyncio.to_thread(ingest_data_task, source_id))
+
+            def _on_done(t: asyncio.Task) -> None:
+                exc = t.exception() if not t.cancelled() else None
+                if exc:
+                    logger.error("Ingestion task failed for source %s: %s", source_id, exc)
+
+            _task.add_done_callback(_on_done)
 
     async def handle_create_source(
         self,
@@ -343,24 +373,7 @@ class DataIngestionService:
             await self.session.refresh(new_source)
 
             settings = get_settings()
-            if settings.USE_CELERY:
-                ingest_data_task.delay(new_source.id)
-            elif background_tasks:
-                background_tasks.add_task(ingest_data_task, new_source.id)
-            else:
-                # Fallback: Run in thread — retain a strong reference so the
-                # task is not garbage-collected before it finishes.
-                import asyncio
-
-                _task = asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
-                _source_id = new_source.id
-
-                def _on_done(t: asyncio.Task) -> None:
-                    exc = t.exception() if not t.cancelled() else None
-                    if exc:
-                        logger.error("Ingestion task failed for source %s: %s", _source_id, exc)
-
-                _task.add_done_callback(_on_done)
+            self._trigger_ingestion(settings, new_source.id, background_tasks)
 
             return IngestionJobResponse(
                 job_id=str(new_source.id),
@@ -374,41 +387,36 @@ class DataIngestionService:
             logger.error(f"Database error: {e}")
             raise SkyulfException(message=f"Database error: {str(e)}") from e
 
-    async def handle_file_upload(
-        self,
-        file: UploadFile,
-        user_id: int,
-        background_tasks: BackgroundTasks | None = None,
-    ) -> IngestionJobResponse:
-        """
-        Handle file upload and create a data source entry.
-        """
-        settings = get_settings()
-
-        # 0. Reject early via Content-Length if the client declares a size —
-        #    avoids buffering a huge body only to discard it at the end.
+    @staticmethod
+    def _check_declared_upload_size(file: UploadFile, settings: Any) -> None:
+        """Reject early via Content-Length if the client declares an over-limit size."""
         content_length = file.headers.get("content-length")
-        if content_length is not None:
-            try:
-                declared_size = int(content_length)
-                if declared_size > settings.MAX_UPLOAD_SIZE:
-                    raise HTTPException(
-                        status_code=413,
-                        detail=(
-                            f"File too large: declared {declared_size / (1024**3):.1f} GB, "
-                            f"limit is {settings.MAX_UPLOAD_SIZE / (1024**3):.0f} GB. "
-                            "Set the MAX_UPLOAD_SIZE env var (bytes) to raise this limit."
-                        ),
-                    )
-            except ValueError:
-                pass  # Malformed header — let the streaming check catch it
+        if content_length is None:
+            return
+        try:
+            declared_size = int(content_length)
+        except ValueError:
+            return  # Malformed header — let the streaming check catch it
+        if declared_size > settings.MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    f"File too large: declared {declared_size / (1024**3):.1f} GB, "
+                    f"limit is {settings.MAX_UPLOAD_SIZE / (1024**3):.0f} GB. "
+                    "Set the MAX_UPLOAD_SIZE env var (bytes) to raise this limit."
+                ),
+            )
 
-        # 1. Validate filename — reject path traversal attempts
+    @staticmethod
+    def _validate_upload_filename(file: UploadFile, settings: Any) -> tuple[str, str]:
+        """Validate filename against path traversal and extension allowlist.
+
+        Returns the raw filename and its (lowercased) extension.
+        """
         raw_name = file.filename or "unknown"
         if ".." in raw_name or raw_name.startswith(("/", "\\")):
             raise HTTPException(status_code=400, detail="Invalid filename")
 
-        # 2. Validate extension against allowlist
         file_ext = Path(raw_name).suffix.lower()
         allowed = [e.lower() for e in settings.ALLOWED_EXTENSIONS]
         if file_ext not in allowed:
@@ -416,13 +424,12 @@ class DataIngestionService:
                 status_code=415,
                 detail=f"Unsupported file type '{file_ext}'. Allowed: {', '.join(allowed)}",
             )
+        return raw_name, file_ext
 
-        # 3. Generate unique filename and save, enforcing size limit
-        file_id = str(uuid.uuid4())
-        safe_filename = f"{file_id}{file_ext}"
-        file_path = self.upload_dir / safe_filename
+    @staticmethod
+    async def _save_uploaded_file(file: UploadFile, file_path: Path, settings: Any) -> None:
+        """Stream `file` to `file_path` in chunks, enforcing MAX_UPLOAD_SIZE."""
         bytes_written = 0
-
         try:
             async with aiofiles.open(file_path, "wb") as out_file:
                 while content := await file.read(1024 * 1024):  # 1MB chunks
@@ -444,7 +451,18 @@ class DataIngestionService:
             logger.error(f"Failed to save file: {e}")
             raise SkyulfException(message="Failed to save file") from e
 
-        # 4. Create DataSource record
+    async def _create_file_source_and_ingest(
+        self,
+        file_id: str,
+        raw_name: str,
+        file_path: Path,
+        user_id: int,
+        background_tasks: BackgroundTasks | None,
+    ) -> IngestionJobResponse:
+        """Persist the DataSource row for an uploaded file and start ingestion.
+
+        Cleans up the saved file if the DB step fails.
+        """
         try:
             new_source = DataSource(
                 source_id=file_id,
@@ -468,25 +486,8 @@ class DataIngestionService:
             await self.session.commit()
             await self.session.refresh(new_source)
 
-            # 5. Trigger Task
-            if settings.USE_CELERY:
-                ingest_data_task.delay(new_source.id)
-            elif background_tasks:
-                background_tasks.add_task(ingest_data_task, new_source.id)
-            else:
-                # Fallback: Run in thread — retain a strong reference so the
-                # task is not garbage-collected before it finishes.
-                import asyncio
-
-                _task = asyncio.create_task(asyncio.to_thread(ingest_data_task, new_source.id))
-                _source_id = new_source.id
-
-                def _on_done(t: asyncio.Task) -> None:
-                    exc = t.exception() if not t.cancelled() else None
-                    if exc:
-                        logger.error("Ingestion task failed for source %s: %s", _source_id, exc)
-
-                _task.add_done_callback(_on_done)
+            settings = get_settings()
+            self._trigger_ingestion(settings, new_source.id, background_tasks)
 
             return IngestionJobResponse(
                 job_id=str(new_source.id),  # Using source ID as job ID for now
@@ -501,6 +502,35 @@ class DataIngestionService:
             if file_path.exists():
                 file_path.unlink()
             raise SkyulfException(message=f"Database error: {str(e)}") from e
+
+    async def handle_file_upload(
+        self,
+        file: UploadFile,
+        user_id: int,
+        background_tasks: BackgroundTasks | None = None,
+    ) -> IngestionJobResponse:
+        """
+        Handle file upload and create a data source entry.
+        """
+        settings = get_settings()
+
+        # 0. Reject early via Content-Length if the client declares a size —
+        #    avoids buffering a huge body only to discard it at the end.
+        self._check_declared_upload_size(file, settings)
+
+        # 1 & 2. Validate filename and extension
+        raw_name, file_ext = self._validate_upload_filename(file, settings)
+
+        # 3. Generate unique filename and save, enforcing size limit
+        file_id = str(uuid.uuid4())
+        safe_filename = f"{file_id}{file_ext}"
+        file_path = self.upload_dir / safe_filename
+        await self._save_uploaded_file(file, file_path, settings)
+
+        # 4. Create DataSource record and 5. trigger ingestion task
+        return await self._create_file_source_and_ingest(
+            file_id, raw_name, file_path, user_id, background_tasks
+        )
 
     async def get_ingestion_status(self, source_id: int) -> dict[str, Any]:
         """

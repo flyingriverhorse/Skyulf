@@ -57,6 +57,37 @@ class EDAVisualizer:
                 dq_table.add_row("Task Type", self.profile.task_type)
         console.print(dq_table)
 
+    @staticmethod
+    def _format_optional_stat(value):
+        """Format a numeric stat to 2 decimal places, or return a placeholder if missing."""
+        return f"{value:.2f}" if value is not None else "-"
+
+    @staticmethod
+    def _format_normality(col_profile):
+        """Format the normality-test result as a colored Yes/No string, or a placeholder."""
+        if not col_profile.normality_test:
+            return "-"
+        return "[green]Yes[/green]" if col_profile.normality_test.is_normal else "[red]No[/red]"
+
+    @staticmethod
+    def _numeric_stats_row(col_name, col_profile):
+        """Build a single formatted numeric-stats table row for a column, or None if not numeric."""
+        if not (col_profile.dtype == "Numeric" and col_profile.numeric_stats):
+            return None
+        stats = col_profile.numeric_stats
+        fmt = EDAVisualizer._format_optional_stat
+
+        return (
+            col_name,
+            fmt(stats.mean),
+            fmt(stats.std),
+            fmt(stats.min),
+            fmt(stats.max),
+            fmt(stats.skewness),
+            fmt(stats.kurtosis),
+            EDAVisualizer._format_normality(col_profile),
+        )
+
     def _render_numeric_stats(self, console, Table):
         console.print("\n[bold]2. Numeric Statistics[/bold]")
         stats_table = Table(show_header=True, header_style="bold cyan")
@@ -71,26 +102,10 @@ class EDAVisualizer:
 
         has_numeric = False
         for col_name, col_profile in self.profile.columns.items():
-            if col_profile.dtype == "Numeric" and col_profile.numeric_stats:
+            row = self._numeric_stats_row(col_name, col_profile)
+            if row is not None:
                 has_numeric = True
-                stats = col_profile.numeric_stats
-
-                mean = f"{stats.mean:.2f}" if stats.mean is not None else "-"
-                std = f"{stats.std:.2f}" if stats.std is not None else "-"
-                min_val = f"{stats.min:.2f}" if stats.min is not None else "-"
-                max_val = f"{stats.max:.2f}" if stats.max is not None else "-"
-                skew = f"{stats.skewness:.2f}" if stats.skewness is not None else "-"
-                kurt = f"{stats.kurtosis:.2f}" if stats.kurtosis is not None else "-"
-
-                is_normal = "-"
-                if col_profile.normality_test:
-                    is_normal = (
-                        "[green]Yes[/green]"
-                        if col_profile.normality_test.is_normal
-                        else "[red]No[/red]"
-                    )
-
-                stats_table.add_row(col_name, mean, std, min_val, max_val, skew, kurt, is_normal)
+                stats_table.add_row(*row)
 
         if has_numeric:
             console.print(stats_table)
@@ -246,53 +261,65 @@ class EDAVisualizer:
             # Schema exposes day_of_week and month_of_year lists rather than period/strength.
             console.print("Seasonality Analysis: Available (Day of Week, Month of Year)")
 
+    def _render_target_correlations_table(self, console, Table):
+        """Render the top target-correlation table if correlations are available."""
+        if not self.profile.target_correlations:
+            return
+        corr_table = Table(show_header=True, header_style="bold green", title="Top Correlations")
+        corr_table.add_column("Feature")
+        corr_table.add_column("Correlation", justify="right")
+
+        sorted_corrs = sorted(
+            self.profile.target_correlations.items(),
+            key=lambda x: abs(x[1]),
+            reverse=True,
+        )
+        for col, corr in sorted_corrs[:5]:
+            corr_table.add_row(col, f"{corr:.4f}")
+        console.print(corr_table)
+
+    @staticmethod
+    def _target_interaction_row(interaction):
+        """Build a single (feature, p-value, significance) row for a target interaction."""
+        p_val = interaction.p_value
+        p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
+        sig = (
+            "[green]High[/green]" if p_val is not None and p_val < 0.05 else "[yellow]Low[/yellow]"
+        )
+        return (interaction.feature, p_str, sig)
+
+    def _render_target_interactions_table(self, console, Table):
+        """Render the top ANOVA feature-association table if boxplot interactions are available."""
+        if not self.profile.target_interactions:
+            return
+        interactions = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
+        if not interactions:
+            return
+        int_table = Table(
+            show_header=True,
+            header_style="bold green",
+            title="Top Feature Associations (ANOVA)",
+        )
+        int_table.add_column("Feature")
+        int_table.add_column("p-value", justify="right")
+        int_table.add_column("Significance", justify="center")
+
+        interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
+
+        for interaction in interactions[:5]:
+            int_table.add_row(*self._target_interaction_row(interaction))
+        console.print(int_table)
+
     def _render_target_analysis(self, console, Table):
         if not self.profile.target_col:
             return
         console.print(f"\n[bold]9. Target Analysis (Target: {self.profile.target_col})[/bold]")
 
         # Numeric Target: Correlations
-        if self.profile.target_correlations:
-            corr_table = Table(
-                show_header=True, header_style="bold green", title="Top Correlations"
-            )
-            corr_table.add_column("Feature")
-            corr_table.add_column("Correlation", justify="right")
-
-            sorted_corrs = sorted(
-                self.profile.target_correlations.items(),
-                key=lambda x: abs(x[1]),
-                reverse=True,
-            )
-            for col, corr in sorted_corrs[:5]:
-                corr_table.add_row(col, f"{corr:.4f}")
-            console.print(corr_table)
+        self._render_target_correlations_table(console, Table)
 
         # Categorical Target: Interactions (ANOVA, boxplot only)
-        if self.profile.target_interactions:
-            interactions = [i for i in self.profile.target_interactions if i.plot_type == "boxplot"]
-            if interactions:
-                int_table = Table(
-                    show_header=True,
-                    header_style="bold green",
-                    title="Top Feature Associations (ANOVA)",
-                )
-                int_table.add_column("Feature")
-                int_table.add_column("p-value", justify="right")
-                int_table.add_column("Significance", justify="center")
-
-                interactions.sort(key=lambda x: x.p_value if x.p_value is not None else 1.0)
-
-                for interaction in interactions[:5]:
-                    p_val = interaction.p_value
-                    p_str = f"{p_val:.4e}" if p_val is not None else "N/A"
-                    sig = (
-                        "[green]High[/green]"
-                        if p_val is not None and p_val < 0.05
-                        else "[yellow]Low[/yellow]"
-                    )
-                    int_table.add_row(interaction.feature, p_str, sig)
-                console.print(int_table)
+        self._render_target_interactions_table(console, Table)
 
     def _detect_regression_tree(self) -> bool:
         """Heuristic: a leaf with a numeric class_name implies regression."""
@@ -307,16 +334,58 @@ class EDAVisualizer:
                     return False
         return False
 
+    @staticmethod
+    def _rule_tree_metric_label(is_regression, accuracy):
+        """Return the (metric name, formatted value) pair for the rule tree's headline metric."""
+        metric_name = "R²" if is_regression else "Accuracy"
+        acc_str = f"{accuracy:.2f}" if is_regression else f"{accuracy:.1%}"
+        return metric_name, acc_str
+
+    @staticmethod
+    def _rule_tree_leaf_label(node, is_regression):
+        """Build the rich-markup label shown for a leaf node in the rule tree."""
+        if is_regression:
+            val = float(node.class_name or "0")
+            return f"[green]➜ Value = {val:.2f}[/green] [dim]n={node.samples}[/dim]"
+        total = sum(node.value)
+        conf = (max(node.value) / total * 100) if total > 0 else 0
+        return f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) [dim]n={node.samples}[/dim]"
+
+    @staticmethod
+    def _render_rule_tree_rules(console, rules):
+        """Print the extracted decision-tree rules, if any."""
+        if not rules:
+            return
+        console.print("\n[italic]Extracted Rules:[/italic]")
+        for rule in rules:
+            console.print(f"[dim]• {rule}[/dim]")
+
+    @staticmethod
+    def _render_feature_importance_table(console, Table, feature_importances):
+        """Render the surrogate-model feature importance table, if any importances exist."""
+        if not feature_importances:
+            return
+        console.print("\n[bold]Feature Importance (Surrogate Model)[/bold]")
+        fi_table = Table(show_header=True, header_style="bold green")
+        fi_table.add_column("Feature")
+        fi_table.add_column("Importance", justify="right")
+        fi_table.add_column("Bar", style="dim")
+
+        for item in feature_importances[:10]:
+            feature = item.get("feature", "Unknown")
+            importance = item.get("importance", 0.0)
+            bar = "█" * int(importance * 20)
+            fi_table.add_row(str(feature), f"{importance:.4f}", bar)
+
+        console.print(fi_table)
+
     def _render_rule_tree(self, console, Table):
         if not self.profile.rule_tree:
             return
 
         is_regression = self._detect_regression_tree()
-        metric_name = "R²" if is_regression else "Accuracy"
-        acc_str = (
-            f"{self.profile.rule_tree.accuracy:.2f}"
-            if is_regression
-            else f"{self.profile.rule_tree.accuracy:.1%}"
+        metric_name, acc_str = self._rule_tree_metric_label(
+            is_regression, self.profile.rule_tree.accuracy
         )
 
         console.print(f"\n[bold]10. Decision Tree Rules ({metric_name}: {acc_str})[/bold]")
@@ -331,16 +400,7 @@ class EDAVisualizer:
                 return
 
             if node.is_leaf:
-                if is_regression:
-                    val = float(node.class_name or "0")
-                    tree.add(f"[green]➜ Value = {val:.2f}[/green] [dim]n={node.samples}[/dim]")
-                else:
-                    total = sum(node.value)
-                    conf = (max(node.value) / total * 100) if total > 0 else 0
-                    tree.add(
-                        f"[green]➜ {node.class_name}[/green] ({conf:.1f}%) "
-                        f"[dim]n={node.samples}[/dim]"
-                    )
+                tree.add(self._rule_tree_leaf_label(node, is_regression))
                 return
 
             # Left (True)
@@ -358,26 +418,10 @@ class EDAVisualizer:
             add_nodes(0, root)
             console.print(root)
 
-        if self.profile.rule_tree.rules:
-            console.print("\n[italic]Extracted Rules:[/italic]")
-            for rule in self.profile.rule_tree.rules:
-                console.print(f"[dim]• {rule}[/dim]")
-
-        if self.profile.rule_tree.feature_importances:
-            console.print("\n[bold]Feature Importance (Surrogate Model)[/bold]")
-            fi_table = Table(show_header=True, header_style="bold green")
-            fi_table.add_column("Feature")
-            fi_table.add_column("Importance", justify="right")
-            fi_table.add_column("Bar", style="dim")
-
-            for item in self.profile.rule_tree.feature_importances[:10]:
-                feature = item.get("feature", "Unknown")
-                importance = item.get("importance", 0.0)
-                bar_len = int(importance * 20)
-                bar = "█" * bar_len
-                fi_table.add_row(str(feature), f"{importance:.4f}", bar)
-
-            console.print(fi_table)
+        self._render_rule_tree_rules(console, self.profile.rule_tree.rules)
+        self._render_feature_importance_table(
+            console, Table, self.profile.rule_tree.feature_importances
+        )
 
     def _render_pca(self, console, Table):
         if not self.profile.pca_components:
@@ -467,6 +511,28 @@ class EDAVisualizer:
             for fignum in new_fignums:
                 plt.close(fignum)
 
+    @staticmethod
+    def _plot_distribution_subplot(plt, name, col):
+        """Draw one histogram subplot for a numeric column onto the current matplotlib figure."""
+        histogram = col.histogram or []
+        widths = [b.end - b.start for b in histogram]
+        centers = [(b.start + b.end) / 2 for b in histogram]
+        counts = [b.count for b in histogram]
+
+        plt.bar(
+            centers,
+            counts,
+            width=widths,
+            align="center",
+            alpha=0.7,
+            edgecolor="black",
+            color="skyblue",
+        )
+        plt.title(f"Distribution: {name}")
+        plt.xlabel(name)
+        plt.ylabel("Count")
+        plt.grid(axis="y", alpha=0.3)
+
     def _plot_distributions(self):
         import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
 
@@ -485,24 +551,7 @@ class EDAVisualizer:
         plt.figure(figsize=(5 * n_cols, 4))
         for i, (name, col) in enumerate(display_cols):
             plt.subplot(1, n_cols, i + 1)
-            histogram = col.histogram or []
-            widths = [b.end - b.start for b in histogram]
-            centers = [(b.start + b.end) / 2 for b in histogram]
-            counts = [b.count for b in histogram]
-
-            plt.bar(
-                centers,
-                counts,
-                width=widths,
-                align="center",
-                alpha=0.7,
-                edgecolor="black",
-                color="skyblue",
-            )
-            plt.title(f"Distribution: {name}")
-            plt.xlabel(name)
-            plt.ylabel("Count")
-            plt.grid(axis="y", alpha=0.3)
+            self._plot_distribution_subplot(plt, name, col)
         plt.tight_layout()
 
     def _plot_correlations(self):
@@ -555,6 +604,30 @@ class EDAVisualizer:
         plt.title("Correlation Matrix (With Target)")
         plt.tight_layout()
 
+    @staticmethod
+    def _boxplot_stats(interaction):
+        """Build matplotlib bxp-style stats dicts for one target interaction's categories."""
+        return [
+            {
+                "label": cat_data.name,
+                "whislo": cat_data.stats.min,
+                "q1": cat_data.stats.q1,
+                "med": cat_data.stats.median,
+                "q3": cat_data.stats.q3,
+                "whishi": cat_data.stats.max,
+                "fliers": [],
+            }
+            for cat_data in interaction.data
+        ]
+
+    @staticmethod
+    def _boxplot_title(interaction):
+        """Build the subplot title for a target interaction boxplot, including ANOVA p-value."""
+        title = f"{interaction.feature} by Target"
+        if interaction.p_value is not None:
+            title += f"\n(ANOVA p={interaction.p_value:.4f})"
+        return title
+
     def _plot_target_interactions(self):
         if not self.profile.target_interactions:
             return
@@ -573,26 +646,30 @@ class EDAVisualizer:
 
         for i, interaction in enumerate(display_items):
             plt.subplot(1, n_plots, i + 1)
-            bxp_stats = [
-                {
-                    "label": cat_data.name,
-                    "whislo": cat_data.stats.min,
-                    "q1": cat_data.stats.q1,
-                    "med": cat_data.stats.median,
-                    "q3": cat_data.stats.q3,
-                    "whishi": cat_data.stats.max,
-                    "fliers": [],
-                }
-                for cat_data in interaction.data
-            ]
             ax = plt.gca()
-            ax.bxp(bxp_stats, showfliers=False)
-            title = f"{interaction.feature} by Target"
-            if interaction.p_value is not None:
-                title += f"\n(ANOVA p={interaction.p_value:.4f})"
-            plt.title(title)
+            ax.bxp(self._boxplot_stats(interaction), showfliers=False)
+            plt.title(self._boxplot_title(interaction))
             plt.grid(axis="y", alpha=0.3)
         plt.tight_layout()
+
+    @staticmethod
+    def _scatter_matrix_numeric_cols(df):
+        """Return up to 5 numeric column names from `df` for the scatter matrix."""
+        numeric_cols = [
+            col
+            for col, dtype in df.schema.items()
+            if dtype in (pl.Float64, pl.Float32, pl.Int64, pl.Int32)
+        ]
+        return numeric_cols[:5]
+
+    def _scatter_matrix_colors(self, pdf):
+        """Map the target column's values to numeric color codes for the scatter matrix."""
+        target_col = self.profile.target_col
+        if not (target_col and target_col in pdf.columns):
+            return None
+        unique_targets = pdf[target_col].unique()
+        color_map = {val: i for i, val in enumerate(unique_targets)}
+        return pdf[target_col].map(color_map)
 
     def _plot_scatter_matrix(self):
         if self.df is None:
@@ -605,26 +682,28 @@ class EDAVisualizer:
         except ImportError:
             return
 
-        numeric_cols = [
-            col
-            for col, dtype in self.df.schema.items()
-            if dtype in (pl.Float64, pl.Float32, pl.Int64, pl.Int32)
-        ]
-        if len(numeric_cols) > 5:
-            numeric_cols = numeric_cols[:5]
-
+        numeric_cols = self._scatter_matrix_numeric_cols(self.df)
         pdf = self.df.select(numeric_cols).to_pandas()
-
-        colors = None
-        target_col = self.profile.target_col
-        if target_col and target_col in pdf.columns:
-            unique_targets = pdf[target_col].unique()
-            color_map = {val: i for i, val in enumerate(unique_targets)}
-            colors = pdf[target_col].map(color_map)
+        colors = self._scatter_matrix_colors(pdf)
 
         plt.figure(figsize=(10, 10))
         scatter_matrix(pdf, alpha=0.8, figsize=(10, 10), diagonal="kde", c=colors, cmap="viridis")
         plt.suptitle("Scatter Matrix")
+
+    @staticmethod
+    def _label_color_map(labels):
+        """Build a mapping from unique non-null labels to sequential integer color codes."""
+        unique_labels = list({lbl for lbl in labels if lbl is not None})
+        return {lbl: i for i, lbl in enumerate(unique_labels)}
+
+    @staticmethod
+    def _pca_color_values(labels):
+        """Convert PCA point labels to numeric color values, falling back to a categorical mapping."""
+        try:
+            return [float(lbl) for lbl in labels if lbl is not None]
+        except (ValueError, TypeError):
+            label_map = EDAVisualizer._label_color_map(labels)
+            return [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
 
     def _plot_pca(self):
         if not self.profile.pca_data:
@@ -636,12 +715,7 @@ class EDAVisualizer:
         y = [p.y for p in self.profile.pca_data]
         labels = [p.label for p in self.profile.pca_data]
 
-        try:
-            c_values = [float(lbl) for lbl in labels if lbl is not None]
-        except (ValueError, TypeError):
-            unique_labels = list({lbl for lbl in labels if lbl is not None})
-            label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
-            c_values = [label_map.get(lbl, -1) for lbl in labels if lbl is not None]
+        c_values = self._pca_color_values(labels)
 
         plt.figure(figsize=(8, 6))
         scatter = plt.scatter(x, y, c=c_values, cmap="viridis", alpha=0.8)
@@ -650,6 +724,17 @@ class EDAVisualizer:
         plt.xlabel("PC1")
         plt.ylabel("PC2")
         plt.grid(True, alpha=0.3)
+
+    @staticmethod
+    def _geospatial_color_values(labels):
+        """Convert geospatial point labels to numeric color values, or None if no labels present."""
+        if not any(labels):
+            return None
+        try:
+            return [float(lbl) if lbl is not None else -1 for lbl in labels]
+        except (ValueError, TypeError):
+            label_map = EDAVisualizer._label_color_map(labels)
+            return [label_map.get(lbl, -1) if lbl is not None else -1 for lbl in labels]
 
     def _plot_geospatial(self):
         if not self.profile.geospatial or not self.profile.geospatial.sample_points:
@@ -662,14 +747,7 @@ class EDAVisualizer:
         labels = [p.label for p in self.profile.geospatial.sample_points]
 
         # Color by label if available
-        c_values = None
-        if any(labels):
-            try:
-                c_values = [float(lbl) if lbl is not None else -1 for lbl in labels]
-            except (ValueError, TypeError):
-                unique_labels = list({lbl for lbl in labels if lbl is not None})
-                label_map = {lbl: i for i, lbl in enumerate(unique_labels)}
-                c_values = [label_map.get(lbl, -1) if lbl is not None else -1 for lbl in labels]
+        c_values = self._geospatial_color_values(labels)
 
         plt.figure(figsize=(10, 6))
         scatter = plt.scatter(lons, lats, c=c_values, cmap="viridis", alpha=0.6, s=10)
@@ -681,23 +759,20 @@ class EDAVisualizer:
         plt.ylabel(f"Latitude ({self.profile.geospatial.lat_col})")
         plt.grid(True, alpha=0.3)
 
-    def _plot_timeseries(self):
-        if not self.profile.timeseries or not self.profile.timeseries.trend:
-            return
-
+    @staticmethod
+    def _timeseries_series(trend):
+        """Parse timeseries trend points into (dates, values_map) for plotting, skipping bad dates."""
         from datetime import datetime
-
-        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
 
         dates = []
         values_map = {}  # col -> list of values
 
         # Initialize lists for each column found in the first point
-        first_point = self.profile.timeseries.trend[0]
+        first_point = trend[0]
         for col in first_point.values:
             values_map[col] = []
 
-        for point in self.profile.timeseries.trend:
+        for point in trend:
             try:
                 # Parse date string back to datetime for plotting
                 dt = datetime.fromisoformat(point.date)
@@ -708,6 +783,16 @@ class EDAVisualizer:
                         values_map[col].append(val)
             except ValueError:
                 continue
+
+        return dates, values_map
+
+    def _plot_timeseries(self):
+        if not self.profile.timeseries or not self.profile.timeseries.trend:
+            return
+
+        import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
+
+        dates, values_map = self._timeseries_series(self.profile.timeseries.trend)
 
         if not dates:
             return

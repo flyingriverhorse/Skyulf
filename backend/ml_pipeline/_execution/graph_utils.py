@@ -53,6 +53,40 @@ def _is_parallel_terminal(term: NodeConfig) -> bool:
     return term.step_type in AUTO_PARALLEL_STEP_TYPES
 
 
+def _preview_data_leaves(data_nodes: list[NodeConfig]) -> list[NodeConfig]:
+    """Return the nodes among ``data_nodes`` that have no downstream consumer."""
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
+    has_consumer: set[str] = set()
+    for n in data_nodes:
+        for parent_id in n.inputs:
+            if parent_id in node_map:
+                has_consumer.add(parent_id)
+    return [n for n in data_nodes if n.node_id not in has_consumer]
+
+
+def _build_preview_leaf_sub_configs(
+    config: PipelineConfig, node_map: dict[str, NodeConfig], leaves: list[NodeConfig]
+) -> list[PipelineConfig]:
+    """Build one sub-pipeline (leaf + its ancestors) per preview data leaf."""
+    sub_configs: list[PipelineConfig] = []
+    for idx, leaf in enumerate(leaves):
+        ancestors = _collect_ancestors(leaf.node_id, node_map)
+        branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
+        sub_configs.append(
+            PipelineConfig(
+                pipeline_id=f"{config.pipeline_id}__preview_{idx}",
+                nodes=branch_nodes,
+                metadata={
+                    **config.metadata,
+                    "preview_branch_index": idx,
+                    "preview_leaf_node_id": leaf.node_id,
+                    "parent_pipeline_id": config.pipeline_id,
+                },
+            )
+        )
+    return sub_configs
+
+
 def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     """Split a pipeline into one sub-pipeline per data leaf, for preview.
 
@@ -77,13 +111,7 @@ def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     node_map: dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
 
     # A node is a leaf when no other (data) node lists it as an input.
-    has_consumer: set[str] = set()
-    for n in data_nodes:
-        for parent_id in n.inputs:
-            if parent_id in node_map:
-                has_consumer.add(parent_id)
-
-    leaves = [n for n in data_nodes if n.node_id not in has_consumer]
+    leaves = _preview_data_leaves(data_nodes)
 
     base = PipelineConfig(
         pipeline_id=config.pipeline_id,
@@ -94,45 +122,25 @@ def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     if len(leaves) <= 1:
         return [base]
 
-    sub_configs: list[PipelineConfig] = []
-    for idx, leaf in enumerate(leaves):
-        ancestors = _collect_ancestors(leaf.node_id, node_map)
-        branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
-        sub_configs.append(
-            PipelineConfig(
-                pipeline_id=f"{config.pipeline_id}__preview_{idx}",
-                nodes=branch_nodes,
-                metadata={
-                    **config.metadata,
-                    "preview_branch_index": idx,
-                    "preview_leaf_node_id": leaf.node_id,
-                    "parent_pipeline_id": config.pipeline_id,
-                },
-            )
-        )
-    return sub_configs
+    return _build_preview_leaf_sub_configs(config, node_map, leaves)
 
 
-def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
-    """Split a pipeline into one PipelineConfig per connected subgraph.
-
-    Disconnected parts of the canvas (e.g. two datasets with no shared nodes)
-    become separate experiment groups, each with its own pipeline_id.
-    Returns a single-element list when the graph is fully connected.
-    """
+def _build_undirected_adjacency(config: PipelineConfig) -> dict[str, set[str]]:
+    """Build an undirected adjacency map from each node's ``inputs`` edges."""
     node_map: dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
-    if not node_map:
-        return [config]
-
-    # Build undirected adjacency
     adj: dict[str, set[str]] = defaultdict(set)
     for node in config.nodes:
         for parent_id in node.inputs:
             if parent_id in node_map:
                 adj[node.node_id].add(parent_id)
                 adj[parent_id].add(node.node_id)
+    return adj
 
-    # BFS to find connected components
+
+def _find_connected_components(
+    node_map: dict[str, NodeConfig], adj: dict[str, set[str]]
+) -> list[list[str]]:
+    """BFS over ``adj`` to find each connected component of node ids in ``node_map``."""
     visited: set[str] = set()
     components: list[list[str]] = []
     for nid in node_map:
@@ -148,11 +156,13 @@ def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
             component.append(cur)
             queue.extend(neighbor for neighbor in adj[cur] if neighbor not in visited)
         components.append(component)
+    return components
 
-    if len(components) <= 1:
-        return [config]
 
-    # Each component gets its own pipeline_id
+def _build_component_configs(
+    config: PipelineConfig, node_map: dict[str, NodeConfig], components: list[list[str]]
+) -> list[PipelineConfig]:
+    """Build one PipelineConfig per connected component, giving each its own pipeline_id."""
     results: list[PipelineConfig] = []
     for component_ids in components:
         comp_nodes = [node_map[nid] for nid in component_ids]
@@ -165,8 +175,124 @@ def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
                 metadata={**config.metadata},
             )
         )
-
     return results
+
+
+def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
+    """Split a pipeline into one PipelineConfig per connected subgraph.
+
+    Disconnected parts of the canvas (e.g. two datasets with no shared nodes)
+    become separate experiment groups, each with its own pipeline_id.
+    Returns a single-element list when the graph is fully connected.
+    """
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
+    if not node_map:
+        return [config]
+
+    adj = _build_undirected_adjacency(config)
+    components = _find_connected_components(node_map, adj)
+
+    if len(components) <= 1:
+        return [config]
+
+    return _build_component_configs(config, node_map, components)
+
+
+def _terminal_copy_for_branch(term: NodeConfig, branch_root_id: str) -> NodeConfig:
+    """Build a copy of a parallel terminal node scoped to a single branch input."""
+    return NodeConfig(
+        node_id=term.node_id,
+        step_type=term.step_type,
+        params={k: v for k, v in term.params.items() if k != "execution_mode"},
+        inputs=[branch_root_id],
+    )
+
+
+def _build_parallel_branch_config(
+    config: PipelineConfig,
+    node_map: dict[str, NodeConfig],
+    term: NodeConfig,
+    branch_root_id: str,
+    branch_index: int,
+) -> PipelineConfig:
+    """Build the sub-pipeline for one input branch of a parallel terminal."""
+    ancestors = _collect_ancestors(branch_root_id, node_map)
+    term_copy = _terminal_copy_for_branch(term, branch_root_id)
+    branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
+    branch_nodes.append(term_copy)
+    return PipelineConfig(
+        pipeline_id=f"{config.pipeline_id}__branch_{branch_index}",
+        nodes=branch_nodes,
+        metadata={
+            **config.metadata,
+            "branch_index": branch_index,
+            "parent_pipeline_id": config.pipeline_id,
+        },
+    )
+
+
+def _build_merge_branch_config(
+    config: PipelineConfig,
+    node_map: dict[str, NodeConfig],
+    term: NodeConfig,
+    branch_index: int,
+) -> PipelineConfig:
+    """Build the sub-pipeline for a non-parallel (merge-mode) terminal."""
+    ancestors = _collect_ancestors(term.node_id, node_map)
+    branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
+    return PipelineConfig(
+        pipeline_id=f"{config.pipeline_id}__branch_{branch_index}",
+        nodes=branch_nodes,
+        metadata={
+            **config.metadata,
+            "branch_index": branch_index,
+            "parent_pipeline_id": config.pipeline_id,
+        },
+    )
+
+
+def _partition_single_terminal(
+    config: PipelineConfig, node_map: dict[str, NodeConfig], term: NodeConfig
+) -> list[PipelineConfig]:
+    """Partition a single-terminal pipeline, splitting per-input only if parallel mode is set."""
+    if not _is_parallel_terminal(term):
+        return [config]
+
+    # Each input to the terminal is a separate experiment branch
+    return [
+        _build_parallel_branch_config(config, node_map, term, branch_root_id, idx)
+        for idx, branch_root_id in enumerate(_unique_inputs(term))
+    ]
+
+
+def _partition_multiple_terminals(
+    config: PipelineConfig,
+    node_map: dict[str, NodeConfig],
+    terminals: list[NodeConfig],
+) -> list[PipelineConfig]:
+    """Partition a pipeline with multiple terminal nodes into one sub-pipeline per branch.
+
+    When a terminal has multiple inputs, always split it into per-input
+    sub-branches so each path is a separate experiment. This avoids the
+    confusing "2 terminals but 3 logical paths" scenario.
+    """
+    sub_configs: list[PipelineConfig] = []
+    global_branch = 0
+    for term in terminals:
+        if _is_parallel_terminal(term):
+            # Parallel mode: each input becomes its own experiment branch
+            for branch_root_id in _unique_inputs(term):
+                sub_configs.append(
+                    _build_parallel_branch_config(
+                        config, node_map, term, branch_root_id, global_branch
+                    )
+                )
+                global_branch += 1
+        else:
+            # Merge mode (default) or single input: one branch per terminal
+            sub_configs.append(_build_merge_branch_config(config, node_map, term, global_branch))
+            global_branch += 1
+    return sub_configs
 
 
 def partition_parallel_pipeline(config: PipelineConfig) -> list[PipelineConfig]:
@@ -192,87 +318,61 @@ def partition_parallel_pipeline(config: PipelineConfig) -> list[PipelineConfig]:
     if not terminals:
         return [config]
 
-    # --- Case 2: single terminal with parallel mode ---
     if len(terminals) == 1:
-        term = terminals[0]
-        if not _is_parallel_terminal(term):
-            return [config]
+        return _partition_single_terminal(config, node_map, terminals[0])
 
-        # Each input to the terminal is a separate experiment branch
-        sub_configs: list[PipelineConfig] = []
-        for idx, branch_root_id in enumerate(_unique_inputs(term)):
-            ancestors = _collect_ancestors(branch_root_id, node_map)
-            # Build a copy of the terminal node with only this branch's input
-            term_copy = NodeConfig(
-                node_id=term.node_id,
-                step_type=term.step_type,
-                params={k: v for k, v in term.params.items() if k != "execution_mode"},
-                inputs=[branch_root_id],
-            )
-            branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
-            branch_nodes.append(term_copy)
-            sub_configs.append(
-                PipelineConfig(
-                    pipeline_id=f"{config.pipeline_id}__branch_{idx}",
-                    nodes=branch_nodes,
-                    metadata={
-                        **config.metadata,
-                        "branch_index": idx,
-                        "parent_pipeline_id": config.pipeline_id,
-                    },
-                )
-            )
-        return sub_configs
+    return _partition_multiple_terminals(config, node_map, terminals)
 
-    # --- Case 1: multiple terminal nodes ---
-    # When a terminal has multiple inputs, always split it into per-input
-    # sub-branches so each path is a separate experiment. This avoids the
-    # confusing "2 terminals but 3 logical paths" scenario.
-    sub_configs = []
-    global_branch = 0
-    for term in terminals:
-        is_parallel = _is_parallel_terminal(term)
-        if is_parallel:
-            # Parallel mode: each input becomes its own experiment branch
-            for branch_root_id in _unique_inputs(term):
-                ancestors = _collect_ancestors(branch_root_id, node_map)
-                term_copy = NodeConfig(
-                    node_id=term.node_id,
-                    step_type=term.step_type,
-                    params={k: v for k, v in term.params.items() if k != "execution_mode"},
-                    inputs=[branch_root_id],
-                )
-                branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
-                branch_nodes.append(term_copy)
-                sub_configs.append(
-                    PipelineConfig(
-                        pipeline_id=(f"{config.pipeline_id}__branch_{global_branch}"),
-                        nodes=branch_nodes,
-                        metadata={
-                            **config.metadata,
-                            "branch_index": global_branch,
-                            "parent_pipeline_id": config.pipeline_id,
-                        },
-                    )
-                )
-                global_branch += 1
-        else:
-            # Merge mode (default) or single input: one branch per terminal
-            ancestors = _collect_ancestors(term.node_id, node_map)
-            branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
-            sub_configs.append(
-                PipelineConfig(
-                    pipeline_id=f"{config.pipeline_id}__branch_{global_branch}",
-                    nodes=branch_nodes,
-                    metadata={
-                        **config.metadata,
-                        "branch_index": global_branch,
-                        "parent_pipeline_id": config.pipeline_id,
-                    },
-                )
-            )
-            global_branch += 1
-    return sub_configs
+
+def _discover_ancestors_bfs(node_id: str, node_map: dict[str, NodeConfig]) -> set[str]:
+    """BFS backwards through ``inputs`` edges from ``node_id`` to find the ancestor subgraph.
+
+    We use a simple FIFO queue (list.pop(0)) because the graphs are tiny;
+    collections.deque would only matter at much larger scale.
+    """
+    discovered: set[str] = set()
+    queue = [node_id]
+    while queue:
+        nid = queue.pop(0)
+        if nid in discovered or nid not in node_map:
+            continue
+        discovered.add(nid)
+        queue.extend(
+            parent_id
+            for parent_id in node_map[nid].inputs
+            if parent_id in node_map and parent_id not in discovered
+        )
+    return discovered
+
+
+def _build_in_degree_and_children(
+    discovered: set[str], node_map: dict[str, NodeConfig]
+) -> tuple[dict[str, int], dict[str, list[str]]]:
+    """Build the in-degree map and children adjacency for Kahn's algorithm over ``discovered``."""
+    in_degree: dict[str, int] = dict.fromkeys(discovered, 0)
+    children: dict[str, list[str]] = {nid: [] for nid in discovered}
+    for nid in discovered:
+        for parent_id in node_map[nid].inputs:
+            if parent_id in discovered:
+                in_degree[nid] += 1
+                children[parent_id].append(nid)
+    return in_degree, children
+
+
+def _kahn_topological_order(
+    discovered: set[str], in_degree: dict[str, int], children: dict[str, list[str]]
+) -> list[str]:
+    """Repeatedly emit zero-in-degree nodes (Kahn's algorithm) to produce a topological order."""
+    result: list[str] = []
+    ready = [nid for nid, deg in in_degree.items() if deg == 0]
+    while ready:
+        nid = ready.pop(0)
+        result.append(nid)
+        for child in children[nid]:
+            in_degree[child] -= 1
+            if in_degree[child] == 0:
+                ready.append(child)
+    return result
 
 
 def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[str]:
@@ -307,41 +407,9 @@ def _collect_ancestors(node_id: str, node_map: dict[str, NodeConfig]) -> list[st
     if node_id not in node_map:
         return []
 
-    # Pass 1 — BFS backwards from node_id to discover the ancestor subgraph.
-    # We use a simple FIFO queue (list.pop(0)) because the graphs are tiny;
-    # collections.deque would only matter at much larger scale.
-    discovered: set[str] = set()
-    queue = [node_id]
-    while queue:
-        nid = queue.pop(0)
-        if nid in discovered or nid not in node_map:
-            continue
-        discovered.add(nid)
-        queue.extend(
-            parent_id
-            for parent_id in node_map[nid].inputs
-            if parent_id in node_map and parent_id not in discovered
-        )
-
-    # Pass 2 — Kahn's algorithm: build in-degree map for the subgraph.
-    in_degree: dict[str, int] = dict.fromkeys(discovered, 0)
-    children: dict[str, list[str]] = {nid: [] for nid in discovered}
-    for nid in discovered:
-        for parent_id in node_map[nid].inputs:
-            if parent_id in discovered:
-                in_degree[nid] += 1
-                children[parent_id].append(nid)
-
-    # Pass 2 — repeatedly emit zero-in-degree nodes.
-    result: list[str] = []
-    ready = [nid for nid, deg in in_degree.items() if deg == 0]
-    while ready:
-        nid = ready.pop(0)
-        result.append(nid)
-        for child in children[nid]:
-            in_degree[child] -= 1
-            if in_degree[child] == 0:
-                ready.append(child)
+    discovered = _discover_ancestors_bfs(node_id, node_map)
+    in_degree, children = _build_in_degree_and_children(discovered, node_map)
+    result = _kahn_topological_order(discovered, in_degree, children)
 
     if len(result) != len(discovered):
         # Cycle in the ancestor subgraph — cannot topologically sort. Fall

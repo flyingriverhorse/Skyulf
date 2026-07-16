@@ -16,125 +16,167 @@ class RecommendationsMixin(_AnalyzerState):
         recs: list[Recommendation] = []
 
         for col, profile in profiles.items():
-            if profile.missing_percentage > 50:
-                recs.append(
-                    Recommendation(
-                        column=col,
-                        action="Drop",
-                        reason=f"High missing values ({profile.missing_percentage:.1f}%)",
-                        suggestion=f"Drop column '{col}' as it contains mostly nulls.",
-                    )
-                )
-            elif profile.missing_percentage > 0:
-                method = "Median" if profile.dtype == "Numeric" else "Mode"
-                recs.append(
-                    Recommendation(
-                        column=col,
-                        action="Impute",
-                        reason=f"Missing values ({profile.missing_percentage:.1f}%)",
-                        suggestion=f"Impute '{col}' using {method}.",
-                    )
-                )
-
+            recs.extend(self._missing_value_recommendations(col, profile))
         for col, profile in profiles.items():
-            if (
-                profile.numeric_stats
-                and profile.numeric_stats.skewness
-                and abs(profile.numeric_stats.skewness) > 1.5
-            ):
-                recs.append(
-                    Recommendation(
-                        column=col,
-                        action="Transform",
-                        reason=f"High skewness ({profile.numeric_stats.skewness:.2f})",
-                        suggestion=f"Apply Log or Box-Cox transformation to '{col}'.",
-                    )
-                )
-
+            recs.extend(self._skewness_recommendations(col, profile))
         for col, profile in profiles.items():
-            if (
-                profile.categorical_stats
-                and profile.dtype == "Categorical"
-                and profile.categorical_stats.unique_count > 50
-            ):
-                recs.append(
-                    Recommendation(
-                        column=col,
-                        action="Encode",
-                        reason=f"High cardinality ({profile.categorical_stats.unique_count})",
-                        suggestion=f"Use Target Encoding or Hashing for '{col}' instead of One-Hot.",
-                    )
-                )
-
+            recs.extend(self._cardinality_recommendations(col, profile))
         for col, profile in profiles.items():
-            if profile.is_constant:
-                recs.append(
-                    Recommendation(
-                        column=col,
-                        action="Drop",
-                        reason="Constant value",
-                        suggestion=f"Drop '{col}' as it has zero variance.",
-                    )
-                )
-
+            recs.extend(self._constant_column_recommendations(col, profile))
         for col, profile in profiles.items():
-            if profile.is_unique and profile.dtype in [
-                "Categorical",
-                "Text",
-                "Numeric",
-            ]:
-                recs.append(
-                    Recommendation(
-                        column=col,
-                        action="Drop",
-                        reason="Likely ID column",
-                        suggestion=f"Drop '{col}' as it appears to be a unique identifier.",
-                    )
-                )
+            recs.extend(self._id_column_recommendations(col, profile))
 
-        # Positive reinforcement when nothing critical surfaced.
+        recs.extend(self._clean_dataset_recommendation(recs))
+        recs.extend(self._target_balance_recommendations(profiles, target_col))
+
+        return recs
+
+    def _missing_value_recommendations(
+        self, col: str, profile: ColumnProfile
+    ) -> list[Recommendation]:
+        """Recommend dropping or imputing a column based on its missing-value ratio."""
+        if profile.missing_percentage > 50:
+            return [
+                Recommendation(
+                    column=col,
+                    action="Drop",
+                    reason=f"High missing values ({profile.missing_percentage:.1f}%)",
+                    suggestion=f"Drop column '{col}' as it contains mostly nulls.",
+                )
+            ]
+        if profile.missing_percentage > 0:
+            method = "Median" if profile.dtype == "Numeric" else "Mode"
+            return [
+                Recommendation(
+                    column=col,
+                    action="Impute",
+                    reason=f"Missing values ({profile.missing_percentage:.1f}%)",
+                    suggestion=f"Impute '{col}' using {method}.",
+                )
+            ]
+        return []
+
+    def _skewness_recommendations(self, col: str, profile: ColumnProfile) -> list[Recommendation]:
+        """Recommend a transformation for highly skewed numeric columns."""
+        if (
+            profile.numeric_stats
+            and profile.numeric_stats.skewness
+            and abs(profile.numeric_stats.skewness) > 1.5
+        ):
+            return [
+                Recommendation(
+                    column=col,
+                    action="Transform",
+                    reason=f"High skewness ({profile.numeric_stats.skewness:.2f})",
+                    suggestion=f"Apply Log or Box-Cox transformation to '{col}'.",
+                )
+            ]
+        return []
+
+    def _cardinality_recommendations(
+        self, col: str, profile: ColumnProfile
+    ) -> list[Recommendation]:
+        """Recommend alternative encodings for high-cardinality categorical columns."""
+        if (
+            profile.categorical_stats
+            and profile.dtype == "Categorical"
+            and profile.categorical_stats.unique_count > 50
+        ):
+            return [
+                Recommendation(
+                    column=col,
+                    action="Encode",
+                    reason=f"High cardinality ({profile.categorical_stats.unique_count})",
+                    suggestion=f"Use Target Encoding or Hashing for '{col}' instead of One-Hot.",
+                )
+            ]
+        return []
+
+    def _constant_column_recommendations(
+        self, col: str, profile: ColumnProfile
+    ) -> list[Recommendation]:
+        """Recommend dropping zero-variance (constant) columns."""
+        if profile.is_constant:
+            return [
+                Recommendation(
+                    column=col,
+                    action="Drop",
+                    reason="Constant value",
+                    suggestion=f"Drop '{col}' as it has zero variance.",
+                )
+            ]
+        return []
+
+    def _id_column_recommendations(self, col: str, profile: ColumnProfile) -> list[Recommendation]:
+        """Recommend dropping columns that look like unique identifiers."""
+        if profile.is_unique and profile.dtype in ["Categorical", "Text", "Numeric"]:
+            return [
+                Recommendation(
+                    column=col,
+                    action="Drop",
+                    reason="Likely ID column",
+                    suggestion=f"Drop '{col}' as it appears to be a unique identifier.",
+                )
+            ]
+        return []
+
+    def _clean_dataset_recommendation(self, recs: list[Recommendation]) -> list[Recommendation]:
+        """Provide positive reinforcement when no critical issues were found."""
         critical_issues = [r for r in recs if r.action in ["Drop", "Impute"]]
         if not critical_issues:
-            recs.append(
+            return [
                 Recommendation(
                     column=None,
                     action="Keep",
                     reason="Clean Dataset",
                     suggestion="No missing values or constant columns found. Data is ready for modeling!",
                 )
-            )
+            ]
+        return []
 
-        if target_col and target_col in profiles:
-            target_profile = profiles[target_col]
-            if target_profile.dtype == "Categorical" and target_profile.categorical_stats:
-                counts = self._target_class_counts(target_col, target_profile)
-                if counts:
-                    min_c = min(counts)
-                    max_c = max(counts)
-                    ratio = min_c / max_c if max_c > 0 else 0
-                    if ratio > 0.8:
-                        recs.append(
-                            Recommendation(
-                                column=target_col,
-                                action="Info",
-                                reason="Balanced Target",
-                                suggestion=f"Target classes are well balanced (Ratio: {ratio:.2f}).",
-                            )
-                        )
-                    elif ratio < 0.2:
-                        recs.append(
-                            Recommendation(
-                                column=target_col,
-                                action="Resample",
-                                reason="Imbalanced Target",
-                                suggestion=(
-                                    f"Target is imbalanced (Ratio: {ratio:.2f}). "
-                                    "Consider SMOTE or Class Weights."
-                                ),
-                            )
-                        )
+    def _target_balance_recommendations(
+        self, profiles: dict[str, ColumnProfile], target_col: str | None
+    ) -> list[Recommendation]:
+        """Recommend resampling or note balance for a categorical target column."""
+        if not target_col or target_col not in profiles:
+            return []
+        target_profile = profiles[target_col]
+        if target_profile.dtype != "Categorical" or not target_profile.categorical_stats:
+            return []
 
-        return recs
+        counts = self._target_class_counts(target_col, target_profile)
+        if not counts:
+            return []
+
+        min_c = min(counts)
+        max_c = max(counts)
+        ratio = min_c / max_c if max_c > 0 else 0
+        return self._build_balance_recommendation(target_col, ratio)
+
+    @staticmethod
+    def _build_balance_recommendation(target_col: str, ratio: float) -> list[Recommendation]:
+        """Build the balanced/imbalanced recommendation for the given class ratio, or [] if neither applies."""
+        if ratio > 0.8:
+            return [
+                Recommendation(
+                    column=target_col,
+                    action="Info",
+                    reason="Balanced Target",
+                    suggestion=f"Target classes are well balanced (Ratio: {ratio:.2f}).",
+                )
+            ]
+        if ratio < 0.2:
+            return [
+                Recommendation(
+                    column=target_col,
+                    action="Resample",
+                    reason="Imbalanced Target",
+                    suggestion=(
+                        f"Target is imbalanced (Ratio: {ratio:.2f}). Consider SMOTE or Class Weights."
+                    ),
+                )
+            ]
+        return []
 
     def _target_class_counts(self, target_col: str, target_profile: ColumnProfile) -> list[int]:
         """Return per-class counts for the target column.

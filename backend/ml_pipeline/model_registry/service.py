@@ -128,21 +128,15 @@ class ModelRegistryService:
         )
 
     @staticmethod
-    async def list_models(
-        session: AsyncSession, skip: int = 0, limit: int | None = None
-    ) -> list[ModelRegistryEntry]:
-        """
-        Lists all model types and their versions.
-        Aggregates BasicTrainingJob and AdvancedTuningJob by (model_type, dataset_source_id).
-        """
-        # Fetch all completed jobs
-
-        # Fetch Deployments to mark is_deployed
+    async def _get_deployed_job_ids(session: AsyncSession) -> dict[Any, Any]:
+        """Fetches active deployments and maps job_id -> deployment_id."""
         deployments_result = await session.execute(select(Deployment))
         deployments = deployments_result.scalars().all()
-        deployed_job_ids = {d.job_id: d.id for d in deployments if d.is_active}
+        return {d.job_id: d.id for d in deployments if d.is_active}
 
-        # Fetch DataSources for names
+    @staticmethod
+    async def _build_dataset_map(session: AsyncSession) -> dict[Any, dict[str, str]]:
+        """Builds a lookup of dataset info keyed by integer id, string id, and source_id."""
         data_sources_result = await session.execute(select(DataSource))
         ds_map: dict[Any, dict[str, str]] = {}
         for ds in data_sources_result.scalars().all():
@@ -154,118 +148,162 @@ class ModelRegistryService:
                 ds_map[str(ds.source_id)] = info
                 # Also map by string version of integer ID just in case
                 ds_map[str(ds.id)] = info
+        return ds_map
 
-        # Fetch Training Jobs
+    @staticmethod
+    async def _fetch_completed_train_jobs(session: AsyncSession) -> list[BasicTrainingJob]:
+        """Fetches completed training jobs ordered by newest first."""
         train_jobs_result = await session.execute(
             select(BasicTrainingJob)
             .where(BasicTrainingJob.status == "completed")
             .order_by(BasicTrainingJob.created_at.desc())
         )
-        train_jobs = train_jobs_result.scalars().all()
+        return list(train_jobs_result.scalars().all())
 
-        # Fetch Tuning Jobs
+    @staticmethod
+    async def _fetch_completed_tune_jobs(session: AsyncSession) -> list[AdvancedTuningJob]:
+        """Fetches completed tuning jobs ordered by newest first."""
         tune_jobs_result = await session.execute(
             select(AdvancedTuningJob)
             .where(AdvancedTuningJob.status == "completed")
             .order_by(AdvancedTuningJob.created_at.desc())
         )
-        tune_jobs = tune_jobs_result.scalars().all()
+        return list(tune_jobs_result.scalars().all())
 
-        # Group by (model_type, dataset_source_id)
+    @staticmethod
+    def _train_job_to_version(
+        job: BasicTrainingJob, deployed_job_ids: dict[Any, Any]
+    ) -> ModelVersion:
+        """Converts a completed training job into a ModelVersion entry."""
+        return ModelVersion(
+            job_id=job.id,
+            pipeline_id=job.pipeline_id,
+            node_id=job.node_id,
+            model_type=cast(str, job.model_type or "unknown"),
+            version=cast(str, job.version),
+            source="training",
+            status=job.status,
+            metrics=cast(dict[str, Any] | None, job.metrics),
+            hyperparameters=cast(dict[str, Any] | None, job.hyperparameters),
+            created_at=cast(datetime | None, job.created_at),
+            artifact_uri=job.artifact_uri,
+            is_deployed=job.id in deployed_job_ids,
+            deployment_id=deployed_job_ids.get(job.id),
+        )
+
+    @staticmethod
+    def _tune_job_to_version(
+        job: AdvancedTuningJob, deployed_job_ids: dict[Any, Any]
+    ) -> ModelVersion:
+        """Converts a completed tuning job into a ModelVersion entry, using run_number as version."""
+        # For tuning jobs, we use run_number as version
+        # And best_params as hyperparameters
+        metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})
+        if job.best_score is not None:
+            metrics["best_score"] = job.best_score
+
+        return ModelVersion(
+            job_id=job.id,
+            pipeline_id=job.pipeline_id,
+            node_id=job.node_id,
+            model_type=cast(str, job.model_type or "unknown"),
+            version=job.run_number,
+            source="tuning",
+            status=job.status,
+            metrics=metrics,
+            hyperparameters=cast(dict[str, Any] | None, job.best_params),
+            created_at=cast(datetime | None, job.created_at),
+            artifact_uri=job.artifact_uri,
+            is_deployed=job.id in deployed_job_ids,
+            deployment_id=deployed_job_ids.get(job.id),
+        )
+
+    @staticmethod
+    def _group_versions_by_model_and_dataset(
+        train_jobs: list[BasicTrainingJob],
+        tune_jobs: list[AdvancedTuningJob],
+        deployed_job_ids: dict[Any, Any],
+    ) -> dict[tuple[str, str], list[ModelVersion]]:
+        """Groups training and tuning job versions by (model_type, dataset_source_id)."""
         grouped: dict[tuple[str, str], list[ModelVersion]] = {}
 
         for job in train_jobs:
             m_type = cast(str, job.model_type or "unknown")
             ds_id = cast(str, job.dataset_source_id or "unknown")
             key = (m_type, ds_id)
-
-            if key not in grouped:
-                grouped[key] = []
-
-            grouped[key].append(
-                ModelVersion(
-                    job_id=job.id,
-                    pipeline_id=job.pipeline_id,
-                    node_id=job.node_id,
-                    model_type=m_type,
-                    version=cast(str, job.version),
-                    source="training",
-                    status=job.status,
-                    metrics=cast(dict[str, Any] | None, job.metrics),
-                    hyperparameters=cast(dict[str, Any] | None, job.hyperparameters),
-                    created_at=cast(datetime | None, job.created_at),
-                    artifact_uri=job.artifact_uri,
-                    is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(job.id),
-                )
+            grouped.setdefault(key, []).append(
+                ModelRegistryService._train_job_to_version(job, deployed_job_ids)
             )
 
         for job in tune_jobs:
             m_type = cast(str, job.model_type or "unknown")
             ds_id = cast(str, job.dataset_source_id or "unknown")
             key = (m_type, ds_id)
-
-            if key not in grouped:
-                grouped[key] = []
-
-            # For tuning jobs, we use run_number as version
-            # And best_params as hyperparameters
-            metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})
-            if job.best_score is not None:
-                metrics["best_score"] = job.best_score
-
-            grouped[key].append(
-                ModelVersion(
-                    job_id=job.id,
-                    pipeline_id=job.pipeline_id,
-                    node_id=job.node_id,
-                    model_type=m_type,
-                    version=job.run_number,
-                    source="tuning",
-                    status=job.status,
-                    metrics=metrics,
-                    hyperparameters=cast(dict[str, Any] | None, job.best_params),
-                    created_at=cast(datetime | None, job.created_at),
-                    artifact_uri=job.artifact_uri,
-                    is_deployed=job.id in deployed_job_ids,
-                    deployment_id=deployed_job_ids.get(job.id),
-                )
+            grouped.setdefault(key, []).append(
+                ModelRegistryService._tune_job_to_version(job, deployed_job_ids)
             )
 
-        # Build result
-        results = []
-        for (m_type, ds_id), versions in grouped.items():
-            # Sort versions by created_at desc
-            versions.sort(key=lambda x: x.created_at or _MIN_DATETIME, reverse=True)
+        return grouped
 
-            latest = versions[0] if versions else None
-            deploy_count = sum(1 for v in versions if v.is_deployed)
+    @staticmethod
+    def _resolve_dataset_info(ds_map: dict[Any, dict[str, str]], ds_id: str) -> tuple[str, str]:
+        """Resolves a dataset's display name and type, falling back to a placeholder."""
+        # Try exact match, then string conversion
+        ds_info = ds_map.get(ds_id)
+        if not ds_info and isinstance(ds_id, str) and ds_id.isdigit():
+            # Fallback: check if ds_id is numeric string and try int key
+            ds_info = ds_map.get(int(ds_id))
 
-            # Resolve dataset name and type
-            # Try exact match, then string conversion
-            ds_info = ds_map.get(ds_id)
-            if not ds_info and isinstance(ds_id, str) and ds_id.isdigit():
-                # Fallback: check if ds_id is numeric string and try int key
-                ds_info = ds_map.get(int(ds_id))
+        if ds_info:
+            return ds_info["name"], ds_info["type"]
+        return f"Dataset {ds_id}", "unknown"
 
-            if ds_info:
-                ds_name = ds_info["name"]
-                ds_type = ds_info["type"]
-            else:
-                ds_name = f"Dataset {ds_id}"
-                ds_type = "unknown"
+    @staticmethod
+    def _build_registry_entry(
+        m_type: str,
+        ds_id: str,
+        versions: list[ModelVersion],
+        ds_map: dict[Any, dict[str, str]],
+    ) -> ModelRegistryEntry:
+        """Builds a ModelRegistryEntry from a group of versions, sorted newest-first."""
+        # Sort versions by created_at desc
+        versions.sort(key=lambda x: x.created_at or _MIN_DATETIME, reverse=True)
 
-            results.append(
-                ModelRegistryEntry(
-                    model_type=m_type,
-                    dataset_id=ds_id,
-                    dataset_name=ds_name,
-                    dataset_type=ds_type,
-                    latest_version=latest,
-                    versions=versions,
-                    deployment_count=deploy_count,
-                )
-            )
+        latest = versions[0] if versions else None
+        deploy_count = sum(1 for v in versions if v.is_deployed)
+        ds_name, ds_type = ModelRegistryService._resolve_dataset_info(ds_map, ds_id)
+
+        return ModelRegistryEntry(
+            model_type=m_type,
+            dataset_id=ds_id,
+            dataset_name=ds_name,
+            dataset_type=ds_type,
+            latest_version=latest,
+            versions=versions,
+            deployment_count=deploy_count,
+        )
+
+    @staticmethod
+    async def list_models(
+        session: AsyncSession, skip: int = 0, limit: int | None = None
+    ) -> list[ModelRegistryEntry]:
+        """
+        Lists all model types and their versions.
+        Aggregates BasicTrainingJob and AdvancedTuningJob by (model_type, dataset_source_id).
+        """
+        deployed_job_ids = await ModelRegistryService._get_deployed_job_ids(session)
+        ds_map = await ModelRegistryService._build_dataset_map(session)
+        train_jobs = await ModelRegistryService._fetch_completed_train_jobs(session)
+        tune_jobs = await ModelRegistryService._fetch_completed_tune_jobs(session)
+
+        grouped = ModelRegistryService._group_versions_by_model_and_dataset(
+            train_jobs, tune_jobs, deployed_job_ids
+        )
+
+        results = [
+            ModelRegistryService._build_registry_entry(m_type, ds_id, versions, ds_map)
+            for (m_type, ds_id), versions in grouped.items()
+        ]
 
         # Sort results by latest_version.created_at desc
         results.sort(

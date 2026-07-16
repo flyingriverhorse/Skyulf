@@ -122,22 +122,35 @@ class StatefulEstimator:
     def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
         """Helper to extract X and y from DataFrame or Tuple."""
         if isinstance(data, tuple) and len(data) == 2:
-            X, y = data[0], data[1]
-            # If y is None but X is a DataFrame containing the target, extract it
-            if y is None and hasattr(X, "columns") and target_column in X.columns:
-                return self._extract_xy(X, target_column)
-            return X, y
+            return self._extract_xy_from_tuple(data, target_column)
 
         engine = get_engine(data)
 
         if engine.name == EngineName.POLARS:
-            if target_column not in data.columns:
-                raise ValueError(f"Target column '{target_column}' not found in data")
-            X = data.drop([target_column])
-            y = data.select(target_column).to_series()
-            return X, y
+            return self._extract_xy_polars(data, target_column)
 
-        # Pandas / Default
+        return self._extract_xy_pandas_like(data, target_column)
+
+    def _extract_xy_from_tuple(self, data: tuple[Any, Any], target_column: str) -> tuple[Any, Any]:
+        """Extracts X/y from a ``(X, y)`` tuple, pulling ``y`` out of ``X`` if it's missing."""
+        X, y = data[0], data[1]
+        # If y is None but X is a DataFrame containing the target, extract it
+        if y is None and hasattr(X, "columns") and target_column in X.columns:
+            return self._extract_xy(X, target_column)
+        return X, y
+
+    @staticmethod
+    def _extract_xy_polars(data: Any, target_column: str) -> tuple[Any, Any]:
+        """Extracts X/y from a Polars DataFrame by dropping/selecting ``target_column``."""
+        if target_column not in data.columns:
+            raise ValueError(f"Target column '{target_column}' not found in data")
+        X = data.drop([target_column])
+        y = data.select(target_column).to_series()
+        return X, y
+
+    @staticmethod
+    def _extract_xy_pandas_like(data: Any, target_column: str) -> tuple[Any, Any]:
+        """Extracts X/y from a pandas or generic DataFrame-like object."""
         # Check for DataFrame-like
         if hasattr(data, "columns"):
             if target_column not in data.columns:
@@ -196,6 +209,68 @@ class StatefulEstimator:
             log_callback=log_callback,
         )
 
+    @staticmethod
+    def _drop_target_column(data: Any, target_column: str) -> Any:
+        """Drop target_column from data, handling pandas (kwarg) and Polars (list-arg) APIs."""
+        try:
+            return data.drop(columns=[target_column])
+        except TypeError:
+            # Polars
+            return data.drop([target_column])
+
+    def _extract_split_features(self, split_data: Any, target_column: str) -> Any:
+        """Extract the feature matrix from a test/validation split, dropping the target if present.
+
+        Handles both the ``(X, y)`` tuple form and the plain DataFrame form
+        (pandas or Polars), so the same logic can be reused for the test and
+        validation splits of ``fit_predict``.
+        """
+        if isinstance(split_data, tuple):
+            X, y_split = split_data
+            X = cast(Any, X)
+            # If y is None, the target may still be in X — drop it
+            if y_split is None and hasattr(X, "columns") and target_column in X.columns:
+                X = self._drop_target_column(X, target_column)
+            return X
+
+        if target_column in split_data.columns:
+            return self._drop_target_column(split_data, target_column)
+        return split_data
+
+    def _normalize_fit_predict_dataset(
+        self,
+        dataset: SplitDataset
+        | pd.DataFrame
+        | tuple[pd.DataFrame, pd.Series]
+        | tuple[pd.DataFrame, pd.DataFrame],
+        target_column: str,
+        log_callback: Callable[[str], None] | None,
+    ) -> SplitDataset:
+        """Wrap raw DataFrame/tuple ``fit_predict`` input into a SplitDataset."""
+        if isinstance(dataset, pd.DataFrame):
+            return SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
+
+        if isinstance(dataset, tuple):
+            # Check if it's (train_df, test_df) or (X, y)
+            elem0 = dataset[0]
+            if isinstance(elem0, pd.DataFrame) and target_column in elem0.columns:
+                # It's (train_df, test_df)
+                train_df, test_df = dataset
+                return SplitDataset(train=train_df, test=test_df, validation=None)  # type: ignore
+
+            # Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.
+            msg = (
+                "WARNING: No test set provided. Using entire input as training data. "
+                "Ensure data was split BEFORE preprocessing to avoid data leakage."
+            )
+            logger.warning(msg)
+            if log_callback:
+                log_callback(msg)
+
+            return SplitDataset(train=cast(Any, dataset), test=pd.DataFrame(), validation=None)
+
+        return dataset
+
     def fit_predict(
         self,
         dataset: SplitDataset
@@ -212,28 +287,7 @@ class StatefulEstimator:
         Fits the model on training data and returns predictions for all splits.
         """
         # Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset
-        if isinstance(dataset, pd.DataFrame):
-            dataset = SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
-        elif isinstance(dataset, tuple):
-            # Check if it's (train_df, test_df) or (X, y)
-            elem0 = dataset[0]
-            if isinstance(elem0, pd.DataFrame) and target_column in elem0.columns:
-                # It's (train_df, test_df)
-                train_df, test_df = dataset
-                dataset = SplitDataset(train=train_df, test=test_df, validation=None)  # type: ignore
-            else:
-                # Fallback: Treat input as training data (e.g. X, y tuple) and initialize empty test set.
-                msg = (
-                    "WARNING: No test set provided. Using entire input as training data. "
-                    "Ensure data was split BEFORE preprocessing to avoid data leakage."
-                )
-                logger.warning(msg)
-                if log_callback:
-                    log_callback(msg)
-
-                dataset = SplitDataset(
-                    train=cast(Any, dataset), test=pd.DataFrame(), validation=None
-                )
+        dataset = self._normalize_fit_predict_dataset(dataset, target_column, log_callback)
 
         # 1. Prepare Data
         X_train, y_train = self._extract_xy(dataset.train, target_column)
@@ -260,62 +314,17 @@ class StatefulEstimator:
         predictions["train"] = self.applier.predict(X_train, self.model)
 
         # Test Predictions
-        is_test_empty = False
-        test_df = None
         test_df = dataset.test[0] if isinstance(dataset.test, tuple) else dataset.test
-
         # is_test_empty: pandas uses `.empty`, Polars uses `.is_empty()`
         is_test_empty = test_df.empty if hasattr(test_df, "empty") else test_df.is_empty()
 
         if not is_test_empty:
-            if isinstance(dataset.test, tuple):
-                X_test, y_test_split = dataset.test
-                X_test = cast(Any, X_test)
-                # If y is None, the target may still be in X — drop it
-                if (
-                    y_test_split is None
-                    and hasattr(X_test, "columns")
-                    and target_column in X_test.columns
-                ):
-                    try:
-                        X_test = X_test.drop(columns=[target_column])
-                    except TypeError:
-                        X_test = X_test.drop([target_column])
-            else:
-                if target_column in dataset.test.columns:
-                    try:
-                        X_test = dataset.test.drop(columns=[target_column])
-                    except TypeError:
-                        # Polars
-                        X_test = dataset.test.drop([target_column])
-                else:
-                    X_test = dataset.test
+            X_test = self._extract_split_features(dataset.test, target_column)
             predictions["test"] = self.applier.predict(X_test, self.model)
 
         # Validation Predictions
         if dataset.validation is not None:
-            if isinstance(dataset.validation, tuple):
-                X_val, y_val_split = dataset.validation
-                X_val = cast(Any, X_val)
-                # If y is None, the target may still be in X — drop it
-                if (
-                    y_val_split is None
-                    and hasattr(X_val, "columns")
-                    and target_column in X_val.columns
-                ):
-                    try:
-                        X_val = X_val.drop(columns=[target_column])
-                    except TypeError:
-                        X_val = X_val.drop([target_column])
-            else:
-                if target_column in dataset.validation.columns:
-                    try:
-                        X_val = dataset.validation.drop(columns=[target_column])
-                    except TypeError:
-                        # Polars
-                        X_val = dataset.validation.drop([target_column])
-                else:
-                    X_val = dataset.validation
+            X_val = self._extract_split_features(dataset.validation, target_column)
             predictions["validation"] = self.applier.predict(X_val, self.model)
 
         return predictions
@@ -351,16 +360,10 @@ class StatefulEstimator:
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
 
-    def evaluate(  # noqa: C901
-        self, dataset: SplitDataset, target_column: str, job_id: str = "unknown"
-    ) -> Any:
+    def evaluate(self, dataset: SplitDataset, target_column: str, job_id: str = "unknown") -> Any:
         """
         Evaluates the model on all splits and returns a detailed report.
         """
-        # Import here to avoid circular dependency
-        from ._evaluation.classification import evaluate_classification_model
-        from ._evaluation.regression import evaluate_regression_model
-
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call fit_predict() first.")
 
@@ -376,73 +379,27 @@ class StatefulEstimator:
             "splits": {},
         }
 
-        # Helper to evaluate a single split
-        def evaluate_split(split_name: str, data: Any):
-            # Delegate to the same engine-agnostic (pandas/polars/tuple) X/y
-            # extraction used by fit_predict, instead of duplicating
-            # ad-hoc pandas-only logic that silently dropped polars splits.
-            try:
-                X, y = self._extract_xy(data, target_column)
-            except ValueError:
-                return None  # Cannot evaluate without target
-            if X is None or y is None:
-                return None
-
-            y_pred = self.applier.predict(X, self.model)
-
-            # Try to get probabilities for classification
-            y_proba = None
-            if problem_type == "classification":
-                y_proba_df = self.applier.predict_proba(X, self.model)
-                if y_proba_df is not None:
-                    y_proba = {
-                        "classes": y_proba_df.columns.tolist(),
-                        "values": y_proba_df.values.tolist(),
-                    }
-
-            split_data = {
-                "y_true": y.tolist() if hasattr(y, "tolist") else list(y),
-                "y_pred": (y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)),
-            }
-
-            if y_proba:
-                split_data["y_proba"] = y_proba
-
-            evaluation_data["splits"][split_name] = split_data
-
-            # Unpack model if it's a tuple (from Tuner)
-            model_to_evaluate = self.model
-            if isinstance(self.model, tuple) and len(self.model) == 2:
-                # Check if first element looks like a model (has fit/predict)
-                # or if it's just a convention from TuningCalculator
-                model_to_evaluate = self.model[0]
-
-            if problem_type == "classification":
-                return evaluate_classification_model(
-                    model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
-                )
-            elif problem_type == "regression":
-                return evaluate_regression_model(
-                    model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
-                )
-            else:
-                raise ValueError(f"Unknown problem type: {problem_type}")
-
         # 2. Evaluate Train
-        splits_payload["train"] = evaluate_split("train", dataset.train)
+        splits_payload["train"] = self._evaluate_split(
+            "train", dataset.train, target_column, problem_type, evaluation_data
+        )
 
         # 3. Evaluate Test
         has_test = self._is_non_empty_split(dataset.test)
 
         if has_test:
-            splits_payload["test"] = evaluate_split("test", dataset.test)
+            splits_payload["test"] = self._evaluate_split(
+                "test", dataset.test, target_column, problem_type, evaluation_data
+            )
 
         # 4. Evaluate Validation
         if dataset.validation is not None:
             has_val = self._is_non_empty_split(dataset.validation)
 
             if has_val:
-                splits_payload["validation"] = evaluate_split("validation", dataset.validation)
+                splits_payload["validation"] = self._evaluate_split(
+                    "validation", dataset.validation, target_column, problem_type, evaluation_data
+                )
 
         # Return report object (simplified for now, assuming schema matches)
         return {
@@ -450,3 +407,84 @@ class StatefulEstimator:
             "splits": splits_payload,
             "raw_data": evaluation_data,
         }
+
+    def _evaluate_split(
+        self,
+        split_name: str,
+        data: Any,
+        target_column: str,
+        problem_type: str,
+        evaluation_data: dict[str, Any],
+    ) -> Any:
+        """Evaluates a single dataset split, recording raw predictions into ``evaluation_data``
+        and returning the split's evaluation report (or ``None`` if it can't be evaluated).
+        """
+        # Delegate to the same engine-agnostic (pandas/polars/tuple) X/y
+        # extraction used by fit_predict, instead of duplicating
+        # ad-hoc pandas-only logic that silently dropped polars splits.
+        try:
+            X, y = self._extract_xy(data, target_column)
+        except ValueError:
+            return None  # Cannot evaluate without target
+        if X is None or y is None:
+            return None
+
+        y_pred = self.applier.predict(X, self.model)
+        y_proba = self._predict_proba_payload(X, problem_type)
+        evaluation_data["splits"][split_name] = self._build_split_raw_data(y, y_pred, y_proba)
+
+        model_to_evaluate = self._unwrap_tuned_model()
+        return self._evaluate_split_with_model(model_to_evaluate, split_name, X, y, problem_type)
+
+    @staticmethod
+    def _build_split_raw_data(
+        y: Any, y_pred: Any, y_proba: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Builds the raw ``y_true``/``y_pred``/(optional) ``y_proba`` payload for a split."""
+        split_data = {
+            "y_true": y.tolist() if hasattr(y, "tolist") else list(y),
+            "y_pred": (y_pred.tolist() if hasattr(y_pred, "tolist") else list(y_pred)),
+        }
+        if y_proba:
+            split_data["y_proba"] = y_proba
+        return split_data
+
+    def _unwrap_tuned_model(self) -> Any:
+        """Unpacks ``self.model`` if it's a ``(model, ...)`` tuple, as produced by the Tuner."""
+        # Check if first element looks like a model (has fit/predict)
+        # or if it's just a convention from TuningCalculator
+        if isinstance(self.model, tuple) and len(self.model) == 2:
+            return self.model[0]
+        return self.model
+
+    def _predict_proba_payload(self, X: Any, problem_type: str) -> dict[str, Any] | None:
+        """Returns the ``{"classes", "values"}`` probability payload for classification splits."""
+        if problem_type != "classification":
+            return None
+        y_proba_df = self.applier.predict_proba(X, self.model)
+        if y_proba_df is None:
+            return None
+        return {
+            "classes": y_proba_df.columns.tolist(),
+            "values": y_proba_df.values.tolist(),
+        }
+
+    @staticmethod
+    def _evaluate_split_with_model(
+        model_to_evaluate: Any, split_name: str, X: Any, y: Any, problem_type: str
+    ) -> Any:
+        """Dispatches to the classification or regression evaluator based on ``problem_type``."""
+        # Import here to avoid circular dependency
+        from ._evaluation.classification import evaluate_classification_model
+        from ._evaluation.regression import evaluate_regression_model
+
+        if problem_type == "classification":
+            return evaluate_classification_model(
+                model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
+            )
+        elif problem_type == "regression":
+            return evaluate_regression_model(
+                model=model_to_evaluate, dataset_name=split_name, X_test=X, y_test=y
+            )
+        else:
+            raise ValueError(f"Unknown problem type: {problem_type}")

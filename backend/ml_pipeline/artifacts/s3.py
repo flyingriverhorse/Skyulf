@@ -18,13 +18,20 @@ class S3ArtifactStore(ArtifactStore):
         if not self.bucket_name:
             raise ValueError("S3 bucket name cannot be empty")
 
-        # Map standard AWS keys to s3fs keys if needed
+        self._remap_aws_credential_keys()
+        self._apply_endpoint_url()
+        self._apply_region_name()
+        self._init_filesystem()
+
+    def _remap_aws_credential_keys(self) -> None:
+        """Map standard AWS credential keys to the s3fs-expected keys, in place."""
         if "aws_access_key_id" in self.storage_options and "key" not in self.storage_options:
             self.storage_options["key"] = self.storage_options.pop("aws_access_key_id")
         if "aws_secret_access_key" in self.storage_options and "secret" not in self.storage_options:
             self.storage_options["secret"] = self.storage_options.pop("aws_secret_access_key")
 
-        # Handle endpoint_url
+    def _apply_endpoint_url(self) -> None:
+        """Move an endpoint_url/aws_endpoint_url option into ``client_kwargs``, in place."""
         endpoint = self.storage_options.pop("endpoint_url", None) or self.storage_options.pop(
             "aws_endpoint_url", None
         )
@@ -34,7 +41,8 @@ class S3ArtifactStore(ArtifactStore):
             if "endpoint_url" not in self.storage_options["client_kwargs"]:
                 self.storage_options["client_kwargs"]["endpoint_url"] = endpoint
 
-        # Handle region_name (passed by some callers)
+    def _apply_region_name(self) -> None:
+        """Move a region_name/region option into ``client_kwargs``, in place."""
         region = self.storage_options.pop("region_name", None) or self.storage_options.pop(
             "region", None
         )
@@ -44,6 +52,8 @@ class S3ArtifactStore(ArtifactStore):
             if "region_name" not in self.storage_options["client_kwargs"]:
                 self.storage_options["client_kwargs"]["region_name"] = region
 
+    def _init_filesystem(self) -> None:
+        """Create the s3fs filesystem client, raising a clear error on failure."""
         try:
             import s3fs  # ty: ignore[unresolved-import]
 
@@ -73,17 +83,23 @@ class S3ArtifactStore(ArtifactStore):
         return "/".join(parts)
 
     @staticmethod
-    def _sanitize_key(key: str) -> str:
-        candidate = str(key).strip()
-        if not candidate:
-            raise ValueError("Artifact key cannot be empty")
-
+    def _split_sanitized_key_parts(candidate: str) -> list[str]:
+        """Normalizes separators and validates that a key resolves to exactly one safe path segment."""
         normalized = candidate.replace("\\", "/").strip("/")
         parts = [part for part in normalized.split("/") if part]
         if not parts or any(part in {".", ".."} for part in parts):
             raise PermissionError("Artifact key contains invalid path segments")
         if len(parts) != 1:
             raise PermissionError("Artifact keys must not contain nested paths")
+        return parts
+
+    @staticmethod
+    def _sanitize_key(key: str) -> str:
+        candidate = str(key).strip()
+        if not candidate:
+            raise ValueError("Artifact key cannot be empty")
+
+        parts = S3ArtifactStore._split_sanitized_key_parts(candidate)
 
         filename = parts[0]
         if filename.endswith(".joblib"):
@@ -142,6 +158,23 @@ class S3ArtifactStore(ArtifactStore):
             )
             raise RuntimeError(f"Failed to check artifact existence in S3: {path}") from e
 
+    def _key_from_listed_path(self, raw_path: str) -> str | None:
+        """Converts one raw S3-listed path into an artifact key, or None if it should be skipped."""
+        normalized = str(raw_path).replace("s3://", "")
+        bucket_prefix = f"{self.bucket_name}/"
+        normalized = normalized.removeprefix(bucket_prefix)
+        if self.prefix:
+            prefix = f"{self.prefix}/"
+            if not normalized.startswith(prefix):
+                return None
+            normalized = normalized.removeprefix(prefix)
+        if "/" in normalized.strip("/"):
+            return None
+        filename = Path(normalized).name
+        if filename.endswith(".joblib"):
+            return filename.removesuffix(".joblib")
+        return filename
+
     def list_artifacts(self) -> list[str]:
         """List all artifacts in the store."""
         base_path = (
@@ -154,23 +187,7 @@ class S3ArtifactStore(ArtifactStore):
                 return []
 
             files = self.fs.ls(base_path)
-            keys = []
-            for f in files:
-                normalized = str(f).replace("s3://", "")
-                bucket_prefix = f"{self.bucket_name}/"
-                normalized = normalized.removeprefix(bucket_prefix)
-                if self.prefix:
-                    prefix = f"{self.prefix}/"
-                    if not normalized.startswith(prefix):
-                        continue
-                    normalized = normalized.removeprefix(prefix)
-                if "/" in normalized.strip("/"):
-                    continue
-                filename = Path(normalized).name
-                if filename.endswith(".joblib"):
-                    keys.append(filename.removesuffix(".joblib"))
-                else:
-                    keys.append(filename)
+            keys = [key for f in files if (key := self._key_from_listed_path(f)) is not None]
             return keys
         except Exception as e:
             logger.error("Failed to list artifacts in %s: %s", base_path, self._sanitize_error(e))

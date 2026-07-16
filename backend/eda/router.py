@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Any, Literal, cast
 
 import orjson
@@ -90,6 +91,45 @@ async def list_all_jobs(
     ]
 
 
+def _build_analysis_config(body: AnalyzeRequest | None) -> dict:
+    """Build the EDAReport config dict from optional analysis request fields."""
+    config: dict = {}
+    if not body:
+        return config
+    if body.target_col:
+        logger.debug("Setting target_col to %s", body.target_col)
+        config["target_col"] = body.target_col
+    if body.exclude_cols:
+        logger.debug("Excluding columns: %s", body.exclude_cols)
+        config["exclude_cols"] = body.exclude_cols
+    if body.filters:
+        logger.debug("Applying filters: %s", body.filters)
+        config["filters"] = [f.model_dump() for f in body.filters]
+    if body.task_type:
+        logger.debug("Setting task_type to %s", body.task_type)
+        config["task_type"] = body.task_type
+    return config
+
+
+async def _dispatch_analysis_job(
+    report: EDAReport, background_tasks: BackgroundTasks, session: AsyncSession
+) -> None:
+    """Dispatch the EDA job via Celery or FastAPI BackgroundTasks depending on settings."""
+    settings = get_settings()
+    if settings.USE_CELERY:
+        task = generate_profile_celery.delay(report.id)
+
+        # Store task_id in config for cancellation
+        new_config = dict(report.config) if report.config else {}
+        new_config["celery_task_id"] = task.id
+        report.config = new_config
+
+        session.add(report)
+        await session.commit()
+    else:
+        background_tasks.add_task(run_eda_background, report.id)
+
+
 @router.post("/{dataset_id}/analyze")
 @limiter.limit("20/minute")
 async def trigger_analysis(
@@ -110,20 +150,7 @@ async def trigger_analysis(
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     # Create Report entry
-    config = {}
-    if body:
-        if body.target_col:
-            logger.debug("Setting target_col to %s", body.target_col)
-            config["target_col"] = body.target_col
-        if body.exclude_cols:
-            logger.debug("Excluding columns: %s", body.exclude_cols)
-            config["exclude_cols"] = body.exclude_cols
-        if body.filters:
-            logger.debug("Applying filters: %s", body.filters)
-            config["filters"] = [f.model_dump() for f in body.filters]
-        if body.task_type:
-            logger.debug("Setting task_type to %s", body.task_type)
-            config["task_type"] = body.task_type
+    config = _build_analysis_config(body)
 
     report = EDAReport(data_source_id=dataset_id, status="PENDING", config=config)
     session.add(report)
@@ -131,21 +158,7 @@ async def trigger_analysis(
     await session.refresh(report)
 
     # Dispatch
-    settings = get_settings()
-    if settings.USE_CELERY:
-        # Use Celery
-        task = generate_profile_celery.delay(report.id)
-
-        # Store task_id in config for cancellation
-        new_config = dict(report.config) if report.config else {}
-        new_config["celery_task_id"] = task.id
-        report.config = new_config
-
-        session.add(report)
-        await session.commit()
-    else:
-        # Use BackgroundTasks
-        background_tasks.add_task(run_eda_background, report.id)
+    await _dispatch_analysis_job(report, background_tasks, session)
 
     return {"job_id": report.id, "status": "PENDING"}
 
@@ -245,6 +258,122 @@ class DecompositionRequest(BaseModel):
     filters: list[FilterRequest] | None = None
 
 
+def _resolve_decomposition_file_path(ds: DataSource) -> str | Path:
+    """Resolve the file path for a DataSource, raising HTTPException if it cannot be found."""
+    source_data_dict = {
+        "config": ds.config or {},
+        "connection_info": ds.source_metadata or {},
+        "file_path": (ds.config or {}).get("file_path"),
+        "source_id": ds.source_id,
+    }
+    file_path = extract_file_path_from_source(source_data_dict)
+
+    if not file_path:
+        # Fallback
+        if ds.source_id and (
+            str(ds.source_id).endswith(".csv") or str(ds.source_id).endswith(".parquet")
+        ):
+            file_path = ds.source_id
+        else:
+            raise HTTPException(status_code=400, detail="File path not found")
+
+    return file_path
+
+
+def _resolve_decomposition_s3_credentials(ds: DataSource) -> dict:
+    """Resolve raw S3 credentials for a DataSource, trying explicit creds, then config, then env settings."""
+    creds = ds.credentials or {}
+    if not creds:
+        config_creds = ds.config or {}
+        creds = {
+            "aws_access_key_id": config_creds.get("aws_access_key_id"),
+            "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
+            "aws_session_token": config_creds.get("aws_session_token"),
+            "endpoint_url": config_creds.get("endpoint_url"),
+        }
+
+    if not creds.get("aws_access_key_id"):
+        settings = get_settings()
+        creds = {
+            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+            "aws_session_token": settings.AWS_SESSION_TOKEN,
+            "endpoint_url": None,
+        }
+
+    return creds
+
+
+def _build_decomposition_storage_options(ds: DataSource) -> dict | None:
+    """Resolve S3 credentials for a DataSource into storage_options (simplified from tasks.py)."""
+    creds = _resolve_decomposition_s3_credentials(ds)
+
+    storage_options = {
+        "key": creds.get("aws_access_key_id") or creds.get("key"),
+        "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
+        "token": creds.get("aws_session_token") or creds.get("token"),
+        "endpoint_url": creds.get("endpoint_url"),
+    }
+    return {k: v for k, v in storage_options.items() if v is not None}
+
+
+async def _load_decomposition_dataframe(
+    data_service: DataService, file_path: str | Path, storage_options: dict | None
+) -> pl.DataFrame:
+    """Load a dataset and ensure it is returned as a Polars DataFrame, converting from pandas if needed."""
+    try:
+        df = await data_service.load_file(file_path, storage_options=storage_options)
+        # Ensure Polars DataFrame
+        if isinstance(df, pd.DataFrame):
+            try:
+                df = pl.from_pandas(df)
+            except Exception:
+                # Fallback: convert object cols to string to handle mixed types
+                pdf = cast(Any, df)
+                for col in pdf.columns:
+                    if pdf[col].dtype == "object":
+                        pdf[col] = pdf[col].astype(str)
+                df = pl.from_pandas(pdf)
+    except Exception:
+        logger.exception("Failed to load dataset")
+        raise SkyulfException(message="Failed to load dataset") from None
+    return df
+
+
+async def _prepare_decomposition_dataframe(ds: DataSource) -> pl.DataFrame:
+    """Resolve the file path/storage options for a DataSource and load it as a Polars DataFrame."""
+    # 2. Resolve File Path
+    file_path = _resolve_decomposition_file_path(ds)
+
+    # 3. Prepare Storage Options (Simplified from tasks.py)
+    storage_options = None
+    if file_path and str(file_path).startswith("s3://"):
+        storage_options = _build_decomposition_storage_options(ds)
+
+    # 4. Load Data
+    data_service = DataService()
+    return await _load_decomposition_dataframe(data_service, file_path, storage_options)
+
+
+def _run_decomposition_analysis(df: pl.DataFrame, body: "DecompositionRequest") -> Any:
+    """Run the decomposition split analysis for a loaded DataFrame given the request body."""
+    analyzer = EDAAnalyzer(cast(Any, df))
+
+    filters_dict = [f.model_dump() for f in body.filters] if body.filters else []
+
+    # Handle empty string split_col from frontend
+    split_col_arg = body.split_col
+    if split_col_arg == "":
+        split_col_arg = None
+
+    return analyzer.get_decomposition_split(
+        measure_col=body.measure_col,
+        measure_agg=body.measure_agg,
+        split_col=split_col_arg,
+        filters=filters_dict,
+    )
+
+
 @router.post("/{dataset_id}/decomposition")
 @limiter.limit("20/minute")
 async def get_decomposition(
@@ -262,91 +391,11 @@ async def get_decomposition(
         if not ds:
             raise HTTPException(status_code=404, detail="Dataset not found")
 
-        # 2. Resolve File Path
-        source_data_dict = {
-            "config": ds.config or {},
-            "connection_info": ds.source_metadata or {},
-            "file_path": (ds.config or {}).get("file_path"),
-            "source_id": ds.source_id,
-        }
-        file_path = extract_file_path_from_source(source_data_dict)
-
-        if not file_path:
-            # Fallback
-            if ds.source_id and (
-                str(ds.source_id).endswith(".csv") or str(ds.source_id).endswith(".parquet")
-            ):
-                file_path = ds.source_id
-            else:
-                raise HTTPException(status_code=400, detail="File path not found")
-
-        # 3. Prepare Storage Options (Simplified from tasks.py)
-        storage_options = None
-        if file_path and str(file_path).startswith("s3://"):
-            creds = ds.credentials or {}
-            if not creds:
-                config_creds = ds.config or {}
-                creds = {
-                    "aws_access_key_id": config_creds.get("aws_access_key_id"),
-                    "aws_secret_access_key": config_creds.get("aws_secret_access_key"),
-                    "aws_session_token": config_creds.get("aws_session_token"),
-                    "endpoint_url": config_creds.get("endpoint_url"),
-                }
-
-            if not creds.get("aws_access_key_id"):
-                settings = get_settings()
-                creds = {
-                    "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-                    "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
-                    "aws_session_token": settings.AWS_SESSION_TOKEN,
-                    "endpoint_url": None,
-                }
-
-            storage_options = {
-                "key": creds.get("aws_access_key_id") or creds.get("key"),
-                "secret": creds.get("aws_secret_access_key") or creds.get("secret"),
-                "token": creds.get("aws_session_token") or creds.get("token"),
-                "endpoint_url": creds.get("endpoint_url"),
-            }
-            storage_options = {k: v for k, v in storage_options.items() if v is not None}
-
-        # 4. Load Data
-        data_service = DataService()
-        try:
-            df = await data_service.load_file(file_path, storage_options=storage_options)
-            # Ensure Polars DataFrame
-            if isinstance(df, pd.DataFrame):
-                try:
-                    df = pl.from_pandas(df)
-                except Exception:
-                    # Fallback: convert object cols to string to handle mixed types
-                    pdf = cast(Any, df)
-                    for col in pdf.columns:
-                        if pdf[col].dtype == "object":
-                            pdf[col] = pdf[col].astype(str)
-                    df = pl.from_pandas(pdf)
-        except Exception:
-            logger.exception("Failed to load dataset")
-            raise SkyulfException(message="Failed to load dataset") from None
+        # 2-4. Resolve path/storage options and load the DataFrame
+        df = await _prepare_decomposition_dataframe(ds)
 
         # 5. Run Analysis
-        analyzer = EDAAnalyzer(cast(Any, df))
-
-        filters_dict = [f.model_dump() for f in body.filters] if body.filters else []
-
-        # Handle empty string split_col from frontend
-        split_col_arg = body.split_col
-        if split_col_arg == "":
-            split_col_arg = None
-
-        result = analyzer.get_decomposition_split(
-            measure_col=body.measure_col,
-            measure_agg=body.measure_agg,
-            split_col=split_col_arg,
-            filters=filters_dict,
-        )
-
-        return result
+        return _run_decomposition_analysis(df, body)
     except HTTPException:
         raise
     except Exception:

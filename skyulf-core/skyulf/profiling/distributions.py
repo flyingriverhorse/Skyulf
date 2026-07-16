@@ -14,6 +14,36 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
     return cast(pl.DataFrame, lf.collect())
 
 
+def _histogram_bin_counts(
+    df: pl.LazyFrame, col_name: str, edges: np.ndarray, bins: int
+) -> dict[int, int]:
+    """Bucket `col_name` into `bins` bins per `edges` and return per-bin-index counts."""
+    hist_df = _collect(
+        df.select(pl.col(col_name))
+        .with_columns(
+            pl.col(col_name)
+            .cut(breaks=list(edges[1:-1]), labels=[str(i) for i in range(bins)])
+            .alias("bin")
+        )
+        .group_by("bin")
+        .len()
+    )
+
+    counts = {}
+    for row in hist_df.iter_rows(named=True):
+        try:
+            # The bin column is Categorical, but iter_rows might return string or int depending on version
+            # We used labels "0", "1", etc.
+            bin_val = row["bin"]
+            bin_idx = int(bin_val)
+            # The count column is named "len" by default in Polars group_by().len()
+            counts[bin_idx] = row.get("len", row.get("count"))
+        except Exception as parse_e:
+            logger.debug("Error parsing bin %r: %s", row, parse_e)
+            continue
+    return counts
+
+
 def calculate_histogram(
     df: pl.LazyFrame, col_name: str, bins: int = 20
 ) -> list[HistogramBin] | None:
@@ -36,31 +66,7 @@ def calculate_histogram(
         # Create bins using numpy (fastest way to get edges)
         edges = np.linspace(min_val, max_val, bins + 1)
 
-        hist_df = _collect(
-            df.select(pl.col(col_name))
-            .with_columns(
-                pl.col(col_name)
-                .cut(breaks=list(edges[1:-1]), labels=[str(i) for i in range(bins)])
-                .alias("bin")
-            )
-            .group_by("bin")
-            .len()
-        )
-
-        # Map back to HistogramBin
-
-        counts = {}
-        for row in hist_df.iter_rows(named=True):
-            try:
-                # The bin column is Categorical, but iter_rows might return string or int depending on version
-                # We used labels "0", "1", etc.
-                bin_val = row["bin"]
-                bin_idx = int(bin_val)
-                # The count column is named "len" by default in Polars group_by().len()
-                counts[bin_idx] = row.get("len", row.get("count"))
-            except Exception as parse_e:
-                logger.debug("Error parsing bin %r: %s", row, parse_e)
-                continue
+        counts = _histogram_bin_counts(df, col_name, edges, bins)
 
         histogram = []
         for i in range(bins):

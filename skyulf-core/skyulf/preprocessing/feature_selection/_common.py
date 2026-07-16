@@ -289,6 +289,27 @@ def _univariate_no_target_artifact(
     )
 
 
+def _rfe_selected_names(selector: Any, cols: list[str]) -> list[str]:
+    """Narrow `cols` to the RFE-selected subset per `support_`, if available."""
+    if isinstance(selector, RFE):
+        support = getattr(selector, "support_", None)
+        if support is not None:
+            return [c for c, s in zip(cols, support, strict=True) if s]
+    return cols
+
+
+def _importances_from_estimator(estimator: Any, names: list[str]) -> dict[str, float]:
+    """Extract feature_importances_ or |coef_| from a fitted estimator, keyed by name."""
+    if hasattr(estimator, "feature_importances_"):
+        return dict(zip(names, estimator.feature_importances_.tolist(), strict=True))
+    if hasattr(estimator, "coef_"):
+        coef = estimator.coef_
+        if coef.ndim > 1:
+            coef = coef[0]
+        return dict(zip(names, np.abs(coef).tolist(), strict=True))
+    return {}
+
+
 def _model_feature_importances(selector: Any, cols: list[str]) -> dict[str, float]:
     """Pull importances or |coef| off a fitted model-based selector."""
     estimator = getattr(selector, "estimator_", None)
@@ -299,16 +320,5 @@ def _model_feature_importances(selector: Any, cols: list[str]) -> dict[str, floa
     # full candidate list. For SelectFromModel (and anything else exposing
     # `support_`), the estimator is fit on the full candidate set, so no
     # narrowing is needed.
-    names = cols
-    if isinstance(selector, RFE):
-        support = getattr(selector, "support_", None)
-        if support is not None:
-            names = [c for c, s in zip(cols, support, strict=True) if s]
-    if hasattr(estimator, "feature_importances_"):
-        return dict(zip(names, estimator.feature_importances_.tolist(), strict=True))
-    if hasattr(estimator, "coef_"):
-        coef = estimator.coef_
-        if coef.ndim > 1:
-            coef = coef[0]
-        return dict(zip(names, np.abs(coef).tolist(), strict=True))
-    return {}
+    names = _rfe_selected_names(selector, cols)
+    return _importances_from_estimator(estimator, names)

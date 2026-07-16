@@ -25,6 +25,24 @@ from ._evaluation.metrics import (
 )
 
 
+def _aggregate_single_metric(
+    key: str, fold_metrics: list[dict[str, float]]
+) -> dict[str, float] | None:
+    """Aggregates one metric's values across folds into mean/std/min/max, dropping non-finite values."""
+    values = [m.get(key, np.nan) for m in fold_metrics]
+    # Filter nans
+    values = [v for v in values if np.isfinite(v)]
+
+    if not values:
+        return None
+    return {
+        "mean": float(np.mean(values)),
+        "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
+        "min": float(np.min(values)),
+        "max": float(np.max(values)),
+    }
+
+
 def _aggregate_metrics(
     fold_metrics: list[dict[str, float]],
 ) -> dict[str, dict[str, float]]:
@@ -41,17 +59,9 @@ def _aggregate_metrics(
     aggregated = {}
 
     for key in keys:
-        values = [m.get(key, np.nan) for m in fold_metrics]
-        # Filter nans
-        values = [v for v in values if np.isfinite(v)]
-
-        if values:
-            aggregated[key] = {
-                "mean": float(np.mean(values)),
-                "std": float(np.std(values, ddof=1)) if len(values) > 1 else 0.0,
-                "min": float(np.min(values)),
-                "max": float(np.max(values)),
-            }
+        result = _aggregate_single_metric(key, fold_metrics)
+        if result is not None:
+            aggregated[key] = result
 
     return aggregated
 
@@ -136,54 +146,20 @@ def perform_cross_validation(
 
     # 2. Iterate Folds
     for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(X_arr, y_arr)):
-        if progress_callback:
-            progress_callback(fold_idx + 1, n_folds)
-
-        if log_callback:
-            log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
-
-        # Split Data
-        # We slice the original X/y to preserve their type (Pandas/Polars) for the calculator
-        # Polars supports slicing with numpy arrays via __getitem__
-        # Pandas supports slicing via iloc
-
-        if hasattr(X, "iloc"):
-            X_train_fold = X.iloc[train_idx]
-            X_val_fold = X.iloc[val_idx]
-        else:
-            # Polars or other
-            X_train_fold = X[train_idx]
-            X_val_fold = X[val_idx]
-
-        if hasattr(y, "iloc"):
-            y_train_fold = y.iloc[train_idx]
-            y_val_fold = y.iloc[val_idx]
-        else:
-            # Polars Series or numpy array
-            y_train_fold = y[train_idx]
-            y_val_fold = y[val_idx]
-
-        # Fit
-        model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
-
-        # Evaluate
-        if problem_type == "classification":
-            metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
-        else:
-            metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
-
-        if log_callback:
-            # Log a key metric for the fold
-            key_metric = "accuracy" if problem_type == "classification" else "r2"
-            score = metrics.get(key_metric, 0.0)
-            log_callback(f"Fold {fold_idx + 1} completed. {key_metric}: {score:.4f}")
-
         fold_results.append(
-            {
-                "fold": fold_idx + 1,
-                "metrics": sanitize_metrics(metrics),
-                # We could store predictions here if needed, but might be too heavy
-            }
+            _run_cv_fold(
+                calculator=calculator,
+                X=X,
+                y=y,
+                train_idx=train_idx,
+                val_idx=val_idx,
+                config=config,
+                problem_type=problem_type,
+                fold_idx=fold_idx,
+                n_folds=n_folds,
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+            )
         )
 
     # 3. Aggregate
@@ -203,6 +179,139 @@ def perform_cross_validation(
             "random_state": random_state,
         },
     }
+
+
+def _slice_fold_data(X: Any, y: Any, train_idx: Any, val_idx: Any) -> tuple[Any, Any, Any, Any]:
+    """Slice X/y into train/val subsets for a single fold, preserving their original type."""
+    # We slice the original X/y to preserve their type (Pandas/Polars) for the calculator
+    # Polars supports slicing with numpy arrays via __getitem__
+    # Pandas supports slicing via iloc
+    if hasattr(X, "iloc"):
+        X_train_fold = X.iloc[train_idx]
+        X_val_fold = X.iloc[val_idx]
+    else:
+        # Polars or other
+        X_train_fold = X[train_idx]
+        X_val_fold = X[val_idx]
+
+    if hasattr(y, "iloc"):
+        y_train_fold = y.iloc[train_idx]
+        y_val_fold = y.iloc[val_idx]
+    else:
+        # Polars Series or numpy array
+        y_train_fold = y[train_idx]
+        y_val_fold = y[val_idx]
+
+    return X_train_fold, X_val_fold, y_train_fold, y_val_fold
+
+
+def _run_cv_fold(
+    calculator: "BaseModelCalculator",
+    X: Any,
+    y: Any,
+    train_idx: Any,
+    val_idx: Any,
+    config: dict[str, Any],
+    problem_type: str,
+    fold_idx: int,
+    n_folds: int,
+    progress_callback: Callable[[int, int], None] | None,
+    log_callback: Callable[[str], None] | None,
+) -> dict[str, Any]:
+    """Fit and evaluate a single CV fold, reporting progress/logging, and return its result entry."""
+    if progress_callback:
+        progress_callback(fold_idx + 1, n_folds)
+
+    if log_callback:
+        log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
+
+    X_train_fold, X_val_fold, y_train_fold, y_val_fold = _slice_fold_data(X, y, train_idx, val_idx)
+
+    # Fit
+    model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
+
+    # Evaluate
+    if problem_type == "classification":
+        metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
+    else:
+        metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
+
+    if log_callback:
+        # Log a key metric for the fold
+        key_metric = "accuracy" if problem_type == "classification" else "r2"
+        score = metrics.get(key_metric, 0.0)
+        log_callback(f"Fold {fold_idx + 1} completed. {key_metric}: {score:.4f}")
+
+    return {
+        "fold": fold_idx + 1,
+        "metrics": sanitize_metrics(metrics),
+        # We could store predictions here if needed, but might be too heavy
+    }
+
+
+def _detect_datetime_columns(X: Any, is_polars: bool) -> list[str]:
+    """Return the list of datetime-like column names in X, for either engine."""
+    if is_polars:
+        import polars as pl
+
+        return [
+            col
+            for col, dtype in zip(X.columns, X.dtypes, strict=True)
+            if dtype in (pl.Datetime, pl.Date) or dtype.base_type() in (pl.Datetime, pl.Date)
+        ]
+    return X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
+
+
+def _auto_detect_sort_column(
+    X: Any,
+    is_polars: bool,
+    log_callback: Callable[[str], None] | None,
+    logger: Any,
+) -> str | None:
+    """Auto-detect the first datetime column to sort by, logging if one is found."""
+    datetime_cols = _detect_datetime_columns(X, is_polars)
+    if not datetime_cols:
+        return None
+    sort_col = datetime_cols[0]
+    msg = f"Time Series CV: auto-detected datetime column '{sort_col}' for sorting."
+    if log_callback:
+        log_callback(msg)
+    logger.info(msg)
+    return sort_col
+
+
+def _sort_polars_by_column(X: Any, y: Any, sort_col: str) -> tuple:
+    """Sort a Polars X/y pair by sort_col and drop that column from X."""
+    # Sort y in lockstep by attaching it as a temporary column so the
+    # same row order is applied to both X and y, then split apart.
+    import polars as pl
+
+    y_series = y if hasattr(y, "name") else pl.Series("__cv_y__", y)
+    y_name = getattr(y_series, "name", None) or "__cv_y__"
+    combined = X.with_columns(y_series.alias(y_name))
+    combined = combined.sort(sort_col)
+    y = combined[y_name]
+    X = combined.drop([y_name, sort_col])
+    return X, y
+
+
+def _sort_pandas_by_column(X: Any, y: Any, sort_col: str) -> tuple:
+    """Sort a pandas X/y pair by sort_col and drop that column from X."""
+    sort_order = X[sort_col].argsort()
+    X = X.iloc[sort_order].reset_index(drop=True)
+    y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
+    # Drop the time column from features so it doesn't leak into the model
+    X = X.drop(columns=[sort_col])
+    return X, y
+
+
+def _log_time_sort_message(
+    msg: str, level: str, log_callback: Callable[[str], None] | None, logger: Any
+) -> None:
+    """Emits a Time Series CV sorting message to both the log callback and the logger."""
+    if log_callback:
+        log_callback(msg)
+    getattr(logger, level)(msg)
 
 
 def _sort_by_time(
@@ -228,59 +337,45 @@ def _sort_by_time(
     is_polars = get_engine(X).name == EngineName.POLARS
 
     sort_col = time_column
-
     if not sort_col:
-        if is_polars:
-            import polars as pl
-
-            datetime_cols = [
-                col
-                for col, dtype in zip(X.columns, X.dtypes, strict=True)
-                if dtype in (pl.Datetime, pl.Date) or dtype.base_type() in (pl.Datetime, pl.Date)
-            ]
-        else:
-            datetime_cols = X.select_dtypes(include=["datetime64", "datetimetz"]).columns.tolist()
-        if datetime_cols:
-            sort_col = datetime_cols[0]
-            msg = f"Time Series CV: auto-detected datetime column '{sort_col}' for sorting."
-            if log_callback:
-                log_callback(msg)
-            logger.info(msg)
+        sort_col = _auto_detect_sort_column(X, is_polars, log_callback, logger)
 
     if sort_col and sort_col in X.columns:
-        msg = f"Time Series CV: data sorted by '{sort_col}'."
         if is_polars:
-            # Sort y in lockstep by attaching it as a temporary column so the
-            # same row order is applied to both X and y, then split apart.
-            import polars as pl
-
-            y_series = y if hasattr(y, "name") else pl.Series("__cv_y__", y)
-            y_name = getattr(y_series, "name", None) or "__cv_y__"
-            combined = X.with_columns(y_series.alias(y_name))
-            combined = combined.sort(sort_col)
-            y = combined[y_name]
-            X = combined.drop([y_name, sort_col])
+            X, y = _sort_polars_by_column(X, y, sort_col)
         else:
-            sort_order = X[sort_col].argsort()
-            X = X.iloc[sort_order].reset_index(drop=True)
-            y = y.iloc[sort_order].reset_index(drop=True) if hasattr(y, "iloc") else y[sort_order]
-            # Drop the time column from features so it doesn't leak into the model
-            X = X.drop(columns=[sort_col])
-        if log_callback:
-            log_callback(msg)
-        logger.info(msg)
+            X, y = _sort_pandas_by_column(X, y, sort_col)
+        _log_time_sort_message(
+            f"Time Series CV: data sorted by '{sort_col}'.", "info", log_callback, logger
+        )
     elif sort_col:
-        msg = f"Time Series CV: specified time column '{sort_col}' not found in data. Using row order."
-        if log_callback:
-            log_callback(msg)
-        logger.warning(msg)
+        _log_time_sort_message(
+            f"Time Series CV: specified time column '{sort_col}' not found in data. Using row order.",
+            "warning",
+            log_callback,
+            logger,
+        )
     else:
-        msg = "Time Series CV: no datetime column found. Assuming data is already sorted chronologically."
-        if log_callback:
-            log_callback(msg)
-        logger.warning(msg)
+        _log_time_sort_message(
+            "Time Series CV: no datetime column found. Assuming data is already sorted chronologically.",
+            "warning",
+            log_callback,
+            logger,
+        )
 
     return X, y
+
+
+def _log_splitter_fallback(cv_type: str, problem_type: str, logger: Any) -> None:
+    """Logs a warning when falling back to plain KFold for an unsupported/mismatched cv_type."""
+    if cv_type == "stratified_k_fold":
+        logger.warning(
+            "stratified_k_fold requested for problem_type='%s' (not classification); "
+            "falling back to plain KFold.",
+            problem_type,
+        )
+    elif cv_type not in ("k_fold", "time_series_split", "shuffle_split", "stratified_k_fold"):
+        logger.warning("Unknown cv_type '%s'; falling back to plain KFold.", cv_type)
 
 
 def _build_splitter(
@@ -306,19 +401,132 @@ def _build_splitter(
             random_state=random_state if shuffle else None,
         )
     else:
-        if cv_type == "stratified_k_fold":
-            logger.warning(
-                "stratified_k_fold requested for problem_type='%s' (not classification); "
-                "falling back to plain KFold.",
-                problem_type,
-            )
-        elif cv_type not in ("k_fold", "time_series_split", "shuffle_split", "stratified_k_fold"):
-            logger.warning("Unknown cv_type '%s'; falling back to plain KFold.", cv_type)
+        _log_splitter_fallback(cv_type, problem_type, logger)
         return KFold(
             n_splits=n_folds,
             shuffle=shuffle,
             random_state=random_state if shuffle else None,
         )
+
+
+def _build_kfold_splitter(
+    problem_type: str,
+    n_splits: int,
+    shuffle: bool,
+    random_state: int,
+) -> Any:
+    """Build a StratifiedKFold for classification or plain KFold otherwise."""
+    if problem_type == "classification":
+        return StratifiedKFold(
+            n_splits=n_splits,
+            shuffle=shuffle,
+            random_state=random_state if shuffle else None,
+        )
+    return KFold(
+        n_splits=n_splits,
+        shuffle=shuffle,
+        random_state=random_state if shuffle else None,
+    )
+
+
+def _slice_by_index(data: Any, idx: Any) -> Any:
+    """Slice data (pandas-like via .iloc, or array-like via indexing) by idx."""
+    return data.iloc[idx] if hasattr(data, "iloc") else data[idx]
+
+
+def _score_metrics_for_problem(
+    artifact: Any,
+    X_val: Any,
+    y_val: Any,
+    problem_type: str,
+) -> dict[str, float]:
+    """Compute classification or regression metrics depending on problem_type."""
+    if problem_type == "classification":
+        return calculate_classification_metrics(artifact, X_val, y_val)
+    return calculate_regression_metrics(artifact, X_val, y_val)
+
+
+def _run_inner_cv(
+    calculator: "BaseModelCalculator",
+    X_train_fold: Any,
+    y_train_fold: Any,
+    config: dict[str, Any],
+    problem_type: str,
+    inner_folds: int,
+    shuffle: bool,
+    random_state: int,
+    logger: Any,
+    log_callback: Callable[[str], None] | None,
+) -> float:
+    """Run the inner CV diagnostic loop and return the mean inner score (NaN if none valid).
+
+    Fits the *same* config (no hyperparameter search) across inner folds of
+    this outer training fold and records the resulting score. This measures
+    how stable the model's performance is across sub-splits, not "the best
+    hyperparameters" - it is purely diagnostic and does not influence the
+    outer-fold model fit.
+    """
+    inner_splitter = _build_kfold_splitter(problem_type, inner_folds, shuffle, random_state)
+    key_metric = "accuracy" if problem_type == "classification" else "r2"
+
+    X_train_arr, y_train_arr = SklearnBridge.to_sklearn((X_train_fold, y_train_fold))
+    inner_scores: list[float] = []
+    for inner_train_idx, inner_val_idx in inner_splitter.split(X_train_arr, y_train_arr):
+        X_inner_train = _slice_by_index(X_train_fold, inner_train_idx)
+        X_inner_val = _slice_by_index(X_train_fold, inner_val_idx)
+        y_inner_train = _slice_by_index(y_train_fold, inner_train_idx)
+        y_inner_val = _slice_by_index(y_train_fold, inner_val_idx)
+
+        try:
+            inner_artifact = calculator.fit(X_inner_train, y_inner_train, config)
+            inner_metrics = _score_metrics_for_problem(
+                inner_artifact, X_inner_val, y_inner_val, problem_type
+            )
+            inner_scores.append(inner_metrics.get(key_metric, 0.0))
+        except Exception as e:
+            logger.warning(f"Inner fold failed: {e}")
+            if log_callback:
+                log_callback(f"Inner fold failed: {e}")
+            # Use NaN rather than 0.0: for regression, 0.0 is itself a
+            # meaningful R^2 value (not a neutral "no score" sentinel),
+            # so a hard failure must not silently corrupt inner_cv_mean.
+            # NaN is filtered out of the mean below.
+            inner_scores.append(float("nan"))
+
+    valid_inner_scores = [s for s in inner_scores if not np.isnan(s)]
+    return float(np.mean(valid_inner_scores)) if valid_inner_scores else float("nan")
+
+
+def _evaluate_outer_fold(
+    calculator: "BaseModelCalculator",
+    X_train_fold: Any,
+    y_train_fold: Any,
+    X_val_fold: Any,
+    y_val_fold: Any,
+    config: dict[str, Any],
+    problem_type: str,
+    fold_idx: int,
+    inner_mean: float,
+    log_callback: Callable[[str], None] | None,
+) -> dict[str, Any]:
+    """Fit on the outer training fold, evaluate on the outer validation fold, and log."""
+    model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
+    metrics = _score_metrics_for_problem(model_artifact, X_val_fold, y_val_fold, problem_type)
+
+    if log_callback:
+        key_metric = "accuracy" if problem_type == "classification" else "r2"
+        score = metrics.get(key_metric, 0.0)
+        log_callback(
+            f"Outer Fold {fold_idx + 1} — {key_metric}: {score:.4f} (inner mean: {inner_mean:.4f})"
+        )
+
+    return {
+        "fold": fold_idx + 1,
+        "metrics": sanitize_metrics(metrics),
+        # None (not NaN) when every inner fold failed, for JSON-safety
+        # parity with sanitize_metrics' non-finite-value handling.
+        "inner_cv_mean": inner_mean if not np.isnan(inner_mean) else None,
+    }
 
 
 def _perform_nested_cv(
@@ -356,18 +564,7 @@ def _perform_nested_cv(
         log_callback(f"Starting Nested CV (Outer: {n_folds} folds, Inner: {inner_folds} folds)")
 
     # Build outer splitter — use stratified for classification, KFold for regression
-    if problem_type == "classification":
-        outer_splitter = StratifiedKFold(
-            n_splits=n_folds,
-            shuffle=shuffle,
-            random_state=random_state if shuffle else None,
-        )
-    else:
-        outer_splitter = KFold(
-            n_splits=n_folds,
-            shuffle=shuffle,
-            random_state=random_state if shuffle else None,
-        )
+    outer_splitter = _build_kfold_splitter(problem_type, n_folds, shuffle, random_state)
 
     X_arr, y_arr = SklearnBridge.to_sklearn((X, y))
 
@@ -381,108 +578,39 @@ def _perform_nested_cv(
             log_callback(f"Nested CV — Outer Fold {fold_idx + 1}/{n_folds}...")
 
         # Slice preserving original types
-        if hasattr(X, "iloc"):
-            X_train_fold = X.iloc[train_idx]
-            X_val_fold = X.iloc[val_idx]
-        else:
-            X_train_fold = X[train_idx]
-            X_val_fold = X[val_idx]
-
-        if hasattr(y, "iloc"):
-            y_train_fold = y.iloc[train_idx]
-            y_val_fold = y.iloc[val_idx]
-        else:
-            y_train_fold = y[train_idx]
-            y_val_fold = y[val_idx]
+        X_train_fold = _slice_by_index(X, train_idx)
+        X_val_fold = _slice_by_index(X, val_idx)
+        y_train_fold = _slice_by_index(y, train_idx)
+        y_val_fold = _slice_by_index(y, val_idx)
 
         # --- Inner loop: diagnostic stability signal ---
-        # Fits the *same* config (no hyperparameter search) across inner
-        # folds of this outer training fold and records the resulting score.
-        # This measures how stable the model's performance is across
-        # sub-splits, not "the best hyperparameters" - it is purely
-        # diagnostic and does not influence the outer-fold model fit below.
-
-        # Build inner splitter
-        if problem_type == "classification":
-            inner_splitter = StratifiedKFold(
-                n_splits=inner_folds,
-                shuffle=shuffle,
-                random_state=random_state if shuffle else None,
-            )
-        else:
-            inner_splitter = KFold(
-                n_splits=inner_folds,
-                shuffle=shuffle,
-                random_state=random_state if shuffle else None,
-            )
-
-        # Inner CV: train on inner folds, collect inner scores for diagnostics
-        X_train_arr, y_train_arr = SklearnBridge.to_sklearn((X_train_fold, y_train_fold))
-        inner_scores: list[float] = []
-        for inner_train_idx, inner_val_idx in inner_splitter.split(X_train_arr, y_train_arr):
-            if hasattr(X_train_fold, "iloc"):
-                X_inner_train = X_train_fold.iloc[inner_train_idx]
-                X_inner_val = X_train_fold.iloc[inner_val_idx]
-            else:
-                X_inner_train = X_train_fold[inner_train_idx]
-                X_inner_val = X_train_fold[inner_val_idx]
-
-            if hasattr(y_train_fold, "iloc"):
-                y_inner_train = y_train_fold.iloc[inner_train_idx]
-                y_inner_val = y_train_fold.iloc[inner_val_idx]
-            else:
-                y_inner_train = y_train_fold[inner_train_idx]
-                y_inner_val = y_train_fold[inner_val_idx]
-
-            try:
-                inner_artifact = calculator.fit(X_inner_train, y_inner_train, config)
-                if problem_type == "classification":
-                    inner_metrics = calculate_classification_metrics(
-                        inner_artifact, X_inner_val, y_inner_val
-                    )
-                    inner_scores.append(inner_metrics.get("accuracy", 0.0))
-                else:
-                    inner_metrics = calculate_regression_metrics(
-                        inner_artifact, X_inner_val, y_inner_val
-                    )
-                    inner_scores.append(inner_metrics.get("r2", 0.0))
-            except Exception as e:
-                logger.warning(f"Inner fold failed: {e}")
-                if log_callback:
-                    log_callback(f"Inner fold failed: {e}")
-                # Use NaN rather than 0.0: for regression, 0.0 is itself a
-                # meaningful R^2 value (not a neutral "no score" sentinel),
-                # so a hard failure must not silently corrupt inner_cv_mean.
-                # NaN is filtered out of the mean below.
-                inner_scores.append(float("nan"))
-
-        valid_inner_scores = [s for s in inner_scores if not np.isnan(s)]
-        inner_mean = float(np.mean(valid_inner_scores)) if valid_inner_scores else float("nan")
+        inner_mean = _run_inner_cv(
+            calculator,
+            X_train_fold,
+            y_train_fold,
+            config,
+            problem_type,
+            inner_folds,
+            shuffle,
+            random_state,
+            logger,
+            log_callback,
+        )
 
         # --- Outer evaluation: train on full outer train, evaluate on outer val ---
-        model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
-
-        if problem_type == "classification":
-            metrics = calculate_classification_metrics(model_artifact, X_val_fold, y_val_fold)
-        else:
-            metrics = calculate_regression_metrics(model_artifact, X_val_fold, y_val_fold)
-
-        if log_callback:
-            key_metric = "accuracy" if problem_type == "classification" else "r2"
-            score = metrics.get(key_metric, 0.0)
-            log_callback(
-                f"Outer Fold {fold_idx + 1} — {key_metric}: {score:.4f} "
-                f"(inner mean: {inner_mean:.4f})"
-            )
-
         fold_results.append(
-            {
-                "fold": fold_idx + 1,
-                "metrics": sanitize_metrics(metrics),
-                # None (not NaN) when every inner fold failed, for JSON-safety
-                # parity with sanitize_metrics' non-finite-value handling.
-                "inner_cv_mean": inner_mean if not np.isnan(inner_mean) else None,
-            }
+            _evaluate_outer_fold(
+                calculator,
+                X_train_fold,
+                y_train_fold,
+                X_val_fold,
+                y_val_fold,
+                config,
+                problem_type,
+                fold_idx,
+                inner_mean,
+                log_callback,
+            )
         )
 
     # Aggregate outer fold metrics
