@@ -104,6 +104,8 @@ export const ShapDependenceView: React.FC<Props> = ({
               <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
               <Tooltip
                 contentStyle={chartTheme.tooltipContentStyle}
+                itemStyle={chartTheme.tooltipItemStyle}
+                labelStyle={chartTheme.tooltipLabelStyle}
                 formatter={(value: number, name: string) => [value.toFixed(3), name]}
               />
               <Scatter data={points} fill="#8884d8" fillOpacity={0.7} />

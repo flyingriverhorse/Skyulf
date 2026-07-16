@@ -23,6 +23,14 @@ export interface ChartColors {
   bgColor: string;
   /** Ready-to-spread `contentStyle` for a Recharts `<Tooltip>`. */
   tooltipContentStyle: Record<string, string>;
+  /** Ready-to-spread `itemStyle` for a Recharts `<Tooltip>` — Recharts
+   * defaults each item's text color to `entry.color || '#000'`, and Pie
+   * chart payload entries don't carry a usable `color`, so without this the
+   * tooltip text renders black-on-dark in dark mode. */
+  tooltipItemStyle: Record<string, string>;
+  /** Ready-to-spread `labelStyle` for a Recharts `<Tooltip>`, matching the
+   * content text color for the (optional) label row above the items. */
+  tooltipLabelStyle: Record<string, string>;
 }
 
 /** Categorical series palette — mid-saturation colors with enough contrast
@@ -38,16 +46,21 @@ export const CHART_SERIES_COLORS = [
 export const isDarkModeActive = (): boolean =>
   typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
 
-export const resolveChartColors = (isDark: boolean): ChartColors => ({
-  axisColor: isDark ? '#9ca3af' : '#6b7280',       // gray-400 / gray-500
-  gridColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
-  textColor: isDark ? '#e5e7eb' : '#374151',        // gray-200 / gray-700
-  subTextColor: isDark ? '#9ca3af' : '#4b5563',      // gray-400 / gray-600
-  bgColor: isDark ? '#1f2937' : '#ffffff',           // gray-800 / white
-  tooltipContentStyle: isDark
-    ? { backgroundColor: '#1f2937', borderRadius: '8px', border: '1px solid #374151', color: '#f3f4f6', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' }
-    : { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #e5e7eb', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
-});
+export const resolveChartColors = (isDark: boolean): ChartColors => {
+  const tooltipTextColor = isDark ? '#f3f4f6' : '#111827';
+  return {
+    axisColor: isDark ? '#9ca3af' : '#6b7280',       // gray-400 / gray-500
+    gridColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)',
+    textColor: isDark ? '#e5e7eb' : '#374151',        // gray-200 / gray-700
+    subTextColor: isDark ? '#9ca3af' : '#4b5563',      // gray-400 / gray-600
+    bgColor: isDark ? '#1f2937' : '#ffffff',           // gray-800 / white
+    tooltipContentStyle: isDark
+      ? { backgroundColor: '#1f2937', borderRadius: '8px', border: '1px solid #374151', color: tooltipTextColor, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' }
+      : { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #e5e7eb', color: tooltipTextColor, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
+    tooltipItemStyle: { color: tooltipTextColor },
+    tooltipLabelStyle: { color: tooltipTextColor },
+  };
+};
 
 /** Imperative snapshot of the current chart theme. Non-reactive — only use
  * outside React render (event handlers, canvas drawing at export time). */

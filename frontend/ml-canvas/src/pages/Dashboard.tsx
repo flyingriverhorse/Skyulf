@@ -180,7 +180,9 @@ export const Dashboard: React.FC = () => {
                   allowDecimals={false}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }}
+                  contentStyle={chartTheme.tooltipContentStyle}
+                  itemStyle={chartTheme.tooltipItemStyle}
+                  labelStyle={chartTheme.tooltipLabelStyle}
                   cursor={{ fill: chartTheme.gridColor }}
                 />
                 <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={30} />
@@ -212,7 +214,11 @@ export const Dashboard: React.FC = () => {
                     } />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--popover-foreground))' }} />
+                <Tooltip
+                  contentStyle={chartTheme.tooltipContentStyle}
+                  itemStyle={chartTheme.tooltipItemStyle}
+                  labelStyle={chartTheme.tooltipLabelStyle}
+                />
                 <Legend verticalAlign="bottom" height={36} iconType="circle" />
               </PieChart>
             </ResponsiveContainer>

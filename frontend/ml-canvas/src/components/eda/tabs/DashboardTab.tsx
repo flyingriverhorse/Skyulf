@@ -70,6 +70,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                 </Pie>
                                 <Tooltip
                                     contentStyle={chartTheme.tooltipContentStyle}
+                                    itemStyle={chartTheme.tooltipItemStyle}
+                                    labelStyle={chartTheme.tooltipLabelStyle}
                                 />
                                 <Legend verticalAlign="bottom" height={36}/>
                             </PieChart>

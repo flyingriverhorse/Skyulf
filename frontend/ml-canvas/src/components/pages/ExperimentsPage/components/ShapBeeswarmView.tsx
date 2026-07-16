@@ -155,6 +155,8 @@ export const ShapBeeswarmView: React.FC<Props> = ({
               <ReferenceLine x={0} stroke="#94a3b8" strokeDasharray="3 3" />
               <Tooltip
                 contentStyle={chartTheme.tooltipContentStyle}
+                itemStyle={chartTheme.tooltipItemStyle}
+                labelStyle={chartTheme.tooltipLabelStyle}
                 formatter={(value: number, name: string) => [value.toFixed(3), name]}
                 labelFormatter={() => ''}
               />

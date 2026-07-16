@@ -84,7 +84,8 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             <YAxis tick={{ fill: chartTheme.axisColor }} />
                             <Tooltip
                                 contentStyle={chartTheme.tooltipContentStyle}
-                                labelStyle={{ color: '#9ca3af' }}
+                                itemStyle={chartTheme.tooltipItemStyle}
+                                labelStyle={chartTheme.tooltipLabelStyle}
                             />
                             <Legend />
                             {Object.keys(profile.timeseries.trend[0]?.values || {}).map((key, idx) => (
@@ -132,6 +133,8 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                 <YAxis tick={{ fill: chartTheme.axisColor }} />
                                 <Tooltip
                                     contentStyle={chartTheme.tooltipContentStyle}
+                                    itemStyle={chartTheme.tooltipItemStyle}
+                                    labelStyle={chartTheme.tooltipLabelStyle}
                                     cursor={{fill: 'transparent'}}
                                 />
                                 <Bar dataKey="count" fill="#8884d8" radius={[4, 4, 0, 0]} />
@@ -165,6 +168,8 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                             <YAxis tick={{ fill: chartTheme.axisColor }} />
                             <Tooltip
                                 contentStyle={chartTheme.tooltipContentStyle}
+                                itemStyle={chartTheme.tooltipItemStyle}
+                                labelStyle={chartTheme.tooltipLabelStyle}
                                 cursor={{fill: 'transparent'}}
                             />
                             <Bar dataKey="count" fill="#82ca9d" radius={[4, 4, 0, 0]} />
@@ -209,6 +214,8 @@ export const TimeSeriesTab: React.FC<TimeSeriesTabProps> = ({
                                     <YAxis domain={[-1, 1]} tick={{ fill: chartTheme.axisColor }} />
                                     <Tooltip
                                         contentStyle={chartTheme.tooltipContentStyle}
+                                        itemStyle={chartTheme.tooltipItemStyle}
+                                        labelStyle={chartTheme.tooltipLabelStyle}
                                         cursor={{fill: 'transparent'}}
                                         formatter={(value: number) => [value.toFixed(3), 'Correlation']}
                                     />

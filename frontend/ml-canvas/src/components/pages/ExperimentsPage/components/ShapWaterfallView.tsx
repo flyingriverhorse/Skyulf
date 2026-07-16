@@ -135,6 +135,8 @@ export const ShapWaterfallView: React.FC<Props> = ({
               <ReferenceLine x={outputValue} stroke="#6366f1" strokeDasharray="3 3" label={{ value: 'Prediction', position: 'top', fontSize: 11, fill: chartTheme.axisColor }} />
               <Tooltip
                 contentStyle={chartTheme.tooltipContentStyle}
+                itemStyle={chartTheme.tooltipItemStyle}
+                labelStyle={chartTheme.tooltipLabelStyle}
                 formatter={(_value: number, _name: string, entry) => {
                   const row = entry?.payload as WaterfallRow | undefined;
                   if (!row) return ['', ''];
