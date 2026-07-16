@@ -18,7 +18,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import SentenceEmbedderArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _join_text_columns, apply_text_pandas_only
+from ._common import _join_text_columns, apply_text_pandas_only, resolve_fit_text_columns
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,28 @@ class SentenceEmbedderApplier(BaseApplier):
 # ── Calculate ─────────────────────────────────────────────────────────────────
 
 
+def _build_sentence_embedder_artifact(
+    config: dict[str, Any], valid_cols: list[str]
+) -> SentenceEmbedderArtifact:
+    """Load the embedding model and build the sentence-embedder artifact dict."""
+    model_name: str = config.get("model_name") or "all-MiniLM-L6-v2"
+    model = _load_model(model_name)
+    embedding_dim = int(_embedding_dimension(model))
+
+    prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
+    output_columns = [f"{prefix}__emb__{i}" for i in range(embedding_dim)]
+
+    return {
+        "type": "sentence_embedder",
+        "columns": valid_cols,
+        "model_name": model_name,
+        "embedding_dim": embedding_dim,
+        "normalize": config.get("normalize", True),
+        "output_columns": output_columns,
+        "drop_original": config.get("drop_original", False),
+    }
+
+
 @NodeRegistry.register("sentence_embedder", SentenceEmbedderApplier)
 @node_meta(
     id="sentence_embedder",
@@ -121,30 +143,9 @@ class SentenceEmbedderCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> SentenceEmbedderArtifact:  # pylint: disable=arguments-differ
-        cols: list[str] = config.get("columns", [])
-        if not cols:
+        resolved = resolve_fit_text_columns(X, config)
+        if resolved is None:
             return {}
+        _, valid_cols = resolved
 
-        if hasattr(X, "to_pandas"):
-            X = X.to_pandas()
-
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return {}
-
-        model_name: str = config.get("model_name") or "all-MiniLM-L6-v2"
-        model = _load_model(model_name)
-        embedding_dim = int(_embedding_dimension(model))
-
-        prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
-        output_columns = [f"{prefix}__emb__{i}" for i in range(embedding_dim)]
-
-        return {
-            "type": "sentence_embedder",
-            "columns": valid_cols,
-            "model_name": model_name,
-            "embedding_dim": embedding_dim,
-            "normalize": config.get("normalize", True),
-            "output_columns": output_columns,
-            "drop_original": config.get("drop_original", False),
-        }
+        return _build_sentence_embedder_artifact(config, valid_cols)

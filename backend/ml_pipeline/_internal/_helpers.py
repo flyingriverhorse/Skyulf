@@ -27,6 +27,39 @@ def prettify_model_type(model_type: str) -> str:
     return " ".join(w.capitalize() for w in cleaned.split("_"))
 
 
+def _resolve_branch_context(sub_config: PipelineConfig) -> tuple[str, str, str]:
+    """Resolve `(model_type, leaf_step, leaf_display)` for the branch's terminal node.
+
+    `model_type` is only populated when the terminal node itself is a
+    training/tuning node; otherwise `leaf_step`/`leaf_display` describe
+    the terminal node directly.
+    """
+    model_type = ""
+    leaf_step = ""
+    leaf_display = ""
+    if sub_config.nodes:
+        leaf = sub_config.nodes[-1]
+        if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+            # Only scan for model_type when the terminal IS a training/tuning node.
+            for n in sub_config.nodes:
+                if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+                    model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
+        else:
+            leaf_step = str(leaf.step_type)
+            leaf_display = str(leaf.params.get("_display_name") or "")
+    return model_type, leaf_step, leaf_display
+
+
+def _friendly_step_label(leaf_step: str) -> str:
+    """Convert a raw `step_type` string to a Title Case label.
+
+    "StandardScaler" → "Standard Scaler", "data_loader" → "Data Loader".
+    """
+    if "_" in leaf_step:
+        return " ".join(w.capitalize() for w in leaf_step.split("_"))
+    return re.sub(r"(?<!^)(?=[A-Z])", " ", leaf_step).strip()
+
+
 def branch_label(index: int, sub_config: PipelineConfig, dup_suffix: str = "") -> str:
     """Build a 'Path A · <suffix>' label for a branch sub-pipeline.
 
@@ -50,19 +83,7 @@ def branch_label(index: int, sub_config: PipelineConfig, dup_suffix: str = "") -
     `#1` / `#2`) so tab labels match the canvas edge labels exactly.
     """
     letter = chr(ord("A") + index)
-    model_type = ""
-    leaf_step = ""
-    leaf_display = ""
-    if sub_config.nodes:
-        leaf = sub_config.nodes[-1]
-        if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
-            # Only scan for model_type when the terminal IS a training/tuning node.
-            for n in sub_config.nodes:
-                if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
-                    model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
-        else:
-            leaf_step = str(leaf.step_type)
-            leaf_display = str(leaf.params.get("_display_name") or "")
+    model_type, leaf_step, leaf_display = _resolve_branch_context(sub_config)
     pretty = prettify_model_type(str(model_type))
     suffix_tail = f" {dup_suffix}" if dup_suffix else ""
     if pretty:
@@ -70,11 +91,7 @@ def branch_label(index: int, sub_config: PipelineConfig, dup_suffix: str = "") -
     if leaf_display:
         return f"Path {letter} · {leaf_display}{suffix_tail}"
     if leaf_step:
-        # "StandardScaler" → "Standard Scaler", "data_loader" → "Data Loader".
-        if "_" in leaf_step:
-            friendly = " ".join(w.capitalize() for w in leaf_step.split("_"))
-        else:
-            friendly = re.sub(r"(?<!^)(?=[A-Z])", " ", leaf_step).strip()
+        friendly = _friendly_step_label(leaf_step)
         return f"Path {letter} · {friendly}{suffix_tail}"
     return f"Path {letter}"
 

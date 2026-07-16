@@ -138,17 +138,8 @@ def cleanup_empty_directories(base_path: str | Path) -> int:
     return removed_count
 
 
-def extract_file_path_from_source(source_data: dict) -> Path | None:
-    """
-    Extract the file path from a data source record.
-
-    Args:
-        source_data: Data source dictionary from database
-
-    Returns:
-        Optional[Path]: Path to the file if it exists
-    """
-    # Check various possible path fields
+def _collect_path_candidates(source_data: dict) -> list:
+    """Gather all possible file-path values from top-level, connection_info, and config fields."""
     path_candidates = [
         source_data.get("file_path"),
         source_data.get("path"),
@@ -181,6 +172,11 @@ def extract_file_path_from_source(source_data: dict) -> Path | None:
             ]
         )
 
+    return path_candidates
+
+
+def _first_valid_path_candidate(path_candidates: list) -> str | Path | None:
+    """Return the first candidate that is an S3 URI or an existing local file, else None."""
     for candidate in path_candidates:
         if candidate and isinstance(candidate, (str, Path)):
             # Special handling for S3 paths - return immediately without checking local existence
@@ -192,6 +188,24 @@ def extract_file_path_from_source(source_data: dict) -> Path | None:
             if path.exists() and path.is_file():  # Only return if it's actually a file
                 logger.debug(f"Found file path: {path}")
                 return path
+
+    return None
+
+
+def extract_file_path_from_source(source_data: dict) -> Path | str | None:
+    """
+    Extract the file path from a data source record.
+
+    Args:
+        source_data: Data source dictionary from database
+
+    Returns:
+        Optional[Path]: Path to the file if it exists (or an ``s3://`` URI string).
+    """
+    path_candidates = _collect_path_candidates(source_data)
+    result = _first_valid_path_candidate(path_candidates)
+    if result is not None:
+        return result
 
     # Deliberately do NOT fall back to source_name as a filesystem path.
     # source_name is a user-supplied label, not a trusted file location; treating
@@ -228,55 +242,85 @@ def cleanup_old_files(
         }
 
     try:
-        # Get all files matching the pattern
-        all_files = list(directory.glob(file_pattern))
-        files_only = [f for f in all_files if f.is_file()]
-
-        if not files_only:
-            return {"status": "success", "files_removed": 0, "reason": "no_files_found"}
-
-        removed_count = 0
-        removed_files = []
-        cutoff_date = datetime.now(UTC) - timedelta(days=max_age_days)
-
-        # Sort files by modification time (newest first)
-        files_by_mtime = sorted(files_only, key=lambda f: f.stat().st_mtime, reverse=True)
-
-        # Remove files older than max_age_days
-        for file_path in files_only:
-            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime, UTC)
-            if file_mtime < cutoff_date:
-                try:
-                    file_path.unlink()
-                    removed_files.append(str(file_path))
-                    removed_count += 1
-                    logger.info(f"Removed old file (age): {file_path}")
-                except Exception as e:
-                    logger.error(f"Failed to remove old file {file_path}: {e}")
-
-        # Remove excess files beyond max_files limit
-        remaining_files = [f for f in files_by_mtime if f.exists()]
-        if len(remaining_files) > max_files:
-            excess_files = remaining_files[max_files:]
-            for file_path in excess_files:
-                try:
-                    file_path.unlink()
-                    removed_files.append(str(file_path))
-                    removed_count += 1
-                    logger.info(f"Removed excess file (count): {file_path}")
-                except Exception as e:
-                    logger.error(f"Failed to remove excess file {file_path}: {e}")
-
-        return {
-            "status": "success",
-            "files_removed": removed_count,
-            "removed_files": removed_files,
-            "remaining_files": len([f for f in files_only if f.exists()]) - removed_count,
-        }
-
+        return _do_cleanup_old_files(directory, max_files, max_age_days, file_pattern)
     except Exception as e:
         logger.error(f"Error during file cleanup in {directory}: {e}")
         return {"status": "error", "error": str(e), "files_removed": 0}
+
+
+def _do_cleanup_old_files(
+    directory: Path,
+    max_files: int,
+    max_age_days: int,
+    file_pattern: str,
+) -> dict:
+    """Perform the actual age- and count-based cleanup pass for `directory`."""
+    # Get all files matching the pattern
+    all_files = list(directory.glob(file_pattern))
+    files_only = [f for f in all_files if f.is_file()]
+
+    if not files_only:
+        return {"status": "success", "files_removed": 0, "reason": "no_files_found"}
+
+    cutoff_date = datetime.now(UTC) - timedelta(days=max_age_days)
+
+    # Sort files by modification time (newest first)
+    files_by_mtime = sorted(files_only, key=lambda f: f.stat().st_mtime, reverse=True)
+
+    age_removed_count, removed_files = _remove_files_older_than(files_only, cutoff_date)
+
+    # Remove excess files beyond max_files limit
+    remaining_files = [f for f in files_by_mtime if f.exists()]
+    excess_removed_count, excess_removed_files = _remove_excess_files(remaining_files, max_files)
+    removed_files.extend(excess_removed_files)
+    removed_count = age_removed_count + excess_removed_count
+
+    return {
+        "status": "success",
+        "files_removed": removed_count,
+        "removed_files": removed_files,
+        "remaining_files": len([f for f in files_only if f.exists()]) - removed_count,
+    }
+
+
+def _remove_files_older_than(
+    files: list[Path],
+    cutoff_date: datetime,
+) -> tuple[int, list[str]]:
+    """Delete files whose modification time is before `cutoff_date`."""
+    removed_count = 0
+    removed_files: list[str] = []
+    for file_path in files:
+        file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime, UTC)
+        if file_mtime < cutoff_date:
+            try:
+                file_path.unlink()
+                removed_files.append(str(file_path))
+                removed_count += 1
+                logger.info(f"Removed old file (age): {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to remove old file {file_path}: {e}")
+    return removed_count, removed_files
+
+
+def _remove_excess_files(
+    remaining_files: list[Path],
+    max_files: int,
+) -> tuple[int, list[str]]:
+    """Delete files beyond the `max_files` newest-kept limit."""
+    removed_count = 0
+    removed_files: list[str] = []
+    if len(remaining_files) > max_files:
+        excess_files = remaining_files[max_files:]
+        for file_path in excess_files:
+            try:
+                file_path.unlink()
+                removed_files.append(str(file_path))
+                removed_count += 1
+                logger.info(f"Removed excess file (count): {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to remove excess file {file_path}: {e}")
+    return removed_count, removed_files
 
 
 def cleanup_uploads_directory(

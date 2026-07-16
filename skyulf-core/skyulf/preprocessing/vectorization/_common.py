@@ -58,6 +58,29 @@ def apply_text_pandas_only(
     return pack_pipeline_output(X_out, y_out, is_tuple)
 
 
+def resolve_fit_text_columns(
+    X: Any, config: dict[str, Any]
+) -> tuple[pd.DataFrame, list[str]] | None:
+    """Resolve the pandas frame and valid text columns for a vectorizer ``fit``.
+
+    Converts *X* to pandas if needed and filters ``config["columns"]`` down to
+    columns actually present. Returns ``None`` when there are no configured or
+    matching columns, signalling the caller should return an empty artifact.
+    """
+    cols: list[str] = config.get("columns", [])
+    if not cols:
+        return None
+
+    if hasattr(X, "to_pandas"):
+        X = X.to_pandas()
+
+    valid_cols = [c for c in cols if c in X.columns]
+    if not valid_cols:
+        return None
+
+    return X, valid_cols
+
+
 def _join_text_columns(X: pd.DataFrame, cols: list) -> pd.Series:
     """Concatenate one or more text columns into a single string series."""
     series = X[cols[0]].fillna("").astype(str)
@@ -74,3 +97,52 @@ def _warn_large_output(output_cols: int, threshold: int = 10_000) -> str | None:
             "Consider reducing max_features to lower memory usage."
         )
     return None
+
+
+def _vectorizer_transform_to_frame(
+    X: pd.DataFrame, vectorizer: Any, valid_cols: list[str], output_columns: list[str]
+) -> pd.DataFrame:
+    """Transform text columns with a fitted vectorizer into a dense output frame."""
+    text = _join_text_columns(X, valid_cols)
+    encoded = vectorizer.transform(text)
+    dense = encoded.toarray() if hasattr(encoded, "toarray") else encoded
+    return pd.DataFrame(
+        dense,
+        columns=output_columns,  # ty: ignore[invalid-argument-type]
+        index=X.index,
+    )
+
+
+def _drop_and_concat(
+    X: pd.DataFrame, encoded_df: pd.DataFrame, valid_cols: list[str], drop_original: bool
+) -> pd.DataFrame:
+    """Optionally drop source columns from *X*, then concat the encoded frame."""
+    X_out = X.copy()
+    if drop_original:
+        X_out = X_out.drop(columns=valid_cols)
+    return pd.concat([X_out, encoded_df], axis=1)
+
+
+def _sklearn_vectorizer_apply_pandas(
+    X: pd.DataFrame, y: Any, params: dict[str, Any]
+) -> tuple[pd.DataFrame, Any]:
+    """Shared apply logic for fitted-vocabulary sklearn vectorizers.
+
+    Used by the Count/TF-IDF/Hashing vectorizer appliers, which all transform
+    text columns with a fitted ``vectorizer_object`` and concatenate the dense
+    result onto the input frame identically.
+    """
+    cols: list[str] = params.get("columns", [])
+    vectorizer: Any = params.get("vectorizer_object")
+    output_columns: list[str] = params.get("output_columns", [])
+    drop_original: bool = params.get("drop_original", False)
+
+    if not cols or vectorizer is None or not output_columns:
+        return X, y
+
+    valid_cols = [c for c in cols if c in X.columns]
+    if not valid_cols:
+        return X, y
+
+    encoded_df = _vectorizer_transform_to_frame(X, vectorizer, valid_cols, output_columns)
+    return _drop_and_concat(X, encoded_df, valid_cols, drop_original), y

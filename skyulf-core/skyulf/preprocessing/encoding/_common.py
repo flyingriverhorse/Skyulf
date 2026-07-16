@@ -26,6 +26,20 @@ _COLUMN_DESTROYING_ENCODERS = frozenset(
 _SUPERVISED_INPLACE_ENCODERS = frozenset(["WOEEncoder"])
 
 
+def _normalize_categories_lines(raw: Any) -> list[str]:
+    """Split raw string/list input into non-empty stripped lines; empty list if unsupported type."""
+    if isinstance(raw, str):
+        return [ln.strip() for ln in raw.strip().splitlines() if ln.strip()]
+    if isinstance(raw, list):
+        return [str(ln).strip() for ln in raw if str(ln).strip()]
+    return []
+
+
+def _split_category_line(line: str) -> list[str]:
+    """Split a single comma-separated category line into stripped non-empty values."""
+    return [v.strip() for v in line.split(",") if v.strip()]
+
+
 def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """Convert the frontend categories_order string/list into sklearn-compatible categories.
 
@@ -36,17 +50,41 @@ def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """
     if not raw:
         return "auto"
-    if isinstance(raw, str):
-        lines = [ln.strip() for ln in raw.strip().splitlines() if ln.strip()]
-    elif isinstance(raw, list):
-        lines = [str(ln).strip() for ln in raw if str(ln).strip()]
-    else:
+    if not isinstance(raw, str | list):
         return "auto"
 
+    lines = _normalize_categories_lines(raw)
     if not lines or len(lines) != n_cols:
         return "auto"
 
-    return [[v.strip() for v in line.split(",") if v.strip()] for line in lines]
+    return [_split_category_line(line) for line in lines]
+
+
+def _detect_target_column(config: dict[str, Any], y: Any) -> str | None:
+    """Resolve the target column name from config['target_column'] or the name of y."""
+    target_col: str | None = config.get("target_column")
+    if target_col is None and y is not None:
+        target_col = getattr(y, "name", None)
+    return target_col
+
+
+def _warn_excluding_target_column(encoder_name: str, target_col: str) -> None:
+    """Log a warning explaining why the target column is excluded from encoding."""
+    if encoder_name in _COLUMN_DESTROYING_ENCODERS:
+        reason = (
+            f"{encoder_name} would replace the column with multiple derived columns, "
+            "breaking downstream Feature/Target Split and model training."
+        )
+    else:
+        reason = (
+            f"{encoder_name} fits against the target and replaces values in-place; "
+            "encoding the target against itself produces a degenerate, leaky mapping "
+            "and silently overwrites the target's own values."
+        )
+    logger.warning(
+        f"{encoder_name}: Excluding target column '{target_col}' from encoding. "
+        f"{reason} Use LabelEncoder or OrdinalEncoder for target columns instead."
+    )
 
 
 def _exclude_target_column(
@@ -69,26 +107,10 @@ def _exclude_target_column(
     ):
         return columns
 
-    target_col: str | None = config.get("target_column")
-    if target_col is None and y is not None:
-        target_col = getattr(y, "name", None)
+    target_col = _detect_target_column(config, y)
 
     if target_col and target_col in columns:
-        if encoder_name in _COLUMN_DESTROYING_ENCODERS:
-            reason = (
-                f"{encoder_name} would replace the column with multiple derived columns, "
-                "breaking downstream Feature/Target Split and model training."
-            )
-        else:
-            reason = (
-                f"{encoder_name} fits against the target and replaces values in-place; "
-                "encoding the target against itself produces a degenerate, leaky mapping "
-                "and silently overwrites the target's own values."
-            )
-        logger.warning(
-            f"{encoder_name}: Excluding target column '{target_col}' from encoding. "
-            f"{reason} Use LabelEncoder or OrdinalEncoder for target columns instead."
-        )
+        _warn_excluding_target_column(encoder_name, target_col)
         columns = [c for c in columns if c != target_col]
 
     return columns

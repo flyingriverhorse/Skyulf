@@ -43,8 +43,73 @@ class DriftJobOption(BaseModel):
     best_metric: str | None = None
 
 
+async def _fetch_drift_job_rows(
+    db: AsyncSession, job_ids: list[str]
+) -> dict[str, BasicTrainingJob | AdvancedTuningJob]:
+    """Look up training/tuning job rows for the given ids across both job tables."""
+    db_jobs: dict[str, BasicTrainingJob | AdvancedTuningJob] = {}
+    try:
+        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
+            stmt = select(model_cls).where(model_cls.id.in_(job_ids))
+            result = await db.execute(stmt)
+            for row in result.scalars().all():
+                db_jobs[str(row.id)] = row
+    except Exception:
+        logger.warning("Could not enrich drift jobs from DB", exc_info=True)
+    return db_jobs
+
+
+def _extract_drift_target_column(db_row: BasicTrainingJob | AdvancedTuningJob) -> str | None:
+    """Resolve the target column for a job row from its stored graph, if possible."""
+    try:
+        graph: dict[str, Any] = cast(dict[str, Any], db_row.graph or {})
+        node_id: str = cast(str, db_row.node_id or "")
+        _, target_col, _ = extract_job_details(graph, node_id)
+        return target_col
+    except Exception:
+        return None  # nosec B110 - target column is optional metadata; job listing still succeeds
+
+
+def _build_drift_metric_summary(metrics: dict[str, Any]) -> str | None:
+    """Collapse the known test metrics present in `metrics` into a compact `key: value` summary."""
+    metric_parts: list[str] = []
+    for key, label in [
+        ("test_accuracy", "acc"),
+        ("test_f1_weighted", "f1"),
+        ("test_precision_weighted", "prec"),
+        ("test_recall_weighted", "recall"),
+        ("test_roc_auc", "auc"),
+        ("test_r2", "r2"),
+        ("test_rmse", "rmse"),
+        ("test_mae", "mae"),
+    ]:
+        if key in metrics:
+            val = metrics[key]
+            if isinstance(val, (int, float)):
+                metric_parts.append(f"{label}: {val:.4f}")
+    return " | ".join(metric_parts) if metric_parts else None
+
+
+def _enrich_drift_job(job: DriftJobOption, db_row: BasicTrainingJob | AdvancedTuningJob) -> None:
+    """Fill in `job`'s model/target/description/metric fields from its DB row, in place."""
+    job.model_type = db_row.model_type
+    job.target_column = _extract_drift_target_column(db_row)
+
+    meta: dict[str, Any] = cast(dict[str, Any], db_row.job_metadata or {})
+    if isinstance(meta, dict):
+        job.description = meta.get("description")
+
+    metrics: dict[str, Any] = cast(dict[str, Any], db_row.metrics or {})
+    if isinstance(metrics, dict):
+        if "n_rows" in metrics:
+            job.n_rows = int(metrics["n_rows"])
+        if "n_features" in metrics:
+            job.n_features = int(metrics["n_features"])
+        job.best_metric = _build_drift_metric_summary(metrics)
+
+
 @router.get("/jobs", response_model=list[DriftJobOption])
-async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
+async def list_drift_jobs(db: AsyncSession = Depends(get_db)):
     """
     List all jobs that have reference data available for drift calculation.
     Scans subdirectories in the artifact folder, enriched with DB metadata.
@@ -67,63 +132,12 @@ async def list_drift_jobs(db: AsyncSession = Depends(get_db)):  # noqa: C901
 
     # Enrich from database
     job_ids = [j.job_id for j in found_jobs]
-    db_jobs: dict[str, BasicTrainingJob | AdvancedTuningJob] = {}
-    try:
-        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model_cls).where(model_cls.id.in_(job_ids))
-            result = await db.execute(stmt)
-            for row in result.scalars().all():
-                db_jobs[str(row.id)] = row
-    except Exception:
-        logger.warning("Could not enrich drift jobs from DB", exc_info=True)
+    db_jobs = await _fetch_drift_job_rows(db, job_ids)
 
     for job in found_jobs:
         db_row = db_jobs.get(job.job_id)
         if db_row:
-            job.model_type = db_row.model_type
-
-            # Extract target column from graph
-            try:
-                graph: dict[str, Any] = cast(dict[str, Any], db_row.graph or {})
-                node_id: str = cast(str, db_row.node_id or "")
-                _, target_col, _ = extract_job_details(graph, node_id)
-                job.target_column = target_col
-            except Exception:
-                pass  # nosec B110 - target column is optional metadata; job listing still succeeds
-
-            # Description from job_metadata
-            meta: dict[str, Any] = cast(dict[str, Any], db_row.job_metadata or {})
-            if isinstance(meta, dict):
-                job.description = meta.get("description")
-
-            # Best metric from metrics dict
-            metrics: dict[str, Any] = cast(dict[str, Any], db_row.metrics or {})
-            if isinstance(metrics, dict):
-                # Data shape
-                if "n_rows" in metrics:
-                    job.n_rows = int(metrics["n_rows"])
-                if "n_features" in metrics:
-                    job.n_features = int(metrics["n_features"])
-
-                # Collect all test metrics into a compact summary
-                metric_parts: list[str] = []
-                for key, label in [
-                    ("test_accuracy", "acc"),
-                    ("test_f1_weighted", "f1"),
-                    ("test_precision_weighted", "prec"),
-                    ("test_recall_weighted", "recall"),
-                    ("test_roc_auc", "auc"),
-                    ("test_r2", "r2"),
-                    ("test_rmse", "rmse"),
-                    ("test_mae", "mae"),
-                ]:
-                    if key in metrics:
-                        val = metrics[key]
-                        if isinstance(val, (int, float)):
-                            metric_parts.append(f"{label}: {val:.4f}")
-                if metric_parts:
-                    job.best_metric = " | ".join(metric_parts)
-
+            _enrich_drift_job(job, db_row)
         jobs.append(job)
 
     jobs.sort(key=lambda x: x.created_at or "", reverse=True)
@@ -169,23 +183,8 @@ class EnrichedDriftReport(BaseModel):
     feature_importances: dict[str, float] | None = None
 
 
-@router.post("/drift/calculate", response_model=EnrichedDriftReport)
-@limiter.limit("20/minute")
-async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load ref → load curr → compute → persist
-    request: Request,
-    job_id: str = Form(...),
-    file: UploadFile = File(...),
-    dataset_name: str | None = Form(None),
-    threshold_psi: float | None = Form(None),
-    threshold_ks: float | None = Form(None),
-    threshold_wasserstein: float | None = Form(None),
-    threshold_kl: float | None = Form(None),
-    db: AsyncSession = Depends(get_db),
-) -> EnrichedDriftReport:
-    # 1. Find the job folder (via the storage seam) and its artifact store.
-    artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
-
-    # 2. Find Reference Data
+def _find_reference_key(artifact_store, dataset_name: str | None, job_id: str) -> str | None:
+    """Locate the reference-data artifact key for a job, preferring an exact dataset_name match."""
     reference_key = None
     if dataset_name:
         # Sanitize as done in engine.py
@@ -204,23 +203,25 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
                 reference_key = key
                 break
 
-    if not reference_key:
-        raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
+    return reference_key
 
-    # 3. Load Reference Data
+
+def _load_reference_dataframe(artifact_store, reference_key: str, job_id: str) -> pl.DataFrame:
+    """Load and convert the reference-data artifact to a Polars DataFrame."""
     try:
         ref_data = artifact_store.load(reference_key)
         # Convert to Polars
         if isinstance(ref_data, pd.DataFrame):
-            ref_df = pl.from_pandas(ref_data)
-        else:
-            # Assume it's already compatible or fail
-            ref_df = pl.DataFrame(ref_data)
+            return pl.from_pandas(ref_data)
+        # Assume it's already compatible or fail
+        return pl.DataFrame(ref_data)
     except Exception:
         logger.exception("Failed to load reference data for job %s", job_id)
         raise SkyulfException(message="Failed to load reference data") from None
 
-    # 3. Load Current Data
+
+async def _load_current_dataframe(file: UploadFile) -> pl.DataFrame:
+    """Read the uploaded file (bounded by MAX_UPLOAD_SIZE) and parse it as CSV/Parquet into Polars."""
     try:
         from backend.config import get_settings as _get_settings
 
@@ -233,48 +234,56 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
                 detail=f"File too large. Maximum allowed size is {_max_size // (1024 * 1024)} MB.",
             )
         filename = (file.filename or "").lower()
-        if filename.endswith(".csv"):
-            curr_df = pl.read_csv(io.BytesIO(content))
-        elif filename.endswith(".parquet"):
-            curr_df = pl.read_parquet(io.BytesIO(content))
-        else:
-            # Default to CSV
-            curr_df = pl.read_csv(io.BytesIO(content))
+        if filename.endswith(".parquet"):
+            return pl.read_parquet(io.BytesIO(content))
+        # Default to CSV (also used for .csv and any other extension)
+        return pl.read_csv(io.BytesIO(content))
     except Exception as e:
         logger.warning("Failed to parse uploaded file: %s", e)
         raise HTTPException(status_code=400, detail="Failed to parse uploaded file") from e
 
-    # 4. Calculate Drift
-    try:
-        custom_thresholds: dict[str, float] = {}
-        if threshold_psi is not None:
-            custom_thresholds["psi"] = threshold_psi
-        if threshold_ks is not None:
-            custom_thresholds["ks"] = threshold_ks
-        if threshold_wasserstein is not None:
-            custom_thresholds["wasserstein"] = threshold_wasserstein
-        if threshold_kl is not None:
-            custom_thresholds["kl_divergence"] = threshold_kl
-        calculator = DriftCalculator(ref_df, curr_df)
-        report = calculator.calculate_drift(thresholds=custom_thresholds or None)
-    except Exception:
-        logger.exception("Drift calculation failed for job %s", job_id)
-        raise SkyulfException(message="Drift calculation failed") from None
 
-    # 5. Save drift check result to DB for history
+def _build_drift_thresholds(
+    threshold_psi: float | None,
+    threshold_ks: float | None,
+    threshold_wasserstein: float | None,
+    threshold_kl: float | None,
+) -> dict[str, float]:
+    """Assemble the custom drift-metric thresholds dict from the individual per-metric overrides."""
+    custom_thresholds: dict[str, float] = {}
+    if threshold_psi is not None:
+        custom_thresholds["psi"] = threshold_psi
+    if threshold_ks is not None:
+        custom_thresholds["ks"] = threshold_ks
+    if threshold_wasserstein is not None:
+        custom_thresholds["wasserstein"] = threshold_wasserstein
+    if threshold_kl is not None:
+        custom_thresholds["kl_divergence"] = threshold_kl
+    return custom_thresholds
+
+
+def _build_drift_column_summary(report) -> dict[str, Any]:
+    """Build a compact per-column drift summary (drifted flag + PSI/Wasserstein/KS p-value)."""
+    col_summary: dict[str, Any] = {}
+    for col_name, col_drift in report.column_drifts.items():
+        metrics_map: dict[str, float] = {}
+        for m in col_drift.metrics:
+            metrics_map[m.metric] = m.value
+        col_summary[col_name] = {
+            "drifted": col_drift.drift_detected,
+            "psi": metrics_map.get("psi"),
+            "wasserstein": metrics_map.get("wasserstein_distance"),
+            "ks_p_value": metrics_map.get("ks_test_p_value"),
+        }
+    return col_summary
+
+
+async def _save_drift_check_result(
+    db: AsyncSession, report, job_id: str, dataset_name: str | None
+) -> None:
+    """Persist a DriftCheckResult row for history; failures are logged but non-fatal."""
     try:
-        # Build per-column summary (PSI + Wasserstein, compact)
-        col_summary: dict[str, Any] = {}
-        for col_name, col_drift in report.column_drifts.items():
-            metrics_map: dict[str, float] = {}
-            for m in col_drift.metrics:
-                metrics_map[m.metric] = m.value
-            col_summary[col_name] = {
-                "drifted": col_drift.drift_detected,
-                "psi": metrics_map.get("psi"),
-                "wasserstein": metrics_map.get("wasserstein_distance"),
-                "ks_p_value": metrics_map.get("ks_test_p_value"),
-            }
+        col_summary = _build_drift_column_summary(report)
 
         check = DriftCheckResult(
             job_id=job_id,
@@ -299,7 +308,9 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
     except Exception:
         logger.warning("Failed to save drift check result", exc_info=True)
 
-    # 6. Load feature importances from training job
+
+async def _load_feature_importances(db: AsyncSession, job_id: str) -> dict[str, float] | None:
+    """Look up feature importances recorded on the training job's metrics, if any."""
     feature_importances: dict[str, float] | None = None
     try:
         for model_cls in (BasicTrainingJob, AdvancedTuningJob):
@@ -313,6 +324,52 @@ async def calculate_drift(  # noqa: C901  # multi-stage handler: parse → load 
                 break
     except Exception:
         logger.warning("Could not load feature importances for job %s", job_id)
+    return feature_importances
+
+
+@router.post("/drift/calculate", response_model=EnrichedDriftReport)
+@limiter.limit("20/minute")
+async def calculate_drift(
+    request: Request,
+    job_id: str = Form(...),
+    file: UploadFile = File(...),
+    dataset_name: str | None = Form(None),
+    threshold_psi: float | None = Form(None),
+    threshold_ks: float | None = Form(None),
+    threshold_wasserstein: float | None = Form(None),
+    threshold_kl: float | None = Form(None),
+    db: AsyncSession = Depends(get_db),
+) -> EnrichedDriftReport:
+    # 1. Find the job folder (via the storage seam) and its artifact store.
+    artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
+
+    # 2. Find Reference Data
+    reference_key = _find_reference_key(artifact_store, dataset_name, job_id)
+    if not reference_key:
+        raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
+
+    # 3. Load Reference Data
+    ref_df = _load_reference_dataframe(artifact_store, reference_key, job_id)
+
+    # 3. Load Current Data
+    curr_df = await _load_current_dataframe(file)
+
+    # 4. Calculate Drift
+    try:
+        custom_thresholds = _build_drift_thresholds(
+            threshold_psi, threshold_ks, threshold_wasserstein, threshold_kl
+        )
+        calculator = DriftCalculator(ref_df, curr_df)
+        report = calculator.calculate_drift(thresholds=custom_thresholds or None)
+    except Exception:
+        logger.exception("Drift calculation failed for job %s", job_id)
+        raise SkyulfException(message="Drift calculation failed") from None
+
+    # 5. Save drift check result to DB for history
+    await _save_drift_check_result(db, report, job_id, dataset_name)
+
+    # 6. Load feature importances from training job
+    feature_importances = await _load_feature_importances(db, job_id)
 
     return EnrichedDriftReport(
         reference_rows=report.reference_rows,
@@ -545,6 +602,28 @@ async def get_errors_grouped(
     ]
 
 
+def _build_zero_filled_hour_buckets(cutoff: datetime, hours: int) -> dict[str, int]:
+    """Build a zero-filled dict keyed by hourly ISO slot strings starting at `cutoff`."""
+    buckets: dict[str, int] = {}
+    for i in range(hours):
+        slot = (cutoff + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
+        buckets[slot.strftime("%Y-%m-%dT%H:00")] = 0
+    return buckets
+
+
+def _fill_error_buckets(buckets: dict[str, int], timestamps: list) -> None:
+    """Increment each bucket's count in-place for timestamps that fall within a known hour slot."""
+    for ts in timestamps:
+        if ts is None:
+            continue
+        # Normalise to UTC-aware
+        if hasattr(ts, "tzinfo") and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        slot_key = ts.strftime("%Y-%m-%dT%H:00")
+        if slot_key in buckets:
+            buckets[slot_key] += 1
+
+
 @router.get("/errors/timeline", response_model=list[ErrorTimelineEntry])
 async def get_error_timeline(
     hours: int = 24,
@@ -569,20 +648,8 @@ async def get_error_timeline(
     timestamps = [row[0] for row in result.all()]
 
     # Build a zero-filled bucket dict: { slot_iso: count }
-    buckets: dict[str, int] = {}
-    for i in range(hours):
-        slot = (cutoff + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
-        buckets[slot.strftime("%Y-%m-%dT%H:00")] = 0
-
-    for ts in timestamps:
-        if ts is None:
-            continue
-        # Normalise to UTC-aware
-        if hasattr(ts, "tzinfo") and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=UTC)
-        slot_key = ts.strftime("%Y-%m-%dT%H:00")
-        if slot_key in buckets:
-            buckets[slot_key] += 1
+    buckets = _build_zero_filled_hour_buckets(cutoff, hours)
+    _fill_error_buckets(buckets, timestamps)
 
     return [ErrorTimelineEntry(hour=h, count=c) for h, c in sorted(buckets.items())]
 
@@ -671,25 +738,44 @@ def _percentile(values: list[float], pct: float) -> float:
     return s[rank]
 
 
-@router.get("/slow-nodes", response_model=SlowNodesResponse)
-async def list_slow_nodes(
-    days: int = 7,
-    limit: int = 10,
-    db: AsyncSession = Depends(get_db),
-) -> SlowNodesResponse:
-    """Aggregate per-step execution time across completed jobs in the window.
-
-    Returns the top `limit` step_types sorted by total cumulative seconds —
-    the most useful "where to invest in optimisation" signal.
-    """
+def _clamp_slow_nodes_params(days: int, limit: int) -> tuple[int, int]:
+    """Clamp `days`/`limit` query params to the configured monitoring caps."""
     from backend.config import get_settings as _get_settings
 
     _settings = _get_settings()
     days = max(1, min(days, _settings.MONITORING_MAX_SLOWNODES_DAYS))
     limit = max(1, min(limit, _settings.MAX_PAGE_SIZE))
+    return days, limit
 
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
+def _accumulate_node_timing(
+    entry: Any,
+    by_step: dict[str, list[float]],
+    sample_node: dict[str, str],
+) -> bool:
+    """Fold a single node-timing entry into the running per-step aggregates.
+
+    Returns True if the entry contributed a run to the aggregates.
+    """
+    if not isinstance(entry, dict):
+        return False
+    step = str(entry.get("step_type") or "unknown")
+    try:
+        secs = float(entry.get("execution_time") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if secs <= 0:
+        return False
+    by_step.setdefault(step, []).append(secs)
+    sample_node.setdefault(step, str(entry.get("node_id") or ""))
+    return True
+
+
+async def _scan_slow_node_jobs(
+    db: AsyncSession,
+    cutoff: datetime,
+) -> tuple[dict[str, list[float]], dict[str, str], int, int]:
+    """Scan completed jobs since `cutoff` and aggregate per-step node timings."""
     by_step: dict[str, list[float]] = {}
     sample_node: dict[str, str] = {}
     jobs_scanned = 0
@@ -710,19 +796,17 @@ async def list_slow_nodes(
             if not isinstance(timings, list):
                 continue
             for entry in timings:
-                if not isinstance(entry, dict):
-                    continue
-                step = str(entry.get("step_type") or "unknown")
-                try:
-                    secs = float(entry.get("execution_time") or 0.0)
-                except (TypeError, ValueError):
-                    continue
-                if secs <= 0:
-                    continue
-                by_step.setdefault(step, []).append(secs)
-                sample_node.setdefault(step, str(entry.get("node_id") or ""))
-                runs_seen += 1
+                if _accumulate_node_timing(entry, by_step, sample_node):
+                    runs_seen += 1
 
+    return by_step, sample_node, jobs_scanned, runs_seen
+
+
+def _build_slow_node_aggregates(
+    by_step: dict[str, list[float]],
+    sample_node: dict[str, str],
+) -> list[SlowNodeAggregate]:
+    """Turn per-step timing lists into sorted `SlowNodeAggregate` rows."""
     aggregates: list[SlowNodeAggregate] = []
     for step, values in by_step.items():
         total = sum(values)
@@ -737,8 +821,27 @@ async def list_slow_nodes(
                 sample_node_id=sample_node.get(step) or None,
             )
         )
-
     aggregates.sort(key=lambda a: a.total_seconds, reverse=True)
+    return aggregates
+
+
+@router.get("/slow-nodes", response_model=SlowNodesResponse)
+async def list_slow_nodes(
+    days: int = 7,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+) -> SlowNodesResponse:
+    """Aggregate per-step execution time across completed jobs in the window.
+
+    Returns the top `limit` step_types sorted by total cumulative seconds —
+    the most useful "where to invest in optimisation" signal.
+    """
+    days, limit = _clamp_slow_nodes_params(days, limit)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+
+    by_step, sample_node, jobs_scanned, runs_seen = await _scan_slow_node_jobs(db, cutoff)
+    aggregates = _build_slow_node_aggregates(by_step, sample_node)
+
     return SlowNodesResponse(
         days=days,
         total_jobs_scanned=jobs_scanned,

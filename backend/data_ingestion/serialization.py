@@ -174,6 +174,64 @@ class AsyncJSONSafeSerializer:
             return None
 
     @staticmethod
+    async def _handle_polars_dataframe(df: Any, records_format: bool, max_rows: int | None) -> Any:
+        """Convert df to JSON-safe format if it is a Polars DataFrame, else return _NOT_HANDLED."""
+        try:
+            import polars as pl
+        except ImportError:
+            return AsyncJSONSafeSerializer._NOT_HANDLED
+
+        if not isinstance(df, pl.DataFrame):
+            return AsyncJSONSafeSerializer._NOT_HANDLED
+
+        if max_rows and df.height > max_rows:
+            df = df.head(max_rows)
+        # Convert to Pandas for now as the rest of the logic assumes Pandas
+        # Or use write_json/to_dicts directly
+        if records_format:
+            return df.to_dicts()
+        else:
+            return df.to_dict(as_series=False)
+
+    @staticmethod
+    async def _prepare_dataframe_for_serialization(
+        df: pd.DataFrame, max_rows: int | None
+    ) -> pd.DataFrame:
+        """Truncate to max_rows, yield control for large frames, and fill NaN before serialization."""
+        # Limit rows if specified
+        if max_rows and len(df) > max_rows:
+            df = df.head(max_rows)
+            logger.info(f"Truncated DataFrame to {max_rows} rows for serialization")
+
+        # Yield control for large DataFrames
+        if len(df) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
+            await asyncio.sleep(0)
+
+        # Clean the DataFrame (df.fillna(None) raises ValueError on modern pandas,
+        # since None is treated as "no value/method specified"; use the same
+        # notnull/where pattern already used elsewhere in this module instead).
+        return df.where(pd.notnull(df), cast(Any, None))
+
+    @staticmethod
+    async def _dataframe_to_records(clean_df: pd.DataFrame) -> list[Any]:
+        """Convert a cleaned pandas DataFrame to a JSON-safe list of record dicts."""
+        records = clean_df.to_dict("records")
+        cleaned_records: list[Any] = []
+        for record in records:
+            clean_record = await AsyncJSONSafeSerializer.clean_for_json(record)
+            cleaned_records.append(clean_record)
+        return cleaned_records
+
+    @staticmethod
+    async def _dataframe_to_columns(clean_df: pd.DataFrame) -> dict[str, Any]:
+        """Convert a cleaned pandas DataFrame to a JSON-safe dict of column name -> values."""
+        column_result: dict[str, Any] = {}
+        for col in clean_df.columns:
+            column_data = clean_df[col].tolist()
+            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
+        return column_result
+
+    @staticmethod
     async def safe_dict_from_dataframe(
         df: pd.DataFrame | Any, records_format: bool = True, max_rows: int | None = None
     ) -> list[dict] | dict:
@@ -189,51 +247,21 @@ class AsyncJSONSafeSerializer:
             JSON-safe dictionary representation
         """
         # Handle Polars
-        try:
-            import polars as pl
-
-            if isinstance(df, pl.DataFrame):
-                if max_rows and df.height > max_rows:
-                    df = df.head(max_rows)
-                # Convert to Pandas for now as the rest of the logic assumes Pandas
-                # Or use write_json/to_dicts directly
-                if records_format:
-                    return df.to_dicts()
-                else:
-                    return df.to_dict(as_series=False)
-        except ImportError:
-            pass
+        polars_result = await AsyncJSONSafeSerializer._handle_polars_dataframe(
+            df, records_format, max_rows
+        )
+        if polars_result is not AsyncJSONSafeSerializer._NOT_HANDLED:
+            return polars_result
 
         if df.empty:
             return [] if records_format else {}
 
-        # Limit rows if specified
-        if max_rows and len(df) > max_rows:
-            df = df.head(max_rows)
-            logger.info(f"Truncated DataFrame to {max_rows} rows for serialization")
-
-        # Yield control for large DataFrames
-        if len(df) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
-            await asyncio.sleep(0)
-
-        # Clean the DataFrame
-        clean_df = df.fillna(None)
+        clean_df = await AsyncJSONSafeSerializer._prepare_dataframe_for_serialization(df, max_rows)
 
         if records_format:
-            # Convert to list of records
-            records = clean_df.to_dict("records")
-            cleaned_records: list[Any] = []
-            for record in records:
-                clean_record = await AsyncJSONSafeSerializer.clean_for_json(record)
-                cleaned_records.append(clean_record)
-            return cleaned_records
+            return await AsyncJSONSafeSerializer._dataframe_to_records(clean_df)
 
-        # Convert to dict of columns
-        column_result: dict[str, Any] = {}
-        for col in clean_df.columns:
-            column_data = clean_df[col].tolist()
-            column_result[str(col)] = await AsyncJSONSafeSerializer.clean_for_json(column_data)
-        return column_result
+        return await AsyncJSONSafeSerializer._dataframe_to_columns(clean_df)
 
     @staticmethod
     async def serialize_dataframe_metadata(df: pd.DataFrame) -> dict[str, Any]:
@@ -522,6 +550,29 @@ class DataTypeConverter:
     """Utility class for data type conversions and validations."""
 
     @staticmethod
+    def _infer_object_column_type(series: pd.Series) -> str:
+        """Infer the semantic type of an object-dtype column (dates, numeric/boolean strings, or text)."""
+        non_null = series.dropna()
+        if non_null.apply(lambda x: isinstance(x, datetime | date)).all():
+            return "datetime"
+        if non_null.str.match(r"^-?\d+\.?\d*$").all():
+            return "numeric_string"
+        if non_null.str.lower().isin(["true", "false", "yes", "no", "1", "0"]).all():
+            return "boolean_string"
+        return "text"
+
+    @staticmethod
+    def _infer_non_object_column_type(series: pd.Series) -> str:
+        """Infer the semantic type of a non-object-dtype column based on its pandas dtype."""
+        if pd.api.types.is_numeric_dtype(series):
+            return "integer" if pd.api.types.is_integer_dtype(series) else "float"
+        if pd.api.types.is_datetime64_any_dtype(series):
+            return "datetime"
+        if pd.api.types.is_bool_dtype(series):
+            return "boolean"
+        return str(series.dtype)
+
+    @staticmethod
     def infer_column_types(df: pd.DataFrame) -> dict[str, str]:
         """
         Infer semantic data types for DataFrame columns.
@@ -539,32 +590,26 @@ class DataTypeConverter:
             col_str = str(col)
 
             if series.dtype == "object":
-                # Check for dates
-                if series.dropna().apply(lambda x: isinstance(x, (datetime, date))).all():
-                    type_mapping[col_str] = "datetime"
-                # Check for numeric strings
-                elif series.dropna().str.match(r"^-?\d+\.?\d*$").all():
-                    type_mapping[col_str] = "numeric_string"
-                # Check for boolean-like strings
-                elif (
-                    series.dropna().str.lower().isin(["true", "false", "yes", "no", "1", "0"]).all()
-                ):
-                    type_mapping[col_str] = "boolean_string"
-                else:
-                    type_mapping[col_str] = "text"
-            elif pd.api.types.is_numeric_dtype(series):
-                if pd.api.types.is_integer_dtype(series):
-                    type_mapping[col_str] = "integer"
-                else:
-                    type_mapping[col_str] = "float"
-            elif pd.api.types.is_datetime64_any_dtype(series):
-                type_mapping[col_str] = "datetime"
-            elif pd.api.types.is_bool_dtype(series):
-                type_mapping[col_str] = "boolean"
+                type_mapping[col_str] = DataTypeConverter._infer_object_column_type(series)
             else:
-                type_mapping[col_str] = str(series.dtype)
+                type_mapping[col_str] = DataTypeConverter._infer_non_object_column_type(series)
 
         return type_mapping
+
+    @staticmethod
+    def _convert_column(series: pd.Series, target_type: str) -> pd.Series:
+        """Convert a single column to the requested target type, returning it unchanged if unrecognized."""
+        if target_type == "integer":
+            return pd.to_numeric(series, errors="coerce").astype("Int64")
+        elif target_type == "float":
+            return pd.to_numeric(series, errors="coerce")
+        elif target_type == "datetime":
+            return pd.to_datetime(series, errors="coerce")
+        elif target_type == "boolean":
+            return series.astype("boolean")
+        elif target_type == "text":
+            return series.astype("string")
+        return series
 
     @staticmethod
     async def convert_dataframe_types(
@@ -587,17 +632,7 @@ class DataTypeConverter:
                 continue
 
             try:
-                if target_type == "integer":
-                    result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype("Int64")
-                elif target_type == "float":
-                    result_df[col] = pd.to_numeric(result_df[col], errors="coerce")
-                elif target_type == "datetime":
-                    result_df[col] = pd.to_datetime(result_df[col], errors="coerce")
-                elif target_type == "boolean":
-                    result_df[col] = result_df[col].astype("boolean")
-                elif target_type == "text":
-                    result_df[col] = result_df[col].astype("string")
-
+                result_df[col] = DataTypeConverter._convert_column(result_df[col], target_type)
             except Exception as e:
                 logger.warning(f"Failed to convert column {col} to {target_type}: {e}")
 

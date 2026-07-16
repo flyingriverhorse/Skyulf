@@ -49,6 +49,28 @@ class TextMixin(_AnalyzerState):
             common_words=common_words,
         )
 
+    @staticmethod
+    def _classify_sentiment_counts(analyzer, texts: list) -> tuple[dict[str, int], int]:
+        """Classify each text's VADER compound score into positive/neutral/negative buckets."""
+        counts = {"positive": 0, "neutral": 0, "negative": 0}
+        total = 0
+
+        for text in texts:
+            if not isinstance(text, str):
+                continue
+
+            compound = analyzer.polarity_scores(text)["compound"]
+
+            if compound >= 0.05:
+                counts["positive"] += 1
+            elif compound <= -0.05:
+                counts["negative"] += 1
+            else:
+                counts["neutral"] += 1
+            total += 1
+
+        return counts, total
+
     def _analyze_sentiment(self, text_series: pl.Series) -> dict[str, float] | None:
         """Return VADER sentiment distribution ratios, or ``None`` if unavailable."""
         if not VADER_AVAILABLE:
@@ -68,22 +90,7 @@ class TextMixin(_AnalyzerState):
 
             analyzer = SentimentIntensityAnalyzer()
 
-            counts = {"positive": 0, "neutral": 0, "negative": 0}
-            total = 0
-
-            for text in texts:
-                if not isinstance(text, str):
-                    continue
-
-                compound = analyzer.polarity_scores(text)["compound"]
-
-                if compound >= 0.05:
-                    counts["positive"] += 1
-                elif compound <= -0.05:
-                    counts["negative"] += 1
-                else:
-                    counts["neutral"] += 1
-                total += 1
+            counts, total = self._classify_sentiment_counts(analyzer, texts)
 
             if total == 0:
                 return None

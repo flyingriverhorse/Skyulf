@@ -118,13 +118,14 @@ def _bool_expr_from_string_col_polars(col: str) -> Any:
     )
 
 
-def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
-    import polars as pl
+def _build_polars_cast_exprs(
+    X: Any, type_map: dict[str, Any], coerce_on_error: bool
+) -> tuple[list[Any], list[str]]:
+    """Build the list of Polars cast expressions and track string->bool columns.
 
-    type_map = params.get("type_map", {})
-    if not type_map:
-        return X, y
-    coerce_on_error = params.get("coerce_on_error", True)
+    Raises ``ValueError`` in strict mode when a target dtype string is unsupported.
+    """
+    import polars as pl
 
     exprs = []
     string_bool_cols: list[str] = []
@@ -150,19 +151,35 @@ def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
             continue
         exprs.append(pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col))
 
+    return exprs, string_bool_cols
+
+
+def _validate_polars_string_bool_casts(result: Any, X: Any, string_bool_cols: list[str]) -> None:
+    """Raise ``ValueError`` if a strict string->bool cast produced unexpected nulls."""
+    for col in string_bool_cols:
+        newly_null = result[col].is_null() & X[col].is_not_null()
+        if newly_null.any():
+            raise ValueError(
+                f"Cannot cast column '{col}' to boolean: contains value(s) "
+                "not recognized as true/false."
+            )
+
+
+def _casting_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> Any:
+    type_map = params.get("type_map", {})
+    if not type_map:
+        return X, y
+    coerce_on_error = params.get("coerce_on_error", True)
+
+    exprs, string_bool_cols = _build_polars_cast_exprs(X, type_map, coerce_on_error)
+
     if not exprs:
         return X, y
 
     result = X.with_columns(exprs)
 
     if not coerce_on_error and string_bool_cols:
-        for col in string_bool_cols:
-            newly_null = result[col].is_null() & X[col].is_not_null()
-            if newly_null.any():
-                raise ValueError(
-                    f"Cannot cast column '{col}' to boolean: contains value(s) "
-                    "not recognized as true/false."
-                )
+        _validate_polars_string_bool_casts(result, X, string_bool_cols)
 
     return result, y
 

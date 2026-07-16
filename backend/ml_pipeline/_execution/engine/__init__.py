@@ -92,13 +92,10 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         if self.log_callback:
             self.log_callback(message)
 
-    def run(
-        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
-    ) -> PipelineExecutionResult:
-        """
-        Executes the pipeline defined by the configuration.
-        """
-        self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+    def _init_run_state(
+        self, config: PipelineConfig, dataset_name: str
+    ) -> tuple[datetime, PipelineExecutionResult]:
+        """Reset per-run engine state and build the optimistic result shell."""
         self.dataset_name = dataset_name
         start_time = datetime.now(UTC)
         self.executed_transformers = []  # Reset for new run
@@ -106,7 +103,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
         # Per-run merge advisories surfaced to API/UI so the user understands
         # what fan-in semantics were applied (column union, last-wins, etc.).
-        self.merge_warnings: list[dict[str, Any]] = []
+        self.merge_warnings = []
 
         self._current_pipeline_id = config.pipeline_id
         pipeline_result = PipelineExecutionResult(
@@ -114,19 +111,16 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             status="success",  # Optimistic default
             start_time=start_time,
         )
+        return start_time, pipeline_result
 
-        # C7 Phase B: walk the topology once and ask each Calculator's
-        # ``infer_output_schema`` what its output columns/dtypes will be.
-        # Pure addition — does not change runtime behaviour. Loaders are
-        # opaque without a catalog seed, so downstream entries will be
-        # ``None`` until Phase C wires in dataset-catalog seeding.
-        pipeline_result.predicted_schemas = self._predict_schemas_safe(config)
+    def _run_node_loop(
+        self, config: PipelineConfig, job_id: str, pipeline_result: PipelineExecutionResult
+    ) -> None:
+        """Execute each node in order, updating `pipeline_result` in place.
 
-        # Capture per-node `logger.warning(...)` calls (e.g. TargetEncoder
-        # coercion notices, OneHotEncoder degenerate-category warnings) so
-        # the UI can surface them as toasts / a notification panel instead
-        # of silently dropping them in the server log. Tagged with the
-        # currently-executing node id via `set_current_node`.
+        Captures per-node warnings via `WarningCaptureHandler` and stops at
+        the first failed/erroring node, marking the pipeline as failed.
+        """
         warn_handler = WarningCaptureHandler().attach()
         try:
             for node in config.nodes:
@@ -158,12 +152,15 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             pipeline_result.node_warnings = warn_handler.drain()
             warn_handler.detach()
 
-        pipeline_result.end_time = datetime.now(UTC)
-        # Dedup advisories: a merge node executed in multiple branches/parts
-        # (e.g. FeatureTargetSplit hit once per parallel branch) re-appends
-        # the same advisory each pass. Collapse on (node_id, kind, inputs,
-        # overlap_columns, dropped_columns, part) so the UI shows one row
-        # per logically distinct merge instead of N copies.
+    def _dedup_merge_warnings(self) -> list[dict[str, Any]]:
+        """Collapse repeated merge advisories from multi-pass branch execution.
+
+        A merge node executed in multiple branches/parts (e.g.
+        FeatureTargetSplit hit once per parallel branch) re-appends the same
+        advisory each pass. Collapse on (node_id, kind, inputs,
+        overlap_columns, dropped_columns, part) so the UI shows one row per
+        logically distinct merge instead of N copies.
+        """
         seen_keys: set = set()
         deduped: list[dict[str, Any]] = []
         for w in self.merge_warnings:
@@ -179,8 +176,125 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 continue
             seen_keys.add(key)
             deduped.append(w)
-        pipeline_result.merge_warnings = deduped
+        return deduped
+
+    def run(
+        self, config: PipelineConfig, job_id: str = "unknown", dataset_name: str = "dataset"
+    ) -> PipelineExecutionResult:
+        """
+        Executes the pipeline defined by the configuration.
+        """
+        self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+        _, pipeline_result = self._init_run_state(config, dataset_name)
+
+        # C7 Phase B: walk the topology once and ask each Calculator's
+        # ``infer_output_schema`` what its output columns/dtypes will be.
+        # Pure addition — does not change runtime behaviour. Loaders are
+        # opaque without a catalog seed, so downstream entries will be
+        # ``None`` until Phase C wires in dataset-catalog seeding.
+        pipeline_result.predicted_schemas = self._predict_schemas_safe(config)
+
+        # Capture per-node `logger.warning(...)` calls (e.g. TargetEncoder
+        # coercion notices, OneHotEncoder degenerate-category warnings) so
+        # the UI can surface them as toasts / a notification panel instead
+        # of silently dropping them in the server log. Tagged with the
+        # currently-executing node id via `set_current_node`.
+        self._run_node_loop(config, job_id, pipeline_result)
+
+        pipeline_result.end_time = datetime.now(UTC)
+        pipeline_result.merge_warnings = self._dedup_merge_warnings()
         return pipeline_result
+
+    def _dispatch_feature_engineering(
+        self, node: NodeConfig, job_id: str
+    ) -> tuple[str | None, dict[str, Any]]:
+        """Run a feature-engineering node, falling back to data-loader if misconfigured."""
+        metrics: dict[str, Any] = {}
+        # Check if it's actually a misconfigured data loader
+        if not node.inputs and "dataset_id" in node.params:
+            logger.warning(
+                f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. "
+                "Executing as data loader."
+            )
+            return self._run_data_loader(node, job_id=job_id), metrics
+        return self._run_feature_engineering(node)
+
+    def _dispatch_transformer_fallback(
+        self, node: NodeConfig, job_id: str
+    ) -> tuple[str | None, dict[str, Any]]:
+        """Try to run the node as a single generic transformer step."""
+        try:
+            logger.debug(f"Running as single transformer: {node.step_type}")
+            return self._run_transformer(node, job_id=job_id)
+        except Exception as e:
+            # If it fails or isn't a valid transformer, re-raise
+            if "Unknown transformer type" in str(e):
+                raise ValueError(f"Unknown step type: {node.step_type}") from e
+            raise e
+
+    def _dispatch_node(self, node: NodeConfig, job_id: str) -> tuple[str | None, dict[str, Any]]:
+        """Run a single node's step logic and return ``(output_artifact_id, metrics)``.
+
+        Centralizes the per-step-type dispatch (data loader, feature
+        engineering, training, tuning, preview, generic transformer) that
+        :meth:`_execute_node` used to inline.
+        """
+        metrics: dict[str, Any] = {}
+        if node.step_type == StepType.DATA_LOADER:
+            return self._run_data_loader(node, job_id=job_id), metrics
+        if node.step_type == StepType.FEATURE_ENGINEERING:
+            return self._dispatch_feature_engineering(node, job_id)
+        if node.step_type == StepType.BASIC_TRAINING:
+            return self._run_basic_training(node, job_id=job_id)
+        if node.step_type == StepType.ADVANCED_TUNING:
+            return self._run_advanced_tuning(node, job_id=job_id)
+        if node.step_type == "data_preview":
+            return self._run_data_preview(node)
+
+        # Try to run as a single transformer step
+        return self._dispatch_transformer_fallback(node, job_id)
+
+    def _build_node_metadata(self, node: NodeConfig, metrics: dict[str, Any]) -> dict[str, Any]:
+        """Best-effort assembly of the one-line node-card summary metadata.
+
+        The artifact store already has the freshly-saved output (every
+        ``_run_*`` path writes under node_id), so loading it here is cheap and
+        keeps summary logic out of the per-runner methods. Every step here
+        tolerates failure - a missing summary just means the card falls back
+        to its static description.
+        """
+        metadata: dict[str, Any] = {}
+        # Output / upstream loads are best-effort and isolated from
+        # the summary call - for trainers and tuners the summary
+        # comes purely from `metrics`, so a failed model load (e.g.
+        # an artifact bundle that doesn't unpickle cleanly) must not
+        # suppress the card line.
+        output: Any = None
+        try:
+            output = self.artifact_store.load(node.node_id)
+        except Exception:
+            logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
+        input_shape: tuple[int, int] | None = None
+        try:
+            if node.inputs:
+                upstream = self.artifact_store.load(node.inputs[0])
+                if isinstance(upstream, pd.DataFrame):
+                    input_shape = upstream.shape
+        except Exception:
+            input_shape = None
+        try:
+            summary = build_summary(
+                step_type=node.step_type,
+                output=output,
+                metrics=metrics,
+                input_shape=input_shape,
+                params=node.params or {},
+            )
+            if summary:
+                metadata["summary"] = summary
+        except Exception:
+            logger.debug("summary skipped for node %s", node.node_id, exc_info=True)
+        return metadata
 
     def _execute_node(self, node: NodeConfig, job_id: str = "unknown") -> NodeExecutionResult:
         """Executes a single node based on its type."""
@@ -188,77 +302,9 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         start_ts = time.time()
 
         try:
-            output_artifact_id = None
-            metrics: dict[str, Any] = {}
-
-            if node.step_type == StepType.DATA_LOADER:
-                output_artifact_id = self._run_data_loader(node, job_id=job_id)
-            elif node.step_type == StepType.FEATURE_ENGINEERING:
-                # Check if it's actually a misconfigured data loader
-                if not node.inputs and "dataset_id" in node.params:
-                    logger.warning(
-                        f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. "
-                        "Executing as data loader."
-                    )
-                    output_artifact_id = self._run_data_loader(node, job_id=job_id)
-                else:
-                    output_artifact_id, metrics = self._run_feature_engineering(node)
-            elif node.step_type == StepType.BASIC_TRAINING:
-                output_artifact_id, metrics = self._run_basic_training(node, job_id=job_id)
-            elif node.step_type == StepType.ADVANCED_TUNING:
-                output_artifact_id, metrics = self._run_advanced_tuning(node, job_id=job_id)
-            elif node.step_type == "data_preview":
-                output_artifact_id, metrics = self._run_data_preview(node)
-            else:
-                # Try to run as a single transformer step
-                try:
-                    logger.debug(f"Running as single transformer: {node.step_type}")
-                    output_artifact_id, metrics = self._run_transformer(node, job_id=job_id)
-                except Exception as e:
-                    # If it fails or isn't a valid transformer, re-raise
-                    if "Unknown transformer type" in str(e):
-                        raise ValueError(f"Unknown step type: {node.step_type}") from e
-                    raise e
-
+            output_artifact_id, metrics = self._dispatch_node(node, job_id)
             duration = time.time() - start_ts
-
-            # Build the one-line node-card summary. The artifact store
-            # already has the freshly-saved output (every _run_* path
-            # writes under node_id), so loading it here is cheap and
-            # keeps summary logic out of the per-runner methods. We
-            # tolerate any failure - a missing summary just means the
-            # card falls back to its static description.
-            metadata: dict[str, Any] = {}
-            # Output / upstream loads are best-effort and isolated from
-            # the summary call - for trainers and tuners the summary
-            # comes purely from `metrics`, so a failed model load (e.g.
-            # an artifact bundle that doesn't unpickle cleanly) must not
-            # suppress the card line.
-            output: Any = None
-            try:
-                output = self.artifact_store.load(node.node_id)
-            except Exception:
-                logger.debug("summary: output load skipped for %s", node.node_id, exc_info=True)
-            input_shape: tuple[int, int] | None = None
-            try:
-                if node.inputs:
-                    upstream = self.artifact_store.load(node.inputs[0])
-                    if isinstance(upstream, pd.DataFrame):
-                        input_shape = upstream.shape
-            except Exception:
-                input_shape = None
-            try:
-                summary = build_summary(
-                    step_type=node.step_type,
-                    output=output,
-                    metrics=metrics,
-                    input_shape=input_shape,
-                    params=node.params or {},
-                )
-                if summary:
-                    metadata["summary"] = summary
-            except Exception:
-                logger.debug("summary skipped for node %s", node.node_id, exc_info=True)
+            metadata = self._build_node_metadata(node, metrics)
 
             return NodeExecutionResult(
                 node_id=node.node_id,

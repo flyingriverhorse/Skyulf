@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 class TargetMixin(_AnalyzerState):
     """Target-relationship helpers for :class:`EDAAnalyzer`."""
 
+    def _collect_target_correlations(self, target_col: str, features: list[str]) -> pl.DataFrame:
+        """Collect per-feature Pearson correlation with the target, suppressing constant-column warnings."""
+        exprs = [pl.corr(col, target_col).alias(col) for col in features]
+
+        import warnings
+
+        # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            return _collect(self.lazy_df.select(exprs))  # type: ignore[attr-defined]
+
     def _calculate_target_correlations(
         self, target_col: str, numeric_cols: list[str]
     ) -> dict[str, float]:
@@ -22,14 +33,7 @@ class TargetMixin(_AnalyzerState):
             if not features:
                 return {}
 
-            exprs = [pl.corr(col, target_col).alias(col) for col in features]
-
-            import warnings
-
-            # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                result = _collect(self.lazy_df.select(exprs))  # type: ignore[attr-defined]
+            result = self._collect_target_correlations(target_col, features)
 
             corrs = {}
             for col in features:
@@ -42,6 +46,33 @@ class TargetMixin(_AnalyzerState):
         except Exception as e:
             logger.warning(f"Error calculating target correlations: {e}")
             return {}
+
+    def _calculate_eta_for_column(self, target_col: str, col: str) -> float | None:
+        """Compute the correlation-ratio (η) association between `target_col` groups and `col`, or None to skip."""
+        global_mean = self.df[col].mean()  # type: ignore[attr-defined]
+        if global_mean is None:
+            return None
+
+        ss_total = self.df.select(  # type: ignore[attr-defined]
+            ((pl.col(col) - global_mean) ** 2).sum()
+        ).item()
+
+        if not ss_total:
+            return 0.0
+
+        groups = self.df.group_by(target_col).agg(  # type: ignore[attr-defined]
+            [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
+        )
+
+        ss_between = 0.0
+        for row in groups.iter_rows(named=True):
+            n = row["n"]
+            mean_group = row["mean"]
+            if mean_group is not None:
+                ss_between += n * ((mean_group - global_mean) ** 2)
+
+        eta_squared = ss_between / ss_total
+        return float(np.sqrt(eta_squared))
 
     def _calculate_categorical_target_associations(
         self, target_col: str, numeric_cols: list[str]
@@ -59,31 +90,9 @@ class TargetMixin(_AnalyzerState):
             # column (e.g. all-null, raising on the `- global_mean` arithmetic)
             # can't wipe out the associations already computed for the rest.
             try:
-                global_mean = self.df[col].mean()  # type: ignore[attr-defined]
-                if global_mean is None:
-                    continue
-
-                ss_total = self.df.select(  # type: ignore[attr-defined]
-                    ((pl.col(col) - global_mean) ** 2).sum()
-                ).item()
-
-                if not ss_total:
-                    associations[col] = 0.0
-                    continue
-
-                groups = self.df.group_by(target_col).agg(  # type: ignore[attr-defined]
-                    [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
-                )
-
-                ss_between = 0.0
-                for row in groups.iter_rows(named=True):
-                    n = row["n"]
-                    mean_group = row["mean"]
-                    if mean_group is not None:
-                        ss_between += n * ((mean_group - global_mean) ** 2)
-
-                eta_squared = ss_between / ss_total
-                associations[col] = float(np.sqrt(eta_squared))
+                eta = self._calculate_eta_for_column(target_col, col)
+                if eta is not None:
+                    associations[col] = eta
             except Exception as e:
                 logger.warning(f"Error calculating categorical target association for '{col}': {e}")
                 continue
@@ -99,94 +108,116 @@ class TargetMixin(_AnalyzerState):
             features_to_process = features[:20]
 
             for feature in features_to_process:
-                if is_target_numeric:
-                    group_col = feature
-                    value_col = target_col
-                else:
-                    group_col = target_col
-                    value_col = feature
-
-                # Skip high-cardinality grouping — not useful as a box plot.
-                if self.df[group_col].n_unique() > 20:  # type: ignore[attr-defined]
-                    continue
-
-                stats_df = _collect(
-                    self.lazy_df.group_by(group_col).agg(  # type: ignore[attr-defined]
-                        [
-                            pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
-                            pl.col(value_col)
-                            .cast(pl.Float64, strict=False)
-                            .quantile(0.25)
-                            .alias("q1"),
-                            pl.col(value_col)
-                            .cast(pl.Float64, strict=False)
-                            .median()
-                            .alias("median"),
-                            pl.col(value_col)
-                            .cast(pl.Float64, strict=False)
-                            .quantile(0.75)
-                            .alias("q3"),
-                            pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max"),
-                        ]
-                    )
-                )
-
-                category_plots = []
-                for row in stats_df.iter_rows(named=True):
-                    if row[group_col] is None or row["min"] is None:
-                        continue
-                    category_plots.append(
-                        CategoryBoxPlot(
-                            name=str(row[group_col]),
-                            stats=BoxPlotStats(
-                                min=float(row["min"]),
-                                q1=float(row["q1"]),
-                                median=float(row["median"]),
-                                q3=float(row["q3"]),
-                                max=float(row["max"]),
-                            ),
-                        )
-                    )
-
-                p_value = None
-                if SCIPY_AVAILABLE and len(category_plots) > 1:
-                    try:
-                        from scipy.stats import f_oneway
-
-                        anova_data = _collect(
-                            self.lazy_df.select(  # type: ignore[attr-defined]
-                                [pl.col(group_col), pl.col(value_col)]
-                            )
-                            .group_by(group_col)
-                            .agg(pl.col(value_col))
-                        )
-
-                        groups_data = []
-                        for row in anova_data.iter_rows(named=True):
-                            if row[group_col] is not None and row[value_col] is not None:
-                                vals = [v for v in row[value_col] if v is not None]
-                                if len(vals) > 1:
-                                    groups_data.append(vals)
-
-                        if len(groups_data) > 1:
-                            _f_stat, p_val = f_oneway(*groups_data)
-                            if not np.isnan(p_val):
-                                p_value = float(p_val)
-                    except Exception as e:
-                        logger.warning(f"ANOVA failed for {feature}: {e}")
-
-                if category_plots:
-                    interactions.append(
-                        TargetInteraction(
-                            feature=feature,
-                            plot_type="boxplot",
-                            data=category_plots,
-                            p_value=p_value,
-                        )
-                    )
+                interaction = self._build_target_interaction(feature, target_col, is_target_numeric)
+                if interaction is not None:
+                    interactions.append(interaction)
 
             return interactions
 
         except Exception as e:
             logger.warning(f"Error calculating target interactions: {e}")
             return []
+
+    def _build_target_interaction(
+        self, feature: str, target_col: str, is_target_numeric: bool
+    ) -> TargetInteraction | None:
+        """Build the box-plot + ANOVA interaction for a single feature, or None if skipped."""
+        group_col, value_col = (feature, target_col) if is_target_numeric else (target_col, feature)
+
+        # Skip high-cardinality grouping — not useful as a box plot.
+        if self.df[group_col].n_unique() > 20:  # type: ignore[attr-defined]
+            return None
+
+        stats_df = self._compute_boxplot_stats(group_col, value_col)
+        category_plots = self._build_category_plots(stats_df, group_col)
+
+        if not category_plots:
+            return None
+
+        p_value = self._compute_anova_p_value(group_col, value_col, category_plots, feature)
+
+        return TargetInteraction(
+            feature=feature,
+            plot_type="boxplot",
+            data=category_plots,
+            p_value=p_value,
+        )
+
+    def _compute_boxplot_stats(self, group_col: str, value_col: str) -> pl.DataFrame:
+        """Compute per-group min/q1/median/q3/max for the value column."""
+        return _collect(
+            self.lazy_df.group_by(group_col).agg(  # type: ignore[attr-defined]
+                [
+                    pl.col(value_col).cast(pl.Float64, strict=False).min().alias("min"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).quantile(0.25).alias("q1"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).median().alias("median"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).quantile(0.75).alias("q3"),
+                    pl.col(value_col).cast(pl.Float64, strict=False).max().alias("max"),
+                ]
+            )
+        )
+
+    def _build_category_plots(
+        self, stats_df: pl.DataFrame, group_col: str
+    ) -> list[CategoryBoxPlot]:
+        """Convert per-group box-plot stat rows into CategoryBoxPlot models."""
+        category_plots = []
+        for row in stats_df.iter_rows(named=True):
+            if row[group_col] is None or row["min"] is None:
+                continue
+            category_plots.append(
+                CategoryBoxPlot(
+                    name=str(row[group_col]),
+                    stats=BoxPlotStats(
+                        min=float(row["min"]),
+                        q1=float(row["q1"]),
+                        median=float(row["median"]),
+                        q3=float(row["q3"]),
+                        max=float(row["max"]),
+                    ),
+                )
+            )
+        return category_plots
+
+    def _compute_anova_p_value(
+        self,
+        group_col: str,
+        value_col: str,
+        category_plots: list[CategoryBoxPlot],
+        feature: str,
+    ) -> float | None:
+        """Run a one-way ANOVA across groups, returning the p-value if computable."""
+        if not (SCIPY_AVAILABLE and len(category_plots) > 1):
+            return None
+
+        try:
+            from scipy.stats import f_oneway
+
+            groups_data = self._collect_anova_groups(group_col, value_col)
+
+            if len(groups_data) > 1:
+                _f_stat, p_val = f_oneway(*groups_data)
+                if not np.isnan(p_val):
+                    return float(p_val)
+        except Exception as e:
+            logger.warning(f"ANOVA failed for {feature}: {e}")
+
+        return None
+
+    def _collect_anova_groups(self, group_col: str, value_col: str) -> list[list]:
+        """Collect per-group value lists (with at least 2 non-null values) for ANOVA."""
+        anova_data = _collect(
+            self.lazy_df.select(  # type: ignore[attr-defined]
+                [pl.col(group_col), pl.col(value_col)]
+            )
+            .group_by(group_col)
+            .agg(pl.col(value_col))
+        )
+
+        groups_data = []
+        for row in anova_data.iter_rows(named=True):
+            if row[group_col] is not None and row[value_col] is not None:
+                vals = [v for v in row[value_col] if v is not None]
+                if len(vals) > 1:
+                    groups_data.append(vals)
+        return groups_data

@@ -28,6 +28,7 @@ graph classification and the HTTP endpoint.
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
@@ -400,7 +401,9 @@ async def _lookup_dataset_file_path(dataset_id: str, session: AsyncSession) -> s
             "config": ds.config if isinstance(ds.config, dict) else {},
         }
         path = extract_file_path_from_source(source_dict)
-        return path.as_posix() if path is not None else None
+        if path is None:
+            return None
+        return path.as_posix() if isinstance(path, Path) else str(path)
     except Exception:  # pragma: no cover — non-critical lookup
         return None
 
