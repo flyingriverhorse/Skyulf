@@ -562,7 +562,7 @@ def _best_score_value_and_label(metrics: Mapping[str, Any], best: float) -> tupl
 def _best_score_headline(metrics: Mapping[str, Any], n_trials: int | None) -> str | None:
     """Render the "<label> <value>" headline from ``best_score``, or ``None`` if absent."""
     best = metrics.get("best_score")
-    if not isinstance(best, (int, float)) or isinstance(best, bool):
+    if not isinstance(best, int | float) or isinstance(best, bool):
         return None
     value, label = _best_score_value_and_label(metrics, best)
     head = f"{label} {value:.3f}"
