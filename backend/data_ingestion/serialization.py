@@ -207,8 +207,10 @@ class AsyncJSONSafeSerializer:
         if len(df) > get_settings().SERIALIZATION_YIELD_THRESHOLD_ROWS:
             await asyncio.sleep(0)
 
-        # Clean the DataFrame
-        return df.fillna(None)
+        # Clean the DataFrame (df.fillna(None) raises ValueError on modern pandas,
+        # since None is treated as "no value/method specified"; use the same
+        # notnull/where pattern already used elsewhere in this module instead).
+        return df.where(pd.notnull(df), cast(Any, None))
 
     @staticmethod
     async def _dataframe_to_records(clean_df: pd.DataFrame) -> list[Any]:

@@ -445,7 +445,7 @@ class DeploymentService:
         input_features = DeploymentService._extract_features_from_engineer(fe)
 
         # If still empty, try model
-        if not input_features and "model" in artifact:
+        if len(input_features) == 0 and "model" in artifact:
             model = artifact["model"]
             if isinstance(model, tuple):
                 model = model[0]
