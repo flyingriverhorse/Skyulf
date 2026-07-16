@@ -13,6 +13,7 @@ import { getJobScoringMetric, shortRunId } from './ExperimentsPage/utils/jobMeta
 import { findBestF1Threshold } from './ExperimentsPage/utils/classificationCharts';
 import { ComparisonTableView } from './ExperimentsPage/components/ComparisonTableView';
 import { FeatureImportanceView } from './ExperimentsPage/components/FeatureImportanceView';
+import { ShapSummaryView } from './ExperimentsPage/components/ShapSummaryView';
 import { BranchComparisonCard } from './ExperimentsPage/components/BranchComparisonCard';
 import { MetricsComparisonChart } from './ExperimentsPage/components/MetricsComparisonChart';
 import { JobListSidebar } from './ExperimentsPage/components/JobListSidebar';
@@ -271,6 +272,18 @@ export const ExperimentsPage: React.FC = () => {
     [featureImportancesByJob]
   );
 
+  // SHAP explainability summaries across selected jobs
+  const shapSummaryByJob = useMemo(() => selectedJobs.map(job => {
+    const result = (job.result ?? {}) as Record<string, unknown>;
+    const metrics = result.metrics as Record<string, unknown> | undefined;
+    const raw = (metrics?.shap_summary ?? result.shap_summary) as Record<string, number> | undefined;
+    return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', shapSummary: raw ?? null };
+  }), [selectedJobs]);
+  const hasShapSummary = useMemo(
+    () => shapSummaryByJob.some(j => j.shapSummary !== null),
+    [shapSummaryByJob]
+  );
+
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 overflow-hidden">
       <ExperimentsHeader
@@ -309,6 +322,7 @@ export const ExperimentsPage: React.FC = () => {
                 activeView={activeView}
                 setActiveView={setActiveView}
                 hasFeatureImportances={hasFeatureImportances}
+                hasShapSummary={hasShapSummary}
               />
 
               <BranchComparisonCard selectedJobs={selectedJobs} getDuration={formatDuration} />
@@ -382,6 +396,15 @@ export const ExperimentsPage: React.FC = () => {
               {activeView === 'importance' && hasFeatureImportances && (
                 <FeatureImportanceView
                   featureImportancesByJob={featureImportancesByJob}
+                  handleDownload={handleDownload}
+                  downloadingChart={downloadingChart}
+                  doneChart={doneChart}
+                />
+              )}
+
+              {activeView === 'shap' && hasShapSummary && (
+                <ShapSummaryView
+                  shapSummaryByJob={shapSummaryByJob}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
