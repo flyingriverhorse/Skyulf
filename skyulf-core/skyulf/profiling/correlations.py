@@ -14,6 +14,51 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
     return cast(pl.DataFrame, lf.collect())
 
 
+def _cap_numeric_columns(numeric_cols: list[str]) -> list[str]:
+    """Truncate to the first 20 numeric columns, logging a warning if any were dropped."""
+    # HARD LIMIT: Top 20 numeric columns to prevent backend/frontend crash
+    # Reduced from 50 to 20 as per user report of crashes
+    if len(numeric_cols) > 20:
+        dropped_cols = numeric_cols[20:]
+        logger.warning(
+            "calculate_correlations: %d numeric columns exceeds the 20-column "
+            "cap; truncating to the first 20 by column order (not variance or "
+            "relevance) and dropping %s from the correlation matrix.",
+            len(numeric_cols),
+            dropped_cols,
+        )
+        numeric_cols = numeric_cols[:20]
+    return numeric_cols
+
+
+def _filter_constant_columns(subset: pl.DataFrame, numeric_cols: list[str]) -> list[str]:
+    """Return the subset of columns with non-null, non-zero standard deviation."""
+    # Handle constant columns to avoid RuntimeWarning: invalid value encountered in divide
+    # Filter out columns with 0 std dev
+    valid_cols = []
+    for col in numeric_cols:
+        std_val = subset[col].std()
+        # Check for None (all nulls or single value) and 0 variance
+        if std_val is not None and cast(float, std_val) > 1e-9:
+            valid_cols.append(col)
+    return valid_cols
+
+
+def _clean_correlation_rows(corr_df: pl.DataFrame) -> list[list[float]]:
+    """Convert a correlation DataFrame to a plain matrix, replacing NaN/None/Inf with 0.0."""
+    matrix = []
+    for row in corr_df.iter_rows():
+        # Handle NaN/None/Inf
+        cleaned_row = []
+        for x in row:
+            if x is None or np.isnan(x) or np.isinf(x):
+                cleaned_row.append(0.0)
+            else:
+                cleaned_row.append(float(x))
+        matrix.append(cleaned_row)
+    return matrix
+
+
 def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> CorrelationMatrix | None:
     """
     Calculates Pearson correlation matrix for numeric columns.
@@ -39,29 +84,11 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
         # Limit to reasonable number of columns to avoid OOM on huge column sets?
         # Let's assume < 1000 columns for now.
 
-        # HARD LIMIT: Top 20 numeric columns to prevent backend/frontend crash
-        # Reduced from 50 to 20 as per user report of crashes
-        if len(numeric_cols) > 20:
-            dropped_cols = numeric_cols[20:]
-            logger.warning(
-                "calculate_correlations: %d numeric columns exceeds the 20-column "
-                "cap; truncating to the first 20 by column order (not variance or "
-                "relevance) and dropping %s from the correlation matrix.",
-                len(numeric_cols),
-                dropped_cols,
-            )
-            numeric_cols = numeric_cols[:20]
+        numeric_cols = _cap_numeric_columns(numeric_cols)
 
         subset = _collect(df.select(numeric_cols))
 
-        # Handle constant columns to avoid RuntimeWarning: invalid value encountered in divide
-        # Filter out columns with 0 std dev
-        valid_cols = []
-        for col in numeric_cols:
-            std_val = subset[col].std()
-            # Check for None (all nulls or single value) and 0 variance
-            if std_val is not None and cast(float, std_val) > 1e-9:
-                valid_cols.append(col)
+        valid_cols = _filter_constant_columns(subset, numeric_cols)
 
         if len(valid_cols) < 2:
             return None
@@ -77,16 +104,7 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
             corr_df = subset.corr()
 
         # Convert to our schema
-        matrix = []
-        for row in corr_df.iter_rows():
-            # Handle NaN/None/Inf
-            cleaned_row = []
-            for x in row:
-                if x is None or np.isnan(x) or np.isinf(x):
-                    cleaned_row.append(0.0)
-                else:
-                    cleaned_row.append(float(x))
-            matrix.append(cleaned_row)
+        matrix = _clean_correlation_rows(corr_df)
 
         return CorrelationMatrix(columns=valid_cols, values=matrix)
 

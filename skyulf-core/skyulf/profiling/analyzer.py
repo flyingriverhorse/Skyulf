@@ -184,6 +184,41 @@ class EDAAnalyzer(
         basic_stats_df = _collect(self.lazy_df.select(basic_aggs))
         return basic_stats_df.row(0, named=True) if len(basic_stats_df) > 0 else {}
 
+    @staticmethod
+    def _int_semantic_type_from_ratio(ratio: float, n_unique: int) -> str:
+        """Classify an integer column as Categorical (low-cardinality) or Numeric."""
+        return "Categorical" if (ratio < 0.05 and n_unique < 20) else "Numeric"
+
+    @staticmethod
+    def _string_semantic_type_from_ratio(ratio: float) -> str:
+        """Classify a string column as Categorical (low-cardinality) or Text."""
+        return "Categorical" if ratio < 0.05 else "Text"
+
+    def _semantic_type_for_column(self, dtype, ratio: float, n_unique: int) -> str:
+        """Map a single column's dtype + cardinality ratio to a semantic bucket."""
+        if dtype in [pl.Float32, pl.Float64]:
+            return "Numeric"
+        if dtype in [
+            pl.Int8,
+            pl.Int16,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt8,
+            pl.UInt16,
+            pl.UInt32,
+            pl.UInt64,
+        ]:
+            return self._int_semantic_type_from_ratio(ratio, n_unique)
+        if dtype == pl.Boolean:
+            return "Boolean"
+        if dtype in [pl.Date, pl.Datetime, pl.Duration]:
+            return "DateTime"
+        if dtype in [pl.Utf8, pl.String]:
+            return self._string_semantic_type_from_ratio(ratio)
+        if str(dtype) == "Categorical":
+            return "Categorical"
+        return "Text"
+
     def _infer_semantic_types(self, basic_stats: dict) -> dict[str, str]:
         """Inline semantic-type inference (avoids re-fetching n_unique per column)."""
         semantic_types: dict[str, str] = {}
@@ -191,31 +226,7 @@ class EDAAnalyzer(
             dtype = self.df[col].dtype
             n_unique = basic_stats.get(f"{col}__unique", 0)
             ratio = n_unique / self.row_count if self.row_count > 0 else 0
-
-            if dtype in [pl.Float32, pl.Float64]:
-                stype = "Numeric"
-            elif dtype in [
-                pl.Int8,
-                pl.Int16,
-                pl.Int32,
-                pl.Int64,
-                pl.UInt8,
-                pl.UInt16,
-                pl.UInt32,
-                pl.UInt64,
-            ]:
-                stype = "Categorical" if (ratio < 0.05 and n_unique < 20) else "Numeric"
-            elif dtype == pl.Boolean:
-                stype = "Boolean"
-            elif dtype in [pl.Date, pl.Datetime, pl.Duration]:
-                stype = "DateTime"
-            elif dtype in [pl.Utf8, pl.String]:
-                stype = "Categorical" if ratio < 0.05 else "Text"
-            elif str(dtype) == "Categorical":
-                stype = "Categorical"
-            else:
-                stype = "Text"
-            semantic_types[col] = stype
+            semantic_types[col] = self._semantic_type_for_column(dtype, ratio, n_unique)
         return semantic_types
 
     def _numeric_advanced_aggs(self, col: str) -> list[pl.Expr]:
