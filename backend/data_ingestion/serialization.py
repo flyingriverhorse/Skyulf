@@ -552,7 +552,7 @@ class DataTypeConverter:
     def _infer_object_column_type(series: pd.Series) -> str:
         """Infer the semantic type of an object-dtype column (dates, numeric/boolean strings, or text)."""
         non_null = series.dropna()
-        if non_null.apply(lambda x: isinstance(x, (datetime, date))).all():
+        if non_null.apply(lambda x: isinstance(x, datetime | date)).all():
             return "datetime"
         if non_null.str.match(r"^-?\d+\.?\d*$").all():
             return "numeric_string"

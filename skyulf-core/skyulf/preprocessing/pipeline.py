@@ -363,8 +363,8 @@ class FeatureEngineer:
     @staticmethod
     def _columns_diff_if_dataframes(before: Any, after: Any):
         """Return the column-set difference if both objects are DataFrames, else None."""
-        if isinstance(before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
-            after, (pd.DataFrame, SkyulfDataFrame)
+        if isinstance(before, pd.DataFrame | SkyulfDataFrame) and isinstance(
+            after, pd.DataFrame | SkyulfDataFrame
         ):
             return list(set(after.columns) - set(before.columns))
         return None
@@ -419,7 +419,7 @@ class FeatureEngineer:
         if isinstance(current_data, tuple):
             _, y_res = current_data
             return y_res
-        if isinstance(current_data, (pd.DataFrame, SkyulfDataFrame)):
+        if isinstance(current_data, pd.DataFrame | SkyulfDataFrame):
             target_col = params.get("target_column")
             if target_col and target_col in current_data.columns:
                 return current_data[target_col]

@@ -50,7 +50,7 @@ def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     """
     if not raw:
         return "auto"
-    if not isinstance(raw, (str, list)):
+    if not isinstance(raw, str | list):
         return "auto"
 
     lines = _normalize_categories_lines(raw)

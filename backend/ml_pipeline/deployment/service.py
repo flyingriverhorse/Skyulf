@@ -99,7 +99,9 @@ class DeploymentService:
         # 1. Get Job Entity
         db_job = await JobService.get_job_by_id(session, job_id)
         DeploymentService._validate_job_for_deployment(db_job, job_id)
-        assert db_job is not None  # noqa: S101 - narrows type after validation raises on None
+        if db_job is None:
+            # Unreachable: _validate_job_for_deployment raises ValueError on a falsy db_job.
+            raise ValueError(f"Job {job_id} not found")
 
         # 2. Get Artifact URI
         artifact_uri = db_job.artifact_uri
