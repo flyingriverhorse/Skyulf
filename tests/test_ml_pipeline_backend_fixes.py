@@ -140,6 +140,83 @@ async def test_get_job_evaluation_succeeds_when_job_id_matches():
         assert result["job_id"] == job_id
 
 
+async def test_get_job_evaluation_decodes_reference_crosstab_labels():
+    """A clustering reference column that was label-encoded upstream (e.g.
+    species name -> 0/1/2) should have its crosstab keys decoded back to the
+    original text, not left as numeric-looking strings, when a matching
+    LabelEncoder is present in the bundled feature engineer."""
+    from sklearn.preprocessing import LabelEncoder
+
+    from backend.ml_pipeline._services.evaluation_service import EvaluationService
+
+    job_id = "job-a"
+    mock_job = MagicMock()
+    mock_job.artifact_uri = "some/uri"
+    mock_job.node_id = "node-1"
+    mock_job.status = "completed"
+
+    species_encoder = LabelEncoder()
+    species_encoder.fit(["setosa", "versicolor", "virginica"])
+
+    mock_feature_engineer = MagicMock()
+    mock_feature_engineer.fitted_steps = [
+        {
+            "type": "LabelEncoder",
+            "artifact": {"encoders": {"species": species_encoder}},
+        }
+    ]
+
+    evaluation_data = {
+        "job_id": job_id,
+        "problem_type": "clustering",
+        "splits": {
+            "train": {
+                "clustering": {
+                    "reference_column": "species",
+                    "reference_crosstab": {
+                        "0": {"0": 46, "1": 2},
+                        "1": {"1": 44},
+                        "2": {"2": 50},
+                    },
+                }
+            }
+        },
+    }
+
+    mock_store = MagicMock()
+    mock_store.exists.side_effect = lambda key: (
+        key
+        in {
+            f"{job_id}_evaluation_data",
+            job_id,
+        }
+    )
+    mock_store.load.side_effect = lambda key: (
+        evaluation_data
+        if key == f"{job_id}_evaluation_data"
+        else {"feature_engineer": mock_feature_engineer, "target_column": ""}
+    )
+
+    with (
+        patch(
+            "backend.ml_pipeline._services.evaluation_service.JobService.get_job_by_id",
+            new=AsyncMock(return_value=mock_job),
+        ),
+        patch(
+            "backend.ml_pipeline._services.evaluation_service.ArtifactFactory.get_artifact_store",
+            return_value=mock_store,
+        ),
+    ):
+        result = await EvaluationService.get_job_evaluation(MagicMock(), job_id)
+
+        crosstab = result["splits"]["train"]["clustering"]["reference_crosstab"]
+        assert crosstab == {
+            "0": {"setosa": 46, "versicolor": 2},
+            "1": {"versicolor": 44},
+            "2": {"virginica": 50},
+        }
+
+
 # ---------------------------------------------------------------------------
 # 3. get_db_session lazy-init race
 # ---------------------------------------------------------------------------

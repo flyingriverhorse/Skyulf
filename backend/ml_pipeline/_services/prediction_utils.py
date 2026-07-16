@@ -40,6 +40,32 @@ def extract_target_label_encoder(
     return None
 
 
+def extract_column_label_encoder(feature_engineer: Any, column_name: str) -> Any | None:
+    """Extract the LabelEncoder fitted for an arbitrary (non-target) column.
+
+    Same ``fitted_steps`` walk as ``extract_target_label_encoder``, but looks
+    up the encoder by plain column name only (no ``__target__`` priority) —
+    used e.g. to decode a clustering "reference column" (a known label like
+    species name) back to its original text if it was label-encoded earlier
+    in the pipeline, before reaching the training node.
+    """
+    if not column_name:
+        return None
+    fitted_steps = getattr(feature_engineer, "fitted_steps", None)
+    if not isinstance(fitted_steps, list):
+        return None
+
+    for raw_step in reversed(fitted_steps):
+        encoders = _get_label_encoder_map(raw_step)
+        if encoders is None:
+            continue
+        encoder = encoders.get(column_name)
+        if encoder is not None and hasattr(encoder, "inverse_transform"):
+            return encoder
+
+    return None
+
+
 def _get_label_encoder_map(raw_step: Any) -> dict[str, Any] | None:
     """Return the `encoders` mapping from a fitted LabelEncoder step, if any."""
     if not isinstance(raw_step, dict):
