@@ -1,56 +1,26 @@
 # SHAP Explainability
 
-Skyulf can compute [SHAP](https://shap.readthedocs.io/) (SHapley Additive
-exPlanations) values for a trained model, explaining *why* it predicts what
-it predicts — both globally (which features matter most overall) and for
-individual rows (why this particular prediction).
+Skyulf can compute [SHAP](https://shap.readthedocs.io/) values for a trained
+model, explaining *why* it predicts what it predicts — both globally (which
+features matter most overall) and for individual rows.
 
-This is optional and best-effort: if the `shap` package isn't installed, or
-the model/data shape isn't supported, the platform simply omits the
-explanation rather than failing the training job.
+It's optional and best-effort: if `shap` isn't installed, or the
+model/data shape isn't supported, the platform just omits the explanation
+instead of failing the training job.
 
-## What you get
+## Quick start
 
-`compute_shap_explanation` returns one dict with everything needed to drive
-several different visualizations from a single computation:
-
-| Key | Shape | Used for |
-|---|---|---|
-| `feature_names` | `list[str]` | Column order for the other fields |
-| `mean_abs_importance` | `{feature: float}` | Global bar chart — average magnitude of each feature's impact, comparable across runs |
-| `samples` | `list[{base_value, feature_values, shap_values}]` | Per-row plots — beeswarm, dependence, and waterfall |
-
-Each entry in `samples` satisfies the SHAP identity:
-
+```bash
+pip install skyulf-core[explainability]
 ```
-base_value + sum(shap_values.values()) ≈ model's output for that row
-```
-
-(for classifiers this reconstructs the predicted class's probability; for
-linear models it's in log-odds/margin space, matching `shap`'s own
-convention.)
-
-In the web platform, this powers the **SHAP Explainability** tab on the
-Experiments page, with four sub-views:
-
-- **Summary** — mean(|SHAP|) bar chart per feature, compared across selected runs (like Feature Importance).
-- **Beeswarm** — every sampled row plotted per feature, colored by that row's own feature value (low → high), showing whether high/low values push predictions up or down.
-- **Dependence** — a single feature's value vs. its SHAP contribution across rows, revealing linear/non-linear relationships.
-- **Waterfall** — one row's prediction broken down feature-by-feature from the base value to the final output.
-
-## Using it from skyulf-core directly
-
-`compute_shap_explanation` lives in the private `_explainability` submodule
-(same pattern as `_evaluation`/`_tuning`) — import it directly rather than
-through `skyulf.modeling`:
 
 ```python
 from sklearn.ensemble import RandomForestClassifier
 from skyulf.modeling._explainability import compute_shap_explanation
 
-model = RandomForestClassifier(n_estimators=100, random_state=42).fit(X_train, y_train)
-
+model = RandomForestClassifier(random_state=42).fit(X_train, y_train)
 explanation = compute_shap_explanation(model, X_train)
+
 if explanation is None:
     print("SHAP unavailable (not installed, or unsupported model/data)")
 else:
@@ -68,45 +38,41 @@ else:
         print(f"  {feature}: {contribution:+.4f}")
 ```
 
-### Signature
+That's it — `explanation` is `None` if SHAP couldn't run (not installed,
+empty data, unsupported model), otherwise a plain `dict` you can plug
+straight into a chart or print.
+
+## What's in `explanation`
+
+| Key | Shape | Use it for |
+|---|---|---|
+| `feature_names` | `list[str]` | Column order for the other fields |
+| `mean_abs_importance` | `{feature: float}` | Global bar chart of average feature impact |
+| `samples` | `list[{base_value, feature_values, shap_values}]` | Per-row plots (beeswarm, dependence, waterfall) |
+
+Each sample follows the SHAP identity: `base_value + sum(shap_values.values())`
+≈ the model's output for that row (predicted class's probability for
+classifiers; log-odds/margin for linear models — same convention as `shap`
+itself).
+
+On the web platform this powers the **SHAP Explainability** tab on the
+Experiments page:
+
+- **Summary** — mean(|SHAP|) per feature, compared across runs.
+- **Beeswarm** — every sampled row per feature, colored by its value, showing which direction it pushes predictions.
+- **Dependence** — one feature's value vs. its SHAP contribution, revealing linear/non-linear relationships.
+- **Waterfall** — one row's prediction broken down feature-by-feature.
+
+## Reference
 
 ```python
 def compute_shap_explanation(
-    model: Any,
-    X: pd.DataFrame,
-    max_samples: int = 200,
-    max_display_samples: int = 50,
+    model: Any,             # any fitted scikit-learn-compatible estimator
+    X: pd.DataFrame,        # features to compute SHAP values for
+    max_samples: int = 200,        # rows used for mean_abs_importance
+    max_display_samples: int = 50, # rows kept in `samples` for per-row plots
 ) -> dict[str, Any] | None: ...
 ```
 
-| Param | Description |
-|---|---|
-| `model` | Any fitted scikit-learn-compatible estimator. `shap.Explainer` auto-selects Tree/Linear/Kernel algorithms based on the model type. |
-| `X` | Feature DataFrame used to compute SHAP values (typically the training or a held-out split). |
-| `max_samples` | Rows used to compute a stable `mean_abs_importance` (default 200). Larger datasets are randomly subsampled with a fixed seed. |
-| `max_display_samples` | Rows kept in the returned `samples` list for per-row plots (default 50) — independent of `max_samples`, keeping the payload small regardless of computation size. |
-
-Returns `None` (never raises) if `shap` isn't installed, `X` is empty, or
-computation fails for any reason — treat a `None` return as "explainability
-unavailable," not an error.
-
-### Notes on multi-class models
-
-- For binary classification, SHAP values/base values for the positive class
-  (index 1) are used, matching the scikit-learn/SHAP convention.
-- For 3+ class models, each row uses **its own predicted class** (via
-  `model.predict()`), so the waterfall/dependence values answer "why did the
-  model predict what it predicted for this row" rather than an arbitrary
-  fixed class.
-
-## Installing the `shap` dependency
-
-`shap` is an optional extra:
-
-```bash
-pip install skyulf-core[explainability]
-```
-
-The full platform (`pyproject.toml` at the repo root) already pins
-`shap>=0.46.0,<1.0.0` as a direct dependency, so no extra install step is
-needed when running Skyulf via `run_skyulf.py`.
+- Multi-class: each row uses **its own predicted class**, so waterfall/dependence explain "why did the model predict what it predicted for this row." Binary classification uses the positive class.
+- The full platform (`pyproject.toml` at the repo root) already pins `shap`, so no extra install is needed when running Skyulf via `run_skyulf.py` — the `pip install` above is only for using `skyulf-core` standalone.

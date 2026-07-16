@@ -180,6 +180,8 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                         <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                                         <Tooltip
                                             contentStyle={chartTheme.tooltipContentStyle}
+                                            itemStyle={chartTheme.tooltipItemStyle}
+                                            labelStyle={chartTheme.tooltipLabelStyle}
                                             formatter={(value: number) => [value.toFixed(3), 'Association']}
                                         />
                                         <ReferenceLine x={0} stroke="#9ca3af" />

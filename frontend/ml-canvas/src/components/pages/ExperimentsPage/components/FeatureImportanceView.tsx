@@ -133,6 +133,8 @@ export const FeatureImportanceView: React.FC<Props> = ({
               <YAxis type="category" dataKey="feature" tick={{ fontSize: 11, fill: chartTheme.axisColor }} width={110} />
               <Tooltip
                 contentStyle={chartTheme.tooltipContentStyle}
+                itemStyle={chartTheme.tooltipItemStyle}
+                labelStyle={chartTheme.tooltipLabelStyle}
                 formatter={(value: number) => value.toFixed(3)}
               />
               <Legend />
