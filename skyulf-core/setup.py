@@ -7,7 +7,7 @@ long_description = (this_directory / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="skyulf-core",
-    version="0.4.0",
+    version="0.5.0",
     description="The core machine learning library for Skyulf.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -65,6 +65,7 @@ setup(
         "preprocessing-imbalanced": ["imbalanced-learn>=0.13.0"],
         "modeling-xgboost": ["xgboost>=2.1.4"],
         "modeling-lightgbm": ["lightgbm>=4.0.0"],
+        "explainability": ["shap>=0.46.0,<1.0.0"],
         # Convenience aggregate: every optional runtime feature (excludes dev/geo
         # which carry heavy native deps and are opt-in on their own).
         "all": [
@@ -79,6 +80,7 @@ setup(
             "xgboost>=2.1.4",
             "lightgbm>=4.0.0",
             "sentence-transformers>=2.2.0",
+            "shap>=0.46.0,<1.0.0",
         ],
     },
     python_requires=">=3.12",

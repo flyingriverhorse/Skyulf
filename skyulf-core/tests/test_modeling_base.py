@@ -639,8 +639,12 @@ class _UnknownProblemTypeCalculator(LogisticRegressionCalculator):
 
     @property
     def problem_type(self) -> str:
-        """Return an unrecognized problem type to exercise the else/raise branch."""
-        return "clustering"
+        """Return an unrecognized problem type to exercise the else/raise branch.
+
+        Not "clustering" — that's now a real, supported problem type (see
+        `skyulf.modeling.clustering.KMeansCalculator`).
+        """
+        return "anomaly_detection"
 
 
 def test_evaluate_unknown_problem_type_raises():

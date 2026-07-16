@@ -771,3 +771,248 @@ def test_data_preview_with_split_dataset(pipeline_data_csv, tmp_path):
     assert preview_res.status == "success"
     assert preview_res.metrics["operation_mode"].startswith("Train:")
     assert "train" in preview_res.metrics["data_summary"]
+
+
+# --- Clustering (KMeans / Segmentation) ------------------------------------
+
+
+def test_basic_training_kmeans_without_target_column_succeeds(pipeline_data_csv, tmp_path):
+    """A KMeans basic-training node with no target_column should train, predict,
+    and evaluate with clustering metrics — not crash on the missing target."""
+    engine = _make_engine(tmp_path, "artifacts_kmeans")
+    config = PipelineConfig(
+        pipeline_id="p_kmeans",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": pipeline_data_csv},
+            ),
+            NodeConfig(
+                node_id="node_training",
+                step_type=StepType.BASIC_TRAINING,
+                inputs=["node_data"],
+                params={
+                    "algorithm": "kmeans",
+                    "hyperparameters": {"n_clusters": 2, "n_init": 5},
+                    "evaluate": True,
+                },
+            ),
+        ],
+    )
+    result = engine.run(config)
+    assert result.status == "success"
+    train_res = result.node_results["node_training"]
+    assert train_res.status == "success"
+    # No feature importances/SHAP for clustering — those keys should be absent.
+    assert "feature_importances" not in train_res.metrics
+    assert "shap_explanation" not in train_res.metrics
+    # cv_ metrics should not appear even though cv_enabled defaults False on a
+    # bare basic_training node (clustering skips CV entirely regardless).
+    assert not [k for k in train_res.metrics if k.startswith("cv_")]
+
+
+def test_advanced_tuning_rejects_clustering_algorithm(pipeline_data_csv, tmp_path):
+    """Advanced Tuning must reject a clustering algorithm with a clear error,
+    rather than crash deep inside the supervised cross_validate() scorer path."""
+    engine = _make_engine(tmp_path, "artifacts_kmeans_tuning_reject")
+    config = PipelineConfig(
+        pipeline_id="p_kmeans_tuning_reject",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": pipeline_data_csv},
+            ),
+            NodeConfig(
+                node_id="node_tuning",
+                step_type=StepType.ADVANCED_TUNING,
+                inputs=["node_data"],
+                params={
+                    "target_column": "target",
+                    "algorithm": "kmeans",
+                    "tuning_config": {"strategy": "grid", "metric": "accuracy", "cv_folds": 2},
+                },
+            ),
+        ],
+    )
+    result = engine.run(config)
+    assert result.status == "failed"
+    error = result.node_results["node_tuning"].error or ""
+    assert "clustering" in error.lower()
+
+
+def test_kmeans_drops_text_columns_and_bundles_feature_columns(tmp_path):
+    """A text/id column left in by upstream nodes must not be fed to KMeans,
+    and the bundled inference artifact must record the exact (numeric-only)
+    feature columns the model was trained on — regression test for the
+    "X has N features, but KMeans is expecting M features" deployment bug,
+    which was ultimately caused by no numeric-only filtering existing before
+    `.fit()`/`.predict()` and no authoritative feature list being persisted.
+    """
+    df = pd.DataFrame(
+        {
+            "customer_id": [f"cust_{i}" for i in range(20)],
+            "amount": [10.0, 20.0, 30.0, 40.0] * 5,
+            "frequency": [1, 2, 3, 4] * 5,
+        }
+    )
+    csv_path = tmp_path / "segmentation_data.csv"
+    df.to_csv(csv_path, index=False)
+
+    engine = _make_engine(tmp_path, "artifacts_kmeans_text_cols")
+    config = PipelineConfig(
+        pipeline_id="p_kmeans_text_cols",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": str(csv_path)},
+            ),
+            NodeConfig(
+                node_id="node_training",
+                step_type=StepType.BASIC_TRAINING,
+                inputs=["node_data"],
+                params={
+                    "algorithm": "kmeans",
+                    "hyperparameters": {"n_clusters": 2, "n_init": 5},
+                    "evaluate": True,
+                },
+            ),
+        ],
+    )
+    result = engine.run(config, job_id="job_kmeans_text_cols")
+    assert result.status == "success"
+
+    bundled = engine.artifact_store.load("job_kmeans_text_cols")
+    assert bundled["feature_columns"] == ["amount", "frequency"]
+    assert "customer_id" not in bundled["feature_columns"]
+
+    # Inference with the text column still present (as it would arrive from
+    # a raw dataset row) must not crash — the applier drops it internally,
+    # matching what happened at fit time.
+    fresh_rows = pd.DataFrame(
+        {
+            "customer_id": ["cust_new"],
+            "amount": [15.0],
+            "frequency": [2],
+        }
+    )
+
+    from skyulf.modeling.clustering import KMeansApplier
+
+    preds = KMeansApplier().predict(fresh_rows, bundled["model"])
+    assert len(preds) == 1
+
+
+def test_kmeans_reference_column_excluded_and_crosstab_bundled(tmp_path):
+    """A user-designated `reference_column` (e.g. a known label like species
+    name, not used as a training feature) must be excluded from the model's
+    features/`feature_columns`, but still be usable afterward to interpret
+    which cluster corresponds to which real-world group via the
+    `reference_crosstab` in the evaluation report.
+    """
+    df = pd.DataFrame(
+        {
+            "species": ["setosa"] * 10 + ["versicolor"] * 10,
+            "petal_length": [1.0, 1.1, 1.2, 1.3, 1.4, 1.1, 1.2, 1.3, 1.4, 1.0]
+            + [4.0, 4.1, 4.2, 4.3, 4.4, 4.1, 4.2, 4.3, 4.4, 4.0],
+            "petal_width": [0.2, 0.2, 0.3, 0.2, 0.3, 0.2, 0.2, 0.3, 0.2, 0.3]
+            + [1.3, 1.4, 1.3, 1.4, 1.3, 1.4, 1.3, 1.4, 1.3, 1.4],
+        }
+    )
+    csv_path = tmp_path / "iris_like.csv"
+    df.to_csv(csv_path, index=False)
+
+    engine = _make_engine(tmp_path, "artifacts_kmeans_reference_column")
+    config = PipelineConfig(
+        pipeline_id="p_kmeans_reference_column",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": str(csv_path)},
+            ),
+            NodeConfig(
+                node_id="node_training",
+                step_type=StepType.BASIC_TRAINING,
+                inputs=["node_data"],
+                params={
+                    "algorithm": "kmeans",
+                    "hyperparameters": {"n_clusters": 2, "n_init": 5},
+                    "reference_column": "species",
+                    "evaluate": True,
+                },
+            ),
+        ],
+    )
+    result = engine.run(config, job_id="job_kmeans_reference_column")
+    assert result.status == "success"
+
+    bundled = engine.artifact_store.load("job_kmeans_reference_column")
+    assert "species" not in bundled["feature_columns"]
+    assert set(bundled["feature_columns"]) == {"petal_length", "petal_width"}
+
+    eval_data = engine.artifact_store.load("job_kmeans_reference_column_evaluation_data")
+    train_clustering = eval_data["splits"]["train"]["clustering"]
+    assert train_clustering["reference_column"] == "species"
+    crosstab = train_clustering["reference_crosstab"]
+    # Each cluster should be dominated by a single species, since the two
+    # groups are numerically well-separated.
+    assert len(crosstab) == 2
+    for counts in crosstab.values():
+        assert sum(counts.values()) == 10
+        assert max(counts.values()) == 10  # perfectly pure cluster in this synthetic data
+
+    # Auto-generated profile label present for every centroid, with no
+    # reference-column leakage into the numeric profile.
+    for centroid in train_clustering["centroids"]:
+        assert centroid["profile"]
+        assert "species" not in centroid["center"]
+
+
+@pytest.mark.parametrize("algorithm", ["minibatch_kmeans", "gaussian_mixture", "birch"])
+def test_additional_clustering_algorithms_train_and_bundle(tmp_path, algorithm):
+    """Mini-Batch K-Means, Gaussian Mixture, and Birch must all be trainable
+    through the same Basic Training pipeline as K-Means, and produce a
+    bundled artifact with the expected feature_columns."""
+    df = pd.DataFrame(
+        {
+            "a": [1.0, 2.0, 3.0, 4.0, 10.0, 11.0, 12.0, 13.0] * 3,
+            "b": [1.0, 2.0, 1.0, 2.0, 10.0, 11.0, 10.0, 11.0] * 3,
+        }
+    )
+    csv_path = tmp_path / f"cluster_data_{algorithm}.csv"
+    df.to_csv(csv_path, index=False)
+
+    engine = _make_engine(tmp_path, f"artifacts_{algorithm}")
+    hyperparameters = {
+        "minibatch_kmeans": {"n_clusters": 2},
+        "gaussian_mixture": {"n_components": 2},
+        "birch": {"n_clusters": 2},
+    }[algorithm]
+    config = PipelineConfig(
+        pipeline_id=f"p_{algorithm}",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": str(csv_path)},
+            ),
+            NodeConfig(
+                node_id="node_training",
+                step_type=StepType.BASIC_TRAINING,
+                inputs=["node_data"],
+                params={
+                    "algorithm": algorithm,
+                    "hyperparameters": hyperparameters,
+                    "evaluate": True,
+                },
+            ),
+        ],
+    )
+    result = engine.run(config, job_id=f"job_{algorithm}")
+    assert result.status == "success"
+
+    bundled = engine.artifact_store.load(f"job_{algorithm}")
+    assert bundled["feature_columns"] == ["a", "b"]

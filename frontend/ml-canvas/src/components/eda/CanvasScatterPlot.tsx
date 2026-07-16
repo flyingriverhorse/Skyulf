@@ -9,7 +9,8 @@ import {
   ChartOptions
 } from 'chart.js';
 import { Scatter } from 'react-chartjs-2';
-import { COLORS, getChartTheme } from './constants';
+import { COLORS } from './constants';
+import { useChartTheme } from '../../core/hooks/useChartTheme';
 import type { ScatterPoint } from './ThreeDScatterPlot';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -84,7 +85,7 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
     return result;
   }, [data, xKey, yKey, labelKey]);
 
-  const theme = getChartTheme();
+  const theme = useChartTheme();
 
   const options: ChartOptions<'scatter'> = {
     responsive: true,

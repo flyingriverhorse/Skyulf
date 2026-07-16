@@ -3,8 +3,8 @@ import { OverviewCards } from '../OverviewCards';
 import { AlertsSection } from '../AlertsSection';
 import { Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { FileText, Database, AlertTriangle, EyeOff, Eye } from 'lucide-react';
-import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 import { COLORS } from '../constants';
+import { useChartTheme } from '../../../core/hooks/useChartTheme';
 import type { EDAProfile, ColumnProfile } from '../../../core/types/edaProfile';
 
 interface DashboardTabProps {
@@ -16,6 +16,8 @@ interface DashboardTabProps {
 interface MissingRow { name: string; value: number }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExclude, excludedCols = [] }) => {
+
+    const chartTheme = useChartTheme();
 
     const dataTypeData = useMemo(() => {
         if (!profile?.columns) return [];
@@ -67,7 +69,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({ profile, onToggleExc
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    contentStyle={getTooltipContentStyle()}
+                                    contentStyle={chartTheme.tooltipContentStyle}
+                                    itemStyle={chartTheme.tooltipItemStyle}
+                                    labelStyle={chartTheme.tooltipLabelStyle}
                                 />
                                 <Legend verticalAlign="bottom" height={36}/>
                             </PieChart>

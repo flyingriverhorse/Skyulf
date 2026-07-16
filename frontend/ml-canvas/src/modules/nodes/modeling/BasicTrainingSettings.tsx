@@ -36,7 +36,11 @@ export interface ModelTrainingConfig {
 // HyperparameterDef, HelpTooltip, BestParamsModal, and HyperparameterInput
 // were extracted into ./components/* to keep this file focused on the panel.
 
-export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onChange: (c: ModelTrainingConfig) => void; nodeId?: string }> = ({
+export const BasicTrainingSettings: React.FC<{
+  config: ModelTrainingConfig;
+  onChange: (c: ModelTrainingConfig) => void;
+  nodeId?: string;
+}> = ({
   config,
   onChange,
   nodeId,
@@ -114,8 +118,16 @@ export const BasicTrainingSettings: React.FC<{ config: ModelTrainingConfig; onCh
           setIsLoadingModels(true);
           try {
               const nodes = await registryApi.getAllNodes();
-              // Accept both "Model" (old) and "Modeling" (new skyulf-core)
-              const models = nodes.filter(n => n.category === 'Model' || n.category === 'Modeling');
+              // Accept both "Model" (old) and "Modeling" (new skyulf-core).
+              // The dedicated Segmentation node has its own model list (see
+              // `SegmentationSettings`) — Basic Training always excludes
+              // clustering algorithms, since its target-column/CV-driven
+              // flow doesn't apply to them.
+              const models = nodes.filter(n => {
+                  const isModeling = n.category === 'Model' || n.category === 'Modeling';
+                  const isClustering = n.tags?.includes('clustering') ?? false;
+                  return isModeling && !isClustering;
+              });
               setAvailableModels(models);
           } catch (error) {
               console.error("Failed to fetch models:", error);

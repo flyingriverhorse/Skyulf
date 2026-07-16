@@ -36,6 +36,7 @@ cmaes>=0.10.0                        # Required by optuna's CmaEsSampler, exerci
 matplotlib>=3.7.0                    # Imported by skyulf-core/tests/test_profiling_visualizer.py — needed for ty type-resolution in CI
 rich>=13.0.0                         # Imported by skyulf-core/tests/test_profiling_visualizer.py — needed for ty type-resolution in CI
 vaderSentiment>=3.3.2                # Imported by skyulf-core/tests/test_profiling_text.py — needed for ty type-resolution in CI
+shap>=0.46.0,<1.0.0                   # Imported by skyulf-core/skyulf/modeling/_explainability/shap_explanation.py — needed for ty type-resolution in CI and exercised in test_explainability.py
 
 # Test + tooling
 pytest>=7.4.0,<10.0.0

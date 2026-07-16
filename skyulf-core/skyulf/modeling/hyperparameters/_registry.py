@@ -4,6 +4,12 @@ from typing import Any
 
 from ._bayes import BERNOULLI_NB_PARAMS, GAUSSIAN_NB_PARAMS, MULTINOMIAL_NB_PARAMS
 from ._calibration import CALIBRATED_CLASSIFIER_PARAMS
+from ._clustering import (
+    BIRCH_PARAMS,
+    GAUSSIAN_MIXTURE_PARAMS,
+    KMEANS_PARAMS,
+    MINIBATCH_KMEANS_PARAMS,
+)
 from ._ensemble import (
     STACKING_CLASSIFIER_PARAMS,
     STACKING_REGRESSOR_PARAMS,
@@ -69,6 +75,10 @@ MODEL_HYPERPARAMETERS = {
     "stacking_classifier": STACKING_CLASSIFIER_PARAMS,
     "voting_regressor": VOTING_REGRESSOR_PARAMS,
     "stacking_regressor": STACKING_REGRESSOR_PARAMS,
+    "kmeans": KMEANS_PARAMS,
+    "minibatch_kmeans": MINIBATCH_KMEANS_PARAMS,
+    "gaussian_mixture": GAUSSIAN_MIXTURE_PARAMS,
+    "birch": BIRCH_PARAMS,
 }
 
 

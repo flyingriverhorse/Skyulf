@@ -159,6 +159,14 @@ export const EvaluationView: React.FC<Props> = ({
             <p className="text-xs mt-2 opacity-70">(Note: Only jobs run after this update have evaluation artifacts)</p>
           </div>
         )
+      ) : evaluationData.problem_type === 'clustering' ? (
+        // Clustering jobs have no y_true/y_pred (only predicted cluster
+        // labels), so the classification/regression charts below don't
+        // apply — point the user at the dedicated Segmentation tab instead.
+        <div className="h-64 flex flex-col items-center justify-center text-gray-400 italic text-center">
+          <p>This is a Segmentation (clustering) run.</p>
+          <p className="text-xs mt-2 opacity-70">See the &quot;Segmentation&quot; tab for cluster sizes, centroids, and quality metrics.</p>
+        </div>
       ) : (
         <div className={`space-y-6 transition-opacity ${isEvalLoading ? 'opacity-60' : ''}`}>
           {isEvalLoading && (
