@@ -304,6 +304,59 @@ def _is_data_preview_sub(sub: PipelineConfig) -> bool:
     return bool(sub.nodes) and sub.nodes[-1].step_type == "data_preview"
 
 
+def _strip_non_preview_nodes(sub: PipelineConfig, training_types: set[StepType]) -> PipelineConfig:
+    """Return a copy of ``sub`` with training/tuning and data_preview nodes removed."""
+    stripped = [
+        n for n in sub.nodes if n.step_type not in training_types and n.step_type != "data_preview"
+    ]
+    return PipelineConfig(
+        pipeline_id=sub.pipeline_id,
+        nodes=stripped,
+        metadata=sub.metadata,
+    )
+
+
+def _pair_training_subs(
+    training_subs: list[PipelineConfig], training_types: set[StepType]
+) -> list[tuple[PipelineConfig, PipelineConfig]]:
+    """Pair each non-data-preview training sub-pipeline with its stripped runnable form."""
+    return [
+        (orig, _strip_non_preview_nodes(orig, training_types))
+        for orig in training_subs
+        if not _is_data_preview_sub(orig)
+    ]
+
+
+def _append_uncovered_preview_branches(
+    paired_subs: list[tuple[PipelineConfig, PipelineConfig]],
+    pipeline_config: PipelineConfig,
+    partition_for_preview: Any,
+) -> None:
+    """Append preview-only branches (data leaves not fed into any training terminal).
+
+    Without this, a canvas mixing a training pipeline with one or more
+    dangling preprocessing chains would silently drop the dangling chains
+    from Run Preview — users only saw the training branch's data and
+    assumed the others vanished. Mutates ``paired_subs`` in place.
+    """
+    covered_node_ids: set[str] = set()
+    for orig, _runnable in paired_subs:
+        for n in orig.nodes:
+            covered_node_ids.add(n.node_id)
+    preview_only_subs = partition_for_preview(pipeline_config)
+    for sub in preview_only_subs:
+        if not sub.nodes:
+            continue
+        if _is_data_preview_sub(sub):
+            continue
+        leaf = sub.nodes[-1]
+        # Skip sub-pipelines whose leaf is already produced by a
+        # training branch (avoids duplicate tabs for the same data).
+        if leaf.node_id in covered_node_ids:
+            continue
+        paired_subs.append((sub, sub))
+
+
 def _partition_preview_pipeline(
     pipeline_config: PipelineConfig, nodes: list[NodeConfig]
 ) -> list[tuple[PipelineConfig, PipelineConfig]]:
@@ -340,44 +393,46 @@ def _partition_preview_pipeline(
         return [(sub, sub) for sub in preview_subs if not _is_data_preview_sub(sub)]
 
     training_subs = partition_parallel_pipeline(pipeline_config)
-
-    def _strip(sub: PipelineConfig) -> PipelineConfig:
-        stripped = [
-            n
-            for n in sub.nodes
-            if n.step_type not in training_types and n.step_type != "data_preview"
-        ]
-        return PipelineConfig(
-            pipeline_id=sub.pipeline_id,
-            nodes=stripped,
-            metadata=sub.metadata,
-        )
-
-    paired_subs = [(orig, _strip(orig)) for orig in training_subs if not _is_data_preview_sub(orig)]
-
-    # Also include preview-only branches (data leaves that don't feed
-    # any training terminal). Without this, a canvas mixing a training
-    # pipeline with one or more dangling preprocessing chains would
-    # silently drop the dangling chains from Run Preview — users only
-    # saw the training branch's data and assumed the others vanished.
-    covered_node_ids: set[str] = set()
-    for orig, _runnable in paired_subs:
-        for n in orig.nodes:
-            covered_node_ids.add(n.node_id)
-    preview_only_subs = partition_for_preview(pipeline_config)
-    for sub in preview_only_subs:
-        if not sub.nodes:
-            continue
-        if _is_data_preview_sub(sub):
-            continue
-        leaf = sub.nodes[-1]
-        # Skip sub-pipelines whose leaf is already produced by a
-        # training branch (avoids duplicate tabs for the same data).
-        if leaf.node_id in covered_node_ids:
-            continue
-        paired_subs.append((sub, sub))
-
+    paired_subs = _pair_training_subs(training_subs, training_types)
+    _append_uncovered_preview_branches(paired_subs, pipeline_config, partition_for_preview)
     return paired_subs
+
+
+def _branch_terminal_group_key(leaf: Any) -> tuple[str, str]:
+    """Return the (model/step grouping key, terminal node_id) for a branch's leaf node.
+
+    Training terminals group by model_type/algorithm; other terminals
+    (e.g. data_preview) group by step_type. Returns empty strings when the
+    leaf shouldn't participate in dup-suffix grouping.
+    """
+    if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+        # Training terminal: group by model_type.
+        mt = str(leaf.params.get("model_type") or leaf.params.get("algorithm") or "")
+    else:
+        # Non-training terminal (e.g. data_preview): group by
+        # step_type so multiple Data Preview nodes get #1/#2/#3,
+        # matching the canvas dup-suffix logic in useBranchColors.
+        mt = str(leaf.step_type)
+    return mt, leaf.node_id
+
+
+def _collect_terminal_ids_by_group(
+    sub_results: list[tuple[Any, Any, Any]],
+) -> tuple[dict[str, list[str]], dict[int, str]]:
+    """Group branch terminal node_ids by their model/step key, per branch index."""
+    terminals_by_model: dict[str, list[str]] = {}
+    terminal_id_per_branch: dict[int, str] = {}
+    for i, (orig_sub, _runnable, _res) in enumerate(sub_results):
+        mt = ""
+        term_id = ""
+        if orig_sub.nodes:
+            mt, term_id = _branch_terminal_group_key(orig_sub.nodes[-1])
+        if mt and term_id:
+            terminal_id_per_branch[i] = term_id
+            ids = terminals_by_model.setdefault(mt, [])
+            if term_id not in ids:
+                ids.append(term_id)
+    return terminals_by_model, terminal_id_per_branch
 
 
 def _compute_branch_dup_suffixes(sub_results: list[tuple[Any, Any, Any]]) -> dict[int, str]:
@@ -392,28 +447,7 @@ def _compute_branch_dup_suffixes(sub_results: list[tuple[Any, Any, Any]]) -> dic
     the canvas. Preview-only branches (no model_type) skip this and stay
     unsuffixed.
     """
-    terminals_by_model: dict[str, list[str]] = {}
-    terminal_id_per_branch: dict[int, str] = {}
-    for i, (orig_sub, _runnable, _res) in enumerate(sub_results):
-        mt = ""
-        term_id = ""
-        if orig_sub.nodes:
-            leaf = orig_sub.nodes[-1]
-            if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
-                # Training terminal: group by model_type.
-                mt = str(leaf.params.get("model_type") or leaf.params.get("algorithm") or "")
-                term_id = leaf.node_id
-            else:
-                # Non-training terminal (e.g. data_preview): group by
-                # step_type so multiple Data Preview nodes get #1/#2/#3,
-                # matching the canvas dup-suffix logic in useBranchColors.
-                mt = str(leaf.step_type)
-                term_id = leaf.node_id
-        if mt and term_id:
-            terminal_id_per_branch[i] = term_id
-            ids = terminals_by_model.setdefault(mt, [])
-            if term_id not in ids:
-                ids.append(term_id)
+    terminals_by_model, terminal_id_per_branch = _collect_terminal_ids_by_group(sub_results)
     terminal_suffix: dict[str, str] = {}
     for ids in terminals_by_model.values():
         if len(ids) < 2:

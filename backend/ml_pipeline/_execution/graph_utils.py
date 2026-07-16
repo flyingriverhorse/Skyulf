@@ -53,6 +53,40 @@ def _is_parallel_terminal(term: NodeConfig) -> bool:
     return term.step_type in AUTO_PARALLEL_STEP_TYPES
 
 
+def _preview_data_leaves(data_nodes: list[NodeConfig]) -> list[NodeConfig]:
+    """Return the nodes among ``data_nodes`` that have no downstream consumer."""
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
+    has_consumer: set[str] = set()
+    for n in data_nodes:
+        for parent_id in n.inputs:
+            if parent_id in node_map:
+                has_consumer.add(parent_id)
+    return [n for n in data_nodes if n.node_id not in has_consumer]
+
+
+def _build_preview_leaf_sub_configs(
+    config: PipelineConfig, node_map: dict[str, NodeConfig], leaves: list[NodeConfig]
+) -> list[PipelineConfig]:
+    """Build one sub-pipeline (leaf + its ancestors) per preview data leaf."""
+    sub_configs: list[PipelineConfig] = []
+    for idx, leaf in enumerate(leaves):
+        ancestors = _collect_ancestors(leaf.node_id, node_map)
+        branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
+        sub_configs.append(
+            PipelineConfig(
+                pipeline_id=f"{config.pipeline_id}__preview_{idx}",
+                nodes=branch_nodes,
+                metadata={
+                    **config.metadata,
+                    "preview_branch_index": idx,
+                    "preview_leaf_node_id": leaf.node_id,
+                    "parent_pipeline_id": config.pipeline_id,
+                },
+            )
+        )
+    return sub_configs
+
+
 def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     """Split a pipeline into one sub-pipeline per data leaf, for preview.
 
@@ -77,13 +111,7 @@ def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     node_map: dict[str, NodeConfig] = {n.node_id: n for n in data_nodes}
 
     # A node is a leaf when no other (data) node lists it as an input.
-    has_consumer: set[str] = set()
-    for n in data_nodes:
-        for parent_id in n.inputs:
-            if parent_id in node_map:
-                has_consumer.add(parent_id)
-
-    leaves = [n for n in data_nodes if n.node_id not in has_consumer]
+    leaves = _preview_data_leaves(data_nodes)
 
     base = PipelineConfig(
         pipeline_id=config.pipeline_id,
@@ -94,45 +122,25 @@ def partition_for_preview(config: PipelineConfig) -> list[PipelineConfig]:
     if len(leaves) <= 1:
         return [base]
 
-    sub_configs: list[PipelineConfig] = []
-    for idx, leaf in enumerate(leaves):
-        ancestors = _collect_ancestors(leaf.node_id, node_map)
-        branch_nodes = [node_map[nid] for nid in ancestors if nid in node_map]
-        sub_configs.append(
-            PipelineConfig(
-                pipeline_id=f"{config.pipeline_id}__preview_{idx}",
-                nodes=branch_nodes,
-                metadata={
-                    **config.metadata,
-                    "preview_branch_index": idx,
-                    "preview_leaf_node_id": leaf.node_id,
-                    "parent_pipeline_id": config.pipeline_id,
-                },
-            )
-        )
-    return sub_configs
+    return _build_preview_leaf_sub_configs(config, node_map, leaves)
 
 
-def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
-    """Split a pipeline into one PipelineConfig per connected subgraph.
-
-    Disconnected parts of the canvas (e.g. two datasets with no shared nodes)
-    become separate experiment groups, each with its own pipeline_id.
-    Returns a single-element list when the graph is fully connected.
-    """
+def _build_undirected_adjacency(config: PipelineConfig) -> dict[str, set[str]]:
+    """Build an undirected adjacency map from each node's ``inputs`` edges."""
     node_map: dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
-    if not node_map:
-        return [config]
-
-    # Build undirected adjacency
     adj: dict[str, set[str]] = defaultdict(set)
     for node in config.nodes:
         for parent_id in node.inputs:
             if parent_id in node_map:
                 adj[node.node_id].add(parent_id)
                 adj[parent_id].add(node.node_id)
+    return adj
 
-    # BFS to find connected components
+
+def _find_connected_components(
+    node_map: dict[str, NodeConfig], adj: dict[str, set[str]]
+) -> list[list[str]]:
+    """BFS over ``adj`` to find each connected component of node ids in ``node_map``."""
     visited: set[str] = set()
     components: list[list[str]] = []
     for nid in node_map:
@@ -148,11 +156,13 @@ def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
             component.append(cur)
             queue.extend(neighbor for neighbor in adj[cur] if neighbor not in visited)
         components.append(component)
+    return components
 
-    if len(components) <= 1:
-        return [config]
 
-    # Each component gets its own pipeline_id
+def _build_component_configs(
+    config: PipelineConfig, node_map: dict[str, NodeConfig], components: list[list[str]]
+) -> list[PipelineConfig]:
+    """Build one PipelineConfig per connected component, giving each its own pipeline_id."""
     results: list[PipelineConfig] = []
     for component_ids in components:
         comp_nodes = [node_map[nid] for nid in component_ids]
@@ -165,8 +175,27 @@ def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
                 metadata={**config.metadata},
             )
         )
-
     return results
+
+
+def _split_connected_components(config: PipelineConfig) -> list[PipelineConfig]:
+    """Split a pipeline into one PipelineConfig per connected subgraph.
+
+    Disconnected parts of the canvas (e.g. two datasets with no shared nodes)
+    become separate experiment groups, each with its own pipeline_id.
+    Returns a single-element list when the graph is fully connected.
+    """
+    node_map: dict[str, NodeConfig] = {n.node_id: n for n in config.nodes}
+    if not node_map:
+        return [config]
+
+    adj = _build_undirected_adjacency(config)
+    components = _find_connected_components(node_map, adj)
+
+    if len(components) <= 1:
+        return [config]
+
+    return _build_component_configs(config, node_map, components)
 
 
 def _terminal_copy_for_branch(term: NodeConfig, branch_root_id: str) -> NodeConfig:
