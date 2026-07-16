@@ -92,6 +92,8 @@ cd frontend/ml-canvas && npm run dev
 
 - [Automated EDA & Profiling](user_guide/eda_profiling.md) — Statistical analysis powered by Polars.
 - [Hyperparameter Tuning](user_guide/hyperparameter_tuning.md) — Grid, Random, Halving, Optuna strategies.
+- [SHAP Explainability](user_guide/shap_explainability.md) — Global + per-row model explanations (summary, beeswarm, dependence, waterfall).
+- [Segmentation (Clustering)](user_guide/segmentation.md) — Group rows by similarity with K-Means, no target column needed.
 - [Drift Monitoring](user_guide/drift_monitoring.md) — Detect data drift in production.
 - [Extending Skyulf-Core](user_guide/extending_custom_nodes.md) — Add your own nodes.
 - [Validation vs scikit-learn](user_guide/validation_vs_sklearn.md) — Proof that Skyulf avoids leakage.

@@ -303,6 +303,23 @@ class DeploymentService:
             raise ValueError(f"Prediction failed: {str(e)}") from e
 
     @staticmethod
+    def _validate_required_columns(df: pd.DataFrame, feature_columns: Any) -> None:
+        """Raise a clear, actionable error if inference data is missing required columns.
+
+        Without this check, a missing column surfaces later as a cryptic
+        sklearn ``X has N features, but <Model> is expecting M features``
+        error — this catches it earlier with the actual column names.
+        """
+        if not feature_columns:
+            return
+        missing = [c for c in feature_columns if c not in df.columns]
+        if missing:
+            raise ValueError(
+                f"Missing required column(s) for prediction: {missing}. "
+                f"Expected columns: {list(feature_columns)}"
+            )
+
+    @staticmethod
     def _predict_with_bundled_artifact(artifact: dict, df: pd.DataFrame) -> list:
         """Predicts using the new SDK bundled artifact format: {"feature_engineer": ..., "model": ...}."""
         feature_engineer = artifact["feature_engineer"]
@@ -312,6 +329,11 @@ class DeploymentService:
         target_col = artifact.get("target_column")
         dropped_cols = artifact.get("dropped_columns", [])
         df = DeploymentService._drop_target_and_dropped_columns(df, target_col, dropped_cols)
+
+        # Validate against the exact columns the model was trained on (when
+        # known) so a mismatch surfaces as a clear message, not a raw sklearn
+        # feature-count error.
+        DeploymentService._validate_required_columns(df, artifact.get("feature_columns"))
 
         estimator = DeploymentService._unwrap_tuple_estimator(estimator)
 
@@ -441,6 +463,13 @@ class DeploymentService:
     @staticmethod
     def _extract_features_from_bundled_artifact(artifact: dict) -> Any:
         """Best-effort extraction of input feature names from a bundled artifact's feature engineer or model."""
+        # Prefer the exact, ordered column list persisted at training time
+        # (authoritative — doesn't rely on sklearn's `feature_names_in_`,
+        # which is unset for estimators fit on a bare numpy array, e.g. KMeans).
+        feature_columns = artifact.get("feature_columns")
+        if feature_columns:
+            return feature_columns
+
         fe = artifact["feature_engineer"]
         input_features = DeploymentService._extract_features_from_engineer(fe)
 

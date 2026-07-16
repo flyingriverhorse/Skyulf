@@ -10,7 +10,8 @@ sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
 ``self._pipeline_has_training_node``, ``self._finalize_training_artifacts``,
 ``self._build_composite_feature_engineer``,
 ``self._resolve_feature_engineer_artifact_key``,
-``self._bundle_transformers_with_model``, ``self._extract_feature_importances``.
+``self._bundle_transformers_with_model``, ``self._extract_feature_importances``,
+``self._extract_shap_explanation``.
 """
 
 import logging
@@ -53,6 +54,7 @@ class NodeRunnersMixin:
     _resolve_feature_engineer_artifact_key: Any
     _bundle_transformers_with_model: Any
     _extract_feature_importances: Any
+    _extract_shap_explanation: Any
     _pipeline_has_training_node: Any
 
     def _record_split_dataset_shape_metrics(
@@ -218,8 +220,63 @@ class NodeRunnersMixin:
         )
         return self._aggregate_cv_metrics(cv_results)
 
+    def _resolve_train_frame(self, data: Any) -> Any:
+        """Best-effort extraction of the actual training DataFrame from ``data``.
+
+        ``data`` may be a plain DataFrame, a ``SplitDataset`` (``.train``), or an
+        ``(X, y)``/``(train, test)`` tuple — normalize all of these down to the
+        single DataFrame that was actually fed into ``estimator.fit_predict()``.
+        """
+        if isinstance(data, SplitDataset):
+            return self._resolve_train_frame(data.train)
+        if isinstance(data, tuple) and len(data) >= 1:
+            return self._resolve_train_frame(data[0])
+        return data
+
+    def _resolve_train_feature_columns(
+        self,
+        data: Any,
+        target_col: str,
+        numeric_only: bool = False,
+        exclude_columns: list[str] | None = None,
+    ) -> list[str] | None:
+        """Best-effort list of the exact feature column names used to fit the model.
+
+        Persisted alongside the bundled inference artifact so the deployment
+        service and the manual-prediction UI can know precisely which columns
+        the model expects, instead of guessing from ``feature_names_in_``
+        (which sklearn only sets when ``.fit()`` is called with a DataFrame —
+        not the case here since ``SklearnBridge.to_sklearn`` converts to a
+        bare numpy array first).
+
+        ``numeric_only`` mirrors clustering models (e.g. K-Means) dropping
+        non-numeric columns before fitting — see ``_select_numeric_features``
+        in ``skyulf.modeling.clustering`` — so the persisted list matches
+        exactly what the model was fit on. ``exclude_columns`` additionally
+        drops named columns (e.g. a clustering "reference column") regardless
+        of dtype, since those are excluded by name, not by numeric-ness.
+        """
+        train_frame = self._resolve_train_frame(data)
+        if not hasattr(train_frame, "columns"):
+            return None
+        columns = list(train_frame.columns)
+        if target_col and target_col in columns:
+            columns.remove(target_col)
+        if numeric_only and hasattr(train_frame, "select_dtypes"):
+            numeric_cols = set(train_frame.select_dtypes(include=["number", "bool"]).columns)
+            columns = [c for c in columns if c in numeric_cols]
+        if exclude_columns:
+            columns = [c for c in columns if c not in exclude_columns]
+        return columns
+
     def _bundle_model_with_transformers(
-        self, node: NodeConfig, job_id: str, target_col: str
+        self,
+        node: NodeConfig,
+        job_id: str,
+        target_col: str,
+        data: Any = None,
+        numeric_only: bool = False,
+        exclude_columns: list[str] | None = None,
     ) -> None:
         """Attach fitted transformers to the trained model artifact for inference."""
         composite_feature_engineer = self._build_composite_feature_engineer(node)
@@ -227,12 +284,21 @@ class NodeRunnersMixin:
         if composite_feature_engineer is None:
             feature_engineer_key = self._resolve_feature_engineer_artifact_key(node)
 
+        feature_columns = (
+            self._resolve_train_feature_columns(
+                data, target_col, numeric_only=numeric_only, exclude_columns=exclude_columns
+            )
+            if data is not None
+            else None
+        )
+
         self._bundle_transformers_with_model(
             node.node_id,
             job_id=job_id,
             feature_engineer_artifact_key=feature_engineer_key,
             feature_engineer_override=composite_feature_engineer,
             target_column=target_col,
+            feature_columns=feature_columns,
         )
 
     def _flatten_split_metrics(self, splits: dict[str, Any], metrics: dict[str, Any]) -> None:
@@ -245,14 +311,23 @@ class NodeRunnersMixin:
                 metrics[f"{prefix}_{k}"] = v
 
     def _evaluate_and_save_report(
-        self, estimator: Any, data: Any, target_col: str, job_id: str, metrics: dict[str, Any]
+        self,
+        estimator: Any,
+        data: Any,
+        target_col: str,
+        job_id: str,
+        metrics: dict[str, Any],
+        reference_column: str = "",
     ) -> None:
         """Evaluate ``estimator`` on ``data``, save the raw eval artifact, flatten metrics.
 
         Mutates ``metrics`` in place with the ``train_``/``test_``/``val_`` prefixed
-        metrics from the evaluation report.
+        metrics from the evaluation report. ``reference_column`` is clustering-only
+        (see ``StatefulEstimator.evaluate``).
         """
-        report = estimator.evaluate(data, target_col, job_id=job_id)
+        report = estimator.evaluate(
+            data, target_col, job_id=job_id, reference_column=reference_column
+        )
 
         # Save evaluation data artifact for API
         if "raw_data" in report:
@@ -280,7 +355,10 @@ class NodeRunnersMixin:
         # Input: SplitDataset (from Feature Engineering) or DataFrame
         # Supports multiple inputs — merges them before training.
 
-        target_col = node.params["target_column"]
+        # Clustering (segmentation) nodes have no target column to predict —
+        # `""` is the established "no target" sentinel `_get_input`/`_extract_xy`
+        # already understand (see `skyulf.modeling.base.StatefulEstimator._extract_xy`).
+        target_col = node.params.get("target_column") or ""
         data = self._get_training_input(node, target_col)
 
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
@@ -290,12 +368,24 @@ class NodeRunnersMixin:
 
         # Factory logic (simplified)
         calculator, applier = self._get_model_components(algorithm)
+        is_clustering = getattr(calculator, "problem_type", "") == "clustering"
+
+        # Clustering-only: an optional column (e.g. a known label like species
+        # name) excluded from training features but kept around purely so the
+        # user can cross-check "which cluster is which real-world group"
+        # after the fact (see `reference_crosstab` in the evaluation report).
+        reference_col = (node.params.get("reference_column") or "") if is_clustering else ""
 
         # SDK StatefulEstimator(calculator, applier, node_id)
         estimator = StatefulEstimator(calculator, applier, node.node_id)
 
-        # 1. Cross-Validation (Optional)
-        cv_metrics = self._run_basic_training_cv(estimator, data, target_col, hyperparameters, node)
+        # 1. Cross-Validation (Optional) — not meaningful for unsupervised
+        # clustering (no scorer/target to cross-validate against).
+        cv_metrics = (
+            {}
+            if is_clustering
+            else self._run_basic_training_cv(estimator, data, target_col, hyperparameters, node)
+        )
 
         # 2. Train Final Model
         self.log(f"Starting model training with algorithm: {algorithm}")
@@ -303,7 +393,9 @@ class NodeRunnersMixin:
         # config expects {"params": ...} usually
         # Ensure hyperparameters are passed correctly.
         # If hyperparameters is already a dict of params, wrap it.
-        fit_config = {"params": hyperparameters}
+        fit_config: dict[str, Any] = {"params": hyperparameters}
+        if reference_col:
+            fit_config["reference_column"] = reference_col
 
         # Debug log
         self.log(f"Fit config params: {fit_config}")
@@ -316,22 +408,40 @@ class NodeRunnersMixin:
         self.log("Model training finished.")
 
         # Bundle transformers with the model for inference
-        self._bundle_model_with_transformers(node, job_id, target_col)
+        self._bundle_model_with_transformers(
+            node,
+            job_id,
+            target_col,
+            data,
+            numeric_only=is_clustering,
+            exclude_columns=[reference_col] if reference_col else None,
+        )
 
         # Optional: Evaluate immediately
         metrics: dict[str, Any] = {}
         if node.params.get("evaluate", True):
             # Ensure data is SplitDataset for evaluation
             eval_data = self._to_split_dataset(data, target_col)
-            self._evaluate_and_save_report(estimator, eval_data, target_col, job_id, metrics)
+            self._evaluate_and_save_report(
+                estimator, eval_data, target_col, job_id, metrics, reference_column=reference_col
+            )
 
         # Merge CV metrics
         metrics.update(cv_metrics)
 
-        # Persist feature importances
-        fi = self._extract_feature_importances(estimator.model, data, target_col)
-        if fi:
-            metrics["feature_importances"] = fi
+        # Feature importances / SHAP explainability don't apply to clustering
+        # (KMeans has no `.feature_importances_`/`.coef_`, and SHAP isn't a
+        # meaningful explanation for "which cluster did this row land in").
+        if not is_clustering:
+            # Persist feature importances
+            fi = self._extract_feature_importances(estimator.model, data, target_col)
+            if fi:
+                metrics["feature_importances"] = fi
+
+            # Persist SHAP explainability summary
+            shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
+            if shap_explanation:
+                metrics["shap_explanation"] = shap_explanation
 
         # Persist data shape for monitoring
         self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
@@ -354,6 +464,19 @@ class NodeRunnersMixin:
         tuning_params["parallel_backend"] = settings.TUNING_PARALLEL_BACKEND
 
         calculator, applier = self._get_model_components(algorithm)
+
+        # Advanced Tuning hard-requires a target column and runs supervised
+        # `cross_validate()` with a scorer — clustering algorithms (no
+        # ground-truth target, no real train/test scorer) would crash deep
+        # inside the tuner rather than fail with a clear message. The
+        # frontend already hides clustering models from this node's dropdown,
+        # but reject defensively here too in case a pipeline JSON is crafted
+        # or replayed directly against the API.
+        if getattr(calculator, "problem_type", "") == "clustering":
+            raise ValueError(
+                f"Algorithm '{algorithm}' is a clustering model and is not supported by "
+                "Advanced Tuning. Use the Segmentation node for clustering instead."
+            )
 
         # Structural models (ensembles) resolve their base estimators here so the
         # tuner can construct a valid meta-estimator, and may auto-build a nested
@@ -496,7 +619,7 @@ class NodeRunnersMixin:
         self.log("Tuning and final model retraining finished.")
 
         # Bundle transformers with the model for inference
-        self._bundle_model_with_transformers(node, job_id, target_col)
+        self._bundle_model_with_transformers(node, job_id, target_col, data)
 
         # Extract metrics from tuning result
         tuning_result, metrics = self._extract_tuning_metrics(estimator, tuning_params)
@@ -519,6 +642,11 @@ class NodeRunnersMixin:
         fi = self._extract_feature_importances(estimator.model, data, target_col)
         if fi:
             metrics["feature_importances"] = fi
+
+        # Persist SHAP explainability summary
+        shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
+        if shap_explanation:
+            metrics["shap_explanation"] = shap_explanation
 
         # Persist data shape for monitoring
         self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
