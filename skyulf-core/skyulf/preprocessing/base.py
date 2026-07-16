@@ -197,29 +197,30 @@ class StatefulTransformer:
         self.params = cast(dict[str, Any], self.calculator.fit(dataset.train, config))
 
         # 2. Apply to all splits
-        new_train = self.applier.apply(dataset.train, self.params)
-        if isinstance(new_train, SplitDataset):
+        return self._apply_to_split_dataset(dataset, self.params)
+
+    def _apply_guarded(self, data: Any, params: dict[str, Any]) -> Any:
+        """Apply the applier to `data` and raise if it produces a nested SplitDataset."""
+        result = self.applier.apply(data, params)
+        if isinstance(result, SplitDataset):
             raise TypeError(
                 "Applier returned SplitDataset inside StatefulTransformer, which is not supported."
             )
+        return result
+
+    def _apply_to_split_dataset(
+        self, dataset: SplitDataset, params: dict[str, Any]
+    ) -> SplitDataset:
+        """Apply the applier to each split (train/test/validation) of a SplitDataset."""
+        new_train = self._apply_guarded(dataset.train, params)
 
         new_test = dataset.test
         if self.apply_on_test:
-            new_test_res = self.applier.apply(dataset.test, self.params)
-            if isinstance(new_test_res, SplitDataset):
-                raise TypeError(
-                    "Applier returned SplitDataset inside StatefulTransformer, which is not supported."
-                )
-            new_test = new_test_res
+            new_test = self._apply_guarded(dataset.test, params)
 
         new_val = dataset.validation
         if self.apply_on_validation and dataset.validation is not None:
-            new_val_res = self.applier.apply(dataset.validation, self.params)
-            if isinstance(new_val_res, SplitDataset):
-                raise TypeError(
-                    "Applier returned SplitDataset inside StatefulTransformer, which is not supported."
-                )
-            new_val = new_val_res
+            new_val = self._apply_guarded(dataset.validation, params)
 
         return SplitDataset(train=new_train, test=new_test, validation=new_val)
 
@@ -236,28 +237,7 @@ class StatefulTransformer:
             return self.applier.apply(dataset, params)
 
         # 2. Apply
-        new_train = self.applier.apply(dataset.train, params)
-        if isinstance(new_train, SplitDataset):
-            raise TypeError(
-                "Applier returned SplitDataset inside StatefulTransformer, which is not supported."
-            )
-
-        new_test = dataset.test
-        if self.apply_on_test:
-            new_test_res = self.applier.apply(dataset.test, params)
-            if isinstance(new_test_res, SplitDataset):
-                raise TypeError(
-                    "Applier returned SplitDataset inside StatefulTransformer, which is not supported."
-                )
-            new_test = new_test_res
-
-        new_val = dataset.validation
-        if self.apply_on_validation and dataset.validation is not None:
-            new_val_res = self.applier.apply(dataset.validation, params)
-            if isinstance(new_val_res, SplitDataset):
-                raise TypeError(
-                    "Applier returned SplitDataset inside StatefulTransformer, which is not supported."
-                )
-            new_val = new_val_res
-
-        return SplitDataset(train=new_train, test=new_test, validation=new_val)
+        # ty can't narrow SplitDataset out of the SkyulfDataFrame branch of this
+        # Union via isinstance alone (mirrors the `frame = cast(Any, dataset)`
+        # note in `_fit_transform_inner` above).
+        return self._apply_to_split_dataset(cast(SplitDataset, dataset), params)

@@ -87,11 +87,10 @@ def _interaction_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[
     return pd.concat([X, pd.DataFrame(new_cols, index=X.index)], axis=1), _y
 
 
-def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Compute interaction columns and append them to a polars DataFrame."""
+def _build_interaction_exprs(X: Any, combos: list[tuple]) -> list:
+    """Build polars expressions for each valid interaction combination, casting to Float64."""
     import polars as pl
 
-    combos = [tuple(c) for c in params.get("combinations", [])]
     exprs = []
     for combo in combos:
         if not all(col in X.columns for col in combo):
@@ -100,6 +99,15 @@ def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[
         for col in combo[1:]:
             expr = expr * pl.col(col).cast(pl.Float64)
         exprs.append(expr.alias(_interaction_name(combo)))
+    return exprs
+
+
+def _interaction_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+    """Compute interaction columns and append them to a polars DataFrame."""
+    import polars as pl
+
+    combos = [tuple(c) for c in params.get("combinations", [])]
+    exprs = _build_interaction_exprs(X, combos)
 
     if params.get("include_bias", False) and _BIAS_COLUMN not in X.columns:
         exprs.append(pl.lit(1.0).alias(_BIAS_COLUMN))

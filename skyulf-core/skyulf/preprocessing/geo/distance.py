@@ -113,6 +113,26 @@ def _geo_distance_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple
     return X.with_columns(expr.alias(output_column)), _y
 
 
+def _validate_geo_distance_columns(X_pd: pd.DataFrame, cols: list[str]) -> None:
+    """Raise ValueError if any of `cols` is missing or non-numeric in X_pd."""
+    missing = [c for c in cols if not c or c not in X_pd.columns]
+    if missing:
+        raise ValueError(f"GeoDistance: columns not found in data: {missing}")
+
+    non_numeric = [c for c in cols if not pd.api.types.is_numeric_dtype(X_pd[c])]
+    if non_numeric:
+        raise ValueError(f"GeoDistance requires numeric columns; non-numeric: {non_numeric}")
+
+
+def _validate_geo_distance_method_unit(method: str, unit: str) -> None:
+    """Raise ValueError if `method` or `unit` aren't in the supported sets."""
+    if method not in _SUPPORTED_METHODS:
+        raise ValueError(f"GeoDistance only supports {_SUPPORTED_METHODS}, got {method!r}")
+
+    if unit not in _SUPPORTED_UNITS:
+        raise ValueError(f"GeoDistance only supports units {_SUPPORTED_UNITS}, got {unit!r}")
+
+
 class GeoDistanceApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -148,22 +168,11 @@ class GeoDistanceCalculator(BaseCalculator):
         lat2_col = config.get("lat2_col", "")
         lon2_col = config.get("lon2_col", "")
         cols = [lat1_col, lon1_col, lat2_col, lon2_col]
-
-        missing = [c for c in cols if not c or c not in X_pd.columns]
-        if missing:
-            raise ValueError(f"GeoDistance: columns not found in data: {missing}")
-
-        non_numeric = [c for c in cols if not pd.api.types.is_numeric_dtype(X_pd[c])]
-        if non_numeric:
-            raise ValueError(f"GeoDistance requires numeric columns; non-numeric: {non_numeric}")
+        _validate_geo_distance_columns(X_pd, cols)
 
         method = config.get("method", "haversine")
-        if method not in _SUPPORTED_METHODS:
-            raise ValueError(f"GeoDistance only supports {_SUPPORTED_METHODS}, got {method!r}")
-
         unit = config.get("unit", "km")
-        if unit not in _SUPPORTED_UNITS:
-            raise ValueError(f"GeoDistance only supports units {_SUPPORTED_UNITS}, got {unit!r}")
+        _validate_geo_distance_method_unit(method, unit)
 
         output_column = config.get("output_column", "geo_distance_km")
 
