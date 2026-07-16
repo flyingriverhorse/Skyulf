@@ -36,38 +36,16 @@ def log_data_action(action: str, success: bool = True, details: str | None = Non
     data_logger.log(level, message)
 
 
-def setup_universal_logging(
-    log_file: str = "logs/fastapi_app.log",
-    log_level: str = "INFO",
-    rotation_type: str = "size",
-    rotation_when: str | None = None,
-    rotation_interval: int = 1,
-    max_bytes: int = 50 * 1024 * 1024,
-    backup_count: int = 10,
-    console_log_level: str = "WARNING",
-) -> None:
-    """
-    Universal logging setup for FastAPI applications.
-    Enhanced for async applications and modern Python practices.
-
-    Args:
-        log_file: Path to log file (creates directory if needed)
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-        console_log_level: Logging level for console output
-    """
-    # Create log directory with better error handling
-    log_dir = Path(log_file).parent
-    if str(log_dir) != ".":  # Only create if there's actually a directory path
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-    root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
-
-    # Remove all existing handlers to prevent duplicates
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-
-    # Choose a file handler based on rotation_type (size or time)
+def _build_file_handler(
+    log_file: str,
+    log_level: str,
+    rotation_type: str,
+    rotation_when: str | None,
+    rotation_interval: int,
+    max_bytes: int,
+    backup_count: int,
+) -> Handler | None:
+    """Build the rotating (size or time based) file handler, or None if it could not be created."""
     try:
         file_handler: Handler
         if rotation_type and rotation_type.lower() in ("time", "timed"):
@@ -103,18 +81,21 @@ def setup_universal_logging(
             "[%(filename)s:%(lineno)d in %(funcName)s()]"
         )
         file_handler.setFormatter(file_formatter)
-        root_logger.addHandler(file_handler)
+        return file_handler
     except OSError as e:
         # Fallback if file logging fails — use stderr since logging may not be ready
         import sys
 
         print(f"Warning: Could not setup file logging to {log_file}: {e}", file=sys.stderr)
+        return None
 
-    # Console handler with cleaner output for development
+
+def _build_console_handler(console_log_level: str) -> Handler:
+    """Build the console handler, preferring Rich's handler and falling back to a plain one."""
     try:
         from rich.logging import RichHandler  # ty: ignore[unresolved-import]
 
-        console_handler = RichHandler(
+        console_handler: Handler = RichHandler(
             rich_tracebacks=True,
             markup=True,
             show_time=True,
@@ -127,11 +108,65 @@ def setup_universal_logging(
         console_handler.setFormatter(console_formatter)
 
     console_handler.setLevel(getattr(logging, console_log_level.upper(), logging.WARNING))
-    root_logger.addHandler(console_handler)
+    return console_handler
 
-    # === NOISE REDUCTION ===
-    # Set noisy libraries to WARNING or ERROR
+
+def _silence_noisy_loggers() -> None:
+    """Set known noisy third-party/framework loggers to WARNING to reduce log spam."""
     logging.getLogger("multipart").setLevel(logging.WARNING)
     logging.getLogger("aiosqlite").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("watchfiles").setLevel(logging.WARNING)
+
+
+def setup_universal_logging(
+    log_file: str = "logs/fastapi_app.log",
+    log_level: str = "INFO",
+    rotation_type: str = "size",
+    rotation_when: str | None = None,
+    rotation_interval: int = 1,
+    max_bytes: int = 50 * 1024 * 1024,
+    backup_count: int = 10,
+    console_log_level: str = "WARNING",
+) -> None:
+    """
+    Universal logging setup for FastAPI applications.
+    Enhanced for async applications and modern Python practices.
+
+    Args:
+        log_file: Path to log file (creates directory if needed)
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        console_log_level: Logging level for console output
+    """
+    # Create log directory with better error handling
+    log_dir = Path(log_file).parent
+    if str(log_dir) != ".":  # Only create if there's actually a directory path
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, log_level.upper(), logging.INFO))
+
+    # Remove all existing handlers to prevent duplicates
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Choose a file handler based on rotation_type (size or time)
+    file_handler = _build_file_handler(
+        log_file,
+        log_level,
+        rotation_type,
+        rotation_when,
+        rotation_interval,
+        max_bytes,
+        backup_count,
+    )
+    if file_handler is not None:
+        root_logger.addHandler(file_handler)
+
+    # Console handler with cleaner output for development
+    console_handler = _build_console_handler(console_log_level)
+    root_logger.addHandler(console_handler)
+
+    # === NOISE REDUCTION ===
+    # Set noisy libraries to WARNING or ERROR
+    _silence_noisy_loggers()

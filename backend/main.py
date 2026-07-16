@@ -112,6 +112,28 @@ def _build_swagger_ui_parameters() -> dict:
     return {key: value for key, value in params.items() if value is not None}
 
 
+def _build_openapi_contact() -> dict:
+    """Build the OpenAPI `info.contact` object from configured contact settings."""
+    contact = {}
+    if settings.API_CONTACT_NAME:
+        contact["name"] = settings.API_CONTACT_NAME
+    if settings.API_CONTACT_EMAIL:
+        contact["email"] = settings.API_CONTACT_EMAIL
+    if settings.API_CONTACT_URL:
+        contact["url"] = settings.API_CONTACT_URL
+    return contact
+
+
+def _build_openapi_license() -> dict | None:
+    """Build the OpenAPI `info.license` object, or None if no license name is configured."""
+    if not settings.API_LICENSE_NAME:
+        return None
+    license_info = {"name": settings.API_LICENSE_NAME}
+    if settings.API_LICENSE_URL:
+        license_info["url"] = settings.API_LICENSE_URL
+    return license_info
+
+
 def _configure_openapi(app: FastAPI) -> None:
     """Attach a custom OpenAPI schema builder with enriched metadata."""
     servers = settings.API_DOCS_SERVERS or [f"http://{settings.HOST}:{settings.PORT}"]
@@ -131,20 +153,12 @@ def _configure_openapi(app: FastAPI) -> None:
         if settings.API_TOS_URL:
             openapi_schema["info"]["termsOfService"] = settings.API_TOS_URL
 
-        contact = {}
-        if settings.API_CONTACT_NAME:
-            contact["name"] = settings.API_CONTACT_NAME
-        if settings.API_CONTACT_EMAIL:
-            contact["email"] = settings.API_CONTACT_EMAIL
-        if settings.API_CONTACT_URL:
-            contact["url"] = settings.API_CONTACT_URL
+        contact = _build_openapi_contact()
         if contact:
             openapi_schema["info"]["contact"] = contact
 
-        if settings.API_LICENSE_NAME:
-            license_info = {"name": settings.API_LICENSE_NAME}
-            if settings.API_LICENSE_URL:
-                license_info["url"] = settings.API_LICENSE_URL
+        license_info = _build_openapi_license()
+        if license_info:
             openapi_schema["info"]["license"] = license_info
 
         if settings.API_LOGO_URL:

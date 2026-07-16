@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -127,6 +128,55 @@ async def _fail_report_safely(
         logger.warning("Failed to update report %s status to FAILED", report_id, exc_info=True)
 
 
+async def _resolve_or_fail_file_path(
+    session: AsyncSession, report: EDAReport, data_source: DataSource
+) -> str | Path | None:
+    """Resolve the dataset file path, marking the report FAILED and committing if not found."""
+    file_path = _resolve_file_path(data_source)
+    if not file_path:
+        report.status = "FAILED"
+        report.error_message = (
+            f"File path not found for source {data_source.id}. Type: {data_source.type}"
+        )
+        await session.commit()
+        return None
+    return file_path
+
+
+async def _load_dataframe_or_fail(
+    session: AsyncSession,
+    report: EDAReport,
+    data_source: DataSource,
+    data_service: DataService,
+    file_path: str | Path,
+) -> Any:
+    """Load the dataset used for analysis, marking the report FAILED and committing on failure."""
+    storage_options = None
+    if file_path and str(file_path).startswith("s3://"):
+        storage_options = _build_s3_storage_options(data_source)
+
+    try:
+        return await data_service.load_file(
+            file_path, force_type="polars", storage_options=storage_options
+        )
+    except Exception as e:
+        report.status = "FAILED"
+        report.error_message = f"Failed to load data: {str(e)}"
+        await session.commit()
+        return None
+
+
+async def _run_analysis_or_fail(session: AsyncSession, report: EDAReport, df: Any) -> Any:
+    """Run the EDA analyzer, marking the report FAILED and committing on failure."""
+    try:
+        return _run_eda_analyzer(df, report.config)
+    except Exception as e:
+        report.status = "FAILED"
+        report.error_message = f"Analysis failed: {str(e)}"
+        await session.commit()
+        return None
+
+
 async def run_eda_analysis(report_id: int, session: AsyncSession):
     """
     Core logic to run EDA analysis.
@@ -150,42 +200,21 @@ async def run_eda_analysis(report_id: int, session: AsyncSession):
 
         # 2. Load Data
         # Use the robust file path extraction logic from file_utils
-        file_path = _resolve_file_path(data_source)
-
+        file_path = await _resolve_or_fail_file_path(session, report, data_source)
         if not file_path:
-            report.status = "FAILED"
-            report.error_message = (
-                f"File path not found for source {data_source.id}. Type: {data_source.type}"
-            )
-            await session.commit()
             return
 
         data_service = DataService()
 
-        # Prepare storage options (credentials) for S3
-        storage_options = None
-        if file_path and str(file_path).startswith("s3://"):
-            storage_options = _build_s3_storage_options(data_source)
-
         # load_file is async
-        try:
-            df = await data_service.load_file(
-                file_path, force_type="polars", storage_options=storage_options
-            )
-        except Exception as e:
-            report.status = "FAILED"
-            report.error_message = f"Failed to load data: {str(e)}"
-            await session.commit()
+        df = await _load_dataframe_or_fail(session, report, data_source, data_service, file_path)
+        if df is None:
             return
 
         # 3. Run Analysis
         # Run in thread pool if CPU bound? Polars releases GIL mostly, so it's fine.
-        try:
-            profile = _run_eda_analyzer(df, report.config)
-        except Exception as e:
-            report.status = "FAILED"
-            report.error_message = f"Analysis failed: {str(e)}"
-            await session.commit()
+        profile = await _run_analysis_or_fail(session, report, df)
+        if profile is None:
             return
 
         # 4. Save Result

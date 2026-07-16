@@ -54,30 +54,34 @@ class DataService:
         if not path_str.startswith("s3://") and not Path(path_str).exists():
             raise FileNotFoundError(f"File not found: {path_str}")
 
-        # Determine which engine to use for loading
-        use_polars = HAS_POLARS
-        if force_type == "pandas":
-            use_polars = False
-        elif force_type == "polars" and not HAS_POLARS:
-            logger.warning("Polars requested but not installed. Falling back to Pandas.")
-            use_polars = False
+        use_polars = self._should_use_polars(force_type)
 
         try:
             if use_polars:
-                try:
-                    return self._load_polars(path_str, storage_options)
-                except Exception as pl_err:
-                    logger.warning(
-                        f"Polars load failed for {path_str}: {pl_err}. Falling back to Pandas."
-                    )
-                    # Fallback to pandas, then convert to Polars
-                    pdf = self._load_pandas(path_str, storage_options)
-                    return pl.from_pandas(pdf)
+                return self._load_polars_with_fallback(path_str, storage_options)
             else:
                 return self._load_pandas(path_str, storage_options)
         except Exception as e:
             logger.error(f"Failed to load file {path_str}: {e}")
             raise
+
+    def _should_use_polars(self, force_type: str | None) -> bool:
+        """Decide whether Polars should be used given availability and the requested engine."""
+        if force_type == "pandas":
+            return False
+        if force_type == "polars" and not HAS_POLARS:
+            logger.warning("Polars requested but not installed. Falling back to Pandas.")
+            return False
+        return HAS_POLARS
+
+    def _load_polars_with_fallback(self, path_str: str, storage_options: dict | None) -> Any:
+        """Load via Polars, falling back to Pandas (converted to Polars) on failure."""
+        try:
+            return self._load_polars(path_str, storage_options)
+        except Exception as pl_err:
+            logger.warning(f"Polars load failed for {path_str}: {pl_err}. Falling back to Pandas.")
+            pdf = self._load_pandas(path_str, storage_options)
+            return pl.from_pandas(pdf)
 
     def _load_polars(self, path: str, storage_options: dict | None = None) -> Any:
         """Load using Polars."""
@@ -115,24 +119,32 @@ class DataService:
         path_str = str(path)
 
         if HAS_POLARS:
-            try:
-                if path_str.endswith(".parquet"):
-                    return _collect(pl.scan_parquet(path_str).limit(limit)).to_dicts()
-                elif path_str.endswith(".csv"):
-                    return _collect(
-                        pl.scan_csv(path_str, ignore_errors=True).limit(limit)
-                    ).to_dicts()
-                elif path_str.endswith(".json"):
-                    # JSON scan is experimental/limited, use read
-                    return pl.read_json(path_str).head(limit).to_dicts()
-            except Exception as e:
-                logger.warning(
-                    f"Polars lazy scan failed for {path_str}: {e}. Falling back to eager load."
-                )
+            sample = self._try_polars_lazy_sample(path_str, limit)
+            if sample is not None:
+                return sample
 
         # Fallback: Load full file (or eager load) and take head
         data = await self.load_file(path, force_type="pandas" if not HAS_POLARS else None)
+        return self._sample_from_loaded_data(data, limit)
 
+    def _try_polars_lazy_sample(self, path_str: str, limit: int) -> Any | None:
+        """Attempt to lazily scan/read the first `limit` rows via Polars; None on failure."""
+        try:
+            if path_str.endswith(".parquet"):
+                return _collect(pl.scan_parquet(path_str).limit(limit)).to_dicts()
+            elif path_str.endswith(".csv"):
+                return _collect(pl.scan_csv(path_str, ignore_errors=True).limit(limit)).to_dicts()
+            elif path_str.endswith(".json"):
+                # JSON scan is experimental/limited, use read
+                return pl.read_json(path_str).head(limit).to_dicts()
+        except Exception as e:
+            logger.warning(
+                f"Polars lazy scan failed for {path_str}: {e}. Falling back to eager load."
+            )
+        return None
+
+    def _sample_from_loaded_data(self, data: Any, limit: int) -> Any:
+        """Take the head of an already-loaded DataFrame/wrapper as a list of dicts."""
         # Handle SkyulfWrapper
         if hasattr(data, "to_pandas"):  # Wrapper or Polars
             # If it's Polars
@@ -160,33 +172,38 @@ class DataService:
 
         # If we have Polars and the data is compatible, use Polars for writing (faster)
         if HAS_POLARS and engine.__name__ == "PolarsEngine":
-            # It's already Polars or wrapped Polars
-            if hasattr(data, "write_parquet"):
-                data.write_parquet(path_str)
-            elif hasattr(data, "_df") and hasattr(data._df, "write_parquet"):
-                data._df.write_parquet(path_str)
-            else:
-                # Should not happen if engine is PolarsEngine
-                logger.warning("PolarsEngine detected but write_parquet missing. Converting...")
-                pl.from_pandas(data).write_parquet(path_str)
-
+            self._save_polars_native(data, path_str)
         elif HAS_POLARS:
-            # It's Pandas (or other), convert to Polars for fast write
-            try:
-                import pandas as pd
-
-                # Zero-copy convert via Arrow if possible
-                if hasattr(data, "to_arrow"):
-                    cast("pl.DataFrame", pl.from_arrow(data.to_arrow())).write_parquet(path_str)
-                elif isinstance(data, pd.DataFrame):
-                    pl.from_pandas(data).write_parquet(path_str)
-                else:
-                    self._save_pandas(data, path_str)
-            except Exception as e:
-                logger.warning(f"Polars write failed ({e}), falling back to Pandas.")
-                self._save_pandas(data, path_str)
+            self._save_via_polars_conversion(data, path_str)
         else:
             # No Polars, use Pandas
+            self._save_pandas(data, path_str)
+
+    def _save_polars_native(self, data: Any, path_str: str) -> None:
+        """Write already-Polars(-wrapped) data directly via `write_parquet`."""
+        if hasattr(data, "write_parquet"):
+            data.write_parquet(path_str)
+        elif hasattr(data, "_df") and hasattr(data._df, "write_parquet"):
+            data._df.write_parquet(path_str)
+        else:
+            # Should not happen if engine is PolarsEngine
+            logger.warning("PolarsEngine detected but write_parquet missing. Converting...")
+            pl.from_pandas(data).write_parquet(path_str)
+
+    def _save_via_polars_conversion(self, data: Any, path_str: str) -> None:
+        """Convert non-Polars data (Pandas/Arrow-capable) to Polars for a fast write."""
+        try:
+            import pandas as pd
+
+            # Zero-copy convert via Arrow if possible
+            if hasattr(data, "to_arrow"):
+                cast("pl.DataFrame", pl.from_arrow(data.to_arrow())).write_parquet(path_str)
+            elif isinstance(data, pd.DataFrame):
+                pl.from_pandas(data).write_parquet(path_str)
+            else:
+                self._save_pandas(data, path_str)
+        except Exception as e:
+            logger.warning(f"Polars write failed ({e}), falling back to Pandas.")
             self._save_pandas(data, path_str)
 
     def _save_pandas(self, data: Any, path: str):

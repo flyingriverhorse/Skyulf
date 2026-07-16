@@ -138,17 +138,8 @@ def cleanup_empty_directories(base_path: str | Path) -> int:
     return removed_count
 
 
-def extract_file_path_from_source(source_data: dict) -> Path | None:
-    """
-    Extract the file path from a data source record.
-
-    Args:
-        source_data: Data source dictionary from database
-
-    Returns:
-        Optional[Path]: Path to the file if it exists
-    """
-    # Check various possible path fields
+def _collect_path_candidates(source_data: dict) -> list:
+    """Gather all possible file-path values from top-level, connection_info, and config fields."""
     path_candidates = [
         source_data.get("file_path"),
         source_data.get("path"),
@@ -181,6 +172,11 @@ def extract_file_path_from_source(source_data: dict) -> Path | None:
             ]
         )
 
+    return path_candidates
+
+
+def _first_valid_path_candidate(path_candidates: list) -> str | Path | None:
+    """Return the first candidate that is an S3 URI or an existing local file, else None."""
     for candidate in path_candidates:
         if candidate and isinstance(candidate, (str, Path)):
             # Special handling for S3 paths - return immediately without checking local existence
@@ -192,6 +188,24 @@ def extract_file_path_from_source(source_data: dict) -> Path | None:
             if path.exists() and path.is_file():  # Only return if it's actually a file
                 logger.debug(f"Found file path: {path}")
                 return path
+
+    return None
+
+
+def extract_file_path_from_source(source_data: dict) -> Path | str | None:
+    """
+    Extract the file path from a data source record.
+
+    Args:
+        source_data: Data source dictionary from database
+
+    Returns:
+        Optional[Path]: Path to the file if it exists (or an ``s3://`` URI string).
+    """
+    path_candidates = _collect_path_candidates(source_data)
+    result = _first_valid_path_candidate(path_candidates)
+    if result is not None:
+        return result
 
     # Deliberately do NOT fall back to source_name as a filesystem path.
     # source_name is a user-supplied label, not a trusted file location; treating
