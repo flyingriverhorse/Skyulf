@@ -76,6 +76,27 @@ def _h3_index_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any
     return pl.from_pandas(X_pd), _y
 
 
+def _validate_h3_columns(X_pd: pd.DataFrame, lat_col: str, lon_col: str) -> None:
+    """Raise ValueError if lat/lon columns are missing or non-numeric in X_pd."""
+    cols = [lat_col, lon_col]
+    missing = [c for c in cols if not c or c not in X_pd.columns]
+    if missing:
+        raise ValueError(f"H3Index: columns not found in data: {missing}")
+
+    non_numeric = [c for c in cols if not pd.api.types.is_numeric_dtype(X_pd[c])]
+    if non_numeric:
+        raise ValueError(f"H3Index requires numeric columns; non-numeric: {non_numeric}")
+
+
+def _validate_h3_resolution(resolution: Any) -> None:
+    """Raise ValueError if resolution isn't an int within the allowed H3 range."""
+    if not isinstance(resolution, int) or not (_MIN_RESOLUTION <= resolution <= _MAX_RESOLUTION):
+        raise ValueError(
+            f"H3Index resolution must be an int in [{_MIN_RESOLUTION}, {_MAX_RESOLUTION}], "
+            f"got {resolution!r}"
+        )
+
+
 class H3IndexApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -105,24 +126,10 @@ class H3IndexCalculator(BaseCalculator):
 
         lat_col = config.get("lat_col", "")
         lon_col = config.get("lon_col", "")
-        cols = [lat_col, lon_col]
-
-        missing = [c for c in cols if not c or c not in X_pd.columns]
-        if missing:
-            raise ValueError(f"H3Index: columns not found in data: {missing}")
-
-        non_numeric = [c for c in cols if not pd.api.types.is_numeric_dtype(X_pd[c])]
-        if non_numeric:
-            raise ValueError(f"H3Index requires numeric columns; non-numeric: {non_numeric}")
+        _validate_h3_columns(X_pd, lat_col, lon_col)
 
         resolution = config.get("resolution", 9)
-        if not isinstance(resolution, int) or not (
-            _MIN_RESOLUTION <= resolution <= _MAX_RESOLUTION
-        ):
-            raise ValueError(
-                f"H3Index resolution must be an int in [{_MIN_RESOLUTION}, {_MAX_RESOLUTION}], "
-                f"got {resolution!r}"
-            )
+        _validate_h3_resolution(resolution)
 
         output_column = config.get("output_column", "h3_index")
 

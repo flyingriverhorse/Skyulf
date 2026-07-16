@@ -274,18 +274,24 @@ class FeatureEngineer:
             if key in fitted_params:
                 metrics[key] = fitted_params[key]
 
+    # Each rule maps a set of transformer types to the fitted_params/metrics key
+    # to copy over when that transformer type produced it. Keys are the same on
+    # both sides for every current rule.
+    _OUTLIER_METRIC_RULES: tuple[tuple[frozenset[str], str], ...] = (
+        (frozenset({"IQR", "Winsorize"}), "bounds"),
+        (frozenset({"ZScore"}), "stats"),
+        (frozenset({"EllipticEnvelope"}), "contamination"),
+    )
+
     def _apply_outlier_metrics(
         self, transformer_type: str, fitted_params: dict[str, Any], metrics: dict[str, Any]
     ) -> None:
         """Populate outlier-detection related metrics (warnings/bounds/stats/contamination)."""
         if transformer_type in self._OUTLIER_TYPES and "warnings" in fitted_params:
             metrics["warnings"] = fitted_params["warnings"]
-        if transformer_type in {"IQR", "Winsorize"} and "bounds" in fitted_params:
-            metrics["bounds"] = fitted_params["bounds"]
-        if transformer_type == "ZScore" and "stats" in fitted_params:
-            metrics["stats"] = fitted_params["stats"]
-        if transformer_type == "EllipticEnvelope" and "contamination" in fitted_params:
-            metrics["contamination"] = fitted_params["contamination"]
+        for types, key in self._OUTLIER_METRIC_RULES:
+            if transformer_type in types and key in fitted_params:
+                metrics[key] = fitted_params[key]
 
     def _apply_feature_gen_metrics(
         self,
@@ -355,47 +361,65 @@ class FeatureEngineer:
             self._apply_feature_gen_metrics(fitted_params, data_before, current_data, metrics)
 
     @staticmethod
-    def _diff_generated_columns(data_before: Any, current_data: Any):
+    def _columns_diff_if_dataframes(before: Any, after: Any):
+        """Return the column-set difference if both objects are DataFrames, else None."""
+        if isinstance(before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
+            after, (pd.DataFrame, SkyulfDataFrame)
+        ):
+            return list(set(after.columns) - set(before.columns))
+        return None
+
+    @classmethod
+    def _diff_generated_columns_split_dataset(
+        cls, data_before: SplitDataset, current_data: SplitDataset
+    ):
+        """Diff columns for the SplitDataset case, handling both DataFrame and (X, y) train shapes."""
+        before_train, after_train = data_before.train, current_data.train
+        diff = cls._columns_diff_if_dataframes(before_train, after_train)
+        if diff is not None:
+            return diff
+        if isinstance(before_train, tuple) and isinstance(after_train, tuple):
+            x_before, _ = before_train
+            x_after, _ = after_train
+            return cls._columns_diff_if_dataframes(x_before, x_after)
+        return None
+
+    @classmethod
+    def _diff_generated_columns(cls, data_before: Any, current_data: Any):
         """Return the set of newly added columns between two pipeline data objects.
 
         Handles plain DataFrames, SplitDatasets of DataFrames, and (X, y) tuple variants.
         Returns None if the structures don't allow a meaningful diff.
         """
-        if isinstance(data_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
-            current_data, (pd.DataFrame, SkyulfDataFrame)
-        ):
-            return list(set(current_data.columns) - set(data_before.columns))
+        diff = cls._columns_diff_if_dataframes(data_before, current_data)
+        if diff is not None:
+            return diff
 
         if isinstance(data_before, SplitDataset) and isinstance(current_data, SplitDataset):
-            before_train, after_train = data_before.train, current_data.train
-            if isinstance(before_train, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
-                after_train, (pd.DataFrame, SkyulfDataFrame)
-            ):
-                return list(set(after_train.columns) - set(before_train.columns))
-            if isinstance(before_train, tuple) and isinstance(after_train, tuple):
-                x_before, _ = before_train
-                x_after, _ = after_train
-                if isinstance(x_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
-                    x_after, (pd.DataFrame, SkyulfDataFrame)
-                ):
-                    return list(set(x_after.columns) - set(x_before.columns))
+            return cls._diff_generated_columns_split_dataset(data_before, current_data)
         return None
 
     @staticmethod
-    def _extract_y_for_resampling(current_data: Any, params: dict[str, Any]):
+    def _extract_y_from_split_dataset(current_data: SplitDataset, params: dict[str, Any]):
+        """Pull the target Series out of a SplitDataset's train split (tuple or DataFrame form)."""
+        if isinstance(current_data.train, tuple):
+            _, y_res = current_data.train
+            return y_res
+        if isinstance(current_data.train, (pd.DataFrame, SkyulfDataFrame)):
+            target_col = params.get("target_column")
+            if target_col and target_col in current_data.train.columns:
+                return current_data.train[target_col]
+        return None
+
+    @classmethod
+    def _extract_y_for_resampling(cls, current_data: Any, params: dict[str, Any]):
         """Pull the target Series out of whatever shape the resampler produced."""
         if isinstance(current_data, SplitDataset):
-            if isinstance(current_data.train, tuple):
-                _, y_res = current_data.train
-                return y_res
-            if isinstance(current_data.train, (pd.DataFrame, SkyulfDataFrame)):
-                target_col = params.get("target_column")
-                if target_col and target_col in current_data.train.columns:
-                    return current_data.train[target_col]
-        elif isinstance(current_data, tuple):
+            return cls._extract_y_from_split_dataset(current_data, params)
+        if isinstance(current_data, tuple):
             _, y_res = current_data
             return y_res
-        elif isinstance(current_data, (pd.DataFrame, SkyulfDataFrame)):
+        if isinstance(current_data, (pd.DataFrame, SkyulfDataFrame)):
             target_col = params.get("target_column")
             if target_col and target_col in current_data.columns:
                 return current_data[target_col]

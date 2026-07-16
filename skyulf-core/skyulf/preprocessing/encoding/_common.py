@@ -60,6 +60,33 @@ def _parse_categories_order(raw: Any, n_cols: int) -> str | list[list[str]]:
     return [_split_category_line(line) for line in lines]
 
 
+def _detect_target_column(config: dict[str, Any], y: Any) -> str | None:
+    """Resolve the target column name from config['target_column'] or the name of y."""
+    target_col: str | None = config.get("target_column")
+    if target_col is None and y is not None:
+        target_col = getattr(y, "name", None)
+    return target_col
+
+
+def _warn_excluding_target_column(encoder_name: str, target_col: str) -> None:
+    """Log a warning explaining why the target column is excluded from encoding."""
+    if encoder_name in _COLUMN_DESTROYING_ENCODERS:
+        reason = (
+            f"{encoder_name} would replace the column with multiple derived columns, "
+            "breaking downstream Feature/Target Split and model training."
+        )
+    else:
+        reason = (
+            f"{encoder_name} fits against the target and replaces values in-place; "
+            "encoding the target against itself produces a degenerate, leaky mapping "
+            "and silently overwrites the target's own values."
+        )
+    logger.warning(
+        f"{encoder_name}: Excluding target column '{target_col}' from encoding. "
+        f"{reason} Use LabelEncoder or OrdinalEncoder for target columns instead."
+    )
+
+
 def _exclude_target_column(
     columns: list[str],
     config: dict[str, Any],
@@ -80,26 +107,10 @@ def _exclude_target_column(
     ):
         return columns
 
-    target_col: str | None = config.get("target_column")
-    if target_col is None and y is not None:
-        target_col = getattr(y, "name", None)
+    target_col = _detect_target_column(config, y)
 
     if target_col and target_col in columns:
-        if encoder_name in _COLUMN_DESTROYING_ENCODERS:
-            reason = (
-                f"{encoder_name} would replace the column with multiple derived columns, "
-                "breaking downstream Feature/Target Split and model training."
-            )
-        else:
-            reason = (
-                f"{encoder_name} fits against the target and replaces values in-place; "
-                "encoding the target against itself produces a degenerate, leaky mapping "
-                "and silently overwrites the target's own values."
-            )
-        logger.warning(
-            f"{encoder_name}: Excluding target column '{target_col}' from encoding. "
-            f"{reason} Use LabelEncoder or OrdinalEncoder for target columns instead."
-        )
+        _warn_excluding_target_column(encoder_name, target_col)
         columns = [c for c in columns if c != target_col]
 
     return columns
