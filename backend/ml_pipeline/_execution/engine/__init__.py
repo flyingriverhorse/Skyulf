@@ -205,6 +205,33 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         pipeline_result.merge_warnings = self._dedup_merge_warnings()
         return pipeline_result
 
+    def _dispatch_feature_engineering(
+        self, node: NodeConfig, job_id: str
+    ) -> tuple[str | None, dict[str, Any]]:
+        """Run a feature-engineering node, falling back to data-loader if misconfigured."""
+        metrics: dict[str, Any] = {}
+        # Check if it's actually a misconfigured data loader
+        if not node.inputs and "dataset_id" in node.params:
+            logger.warning(
+                f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. "
+                "Executing as data loader."
+            )
+            return self._run_data_loader(node, job_id=job_id), metrics
+        return self._run_feature_engineering(node)
+
+    def _dispatch_transformer_fallback(
+        self, node: NodeConfig, job_id: str
+    ) -> tuple[str | None, dict[str, Any]]:
+        """Try to run the node as a single generic transformer step."""
+        try:
+            logger.debug(f"Running as single transformer: {node.step_type}")
+            return self._run_transformer(node, job_id=job_id)
+        except Exception as e:
+            # If it fails or isn't a valid transformer, re-raise
+            if "Unknown transformer type" in str(e):
+                raise ValueError(f"Unknown step type: {node.step_type}") from e
+            raise e
+
     def _dispatch_node(self, node: NodeConfig, job_id: str) -> tuple[str | None, dict[str, Any]]:
         """Run a single node's step logic and return ``(output_artifact_id, metrics)``.
 
@@ -216,14 +243,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         if node.step_type == StepType.DATA_LOADER:
             return self._run_data_loader(node, job_id=job_id), metrics
         if node.step_type == StepType.FEATURE_ENGINEERING:
-            # Check if it's actually a misconfigured data loader
-            if not node.inputs and "dataset_id" in node.params:
-                logger.warning(
-                    f"Node {node.node_id} has step_type='feature_engineering' but looks like a data loader. "
-                    "Executing as data loader."
-                )
-                return self._run_data_loader(node, job_id=job_id), metrics
-            return self._run_feature_engineering(node)
+            return self._dispatch_feature_engineering(node, job_id)
         if node.step_type == StepType.BASIC_TRAINING:
             return self._run_basic_training(node, job_id=job_id)
         if node.step_type == StepType.ADVANCED_TUNING:
@@ -232,14 +252,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             return self._run_data_preview(node)
 
         # Try to run as a single transformer step
-        try:
-            logger.debug(f"Running as single transformer: {node.step_type}")
-            return self._run_transformer(node, job_id=job_id)
-        except Exception as e:
-            # If it fails or isn't a valid transformer, re-raise
-            if "Unknown transformer type" in str(e):
-                raise ValueError(f"Unknown step type: {node.step_type}") from e
-            raise e
+        return self._dispatch_transformer_fallback(node, job_id)
 
     def _build_node_metadata(self, node: NodeConfig, metrics: dict[str, Any]) -> dict[str, Any]:
         """Best-effort assembly of the one-line node-card summary metadata.

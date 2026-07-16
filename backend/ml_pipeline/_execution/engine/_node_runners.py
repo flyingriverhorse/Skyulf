@@ -55,35 +55,51 @@ class NodeRunnersMixin:
     _extract_feature_importances: Any
     _pipeline_has_training_node: Any
 
+    def _record_split_dataset_shape_metrics(
+        self, metrics: dict[str, Any], data: SplitDataset, target_col: str
+    ) -> bool:
+        """Populate n_rows/n_features from a SplitDataset's train slot. Returns True if set."""
+        train_data = data.train
+        if isinstance(train_data, tuple) and len(train_data) >= 1:
+            train_x = cast(Any, train_data[0])
+            if hasattr(train_x, "shape"):
+                metrics["n_rows"] = train_x.shape[0]
+                metrics["n_features"] = train_x.shape[1]
+                return True
+        if hasattr(train_data, "shape"):
+            train_frame = cast(Any, train_data)
+            metrics["n_rows"] = train_frame.shape[0]
+            metrics["n_features"] = train_frame.shape[1] - int(
+                target_col in getattr(train_frame, "columns", ())
+            )
+            return True
+        return False
+
+    def _record_tuple_shape_metrics(self, metrics: dict[str, Any], data: tuple) -> None:
+        """Populate n_rows/n_features from an ``(X, ...)``-shaped tuple, if possible."""
+        if len(data) < 1:
+            return
+        first = cast(Any, data[0])
+        if hasattr(first, "shape"):
+            metrics["n_rows"] = first.shape[0]
+            metrics["n_features"] = first.shape[1]
+
     def _record_data_shape_metrics(
         self, metrics: dict[str, Any], data: Any, target_col: str
     ) -> None:
+        """Populate ``n_rows``/``n_features`` in ``metrics`` from a resolved data artifact."""
         if isinstance(data, pd.DataFrame):
             metrics["n_rows"] = len(data)
             metrics["n_features"] = len(data.columns) - int(target_col in data.columns)
             return
 
-        if isinstance(data, SplitDataset):
-            train_data = data.train
-            if isinstance(train_data, tuple) and len(train_data) >= 1:
-                train_x = cast(Any, train_data[0])
-                if hasattr(train_x, "shape"):
-                    metrics["n_rows"] = train_x.shape[0]
-                    metrics["n_features"] = train_x.shape[1]
-                    return
-            if hasattr(train_data, "shape"):
-                train_frame = cast(Any, train_data)
-                metrics["n_rows"] = train_frame.shape[0]
-                metrics["n_features"] = train_frame.shape[1] - int(
-                    target_col in getattr(train_frame, "columns", ())
-                )
-                return
+        if isinstance(data, SplitDataset) and self._record_split_dataset_shape_metrics(
+            metrics, data, target_col
+        ):
+            return
 
-        if isinstance(data, tuple) and len(data) >= 1:
-            first = cast(Any, data[0])
-            if hasattr(first, "shape"):
-                metrics["n_rows"] = first.shape[0]
-                metrics["n_features"] = first.shape[1]
+        if isinstance(data, tuple):
+            self._record_tuple_shape_metrics(metrics, data)
 
     def _run_data_loader(self, node: NodeConfig, job_id: str = "unknown") -> str:
         # params: {"source": "csv", "path": "...", "sample": True/False, "limit": 1000}
@@ -588,6 +604,47 @@ class NodeRunnersMixin:
                 f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})"
             ) from None
 
+    def _data_preview_df_info(self, df: pd.DataFrame, name: str) -> dict[str, Any]:
+        """Build the preview payload (shape/columns/sample) for a single DataFrame."""
+        return {
+            "name": name,
+            "shape": df.shape,
+            "columns": list(df.columns),
+            # "dtypes": {k: str(v) for k, v in df.dtypes.items()}, # Optional, can be large
+            "sample": df.head(20).replace({np.nan: None}).to_dict(orient="records"),
+        }
+
+    def _preview_slot_info(self, slot: Any, name: str) -> dict[str, Any] | None:
+        """Build preview info for a test/validation SplitDataset slot (tuple or DataFrame), or None."""
+        if isinstance(slot, tuple):
+            X, _ = slot
+            return self._data_preview_df_info(X, f"{name} (X)")
+        if isinstance(slot, pd.DataFrame) and not slot.empty:
+            return self._data_preview_df_info(slot, name)
+        return None
+
+    def _build_split_dataset_data_summary(self, data: SplitDataset) -> dict[str, Any]:
+        """Build the train/test/validation preview summary for a SplitDataset."""
+        summary: dict[str, Any] = {}
+
+        if isinstance(data.train, tuple):
+            X, _ = data.train
+            summary["train"] = self._data_preview_df_info(cast(pd.DataFrame, X), "Train (X)")
+        else:
+            summary["train"] = self._data_preview_df_info(cast(pd.DataFrame, data.train), "Train")
+
+        if data.test is not None:
+            test_info = self._preview_slot_info(data.test, "Test")
+            if test_info is not None:
+                summary["test"] = test_info
+
+        if data.validation is not None:
+            val_info = self._preview_slot_info(data.validation, "Validation")
+            if val_info is not None:
+                summary["validation"] = val_info
+
+        return summary
+
     def _run_data_preview(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         """
         Generates a detailed preview of the data and pipeline state.
@@ -603,48 +660,12 @@ class NodeRunnersMixin:
         }
 
         # 1. Analyze Data
-        def get_df_info(df: pd.DataFrame, name: str):
-            return {
-                "name": name,
-                "shape": df.shape,
-                "columns": list(df.columns),
-                # "dtypes": {k: str(v) for k, v in df.dtypes.items()}, # Optional, can be large
-                "sample": df.head(20).replace({np.nan: None}).to_dict(orient="records"),
-            }
-
         if isinstance(data, SplitDataset):
             preview_info["operation_mode"] = "Train: fit_transform | Test/Val: transform"
-
-            # Train
-            if isinstance(data.train, tuple):
-                X, _ = data.train
-                preview_info["data_summary"]["train"] = get_df_info(X, "Train (X)")
-            else:
-                preview_info["data_summary"]["train"] = get_df_info(data.train, "Train")
-
-            # Test
-            if data.test is not None:
-                if isinstance(data.test, tuple):
-                    X_test, _ = data.test
-                    preview_info["data_summary"]["test"] = get_df_info(X_test, "Test (X)")
-                elif isinstance(data.test, pd.DataFrame) and not data.test.empty:
-                    preview_info["data_summary"]["test"] = get_df_info(data.test, "Test")
-
-            # Validation
-            if data.validation is not None:
-                if isinstance(data.validation, tuple):
-                    X_val, _ = data.validation
-                    preview_info["data_summary"]["validation"] = get_df_info(
-                        X_val, "Validation (X)"
-                    )
-                elif isinstance(data.validation, pd.DataFrame):
-                    preview_info["data_summary"]["validation"] = get_df_info(
-                        data.validation, "Validation"
-                    )
-
+            preview_info["data_summary"] = self._build_split_dataset_data_summary(data)
         elif isinstance(data, pd.DataFrame):
             preview_info["operation_mode"] = "fit_transform"
-            preview_info["data_summary"]["full"] = get_df_info(data, "Full Dataset")
+            preview_info["data_summary"]["full"] = self._data_preview_df_info(data, "Full Dataset")
 
         # 2. Get History
         # Return the list of transformers executed so far
