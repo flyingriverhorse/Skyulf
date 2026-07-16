@@ -160,6 +160,49 @@ class BasicTrainingManager:
             job.hyperparameters = result["hyperparameters"]
 
     @staticmethod
+    def _append_job_logs(job: BasicTrainingJob, logs: list[str]) -> None:
+        """Appends new log lines to a job's existing logs list, in place."""
+        current_logs: list[str] = job.logs or []
+        job.logs = current_logs + logs
+
+    @staticmethod
+    def _handle_cancelled_status_update(
+        session: Session, job: BasicTrainingJob, logs: list[str] | None
+    ) -> bool:
+        """Handle a status update for an already-cancelled job: only append logs, never revive it."""
+        if logs:
+            BasicTrainingManager._append_job_logs(job, logs)
+            session.commit()
+        return True
+
+    @staticmethod
+    def _apply_status_update_fields(
+        job: BasicTrainingJob,
+        status: JobStatus | None,
+        error: str | None,
+        logs: list[str] | None,
+        result: dict[str, Any] | None,
+    ) -> None:
+        """Apply status/error/logs/result fields onto a training job."""
+        if status:
+            job.status = status.value
+        if error:
+            job.error_message = error
+
+        if logs:
+            BasicTrainingManager._append_job_logs(job, logs)
+
+        if result:
+            BasicTrainingManager._update_training_result(job, result)
+
+        if status in [
+            JobStatus.COMPLETED,
+            JobStatus.FAILED,
+            JobStatus.SUCCEEDED,
+        ]:
+            job.finished_at = datetime.now(UTC)
+
+    @staticmethod
     def update_status_sync(
         session: Session,
         job_id: str,
@@ -179,30 +222,9 @@ class BasicTrainingManager:
         # stays accurate; logs are still appended so cancellation traces are
         # preserved for debugging.
         if job.status == JobStatus.CANCELLED.value:
-            if logs:
-                current_logs: list[str] = job.logs or []
-                job.logs = current_logs + logs
-                session.commit()
-            return True
+            return BasicTrainingManager._handle_cancelled_status_update(session, job, logs)
 
-        if status:
-            job.status = status.value
-        if error:
-            job.error_message = error
-
-        if logs:
-            current_logs: list[str] = job.logs or []
-            job.logs = current_logs + logs
-
-        if result:
-            BasicTrainingManager._update_training_result(job, result)
-
-        if status in [
-            JobStatus.COMPLETED,
-            JobStatus.FAILED,
-            JobStatus.SUCCEEDED,
-        ]:
-            job.finished_at = datetime.now(UTC)
+        BasicTrainingManager._apply_status_update_fields(job, status, error, logs, result)
 
         session.commit()
         return True
