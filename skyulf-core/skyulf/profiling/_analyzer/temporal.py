@@ -76,6 +76,33 @@ class TemporalMixin(_AnalyzerState):
             trend_points.append(TimeSeriesPoint(date=row["date"].isoformat(), values=vals))
         return trend_df, trend_points
 
+    @staticmethod
+    def _resample_trend_df(
+        ts_df: pl.LazyFrame, date_col: str, cols_to_track: list[str], interval: str
+    ) -> pl.DataFrame:
+        """Group-by-dynamic resample of counts (no tracked cols) or per-column means."""
+        if not cols_to_track:
+            return _collect(
+                ts_df.group_by_dynamic(date_col, every=interval)
+                .agg(pl.len().alias("count"))
+                .sort(date_col)
+            )
+        aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
+        return _collect(ts_df.group_by_dynamic(date_col, every=interval).agg(aggs).sort(date_col))
+
+    @staticmethod
+    def _trend_points_from_df(trend_df: pl.DataFrame, date_col: str) -> list[TimeSeriesPoint]:
+        """Convert resampled trend rows into `TimeSeriesPoint` models, skipping empty/null rows."""
+        trend_points = []
+        for row in trend_df.iter_rows(named=True):
+            if row[date_col] is None:
+                continue
+            vals = {k: v for k, v in row.items() if k != date_col and v is not None}
+            if not vals:
+                continue
+            trend_points.append(TimeSeriesPoint(date=row[date_col].isoformat(), values=vals))
+        return trend_points
+
     def _build_resampled_trend(
         self,
         ts_df: pl.LazyFrame,
@@ -86,27 +113,8 @@ class TemporalMixin(_AnalyzerState):
     ) -> tuple[pl.DataFrame, list[TimeSeriesPoint]]:
         """Group-by-dynamic resample the trend to ~100 points across the date range."""
         interval = self._resample_interval(min_date, max_date)
-
-        if not cols_to_track:
-            trend_df = _collect(
-                ts_df.group_by_dynamic(date_col, every=interval)
-                .agg(pl.len().alias("count"))
-                .sort(date_col)
-            )
-        else:
-            aggs = [pl.col(c).mean().alias(c) for c in cols_to_track]
-            trend_df = _collect(
-                ts_df.group_by_dynamic(date_col, every=interval).agg(aggs).sort(date_col)
-            )
-
-        trend_points = []
-        for row in trend_df.iter_rows(named=True):
-            if row[date_col] is None:
-                continue
-            vals = {k: v for k, v in row.items() if k != date_col and v is not None}
-            if not vals:
-                continue
-            trend_points.append(TimeSeriesPoint(date=row[date_col].isoformat(), values=vals))
+        trend_df = self._resample_trend_df(ts_df, date_col, cols_to_track, interval)
+        trend_points = self._trend_points_from_df(trend_df, date_col)
         return trend_df, trend_points
 
     def _compute_seasonality(self, date_col: str, cols_to_track: list[str]) -> SeasonalityStats:

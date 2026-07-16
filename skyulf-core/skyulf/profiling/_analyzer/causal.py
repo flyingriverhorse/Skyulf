@@ -59,6 +59,17 @@ class CausalMixin(_AnalyzerState):
         # No target hint → keep highest-variance columns.
         return self._select_highest_variance_columns(numeric_cols)
 
+    @staticmethod
+    def _causal_edge_from_endpoints(source: str, target: str, end_i: int, end_j: int) -> CausalEdge:
+        """Build the `CausalEdge` for a known, non-absent PC endpoint combination."""
+        edge_builders = {
+            (-1, 1): lambda: CausalEdge(source=source, target=target, type="directed"),
+            (1, -1): lambda: CausalEdge(source=target, target=source, type="directed"),
+            (-1, -1): lambda: CausalEdge(source=source, target=target, type="undirected"),
+            (1, 1): lambda: CausalEdge(source=source, target=target, type="bidirected"),
+        }
+        return edge_builders[(end_i, end_j)]()
+
     def _classify_causal_edge(
         self, source: str, target: str, end_i: int, end_j: int
     ) -> CausalEdge | None:
@@ -68,15 +79,9 @@ class CausalMixin(_AnalyzerState):
         """
         if end_j == 0 and end_i == 0:
             return None
-        if end_i == -1 and end_j == 1:
-            return CausalEdge(source=source, target=target, type="directed")
-        if end_i == 1 and end_j == -1:
-            return CausalEdge(source=target, target=source, type="directed")
-        if end_i == -1 and end_j == -1:
-            return CausalEdge(source=source, target=target, type="undirected")
-        if end_i == 1 and end_j == 1:
-            return CausalEdge(source=source, target=target, type="bidirected")
-        return None
+        if (end_i, end_j) not in {(-1, 1), (1, -1), (-1, -1), (1, 1)}:
+            return None
+        return self._causal_edge_from_endpoints(source, target, end_i, end_j)
 
     def _build_causal_edges(self, adj_matrix, numeric_cols: list[str]) -> list[CausalEdge]:
         """Translate the causal-learn adjacency matrix into `CausalEdge` objects."""

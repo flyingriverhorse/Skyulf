@@ -80,6 +80,18 @@ class EDAAnalyzer(
         pl.UInt64,
     )
 
+    @staticmethod
+    def _filter_expr_builders() -> dict[str, Any]:
+        """Map supported comparison operators to a `(col, val) -> pl.Expr` builder."""
+        return {
+            "==": lambda col, val: pl.col(col) == val,
+            "!=": lambda col, val: pl.col(col) != val,
+            ">": lambda col, val: pl.col(col) > val,
+            "<": lambda col, val: pl.col(col) < val,
+            ">=": lambda col, val: pl.col(col) >= val,
+            "<=": lambda col, val: pl.col(col) <= val,
+        }
+
     def _apply_single_analyze_filter(self, f: dict[str, Any]) -> Filter | None:
         """Apply one filter dict to `self.df`; returns the resulting `Filter` record or None if skipped."""
         col = f.get("column")
@@ -90,18 +102,9 @@ class EDAAnalyzer(
             logger.warning("Skipping filter on unknown column %r; filter was not applied.", col)
             return None
 
-        if op == "==":
-            self.df = self.df.filter(pl.col(col) == val)
-        elif op == "!=":
-            self.df = self.df.filter(pl.col(col) != val)
-        elif op == ">":
-            self.df = self.df.filter(pl.col(col) > val)
-        elif op == "<":
-            self.df = self.df.filter(pl.col(col) < val)
-        elif op == ">=":
-            self.df = self.df.filter(pl.col(col) >= val)
-        elif op == "<=":
-            self.df = self.df.filter(pl.col(col) <= val)
+        builders = self._filter_expr_builders()
+        if op in builders:
+            self.df = self.df.filter(builders[op](col, val))
         elif op == "in" and isinstance(val, list):
             self.df = self.df.filter(pl.col(col).is_in(val))
         else:

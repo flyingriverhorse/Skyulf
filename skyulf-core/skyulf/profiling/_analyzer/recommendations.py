@@ -151,6 +151,11 @@ class RecommendationsMixin(_AnalyzerState):
         min_c = min(counts)
         max_c = max(counts)
         ratio = min_c / max_c if max_c > 0 else 0
+        return self._build_balance_recommendation(target_col, ratio)
+
+    @staticmethod
+    def _build_balance_recommendation(target_col: str, ratio: float) -> list[Recommendation]:
+        """Build the balanced/imbalanced recommendation for the given class ratio, or [] if neither applies."""
         if ratio > 0.8:
             return [
                 Recommendation(

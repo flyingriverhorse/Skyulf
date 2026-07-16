@@ -218,56 +218,71 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
     return all(np.isclose(val, 0) or np.isclose(val, 1) for val in unique_vals)
 
 
+def _polars_numeric_dtype_cols(frame: Any) -> list[str]:
+    """List the columns of a Polars frame whose dtype is numeric (float/int/uint)."""
+    import polars as pl
+
+    numeric_dtypes = [
+        pl.Float32,
+        pl.Float64,
+        pl.Int8,
+        pl.Int16,
+        pl.Int32,
+        pl.Int64,
+        pl.UInt8,
+        pl.UInt16,
+        pl.UInt32,
+        pl.UInt64,
+    ]
+    return [c for c, t in zip(frame.columns, frame.dtypes, strict=True) if t in numeric_dtypes]
+
+
+def _polars_column_excluded(series: Any, exclude_binary: bool, exclude_constant: bool) -> bool:
+    """Check whether a Polars numeric series should be excluded (boolean/empty/binary/constant)."""
+    import polars as pl
+
+    if series.dtype == pl.Boolean:
+        return True
+
+    valid = series.drop_nulls()
+    if valid.is_empty():
+        return True
+    if exclude_binary and _is_binary_numeric(valid):
+        return True
+    return bool(exclude_constant and valid.n_unique() < 2)
+
+
 def _detect_numeric_columns_polars(
     frame: Any, exclude_binary: bool, exclude_constant: bool
 ) -> list[str]:
     """Find numeric-like columns in a Polars frame, applying binary/constant exclusion rules."""
-    import polars as pl
-
     detected: list[str] = []
 
-    # Select numeric columns first
-    numeric_cols = [
-        c
-        for c, t in zip(frame.columns, frame.dtypes, strict=True)
-        if t
-        in [
-            pl.Float32,
-            pl.Float64,
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        ]
-    ]
-
-    for col in numeric_cols:
+    for col in _polars_numeric_dtype_cols(frame):
         series = frame[col]
-
-        # 1. Exclude explicit booleans (already filtered by type check above mostly, but good to be safe)
-        if series.dtype == pl.Boolean:
+        if _polars_column_excluded(series, exclude_binary, exclude_constant):
             continue
-
-        # 2. Check for validity (non-nulls)
-        valid = series.drop_nulls()
-        if valid.is_empty():
-            continue
-
-        # 3. Exclude 0/1 columns (Binary)
-        if exclude_binary and _is_binary_numeric(valid):
-            continue
-
-        # 4. Exclude constant columns
-        if exclude_constant and valid.n_unique() < 2:
-            continue
-
         detected.append(col)
 
     return detected
+
+
+def _pandas_column_excluded(series: Any, exclude_binary: bool, exclude_constant: bool) -> bool:
+    """Check whether a Pandas numeric series should be excluded (boolean/non-numeric/empty/binary/constant)."""
+    dtype = series.dtype
+
+    if pd.api.types.is_bool_dtype(dtype):
+        return True
+    # Strict Numeric Check (Align with Polars behavior)
+    if not pd.api.types.is_numeric_dtype(dtype):
+        return True
+
+    valid = series.dropna()
+    if valid.empty:
+        return True
+    if exclude_binary and _is_binary_numeric(valid):
+        return True
+    return bool(exclude_constant and valid.nunique() < 2)
 
 
 def _detect_numeric_columns_pandas(
@@ -282,27 +297,7 @@ def _detect_numeric_columns_pandas(
             continue
 
         series = frame[column]
-        dtype = series.dtype
-
-        # 1. Exclude explicit booleans
-        if pd.api.types.is_bool_dtype(dtype):
-            continue
-
-        # 2. Strict Numeric Check (Align with Polars behavior)
-        if not pd.api.types.is_numeric_dtype(dtype):
-            continue
-
-        valid = series.dropna()
-
-        if valid.empty:
-            continue
-
-        # 3. Exclude 0/1 columns (Binary)
-        if exclude_binary and _is_binary_numeric(valid):
-            continue
-
-        # 4. Exclude constant columns
-        if exclude_constant and valid.nunique() < 2:
+        if _pandas_column_excluded(series, exclude_binary, exclude_constant):
             continue
 
         detected.append(column)

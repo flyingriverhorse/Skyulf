@@ -54,6 +54,15 @@ class DecompositionMixin(_AnalyzerState):
             return filtered_df.filter(col_expr.is_in(cast(Any, val)))
         return filtered_df
 
+    @staticmethod
+    def _filter_unknown_numeric(filtered_df: pl.DataFrame, col: str, op: str) -> pl.DataFrame:
+        """Filter a numeric column against the FE's "Unknown" (null) sentinel."""
+        if op == "==":
+            return filtered_df.filter(pl.col(col).is_null())
+        elif op == "!=":
+            return filtered_df.filter(pl.col(col).is_not_null())
+        return filtered_df
+
     def _apply_single_filter(self, filtered_df: pl.DataFrame, f: dict[str, Any]) -> pl.DataFrame:
         """Apply one filter dict to ``filtered_df``, with numeric-vs-string coercion.
 
@@ -72,11 +81,7 @@ class DecompositionMixin(_AnalyzerState):
 
         if is_numeric and isinstance(val, str):
             if val == "Unknown":
-                if op == "==":
-                    return filtered_df.filter(pl.col(col).is_null())
-                elif op == "!=":
-                    return filtered_df.filter(pl.col(col).is_not_null())
-                return filtered_df
+                return self._filter_unknown_numeric(filtered_df, col, op)
             val = self._coerce_filter_value(dtype, val)
 
         col_expr = (

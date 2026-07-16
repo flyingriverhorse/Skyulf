@@ -14,6 +14,17 @@ logger = logging.getLogger(__name__)
 class TargetMixin(_AnalyzerState):
     """Target-relationship helpers for :class:`EDAAnalyzer`."""
 
+    def _collect_target_correlations(self, target_col: str, features: list[str]) -> pl.DataFrame:
+        """Collect per-feature Pearson correlation with the target, suppressing constant-column warnings."""
+        exprs = [pl.corr(col, target_col).alias(col) for col in features]
+
+        import warnings
+
+        # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            return _collect(self.lazy_df.select(exprs))  # type: ignore[attr-defined]
+
     def _calculate_target_correlations(
         self, target_col: str, numeric_cols: list[str]
     ) -> dict[str, float]:
@@ -22,14 +33,7 @@ class TargetMixin(_AnalyzerState):
             if not features:
                 return {}
 
-            exprs = [pl.corr(col, target_col).alias(col) for col in features]
-
-            import warnings
-
-            # corrcoef on constant columns emits a divide-by-zero RuntimeWarning.
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", RuntimeWarning)
-                result = _collect(self.lazy_df.select(exprs))  # type: ignore[attr-defined]
+            result = self._collect_target_correlations(target_col, features)
 
             corrs = {}
             for col in features:
@@ -42,6 +46,33 @@ class TargetMixin(_AnalyzerState):
         except Exception as e:
             logger.warning(f"Error calculating target correlations: {e}")
             return {}
+
+    def _calculate_eta_for_column(self, target_col: str, col: str) -> float | None:
+        """Compute the correlation-ratio (η) association between `target_col` groups and `col`, or None to skip."""
+        global_mean = self.df[col].mean()  # type: ignore[attr-defined]
+        if global_mean is None:
+            return None
+
+        ss_total = self.df.select(  # type: ignore[attr-defined]
+            ((pl.col(col) - global_mean) ** 2).sum()
+        ).item()
+
+        if not ss_total:
+            return 0.0
+
+        groups = self.df.group_by(target_col).agg(  # type: ignore[attr-defined]
+            [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
+        )
+
+        ss_between = 0.0
+        for row in groups.iter_rows(named=True):
+            n = row["n"]
+            mean_group = row["mean"]
+            if mean_group is not None:
+                ss_between += n * ((mean_group - global_mean) ** 2)
+
+        eta_squared = ss_between / ss_total
+        return float(np.sqrt(eta_squared))
 
     def _calculate_categorical_target_associations(
         self, target_col: str, numeric_cols: list[str]
@@ -59,31 +90,9 @@ class TargetMixin(_AnalyzerState):
             # column (e.g. all-null, raising on the `- global_mean` arithmetic)
             # can't wipe out the associations already computed for the rest.
             try:
-                global_mean = self.df[col].mean()  # type: ignore[attr-defined]
-                if global_mean is None:
-                    continue
-
-                ss_total = self.df.select(  # type: ignore[attr-defined]
-                    ((pl.col(col) - global_mean) ** 2).sum()
-                ).item()
-
-                if not ss_total:
-                    associations[col] = 0.0
-                    continue
-
-                groups = self.df.group_by(target_col).agg(  # type: ignore[attr-defined]
-                    [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
-                )
-
-                ss_between = 0.0
-                for row in groups.iter_rows(named=True):
-                    n = row["n"]
-                    mean_group = row["mean"]
-                    if mean_group is not None:
-                        ss_between += n * ((mean_group - global_mean) ** 2)
-
-                eta_squared = ss_between / ss_total
-                associations[col] = float(np.sqrt(eta_squared))
+                eta = self._calculate_eta_for_column(target_col, col)
+                if eta is not None:
+                    associations[col] = eta
             except Exception as e:
                 logger.warning(f"Error calculating categorical target association for '{col}': {e}")
                 continue
