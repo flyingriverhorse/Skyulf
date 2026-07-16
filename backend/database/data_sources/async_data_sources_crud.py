@@ -239,7 +239,7 @@ async def _delete_primary(
         return rows
     except Exception:
         logger.exception(f"{primary_name} delete failed for data_sources")
-        raise RuntimeError(f"Failed to delete from primary database ({primary_name})") from None
+        raise RuntimeError(f"Failed to delete from primary database ({primary_name})") from None  # nosec B608 - error message only (contains "delete"/f-string, no SQL is built here); actual delete uses SQLAlchemy Core in delete_data_source()
 
 
 async def _sync_secondary_delete(
