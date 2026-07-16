@@ -21,8 +21,8 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { StatusBadge } from '../../shared/StatusBadge';
-import { getTooltipContentStyle } from '../../../core/utils/chartUtils';
 import { getChartTheme } from '../constants';
+import { useChartTheme } from '../../../core/hooks/useChartTheme';
 
 interface TargetAnalysisTabProps {
     profile: any;
@@ -42,7 +42,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
     report
 }) => {
     const [dlAllState, setDlAllState] = useState<'idle' | 'downloading' | 'done'>('idle');
-    const chartTheme = getChartTheme();
+    const chartTheme = useChartTheme();
 
     const showDone = useCallback(() => {
         setDlAllState('done');
@@ -179,7 +179,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                         <XAxis type="number" domain={[0, 1]} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                                         <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
                                         <Tooltip
-                                            contentStyle={getTooltipContentStyle()}
+                                            contentStyle={chartTheme.tooltipContentStyle}
                                             formatter={(value: number) => [value.toFixed(3), 'Association']}
                                         />
                                         <ReferenceLine x={0} stroke="#9ca3af" />
@@ -282,7 +282,7 @@ export const TargetAnalysisTab: React.FC<TargetAnalysisTabProps> = ({
                                                         if (active && payload && payload.length) {
                                                             const data = payload[0].payload;
                                                             return (
-                                                                <div style={getTooltipContentStyle()} className="text-xs p-2 rounded shadow-lg z-50">
+                                                                <div style={chartTheme.tooltipContentStyle} className="text-xs p-2 rounded shadow-lg z-50">
                                                                     <p className="font-semibold mb-1">{data.name}</p>
                                                                     <p>Max: {data.stats.max.toFixed(2)}</p>
                                                                     <p>Q3: {data.stats.q3.toFixed(2)}</p>

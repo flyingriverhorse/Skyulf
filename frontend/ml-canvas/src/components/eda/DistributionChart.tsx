@@ -1,8 +1,7 @@
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { InfoTooltip } from '../ui/InfoTooltip';
-import { getChartTheme } from './constants';
-import { getTooltipContentStyle } from '../../core/utils/chartUtils';
+import { useChartTheme } from '../../core/hooks/useChartTheme';
 import type { ColumnProfile, HistogramBin } from '../../core/types/edaProfile';
 
 /**
@@ -24,6 +23,7 @@ interface DistributionChartProps {
 }
 
 export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, onBarClick }) => {
+  const theme = useChartTheme();
   const { data, typeMatched } = useMemo((): { data: DistributionDatum[]; typeMatched: boolean } => {
     if (!profile) return { data: [], typeMatched: false };
 
@@ -85,7 +85,6 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
   }
 
   const type = profile.dtype;
-  const theme = getChartTheme();
 
   return (
     <div className="h-full w-full min-h-[250px] relative">
@@ -130,7 +129,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
                 if (active && payload && payload.length) {
                 const item = payload[0].payload;
                 return (
-                    <div style={getTooltipContentStyle()} className="text-xs p-2 rounded shadow-lg">
+                    <div style={theme.tooltipContentStyle} className="text-xs p-2 rounded shadow-lg">
                     <p className="font-semibold mb-1">{item.fullName}</p>
                     <p>Count: {item.count}</p>
                     {onBarClick && <p className="text-blue-300 mt-1 italic">Click to filter</p>}

@@ -11,8 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
-import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
-import { getChartTheme } from '../../../eda/constants';
+import { useChartTheme } from '../../../../core/hooks/useChartTheme';
 
 export interface FeatureImportanceEntry {
   jobId: string;
@@ -51,7 +50,7 @@ export const FeatureImportanceView: React.FC<Props> = ({
   downloadingChart,
   doneChart,
 }) => {
-  const chartTheme = getChartTheme();
+  const chartTheme = useChartTheme();
   // The Set/sort/map operations below scan every job and feature, so they're
   // memoised on featureImportancesByJob to avoid recomputing on every
   // unrelated re-render (e.g. hover state on download buttons).
@@ -133,7 +132,7 @@ export const FeatureImportanceView: React.FC<Props> = ({
               <XAxis type="number" domain={[0, 1]} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
               <YAxis type="category" dataKey="feature" tick={{ fontSize: 11, fill: chartTheme.axisColor }} width={110} />
               <Tooltip
-                contentStyle={getTooltipContentStyle()}
+                contentStyle={chartTheme.tooltipContentStyle}
                 formatter={(value: number) => value.toFixed(3)}
               />
               <Legend />

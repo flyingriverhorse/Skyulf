@@ -12,7 +12,7 @@ import {
 import { apiClient } from '../core/api/client';
 import { jobsApi } from '../core/api/jobs';
 import { LoadingState, EmptyState, ErrorState, StatusBadge } from '../components/shared';
-import { getChartTheme } from '../components/eda/constants';
+import { useChartTheme } from '../core/hooks/useChartTheme';
 
 interface SystemStats {
   total_jobs: number;
@@ -37,7 +37,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 };
 
 export const Dashboard: React.FC = () => {
-  const chartTheme = getChartTheme();
+  const chartTheme = useChartTheme();
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [jobs, setJobs] = useState<TrainingJobSummary[]>([]);
   const [loading, setLoading] = useState(true);

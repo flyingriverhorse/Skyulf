@@ -1,11 +1,12 @@
 import { Plotly } from '../plotly';
 import { toPng } from 'html-to-image';
+import { isDarkModeActive, getChartTheme as getSharedChartTheme } from '../theme/chartTheme';
 
 export const downloadChart = async (elementId: string, filename: string, title?: string, subtitle?: string, extraInfo?: string) => {
     const element = document.getElementById(elementId);
     if (!element) return;
 
-    const isDarkMode = document.documentElement.classList.contains('dark');
+    const isDarkMode = isDarkModeActive();
     const bgColor = isDarkMode ? '#1f2937' : '#ffffff'; // gray-800 vs white
     const textColor = isDarkMode ? '#f3f4f6' : '#111827'; // gray-100 vs gray-900
     const subTextColor = isDarkMode ? '#9ca3af' : '#4b5563'; // gray-400 vs gray-600
@@ -145,9 +146,4 @@ export const downloadChart = async (elementId: string, filename: string, title?:
     }
 };
 
-export const getTooltipContentStyle = (): Record<string, string> => {
-    const isDark = document.documentElement.classList.contains('dark');
-    return isDark
-        ? { backgroundColor: '#1f2937', borderRadius: '8px', border: '1px solid #374151', color: '#f3f4f6', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.3)' }
-        : { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '8px', border: '1px solid #e5e7eb', color: '#111827', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' };
-};
+export const getTooltipContentStyle = (): Record<string, string> => getSharedChartTheme().tooltipContentStyle;

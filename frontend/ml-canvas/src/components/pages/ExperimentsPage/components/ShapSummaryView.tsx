@@ -11,8 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
-import { getTooltipContentStyle } from '../../../../core/utils/chartUtils';
-import { getChartTheme } from '../../../eda/constants';
+import { useChartTheme } from '../../../../core/hooks/useChartTheme';
 
 export interface ShapSummaryEntry {
   jobId: string;
@@ -49,7 +48,7 @@ export const ShapSummaryView: React.FC<Props> = ({
   downloadingChart,
   doneChart,
 }) => {
-  const chartTheme = getChartTheme();
+  const chartTheme = useChartTheme();
   // Mirrors FeatureImportanceView's memoisation: the scan over every job and
   // feature is only worth recomputing when the underlying data changes.
   const { chartData, barKeys, topFeatures, allFeatures, jobsWithDataCount } = useMemo(() => {
@@ -124,7 +123,7 @@ export const ShapSummaryView: React.FC<Props> = ({
               <XAxis type="number" domain={[0, 1]} tick={{ fontSize: 12, fill: chartTheme.axisColor }} />
               <YAxis type="category" dataKey="feature" tick={{ fontSize: 11, fill: chartTheme.axisColor }} width={110} />
               <Tooltip
-                contentStyle={getTooltipContentStyle()}
+                contentStyle={chartTheme.tooltipContentStyle}
                 formatter={(value: number) => value.toFixed(3)}
               />
               <Legend />
