@@ -15,6 +15,7 @@ from backend.config import get_settings
 from backend.ml_pipeline._services.job_service import JobService
 from backend.ml_pipeline._services.prediction_utils import (
     decode_int_like,
+    extract_column_label_encoder,
     extract_target_label_encoder,
 )
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
@@ -86,15 +87,24 @@ class EvaluationService:
             y_proba["labels"] = decode_int_like(y_proba["classes"], label_encoder)
 
     @staticmethod
-    def _load_target_label_encoder(artifact_store: Any, job_id: str) -> Any:
-        """Loads the job bundle and extracts its target label encoder, if any."""
+    def _load_feature_engineer_bundle(
+        artifact_store: Any, job_id: str
+    ) -> tuple[Any, str | None] | None:
+        """Loads the job bundle and returns ``(feature_engineer, target_column)``, if present."""
         if not artifact_store.exists(job_id):
             return None
         bundle = artifact_store.load(job_id)
         if not (isinstance(bundle, dict) and "feature_engineer" in bundle):
             return None
-        feature_engineer = bundle.get("feature_engineer")
-        target_col_name = bundle.get("target_column")
+        return bundle.get("feature_engineer"), bundle.get("target_column")
+
+    @staticmethod
+    def _load_target_label_encoder(artifact_store: Any, job_id: str) -> Any:
+        """Loads the job bundle and extracts its target label encoder, if any."""
+        loaded = EvaluationService._load_feature_engineer_bundle(artifact_store, job_id)
+        if loaded is None:
+            return None
+        feature_engineer, target_col_name = loaded
         return extract_target_label_encoder(feature_engineer, target_column=target_col_name)
 
     @staticmethod
@@ -121,6 +131,70 @@ class EvaluationService:
             logger.debug(f"Evaluation decode skipped/failed: {e}")
 
     @staticmethod
+    def _decode_reference_crosstab(crosstab: dict[str, Any], label_encoder: Any) -> dict[str, Any]:
+        """Best-effort decode of a cluster's ``{reference_value: count}`` breakdown.
+
+        Reference-column values that were label-encoded upstream (e.g. species
+        name -> 0/1/2) show up here as numeric-looking string keys — decode
+        them back to their original text via ``label_encoder`` so the UI shows
+        "setosa" instead of "0".
+        """
+        decoded_keys = decode_int_like(list(crosstab.keys()), label_encoder)
+        return dict(zip((str(k) for k in decoded_keys), crosstab.values(), strict=True))
+
+    @staticmethod
+    def _decode_reference_column(data: Any, artifact_store: Any, job_id: str) -> None:
+        """Best-effort decode of clustering's reference-column crosstab labels in-place.
+
+        Only meaningful when the user set a ``reference_column`` and it was
+        label-encoded somewhere upstream in the pipeline — silently skips
+        otherwise (e.g. a text reference column that was never encoded is
+        already human-readable and needs no decoding).
+        """
+        try:
+            if not (isinstance(data, dict) and data.get("problem_type") == "clustering"):
+                return
+            splits = data.get("splits")
+            if not isinstance(splits, dict):
+                return
+
+            reference_column: str | None = None
+            for split_data in splits.values():
+                if isinstance(split_data, dict):
+                    clustering = split_data.get("clustering")
+                    if isinstance(clustering, dict) and clustering.get("reference_column"):
+                        reference_column = clustering["reference_column"]
+                        break
+            if not reference_column:
+                return
+
+            loaded = EvaluationService._load_feature_engineer_bundle(artifact_store, job_id)
+            if loaded is None:
+                return
+            feature_engineer, _target_col_name = loaded
+            label_encoder = extract_column_label_encoder(feature_engineer, reference_column)
+            if label_encoder is None:
+                return
+
+            for split_data in splits.values():
+                if not isinstance(split_data, dict):
+                    continue
+                clustering = split_data.get("clustering")
+                if not isinstance(clustering, dict):
+                    continue
+                crosstab = clustering.get("reference_crosstab")
+                if isinstance(crosstab, dict):
+                    clustering["reference_crosstab"] = {
+                        cluster_id: EvaluationService._decode_reference_crosstab(
+                            counts, label_encoder
+                        )
+                        for cluster_id, counts in crosstab.items()
+                        if isinstance(counts, dict)
+                    }
+        except Exception as e:
+            logger.debug(f"Reference column decode skipped/failed: {e}")
+
+    @staticmethod
     async def get_job_evaluation(session: AsyncSession, job_id: str) -> dict[str, Any]:
         """
         Retrieves the raw evaluation data (y_true, y_pred) for a job.
@@ -145,6 +219,9 @@ class EvaluationService:
 
             # Optional: decode target labels for nicer UI (ROC selector, confusion matrix)
             EvaluationService._decode_target_labels(data, artifact_store, job_id)
+
+            # Optional: decode a clustering reference column's crosstab labels
+            EvaluationService._decode_reference_column(data, artifact_store, job_id)
 
             return data
         except Exception as e:
