@@ -19,7 +19,13 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import CountVectorizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _join_text_columns, _warn_large_output, apply_text_pandas_only
+from ._common import (
+    _join_text_columns,
+    _sklearn_vectorizer_apply_pandas,
+    _warn_large_output,
+    apply_text_pandas_only,
+    resolve_fit_text_columns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,32 +38,8 @@ _LARGE_VOCAB_THRESHOLD = 10_000
 def _count_apply_pandas(
     X: pd.DataFrame, y: Any, params: dict[str, Any]
 ) -> tuple[pd.DataFrame, Any]:
-    cols: list[str] = params.get("columns", [])
-    vectorizer: CountVectorizer | None = params.get("vectorizer_object")
-    output_columns: list[str] = params.get("output_columns", [])
-    drop_original: bool = params.get("drop_original", False)
-
-    if not cols or vectorizer is None or not output_columns:
-        return X, y
-
-    valid_cols = [c for c in cols if c in X.columns]
-    if not valid_cols:
-        return X, y
-
-    text = _join_text_columns(X, valid_cols)
-    encoded = vectorizer.transform(text)
-    dense = encoded.toarray() if hasattr(encoded, "toarray") else encoded
-
-    encoded_df = pd.DataFrame(
-        dense,
-        columns=output_columns,  # ty: ignore[invalid-argument-type]
-        index=X.index,
-    )
-
-    X_out = X.copy()
-    if drop_original:
-        X_out = X_out.drop(columns=valid_cols)
-    return pd.concat([X_out, encoded_df], axis=1), y
+    """Transform text columns using the fitted ``CountVectorizer``."""
+    return _sklearn_vectorizer_apply_pandas(X, y, params)
 
 
 class CountVectorizerApplier(BaseApplier):
@@ -91,6 +73,53 @@ class CountVectorizerApplier(BaseApplier):
     },
     tags=["text", "nlp", "vectorizer", "bag-of-words"],
 )
+def _build_count_artifact(
+    config: dict[str, Any], X: pd.DataFrame, valid_cols: list[str]
+) -> CountVectorizerArtifact:
+    """Fit a ``CountVectorizer`` on the resolved text columns and build its artifact dict."""
+    max_features: int | None = config.get("max_features") or None
+    min_df: Any = config.get("min_df", 1)
+    max_df: Any = config.get("max_df", 1.0)
+    ngram_min, ngram_max = config.get("ngram_range", [1, 1])
+    lowercase: bool = bool(config.get("lowercase", True))
+    stop_words: str | None = config.get("stop_words") or None
+    binary: bool = bool(config.get("binary", False))
+
+    vectorizer = CountVectorizer(
+        max_features=max_features,
+        min_df=min_df,
+        max_df=max_df,
+        ngram_range=(ngram_min, ngram_max),
+        lowercase=lowercase,
+        stop_words=stop_words,
+        binary=binary,
+    )
+
+    text = _join_text_columns(X, valid_cols)
+    vectorizer.fit(text)
+
+    feature_names: list[str] = vectorizer.get_feature_names_out().tolist()
+    prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
+    output_columns = [f"{prefix}__count__{name}" for name in feature_names]
+
+    warn = _warn_large_output(len(output_columns), threshold=_LARGE_VOCAB_THRESHOLD)
+    if warn:
+        logger.warning(warn)
+
+    return {
+        "type": "count_vectorizer",
+        "columns": valid_cols,
+        "output_columns": output_columns,
+        "vocabulary": vectorizer.vocabulary_,
+        "max_features": max_features,
+        "lowercase": lowercase,
+        "stop_words": stop_words,
+        "binary": binary,
+        "vectorizer_object": vectorizer,
+        "drop_original": bool(config.get("drop_original", False)),
+    }
+
+
 class CountVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:
         # Vocabulary size is data-dependent — return None to signal unknown.
@@ -98,56 +127,9 @@ class CountVectorizerCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> CountVectorizerArtifact:  # pylint: disable=arguments-differ
-        cols: list[str] = config.get("columns", [])
-        if not cols:
+        resolved = resolve_fit_text_columns(X, config)
+        if resolved is None:
             return {}
+        X, valid_cols = resolved
 
-        # Always work in pandas
-        if hasattr(X, "to_pandas"):
-            X = X.to_pandas()
-
-        valid_cols = [c for c in cols if c in X.columns]
-        if not valid_cols:
-            return {}
-
-        max_features: int | None = config.get("max_features") or None
-        min_df: Any = config.get("min_df", 1)
-        max_df: Any = config.get("max_df", 1.0)
-        ngram_min, ngram_max = config.get("ngram_range", [1, 1])
-        lowercase: bool = bool(config.get("lowercase", True))
-        stop_words: str | None = config.get("stop_words") or None
-        binary: bool = bool(config.get("binary", False))
-
-        vectorizer = CountVectorizer(
-            max_features=max_features,
-            min_df=min_df,
-            max_df=max_df,
-            ngram_range=(ngram_min, ngram_max),
-            lowercase=lowercase,
-            stop_words=stop_words,
-            binary=binary,
-        )
-
-        text = _join_text_columns(X, valid_cols)
-        vectorizer.fit(text)
-
-        feature_names: list[str] = vectorizer.get_feature_names_out().tolist()
-        prefix = valid_cols[0] if len(valid_cols) == 1 else "_".join(valid_cols)
-        output_columns = [f"{prefix}__count__{name}" for name in feature_names]
-
-        warn = _warn_large_output(len(output_columns), threshold=_LARGE_VOCAB_THRESHOLD)
-        if warn:
-            logger.warning(warn)
-
-        return {
-            "type": "count_vectorizer",
-            "columns": valid_cols,
-            "output_columns": output_columns,
-            "vocabulary": vectorizer.vocabulary_,
-            "max_features": max_features,
-            "lowercase": lowercase,
-            "stop_words": stop_words,
-            "binary": binary,
-            "vectorizer_object": vectorizer,
-            "drop_original": bool(config.get("drop_original", False)),
-        }
+        return _build_count_artifact(config, X, valid_cols)
