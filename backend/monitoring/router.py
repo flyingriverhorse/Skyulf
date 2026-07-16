@@ -602,6 +602,28 @@ async def get_errors_grouped(
     ]
 
 
+def _build_zero_filled_hour_buckets(cutoff: datetime, hours: int) -> dict[str, int]:
+    """Build a zero-filled dict keyed by hourly ISO slot strings starting at `cutoff`."""
+    buckets: dict[str, int] = {}
+    for i in range(hours):
+        slot = (cutoff + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
+        buckets[slot.strftime("%Y-%m-%dT%H:00")] = 0
+    return buckets
+
+
+def _fill_error_buckets(buckets: dict[str, int], timestamps: list) -> None:
+    """Increment each bucket's count in-place for timestamps that fall within a known hour slot."""
+    for ts in timestamps:
+        if ts is None:
+            continue
+        # Normalise to UTC-aware
+        if hasattr(ts, "tzinfo") and ts.tzinfo is None:
+            ts = ts.replace(tzinfo=UTC)
+        slot_key = ts.strftime("%Y-%m-%dT%H:00")
+        if slot_key in buckets:
+            buckets[slot_key] += 1
+
+
 @router.get("/errors/timeline", response_model=list[ErrorTimelineEntry])
 async def get_error_timeline(
     hours: int = 24,
@@ -626,20 +648,8 @@ async def get_error_timeline(
     timestamps = [row[0] for row in result.all()]
 
     # Build a zero-filled bucket dict: { slot_iso: count }
-    buckets: dict[str, int] = {}
-    for i in range(hours):
-        slot = (cutoff + timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
-        buckets[slot.strftime("%Y-%m-%dT%H:00")] = 0
-
-    for ts in timestamps:
-        if ts is None:
-            continue
-        # Normalise to UTC-aware
-        if hasattr(ts, "tzinfo") and ts.tzinfo is None:
-            ts = ts.replace(tzinfo=UTC)
-        slot_key = ts.strftime("%Y-%m-%dT%H:00")
-        if slot_key in buckets:
-            buckets[slot_key] += 1
+    buckets = _build_zero_filled_hour_buckets(cutoff, hours)
+    _fill_error_buckets(buckets, timestamps)
 
     return [ErrorTimelineEntry(hour=h, count=c) for h, c in sorted(buckets.items())]
 

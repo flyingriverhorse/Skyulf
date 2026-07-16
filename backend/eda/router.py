@@ -91,6 +91,45 @@ async def list_all_jobs(
     ]
 
 
+def _build_analysis_config(body: AnalyzeRequest | None) -> dict:
+    """Build the EDAReport config dict from optional analysis request fields."""
+    config: dict = {}
+    if not body:
+        return config
+    if body.target_col:
+        logger.debug("Setting target_col to %s", body.target_col)
+        config["target_col"] = body.target_col
+    if body.exclude_cols:
+        logger.debug("Excluding columns: %s", body.exclude_cols)
+        config["exclude_cols"] = body.exclude_cols
+    if body.filters:
+        logger.debug("Applying filters: %s", body.filters)
+        config["filters"] = [f.model_dump() for f in body.filters]
+    if body.task_type:
+        logger.debug("Setting task_type to %s", body.task_type)
+        config["task_type"] = body.task_type
+    return config
+
+
+async def _dispatch_analysis_job(
+    report: EDAReport, background_tasks: BackgroundTasks, session: AsyncSession
+) -> None:
+    """Dispatch the EDA job via Celery or FastAPI BackgroundTasks depending on settings."""
+    settings = get_settings()
+    if settings.USE_CELERY:
+        task = generate_profile_celery.delay(report.id)
+
+        # Store task_id in config for cancellation
+        new_config = dict(report.config) if report.config else {}
+        new_config["celery_task_id"] = task.id
+        report.config = new_config
+
+        session.add(report)
+        await session.commit()
+    else:
+        background_tasks.add_task(run_eda_background, report.id)
+
+
 @router.post("/{dataset_id}/analyze")
 @limiter.limit("20/minute")
 async def trigger_analysis(
@@ -111,20 +150,7 @@ async def trigger_analysis(
         raise HTTPException(status_code=404, detail="Dataset not found")
 
     # Create Report entry
-    config = {}
-    if body:
-        if body.target_col:
-            logger.debug("Setting target_col to %s", body.target_col)
-            config["target_col"] = body.target_col
-        if body.exclude_cols:
-            logger.debug("Excluding columns: %s", body.exclude_cols)
-            config["exclude_cols"] = body.exclude_cols
-        if body.filters:
-            logger.debug("Applying filters: %s", body.filters)
-            config["filters"] = [f.model_dump() for f in body.filters]
-        if body.task_type:
-            logger.debug("Setting task_type to %s", body.task_type)
-            config["task_type"] = body.task_type
+    config = _build_analysis_config(body)
 
     report = EDAReport(data_source_id=dataset_id, status="PENDING", config=config)
     session.add(report)
@@ -132,21 +158,7 @@ async def trigger_analysis(
     await session.refresh(report)
 
     # Dispatch
-    settings = get_settings()
-    if settings.USE_CELERY:
-        # Use Celery
-        task = generate_profile_celery.delay(report.id)
-
-        # Store task_id in config for cancellation
-        new_config = dict(report.config) if report.config else {}
-        new_config["celery_task_id"] = task.id
-        report.config = new_config
-
-        session.add(report)
-        await session.commit()
-    else:
-        # Use BackgroundTasks
-        background_tasks.add_task(run_eda_background, report.id)
+    await _dispatch_analysis_job(report, background_tasks, session)
 
     return {"job_id": report.id, "status": "PENDING"}
 
@@ -328,6 +340,40 @@ async def _load_decomposition_dataframe(
     return df
 
 
+async def _prepare_decomposition_dataframe(ds: DataSource) -> pl.DataFrame:
+    """Resolve the file path/storage options for a DataSource and load it as a Polars DataFrame."""
+    # 2. Resolve File Path
+    file_path = _resolve_decomposition_file_path(ds)
+
+    # 3. Prepare Storage Options (Simplified from tasks.py)
+    storage_options = None
+    if file_path and str(file_path).startswith("s3://"):
+        storage_options = _build_decomposition_storage_options(ds)
+
+    # 4. Load Data
+    data_service = DataService()
+    return await _load_decomposition_dataframe(data_service, file_path, storage_options)
+
+
+def _run_decomposition_analysis(df: pl.DataFrame, body: "DecompositionRequest") -> Any:
+    """Run the decomposition split analysis for a loaded DataFrame given the request body."""
+    analyzer = EDAAnalyzer(cast(Any, df))
+
+    filters_dict = [f.model_dump() for f in body.filters] if body.filters else []
+
+    # Handle empty string split_col from frontend
+    split_col_arg = body.split_col
+    if split_col_arg == "":
+        split_col_arg = None
+
+    return analyzer.get_decomposition_split(
+        measure_col=body.measure_col,
+        measure_agg=body.measure_agg,
+        split_col=split_col_arg,
+        filters=filters_dict,
+    )
+
+
 @router.post("/{dataset_id}/decomposition")
 @limiter.limit("20/minute")
 async def get_decomposition(
@@ -345,36 +391,11 @@ async def get_decomposition(
         if not ds:
             raise HTTPException(status_code=404, detail="Dataset not found")
 
-        # 2. Resolve File Path
-        file_path = _resolve_decomposition_file_path(ds)
-
-        # 3. Prepare Storage Options (Simplified from tasks.py)
-        storage_options = None
-        if file_path and str(file_path).startswith("s3://"):
-            storage_options = _build_decomposition_storage_options(ds)
-
-        # 4. Load Data
-        data_service = DataService()
-        df = await _load_decomposition_dataframe(data_service, file_path, storage_options)
+        # 2-4. Resolve path/storage options and load the DataFrame
+        df = await _prepare_decomposition_dataframe(ds)
 
         # 5. Run Analysis
-        analyzer = EDAAnalyzer(cast(Any, df))
-
-        filters_dict = [f.model_dump() for f in body.filters] if body.filters else []
-
-        # Handle empty string split_col from frontend
-        split_col_arg = body.split_col
-        if split_col_arg == "":
-            split_col_arg = None
-
-        result = analyzer.get_decomposition_split(
-            measure_col=body.measure_col,
-            measure_agg=body.measure_agg,
-            split_col=split_col_arg,
-            filters=filters_dict,
-        )
-
-        return result
+        return _run_decomposition_analysis(df, body)
     except HTTPException:
         raise
     except Exception:
