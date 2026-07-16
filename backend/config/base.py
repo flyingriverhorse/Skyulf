@@ -120,41 +120,54 @@ class Settings(
             return [item.strip() for item in v.split(",") if item.strip()]
         return cast(list[str], v)
 
+    def _postgres_url_query_string(self) -> str:
+        """Build the optional '?sslmode=...&...' query string from DB_SSLMODE/DB_SSLROOTCERT/DB_EXTRA_PARAMS."""
+        params = []
+        if self.DB_SSLMODE:
+            params.append(f"sslmode={self.DB_SSLMODE}")
+        if self.DB_SSLROOTCERT:
+            params.append(f"sslrootcert={self.DB_SSLROOTCERT}")
+        if self.DB_EXTRA_PARAMS:
+            params.append(self.DB_EXTRA_PARAMS)
+
+        return f"?{'&'.join(params)}" if params else ""
+
+    def _configure_postgres_database_url(self) -> None:
+        """Validate required postgres fields and build DATABASE_URL when not already a postgres URL."""
+        if self.DATABASE_URL.startswith(("postgresql", "postgres")):
+            return
+
+        if not all([self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]):
+            raise ValueError(
+                "For PostgreSQL, either provide DATABASE_URL or all of: "
+                "DB_USER, DB_PASSWORD, DB_HOST, DB_NAME"
+            )
+        port = self.DB_PORT or 5432
+        pwd = urllib.parse.quote_plus(self.DB_PASSWORD) if self.DB_PASSWORD else ""
+        url = f"postgresql+asyncpg://{self.DB_USER}:{pwd}@{self.DB_HOST}:{port}/{self.DB_NAME}"
+        url += self._postgres_url_query_string()
+
+        self.DATABASE_URL = url
+
+    def _configure_sqlite_database_url(self) -> None:
+        """Build a sqlite+aiosqlite DATABASE_URL from DB_PATH when not already a sqlite URL."""
+        if self.DATABASE_URL.startswith("sqlite"):
+            return
+
+        db_path = self.DB_PATH or "mlops_database.db"
+        if Path(db_path).is_absolute():
+            self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
+        else:
+            self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
+
     @model_validator(mode="after")
     def validate_database_config(self) -> "Settings":
         """Auto-construct DATABASE_URL from component fields when needed."""
         # pylint: disable=access-member-before-definition
         if self.DB_TYPE == "postgres":
-            if not self.DATABASE_URL.startswith(("postgresql", "postgres")):
-                if not all([self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]):
-                    raise ValueError(
-                        "For PostgreSQL, either provide DATABASE_URL or all of: "
-                        "DB_USER, DB_PASSWORD, DB_HOST, DB_NAME"
-                    )
-                port = self.DB_PORT or 5432
-                pwd = urllib.parse.quote_plus(self.DB_PASSWORD) if self.DB_PASSWORD else ""
-                url = (
-                    f"postgresql+asyncpg://{self.DB_USER}:{pwd}@"
-                    f"{self.DB_HOST}:{port}/{self.DB_NAME}"
-                )
-                params = []
-                if self.DB_SSLMODE:
-                    params.append(f"sslmode={self.DB_SSLMODE}")
-                if self.DB_SSLROOTCERT:
-                    params.append(f"sslrootcert={self.DB_SSLROOTCERT}")
-                if self.DB_EXTRA_PARAMS:
-                    params.append(self.DB_EXTRA_PARAMS)
-
-                if params:
-                    url += f"?{'&'.join(params)}"
-
-                self.DATABASE_URL = url
-        elif self.DB_TYPE == "sqlite" and not self.DATABASE_URL.startswith("sqlite"):
-            db_path = self.DB_PATH or "mlops_database.db"
-            if Path(db_path).is_absolute():
-                self.DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
-            else:
-                self.DATABASE_URL = f"sqlite+aiosqlite:///./{db_path}"
+            self._configure_postgres_database_url()
+        elif self.DB_TYPE == "sqlite":
+            self._configure_sqlite_database_url()
         return self
 
     @model_validator(mode="after")
