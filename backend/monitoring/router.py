@@ -728,25 +728,44 @@ def _percentile(values: list[float], pct: float) -> float:
     return s[rank]
 
 
-@router.get("/slow-nodes", response_model=SlowNodesResponse)
-async def list_slow_nodes(
-    days: int = 7,
-    limit: int = 10,
-    db: AsyncSession = Depends(get_db),
-) -> SlowNodesResponse:
-    """Aggregate per-step execution time across completed jobs in the window.
-
-    Returns the top `limit` step_types sorted by total cumulative seconds —
-    the most useful "where to invest in optimisation" signal.
-    """
+def _clamp_slow_nodes_params(days: int, limit: int) -> tuple[int, int]:
+    """Clamp `days`/`limit` query params to the configured monitoring caps."""
     from backend.config import get_settings as _get_settings
 
     _settings = _get_settings()
     days = max(1, min(days, _settings.MONITORING_MAX_SLOWNODES_DAYS))
     limit = max(1, min(limit, _settings.MAX_PAGE_SIZE))
+    return days, limit
 
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
+def _accumulate_node_timing(
+    entry: Any,
+    by_step: dict[str, list[float]],
+    sample_node: dict[str, str],
+) -> bool:
+    """Fold a single node-timing entry into the running per-step aggregates.
+
+    Returns True if the entry contributed a run to the aggregates.
+    """
+    if not isinstance(entry, dict):
+        return False
+    step = str(entry.get("step_type") or "unknown")
+    try:
+        secs = float(entry.get("execution_time") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    if secs <= 0:
+        return False
+    by_step.setdefault(step, []).append(secs)
+    sample_node.setdefault(step, str(entry.get("node_id") or ""))
+    return True
+
+
+async def _scan_slow_node_jobs(
+    db: AsyncSession,
+    cutoff: datetime,
+) -> tuple[dict[str, list[float]], dict[str, str], int, int]:
+    """Scan completed jobs since `cutoff` and aggregate per-step node timings."""
     by_step: dict[str, list[float]] = {}
     sample_node: dict[str, str] = {}
     jobs_scanned = 0
@@ -767,19 +786,17 @@ async def list_slow_nodes(
             if not isinstance(timings, list):
                 continue
             for entry in timings:
-                if not isinstance(entry, dict):
-                    continue
-                step = str(entry.get("step_type") or "unknown")
-                try:
-                    secs = float(entry.get("execution_time") or 0.0)
-                except (TypeError, ValueError):
-                    continue
-                if secs <= 0:
-                    continue
-                by_step.setdefault(step, []).append(secs)
-                sample_node.setdefault(step, str(entry.get("node_id") or ""))
-                runs_seen += 1
+                if _accumulate_node_timing(entry, by_step, sample_node):
+                    runs_seen += 1
 
+    return by_step, sample_node, jobs_scanned, runs_seen
+
+
+def _build_slow_node_aggregates(
+    by_step: dict[str, list[float]],
+    sample_node: dict[str, str],
+) -> list[SlowNodeAggregate]:
+    """Turn per-step timing lists into sorted `SlowNodeAggregate` rows."""
     aggregates: list[SlowNodeAggregate] = []
     for step, values in by_step.items():
         total = sum(values)
@@ -794,8 +811,27 @@ async def list_slow_nodes(
                 sample_node_id=sample_node.get(step) or None,
             )
         )
-
     aggregates.sort(key=lambda a: a.total_seconds, reverse=True)
+    return aggregates
+
+
+@router.get("/slow-nodes", response_model=SlowNodesResponse)
+async def list_slow_nodes(
+    days: int = 7,
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+) -> SlowNodesResponse:
+    """Aggregate per-step execution time across completed jobs in the window.
+
+    Returns the top `limit` step_types sorted by total cumulative seconds —
+    the most useful "where to invest in optimisation" signal.
+    """
+    days, limit = _clamp_slow_nodes_params(days, limit)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+
+    by_step, sample_node, jobs_scanned, runs_seen = await _scan_slow_node_jobs(db, cutoff)
+    aggregates = _build_slow_node_aggregates(by_step, sample_node)
+
     return SlowNodesResponse(
         days=days,
         total_jobs_scanned=jobs_scanned,

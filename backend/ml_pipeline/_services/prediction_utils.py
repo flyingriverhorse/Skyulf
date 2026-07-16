@@ -30,29 +30,47 @@ def extract_target_label_encoder(
 
     # Walk backwards so the most recent LabelEncoder wins
     for raw_step in reversed(fitted_steps):
-        if not isinstance(raw_step, dict):
+        encoders = _get_label_encoder_map(raw_step)
+        if encoders is None:
             continue
-        step = cast(dict[str, Any], raw_step)
-        if step.get("type") != "LabelEncoder":
-            continue
-        artifact = step.get("artifact")
-        if not isinstance(artifact, dict):
-            continue
-        encoders = artifact.get("encoders")
-        if not isinstance(encoders, dict):
-            continue
+        encoder = _resolve_target_encoder(encoders, target_column)
+        if encoder is not None:
+            return encoder
 
-        # Priority 1: explicit __target__ key
-        target_encoder = encoders.get("__target__")
-        if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
-            return target_encoder
+    return None
 
-        # Priority 2: encoder keyed by the target column name
-        # (happens when LabelEncoder runs before Feature/Target Split)
-        if target_column:
-            col_encoder = encoders.get(target_column)
-            if col_encoder is not None and hasattr(col_encoder, "inverse_transform"):
-                return col_encoder
+
+def _get_label_encoder_map(raw_step: Any) -> dict[str, Any] | None:
+    """Return the `encoders` mapping from a fitted LabelEncoder step, if any."""
+    if not isinstance(raw_step, dict):
+        return None
+    step = cast(dict[str, Any], raw_step)
+    if step.get("type") != "LabelEncoder":
+        return None
+    artifact = step.get("artifact")
+    if not isinstance(artifact, dict):
+        return None
+    encoders = artifact.get("encoders")
+    if not isinstance(encoders, dict):
+        return None
+    return encoders
+
+
+def _resolve_target_encoder(encoders: dict[str, Any], target_column: str | None) -> Any | None:
+    """Pick the target's LabelEncoder from a step's `encoders` mapping.
+
+    Priority 1: explicit ``__target__`` key. Priority 2: encoder keyed by the
+    target column name (happens when LabelEncoder runs before Feature/Target
+    Split).
+    """
+    target_encoder = encoders.get("__target__")
+    if target_encoder is not None and hasattr(target_encoder, "inverse_transform"):
+        return target_encoder
+
+    if target_column:
+        col_encoder = encoders.get(target_column)
+        if col_encoder is not None and hasattr(col_encoder, "inverse_transform"):
+            return col_encoder
 
     return None
 
