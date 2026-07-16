@@ -376,9 +376,19 @@ class StatefulEstimator:
         # 2. Train Model
         self.model = self.calculator.fit(X_combined, y_combined, config)
 
-    def evaluate(self, dataset: SplitDataset, target_column: str, job_id: str = "unknown") -> Any:
+    def evaluate(
+        self,
+        dataset: SplitDataset,
+        target_column: str,
+        job_id: str = "unknown",
+        reference_column: str = "",
+    ) -> Any:
         """
         Evaluates the model on all splits and returns a detailed report.
+
+        ``reference_column`` is clustering-only: an optional column (e.g. a
+        known label like species name) excluded from training features but
+        used here purely to build a post-hoc cluster/label breakdown.
         """
         if self.model is None:
             raise ValueError("Model has not been trained yet. Call fit_predict() first.")
@@ -397,7 +407,7 @@ class StatefulEstimator:
 
         # 2. Evaluate Train
         splits_payload["train"] = self._evaluate_split(
-            "train", dataset.train, target_column, problem_type, evaluation_data
+            "train", dataset.train, target_column, problem_type, evaluation_data, reference_column
         )
 
         # 3. Evaluate Test
@@ -405,7 +415,7 @@ class StatefulEstimator:
 
         if has_test:
             splits_payload["test"] = self._evaluate_split(
-                "test", dataset.test, target_column, problem_type, evaluation_data
+                "test", dataset.test, target_column, problem_type, evaluation_data, reference_column
             )
 
         # 4. Evaluate Validation
@@ -414,7 +424,12 @@ class StatefulEstimator:
 
             if has_val:
                 splits_payload["validation"] = self._evaluate_split(
-                    "validation", dataset.validation, target_column, problem_type, evaluation_data
+                    "validation",
+                    dataset.validation,
+                    target_column,
+                    problem_type,
+                    evaluation_data,
+                    reference_column,
                 )
 
         # Return report object (simplified for now, assuming schema matches)
@@ -431,6 +446,7 @@ class StatefulEstimator:
         target_column: str,
         problem_type: str,
         evaluation_data: dict[str, Any],
+        reference_column: str = "",
     ) -> Any:
         """Evaluates a single dataset split, recording raw predictions into ``evaluation_data``
         and returning the split's evaluation report (or ``None`` if it can't be evaluated).
@@ -456,7 +472,7 @@ class StatefulEstimator:
             # `.predict()`, so (unlike DBSCAN/Agglomerative) evaluating each
             # split independently with its own predicted labels is valid.
             split_report = self._evaluate_split_with_model(
-                model_to_evaluate, split_name, X, y_pred, problem_type
+                model_to_evaluate, split_name, X, y_pred, problem_type, reference_column
             )
             evaluation_data["splits"][split_name] = self._build_clustering_split_raw_data(
                 y_pred, split_report
@@ -524,7 +540,12 @@ class StatefulEstimator:
 
     @staticmethod
     def _evaluate_split_with_model(
-        model_to_evaluate: Any, split_name: str, X: Any, y: Any, problem_type: str
+        model_to_evaluate: Any,
+        split_name: str,
+        X: Any,
+        y: Any,
+        problem_type: str,
+        reference_column: str = "",
     ) -> Any:
         """Dispatches to the classification, regression, or clustering evaluator.
 
@@ -547,7 +568,11 @@ class StatefulEstimator:
             )
         elif problem_type == "clustering":
             return evaluate_clustering_model(
-                model=model_to_evaluate, X=X, labels=y, dataset_name=split_name
+                model=model_to_evaluate,
+                X=X,
+                labels=y,
+                dataset_name=split_name,
+                reference_column=reference_column,
             )
         else:
             raise ValueError(f"Unknown problem type: {problem_type}")

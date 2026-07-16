@@ -359,7 +359,11 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               model_type: node.data.model_type,
               hyperparameters: node.data.hyperparameters,
               cv_enabled: false,
-              execution_mode: node.data.execution_mode
+              execution_mode: node.data.execution_mode,
+              // Optional column (e.g. species name) excluded from training
+              // but kept for post-hoc cluster interpretation — see
+              // `reference_crosstab` in the evaluation report.
+              reference_column: node.data.reference_column || undefined,
           };
       } else if (node.data.definitionType === 'EnsembleNode') {
           // Phase 2: auto-detect base learners wired into the ensemble's input.
