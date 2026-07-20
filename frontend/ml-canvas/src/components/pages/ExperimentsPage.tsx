@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { Filter } from 'lucide-react';
 import { useConfirm } from '../shared';
@@ -9,9 +9,9 @@ import { apiClient } from '../../core/api/client';
 import { formatDuration } from '../../core/utils/format';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 import type { EvaluationData, ShapExplanationData } from './ExperimentsPage/types';
-import { getJobScoringMetric, getTaskForModelType, shortRunId } from './ExperimentsPage/utils/jobMeta';
+import { getJobScoringMetric, getTaskForModelType, mapJobMetricToDropdown, shortRunId, type ThresholdMetric } from './ExperimentsPage/utils/jobMeta';
 import { registryApi, type RegistryItem } from '../../core/api/registry';
-import { findBestF1Threshold } from './ExperimentsPage/utils/classificationCharts';
+import { findBestThreshold } from './ExperimentsPage/utils/classificationCharts';
 import { ComparisonTableView } from './ExperimentsPage/components/ComparisonTableView';
 import { FeatureImportanceView } from './ExperimentsPage/components/FeatureImportanceView';
 import { ShapExplainabilityView } from './ExperimentsPage/components/ShapExplainabilityView';
@@ -34,6 +34,11 @@ const parseMetricKey = (key: string) => {
 export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
   const confirm = useConfirm();
+  // Ref mirror of `jobs`, read (not depended on) inside fetchEvaluationData
+  // below so looking up the job's own scoring metric doesn't force that
+  // callback to be treated as reactive on every jobs-list refresh/poll.
+  const jobsRef = useRef(jobs);
+  jobsRef.current = jobs;
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
   const [filterType, setFilterType] = useState<'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
@@ -72,9 +77,13 @@ export const ExperimentsPage: React.FC = () => {
   const [threshold, setThreshold] = useState(0.5);
   const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
   const [selectedRegressionSplit, setSelectedRegressionSplit] = useState<string | null>(null);
+  // Which metric the classification best-threshold scan optimizes for.
+  // Reset per-job in fetchEvaluationData below, defaulting to the job's
+  // own scoring metric (via mapJobMetricToDropdown) instead of always F1.
+  const [selectedThresholdMetric, setSelectedThresholdMetric] = useState<ThresholdMetric>('f1_weighted');
 
-  // Best F1 threshold(s) — recomputed only when class, visible splits, or
-  // evaluation data changes, not on every slider drag.
+  // Best-threshold badge(s) — recomputed only when class, metric, visible
+  // splits, or evaluation data changes, not on every slider drag.
   //
   // Computes one badge PER currently-visible split (per the "Splits:"
   // toggles) rather than a single winner, so the user can see and apply
@@ -85,7 +94,7 @@ export const ExperimentsPage: React.FC = () => {
   //
   // Note: the splits dict key is `'validation'`, not `'val'` — mirrors the
   // same key the regression-tab fix above already corrected.
-  const bestF1Infos = useMemo(() => {
+  const bestMetricInfos = useMemo(() => {
     if (!evaluationData || !selectedRocClass || evaluationData.problem_type === 'clustering') return [];
     const splits = evaluationData.splits;
     const priority: Array<{ key: string; visible: boolean; label: string }> = [
@@ -96,16 +105,15 @@ export const ExperimentsPage: React.FC = () => {
     const candidates = priority.filter(p => splits[p.key]?.y_proba);
     const visibleCandidates = candidates.filter(p => p.visible);
     const toCompute = visibleCandidates.length > 0 ? visibleCandidates : candidates;
-    const evalJob = evalJobId ? jobs.find(j => j.job_id === evalJobId) : null;
-    const metricName = (evalJob ? getJobScoringMetric(evalJob) : undefined) ?? 'f1';
     return toCompute.flatMap(({ key, label }) => {
       const refSplit = splits[key];
       if (!refSplit?.y_proba) return [];
-      const result = findBestF1Threshold(refSplit.y_true, refSplit.y_proba, selectedRocClass);
+      const result = findBestThreshold(refSplit.y_true, refSplit.y_proba, selectedRocClass, selectedThresholdMetric);
       if (!result) return [];
-      return [{ ...result, splitLabel: label, metricName }];
+      return [{ ...result, splitLabel: label, metricName: selectedThresholdMetric }];
     });
-  }, [evaluationData, selectedRocClass, evalJobId, jobs, showValMetrics, showTestMetrics, showTrainMetrics]);
+  }, [evaluationData, selectedRocClass, selectedThresholdMetric, showValMetrics, showTestMetrics, showTrainMetrics]);
+
 
   useEffect(() => {
     fetchJobs();
@@ -209,6 +217,10 @@ export const ExperimentsPage: React.FC = () => {
     setIsEvalLoading(true);
     setEvalError(null);
     setEvalJobId(jobId);
+    // Default the metric dropdown to this job's own scoring metric (not
+    // always F1) — the user can still change it afterward for this job.
+    const job = jobsRef.current.find(j => j.job_id === jobId);
+    setSelectedThresholdMetric(mapJobMetricToDropdown(job ? getJobScoringMetric(job) : undefined));
     try {
       const res = await apiClient.get(`/pipeline/jobs/${jobId}/evaluation`);
       setEvaluationData(res.data);
@@ -456,7 +468,9 @@ export const ExperimentsPage: React.FC = () => {
                   setSelectedRocClass={setSelectedRocClass}
                   cmView={cmView}
                   setCmView={setCmView}
-                  bestF1Infos={bestF1Infos}
+                  selectedMetric={selectedThresholdMetric}
+                  setSelectedMetric={setSelectedThresholdMetric}
+                  bestMetricInfos={bestMetricInfos}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
