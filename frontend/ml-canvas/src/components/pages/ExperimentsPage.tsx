@@ -47,7 +47,12 @@ export const ExperimentsPage: React.FC = () => {
   const [showTrainMetrics, setShowTrainMetrics] = useState(true);
   const [showTestMetrics, setShowTestMetrics] = useState(true);
   const [showValMetrics, setShowValMetrics] = useState(true);
-  const [showCvMetrics, setShowCvMetrics] = useState(true);
+  // Cross-Validation defaults to unchecked/hidden in the visual chart
+  // comparison — it's a single cross-validated score, not comparable
+  // split-for-split against train/test/val bars, so it would otherwise
+  // clutter the default view. Still toggleable by the user via its
+  // checkbox when they actually want to see it.
+  const [showCvMetrics, setShowCvMetrics] = useState(false);
 
   // Table expansion states (lifted so they survive view switches)
   const [isMetricsExpanded, setIsMetricsExpanded] = useState(true);
@@ -68,37 +73,38 @@ export const ExperimentsPage: React.FC = () => {
   const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
   const [selectedRegressionSplit, setSelectedRegressionSplit] = useState<string | null>(null);
 
-  // Best F1 threshold — recomputed only when class, visible splits, or
+  // Best F1 threshold(s) — recomputed only when class, visible splits, or
   // evaluation data changes, not on every slider drag.
   //
-  // Prefer computing (and applying, on click) the best threshold using a
-  // split the user currently has checked in the "Splits:" toggles — using
-  // a hidden split (e.g. showing "best f1: 0.81 (test)" and silently
-  // snapping the shared threshold slider to a value tuned on Test while
-  // only the Train chart is visible) was confusing and not actionable for
-  // what's actually on screen. Falls back to any split with proba data if
-  // none of the currently-visible splits have it (e.g. all toggles off).
+  // Computes one badge PER currently-visible split (per the "Splits:"
+  // toggles) rather than a single winner, so the user can see and apply
+  // the best threshold for Train, Test, and Validation independently
+  // instead of one hidden-split value being silently applied regardless
+  // of what's on screen. Falls back to showing every split with proba
+  // data if none are currently visible (e.g. all toggles off).
   //
   // Note: the splits dict key is `'validation'`, not `'val'` — mirrors the
   // same key the regression-tab fix above already corrected.
-  const bestF1Info = useMemo(() => {
-    if (!evaluationData || !selectedRocClass || evaluationData.problem_type === 'clustering') return null;
+  const bestF1Infos = useMemo(() => {
+    if (!evaluationData || !selectedRocClass || evaluationData.problem_type === 'clustering') return [];
     const splits = evaluationData.splits;
     const priority: Array<{ key: string; visible: boolean; label: string }> = [
       { key: 'validation', visible: showValMetrics, label: 'validation' },
       { key: 'test', visible: showTestMetrics, label: 'test' },
       { key: 'train', visible: showTrainMetrics, label: 'train' },
     ];
-    const pick = (onlyVisible: boolean) => priority.find(p => (!onlyVisible || p.visible) && splits[p.key]?.y_proba);
-    const chosen = pick(true) ?? pick(false);
-    if (!chosen) return null;
-    const refSplit = splits[chosen.key];
-    if (!refSplit?.y_proba) return null;
-    const result = findBestF1Threshold(refSplit.y_true, refSplit.y_proba, selectedRocClass);
-    if (!result) return null;
+    const candidates = priority.filter(p => splits[p.key]?.y_proba);
+    const visibleCandidates = candidates.filter(p => p.visible);
+    const toCompute = visibleCandidates.length > 0 ? visibleCandidates : candidates;
     const evalJob = evalJobId ? jobs.find(j => j.job_id === evalJobId) : null;
     const metricName = (evalJob ? getJobScoringMetric(evalJob) : undefined) ?? 'f1';
-    return { ...result, splitLabel: chosen.label, metricName };
+    return toCompute.flatMap(({ key, label }) => {
+      const refSplit = splits[key];
+      if (!refSplit?.y_proba) return [];
+      const result = findBestF1Threshold(refSplit.y_true, refSplit.y_proba, selectedRocClass);
+      if (!result) return [];
+      return [{ ...result, splitLabel: label, metricName }];
+    });
   }, [evaluationData, selectedRocClass, evalJobId, jobs, showValMetrics, showTestMetrics, showTrainMetrics]);
 
   useEffect(() => {
@@ -450,7 +456,7 @@ export const ExperimentsPage: React.FC = () => {
                   setSelectedRocClass={setSelectedRocClass}
                   cmView={cmView}
                   setCmView={setCmView}
-                  bestF1Info={bestF1Info}
+                  bestF1Infos={bestF1Infos}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
