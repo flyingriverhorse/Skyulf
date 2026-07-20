@@ -34,7 +34,7 @@ interface Props {
   setSelectedRocClass: (v: string) => void;
   cmView: 'overall' | 'per-class';
   setCmView: (v: 'overall' | 'per-class') => void;
-  bestF1Info: BestF1Info | null;
+  bestF1Infos: BestF1Info[];
   handleDownload: (elementId: string, fileName: string) => Promise<void>;
   downloadingChart: string | null;
   doneChart: string | null;
@@ -61,7 +61,7 @@ export const EvaluationView: React.FC<Props> = ({
   setSelectedRocClass,
   cmView,
   setCmView,
-  bestF1Info,
+  bestF1Infos,
   handleDownload,
   downloadingChart,
   doneChart,
@@ -259,19 +259,27 @@ export const EvaluationView: React.FC<Props> = ({
                       className="w-28 accent-blue-500"
                     />
                     <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>
-                    {bestF1Info && (
-                      <button
-                        onClick={() => { setThreshold(bestF1Info.threshold); }}
-                        className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors whitespace-nowrap"
-                        title={`Best ${bestF1Info.metricName}=${bestF1Info.f1.toFixed(3)} on ${bestF1Info.splitLabel} split — click to apply`}
-                      >
-                        ★ best {bestF1Info.metricName}: {bestF1Info.threshold.toFixed(2)}
-                        <span className="opacity-50 text-[10px]">({bestF1Info.splitLabel})</span>
-                      </button>
-                    )}
-                    {bestF1Info && (
+                    {bestF1Infos.map(info => {
+                      const colors: Record<string, string> = {
+                        train: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50',
+                        test: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
+                        validation: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/50',
+                      };
+                      const isActive = Math.abs(threshold - info.threshold) < 0.001;
+                      return (
+                        <button
+                          key={info.splitLabel}
+                          onClick={() => { setThreshold(info.threshold); }}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${colors[info.splitLabel] ?? colors.test} ${isActive ? 'ring-2 ring-offset-1 ring-current' : ''}`}
+                          title={`Best ${info.metricName}=${info.f1.toFixed(3)} on ${info.splitLabel} split — click to apply`}
+                        >
+                          ★ {info.splitLabel} {info.metricName}: {info.threshold.toFixed(2)}
+                        </button>
+                      );
+                    })}
+                    {bestF1Infos.length > 0 && (
                       <InfoTooltip
-                        text={`"Best ${bestF1Info.metricName}" is the threshold that maximises ${bestF1Info.metricName} for the selected class on the ${bestF1Info.splitLabel} split.\n\nIt is found by scanning every unique prediction score as a candidate — the same method sklearn uses internally.\n\nThe metric shown matches the scoring metric chosen when the job was trained (${bestF1Info.metricName}). Click the badge to snap the slider to this value.`}
+                        text={`Each badge shows the threshold that maximises ${bestF1Infos[0]!.metricName} for the selected class on that split (found by scanning every unique prediction score, same method sklearn uses internally) — one per split currently checked in "Splits:" above. Click a badge to snap the slider to that split's optimal value.`}
                         align="center"
                       />
                     )}
