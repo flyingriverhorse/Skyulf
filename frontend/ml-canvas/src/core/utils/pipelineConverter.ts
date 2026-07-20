@@ -15,6 +15,7 @@ const MODEL_SOURCE_TYPES = new Set([
   'basic_training',
   'hyperparameter_tuning',
   'advanced_tuning',
+  'training',
 ]);
 
 // Maps a full training-node `model_type` back to the short ensemble base-learner
@@ -101,6 +102,45 @@ const collectWiredBaseSpecs = (
 
   return { baseEstimators, baseParams, modelSourceIds };
 };
+
+/**
+ * Fixed-mode ("basic_training") training params shared by the plain
+ * `model_training`/`basic_training` node and the unified `TrainingNode`
+ * (Phase 3) when its `run_mode` is `'basic'`.
+ */
+const buildFixedTrainingParams = (data: Record<string, unknown>): Record<string, unknown> => ({
+    target_column: data.target_column,
+    model_type: data.model_type,
+    hyperparameters: data.hyperparameters,
+    cv_enabled: data.cv_enabled,
+    cv_folds: data.cv_folds,
+    cv_type: data.cv_type,
+    cv_shuffle: data.cv_shuffle,
+    cv_random_state: data.cv_random_state,
+    cv_time_column: data.cv_time_column,
+    execution_mode: data.execution_mode,
+});
+
+/**
+ * The tuning-config fields common to every tuning-engine consumer (the plain
+ * `hyperparameter_tuning`/`advanced_tuning` node, the unified `TrainingNode`
+ * in advanced mode, and `EnsembleNode`'s advanced mode). Callers add their
+ * own structural fields on top (`search_space` for plain training nodes,
+ * `base_estimators`/`final_estimator`/etc. for the ensemble).
+ */
+const buildBaseTuningConfig = (data: Record<string, unknown>): Record<string, unknown> => ({
+    strategy: data.search_strategy,
+    strategy_params: data.strategy_params || {},
+    metric: data.metric,
+    n_trials: data.n_trials,
+    cv_enabled: data.cv_enabled,
+    cv_folds: data.cv_folds,
+    cv_type: data.cv_type,
+    cv_shuffle: data.cv_shuffle,
+    cv_random_state: data.cv_random_state,
+    cv_time_column: data.cv_time_column,
+    random_state: data.random_state,
+});
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
@@ -338,18 +378,26 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           params = node.data;
       } else if (node.data.definitionType === 'model_training' || node.data.definitionType === BackendStepType.BASIC_TRAINING) {
           stepType = BackendStepType.BASIC_TRAINING;
-          params = {
-              target_column: node.data.target_column,
-              model_type: node.data.model_type,
-              hyperparameters: node.data.hyperparameters,
-              cv_enabled: node.data.cv_enabled,
-              cv_folds: node.data.cv_folds,
-              cv_type: node.data.cv_type,
-              cv_shuffle: node.data.cv_shuffle,
-              cv_random_state: node.data.cv_random_state,
-              cv_time_column: node.data.cv_time_column,
-              execution_mode: node.data.execution_mode
-          };
+          params = buildFixedTrainingParams(node.data);
+      } else if (node.data.definitionType === BackendStepType.TRAINING) {
+          // Unified TrainingNode (Phase 3): dispatch to the same fixed/tuned
+          // param-building helpers used by the legacy standalone nodes,
+          // keyed on the node's own `run_mode` toggle.
+          if (node.data.run_mode === 'advanced') {
+              stepType = BackendStepType.ADVANCED_TUNING;
+              params = {
+                  target_column: node.data.target_column,
+                  algorithm: node.data.model_type,
+                  execution_mode: node.data.execution_mode,
+                  tuning_config: {
+                      ...buildBaseTuningConfig(node.data),
+                      search_space: node.data.search_space
+                  }
+              };
+          } else {
+              stepType = BackendStepType.BASIC_TRAINING;
+              params = buildFixedTrainingParams(node.data);
+          }
       } else if (node.data.definitionType === 'SegmentationNode') {
           stepType = BackendStepType.BASIC_TRAINING;
           params = {
@@ -429,10 +477,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   algorithm: node.data.model_type,
                   execution_mode: node.data.execution_mode,
                   tuning_config: {
-                      strategy: node.data.search_strategy,
-                      strategy_params: node.data.strategy_params || {},
-                      metric: node.data.metric,
-                      n_trials: node.data.n_trials,
+                      ...buildBaseTuningConfig(node.data),
                       // Structural selection the backend resolves into the model.
                       base_estimators: baseEstimators,
                       final_estimator: node.data.final_estimator,
@@ -447,13 +492,6 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       tune_base_models: node.data.tune_base_models,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params,
-                      cv_enabled: node.data.cv_enabled,
-                      cv_folds: node.data.cv_folds,
-                      cv_type: node.data.cv_type,
-                      cv_shuffle: node.data.cv_shuffle,
-                      cv_random_state: node.data.cv_random_state,
-                      cv_time_column: node.data.cv_time_column,
-                      random_state: node.data.random_state
                   }
               };
           } else {
@@ -491,17 +529,8 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               algorithm: node.data.model_type,
               execution_mode: node.data.execution_mode,
               tuning_config: {
-                  strategy: node.data.search_strategy,                    strategy_params: node.data.strategy_params,
-                    metric: node.data.metric,
-                  n_trials: node.data.n_trials,
-                  search_space: node.data.search_space,
-                  cv_enabled: node.data.cv_enabled,
-                  cv_folds: node.data.cv_folds,
-                  cv_type: node.data.cv_type,
-                  cv_shuffle: node.data.cv_shuffle,
-                  cv_random_state: node.data.cv_random_state,
-                  cv_time_column: node.data.cv_time_column,
-                  random_state: node.data.random_state
+                  ...buildBaseTuningConfig(node.data),
+                  search_space: node.data.search_space
               }
           };
       } else if (node.data.definitionType === 'data_preview') {

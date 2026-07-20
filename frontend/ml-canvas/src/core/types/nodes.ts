@@ -38,6 +38,13 @@ export interface NodeDefinition<TConfig = any> {
   category: NodeCategory;
   description: string;
 
+  // When true, kept fully registered (so saved canvases referencing this
+  // `type` still load/render/execute) but excluded from palette UIs (the
+  // Sidebar drag list, the Ctrl/Cmd+K command palette). Used for legacy node
+  // types superseded by a newer unified node — see `TrainingNode`, which
+  // replaces `BasicTrainingNode`/`AdvancedTuningNode` for new canvases.
+  hidden?: boolean;
+
   // Visual Configuration
   icon?: React.ElementType;      // Lucide Icon / React component
   color?: string;            // Tailwind class or hex
