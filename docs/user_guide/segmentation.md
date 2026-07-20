@@ -119,7 +119,8 @@ Regression models never pass anything here, so this has no effect on them.
 ## Via the pipeline / node graph
 
 In the UI, drag a **Segmentation** node onto the canvas (found alongside
-other Modeling nodes) instead of Basic Training. It has its own
+other Modeling nodes) instead of a Classification/Regression/Text
+Classification node. It has its own
 model/hyperparameter picker (all four algorithms above), an optional
 **Reference Column** selector, and no target-column/CV UI at all (neither
 applies to unsupervised clustering). Results appear in a dedicated
@@ -153,9 +154,11 @@ Same thing via a pipeline config:
 - **Metrics need real clusters.** Silhouette/Calinski-Harabasz/Davies-Bouldin
   are only computed when there's more than 1 cluster and fewer clusters than
   rows — otherwise they're omitted rather than raising.
-- **Advanced Tuning doesn't apply.** Hyperparameter tuning scores candidates
-  with a supervised metric (accuracy, R², etc.), which clustering has no
-  equivalent of — the model dropdown there excludes all clustering models.
+- **Advanced mode (hyperparameter tuning) doesn't apply.** Tuning scores
+  candidates with a supervised metric (accuracy, R², etc.), which clustering
+  has no equivalent of — Segmentation has no `run_mode` toggle at all, and
+  the model dropdowns on the tuning-capable nodes exclude all clustering
+  models.
 - **Reference column dtype doesn't matter.** Whether it's text (species
   name) or numeric (a segment code), it's excluded from training by name,
   not just by non-numeric filtering.

@@ -16,6 +16,25 @@ const MODEL_SOURCE_TYPES = new Set([
   'hyperparameter_tuning',
   'advanced_tuning',
   'training',
+  'classification',
+  'regression',
+  'text_classification',
+]);
+
+/**
+ * `definitionType`s that share the unified `TrainingNode`'s fixed/tuned
+ * `run_mode` dispatch (Phase 3 Part B, plan §0.6): the generic `TrainingNode`
+ * plus the 3 task-scoped supervised nodes (Segmentation is unsupervised and
+ * has no `run_mode` — see `SegmentationNode`). All submit the same
+ * `basic_training`/`advanced_tuning` backend `step_type`s — the task split
+ * is purely a frontend/UX concern (model-list filtering), the backend
+ * doesn't need to know which task node produced the job.
+ */
+const RUN_MODE_TRAINING_TYPES = new Set<string>([
+  BackendStepType.TRAINING,
+  BackendStepType.CLASSIFICATION,
+  BackendStepType.REGRESSION,
+  BackendStepType.TEXT_CLASSIFICATION,
 ]);
 
 // Maps a full training-node `model_type` back to the short ensemble base-learner
@@ -379,10 +398,13 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'model_training' || node.data.definitionType === BackendStepType.BASIC_TRAINING) {
           stepType = BackendStepType.BASIC_TRAINING;
           params = buildFixedTrainingParams(node.data);
-      } else if (node.data.definitionType === BackendStepType.TRAINING) {
-          // Unified TrainingNode (Phase 3): dispatch to the same fixed/tuned
-          // param-building helpers used by the legacy standalone nodes,
-          // keyed on the node's own `run_mode` toggle.
+      } else if (RUN_MODE_TRAINING_TYPES.has(node.data.definitionType as string)) {
+          // Unified TrainingNode and the task-scoped Classification/
+          // Regression/Text Classification nodes (Phase 3 Part B): dispatch
+          // to the same fixed/tuned param-building helpers used by the
+          // legacy standalone nodes, keyed on the node's own `run_mode`
+          // toggle. The task split only affects which models the settings
+          // panel offers — the submitted params/step_type are identical.
           if (node.data.run_mode === 'advanced') {
               stepType = BackendStepType.ADVANCED_TUNING;
               params = {

@@ -153,6 +153,76 @@ describe('convertGraphToPipelineConfig', () => {
     });
   });
 
+  // Phase 3 Part B (plan §0.6): the generic TrainingNode and the 3
+  // task-scoped nodes (Classification/Regression/Text Classification) all
+  // share the same run_mode-keyed dispatch — only the model dropdown they
+  // expose differs, the submitted step_type/params must be identical.
+  it.each(['training', 'classification', 'regression', 'text_classification'])(
+    '%s definitionType in basic run_mode submits a basic_training step',
+    (definitionType) => {
+      const nodes = [
+        node('ds', 'dataset_node', { datasetId: 'd1' }),
+        node('train', definitionType, {
+          run_mode: 'basic',
+          target_column: 'y',
+          model_type: 'logistic_regression',
+          hyperparameters: { C: 1 },
+          cv_enabled: true,
+          cv_folds: 3,
+          cv_type: 'kfold',
+          cv_shuffle: true,
+          cv_random_state: 42,
+        }),
+      ];
+      const edges = [edge('ds', 'train')];
+      const cfg = convertGraphToPipelineConfig(nodes, edges);
+      const train = cfg.nodes.find((n) => n.node_id === 'train');
+      expect(train?.step_type).toBe('basic_training');
+      expect(train?.params).toMatchObject({
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        hyperparameters: { C: 1 },
+      });
+    },
+  );
+
+  it.each(['training', 'classification', 'regression', 'text_classification'])(
+    '%s definitionType in advanced run_mode submits an advanced_tuning step',
+    (definitionType) => {
+      const nodes = [
+        node('ds', 'dataset_node', { datasetId: 'd1' }),
+        node('train', definitionType, {
+          run_mode: 'advanced',
+          target_column: 'y',
+          model_type: 'logistic_regression',
+          search_space: { C: [0.1, 1, 10] },
+          search_strategy: 'random',
+          metric: 'accuracy',
+          n_trials: 5,
+          cv_enabled: true,
+          cv_folds: 3,
+          cv_type: 'kfold',
+          cv_shuffle: true,
+          cv_random_state: 42,
+        }),
+      ];
+      const edges = [edge('ds', 'train')];
+      const cfg = convertGraphToPipelineConfig(nodes, edges);
+      const train = cfg.nodes.find((n) => n.node_id === 'train');
+      expect(train?.step_type).toBe('advanced_tuning');
+      expect(train?.params).toMatchObject({
+        target_column: 'y',
+        algorithm: 'logistic_regression',
+      });
+      expect((train?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+        strategy: 'random',
+        metric: 'accuracy',
+        n_trials: 5,
+        search_space: { C: [0.1, 1, 10] },
+      });
+    },
+  );
+
   it('emits a data_preview step with empty params', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),

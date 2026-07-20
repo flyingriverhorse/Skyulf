@@ -198,7 +198,7 @@ For detailed examples including **Time Series**, **Geospatial Analysis**, and **
 *   **📓 Notebook Export:** Export any canvas pipeline to a fully self-contained Jupyter notebook with one click — two modes available:
     *   **Full mode** — one cell per preprocessing node so you can tweak parameters, inspect intermediate state, and understand every transformation.
     *   **Compact mode** — single `SkyulfPipeline.fit()` call per branch, ideal for sharing reproducible results or running in CI. Multi-branch canvases get a coloured `(branch × split)` comparison table.
-    *   **Advanced Tuning nodes** are properly wired with `TuningCalculator`/`TuningApplier` wrappers so Optuna/grid/random search actually runs in the notebook — with per-trial progress printed to cell output.
+    *   **Training nodes in Advanced mode** (Classification / Regression / Text Classification, `run_mode: "advanced"`) are properly wired with `TuningCalculator`/`TuningApplier` wrappers so Optuna/grid/random search actually runs in the notebook — with per-trial progress printed to cell output.
 
 ## Version History
 

@@ -9,7 +9,8 @@ import { apiClient } from '../../core/api/client';
 import { formatDuration } from '../../core/utils/format';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 import type { EvaluationData, ShapExplanationData } from './ExperimentsPage/types';
-import { getJobScoringMetric, shortRunId } from './ExperimentsPage/utils/jobMeta';
+import { getJobScoringMetric, getTaskForModelType, shortRunId } from './ExperimentsPage/utils/jobMeta';
+import { registryApi, type RegistryItem } from '../../core/api/registry';
 import { findBestF1Threshold } from './ExperimentsPage/utils/classificationCharts';
 import { ComparisonTableView } from './ExperimentsPage/components/ComparisonTableView';
 import { FeatureImportanceView } from './ExperimentsPage/components/FeatureImportanceView';
@@ -20,9 +21,6 @@ import { JobListSidebar } from './ExperimentsPage/components/JobListSidebar';
 import { EvaluationView } from './ExperimentsPage/components/EvaluationView';
 import { SegmentationView } from './ExperimentsPage/components/SegmentationView';
 import { ExperimentsHeader, ViewTabs, type ExperimentsView } from './ExperimentsPage/components/HeaderAndTabs';
-
-// Model types whose jobs are unsupervised clustering runs (Segmentation tab).
-const CLUSTERING_MODEL_TYPES = ['kmeans'];
 
 // Local helper: split a metric key into split-prefix and base name.
 const parseMetricKey = (key: string) => {
@@ -37,9 +35,10 @@ export const ExperimentsPage: React.FC = () => {
   const { jobs, fetchJobs, hasMore, loadMoreJobs, isLoading, promoteJob, unpromoteJob } = useJobStore();
   const confirm = useConfirm();
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
-  const [filterType, setFilterType] = useState<'all' | 'basic_training' | 'advanced_tuning'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('all');
+  const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
 
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -86,6 +85,7 @@ export const ExperimentsPage: React.FC = () => {
   useEffect(() => {
     fetchJobs();
     void fetchDatasets();
+    void fetchRegistryItems();
   }, [fetchJobs]);
 
   useEffect(() => {
@@ -103,6 +103,19 @@ export const ExperimentsPage: React.FC = () => {
     } catch (e) {
       console.error('Failed to fetch datasets', e);
       toast.error('Failed to load datasets', 'The dataset filter may be incomplete. Please retry.');
+    }
+  };
+
+  // One-time fetch of the node registry so job task types (Classification /
+  // Regression / Text Classification / Segmentation) can be derived from
+  // each job's model_type, mirroring TrainingSettings.tsx's tag-based model
+  // filtering (plan §0.5/§0.6).
+  const fetchRegistryItems = async () => {
+    try {
+      const nodes = await registryApi.getAllNodes();
+      setRegistryItems(nodes);
+    } catch (e) {
+      console.error('Failed to fetch node registry', e);
     }
   };
 
@@ -198,7 +211,7 @@ export const ExperimentsPage: React.FC = () => {
   }, [activeView, selectedJobIds, evalJobId]);
 
   const filteredJobs = useMemo(() => jobs.filter(job => {
-    const typeMatch = filterType === 'all' || job.job_type === filterType;
+    const typeMatch = filterType === 'all' || getTaskForModelType(job.model_type, registryItems) === filterType;
     const datasetMatch = selectedDatasetId === 'all' || job.dataset_id === selectedDatasetId;
     const statusMatch = job.status === 'completed';
     return typeMatch && datasetMatch && statusMatch;
@@ -207,7 +220,7 @@ export const ExperimentsPage: React.FC = () => {
     if (a.promoted_at && !b.promoted_at) return -1;
     if (!a.promoted_at && b.promoted_at) return 1;
     return 0;
-  }), [jobs, filterType, selectedDatasetId]);
+  }), [jobs, filterType, selectedDatasetId, registryItems]);
 
   const selectedJobs = useMemo(
     () => jobs.filter(job => selectedJobIds.includes(job.job_id)),
@@ -288,12 +301,12 @@ export const ExperimentsPage: React.FC = () => {
     [shapExplanationByJob]
   );
 
-  // Segmentation (clustering) jobs — detected from job.model_type rather
-  // than fetching evaluation data for every selected job, since the model
-  // type is already available in the job list.
+  // Segmentation (clustering) jobs — detected from job.model_type via the
+  // same tag-based task lookup used for the filterType tabs, rather than
+  // fetching evaluation data for every selected job.
   const hasSegmentation = useMemo(
-    () => selectedJobs.some(j => CLUSTERING_MODEL_TYPES.includes(j.model_type ?? '')),
-    [selectedJobs]
+    () => selectedJobs.some(j => getTaskForModelType(j.model_type, registryItems) === 'segmentation'),
+    [selectedJobs, registryItems]
   );
 
   return (

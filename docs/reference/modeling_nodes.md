@@ -2,6 +2,8 @@
 
 This page documents modeling configuration for `SkyulfPipeline`.
 
+> **Note:** The canvas used to offer separate "Basic Training" and "Advanced Tuning" nodes. These have been superseded by four task-scoped nodes — **Classification**, **Regression**, **Text Classification**, and **Segmentation** — each with a `run_mode: "basic" | "advanced"` toggle (Segmentation has no toggle; clustering is always direct-fit). The old node types still open in previously-saved canvases for backward compatibility, but are no longer offered when building new pipelines.
+
 ## Common config shape
 
 `SkyulfPipeline` expects a modeling block like:
@@ -331,7 +333,7 @@ The **Ensemble Node** behaves differently from ordinary fan-in on the canvas:
 Yes. Unlike normal nodes (where multiple inputs trigger a column merge or a parallel-experiment split), the Ensemble Node classifies its incoming edges by source type:
 
 - **One dataset edge** (e.g. a `train_test_split` output) supplies the rows/columns the ensemble trains on.
-- **N model-spec edges** — any `Basic Training` / `Advanced Training` nodes wired in are treated as *base-learner specifications*, not data. Only their recipe (`model_type` + hyperparameters) is read; their fitted weights are discarded because sklearn's Voting/Stacking always refit base learners on the composite dataset anyway.
+- **N model-spec edges** — any **Classification / Regression / Text Classification** node (or a legacy `Basic Training`/`Advanced Training` node from an older saved canvas) wired in is treated as a *base-learner specification*, not data. Only its recipe (`model_type` + hyperparameters) is read; its fitted weights are discarded because sklearn's Voting/Stacking always refit base learners on the composite dataset anyway.
 
 So **models from the same branch are automatically adopted as ensemble members**. If no direct dataset edge exists (the common `split → model → ensemble` flow), the ensemble *inherits* the dataset its wired models consume and refits everything on that single dataset.
 
@@ -350,7 +352,7 @@ Wired model nodes *override* the chip selection; if no models are wired, the man
 
 **3. How do wired models' search spaces work — automatically?**
 
-Automatic. When an `Advanced Training` node is wired in, the converter (`pipelineConverter.ts`):
+Automatic. When a wired node's `run_mode` is `"advanced"`, the converter (`pipelineConverter.ts`):
 
 - reads its `model_type` and adds the resolved base key to `base_estimators`,
 - extracts its active `search_space` / `hyperparameters` and nests them under `base_estimator_params` (namespaced as `<base_key>__<param>`),

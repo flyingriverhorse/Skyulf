@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Rocket, Trophy, GitBranch } from 'lucide-react';
 import type { JobInfo } from '../../../../core/api/jobs';
 import { clickableProps } from '../../../../core/utils/a11y';
-import { shortRunId } from '../utils/jobMeta';
+import { hasTuningMetadata, shortRunId } from '../utils/jobMeta';
 
 interface Props {
   filteredJobs: JobInfo[];
@@ -104,7 +104,7 @@ export const JobListSidebar: React.FC<Props> = ({
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
                   {job.model_type} • {job.dataset_name || 'Unknown Dataset'}
-                  {job.job_type === 'advanced_tuning' && (job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy) && (
+                  {hasTuningMetadata(job) && (job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy) && (
                     <span className="ml-1 text-gray-400">
                       ({job.search_strategy || (job.config as { tuning?: { strategy?: string } }).tuning?.strategy})
                     </span>
