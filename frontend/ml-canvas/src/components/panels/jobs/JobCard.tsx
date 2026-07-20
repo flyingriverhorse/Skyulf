@@ -4,14 +4,11 @@ import { JobInfo } from '../../../core/api/jobs';
 import { clickableProps } from '../../../core/utils/a11y';
 import { formatMetricName, formatDuration } from '../../../core/utils/format';
 import { StatusBadge } from '../../shared/StatusBadge';
+import { getDisplayScore, getTaskForModelType, type ExperimentsTask } from '../../pages/ExperimentsPage/utils/jobMeta';
+import type { RegistryItem } from '../../../core/api/registry';
 
-/** Extract the scoring metric name from a job's result or config. */
-const getScoringMetric = (job: JobInfo): string | undefined => {
-  const result = job.result as Record<string, unknown> | undefined;
-  if (result?.scoring_metric) return result.scoring_metric as string;
-  const config = job.config as Record<string, unknown> | undefined;
-  const tuning = config?.tuning_config as Record<string, unknown> | undefined;
-  return tuning?.metric as string | undefined;
+const SPLIT_LABEL: Record<'test' | 'val' | 'train' | 'cv', string> = {
+  test: 'test', val: 'val', train: 'train', cv: 'cv',
 };
 
 const getStatusColor = (status: string): string => {
@@ -40,9 +37,14 @@ const formatDate = (dateStr: string | null): string => {
 interface JobCardProps {
   job: JobInfo;
   onClick: () => void;
+  registryItems: RegistryItem[];
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => (
+export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems }) => {
+  const task: ExperimentsTask = getTaskForModelType(job.model_type, registryItems);
+  const score = job.status === 'completed' && !job.error ? getDisplayScore(job, task) : null;
+
+  return (
   <div
     {...clickableProps(onClick)}
     className={`grid grid-cols-12 gap-4 p-3 rounded-lg border text-sm items-center transition-colors cursor-pointer ${getStatusColor(job.status)}`}
@@ -88,29 +90,27 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => (
               Error
           </span>
       ) : job.status === 'completed' && job.result ? (
-          job.job_type === 'basic_training' && !!(job.result as { metrics?: Record<string, unknown> }).metrics ? (
+          score ? (
              <div className="flex flex-wrap gap-1">
-               {Object.entries((job.result as { metrics: Record<string, unknown> }).metrics).slice(0, 1).map(([k, v]) => (
-                 <span key={k} className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">
-                   {k}: {Number(v).toFixed(3)}
-                 </span>
-               ))}
+               <span
+                 className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                   score.split === 'cv'
+                     ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                 }`}
+                 title={`${SPLIT_LABEL[score.split]} split`}
+               >
+                 {formatMetricName(score.metric) || score.metric}: {score.value.toFixed(score.split === 'cv' ? 4 : 3)}
+                 {score.split !== 'cv' && <span className="opacity-60"> ({SPLIT_LABEL[score.split]})</span>}
+               </span>
              </div>
-          ) : job.job_type === 'advanced_tuning' ? (
-             <div className="flex flex-wrap gap-1">
-               {(job.result as { best_score?: number }).best_score !== undefined && (
-                 <span className="text-[10px] bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                   {formatMetricName(getScoringMetric(job)) || 'Score'}: {Number((job.result as { best_score?: number }).best_score).toFixed(4)}
-                 </span>
-               )}
-               {!(job.result as Record<string, unknown>).best_score && !!(job.result as Record<string, unknown>).best_params && (
-                 <span className="text-[10px] text-gray-500 dark:text-gray-400">Params found</span>
-               )}
-             </div>
+          ) : job.job_type === 'advanced_tuning' && !!(job.result as Record<string, unknown>).best_params ? (
+             <span className="text-[10px] text-gray-500 dark:text-gray-400">Params found</span>
           ) : <span className="text-gray-400 text-xs">-</span>
       ) : (
           <span className="text-gray-400 text-xs">-</span>
       )}
     </div>
   </div>
-);
+  );
+};

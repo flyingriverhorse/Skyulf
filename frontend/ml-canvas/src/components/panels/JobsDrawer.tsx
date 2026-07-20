@@ -345,7 +345,7 @@ export const JobsDrawer: React.FC = () => {
                             className="flex-1 overflow-y-auto p-4 space-y-2"
                             renderItem={(job) => (
                                 <div className="pb-2">
-                                <JobCard job={job} onClick={() => { setSelectedJob(job); }} />
+                                <JobCard job={job} onClick={() => { setSelectedJob(job); }} registryItems={registryItems} />
                                 </div>
                             )}
                         />
