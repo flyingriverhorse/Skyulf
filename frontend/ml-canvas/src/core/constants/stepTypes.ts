@@ -10,6 +10,14 @@ export enum StepType {
   // BASIC_TRAINING/ADVANCED_TUNING depending on its `run_mode`, same as
   // before, so the backend dispatcher doesn't need to understand this value.
   TRAINING = 'training',
+  // Task-scoped canvas nodes (Phase 3 Part B, plan §0.6). Like TRAINING,
+  // these are canvas-only `definitionType`s — never submitted as a job
+  // `job_type`. Each still resolves to BASIC_TRAINING/ADVANCED_TUNING based
+  // on `run_mode`, exactly like TRAINING; the backend doesn't need to know
+  // which task-scoped node produced the job.
+  CLASSIFICATION = 'classification',
+  REGRESSION = 'regression',
+  TEXT_CLASSIFICATION = 'text_classification',
 }
 
 // Additional legacy or frontend-specific types can be added here if needed,

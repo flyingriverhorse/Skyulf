@@ -114,16 +114,37 @@ const StrategyParamsHint: React.FC<{
     );
 };
 
+/**
+ * Task types the 4 dedicated task-scoped nodes (Phase 3 Part B, plan §0.6)
+ * can filter the model dropdown by. `undefined` (the generic `TrainingNode`)
+ * keeps the original behavior: every non-clustering model. Maps to registry
+ * tags added on the backend: `classification`/`regression` tag names match
+ * directly; `text_classification` maps to the `text` tag (models suited for
+ * vectorized text features, e.g. Naive Bayes / Logistic Regression / SGD).
+ */
+export type TrainingTask = 'classification' | 'regression' | 'text_classification';
+
+const TASK_TAG: Record<TrainingTask, string> = {
+  classification: 'classification',
+  regression: 'regression',
+  text_classification: 'text',
+};
+
 export const TrainingSettings: React.FC<{
   config: TrainingConfig;
   onChange: (c: TrainingConfig) => void;
   nodeId?: string;
+  /** Restricts the model dropdown to models tagged for this task. Omit for
+   * the generic `TrainingNode`, which shows every non-clustering model. */
+  task?: TrainingTask;
 }> = ({
   config,
   onChange,
   nodeId,
+  task,
 }) => {
   const isAdvanced = config.run_mode === 'advanced';
+  const taskTag = task ? TASK_TAG[task] : undefined;
 
   // Basic-mode hyperparameter defs/editor state.
   const [hyperparameters, setHyperparameters] = useState<HyperparameterDef[]>([]);
@@ -164,7 +185,11 @@ export const TrainingSettings: React.FC<{
               const models = nodes.filter(n => {
                   const isModeling = n.category === 'Model' || n.category === 'Modeling';
                   const isClustering = n.tags?.includes('clustering') ?? false;
-                  return isModeling && !isClustering;
+                  if (!isModeling || isClustering) return false;
+                  // Task-scoped node (Classification/Regression/Text
+                  // Classification): further restrict to the matching tag.
+                  if (taskTag) return n.tags?.includes(taskTag) ?? false;
+                  return true;
               });
               setAvailableModels(models);
           } catch (error) {
@@ -182,7 +207,7 @@ export const TrainingSettings: React.FC<{
           }
       };
       fetchModels();
-  }, []);
+  }, [taskTag]);
 
   // We use a ref to track if customization was active before model switch (basic mode).
   const keepCustomizationOpen = useRef(false);
