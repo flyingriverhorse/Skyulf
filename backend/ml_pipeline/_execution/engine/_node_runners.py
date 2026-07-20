@@ -1,8 +1,9 @@
 """Per-step node-runner methods for :class:`PipelineEngine`.
 
 Mixin slice — owns: ``_run_data_loader``, ``_run_basic_training``,
-``_run_advanced_tuning``, ``_run_transformer``, ``_run_data_preview`` and
-the algorithm-component factory ``_get_model_components``.
+``_run_advanced_tuning``, ``_run_transformer``, ``_run_data_preview``,
+the algorithm-component factory ``_get_model_components``, and the shared
+post-fit orchestration helper ``_finalize_training_run``.
 
 Relies on attributes/methods provided by :class:`PipelineEngine` and its
 sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
@@ -349,6 +350,79 @@ class NodeRunnersMixin:
         except Exception:
             logger.debug("Failed to record data shape metrics for node %s", node_id, exc_info=True)
 
+    def _finalize_training_run(
+        self,
+        node: NodeConfig,
+        job_id: str,
+        target_col: str,
+        data: Any,
+        estimator: Any,
+        metrics: dict[str, Any],
+        cv_metrics: dict[str, Any],
+        *,
+        completion_log: str,
+        is_clustering: bool = False,
+        reference_col: str = "",
+        numeric_only: bool = False,
+        exclude_columns: list[str] | None = None,
+        should_evaluate: bool = True,
+        swallow_evaluate_errors: bool = False,
+    ) -> dict[str, Any]:
+        """Shared post-fit steps for both training modes.
+
+        Finalizes artifacts, bundles transformers, optionally evaluates, merges
+        CV metrics, extracts feature importances/SHAP, and records data-shape
+        metrics. Mutates and returns the completed ``metrics`` dict.
+
+        ``data`` is coerced to ``SplitDataset`` via ``_to_split_dataset`` before
+        evaluation — that call is idempotent when ``data`` is already a
+        ``SplitDataset`` (the tuning path), so both callers can pass ``data``
+        as-is without pre-converting.
+        """
+        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
+
+        self.log(completion_log)
+
+        self._bundle_model_with_transformers(
+            node,
+            job_id,
+            target_col,
+            data,
+            numeric_only=numeric_only,
+            exclude_columns=exclude_columns,
+        )
+
+        if should_evaluate:
+            eval_data = self._to_split_dataset(data, target_col)
+            if swallow_evaluate_errors:
+                try:
+                    self._evaluate_and_save_report(
+                        estimator, eval_data, target_col, job_id, metrics,
+                        reference_column=reference_col,
+                    )
+                except Exception:
+                    logger.exception("Failed to evaluate tuned model")
+            else:
+                self._evaluate_and_save_report(
+                    estimator, eval_data, target_col, job_id, metrics,
+                    reference_column=reference_col,
+                )
+
+        metrics.update(cv_metrics)
+
+        if not is_clustering:
+            fi = self._extract_feature_importances(estimator.model, data, target_col)
+            if fi:
+                metrics["feature_importances"] = fi
+
+            shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
+            if shap_explanation:
+                metrics["shap_explanation"] = shap_explanation
+
+        self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
+
+        return metrics
+
     def _run_basic_training(
         self, node: NodeConfig, job_id: str = "unknown"
     ) -> tuple[str, dict[str, Any]]:
@@ -402,51 +476,23 @@ class NodeRunnersMixin:
 
         estimator.fit_predict(data, target_col, fit_config, log_callback=self.log)
 
-        # Finalize and save artifacts
-        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
-
-        self.log("Model training finished.")
-
-        # Bundle transformers with the model for inference
-        self._bundle_model_with_transformers(
+        metrics: dict[str, Any] = {}
+        return node.node_id, self._finalize_training_run(
             node,
             job_id,
             target_col,
             data,
+            estimator,
+            metrics,
+            cv_metrics,
+            completion_log="Model training finished.",
+            is_clustering=is_clustering,
+            reference_col=reference_col,
             numeric_only=is_clustering,
             exclude_columns=[reference_col] if reference_col else None,
+            should_evaluate=node.params.get("evaluate", True),
+            swallow_evaluate_errors=False,
         )
-
-        # Optional: Evaluate immediately
-        metrics: dict[str, Any] = {}
-        if node.params.get("evaluate", True):
-            # Ensure data is SplitDataset for evaluation
-            eval_data = self._to_split_dataset(data, target_col)
-            self._evaluate_and_save_report(
-                estimator, eval_data, target_col, job_id, metrics, reference_column=reference_col
-            )
-
-        # Merge CV metrics
-        metrics.update(cv_metrics)
-
-        # Feature importances / SHAP explainability don't apply to clustering
-        # (KMeans has no `.feature_importances_`/`.coef_`, and SHAP isn't a
-        # meaningful explanation for "which cluster did this row land in").
-        if not is_clustering:
-            # Persist feature importances
-            fi = self._extract_feature_importances(estimator.model, data, target_col)
-            if fi:
-                metrics["feature_importances"] = fi
-
-            # Persist SHAP explainability summary
-            shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
-            if shap_explanation:
-                metrics["shap_explanation"] = shap_explanation
-
-        # Persist data shape for monitoring
-        self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
-
-        return node.node_id, metrics
 
     def _prepare_tuning_config(self, node: NodeConfig) -> tuple[Any, Any, dict[str, Any]]:
         """Resolve model components and build the ``tuning_params`` dict for a tuning node.
@@ -629,29 +675,22 @@ class NodeRunnersMixin:
             calculator, applier, data, target_col, tuning_params, tuning_result, node
         )
 
-        # Evaluate the tuned model
-        try:
-            self._evaluate_and_save_report(estimator, data, target_col, job_id, metrics)
-        except Exception:
-            logger.exception("Failed to evaluate tuned model")
-
-        # Merge CV metrics
-        metrics.update(cv_metrics)
-
-        # Persist feature importances
-        fi = self._extract_feature_importances(estimator.model, data, target_col)
-        if fi:
-            metrics["feature_importances"] = fi
-
-        # Persist SHAP explainability summary
-        shap_explanation = self._extract_shap_explanation(estimator.model, data, target_col)
-        if shap_explanation:
-            metrics["shap_explanation"] = shap_explanation
-
-        # Persist data shape for monitoring
-        self._safe_record_data_shape_metrics(metrics, data, target_col, node.node_id)
-
-        return node.node_id, metrics
+        return node.node_id, self._finalize_training_run(
+            node,
+            job_id,
+            target_col,
+            data,
+            estimator,
+            metrics,
+            cv_metrics,
+            completion_log="Tuning and final model retraining finished.",
+            is_clustering=False,
+            reference_col="",
+            numeric_only=False,
+            exclude_columns=None,
+            should_evaluate=True,
+            swallow_evaluate_errors=True,
+        )
 
     def _run_transformer(
         self, node: NodeConfig, job_id: str = "unknown"
