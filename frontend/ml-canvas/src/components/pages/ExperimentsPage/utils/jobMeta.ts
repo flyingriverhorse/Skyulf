@@ -2,6 +2,7 @@
  * Lightweight helpers for working with job records on the Experiments page.
  * Pure functions only — no React, no API calls.
  */
+import type { TaskType } from '../../../../core/types/taskType';
 
 /** Extract the resolved scoring metric from a job's result (top-level or nested in metrics). */
 export function getJobScoringMetric(job: { result?: Record<string, unknown> | null }): string | undefined {
@@ -29,7 +30,7 @@ export function shortRunId(job: { pipeline_id: string; parent_pipeline_id?: stri
  * engine). "other" covers any model_type not resolvable via registry tags
  * (e.g. registry not loaded yet, or a model added without task tags).
  */
-export type ExperimentsTask = 'classification' | 'regression' | 'text_classification' | 'segmentation' | 'other';
+export type ExperimentsTask = TaskType | 'other';
 
 /**
  * Resolves a job's task type from its `model_type`, using the same

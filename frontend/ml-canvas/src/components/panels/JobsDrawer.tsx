@@ -2,10 +2,28 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useJobStore } from '../../core/store/useJobStore';
 import { X, RefreshCw, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lucide-react';
 import { JobInfo } from '../../core/api/jobs';
+import { RegistryItem, registryApi } from '../../core/api/registry';
+import { getTaskForModelType } from '../pages/ExperimentsPage/utils/jobMeta';
+import { TaskType } from '../../core/types/taskType';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { VirtualList } from '../shared/VirtualList';
 import { JobCard } from './jobs/JobCard';
 import { JobDetailsView } from './jobs/JobDetailsView';
+
+/** Job History tabs, in display order (plan §0.5: task type, not engine). */
+const TASK_TABS: { task: TaskType; label: string }[] = [
+  { task: 'classification', label: 'Classification' },
+  { task: 'regression', label: 'Regression' },
+  { task: 'text_classification', label: 'Text Classification' },
+  { task: 'segmentation', label: 'Segmentation' },
+];
+
+const TASK_LABELS: Record<TaskType, string> = {
+  classification: 'classification',
+  regression: 'regression',
+  text_classification: 'text classification',
+  segmentation: 'segmentation',
+};
 
 export const JobsDrawer: React.FC = () => {
   const {
@@ -26,6 +44,19 @@ export const JobsDrawer: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [modelFilter, setModelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
+
+  // One-time fetch of registry items (mirrors ExperimentsPage.tsx's
+  // fetchDatasets()-style pattern) so job task types can be resolved via
+  // getTaskForModelType. Not cached/shared across components — kept as a
+  // simple local fetch to minimize risk of this change.
+  useEffect(() => {
+    let cancelled = false;
+    registryApi.getAllNodes()
+      .then(nodes => { if (!cancelled) setRegistryItems(nodes); })
+      .catch(error => { console.error('Failed to fetch registry items:', error); });
+    return () => { cancelled = true; };
+  }, []);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -61,12 +92,13 @@ export const JobsDrawer: React.FC = () => {
   }, [isDrawerOpen]);
 
   // Auto-load more when the current tab shows fewer than 5 jobs but the
-  // server still has more.  The store fetches all job types together, so
-  // a tab that is sparse (e.g. 2 advanced-tuning among 50 basic-training)
-  // keeps fetching until it reaches the threshold or exhausts the server.
+  // server still has more.  The store fetches all jobs together regardless
+  // of task, so a tab that is sparse (e.g. 2 segmentation jobs among 50
+  // classification jobs) keeps fetching until it reaches the threshold or
+  // exhausts the server.
   //
   // Cap the number of consecutive auto-triggered page fetches: if the
-  // active tab's job type is very rare relative to total volume, this
+  // active tab's task is very rare relative to total volume, this
   // effect would otherwise re-fire on every `jobs` update and hammer the
   // API fetching dozens of pages back-to-back trying to reach the
   // threshold. Once the cap is hit we stop auto-loading for this tab —
@@ -83,16 +115,16 @@ export const JobsDrawer: React.FC = () => {
   useEffect(() => {
     if (!isDrawerOpen || isLoading || !hasMore) return;
     if (autoLoadAttemptsRef.current >= MAX_AUTO_LOAD_ATTEMPTS) return;
-    const tabCount = jobs.filter(j => j.job_type === activeTab).length;
+    const tabCount = jobs.filter(j => getTaskForModelType(j.model_type, registryItems) === activeTab).length;
     if (tabCount < 5) {
       autoLoadAttemptsRef.current += 1;
       void loadMoreJobs();
     }
-  }, [isDrawerOpen, activeTab, jobs, hasMore, isLoading, loadMoreJobs]);
+  }, [isDrawerOpen, activeTab, jobs, hasMore, isLoading, loadMoreJobs, registryItems]);
 
   if (!isDrawerOpen) return null;
 
-  const tabJobs = jobs.filter(job => job.job_type === activeTab);
+  const tabJobs = jobs.filter(job => getTaskForModelType(job.model_type, registryItems) === activeTab);
 
   // Derive unique model types and statuses from current tab's jobs
   const modelTypes = [...new Set(tabJobs.map(j => j.model_type).filter(Boolean))] as string[];
@@ -200,26 +232,19 @@ export const JobsDrawer: React.FC = () => {
 
                 {/* Tabs */}
                 <div className="flex border-b border-gray-200 dark:border-gray-700">
-                <button
-                    className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'advanced_tuning'
-                        ? 'border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-50/50 dark:bg-purple-900/20'
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
-                    onClick={() => setTab('advanced_tuning')}
-                >
-                    Advanced Training
-                </button>
-                <button
-                    className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
-                    activeTab === 'basic_training'
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
-                    onClick={() => setTab('basic_training')}
-                >
-                    Standard Training
-                </button>
+                {TASK_TABS.map(({ task, label }) => (
+                    <button
+                        key={task}
+                        className={`flex-1 py-3 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === task
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        }`}
+                        onClick={() => setTab(task)}
+                    >
+                        {label}
+                    </button>
+                ))}
                 </div>
 
                 {/* Filter Bar */}
@@ -308,7 +333,7 @@ export const JobsDrawer: React.FC = () => {
                     <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
                     {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
                       ? 'No jobs match the current filters.'
-                      : `No ${activeTab === 'advanced_tuning' ? 'advanced training' : 'training'} jobs found.`
+                      : `No ${TASK_LABELS[activeTab]} jobs found.`
                     }
                     </div>
                 ) : (

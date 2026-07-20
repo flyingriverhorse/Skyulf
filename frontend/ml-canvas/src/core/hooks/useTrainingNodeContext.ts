@@ -7,6 +7,7 @@ import { useDatasetSchema } from './useDatasetSchema';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
 import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
+import type { TaskType } from '../types/taskType';
 
 type JobType = 'basic_training' | 'advanced_tuning';
 
@@ -73,7 +74,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
     | undefined;
 
   const runJob = useCallback(
-    async (jobType: JobType) => {
+    async (jobType: JobType, task: TaskType) => {
       if (!nodeId) return;
       try {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
@@ -90,7 +91,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
         } else {
           toast.success('Training job submitted');
         }
-        setTab(jobType);
+        setTab(task);
         toggleDrawer(true);
       } catch (error) {
         console.error('Failed to submit job:', error);

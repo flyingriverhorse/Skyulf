@@ -11,7 +11,7 @@ import {
   extractEnsembleSummary,
   formatBaseEstimator,
 } from '../../../../core/utils/format';
-import { getJobScoringMetric, shortRunId } from '../utils/jobMeta';
+import { getJobScoringMetric, hasTuningMetadata, shortRunId } from '../utils/jobMeta';
 
 type GraphNode = {
   node_id: string;
@@ -22,10 +22,10 @@ type GraphNode = {
 
 // Extracts actual model hyperparameters: best_params for advanced tuning,
 // nested hyperparameters dict for basic training. Pure function of the job.
-const getModelParams = (job: { job_type?: string; hyperparameters?: unknown }): Record<string, unknown> => {
+const getModelParams = (job: { job_type?: string; hyperparameters?: unknown; search_strategy?: string }): Record<string, unknown> => {
   const hp = job.hyperparameters as Record<string, unknown> | undefined;
   if (!hp) return {};
-  if (job.job_type === 'advanced_tuning') {
+  if (hasTuningMetadata(job)) {
     // For advanced tuning, hyperparameters IS the best_params (or search_space) directly
     return hp;
   }
@@ -71,7 +71,7 @@ export const ComparisonTableView: React.FC<Props> = ({
     const summaryFor = (job: JobInfo) => {
       if (!isEnsembleModelType(job.model_type)) return null;
       let bucket: Record<string, unknown> | undefined;
-      if (job.job_type === 'advanced_tuning') {
+      if (hasTuningMetadata(job)) {
         const cfg = (job.config as Record<string, unknown>) ||
           (job.graph?.nodes as GraphNode[] | undefined)?.find(n => n.node_id === job.node_id)?.params;
         bucket = cfg?.tuning_config as Record<string, unknown> | undefined;
@@ -423,7 +423,7 @@ export const ComparisonTableView: React.FC<Props> = ({
             </tr>
             {isTuningExpanded && (
               <>
-                {['Target Column', 'CV Enabled', 'CV Method', 'CV Folds', 'CV Shuffle', 'CV Random State', ...(selectedJobs.some(j => j.job_type === 'advanced_tuning') ? ['Strategy', 'Strategy Params', 'Metric', 'Trials'] : [])].map(field => (
+                {['Target Column', 'CV Enabled', 'CV Method', 'CV Folds', 'CV Shuffle', 'CV Random State', ...(selectedJobs.some(j => hasTuningMetadata(j)) ? ['Strategy', 'Strategy Params', 'Metric', 'Trials'] : [])].map(field => (
                   <tr key={field} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                     <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
                       <div className="flex items-center gap-1">
@@ -435,7 +435,7 @@ export const ComparisonTableView: React.FC<Props> = ({
                       // Resolve config: for advanced tuning use job.config or graph node params,
                       // for basic training use job.hyperparameters (which contains full node params)
                       let cfg: Record<string, unknown> | null = null;
-                      if (job.job_type === 'advanced_tuning') {
+                      if (hasTuningMetadata(job)) {
                         const nodeParams = (job.config as Record<string, unknown>) ||
                           (job.graph?.nodes as Array<{ node_id: string; params?: Record<string, unknown> }> | undefined)?.find((n) => n.node_id === job.node_id)?.params;
                         cfg = nodeParams || null;
@@ -450,7 +450,7 @@ export const ComparisonTableView: React.FC<Props> = ({
 
                       // For advanced tuning, CV params are inside tuning_config
                       const tuningConfig = cfg.tuning_config as Record<string, unknown> | undefined;
-                      const cvSource = (job.job_type === 'advanced_tuning' && tuningConfig ? tuningConfig : cfg) as Record<string, unknown>;
+                      const cvSource = (hasTuningMetadata(job) && tuningConfig ? tuningConfig : cfg) as Record<string, unknown>;
                       // Local helper: coerce unknown-typed config field to a renderable scalar.
                       const str = (v: unknown, fallback: string | number = '-'): string | number =>
                         v === undefined || v === null || v === '' ? fallback : (typeof v === 'number' ? v : String(v));

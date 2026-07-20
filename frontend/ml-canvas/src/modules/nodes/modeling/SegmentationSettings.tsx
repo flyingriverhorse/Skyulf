@@ -180,7 +180,7 @@ export const SegmentationSettings: React.FC<{
       } else {
         toast.success('Segmentation job submitted');
       }
-      setTab('basic_training');
+      setTab('segmentation');
       toggleJobDrawer(true);
     } catch (error) {
       console.error('Failed to submit segmentation job:', error);

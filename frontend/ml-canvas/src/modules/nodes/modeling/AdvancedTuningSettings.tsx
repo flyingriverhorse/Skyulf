@@ -21,6 +21,7 @@ import { SearchSpaceInput } from './components/SearchSpaceInput';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
 import { toast } from '../../../core/toast';
+import { getTaskForModelType } from '../../../components/pages/ExperimentsPage/utils/jobMeta';
 
 export interface TuningConfig {
   target_column: string;
@@ -265,7 +266,8 @@ export const AdvancedTuningSettings: React.FC<{ config: TuningConfig; onChange: 
         } else {
             toast.success('Training job submitted');
         }
-        setTab('advanced_tuning');
+        const resolvedTask = getTaskForModelType(config.model_type, availableModels);
+        setTab(resolvedTask === 'other' ? 'classification' : resolvedTask);
         toggleDrawer(true);
     } catch (error) {
         console.error("Failed to submit tuning job:", error);
