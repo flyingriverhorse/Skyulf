@@ -23,8 +23,10 @@ export const CommandPalette: React.FC = () => {
   const listRef = useRef<HTMLUListElement>(null);
 
   // All registered node defs are stable for the lifetime of the app
-  // (registry is initialised once at boot), so we can compute once.
-  const allNodes: NodeDefinition[] = useMemo(() => registry.getAll(), []);
+  // (registry is initialised once at boot), so we can compute once. Legacy
+  // node types (superseded by the unified `TrainingNode`) are excluded from
+  // the palette but stay registered for backward-compatible canvas loading.
+  const allNodes: NodeDefinition[] = useMemo(() => registry.getAll().filter((n) => !n.hidden), []);
 
   useEffect(() => {
     const onOpen = (): void => {

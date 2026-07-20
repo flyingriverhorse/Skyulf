@@ -6,6 +6,7 @@ import { ImputationNode } from '../../modules/nodes/processing/ImputationNode';
 import { ScalingNode } from '../../modules/nodes/processing/ScalingNode';
 import { BasicTrainingNode } from '../../modules/nodes/modeling/BasicTrainingNode';
 import { AdvancedTuningNode } from '../../modules/nodes/modeling/AdvancedTuningNode';
+import { TrainingNode } from '../../modules/nodes/modeling/TrainingNode';
 import { EnsembleNode } from '../../modules/nodes/modeling/EnsembleNode';
 import { SegmentationNode } from '../../modules/nodes/modeling/SegmentationNode';
 import { FeatureSelectionNode } from '../../modules/nodes/processing/FeatureSelectionNode';
@@ -66,8 +67,14 @@ export const initializeRegistry = () => {
   registry.register(DeduplicationNode);
   registry.register(CastTypeNode);
   registry.register(MissingIndicatorNode);
-  registry.register(BasicTrainingNode);
-  registry.register(AdvancedTuningNode);
+  // Legacy Basic Training / Advanced Tuning node types are kept registered
+  // (unchanged, `hidden: true`) so canvases saved before Phase 3's unified
+  // `TrainingNode` still load and render correctly — see the unification
+  // plan doc. New canvases should use `TrainingNode`, the only one of the
+  // three shown in the palette (Sidebar/CommandPalette filter out `hidden`).
+  registry.register({ ...BasicTrainingNode, hidden: true });
+  registry.register({ ...AdvancedTuningNode, hidden: true });
+  registry.register(TrainingNode);
   registry.register(EnsembleNode);
   registry.register(SegmentationNode);
 };
