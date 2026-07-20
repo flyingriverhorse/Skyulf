@@ -19,6 +19,7 @@ import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
 import { toast } from '../../../core/toast';
+import { getTaskForModelType } from '../../../components/pages/ExperimentsPage/utils/jobMeta';
 
 export interface ModelTrainingConfig {
   target_column: string;
@@ -210,7 +211,8 @@ export const BasicTrainingSettings: React.FC<{
         } else {
             toast.success('Training job submitted');
         }
-        setTab('basic_training');
+        const resolvedTask = getTaskForModelType(config.model_type, availableModels);
+        setTab(resolvedTask === 'other' ? 'classification' : resolvedTask);
         toggleJobDrawer(true);
     } catch (error) {
         console.error("Failed to submit training job:", error);

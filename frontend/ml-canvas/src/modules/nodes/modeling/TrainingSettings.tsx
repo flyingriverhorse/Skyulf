@@ -14,6 +14,7 @@ import { SearchSpaceInput } from './components/SearchSpaceInput';
 import { StrategySettingsModal, StrategyConfig } from './components/StrategySettingsModal';
 import type { HyperparameterDef } from './components/types';
 import type { ExecutionMode } from '../../../core/types/executionMode';
+import { getTaskForModelType } from '../../../components/pages/ExperimentsPage/utils/jobMeta';
 
 export type TrainingRunMode = 'basic' | 'advanced';
 
@@ -304,7 +305,14 @@ export const TrainingSettings: React.FC<{
   }, [upstreamTarget, config.target_column, isAdvanced]);
 
   const handleSubmit = async () => {
-    await runJob(isAdvanced ? 'advanced_tuning' : 'basic_training');
+    // Task-scoped nodes already know their task; the generic (hidden)
+    // TrainingNode resolves it from the selected model's registry tags —
+    // reuses the same registry fetch as the model dropdown, no extra fetch.
+    // Falls back to 'classification' (like jobMeta.ts's own default) if
+    // unresolvable — this only affects which drawer tab opens, never
+    // whether the job itself is submitted.
+    const resolvedTask = task ?? getTaskForModelType(config.model_type, availableModels);
+    await runJob(isAdvanced ? 'advanced_tuning' : 'basic_training', resolvedTask === 'other' ? 'classification' : resolvedTask);
   };
 
   const ModelConfigSection = (

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { jobsApi, JobInfo, RunPipelineRequest } from '../api/jobs';
 import { jobEventsSocket } from '../realtime/jobEventsSocket';
+import type { TaskType } from '../types/taskType';
 
 interface ActiveParallelRun {
   jobIds: string[];
@@ -12,7 +13,7 @@ interface JobState {
   jobs: JobInfo[];
   isLoading: boolean;
   isDrawerOpen: boolean;
-  activeTab: 'basic_training' | 'advanced_tuning';
+  activeTab: TaskType;
   hasMore: boolean;
   skip: number;
   activeParallelRun: ActiveParallelRun | null;
@@ -23,7 +24,7 @@ interface JobState {
   submitJob: (payload: RunPipelineRequest) => Promise<string>;
   cancelJob: (jobId: string) => Promise<void>;
   toggleDrawer: (isOpen?: boolean) => void;
-  setTab: (tab: 'basic_training' | 'advanced_tuning') => void;
+  setTab: (tab: TaskType) => void;
   setActiveParallelRun: (run: ActiveParallelRun | null) => void;
   promoteJob: (jobId: string) => Promise<void>;
   unpromoteJob: (jobId: string) => Promise<void>;
@@ -128,7 +129,7 @@ export const useJobStore = create<JobState>((set, get) => {
     jobs: [],
     isLoading: false,
     isDrawerOpen: false,
-    activeTab: 'advanced_tuning',
+    activeTab: 'classification',
     hasMore: true,
     skip: 0,
     activeParallelRun: null,
