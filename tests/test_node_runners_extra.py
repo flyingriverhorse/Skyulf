@@ -812,9 +812,13 @@ def test_basic_training_kmeans_without_target_column_succeeds(pipeline_data_csv,
     assert not [k for k in train_res.metrics if k.startswith("cv_")]
 
 
-def test_advanced_tuning_rejects_clustering_algorithm(pipeline_data_csv, tmp_path):
-    """Advanced Tuning must reject a clustering algorithm with a clear error,
-    rather than crash deep inside the supervised cross_validate() scorer path."""
+def test_advanced_tuning_clustering_algorithm_silently_runs_fixed_mode(pipeline_data_csv, tmp_path):
+    """Phase 2b: clustering never had a supervised scorer to tune against, so a
+    clustering algorithm reaching a tuning-mode node (e.g. Advanced Tuning /
+    run_mode='tuned') now silently forces the plain direct-fit path instead of
+    raising — clustering has no reachable "toggle mismatch" scenario via the
+    UI (its model dropdown never offers a tuning mode), so this is a
+    defensive-path behavior change, not a user-facing regression."""
     engine = _make_engine(tmp_path, "artifacts_kmeans_tuning_reject")
     config = PipelineConfig(
         pipeline_id="p_kmeans_tuning_reject",
@@ -837,9 +841,7 @@ def test_advanced_tuning_rejects_clustering_algorithm(pipeline_data_csv, tmp_pat
         ],
     )
     result = engine.run(config)
-    assert result.status == "failed"
-    error = result.node_results["node_tuning"].error or ""
-    assert "clustering" in error.lower()
+    assert result.status == "success"
 
 
 def test_kmeans_drops_text_columns_and_bundles_feature_columns(tmp_path):

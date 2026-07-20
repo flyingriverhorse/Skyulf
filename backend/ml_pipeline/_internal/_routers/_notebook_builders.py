@@ -454,7 +454,8 @@ _TUNING_TRIAL_CALLBACK_SRC = (
 def _modeling_cell_tuning(model: _NodeIn, algo: str, config_json: str, metrics_var: str) -> str:
     """Render an `advanced_tuning` cell that mirrors the engine's runner.
 
-    The engine's `_run_advanced_tuning` wraps the base calculator/applier in
+    The engine's unified `_run_training` (run_mode='tuned') wraps the base
+    calculator/applier in
     `TuningCalculator`/`TuningApplier` before invoking `fit_predict`. Without
     that wrap the base estimator silently ignores `tuning_config` and runs a
     single default-param fit. We also pass `log_callback=print` and a small

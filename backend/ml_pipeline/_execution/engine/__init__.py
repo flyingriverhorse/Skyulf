@@ -10,7 +10,8 @@ The :class:`PipelineEngine` orchestrates execution of pipelines defined by
 * :class:`._feature_eng.FeatureEngMixin` — composite FeatureEngineer building,
   ``_run_feature_engineering``, and inference-bundle assembly.
 * :class:`._node_runners.NodeRunnersMixin` — per-step runners
-  (``_run_data_loader``, ``_run_basic_training``, ``_run_advanced_tuning``,
+  (``_run_data_loader``, ``_run_training`` — unified fixed/tuned training,
+  replacing the old ``_run_basic_training``/``_run_advanced_tuning``,
   ``_run_transformer``, ``_run_data_preview``).
 
 This module owns the public API (``run``), per-node dispatch (``_execute_node``),
@@ -72,7 +73,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
         return any(
-            node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]
+            node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING]
             for node in self._node_configs.values()
         )
 
@@ -244,10 +245,8 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             return self._run_data_loader(node, job_id=job_id), metrics
         if node.step_type == StepType.FEATURE_ENGINEERING:
             return self._dispatch_feature_engineering(node, job_id)
-        if node.step_type == StepType.BASIC_TRAINING:
-            return self._run_basic_training(node, job_id=job_id)
-        if node.step_type == StepType.ADVANCED_TUNING:
-            return self._run_advanced_tuning(node, job_id=job_id)
+        if node.step_type in (StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING):
+            return self._run_training(node, job_id=job_id)
         if node.step_type == "data_preview":
             return self._run_data_preview(node)
 
