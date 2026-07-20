@@ -68,19 +68,38 @@ export const ExperimentsPage: React.FC = () => {
   const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
   const [selectedRegressionSplit, setSelectedRegressionSplit] = useState<string | null>(null);
 
-  // Best F1 threshold — recomputed only when class or evaluation data changes, not on every slider drag
+  // Best F1 threshold — recomputed only when class, visible splits, or
+  // evaluation data changes, not on every slider drag.
+  //
+  // Prefer computing (and applying, on click) the best threshold using a
+  // split the user currently has checked in the "Splits:" toggles — using
+  // a hidden split (e.g. showing "best f1: 0.81 (test)" and silently
+  // snapping the shared threshold slider to a value tuned on Test while
+  // only the Train chart is visible) was confusing and not actionable for
+  // what's actually on screen. Falls back to any split with proba data if
+  // none of the currently-visible splits have it (e.g. all toggles off).
+  //
+  // Note: the splits dict key is `'validation'`, not `'val'` — mirrors the
+  // same key the regression-tab fix above already corrected.
   const bestF1Info = useMemo(() => {
     if (!evaluationData || !selectedRocClass || evaluationData.problem_type === 'clustering') return null;
     const splits = evaluationData.splits;
-    const refSplit = splits.val ?? splits.test ?? splits.train;
-    const splitLabel = splits.val ? 'val' : splits.test ? 'test' : 'train';
+    const priority: Array<{ key: string; visible: boolean; label: string }> = [
+      { key: 'validation', visible: showValMetrics, label: 'validation' },
+      { key: 'test', visible: showTestMetrics, label: 'test' },
+      { key: 'train', visible: showTrainMetrics, label: 'train' },
+    ];
+    const pick = (onlyVisible: boolean) => priority.find(p => (!onlyVisible || p.visible) && splits[p.key]?.y_proba);
+    const chosen = pick(true) ?? pick(false);
+    if (!chosen) return null;
+    const refSplit = splits[chosen.key];
     if (!refSplit?.y_proba) return null;
     const result = findBestF1Threshold(refSplit.y_true, refSplit.y_proba, selectedRocClass);
     if (!result) return null;
     const evalJob = evalJobId ? jobs.find(j => j.job_id === evalJobId) : null;
     const metricName = (evalJob ? getJobScoringMetric(evalJob) : undefined) ?? 'f1';
-    return { ...result, splitLabel, metricName };
-  }, [evaluationData, selectedRocClass, evalJobId, jobs]);
+    return { ...result, splitLabel: chosen.label, metricName };
+  }, [evaluationData, selectedRocClass, evalJobId, jobs, showValMetrics, showTestMetrics, showTrainMetrics]);
 
   useEffect(() => {
     fetchJobs();
@@ -241,6 +260,25 @@ export const ExperimentsPage: React.FC = () => {
     return { name: shortRunId(job), ...metrics };
   }), [selectedJobs]);
 
+  // Unfiltered union of numeric metric keys across selected jobs — used to
+  // decide which of the Train/Test/Validation/CV checkboxes are even worth
+  // showing (a checkbox for a split none of the selected jobs have is dead
+  // UI that toggles nothing).
+  const rawMetricKeys = useMemo(() => Array.from(new Set(
+    selectedJobs.flatMap(job => {
+      const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
+      return Object.keys(m).filter(k => {
+        const val = m[k];
+        return typeof val === 'number' && !isNaN(val);
+      });
+    })
+  )), [selectedJobs]);
+
+  const hasTrainMetrics = useMemo(() => rawMetricKeys.some(k => k.startsWith('train_')), [rawMetricKeys]);
+  const hasTestMetrics = useMemo(() => rawMetricKeys.some(k => k.startsWith('test_')), [rawMetricKeys]);
+  const hasValMetrics = useMemo(() => rawMetricKeys.some(k => k.startsWith('val_')), [rawMetricKeys]);
+  const hasCvMetrics = useMemo(() => rawMetricKeys.some(k => k.startsWith('cv_') || k === 'best_score'), [rawMetricKeys]);
+
   // Get all unique metric keys from selected jobs (numeric only, filtered by visibility)
   const metricKeys = useMemo(() => Array.from(new Set(
     selectedJobs.flatMap(job => {
@@ -368,6 +406,10 @@ export const ExperimentsPage: React.FC = () => {
                   setShowValMetrics={setShowValMetrics}
                   showCvMetrics={showCvMetrics}
                   setShowCvMetrics={setShowCvMetrics}
+                  hasTrainMetrics={hasTrainMetrics}
+                  hasTestMetrics={hasTestMetrics}
+                  hasValMetrics={hasValMetrics}
+                  hasCvMetrics={hasCvMetrics}
                 />
               )}
 

@@ -93,6 +93,13 @@ export const EvaluationView: React.FC<Props> = ({
     validation: 'Validation',
   };
 
+  // Classification split-toggle availability — hides a Train/Test/Validation
+  // checkbox entirely when this job has no data for that split at all,
+  // instead of showing a checkbox that toggles nothing.
+  const hasTrainSplit = !!evaluationData?.splits.train;
+  const hasTestSplit = !!evaluationData?.splits.test;
+  const hasValidationSplit = !!evaluationData?.splits.validation;
+
   const activeRegressionSplit = useMemo(() => {
     if (selectedRegressionSplit != null && availableRegressionSplits.includes(selectedRegressionSplit)) {
       return selectedRegressionSplit;
@@ -196,18 +203,24 @@ export const EvaluationView: React.FC<Props> = ({
             {/* Split visibility toggles — classification only */}
             {evaluationData.problem_type !== 'regression' && (<>
               <div className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Splits:</div>
+              {hasTrainSplit && (
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
                 <input type="checkbox" checked={showTrainMetrics} onChange={e => { setShowTrainMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
                 <span className="text-gray-700 dark:text-gray-300">Train</span>
               </label>
+              )}
+              {hasTestSplit && (
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
                 <input type="checkbox" checked={showTestMetrics} onChange={e => { setShowTestMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
                 <span className="text-gray-700 dark:text-gray-300">Test</span>
               </label>
+              )}
+              {hasValidationSplit && (
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
                 <input type="checkbox" checked={showValMetrics} onChange={e => { setShowValMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
                 <span className="text-gray-700 dark:text-gray-300">Validation</span>
               </label>
+              )}
             </>)}
 
             {/* Classification controls */}
