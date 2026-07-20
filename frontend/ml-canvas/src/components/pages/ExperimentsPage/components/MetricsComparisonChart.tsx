@@ -26,6 +26,11 @@ interface Props {
   setShowValMetrics: (v: boolean) => void;
   showCvMetrics: boolean;
   setShowCvMetrics: (v: boolean) => void;
+  /** Whether any selected job actually has metrics for this split — hides the checkbox entirely when false, since a toggle for a split no job has is dead UI. */
+  hasTrainMetrics: boolean;
+  hasTestMetrics: boolean;
+  hasValMetrics: boolean;
+  hasCvMetrics: boolean;
 }
 
 const parseMetricKey = (key: string) => {
@@ -50,12 +55,17 @@ export const MetricsComparisonChart: React.FC<Props> = ({
   setShowValMetrics,
   showCvMetrics,
   setShowCvMetrics,
+  hasTrainMetrics,
+  hasTestMetrics,
+  hasValMetrics,
+  hasCvMetrics,
 }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">Metrics Comparison</h3>
         <div className="flex gap-4 text-sm">
+          {hasTrainMetrics && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -65,6 +75,8 @@ export const MetricsComparisonChart: React.FC<Props> = ({
             />
             <span className="text-gray-700 dark:text-gray-300">Train</span>
           </label>
+          )}
+          {hasTestMetrics && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -74,6 +86,8 @@ export const MetricsComparisonChart: React.FC<Props> = ({
             />
             <span className="text-gray-700 dark:text-gray-300">Test</span>
           </label>
+          )}
+          {hasValMetrics && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -83,6 +97,8 @@ export const MetricsComparisonChart: React.FC<Props> = ({
             />
             <span className="text-gray-700 dark:text-gray-300">Validation</span>
           </label>
+          )}
+          {hasCvMetrics && (
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -92,6 +108,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
             />
             <span className="text-gray-700 dark:text-gray-300">Cross-Validation</span>
           </label>
+          )}
         </div>
       </div>
 
