@@ -2,13 +2,15 @@ import React, { useMemo } from 'react';
 import { LoadingState, ErrorState } from '../../../shared';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationData, EvaluationSplit } from '../types';
+import type { ThresholdMetric } from '../utils/jobMeta';
+import { thresholdMetricOptions, metricLabel, normalizeThresholdMetric } from '../utils/classificationCharts';
 import { RegressionChartsForSplit } from './RegressionChartsForSplit';
 import { ClassificationChartsForSplit } from './ClassificationChartsForSplit';
 import { PerClassConfusionMatrix } from './PerClassConfusionMatrix';
 
-interface BestF1Info {
+interface BestMetricInfo {
   threshold: number;
-  f1: number;
+  value: number;
   splitLabel: string;
   metricName: string;
 }
@@ -34,7 +36,9 @@ interface Props {
   setSelectedRocClass: (v: string) => void;
   cmView: 'overall' | 'per-class';
   setCmView: (v: 'overall' | 'per-class') => void;
-  bestF1Infos: BestF1Info[];
+  selectedMetric: ThresholdMetric;
+  setSelectedMetric: (v: ThresholdMetric) => void;
+  bestMetricInfos: BestMetricInfo[];
   handleDownload: (elementId: string, fileName: string) => Promise<void>;
   downloadingChart: string | null;
   doneChart: string | null;
@@ -61,7 +65,9 @@ export const EvaluationView: React.FC<Props> = ({
   setSelectedRocClass,
   cmView,
   setCmView,
-  bestF1Infos,
+  selectedMetric,
+  setSelectedMetric,
+  bestMetricInfos,
   handleDownload,
   downloadingChart,
   doneChart,
@@ -247,6 +253,22 @@ export const EvaluationView: React.FC<Props> = ({
                     </div>
                   )}
                   <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
+                    <select
+                      className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
+                      value={normalizeThresholdMetric(selectedMetric, isBinary)}
+                      onChange={(e) => { setSelectedMetric(normalizeThresholdMetric(e.target.value as ThresholdMetric, isBinary)); }}
+                    >
+                      {thresholdMetricOptions(isBinary).map(m => (
+                        <option key={m} value={m}>{metricLabel(m, isBinary)}</option>
+                      ))}
+                    </select>
+                    <InfoTooltip
+                      text={`Which metric the best-threshold badges below and ROC/PR-based scan optimize for. Precision/Recall/F1 use the selected class as positive for binary jobs, and a support-weighted average across all classes for multiclass jobs (accuracy is unaffected either way).`}
+                      align="center"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Threshold:</span>
                     <InfoTooltip
                       text={`Threshold (t): a sample is predicted as the selected class when P(class) ≥ t.\n\n↑ Raise t → fewer positives predicted → lower recall, higher precision (fewer false alarms, more misses).\n↓ Lower t → more positives predicted → higher recall, lower precision (fewer misses, more false alarms).\n\nDefault 0.5 works well for balanced classes. Adjust for imbalanced data or when the cost of false positives ≠ false negatives.`}
@@ -259,27 +281,28 @@ export const EvaluationView: React.FC<Props> = ({
                       className="w-28 accent-blue-500"
                     />
                     <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>
-                    {bestF1Infos.map(info => {
+                    {bestMetricInfos.map(info => {
                       const colors: Record<string, string> = {
                         train: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50',
                         test: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
                         validation: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/50',
                       };
                       const isActive = Math.abs(threshold - info.threshold) < 0.001;
+                      const badgeMetricLabel = metricLabel(info.metricName as ThresholdMetric, isBinary);
                       return (
                         <button
                           key={info.splitLabel}
                           onClick={() => { setThreshold(info.threshold); }}
                           className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${colors[info.splitLabel] ?? colors.test} ${isActive ? 'ring-2 ring-offset-1 ring-current' : ''}`}
-                          title={`Best ${info.metricName}=${info.f1.toFixed(3)} on ${info.splitLabel} split — click to apply`}
+                          title={`Best ${badgeMetricLabel}=${info.value.toFixed(3)} on ${info.splitLabel} split — click to apply`}
                         >
-                          ★ {info.splitLabel} {info.metricName}: {info.threshold.toFixed(2)}
+                          ★ {info.splitLabel} {badgeMetricLabel}: {info.threshold.toFixed(2)}
                         </button>
                       );
                     })}
-                    {bestF1Infos.length > 0 && (
+                    {bestMetricInfos.length > 0 && (
                       <InfoTooltip
-                        text={`Each badge shows the threshold that maximises ${bestF1Infos[0]!.metricName} for the selected class on that split (found by scanning every unique prediction score, same method sklearn uses internally) — one per split currently checked in "Splits:" above. Click a badge to snap the slider to that split's optimal value.`}
+                        text={`Each badge shows the threshold that maximises ${metricLabel(bestMetricInfos[0]!.metricName as ThresholdMetric, isBinary)} for the selected class on that split (found by scanning every unique prediction score, same method sklearn uses internally) — one per split currently checked in "Splits:" above. Click a badge to snap the slider to that split's optimal value.`}
                         align="center"
                       />
                     )}

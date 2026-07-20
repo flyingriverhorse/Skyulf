@@ -3,6 +3,8 @@
  * Pure functions only — no React, no API calls.
  */
 import type { TaskType } from '../../../../core/types/taskType';
+import type { ThresholdMetric } from './classificationCharts';
+export type { ThresholdMetric };
 
 /**
  * Extract the resolved scoring metric from a job's result (top-level or
@@ -19,6 +21,26 @@ export function getJobScoringMetric(job: { result?: Record<string, unknown> | nu
   const tuning = config?.tuning_config as Record<string, unknown> | undefined;
   if (typeof tuning?.metric === 'string') return tuning.metric;
   return undefined;
+}
+
+/**
+ * Maps a job's own scoring metric (as reported by `getJobScoringMetric`,
+ * e.g. "f1_weighted", "roc_auc", "precision_weighted") to the closest
+ * dropdown option, so the Model Evaluation metric selector defaults to
+ * whatever the job was actually scored/tuned on instead of always F1.
+ * Unmappable/threshold-independent metrics (e.g. "roc_auc",
+ * "balanced_accuracy") fall back to "f1_weighted" — a safe default that
+ * works for both binary and multiclass jobs.
+ */
+export function mapJobMetricToDropdown(scoringMetric: string | undefined): ThresholdMetric {
+  if (!scoringMetric) return 'f1_weighted';
+  const m = scoringMetric.toLowerCase();
+  if (m === 'accuracy') return 'accuracy';
+  if (m === 'f1_weighted') return 'f1_weighted';
+  if (m === 'f1' || m === 'f1_macro') return 'f1';
+  if (m.startsWith('precision')) return 'precision';
+  if (m.startsWith('recall')) return 'recall';
+  return 'f1_weighted';
 }
 
 /** Per-task priority list of metric base names, best-first, used by `getDisplayScore`. */
