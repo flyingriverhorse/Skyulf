@@ -13,6 +13,7 @@ from backend.ml_pipeline._execution.graph_utils import (
     determine_search_strategy,
     extract_job_details,
 )
+from backend.ml_pipeline._execution.job_manager_base import TrainingJobManagerBase
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline._execution.utils import (
     get_dataset_map,
@@ -23,7 +24,7 @@ from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
-class AdvancedTuningManager:
+class AdvancedTuningManager(TrainingJobManagerBase):
     @staticmethod
     async def create_tuning_job(
         session: AsyncSession,
@@ -130,27 +131,7 @@ class AdvancedTuningManager:
         so the worker actually stops. The status guard in `update_status_sync`
         prevents late writes from racing the row back to COMPLETED.
         """
-        stmt = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
-        result = await session.execute(stmt)
-        job = result.scalar_one_or_none()
-
-        if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-            job.status = JobStatus.CANCELLED.value
-            job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now(UTC)
-            meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
-            task_id = meta.get("celery_task_id")
-            if task_id:
-                try:
-                    from backend.celery_app import celery_app
-
-                    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
-                except Exception:
-                    # Best-effort: never let revoke errors block the user-visible cancel.
-                    pass  # nosec B110
-            await session.commit()
-            return True
-        return False
+        return await TrainingJobManagerBase._cancel_job(session, AdvancedTuningJob, job_id)
 
     @staticmethod
     def _update_tuning_result(job: AdvancedTuningJob, result: dict[str, Any]):
@@ -168,18 +149,14 @@ class AdvancedTuningManager:
     @staticmethod
     def _append_job_logs(job: AdvancedTuningJob, logs: list[str]) -> None:
         """Appends new log lines to a job's existing logs list, in place."""
-        current_logs: list[str] = job.logs or []
-        job.logs = current_logs + logs
+        TrainingJobManagerBase._append_job_logs(job, logs)
 
     @staticmethod
     def _handle_cancelled_status_update(
         session: Session, job: AdvancedTuningJob, logs: list[str] | None
     ) -> bool:
         """Handle a status update for an already-cancelled job: only append logs, never revive it."""
-        if logs:
-            AdvancedTuningManager._append_job_logs(job, logs)
-            session.commit()
-        return True
+        return TrainingJobManagerBase._handle_cancelled_status_update(session, job, logs)
 
     @staticmethod
     def _apply_status_update_fields(
@@ -218,20 +195,16 @@ class AdvancedTuningManager:
         logs: list[str] | None = None,
     ) -> bool:
         """Updates tuning job status (Sync). Returns True if job found and updated."""
-        job = session.query(AdvancedTuningJob).filter(AdvancedTuningJob.id == job_id).first()
-        if not job:
-            return False
-
-        # See BasicTrainingManager.update_status_sync — refuse to overwrite
-        # a CANCELLED row so a late-arriving worker write can't flip Stop
-        # back to Completed.
-        if job.status == JobStatus.CANCELLED.value:
-            return AdvancedTuningManager._handle_cancelled_status_update(session, job, logs)
-
-        AdvancedTuningManager._apply_status_update_fields(job, status, error, logs, result)
-
-        session.commit()
-        return True
+        return TrainingJobManagerBase._update_status_sync(
+            session,
+            AdvancedTuningJob,
+            job_id,
+            status,
+            error,
+            result,
+            logs,
+            AdvancedTuningManager._apply_status_update_fields,
+        )
 
     @staticmethod
     async def get_tuning_job(session: AsyncSession, job_id: str) -> JobInfo | None:

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.config import get_settings
 from backend.database.models import BasicTrainingJob
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
+from backend.ml_pipeline._execution.job_manager_base import TrainingJobManagerBase
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline._execution.utils import (
     get_dataset_map,
@@ -21,7 +22,7 @@ from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
-class BasicTrainingManager:
+class BasicTrainingManager(TrainingJobManagerBase):
     @staticmethod
     async def create_training_job(
         session: AsyncSession,
@@ -125,30 +126,7 @@ class BasicTrainingManager:
         training". The `update_status_sync` cancelled-state guard further
         protects against any late writes that race past the revoke.
         """
-        stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
-        result = await session.execute(stmt)
-        job = result.scalar_one_or_none()
-
-        if job and job.status in [JobStatus.QUEUED.value, JobStatus.RUNNING.value]:
-            job.status = JobStatus.CANCELLED.value
-            job.error_message = "Job cancelled by user."
-            job.finished_at = datetime.now(UTC)
-            # Revoke the Celery task if we recorded its id at submission time.
-            meta = (job.job_metadata or {}) if isinstance(job.job_metadata, dict) else {}
-            task_id = meta.get("celery_task_id")
-            if task_id:
-                try:
-                    from backend.celery_app import celery_app
-
-                    celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
-                except Exception:
-                    # Best-effort: never let revoke errors block the user-visible
-                    # cancel. The status guard in update_status_sync still keeps
-                    # the row at CANCELLED even if the worker writes back.
-                    pass  # nosec B110
-            await session.commit()
-            return True
-        return False
+        return await TrainingJobManagerBase._cancel_job(session, BasicTrainingJob, job_id)
 
     @staticmethod
     def _update_training_result(job: BasicTrainingJob, result: dict[str, Any]):
@@ -162,18 +140,14 @@ class BasicTrainingManager:
     @staticmethod
     def _append_job_logs(job: BasicTrainingJob, logs: list[str]) -> None:
         """Appends new log lines to a job's existing logs list, in place."""
-        current_logs: list[str] = job.logs or []
-        job.logs = current_logs + logs
+        TrainingJobManagerBase._append_job_logs(job, logs)
 
     @staticmethod
     def _handle_cancelled_status_update(
         session: Session, job: BasicTrainingJob, logs: list[str] | None
     ) -> bool:
         """Handle a status update for an already-cancelled job: only append logs, never revive it."""
-        if logs:
-            BasicTrainingManager._append_job_logs(job, logs)
-            session.commit()
-        return True
+        return TrainingJobManagerBase._handle_cancelled_status_update(session, job, logs)
 
     @staticmethod
     def _apply_status_update_fields(
@@ -212,22 +186,16 @@ class BasicTrainingManager:
         logs: list[str] | None = None,
     ) -> bool:
         """Updates training job status (Sync). Returns True if job found and updated."""
-        job = session.query(BasicTrainingJob).filter(BasicTrainingJob.id == job_id).first()
-        if not job:
-            return False
-
-        # Guard: once a job is CANCELLED by the user, the worker may still be
-        # mid-`fit` and try to flip it back to RUNNING/COMPLETED on its next
-        # progress write. Refuse those overwrites so the user-visible state
-        # stays accurate; logs are still appended so cancellation traces are
-        # preserved for debugging.
-        if job.status == JobStatus.CANCELLED.value:
-            return BasicTrainingManager._handle_cancelled_status_update(session, job, logs)
-
-        BasicTrainingManager._apply_status_update_fields(job, status, error, logs, result)
-
-        session.commit()
-        return True
+        return TrainingJobManagerBase._update_status_sync(
+            session,
+            BasicTrainingJob,
+            job_id,
+            status,
+            error,
+            result,
+            logs,
+            BasicTrainingManager._apply_status_update_fields,
+        )
 
     @staticmethod
     async def get_training_job(session: AsyncSession, job_id: str) -> JobInfo | None:
