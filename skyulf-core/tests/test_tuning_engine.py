@@ -20,7 +20,16 @@ from skyulf.modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
 )
+from skyulf.modeling.classification import (
+    KNeighborsClassifierApplier,
+    KNeighborsClassifierCalculator,
+    RandomForestClassifierApplier,
+    RandomForestClassifierCalculator,
+)
 from skyulf.modeling.regression import (
+    LinearRegressionApplier,
+    LinearRegressionCalculator,
+    RandomForestRegressorApplier,
     RandomForestRegressorCalculator,
 )
 
@@ -1201,3 +1210,144 @@ def test_tune_search_phase_shuffle_split_honors_cv_random_state(monkeypatch):
     tuner.fit(X, y, config=cfg)
 
     assert captured["random_state"] == 77
+
+
+# ---------------------------------------------------------------------------
+# Phase 2b characterization: does TuningCalculator(n_trials=1) degenerate to
+# a plain calculator.fit()? These tests exist to PROVE (or disprove) the
+# "basic training = tuning with one trial" assumption in the unification
+# plan, per model type, before any production fit path is merged.
+# ---------------------------------------------------------------------------
+
+
+def _direct_fit_predict(calculator, applier, X, y, params: dict) -> Any:
+    """Fit `calculator` directly (today's Basic Training path) and return predictions."""
+    model = calculator.fit(pd.DataFrame(X), pd.Series(y), {"params": params})
+    return applier.predict(pd.DataFrame(X), model)
+
+
+def _tuned_fixed_fit_predict(calculator, applier, X, y, params: dict, metric: str) -> Any:
+    """Fit via TuningCalculator with a single-value ("fixed") search space per param.
+
+    Mirrors the Phase 2b proposal: `run_mode="fixed"` maps every chosen
+    hyperparameter to a one-item search-space list so grid search degenerates
+    to exactly one trial, instead of leaving the search space empty.
+    """
+    tuner = TuningCalculator(calculator)
+    tuned_applier = TuningApplier(applier)
+    config = TuningConfig(
+        strategy="grid",
+        metric=metric,
+        search_space={k: [v] for k, v in params.items()},
+        cv_folds=3,
+    ).__dict__
+    model_artifact = tuner.fit(pd.DataFrame(X), pd.Series(y), config)
+    return tuned_applier.predict(pd.DataFrame(X), model_artifact)
+
+
+_CHARACTERIZATION_CASES = [
+    pytest.param(
+        LogisticRegressionCalculator(),
+        LogisticRegressionApplier(),
+        "classification",
+        {"C": 0.01},
+        "accuracy",
+        id="logistic_regression",
+    ),
+    pytest.param(
+        RandomForestClassifierCalculator(),
+        RandomForestClassifierApplier(),
+        "classification",
+        {"n_estimators": 30, "max_depth": 4},
+        "accuracy",
+        id="random_forest_classifier",
+    ),
+    pytest.param(
+        KNeighborsClassifierCalculator(),
+        KNeighborsClassifierApplier(),
+        "classification",
+        {"n_neighbors": 7},
+        "accuracy",
+        id="k_neighbors_classifier",
+    ),
+    pytest.param(
+        LinearRegressionCalculator(),
+        LinearRegressionApplier(),
+        "regression",
+        {"fit_intercept": False},
+        "r2",
+        id="linear_regression",
+    ),
+    pytest.param(
+        RandomForestRegressorCalculator(),
+        RandomForestRegressorApplier(),
+        "regression",
+        {"n_estimators": 30, "max_depth": 4},
+        "r2",
+        id="random_forest_regressor",
+    ),
+]
+
+
+@pytest.mark.parametrize("calculator, applier, problem_type, params, metric", _CHARACTERIZATION_CASES)
+def test_fixed_mode_tuning_reproduces_direct_fit(calculator, applier, problem_type, params, metric):
+    """A single-value ("fixed") tuning search space must reproduce direct calculator.fit().
+
+    This is the core Phase 2b gating assumption: if `run_mode="fixed"` is
+    implemented as a one-item-per-param grid search space (not an empty
+    search space), predictions from the tuning-engine path must match the
+    plain direct-fit path exactly, across model types.
+    """
+    X, y = _clf_xy() if problem_type == "classification" else _reg_xy()
+
+    direct_preds = _direct_fit_predict(calculator, applier, X, y, params)
+    tuned_preds = _tuned_fixed_fit_predict(calculator, applier, X, y, params, metric)
+
+    import numpy as np
+
+    np.testing.assert_allclose(
+        np.asarray(direct_preds, dtype=float),
+        np.asarray(tuned_preds, dtype=float),
+        err_msg=(
+            f"Fixed-mode tuning (n_trials=1, single-value search space) diverged "
+            f"from direct fit for {calculator.__class__.__name__}"
+        ),
+    )
+
+
+@pytest.mark.parametrize("calculator, applier, problem_type, params, metric", _CHARACTERIZATION_CASES)
+def test_empty_search_space_silently_ignores_user_hyperparams(
+    calculator, applier, problem_type, params, metric
+):
+    """Documents the real Phase 2b gap: an EMPTY search space does NOT preserve
+    user-chosen hyperparameters — it silently falls back to the calculator's
+    built-in `default_params`, diverging from direct fit whenever `params`
+    differs from those defaults. This is why Phase 2b's `run_mode="fixed"`
+    must map chosen hyperparams to single-value search-space entries (as
+    exercised above), never just skip/empty the search space.
+    """
+    if params == calculator.default_params:
+        pytest.skip("params equal calculator defaults; no divergence to demonstrate")
+
+    X, y = _clf_xy() if problem_type == "classification" else _reg_xy()
+
+    direct_preds = _direct_fit_predict(calculator, applier, X, y, params)
+
+    tuner = TuningCalculator(calculator)
+    tuned_applier = TuningApplier(applier)
+    config = TuningConfig(strategy="grid", metric=metric, search_space={}, cv_folds=3).__dict__
+    model_artifact = tuner.fit(pd.DataFrame(X), pd.Series(y), config)
+    empty_space_preds = tuned_applier.predict(pd.DataFrame(X), model_artifact)
+
+    import numpy as np
+
+    # These are EXPECTED to differ - the assertion documents the gap, it does
+    # not mean anything is broken today (Phase 2b hasn't shipped yet).
+    assert not np.allclose(
+        np.asarray(direct_preds, dtype=float),
+        np.asarray(empty_space_preds, dtype=float),
+    ), (
+        f"{calculator.__class__.__name__}: expected empty search space to diverge "
+        "from direct fit when params != defaults, but it matched. Re-check this "
+        "assumption before relying on it elsewhere."
+    )

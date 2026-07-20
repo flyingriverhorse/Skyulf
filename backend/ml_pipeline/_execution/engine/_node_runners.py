@@ -1,9 +1,11 @@
 """Per-step node-runner methods for :class:`PipelineEngine`.
 
-Mixin slice — owns: ``_run_data_loader``, ``_run_basic_training``,
-``_run_advanced_tuning``, ``_run_transformer``, ``_run_data_preview``,
-the algorithm-component factory ``_get_model_components``, and the shared
-post-fit orchestration helper ``_finalize_training_run``.
+Mixin slice — owns: ``_run_data_loader``, ``_run_training`` (unified
+fixed/tuned training entry point, replacing the old separate
+``_run_basic_training``/``_run_advanced_tuning``), ``_run_transformer``,
+``_run_data_preview``, the algorithm-component factory
+``_get_model_components``, and the shared post-fit orchestration helper
+``_finalize_training_run``.
 
 Relies on attributes/methods provided by :class:`PipelineEngine` and its
 sibling mixins: ``self.catalog``, ``self.artifact_store``, ``self.log``,
@@ -32,6 +34,7 @@ from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
 from ..schemas import NodeConfig
+from ...constants import StepType
 
 if TYPE_CHECKING:
     from ...artifacts.store import ArtifactStore
@@ -195,31 +198,6 @@ class NodeRunnersMixin:
                 cv_metrics[f"cv_{metric_name}_mean"] = stats["mean"]
                 cv_metrics[f"cv_{metric_name}_std"] = stats["std"]
         return cv_metrics
-
-    def _run_basic_training_cv(
-        self,
-        estimator: Any,
-        data: Any,
-        target_col: str,
-        hyperparameters: dict[str, Any],
-        node: NodeConfig,
-    ) -> dict[str, Any]:
-        """Run optional cross-validation for basic training and return ``cv_`` metrics."""
-        if not node.params.get("cv_enabled", False):
-            return {}
-        cv_data = self._to_split_dataset(data, target_col)
-        cv_results = estimator.cross_validate(
-            cv_data,
-            target_col,
-            hyperparameters,
-            n_folds=node.params.get("cv_folds", 5),
-            cv_type=node.params.get("cv_type", "k_fold"),
-            shuffle=node.params.get("cv_shuffle", True),
-            random_state=node.params.get("cv_random_state", 42),
-            time_column=node.params.get("cv_time_column") or None,
-            log_callback=self.log,
-        )
-        return self._aggregate_cv_metrics(cv_results)
 
     def _resolve_train_frame(self, data: Any) -> Any:
         """Best-effort extraction of the actual training DataFrame from ``data``.
@@ -423,12 +401,100 @@ class NodeRunnersMixin:
 
         return metrics
 
-    def _run_basic_training(
-        self, node: NodeConfig, job_id: str = "unknown"
-    ) -> tuple[str, dict[str, Any]]:
-        # Input: SplitDataset (from Feature Engineering) or DataFrame
-        # Supports multiple inputs — merges them before training.
+    def _resolve_run_mode(self, node: NodeConfig) -> str:
+        """Derive ``'fixed'`` (plain, single hyperparameter set) vs ``'tuned'``
+        (hyperparameter search) for this node.
 
+        New pipelines set an explicit ``run_mode`` param on a
+        ``StepType.TRAINING`` node. Old saved pipelines / job rows still carry
+        the legacy ``basic_training``/``advanced_tuning`` step types —
+        normalize those to the equivalent ``run_mode`` here so they keep
+        executing unchanged (Phase 2b backward-compat shim).
+        """
+        if node.step_type == StepType.BASIC_TRAINING:
+            return "fixed"
+        if node.step_type == StepType.ADVANCED_TUNING:
+            return "tuned"
+        return node.params.get("run_mode", "fixed")
+
+    def _default_metric_for_problem_type(self, problem_type: str) -> str:
+        """Internal-only default scoring metric for ``run_mode='fixed'``.
+
+        Fixed-mode training never surfaces tuning config to the user, but the
+        tuning engine's CV-scoring loop still needs a valid metric even for a
+        single candidate — pick a sane default per problem type.
+        """
+        return "accuracy" if problem_type == "classification" else "r2"
+
+    def _build_fixed_run_params(self, node: NodeConfig, calculator: Any) -> dict[str, Any]:
+        """Build tuning-engine params for ``run_mode='fixed'``.
+
+        Maps every user-chosen hyperparameter to a single-item search-space
+        list (``{"n_estimators": [50]}``) rather than leaving the search
+        space empty — proven necessary by the Phase 2b characterization
+        tests in ``skyulf-core/tests/test_tuning_engine.py``
+        (``test_empty_search_space_silently_ignores_user_hyperparams``): an
+        empty search space silently falls back to the calculator's built-in
+        defaults instead of the hyperparameters the user actually chose.
+        """
+        hyperparameters = node.params.get("hyperparameters", {})
+        return {
+            "strategy": "grid",
+            "metric": node.params.get("metric")
+            or self._default_metric_for_problem_type(calculator.problem_type),
+            "search_space": {k: [v] for k, v in hyperparameters.items()},
+            "n_trials": 1,
+            "cv_enabled": node.params.get("cv_enabled", False),
+            "cv_folds": node.params.get("cv_folds", 5),
+            "cv_type": node.params.get("cv_type", "k_fold"),
+            "cv_shuffle": node.params.get("cv_shuffle", True),
+            "cv_random_state": node.params.get("cv_random_state", 42),
+            "cv_time_column": node.params.get("cv_time_column") or None,
+            "random_state": node.params.get("random_state", 42),
+        }
+
+    def _run_training(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, dict[str, Any]]:
+        """Unified training entry point for both run modes (Phase 2b merge).
+
+        Dispatches to the plain direct-fit path for clustering (no scorer to
+        tune against — always ``fixed``, regardless of the requested
+        ``run_mode``) and to the tuning-engine path for everything else,
+        with ``run_mode='fixed'`` degenerating the search to a single,
+        user-chosen-hyperparameter candidate.
+        """
+        run_mode = self._resolve_run_mode(node)
+
+        algorithm = node.params.get("algorithm") or node.params.get("model_type")
+        if not algorithm:
+            raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
+        calculator, applier = self._get_model_components(algorithm)
+        is_clustering = getattr(calculator, "problem_type", "") == "clustering"
+
+        if is_clustering:
+            # Clustering has no supervised scorer to tune against, so it
+            # always runs the plain direct-fit path — never the tuning
+            # engine — regardless of the requested run_mode.
+            return self._run_training_direct(node, job_id, calculator, applier)
+
+        target_col = node.params.get("target_column") or ""
+        if not target_col:
+            raise ValueError("Missing 'target_column' in node parameters")
+
+        if run_mode == "tuned":
+            tuning_params = self._prepare_tuning_config(node, calculator)
+        else:
+            tuning_params = self._build_fixed_run_params(node, calculator)
+
+        return self._run_training_tuned(
+            node, job_id, target_col, calculator, applier, tuning_params, run_mode
+        )
+
+    def _run_training_direct(
+        self, node: NodeConfig, job_id: str, calculator: Any, applier: Any
+    ) -> tuple[str, dict[str, Any]]:
+        """Plain direct-fit path — clustering only (Phase 2b keeps this route
+        for clustering since the tuning engine requires a supervised scorer).
+        """
         # Clustering (segmentation) nodes have no target column to predict —
         # `""` is the established "no target" sentinel `_get_input`/`_extract_xy`
         # already understand (see `skyulf.modeling.base.StatefulEstimator._extract_xy`).
@@ -436,32 +502,22 @@ class NodeRunnersMixin:
         data = self._get_training_input(node, target_col)
 
         algorithm = node.params.get("algorithm") or node.params.get("model_type")
-        if not algorithm:
-            raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
         hyperparameters = node.params.get("hyperparameters", {})
-
-        # Factory logic (simplified)
-        calculator, applier = self._get_model_components(algorithm)
-        is_clustering = getattr(calculator, "problem_type", "") == "clustering"
 
         # Clustering-only: an optional column (e.g. a known label like species
         # name) excluded from training features but kept around purely so the
         # user can cross-check "which cluster is which real-world group"
         # after the fact (see `reference_crosstab` in the evaluation report).
-        reference_col = (node.params.get("reference_column") or "") if is_clustering else ""
+        reference_col = node.params.get("reference_column") or ""
 
         # SDK StatefulEstimator(calculator, applier, node_id)
         estimator = StatefulEstimator(calculator, applier, node.node_id)
 
-        # 1. Cross-Validation (Optional) — not meaningful for unsupervised
-        # clustering (no scorer/target to cross-validate against).
-        cv_metrics = (
-            {}
-            if is_clustering
-            else self._run_basic_training_cv(estimator, data, target_col, hyperparameters, node)
-        )
+        # Cross-Validation is not meaningful for unsupervised clustering (no
+        # scorer/target to cross-validate against).
+        cv_metrics: dict[str, Any] = {}
 
-        # 2. Train Final Model
+        # Train Final Model
         self.log(f"Starting model training with algorithm: {algorithm}")
         # SDK fit_predict(dataset, target_column, config)
         # config expects {"params": ...} usually
@@ -486,39 +542,36 @@ class NodeRunnersMixin:
             metrics,
             cv_metrics,
             completion_log="Model training finished.",
-            is_clustering=is_clustering,
+            is_clustering=True,
             reference_col=reference_col,
-            numeric_only=is_clustering,
+            numeric_only=True,
             exclude_columns=[reference_col] if reference_col else None,
             should_evaluate=node.params.get("evaluate", True),
             swallow_evaluate_errors=False,
         )
 
-    def _prepare_tuning_config(self, node: NodeConfig) -> tuple[Any, Any, dict[str, Any]]:
-        """Resolve model components and build the ``tuning_params`` dict for a tuning node.
+    def _prepare_tuning_config(self, node: NodeConfig, calculator: Any) -> dict[str, Any]:
+        """Build the ``tuning_params`` dict for ``run_mode='tuned'``.
 
         Injects server-side parallelism settings and auto-builds a nested
         search space for structural (ensemble) models when the UI sent none.
+        ``calculator`` is already resolved by the caller (``_run_training``),
+        which also already excludes clustering before reaching here — the
+        clustering guard below is kept only as a defensive backstop for a
+        hand-crafted/replayed pipeline JSON that calls this directly.
         """
-        algorithm = node.params.get("algorithm") or node.params.get("model_type")
-        if not algorithm:
-            raise ValueError("Missing 'algorithm' or 'model_type' in node parameters")
         tuning_params = dict(node.params["tuning_config"])  # Dict matching TuningConfig
         # Inject server-side parallelism from settings (not user-configurable via the UI)
         settings = get_settings()
         tuning_params["n_jobs"] = settings.TUNING_N_JOBS
         tuning_params["parallel_backend"] = settings.TUNING_PARALLEL_BACKEND
 
-        calculator, applier = self._get_model_components(algorithm)
-
         # Advanced Tuning hard-requires a target column and runs supervised
         # `cross_validate()` with a scorer — clustering algorithms (no
         # ground-truth target, no real train/test scorer) would crash deep
-        # inside the tuner rather than fail with a clear message. The
-        # frontend already hides clustering models from this node's dropdown,
-        # but reject defensively here too in case a pipeline JSON is crafted
-        # or replayed directly against the API.
+        # inside the tuner rather than fail with a clear message.
         if getattr(calculator, "problem_type", "") == "clustering":
+            algorithm = node.params.get("algorithm") or node.params.get("model_type")
             raise ValueError(
                 f"Algorithm '{algorithm}' is a clustering model and is not supported by "
                 "Advanced Tuning. Use the Segmentation node for clustering instead."
@@ -536,7 +589,7 @@ class NodeRunnersMixin:
             if auto_space:
                 tuning_params["search_space"] = auto_space
 
-        return calculator, applier, tuning_params
+        return tuning_params
 
     def _extract_tuning_metrics(
         self, estimator: Any, tuning_params: dict[str, Any]
@@ -613,15 +666,33 @@ class NodeRunnersMixin:
             logger.exception("Cross-validation failed for tuned model")
             return {}
 
-    def _run_advanced_tuning(
-        self, node: NodeConfig, job_id: str = "unknown"
+    def _run_training_tuned(
+        self,
+        node: NodeConfig,
+        job_id: str,
+        target_col: str,
+        calculator: Any,
+        applier: Any,
+        tuning_params: dict[str, Any],
+        run_mode: str,
     ) -> tuple[str, dict[str, Any]]:
-        # Input: SplitDataset — supports multiple inputs via merge.
-        target_col = node.params["target_column"]
+        """Shared tuning-engine fit path for both run modes (Phase 2b merge).
 
-        data = self._get_input(node, target_col)
-
-        calculator, applier, tuning_params = self._prepare_tuning_config(node)
+        ``run_mode='tuned'`` runs the real multi-candidate search exactly as
+        Advanced Tuning always has. ``run_mode='fixed'`` degenerates the same
+        engine to a single, user-chosen-hyperparameter candidate (built by
+        ``_build_fixed_run_params``) — proven equivalent to a direct
+        ``calculator.fit()`` call by the Phase 2b characterization tests in
+        ``skyulf-core/tests/test_tuning_engine.py``.
+        """
+        # Input: SplitDataset — supports multiple inputs via merge. Fixed mode
+        # reuses Basic Training's Model-artifact safety check; tuned mode
+        # never had it, so it's left as-is to avoid a behavior change there.
+        data = (
+            self._get_training_input(node, target_col)
+            if run_mode == "fixed"
+            else self._get_input(node, target_col)
+        )
 
         # Create Tuner components
         tuner_calc = TuningCalculator(calculator)
@@ -662,15 +733,22 @@ class NodeRunnersMixin:
         # Finalize and save artifacts
         self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
 
-        self.log("Tuning and final model retraining finished.")
+        completion_log = (
+            "Model training finished."
+            if run_mode == "fixed"
+            else "Tuning and final model retraining finished."
+        )
+        self.log(completion_log)
 
         # Bundle transformers with the model for inference
         self._bundle_model_with_transformers(node, job_id, target_col, data)
 
-        # Extract metrics from tuning result
+        # Extract metrics from tuning result (populates best_params/best_score/
+        # trials for BOTH modes, so fixed-mode jobs report the effective
+        # hyperparameters consistently with tuned-mode jobs)
         tuning_result, metrics = self._extract_tuning_metrics(estimator, tuning_params)
 
-        # Cross-Validation on the tuned model (using best params)
+        # Cross-Validation on the tuned/fixed model (using best/fixed params)
         cv_metrics = self._run_tuned_cv(
             calculator, applier, data, target_col, tuning_params, tuning_result, node
         )
@@ -683,13 +761,13 @@ class NodeRunnersMixin:
             estimator,
             metrics,
             cv_metrics,
-            completion_log="Tuning and final model retraining finished.",
+            completion_log=completion_log,
             is_clustering=False,
             reference_col="",
             numeric_only=False,
             exclude_columns=None,
-            should_evaluate=True,
-            swallow_evaluate_errors=True,
+            should_evaluate=node.params.get("evaluate", True) if run_mode == "fixed" else True,
+            swallow_evaluate_errors=run_mode != "fixed",
         )
 
     def _run_transformer(
