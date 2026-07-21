@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 from backend.database.models import (
     DriftCheckResult,
     ErrorEvent,
-    TrainingJob,
     PipelineRunLog,
+    TrainingJob,
 )
 from backend.dependencies import get_db
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
