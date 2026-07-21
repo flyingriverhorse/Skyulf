@@ -453,8 +453,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
               };
           }
       } else if (node.data.definitionType === 'SegmentationNode') {
-          stepType = BackendStepType.BASIC_TRAINING;
+          stepType = BackendStepType.TRAINING;
           params = {
+              run_mode: 'fixed',
               // No target_column — clustering is unsupervised. The backend
               // treats an empty string as the "no target" sentinel.
               target_column: '',
@@ -525,8 +526,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           // ensemble through the hyperparameter search engine (the backend
           // auto-builds a nested `<name>__<param>` space when none is sent).
           if (node.data.run_mode === 'advanced') {
-              stepType = BackendStepType.ADVANCED_TUNING;
+              stepType = BackendStepType.TRAINING;
               params = {
+                  run_mode: 'tuned',
                   target_column: node.data.target_column,
                   algorithm: node.data.model_type,
                   execution_mode: node.data.execution_mode,
@@ -549,8 +551,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   }
               };
           } else {
-              stepType = BackendStepType.BASIC_TRAINING;
+              stepType = BackendStepType.TRAINING;
               params = {
+                  run_mode: 'fixed',
                   target_column: node.data.target_column,
                   model_type: node.data.model_type,
                   hyperparameters: {
