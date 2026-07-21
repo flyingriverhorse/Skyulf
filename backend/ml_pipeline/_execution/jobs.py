@@ -133,8 +133,8 @@ class JobManager:
         """Stash the Celery task id on the job's metadata so cancel_job can revoke it.
 
         Stored under `job_metadata.celery_task_id` to avoid a schema migration.
-        Tries BasicTrainingJob first, then AdvancedTuningJob; silently no-ops
-        if the job row doesn't exist (job creation race shouldn't break submit).
+        Queries the unified TrainingJob table directly; silently no-ops if the
+        job row doesn't exist (job creation race shouldn't break submit).
         """
         stmt = select(TrainingJob).where(TrainingJob.id == job_id)
         result = await session.execute(stmt)
