@@ -36,7 +36,7 @@ export const JobsPage: React.FC = () => {
   const [ensembleSubFilter, setEnsembleSubFilter] = useState<'all' | 'classification' | 'regression'>('all');
   const LIMIT = 25;  // match drawer PAGE_SIZE so both show the same number of rows per tab
 
-  // Backend only filters jobs by job_type (basic_training/advanced_tuning),
+  // Backend only filters jobs by job_type (training/tuning),
   // not by task. So the four task tabs above all share one merged
   // training+tuning "pool" (job_type omitted \u2192 backend merge-sorts both
   // tables, see JobManager.list_jobs), which is filtered client-side by
