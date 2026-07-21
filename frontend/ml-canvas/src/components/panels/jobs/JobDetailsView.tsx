@@ -318,7 +318,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 {job.job_id.slice(0, 8)}
                             </span>
                             {isEnsembleModelType(job.model_type) && (
-                                <span className="text-xs font-normal px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                                <span className="text-xs font-normal px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 whitespace-nowrap">
                                     {getEnsembleStrategy(job.model_type)} · {getEnsembleSubTask(job.model_type) === 'regression' ? 'Regression' : 'Classification'}
                                 </span>
                             )}
