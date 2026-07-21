@@ -200,7 +200,7 @@ async def _submit_or_dedupe_branch_job(
             session=db,
             pipeline_id=sub.pipeline_id,
             node_id=target_node_id or "unknown",
-            job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
+            job_type=cast(Literal["training", "tuning", "preview"], job_type),
             dataset_id=dataset_id,
             model_type=model_type,
             graph=branch_graph,
