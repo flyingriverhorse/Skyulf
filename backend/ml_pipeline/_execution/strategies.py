@@ -171,13 +171,6 @@ class JobStrategyFactory:
     }
 
     @classmethod
-    def get_strategy(cls, job_type: str) -> JobStrategy:
-        """Returns the strategy for the given job type."""
-        if job_type in cls._strategies:
-            return cls._strategies[job_type]
-        raise ValueError(f"Unknown job type: {job_type}")
-
-    @classmethod
     def get_strategy_by_job(cls, job: MLJob) -> JobStrategy:
         run_mode = getattr(job, "run_mode", None)
         if run_mode == "fixed":
