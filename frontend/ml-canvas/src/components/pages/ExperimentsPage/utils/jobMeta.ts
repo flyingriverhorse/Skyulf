@@ -99,7 +99,7 @@ export function getDisplayScore(
   const metrics = (job.result as { metrics?: Record<string, unknown> } | undefined)?.metrics;
   if (!metrics) return null;
 
-  const priority = task === 'other' ? [] : SCORE_METRIC_PRIORITY[task];
+  const priority = task === 'other' || task === 'ensemble' ? [] : SCORE_METRIC_PRIORITY[task];
   for (const base of priority) {
     for (const split of SCORE_SPLIT_PRIORITY) {
       const v = metrics[`${split}_${base}`];
