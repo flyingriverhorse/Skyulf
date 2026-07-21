@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
-from backend.database.models import AdvancedTuningJob
+from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.graph_utils import (
     determine_search_strategy,
     extract_job_details,
@@ -46,14 +46,15 @@ class AdvancedTuningManager(TrainingJobManagerBase):
 
         search_strategy = determine_search_strategy(graph, node_id)
 
-        job = AdvancedTuningJob(
+        job = TrainingJob(
             id=job_id,
             pipeline_id=pipeline_id,
             node_id=node_id,
             dataset_source_id=dataset_id,
             user_id=user_id,
             status=JobStatus.QUEUED.value,
-            run_number=next_version,
+            run_mode="tuned",
+            version=next_version,
             model_type=model_type,
             search_strategy=search_strategy,
             graph=graph,
@@ -66,7 +67,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
         return job_id
 
     @staticmethod
-    def map_tuning_job_to_info(job: AdvancedTuningJob, dataset_name: str | None) -> JobInfo:
+    def map_tuning_job_to_info(job: TrainingJob, dataset_name: str | None) -> JobInfo:
         # Extract details from graph
         (
             node_params,
@@ -111,7 +112,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
             created_at=type_cast(datetime, job.created_at),
             metrics=type_cast(dict[str, Any] | None, metrics),
             search_strategy=type_cast(str | None, job.search_strategy),
-            version=type_cast(int | None, job.run_number),
+            version=type_cast(int | None, job.version),
             target_column=target_column,
             dropped_columns=dropped_columns,
             logs=type_cast(list[str] | None, job.logs),
@@ -131,10 +132,12 @@ class AdvancedTuningManager(TrainingJobManagerBase):
         so the worker actually stops. The status guard in `update_status_sync`
         prevents late writes from racing the row back to COMPLETED.
         """
-        return await TrainingJobManagerBase._cancel_job(session, AdvancedTuningJob, job_id)
+        return await TrainingJobManagerBase._cancel_job(
+            session, TrainingJob, job_id, run_mode="tuned"
+        )
 
     @staticmethod
-    def _update_tuning_result(job: AdvancedTuningJob, result: dict[str, Any]):
+    def _update_tuning_result(job: TrainingJob, result: dict[str, Any]):
         if "best_params" in result:
             job.best_params = result["best_params"]
         if "best_score" in result:
@@ -147,20 +150,20 @@ class AdvancedTuningManager(TrainingJobManagerBase):
         job.metrics = result
 
     @staticmethod
-    def _append_job_logs(job: AdvancedTuningJob, logs: list[str]) -> None:
+    def _append_job_logs(job: TrainingJob, logs: list[str]) -> None:
         """Appends new log lines to a job's existing logs list, in place."""
         TrainingJobManagerBase._append_job_logs(job, logs)
 
     @staticmethod
     def _handle_cancelled_status_update(
-        session: Session, job: AdvancedTuningJob, logs: list[str] | None
+        session: Session, job: TrainingJob, logs: list[str] | None
     ) -> bool:
         """Handle a status update for an already-cancelled job: only append logs, never revive it."""
         return TrainingJobManagerBase._handle_cancelled_status_update(session, job, logs)
 
     @staticmethod
     def _apply_status_update_fields(
-        job: AdvancedTuningJob,
+        job: TrainingJob,
         status: JobStatus | None,
         error: str | None,
         logs: list[str] | None,
@@ -197,19 +200,22 @@ class AdvancedTuningManager(TrainingJobManagerBase):
         """Updates tuning job status (Sync). Returns True if job found and updated."""
         return TrainingJobManagerBase._update_status_sync(
             session,
-            AdvancedTuningJob,
+            TrainingJob,
             job_id,
             status,
             error,
             result,
             logs,
             AdvancedTuningManager._apply_status_update_fields,
+            run_mode="tuned",
         )
 
     @staticmethod
     async def get_tuning_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves a tuning job by ID."""
-        stmt = select(AdvancedTuningJob).where(AdvancedTuningJob.id == job_id)
+        stmt = select(TrainingJob).where(
+            TrainingJob.id == job_id, TrainingJob.run_mode == "tuned"
+        )
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -230,8 +236,9 @@ class AdvancedTuningManager(TrainingJobManagerBase):
 
         # 2. Fetch Jobs
         result_tune = await session.execute(
-            select(AdvancedTuningJob)
-            .order_by(AdvancedTuningJob.started_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "tuned")
+            .order_by(TrainingJob.started_at.desc())
             .limit(limit)
             .offset(skip)
         )
@@ -254,10 +261,11 @@ class AdvancedTuningManager(TrainingJobManagerBase):
     @staticmethod
     async def get_latest_tuning_job_for_node(session: AsyncSession, node_id: str) -> JobInfo | None:
         result = await session.execute(
-            select(AdvancedTuningJob)
-            .where(AdvancedTuningJob.node_id == node_id)
-            .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(AdvancedTuningJob.finished_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "tuned")
+            .where(TrainingJob.node_id == node_id)
+            .where(TrainingJob.status == JobStatus.COMPLETED.value)
+            .order_by(TrainingJob.finished_at.desc())
             .limit(1)
         )
         job = result.scalars().first()
@@ -271,10 +279,11 @@ class AdvancedTuningManager(TrainingJobManagerBase):
         session: AsyncSession, model_type: str
     ) -> JobInfo | None:
         result = await session.execute(
-            select(AdvancedTuningJob)
-            .where(AdvancedTuningJob.model_type == model_type)
-            .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(AdvancedTuningJob.finished_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "tuned")
+            .where(TrainingJob.model_type == model_type)
+            .where(TrainingJob.status == JobStatus.COMPLETED.value)
+            .order_by(TrainingJob.finished_at.desc())
             .limit(1)
         )
         job = result.scalars().first()
@@ -290,10 +299,11 @@ class AdvancedTuningManager(TrainingJobManagerBase):
         """Lists recent completed tuning jobs for a model type."""
         effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
         result = await session.execute(
-            select(AdvancedTuningJob)
-            .where(AdvancedTuningJob.model_type == model_type)
-            .where(AdvancedTuningJob.status == JobStatus.COMPLETED.value)
-            .order_by(AdvancedTuningJob.finished_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "tuned")
+            .where(TrainingJob.model_type == model_type)
+            .where(TrainingJob.status == JobStatus.COMPLETED.value)
+            .order_by(TrainingJob.finished_at.desc())
             .limit(effective_limit)
         )
         jobs = result.scalars().all()
