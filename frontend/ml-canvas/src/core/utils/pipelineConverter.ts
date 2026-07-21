@@ -26,15 +26,36 @@ const MODEL_SOURCE_TYPES = new Set([
  * `run_mode` dispatch (Phase 3 Part B, plan §0.6): the generic `TrainingNode`
  * plus the 3 task-scoped supervised nodes (Segmentation is unsupervised and
  * has no `run_mode` — see `SegmentationNode`). All submit the same
- * `basic_training`/`advanced_tuning` backend `step_type`s — the task split
- * is purely a frontend/UX concern (model-list filtering), the backend
- * doesn't need to know which task node produced the job.
+ * canonical `training` backend `step_type` — the task split is purely a
+ * frontend/UX concern (model-list filtering), the backend doesn't need to
+ * know which task node produced the job.
  */
 const RUN_MODE_TRAINING_TYPES = new Set<string>([
   BackendStepType.TRAINING,
   BackendStepType.CLASSIFICATION,
   BackendStepType.REGRESSION,
   BackendStepType.TEXT_CLASSIFICATION,
+]);
+
+// Legacy hidden node `definitionType`s (Phase 7 merge): these predate the
+// `run_mode` field entirely (see `BasicTrainingNode.ts`/`AdvancedTuningNode.ts`
+// `defaultConfig` — neither ever sets `run_mode`), so their fixed/tuned intent
+// must be read off the definitionType itself rather than `node.data.run_mode`.
+const LEGACY_FIXED_TRAINING_TYPES = new Set<string>([
+  'model_training',
+  BackendStepType.BASIC_TRAINING,
+]);
+const LEGACY_TUNED_TRAINING_TYPES = new Set<string>([
+  'hyperparameter_tuning',
+  BackendStepType.ADVANCED_TUNING,
+]);
+
+// All definitionTypes that flow through the single shared fixed/tuned
+// training dispatch below (Phase 7 merge of the legacy + unified branches).
+const ALL_TRAINING_DISPATCH_TYPES = new Set<string>([
+  ...RUN_MODE_TRAINING_TYPES,
+  ...LEGACY_FIXED_TRAINING_TYPES,
+  ...LEGACY_TUNED_TRAINING_TYPES,
 ]);
 
 // Maps a full training-node `model_type` back to the short ensemble base-learner
@@ -395,17 +416,24 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'InvalidValueReplacement') {
           stepType = 'InvalidValueReplacement';
           params = node.data;
-      } else if (node.data.definitionType === 'model_training' || node.data.definitionType === BackendStepType.BASIC_TRAINING) {
-          stepType = BackendStepType.BASIC_TRAINING;
-          params = buildFixedTrainingParams(node.data);
-      } else if (RUN_MODE_TRAINING_TYPES.has(node.data.definitionType as string)) {
-          // Unified TrainingNode and the task-scoped Classification/
-          // Regression/Text Classification nodes (Phase 3 Part B): dispatch
-          // to the same fixed/tuned param-building helpers used by the
-          // legacy standalone nodes, keyed on the node's own `run_mode`
-          // toggle. The task split only affects which models the settings
-          // panel offers — the submitted params/step_type are identical.
-          if (node.data.run_mode === 'advanced') {
+      } else if (ALL_TRAINING_DISPATCH_TYPES.has(node.data.definitionType as string)) {
+          // Unified TrainingNode, the task-scoped Classification/Regression/
+          // Text Classification nodes (Phase 3 Part B), AND the legacy
+          // hidden BasicTrainingNode/AdvancedTuningNode (Phase 7 merge):
+          // all dispatch through the same fixed/tuned param-building
+          // helpers and emit the canonical `training` step_type.
+          //
+          // The legacy nodes never populate `node.data.run_mode` at all
+          // (only the newer unified TrainingNode defaults one) - so the
+          // "advanced" intent must be inferred from the node's
+          // `definitionType` itself for those old node shapes. Do not
+          // simplify this to `node.data.run_mode === 'advanced'` alone;
+          // that would silently reclassify every saved legacy
+          // AdvancedTuningNode as a fixed/basic run.
+          const isAdvanced = node.data.run_mode
+              ? node.data.run_mode === 'advanced'
+              : LEGACY_TUNED_TRAINING_TYPES.has(node.data.definitionType as string);
+          if (isAdvanced) {
               stepType = BackendStepType.TRAINING;
               params = {
                   run_mode: 'tuned',
@@ -548,17 +576,6 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   execution_mode: node.data.execution_mode
               };
           }
-      } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === BackendStepType.ADVANCED_TUNING) {
-          stepType = BackendStepType.ADVANCED_TUNING;
-          params = {
-              target_column: node.data.target_column,
-              algorithm: node.data.model_type,
-              execution_mode: node.data.execution_mode,
-              tuning_config: {
-                  ...buildBaseTuningConfig(node.data),
-                  search_space: node.data.search_space
-              }
-          };
       } else if (node.data.definitionType === 'data_preview') {
           stepType = 'data_preview';
           params = {};
