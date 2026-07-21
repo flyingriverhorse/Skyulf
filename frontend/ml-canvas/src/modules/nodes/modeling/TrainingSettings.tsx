@@ -131,6 +131,21 @@ const TASK_TAG: Record<TrainingTask, string> = {
   text_classification: 'text',
 };
 
+/** Basic mode: a conditional param (e.g. `l1_ratio`) shows only when its fixed dependency value matches. */
+const isBasicParamVisible = (def: HyperparameterDef, hyperparameters: Record<string, unknown>): boolean => {
+  if (!def.depends_on) return true;
+  const { param, value } = def.depends_on;
+  return (hyperparameters[param] ?? def.default) === value;
+};
+
+/** Advanced mode: a conditional param shows only when its dependency's search space includes the required value. */
+const isSearchSpaceParamVisible = (def: HyperparameterDef, searchSpace: Record<string, unknown>): boolean => {
+  if (!def.depends_on) return true;
+  const { param, value } = def.depends_on;
+  const depValues = searchSpace[param];
+  return Array.isArray(depValues) && depValues.includes(value);
+};
+
 export const TrainingSettings: React.FC<{
   config: TrainingConfig;
   onChange: (c: TrainingConfig) => void;
@@ -692,7 +707,7 @@ export const TrainingSettings: React.FC<{
                       <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
                   </div>
               ) : (
-                  hyperparameters.map((param) => (
+                  hyperparameters.filter(param => isBasicParamVisible(param, config.hyperparameters)).map((param) => (
                     <div key={param.name} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                       <div className="flex justify-between items-center mb-2">
                           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -754,7 +769,7 @@ export const TrainingSettings: React.FC<{
             </div>
         ) : (
             <div className="space-y-3">
-                {searchSpaceDefs.map(def => (
+                {searchSpaceDefs.filter(def => isSearchSpaceParamVisible(def, config.search_space)).map(def => (
                     <div key={`${config.model_type}-${def.name}`} className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <SearchSpaceInput
                             def={def}
@@ -769,6 +784,11 @@ export const TrainingSettings: React.FC<{
                                 });
                             }}
                         />
+                        {def.depends_on && (
+                            <p className="mt-1 text-[10px] text-gray-400 italic">
+                                Shown because "{def.depends_on.param}" search space includes "{String(def.depends_on.value)}".
+                            </p>
+                        )}
                     </div>
                 ))}
                 {searchSpaceDefs.length === 0 && (
