@@ -9,7 +9,7 @@ export interface JobInfo {
   node_id: string;
   dataset_id?: string;
   dataset_name?: string;
-  job_type: 'basic_training' | 'advanced_tuning' | 'eda' | 'ingestion';
+  job_type: 'training' | 'tuning' | 'eda' | 'ingestion';
   status: JobStatus;
   start_time: string | null;
   end_time: string | null;
@@ -37,7 +37,7 @@ export interface JobInfo {
 
 export interface RunPipelineRequest extends PipelineConfigModel {
   target_node_id?: string;
-  job_type?: 'basic_training' | 'advanced_tuning' | 'preview';
+  job_type?: 'training' | 'tuning' | 'preview';
 }
 
 // One entry per completed branch in the latest run group of a trainer

@@ -87,7 +87,7 @@ export function getDisplayScore(
   job: { job_type: string; result?: Record<string, unknown> | null; config?: unknown },
   task: ExperimentsTask,
 ): DisplayScore | null {
-  if (job.job_type === 'advanced_tuning') {
+  if (job.job_type === 'tuning') {
     const best = (job.result as { best_score?: unknown } | undefined)?.best_score;
     if (typeof best === 'number' && !Number.isNaN(best)) {
       const scoring = getJobScoringMetric(job) || 'score';
@@ -164,8 +164,8 @@ export function getTaskForModelType(
 
 /**
  * Whether a job actually carries tuning metadata (search strategy/best
- * params from an advanced-tuning run), rather than checking `job_type ===
- * 'advanced_tuning'` directly (plan §0.5: task type and tuning metadata are
+ * params from a tuning run), rather than checking `job_type ===
+ * 'tuning'` directly (plan §0.5: task type and tuning metadata are
  * decoupled concepts from the job's `job_type` string). `search_strategy`
  * is the reliable signal here \u2014 it's a column that only exists on the
  * backend's `TrainingJob` model when `run_mode === "tuned"` (`nullable=False`
@@ -173,5 +173,5 @@ export function getTaskForModelType(
  * for basic training runs, independent of the `job_type` string.
  */
 export function hasTuningMetadata(job: { job_type?: string; search_strategy?: string }): boolean {
-  return job.search_strategy != null || job.job_type === 'advanced_tuning';
+  return job.search_strategy != null || job.job_type === 'tuning';
 }

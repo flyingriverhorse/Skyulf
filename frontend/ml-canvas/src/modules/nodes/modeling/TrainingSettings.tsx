@@ -312,7 +312,7 @@ export const TrainingSettings: React.FC<{
     // unresolvable — this only affects which drawer tab opens, never
     // whether the job itself is submitted.
     const resolvedTask = task ?? getTaskForModelType(config.model_type, availableModels);
-    await runJob(isAdvanced ? 'advanced_tuning' : 'basic_training', resolvedTask === 'other' ? 'classification' : resolvedTask);
+    await runJob(isAdvanced ? 'tuning' : 'training', resolvedTask === 'other' ? 'classification' : resolvedTask);
   };
 
   const ModelConfigSection = (

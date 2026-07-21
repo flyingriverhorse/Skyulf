@@ -169,7 +169,7 @@ export const SegmentationSettings: React.FC<{
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         target_node_id: nodeId,
-        job_type: 'basic_training'
+        job_type: 'training'
       });
       const jobCount = response.job_ids?.length || 1;
       if (jobCount > 1) {

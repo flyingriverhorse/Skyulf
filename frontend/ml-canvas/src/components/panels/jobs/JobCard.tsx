@@ -70,7 +70,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
       </div>
       <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 flex-wrap">
         <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
-        {job.job_type === 'advanced_tuning' && job.search_strategy && (
+        {job.job_type === 'tuning' && job.search_strategy && (
           <span className="text-gray-400 truncate">({job.search_strategy})</span>
         )}
         {isEnsemble && (
@@ -117,7 +117,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
                  {score.split !== 'cv' && <span className="opacity-60"> ({SPLIT_LABEL[score.split]})</span>}
                </span>
              </div>
-          ) : job.job_type === 'advanced_tuning' && !!(job.result as Record<string, unknown>).best_params ? (
+          ) : job.job_type === 'tuning' && !!(job.result as Record<string, unknown>).best_params ? (
              <span className="text-[10px] text-gray-500 dark:text-gray-400">Params found</span>
           ) : <span className="text-gray-400 text-xs">-</span>
       ) : (

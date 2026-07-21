@@ -78,7 +78,7 @@ export const JobListSidebar: React.FC<Props> = ({
                     {shortRunId(job)}
                   </span>
                   <div className="flex items-center gap-2">
-                    {job.status === 'completed' && (job.job_type === 'basic_training' || job.job_type === 'advanced_tuning') && (
+                    {job.status === 'completed' && (job.job_type === 'training' || job.job_type === 'tuning') && (
                       <>
                         <button
                           onClick={(e) => { void handlePromote(e, job); }}
