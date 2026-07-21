@@ -23,6 +23,13 @@ class BaseModelCalculator(ABC):
     def problem_type(self) -> str:
         """Returns 'classification', 'regression', or 'clustering'."""
 
+    #: Config keys that a model's ``prepare_tuning_params`` absorbs into its
+    #: own structural state (e.g. an ensemble's resolved ``estimators``)
+    #: rather than treating as a literal single-item search-space candidate.
+    #: Empty for plain models. See ``_BaseEnsembleCalculator`` in
+    #: ``ensemble.py`` for the non-trivial override.
+    STRUCTURAL_TUNING_KEYS: tuple[str, ...] = ()
+
     @property
     def default_params(self) -> dict[str, Any]:
         """Default hyperparameters for the model."""

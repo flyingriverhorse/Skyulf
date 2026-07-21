@@ -139,6 +139,28 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     IS_STACKING: bool = False
     HAS_VOTING: bool = False  # Only VotingClassifier exposes the ``voting`` param.
 
+    # Config keys absorbed into `_tuning_base_config`/`default_params` by
+    # `prepare_tuning_params` rather than left as literal search-space
+    # candidates. Callers building a single-candidate "fixed run" search
+    # space (see `PipelineEngine._build_fixed_run_params`) must exclude
+    # these from that space — passing e.g. a raw `final_estimator` string
+    # through the grid overrides the resolved estimator instance and
+    # crashes sklearn's parameter validation.
+    STRUCTURAL_TUNING_KEYS: tuple[str, ...] = (
+        "base_estimators",
+        "final_estimator",
+        "voting",
+        "cv",
+        "passthrough",
+        "weights",
+        "n_jobs",
+        "calibrate_base_models",
+        "calibration_method",
+        "calibration_cv",
+        "base_estimator_params",
+        "final_estimator_params",
+    )
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Structural config remembered when tuning so the meta-estimator can be
@@ -189,21 +211,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         """Remember the structural selection so the tuner can build the model."""
         src = config.get("params") if isinstance(config.get("params"), dict) else config
         src = src or {}
-        keep = (
-            "base_estimators",
-            "final_estimator",
-            "voting",
-            "cv",
-            "passthrough",
-            "weights",
-            "n_jobs",
-            "calibrate_base_models",
-            "calibration_method",
-            "calibration_cv",
-            "base_estimator_params",
-            "final_estimator_params",
-        )
-        self._tuning_base_config = {k: src[k] for k in keep if k in src}
+        self._tuning_base_config = {k: src[k] for k in self.STRUCTURAL_TUNING_KEYS if k in src}
 
     def build_tuning_search_space(self, config: dict[str, Any], strategy: str) -> dict[str, Any]:
         """Auto-build the ensemble's tuning space.

@@ -438,11 +438,27 @@ class NodeRunnersMixin:
         defaults instead of the hyperparameters the user actually chose.
         """
         hyperparameters = node.params.get("hyperparameters", {})
+        # Structural models (ensembles) must resolve their base estimators here
+        # too — mirrors the same call in `_prepare_tuning_config` (the tuned
+        # path). Without it, `default_params` never gets a resolved `estimators`
+        # list and `_instantiate_model` crashes building a bare
+        # `VotingClassifier()`/`StackingClassifier()` with no estimators. No-op
+        # for plain (non-ensemble) models — see `BaseModelCalculator.prepare_tuning_params`.
+        calculator.prepare_tuning_params(hyperparameters)
+        # Structural keys (base_estimators, final_estimator, voting, ...) are
+        # already absorbed into `default_params` by the call above — they must
+        # NOT also appear as single-item search-space candidates, or a raw
+        # value (e.g. a `final_estimator` string) would override the resolved
+        # estimator instance and crash sklearn's parameter validation.
+        structural_keys = getattr(calculator, "STRUCTURAL_TUNING_KEYS", ())
+        search_space_hyperparameters = {
+            k: v for k, v in hyperparameters.items() if k not in structural_keys
+        }
         return {
             "strategy": "grid",
             "metric": node.params.get("metric")
             or self._default_metric_for_problem_type(calculator.problem_type),
-            "search_space": {k: [v] for k, v in hyperparameters.items()},
+            "search_space": {k: [v] for k, v in search_space_hyperparameters.items()},
             "n_trials": 1,
             "cv_enabled": node.params.get("cv_enabled", False),
             "cv_folds": node.params.get("cv_folds", 5),
