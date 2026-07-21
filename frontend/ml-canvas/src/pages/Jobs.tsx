@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   Activity, CheckCircle, XCircle, Clock, Search,
-  RefreshCw, Database, BarChart2, Filter, Tags, TrendingUp, FileText, Boxes
+  RefreshCw, Database, BarChart2, Filter, Tags, TrendingUp, FileText, Boxes, Layers
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
 import { registryApi, RegistryItem } from '../core/api/registry';
 import { getTaskForModelType } from '../components/pages/ExperimentsPage/utils/jobMeta';
+import { getEnsembleSubTask } from '../core/utils/format';
 import type { TaskType } from '../core/types/taskType';
 import { LoadingState, EmptyState } from '../components/shared';
 import { formatDuration } from '../core/utils/format';
@@ -19,6 +20,7 @@ const TASK_TABS: { task: TaskType; label: string; icon: React.ReactNode }[] = [
   { task: 'regression', label: 'Regression', icon: <TrendingUp size={16} /> },
   { task: 'text_classification', label: 'Text Classification', icon: <FileText size={16} /> },
   { task: 'segmentation', label: 'Segmentation', icon: <Boxes size={16} /> },
+  { task: 'ensemble', label: 'Ensemble', icon: <Layers size={16} /> },
 ];
 const TASK_TYPES: TaskType[] = TASK_TABS.map(t => t.task);
 
@@ -31,6 +33,7 @@ export const JobsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [ensembleSubFilter, setEnsembleSubFilter] = useState<'all' | 'classification' | 'regression'>('all');
   const LIMIT = 25;  // match drawer PAGE_SIZE so both show the same number of rows per tab
 
   // Backend only filters jobs by job_type (basic_training/advanced_tuning),
@@ -172,6 +175,10 @@ export const JobsPage: React.FC = () => {
   }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== 'ensemble') setEnsembleSubFilter('all');
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!isTaskTab(activeTab) || loading || !poolHasMore) return;
     if (autoLoadAttempts >= MAX_AUTO_LOAD_ATTEMPTS) return;
     const tabCount = pool.filter(j => getTaskForModelType(j.model_type, registryItems) === activeTab).length;
@@ -191,7 +198,9 @@ export const JobsPage: React.FC = () => {
   };
 
   const visibleJobs = isTaskTab(activeTab)
-    ? pool.filter(job => getTaskForModelType(job.model_type, registryItems) === activeTab)
+    ? pool
+        .filter(job => getTaskForModelType(job.model_type, registryItems) === activeTab)
+        .filter(job => activeTab !== 'ensemble' || ensembleSubFilter === 'all' || getEnsembleSubTask(job.model_type) === ensembleSubFilter)
     : jobs;
   const visibleHasMore = isTaskTab(activeTab) ? poolHasMore : hasMore;
 
@@ -271,6 +280,24 @@ export const JobsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {activeTab === 'ensemble' && (
+        <div className="flex items-center gap-1.5 px-4 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+          {(['all', 'classification', 'regression'] as const).map((value) => (
+            <button
+              key={value}
+              onClick={() => setEnsembleSubFilter(value)}
+              className={`px-2.5 py-1 text-xs rounded-full border transition-colors capitalize ${
+                ensembleSubFilter === value
+                  ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300'
+                  : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+      )}
 
       {showFilters && (
         <div className="flex items-center gap-4 px-4 py-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
