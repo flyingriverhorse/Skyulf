@@ -23,6 +23,12 @@ class HyperparameterField:
         None  # Only relevant/shown when another param equals a given value,
         # e.g. {"param": "penalty", "value": "elasticnet"} for `l1_ratio`.
     )
+    exclusive_options: list[Any] | None = (
+        None  # For multi-select search-space tuning: values here can't be
+        # combined with any other option in the same search space (e.g.
+        # `penalty="elasticnet"` mixed with "l1"/"l2" produces invalid
+        # per-trial combos elsewhere, so selecting one deselects the rest).
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

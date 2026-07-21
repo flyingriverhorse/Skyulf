@@ -55,6 +55,11 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
     const handleBlur = () => {
         try {
             const parsed = validateAndParse(localValue);
+            const exclusive = def.exclusive_options ?? [];
+            const pickedExclusive = parsed.filter(v => exclusive.includes(v));
+            if (pickedExclusive.length > 0 && parsed.length > pickedExclusive.length) {
+                throw new Error(`"${String(pickedExclusive[0])}" can't be combined with other options here — use it alone.`);
+            }
             setError(null);
             // Avoid identity-only re-renders that could loop upstream effects
             if (JSON.stringify(parsed) !== JSON.stringify(value)) {
@@ -99,9 +104,17 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
                                 onClick={() => {
                                     const current = validateAndParse(localValue);
                                     const exists = current.includes(opt.value);
-                                    const newValue = exists
-                                        ? current.filter(v => v !== opt.value)
-                                        : [...current, opt.value];
+                                    const exclusive = def.exclusive_options ?? [];
+                                    let newValue: unknown[];
+                                    if (exists) {
+                                        newValue = current.filter(v => v !== opt.value);
+                                    } else if (exclusive.includes(opt.value)) {
+                                        // Selecting an exclusive option (e.g. "elasticnet") drops everything else.
+                                        newValue = [opt.value];
+                                    } else {
+                                        // Selecting a non-exclusive option drops any exclusive one already picked.
+                                        newValue = [...current.filter(v => !exclusive.includes(v)), opt.value];
+                                    }
                                     onChange(newValue);
                                 }}
                                 className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
@@ -114,6 +127,14 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
                             </button>
                         ))}
                     </div>
+                )}
+                {def.exclusive_options && def.exclusive_options.length > 0 && (
+                    <p className="mt-1 text-[10px] text-gray-400 italic">
+                        {def.options
+                            ?.filter(o => def.exclusive_options?.includes(o.value))
+                            .map(o => `"${o.label}"`)
+                            .join(', ')} can't be combined with other options here — selecting it clears the rest.
+                    </p>
                 )}
             </div>
             {error && (

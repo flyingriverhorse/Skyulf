@@ -94,13 +94,17 @@ def get_hyperparameters(model_key: str) -> list[dict[str, Any]]:
 DEFAULT_SEARCH_SPACES: dict[str, Any] = {
     "logistic_regression": {
         "C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
-        "penalty": ["l1", "l2", "elasticnet"],
+        # No "elasticnet" here by default — it's mutually exclusive with
+        # "l1"/"l2" (see `exclusive_options` on the penalty field) and only
+        # makes sense paired with an explicit l1_ratio range, which isn't a
+        # sane zero-config default. Users can still pick it manually.
+        "penalty": ["l1", "l2"],
         "solver": ["saga"],
         "max_iter": [100, 200, 500, 1000],
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge", "modified_huber"],
-        "penalty": ["l1", "l2", "elasticnet"],
+        "penalty": ["l1", "l2"],
         "alpha": [1e-5, 1e-4, 1e-3, 1e-2],
         "max_iter": [500, 1000, 2000],
     },
@@ -309,7 +313,9 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge"],
-        "penalty": ["l2", "elasticnet"],
+        # No "elasticnet" here — mutually exclusive with "l2" (see
+        # `exclusive_options`); a grid trial pairing them makes no sense.
+        "penalty": ["l2"],
         "alpha": [1e-4, 1e-3],
         "max_iter": [1000],
     },

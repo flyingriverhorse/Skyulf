@@ -25,6 +25,7 @@ LOGISTIC_REGRESSION_PARAMS = [
             {"label": "None", "value": None},
         ],
         description="Norm used in the penalization.",
+        exclusive_options=["elasticnet"],
     ),
     HyperparameterField(
         name="solver",
@@ -200,6 +201,7 @@ SGD_CLASSIFIER_PARAMS = [
             {"label": "ElasticNet", "value": "elasticnet"},
         ],
         description="The regularization term to use.",
+        exclusive_options=["elasticnet"],
     ),
     HyperparameterField(
         name="alpha",
