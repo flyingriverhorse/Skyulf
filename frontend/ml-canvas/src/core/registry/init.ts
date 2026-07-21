@@ -4,9 +4,6 @@ import { DatasetNode } from '../../modules/nodes/data/DatasetNode';
 import { DropColumnsNode } from '../../modules/nodes/processing/DropColumnsNode';
 import { ImputationNode } from '../../modules/nodes/processing/ImputationNode';
 import { ScalingNode } from '../../modules/nodes/processing/ScalingNode';
-import { BasicTrainingNode } from '../../modules/nodes/modeling/BasicTrainingNode';
-import { AdvancedTuningNode } from '../../modules/nodes/modeling/AdvancedTuningNode';
-import { TrainingNode } from '../../modules/nodes/modeling/TrainingNode';
 import { ClassificationNode } from '../../modules/nodes/modeling/ClassificationNode';
 import { RegressionNode } from '../../modules/nodes/modeling/RegressionNode';
 import { TextClassificationNode } from '../../modules/nodes/modeling/TextClassificationNode';
@@ -70,19 +67,6 @@ export const initializeRegistry = () => {
   registry.register(DeduplicationNode);
   registry.register(CastTypeNode);
   registry.register(MissingIndicatorNode);
-  // Legacy Basic Training / Advanced Tuning node types are kept registered
-  // (unchanged, `hidden: true`) so canvases saved before Phase 3's unified
-  // `TrainingNode` still load and render correctly — see the unification
-  // plan doc. The generic `TrainingNode` itself is also now `hidden: true`
-  // (Phase 3 Part B, plan §0.6): it stays registered so canvases saved
-  // during Part A keep loading/executing, but new canvases should use one
-  // of the 4 task-scoped nodes below (Classification / Regression / Text
-  // Classification / Segmentation) for better discoverability — the
-  // task-type split is the intended end state, the generic node was a
-  // stepping stone.
-  registry.register({ ...BasicTrainingNode, hidden: true });
-  registry.register({ ...AdvancedTuningNode, hidden: true });
-  registry.register({ ...TrainingNode, hidden: true });
   registry.register(ClassificationNode);
   registry.register(RegressionNode);
   registry.register(TextClassificationNode);
