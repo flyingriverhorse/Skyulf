@@ -140,6 +140,7 @@ def _pick_target_node_id(node_list: list[NodeConfig]) -> str | None:
         in [
             StepType.BASIC_TRAINING,
             StepType.ADVANCED_TUNING,
+            StepType.TRAINING,
         ]
         and target.inputs
     ):
@@ -424,7 +425,7 @@ def _partition_preview_pipeline(
         partition_parallel_pipeline,
     )
 
-    training_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}
+    training_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING}
     has_training = any(n.step_type in training_types for n in nodes)
 
     if not has_training:
@@ -445,7 +446,7 @@ def _branch_terminal_group_key(leaf: Any) -> tuple[str, str]:
     (e.g. data_preview) group by step_type. Returns empty strings when the
     leaf shouldn't participate in dup-suffix grouping.
     """
-    if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+    if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING}:
         # Training terminal: group by model_type.
         mt = str(leaf.params.get("model_type") or leaf.params.get("algorithm") or "")
     else:

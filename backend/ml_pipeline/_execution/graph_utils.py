@@ -551,6 +551,7 @@ def extract_job_details(
             "feature_target_split",
             StepType.BASIC_TRAINING,
             StepType.ADVANCED_TUNING,
+            StepType.TRAINING,
             "hyperparameter_tuning",
         ] and params.get("target_column"):
             target_column = params.get("target_column")

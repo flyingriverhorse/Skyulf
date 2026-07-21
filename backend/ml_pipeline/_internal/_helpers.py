@@ -39,10 +39,14 @@ def _resolve_branch_context(sub_config: PipelineConfig) -> tuple[str, str, str]:
     leaf_display = ""
     if sub_config.nodes:
         leaf = sub_config.nodes[-1]
-        if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+        if leaf.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING}:
             # Only scan for model_type when the terminal IS a training/tuning node.
             for n in sub_config.nodes:
-                if n.step_type in {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING}:
+                if n.step_type in {
+                    StepType.BASIC_TRAINING,
+                    StepType.ADVANCED_TUNING,
+                    StepType.TRAINING,
+                }:
                     model_type = n.params.get("model_type") or n.params.get("algorithm") or ""
         else:
             leaf_step = str(leaf.step_type)
