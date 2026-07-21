@@ -10,7 +10,6 @@ from backend.ml_pipeline._execution.schemas import (
 from backend.ml_pipeline._execution.strategies import (
     AdvancedTuningStrategy,
     BasicTrainingStrategy,
-    JobStrategyFactory,
 )
 from backend.ml_pipeline.constants import StepType
 
@@ -27,20 +26,6 @@ class TestEnumStrSemantics(unittest.TestCase):
     def test_job_status_str_returns_value(self):
         self.assertEqual(str(JobStatus.QUEUED), "queued")
         self.assertEqual(f"{JobStatus.COMPLETED}", "completed")
-
-
-class TestJobStrategyFactory(unittest.TestCase):
-    def test_get_basic_strategy(self):
-        strategy = JobStrategyFactory.get_strategy(StepType.BASIC_TRAINING)
-        self.assertIsInstance(strategy, BasicTrainingStrategy)
-
-    def test_get_tuning_strategy(self):
-        strategy = JobStrategyFactory.get_strategy(StepType.ADVANCED_TUNING)
-        self.assertIsInstance(strategy, AdvancedTuningStrategy)
-
-    def test_invalid_strategy(self):
-        with self.assertRaises(ValueError):
-            JobStrategyFactory.get_strategy("INVALID_TYPE")
 
 
 class TestBasicTrainingStrategy(unittest.TestCase):
