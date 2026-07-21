@@ -102,7 +102,7 @@ export function useRunControls(): RunControls {
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
-        job_type: 'basic_training',
+        job_type: 'training',
       });
       const count = response.job_ids?.length || 1;
       if (response.job_ids?.length > 1) {

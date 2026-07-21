@@ -425,7 +425,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                     )}
                                 </div>
 
-                                {job.job_type === 'basic_training' && !!(job.result as Record<string, unknown>).metrics && (
+                                {job.job_type === 'training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                             {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
@@ -446,7 +446,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                     </div>
                                 )}
 
-                                {job.job_type === 'advanced_tuning' && (
+                                {job.job_type === 'tuning' && (
                                     <div className="space-y-4">
                                         {/* Tuning Configuration */}
                                         {job.graph && (
