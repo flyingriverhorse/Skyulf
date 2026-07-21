@@ -18,7 +18,6 @@ from backend.ml_pipeline._execution.utils import (
     parse_branch_info,
     resolve_dataset_name,
 )
-from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
@@ -95,7 +94,7 @@ class BasicTrainingManager(TrainingJobManagerBase):
             node_id=job.node_id,
             dataset_id=t_cast(str | None, job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type=StepType.BASIC_TRAINING.value,
+            job_type="training",
             status=JobStatus(job.status),
             start_time=job.started_at,
             end_time=job.finished_at,

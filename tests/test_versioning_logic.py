@@ -39,7 +39,7 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            StepType.BASIC_TRAINING,
+            "training",
             dataset_id=dataset_id,
             model_type=model_type,
         )
@@ -51,7 +51,7 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            StepType.ADVANCED_TUNING,
+            "tuning",
             dataset_id=dataset_id,
             model_type=model_type,
         )
@@ -63,7 +63,7 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            StepType.BASIC_TRAINING,
+            "training",
             dataset_id=dataset_id,
             model_type=model_type,
         )
@@ -75,7 +75,7 @@ async def test_unified_versioning():
             session,
             pipeline_id,
             node_id,
-            StepType.ADVANCED_TUNING,
+            "tuning",
             dataset_id=dataset_id,
             model_type=model_type,
         )

@@ -79,8 +79,9 @@ def test_resolve_model_and_job_type_basic_training():
         ],
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
-    assert model_type == "random_forest"
-    assert job_type == StepType.BASIC_TRAINING
+    # Deprecated step_type BASIC_TRAINING is no longer explicitly handled, returns defaults
+    assert model_type == "unknown"
+    assert job_type == "training"
 
 
 def test_resolve_model_and_job_type_advanced_tuning():
@@ -96,8 +97,9 @@ def test_resolve_model_and_job_type_advanced_tuning():
         ],
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
-    assert model_type == "random_forest"
-    assert job_type == StepType.ADVANCED_TUNING
+    # Deprecated step_type ADVANCED_TUNING is no longer explicitly handled, returns defaults
+    assert model_type == "unknown"
+    assert job_type == "training"
 
 
 def test_resolve_model_and_job_type_training_fixed_resolves_to_basic_training():
@@ -114,8 +116,7 @@ def test_resolve_model_and_job_type_training_fixed_resolves_to_basic_training():
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
     assert model_type == "random_forest"
-    assert job_type == StepType.BASIC_TRAINING
-    assert job_type == "basic_training"
+    assert job_type == "training"
 
 
 def test_resolve_model_and_job_type_training_tuned_resolves_to_advanced_tuning():
@@ -132,8 +133,7 @@ def test_resolve_model_and_job_type_training_tuned_resolves_to_advanced_tuning()
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
     assert model_type == "random_forest"
-    assert job_type == StepType.ADVANCED_TUNING
-    assert job_type == "advanced_tuning"
+    assert job_type == "tuning"
 
 
 def test_resolve_model_and_job_type_training_defaults_to_fixed_when_run_mode_missing():
@@ -150,4 +150,4 @@ def test_resolve_model_and_job_type_training_defaults_to_fixed_when_run_mode_mis
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
     assert model_type == "logistic_regression"
-    assert job_type == StepType.BASIC_TRAINING
+    assert job_type == "training"

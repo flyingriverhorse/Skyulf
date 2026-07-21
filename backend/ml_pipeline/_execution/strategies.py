@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from backend.database.models import MLJob, TrainingJob
 from backend.ml_pipeline._execution.schemas import PipelineExecutionResult
 from backend.ml_pipeline._execution.summary import build_summary
-from backend.ml_pipeline.constants import StepType
 
 
 class JobStrategy(ABC):
@@ -165,8 +164,8 @@ class AdvancedTuningStrategy(JobStrategy):
 
 class JobStrategyFactory:
     _strategies: dict[str, JobStrategy] = {
-        StepType.BASIC_TRAINING: BasicTrainingStrategy(),
-        StepType.ADVANCED_TUNING: AdvancedTuningStrategy(),
+        "training": BasicTrainingStrategy(),
+        "tuning": AdvancedTuningStrategy(),
         # Add more strategies here as needed
     }
 
@@ -174,9 +173,9 @@ class JobStrategyFactory:
     def get_strategy_by_job(cls, job: MLJob) -> JobStrategy:
         run_mode = getattr(job, "run_mode", None)
         if run_mode == "fixed":
-            return cls._strategies[StepType.BASIC_TRAINING]
+            return cls._strategies["training"]
         elif run_mode == "tuned":
-            return cls._strategies[StepType.ADVANCED_TUNING]
+            return cls._strategies["tuning"]
         else:
             raise ValueError(f"Unknown job run_mode: {run_mode!r} (job type: {type(job)})")
 
