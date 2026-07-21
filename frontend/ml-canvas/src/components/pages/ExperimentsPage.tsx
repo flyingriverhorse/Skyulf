@@ -40,7 +40,7 @@ export const ExperimentsPage: React.FC = () => {
   const jobsRef = useRef(jobs);
   jobsRef.current = jobs;
   const [selectedJobIds, setSelectedJobIds] = useState<string[]>([]);
-  const [filterType, setFilterType] = useState<'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation' | 'ensemble'>('all');
   const [datasets, setDatasets] = useState<{id: string, name: string}[]>([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>('all');
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
