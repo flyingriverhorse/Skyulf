@@ -84,8 +84,8 @@ async def test_deployment_flow(async_session, tmp_path):
     await async_session.execute(
         text(
             """
-        INSERT INTO basic_training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
-        VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, run_mode, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
+        VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :run_mode, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         ),
         {
@@ -95,6 +95,7 @@ async def test_deployment_flow(async_session, tmp_path):
             "ds_id": "ds1",
             "user_id": None,
             "status": "completed",
+            "run_mode": "fixed",
             "version": 1,
             "model_type": "linear_regression",
             "graph": "{}",
@@ -144,8 +145,8 @@ async def test_deployment_predict_decodes_label_encoded_target(async_session, tm
     await async_session.execute(
         text(
             """
-        INSERT INTO basic_training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
-        VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        INSERT INTO training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, run_mode, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
+        VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :run_mode, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """
         ),
         {
@@ -155,6 +156,7 @@ async def test_deployment_predict_decodes_label_encoded_target(async_session, tm
             "ds_id": "ds1",
             "user_id": None,
             "status": "completed",
+            "run_mode": "fixed",
             "version": 1,
             "model_type": "dummy_classifier",
             "graph": "{}",
