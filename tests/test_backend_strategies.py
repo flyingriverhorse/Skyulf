@@ -20,8 +20,8 @@ class TestEnumStrSemantics(unittest.TestCase):
     `(str, Enum)`)."""
 
     def test_step_type_str_returns_value(self):
-        self.assertEqual(str(StepType.BASIC_TRAINING), "basic_training")
-        self.assertEqual(f"{StepType.ADVANCED_TUNING}", "advanced_tuning")
+        self.assertEqual(str(StepType.TRAINING), "training")
+        self.assertEqual(f"{StepType.DATA_LOADER}", "data_loader")
 
     def test_job_status_str_returns_value(self):
         self.assertEqual(str(JobStatus.QUEUED), "queued")

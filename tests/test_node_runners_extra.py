@@ -139,7 +139,7 @@ def test_safe_record_data_shape_metrics_swallows_exceptions():
 def test_get_training_input_rejects_model_artifact():
     """A model-like artifact (has .predict/.fit) upstream raises a clear ValueError."""
     harness = _Harness()
-    node = NodeConfig(node_id="n1", step_type=StepType.BASIC_TRAINING, params={})
+    node = NodeConfig(node_id="n1", step_type=StepType.TRAINING, params={})
 
     class FakeModel:
         def predict(self):
@@ -153,7 +153,7 @@ def test_get_training_input_rejects_model_artifact():
 def test_get_training_input_passes_through_dataframe():
     """A plain DataFrame upstream input passes through untouched."""
     harness = _Harness()
-    node = NodeConfig(node_id="n1", step_type=StepType.BASIC_TRAINING, params={})
+    node = NodeConfig(node_id="n1", step_type=StepType.TRAINING, params={})
     df = pd.DataFrame({"a": [1, 2]})
     harness._get_input = MagicMock(return_value=df)
     result = harness._get_training_input(node, "target")
@@ -352,7 +352,7 @@ def test_basic_training_missing_algorithm_raises(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={"target_column": "target"},
             ),
@@ -377,9 +377,10 @@ def test_advanced_tuning_missing_algorithm_raises(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "tuning_config": {"strategy": "grid", "metric": "accuracy", "cv_folds": 2},
                 },
@@ -404,7 +405,7 @@ def test_basic_training_unknown_algorithm_raises(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={"target_column": "target", "algorithm": "not_a_real_algorithm"},
             ),
@@ -428,7 +429,7 @@ def test_basic_training_with_cross_validation(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
                     "target_column": "target",
@@ -462,9 +463,10 @@ def test_advanced_tuning_with_cross_validation_nested(pipeline_data_csv, tmp_pat
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "algorithm": "logistic_regression",
                     "tuning_config": {
@@ -506,7 +508,7 @@ def test_splitter_transformer_saves_reference_data(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_split"],
                 params={
                     "target_column": "target",
@@ -534,9 +536,10 @@ def test_advanced_tuning_ensemble_auto_builds_search_space(pipeline_data_csv, tm
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "algorithm": "voting_classifier",
                     "tuning_config": {
@@ -576,9 +579,10 @@ def test_advanced_tuning_evaluate_failure_is_logged_not_raised(
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "algorithm": "logistic_regression",
                     "tuning_config": {
@@ -619,9 +623,10 @@ def test_run_tuned_cv_exception_is_caught(pipeline_data_csv, tmp_path, monkeypat
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "algorithm": "logistic_regression",
                     "tuning_config": {
@@ -790,7 +795,7 @@ def test_basic_training_kmeans_without_target_column_succeeds(pipeline_data_csv,
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
                     "algorithm": "kmeans",
@@ -830,9 +835,10 @@ def test_advanced_tuning_clustering_algorithm_silently_runs_fixed_mode(pipeline_
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "algorithm": "kmeans",
                     "tuning_config": {"strategy": "grid", "metric": "accuracy", "cv_folds": 2},
@@ -873,7 +879,7 @@ def test_kmeans_drops_text_columns_and_bundles_feature_columns(tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
                     "algorithm": "kmeans",
@@ -937,7 +943,7 @@ def test_kmeans_reference_column_excluded_and_crosstab_bundled(tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
                     "algorithm": "kmeans",
@@ -1003,7 +1009,7 @@ def test_additional_clustering_algorithms_train_and_bundle(tmp_path, algorithm):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_data"],
                 params={
                     "algorithm": algorithm,

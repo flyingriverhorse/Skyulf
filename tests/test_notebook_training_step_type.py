@@ -68,26 +68,18 @@ class TestSplitOrModelRecognizesTraining:
 
 
 class TestIsTuningModel:
-    """Finding 2c: `_is_tuning_model` helper used by both call sites."""
-
-    def test_legacy_advanced_tuning_is_tuning(self):
-        model = _NodeIn(node_id="m", step_type="advanced_tuning", params={}, inputs=[])
-        assert _is_tuning_model(model) is True
-
-    def test_legacy_basic_training_is_not_tuning(self):
-        model = _NodeIn(node_id="m", step_type="basic_training", params={}, inputs=[])
-        assert _is_tuning_model(model) is False
+    """_is_tuning_model dispatches on run_mode param for `training` nodes."""
 
     def test_training_run_mode_tuned_is_tuning(self):
-        model = _NodeIn(
-            node_id="m", step_type="training", params={"run_mode": "tuned"}, inputs=[]
-        )
+        model = _NodeIn(node_id="m", step_type="training", params={"run_mode": "tuned"}, inputs=[])
         assert _is_tuning_model(model) is True
 
     def test_training_run_mode_fixed_is_not_tuning(self):
-        model = _NodeIn(
-            node_id="m", step_type="training", params={"run_mode": "fixed"}, inputs=[]
-        )
+        model = _NodeIn(node_id="m", step_type="training", params={"run_mode": "fixed"}, inputs=[])
+        assert _is_tuning_model(model) is False
+
+    def test_training_no_run_mode_is_not_tuning(self):
+        model = _NodeIn(node_id="m", step_type="training", params={}, inputs=[])
         assert _is_tuning_model(model) is False
 
 

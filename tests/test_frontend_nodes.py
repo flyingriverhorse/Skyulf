@@ -188,7 +188,7 @@ async def test_models(sample_data, tmp_path):
                 },
                 {
                     "node_id": "model",
-                    "step_type": "basic_training",
+                    "step_type": "training",
                     "params": {"algorithm": node_id, "target_column": "target"},
                     "inputs": ["splitter"],
                 },

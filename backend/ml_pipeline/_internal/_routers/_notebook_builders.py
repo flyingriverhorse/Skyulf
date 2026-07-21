@@ -159,10 +159,7 @@ def _model_label(model: _NodeIn | None) -> str:
 
 
 def _is_tuning_model(model: _NodeIn) -> bool:
-    """True for a legacy `advanced_tuning` node, or a unified `training`
-    node whose `run_mode` param is `"tuned"`."""
-    if model.step_type == "advanced_tuning":
-        return True
+    """True for a `training` node whose `run_mode` param is `"tuned"`."""
     return model.step_type == "training" and model.params.get("run_mode") == "tuned"
 
 

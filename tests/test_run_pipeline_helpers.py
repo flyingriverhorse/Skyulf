@@ -22,7 +22,7 @@ def test_resolve_branch_target_node_id_basic_training_terminal():
         nodes=[
             NodeConfig(node_id="n1", step_type=StepType.DATA_LOADER, params={}, inputs=[]),
             NodeConfig(
-                node_id="n2", step_type=StepType.BASIC_TRAINING, params={}, inputs=["n1"]
+                node_id="n2", step_type=StepType.TRAINING, params={}, inputs=["n1"]
             ),
         ],
     )
@@ -72,15 +72,14 @@ def test_resolve_model_and_job_type_basic_training():
         nodes=[
             NodeConfig(
                 node_id="n2",
-                step_type=StepType.BASIC_TRAINING,
-                params={"model_type": "random_forest"},
+                step_type=StepType.TRAINING,
+                params={"run_mode": "fixed", "model_type": "random_forest"},
                 inputs=["n1"],
             ),
         ],
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
-    # Deprecated step_type BASIC_TRAINING is no longer explicitly handled, returns defaults
-    assert model_type == "unknown"
+    assert model_type == "random_forest"
     assert job_type == "training"
 
 
@@ -90,16 +89,15 @@ def test_resolve_model_and_job_type_advanced_tuning():
         nodes=[
             NodeConfig(
                 node_id="n2",
-                step_type=StepType.ADVANCED_TUNING,
-                params={"algorithm": "random_forest"},
+                step_type=StepType.TRAINING,
+                params={"run_mode": "tuned", "algorithm": "random_forest"},
                 inputs=["n1"],
             ),
         ],
     )
     model_type, job_type = run_pipeline_mod._resolve_model_and_job_type(sub, "n2", None)
-    # Deprecated step_type ADVANCED_TUNING is no longer explicitly handled, returns defaults
-    assert model_type == "unknown"
-    assert job_type == "training"
+    assert model_type == "random_forest"
+    assert job_type == "tuning"
 
 
 def test_resolve_model_and_job_type_training_fixed_resolves_to_basic_training():

@@ -200,20 +200,20 @@ def test_transformer_without_input_shape_falls_back_to_shape_line() -> None:
 
 def test_training_summary_prefers_acc_plus_f1() -> None:
     metrics = {"metrics": {"accuracy": 0.873, "f1": 0.842, "precision": 0.91}}
-    out = build_summary(step_type="basic_training", output=None, metrics=metrics)
+    out = build_summary(step_type="training", output=None, metrics=metrics)
     assert out == "acc 0.87 · f1 0.84"
 
 
 def test_training_summary_falls_back_to_accuracy_only() -> None:
     out = build_summary(
-        step_type="basic_training", output=None, metrics={"metrics": {"accuracy": 0.9}}
+        step_type="training", output=None, metrics={"metrics": {"accuracy": 0.9}}
     )
     assert out == "acc 0.90"
 
 
 def test_training_summary_regression_path() -> None:
     out = build_summary(
-        step_type="basic_training",
+        step_type="training",
         output=None,
         metrics={"metrics": {"r2": 0.87, "rmse": 0.123}},
     )
@@ -238,7 +238,7 @@ def test_training_summary_handles_test_prefixed_classification_metrics() -> None
     here diverge by 0.12 so the overfit-gap badge also appears.
     """
     out = build_summary(
-        step_type="basic_training",
+        step_type="training",
         output=None,
         metrics={
             "train_accuracy": 0.99,
@@ -253,7 +253,7 @@ def test_training_summary_handles_test_prefixed_classification_metrics() -> None
 def test_training_summary_handles_multiclass_f1_weighted() -> None:
     """Multiclass evaluation surfaces ``test_f1_weighted`` rather than ``test_f1``."""
     out = build_summary(
-        step_type="basic_training",
+        step_type="training",
         output=None,
         metrics={"test_accuracy": 0.85, "test_f1_weighted": 0.83},
     )
@@ -279,7 +279,7 @@ def test_training_summary_handles_test_prefixed_regression_metrics() -> None:
 
 def test_training_summary_falls_back_to_auc_when_no_acc_or_f1() -> None:
     out = build_summary(
-        step_type="basic_training",
+        step_type="training",
         output=None,
         metrics={"test_roc_auc": 0.93},
     )
@@ -310,7 +310,7 @@ def test_build_summary_swallows_exceptions() -> None:
 def test_training_summary_appends_overfit_gap_when_train_diverges() -> None:
     """When ``train_*`` and ``test_*`` differ by ≥ 0.05, append ▲gap."""
     out = build_summary(
-        step_type="basic_training",
+        step_type="training",
         output=None,
         metrics={
             "train_accuracy": 0.99,
@@ -325,7 +325,7 @@ def test_training_summary_appends_overfit_gap_when_train_diverges() -> None:
 def test_training_summary_omits_gap_when_train_test_close() -> None:
     """A small gap (< 0.05) is not interesting; keep the card clean."""
     out = build_summary(
-        step_type="basic_training",
+        step_type="training",
         output=None,
         metrics={
             "train_accuracy": 0.88,
@@ -358,7 +358,7 @@ def test_advanced_tuning_leads_with_best_score_and_scoring_metric() -> None:
     rounded test-set numbers often don't on small holdouts).
     """
     out = build_summary(
-        step_type="advanced_tuning",
+        step_type="training",
         output=None,
         metrics={
             "best_score": 0.9324,
@@ -367,19 +367,21 @@ def test_advanced_tuning_leads_with_best_score_and_scoring_metric() -> None:
             "test_accuracy": 0.9667,
             "test_f1_weighted": 0.9666,
         },
+        params={"run_mode": "tuned"},
     )
     assert out == "f1w 0.932 · 10 trials"
 
 
 def test_advanced_tuning_uses_best_score_when_no_test_metrics() -> None:
     out = build_summary(
-        step_type="advanced_tuning",
+        step_type="training",
         output=None,
         metrics={
             "best_score": 0.913,
             "scoring_metric": "f1",
             "trials": [{}, {}, {}, {}, {}],
         },
+        params={"run_mode": "tuned"},
     )
     assert out == "f1 0.913 · 5 trials"
 
@@ -387,9 +389,10 @@ def test_advanced_tuning_uses_best_score_when_no_test_metrics() -> None:
 def test_advanced_tuning_int_trials_is_accepted() -> None:
     """Some tuners report ``trials`` as a count rather than a list."""
     out = build_summary(
-        step_type="advanced_tuning",
+        step_type="training",
         output=None,
         metrics={"best_score": 0.5, "scoring_metric": "r2", "trials": 12},
+        params={"run_mode": "tuned"},
     )
     assert out == "r² 0.500 · 12 trials"
 
@@ -398,28 +401,30 @@ def test_advanced_tuning_neg_loss_is_sign_flipped() -> None:
     """sklearn losses come in as ``neg_*`` (higher-is-better). Show the
     natural magnitude on the card so the user can reason about it."""
     out = build_summary(
-        step_type="advanced_tuning",
+        step_type="training",
         output=None,
         metrics={
             "best_score": -12.34,
             "scoring_metric": "neg_mean_squared_error",
             "trials": 20,
         },
+        params={"run_mode": "tuned"},
     )
     assert out == "mse 12.340 · 20 trials"
 
 
 def test_advanced_tuning_legacy_eval_only_falls_back_to_test_metrics() -> None:
-    """Old job rows without ``best_score`` (pre-tuning-summary refactor)
-    still render via the eval headline."""
+    """`training` node with `run_mode=tuned` and no ``best_score`` falls back
+    to the eval headline (mirrors legacy job rows pre-tuning-summary refactor)."""
     out = build_summary(
-        step_type="advanced_tuning",
+        step_type="training",
         output=None,
         metrics={
             "trials": [{}] * 40,
             "test_accuracy": 0.873,
             "test_f1": 0.842,
         },
+        params={"run_mode": "tuned"},
     )
     assert out == "acc 0.87 · f1 0.84 · 40 trials"
 

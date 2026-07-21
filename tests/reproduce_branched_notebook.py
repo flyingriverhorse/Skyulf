@@ -17,8 +17,8 @@ nodes = [
     ),
     _NodeIn(
         node_id="train_xgb",
-        step_type="basic_training",
-        params={"algorithm": "xgboost_classifier"},
+        step_type="training",
+        params={"algorithm": "xgboost_classifier", "run_mode": "fixed"},
         inputs=["tts1"],
     ),
     _NodeIn(
@@ -32,8 +32,8 @@ nodes = [
     ),
     _NodeIn(
         node_id="train_rf",
-        step_type="advanced_tuning",
-        params={"algorithm": "random_forest_classifier"},
+        step_type="training",
+        params={"algorithm": "random_forest_classifier", "run_mode": "tuned"},
         inputs=["tts2"],
     ),
 ]

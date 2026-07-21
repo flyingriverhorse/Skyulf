@@ -634,6 +634,8 @@ def _render_tune(ctx: SummaryContext) -> str | None:
 
 
 def _render_train(ctx: SummaryContext) -> str | None:
+    if ctx.params.get("run_mode") == "tuned":
+        return _tuning_summary(ctx.metrics)
     return _training_summary(ctx.metrics)
 
 

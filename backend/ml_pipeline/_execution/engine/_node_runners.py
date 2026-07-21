@@ -403,18 +403,9 @@ class NodeRunnersMixin:
 
     def _resolve_run_mode(self, node: NodeConfig) -> str:
         """Derive ``'fixed'`` (plain, single hyperparameter set) vs ``'tuned'``
-        (hyperparameter search) for this node.
-
-        New pipelines set an explicit ``run_mode`` param on a
-        ``StepType.TRAINING`` node. Old saved pipelines / job rows still carry
-        the legacy ``basic_training``/``advanced_tuning`` step types —
-        normalize those to the equivalent ``run_mode`` here so they keep
-        executing unchanged (Phase 2b backward-compat shim).
+        (hyperparameter search) for this ``StepType.TRAINING`` node, from its
+        ``run_mode`` param.
         """
-        if node.step_type == StepType.BASIC_TRAINING:
-            return "fixed"
-        if node.step_type == StepType.ADVANCED_TUNING:
-            return "tuned"
         return node.params.get("run_mode", "fixed")
 
     def _default_metric_for_problem_type(self, problem_type: str) -> str:
