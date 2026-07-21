@@ -204,6 +204,26 @@ export const ENSEMBLE_MODEL_TYPES = new Set([
 export const isEnsembleModelType = (modelType?: string | null): boolean =>
   !!modelType && ENSEMBLE_MODEL_TYPES.has(modelType);
 
+/**
+ * Which underlying task ('classification'/'regression') an ensemble model
+ * type covers, derived from its name (there are only 4 known ensemble
+ * model types — voting/stacking classifier/regressor — so no registry
+ * lookup is needed). Returns undefined for non-ensemble model types.
+ */
+export const getEnsembleSubTask = (modelType?: string | null): 'classification' | 'regression' | undefined => {
+  if (!isEnsembleModelType(modelType)) return undefined;
+  return modelType!.endsWith('_regressor') ? 'regression' : 'classification';
+};
+
+/**
+ * Ensemble strategy label ('Voting'/'Stacking') derived from the model
+ * type's prefix. Returns undefined for non-ensemble model types.
+ */
+export const getEnsembleStrategy = (modelType?: string | null): 'Voting' | 'Stacking' | undefined => {
+  if (!isEnsembleModelType(modelType)) return undefined;
+  return modelType!.startsWith('stacking') ? 'Stacking' : 'Voting';
+};
+
 // Friendly labels for base-learner keys (mirrors EnsembleSettings option lists).
 const BASE_ESTIMATOR_LABELS: Record<string, string> = {
   logistic_regression: 'Logistic Regression',

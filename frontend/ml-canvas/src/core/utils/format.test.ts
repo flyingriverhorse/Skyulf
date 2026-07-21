@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatMetricName, formatBytes } from './format';
+import { formatMetricName, formatBytes, getEnsembleSubTask, getEnsembleStrategy } from './format';
 
 describe('formatMetricName', () => {
   it('returns empty string for null/undefined/empty input', () => {
@@ -50,5 +50,53 @@ describe('formatBytes', () => {
 
   it('clamps negative decimals to 0', () => {
     expect(formatBytes(1536, -1)).toBe('2 KB');
+  });
+});
+
+describe('getEnsembleSubTask', () => {
+  it('returns "classification" for voting_classifier', () => {
+    expect(getEnsembleSubTask('voting_classifier')).toBe('classification');
+  });
+
+  it('returns "classification" for stacking_classifier', () => {
+    expect(getEnsembleSubTask('stacking_classifier')).toBe('classification');
+  });
+
+  it('returns "regression" for voting_regressor', () => {
+    expect(getEnsembleSubTask('voting_regressor')).toBe('regression');
+  });
+
+  it('returns "regression" for stacking_regressor', () => {
+    expect(getEnsembleSubTask('stacking_regressor')).toBe('regression');
+  });
+
+  it('returns undefined for a non-ensemble model type', () => {
+    expect(getEnsembleSubTask('random_forest')).toBeUndefined();
+  });
+
+  it('returns undefined for undefined input', () => {
+    expect(getEnsembleSubTask(undefined)).toBeUndefined();
+  });
+});
+
+describe('getEnsembleStrategy', () => {
+  it('returns "Voting" for voting_classifier', () => {
+    expect(getEnsembleStrategy('voting_classifier')).toBe('Voting');
+  });
+
+  it('returns "Voting" for voting_regressor', () => {
+    expect(getEnsembleStrategy('voting_regressor')).toBe('Voting');
+  });
+
+  it('returns "Stacking" for stacking_classifier', () => {
+    expect(getEnsembleStrategy('stacking_classifier')).toBe('Stacking');
+  });
+
+  it('returns "Stacking" for stacking_regressor', () => {
+    expect(getEnsembleStrategy('stacking_regressor')).toBe('Stacking');
+  });
+
+  it('returns undefined for a non-ensemble model type', () => {
+    expect(getEnsembleStrategy('logistic_regression')).toBeUndefined();
   });
 });
