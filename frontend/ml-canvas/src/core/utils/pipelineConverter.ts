@@ -143,7 +143,7 @@ const buildFixedTrainingParams = (data: Record<string, unknown>): Record<string,
 
 /**
  * The tuning-config fields common to every tuning-engine consumer (the plain
- * `hyperparameter_tuning`/`tuning` node, the unified `TrainingNode`
+ * `tuning` node, the unified `TrainingNode`
  * in advanced mode, and `EnsembleNode`'s advanced mode). Callers add their
  * own structural fields on top (`search_space` for plain training nodes,
  * `base_estimators`/`final_estimator`/etc. for the ensemble).
