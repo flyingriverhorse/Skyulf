@@ -7,7 +7,7 @@ import {
 import { JobInfo } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
-import { formatMetricName, getMetricDescription, extractEnsembleSummary, formatBaseEstimator } from '../../../core/utils/format';
+import { formatMetricName, getMetricDescription, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { useConfirm } from '../../shared';
 import { toast } from '../../../core/toast';
@@ -317,6 +317,11 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             <span className="text-xs font-normal text-gray-500 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
                                 {job.job_id.slice(0, 8)}
                             </span>
+                            {isEnsembleModelType(job.model_type) && (
+                                <span className="text-xs font-normal px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                                    {getEnsembleStrategy(job.model_type)} · {getEnsembleSubTask(job.model_type) === 'regression' ? 'Regression' : 'Classification'}
+                                </span>
+                            )}
                         </h2>
                     </div>
                 </div>
