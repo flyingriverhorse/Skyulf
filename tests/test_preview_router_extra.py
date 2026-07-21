@@ -192,6 +192,32 @@ def test_pick_target_node_id_training_terminal_without_inputs_keeps_self():
     assert preview_mod._pick_target_node_id(nodes) == "n1"
 
 
+def test_pick_target_node_id_unified_training_fixed_uses_input():
+    nodes = [
+        NodeConfig(node_id="n1", step_type=StepType.DATA_LOADER, params={}, inputs=[]),
+        NodeConfig(
+            node_id="n2",
+            step_type=StepType.TRAINING,
+            params={"run_mode": "fixed"},
+            inputs=["n1"],
+        ),
+    ]
+    assert preview_mod._pick_target_node_id(nodes) == "n1"
+
+
+def test_pick_target_node_id_unified_training_tuned_uses_input():
+    nodes = [
+        NodeConfig(node_id="n1", step_type=StepType.DATA_LOADER, params={}, inputs=[]),
+        NodeConfig(
+            node_id="n2",
+            step_type=StepType.TRAINING,
+            params={"run_mode": "tuned"},
+            inputs=["n1"],
+        ),
+    ]
+    assert preview_mod._pick_target_node_id(nodes) == "n1"
+
+
 # --------------------------------------------------------------------------
 # _is_polars_dataframe
 # --------------------------------------------------------------------------
@@ -601,6 +627,42 @@ def test_partition_preview_pipeline_with_training_node():
     assert [n.node_id for n in runnable.nodes] == ["n1"]
 
 
+def test_partition_preview_pipeline_with_unified_training_node_fixed():
+    nodes = [
+        NodeConfig(node_id="n1", step_type=StepType.DATA_LOADER, params={}, inputs=[]),
+        NodeConfig(
+            node_id="n2",
+            step_type=StepType.TRAINING,
+            params={"run_mode": "fixed", "model_type": "random_forest"},
+            inputs=["n1"],
+        ),
+    ]
+    pipeline_config = PipelineConfig(pipeline_id="p", nodes=nodes)
+    result = preview_mod._partition_preview_pipeline(pipeline_config, nodes)
+    assert len(result) == 1
+    orig, runnable = result[0]
+    assert [n.node_id for n in orig.nodes] == ["n1", "n2"]
+    assert [n.node_id for n in runnable.nodes] == ["n1"]
+
+
+def test_partition_preview_pipeline_with_unified_training_node_tuned():
+    nodes = [
+        NodeConfig(node_id="n1", step_type=StepType.DATA_LOADER, params={}, inputs=[]),
+        NodeConfig(
+            node_id="n2",
+            step_type=StepType.TRAINING,
+            params={"run_mode": "tuned", "algorithm": "random_forest"},
+            inputs=["n1"],
+        ),
+    ]
+    pipeline_config = PipelineConfig(pipeline_id="p", nodes=nodes)
+    result = preview_mod._partition_preview_pipeline(pipeline_config, nodes)
+    assert len(result) == 1
+    orig, runnable = result[0]
+    assert [n.node_id for n in orig.nodes] == ["n1", "n2"]
+    assert [n.node_id for n in runnable.nodes] == ["n1"]
+
+
 # --------------------------------------------------------------------------
 # _branch_terminal_group_key / _collect_terminal_ids_by_group / _compute_branch_dup_suffixes
 # --------------------------------------------------------------------------
@@ -623,6 +685,29 @@ def test_branch_terminal_group_key_falls_back_to_algorithm():
         node_id="n2",
         step_type=StepType.ADVANCED_TUNING,
         params={"algorithm": "svm"},
+        inputs=["n1"],
+    )
+    mt, _ = preview_mod._branch_terminal_group_key(leaf)
+    assert mt == "svm"
+
+
+def test_branch_terminal_group_key_unified_training_fixed_uses_model_type():
+    leaf = NodeConfig(
+        node_id="n2",
+        step_type=StepType.TRAINING,
+        params={"run_mode": "fixed", "model_type": "xgboost"},
+        inputs=["n1"],
+    )
+    mt, term_id = preview_mod._branch_terminal_group_key(leaf)
+    assert mt == "xgboost"
+    assert term_id == "n2"
+
+
+def test_branch_terminal_group_key_unified_training_tuned_falls_back_to_algorithm():
+    leaf = NodeConfig(
+        node_id="n2",
+        step_type=StepType.TRAINING,
+        params={"run_mode": "tuned", "algorithm": "svm"},
         inputs=["n1"],
     )
     mt, _ = preview_mod._branch_terminal_group_key(leaf)

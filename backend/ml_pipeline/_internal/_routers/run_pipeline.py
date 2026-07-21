@@ -104,7 +104,12 @@ def _resolve_branch_target_node_id(
 ) -> str | None:
     """Identify the terminal node for a sub-pipeline (training/tuning/preview leaf)."""
     target_node_id = requested_target_node_id
-    terminal_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, "data_preview"}
+    terminal_types = {
+        StepType.BASIC_TRAINING,
+        StepType.ADVANCED_TUNING,
+        StepType.TRAINING,
+        "data_preview",
+    }
     for n in reversed(sub.nodes):
         if n.step_type in terminal_types:
             target_node_id = n.node_id
@@ -129,6 +134,13 @@ def _resolve_model_and_job_type(
         elif n.step_type == StepType.ADVANCED_TUNING:
             model_type = n.params.get("algorithm", n.params.get("model_type", "unknown"))
             job_type = StepType.ADVANCED_TUNING
+        elif n.step_type == StepType.TRAINING:
+            model_type = n.params.get("algorithm", n.params.get("model_type", "unknown"))
+            job_type = (
+                StepType.ADVANCED_TUNING
+                if n.params.get("run_mode", "fixed") == "tuned"
+                else StepType.BASIC_TRAINING
+            )
         elif n.step_type == "data_preview":
             model_type = "preview"
             job_type = "preview"
