@@ -11,7 +11,6 @@ The :class:`PipelineEngine` orchestrates execution of pipelines defined by
   ``_run_feature_engineering``, and inference-bundle assembly.
 * :class:`._node_runners.NodeRunnersMixin` — per-step runners
   (``_run_data_loader``, ``_run_training`` — unified fixed/tuned training,
-  replacing the old ``_run_basic_training``/``_run_advanced_tuning``,
   ``_run_transformer``, ``_run_data_preview``).
 
 This module owns the public API (``run``), per-node dispatch (``_execute_node``),

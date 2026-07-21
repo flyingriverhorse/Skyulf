@@ -145,9 +145,9 @@ def config_fingerprint(cfg: _PipelineIn) -> str:
 def _model_algorithm(model: _NodeIn) -> str:
     """Resolve the registry key for a modeling node.
 
-    `basic_training` / `advanced_tuning` are job-router step types — the real
-    NodeRegistry key lives in `params.algorithm` (e.g. `xgboost_classifier`).
-    Falls back to `step_type` for nodes that ARE direct registry entries.
+    `training` is a job-router step type — the real NodeRegistry key lives
+    in `params.algorithm` (e.g. `xgboost_classifier`). Falls back to
+    `step_type` for nodes that ARE direct registry entries.
     """
     return str(model.params.get("algorithm") or model.params.get("type") or model.step_type)
 
@@ -168,9 +168,9 @@ def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
 
     Re-injects ``type`` from ``params.algorithm`` (the engine's routing key,
     stripped from runtime params) so ``_init_model_estimator`` can resolve
-    the estimator. For ``advanced_tuning`` we map to ``hyperparameter_tuner``
-    and flatten the nested ``tuning_config`` fields so ``TuningCalculator.fit``
-    picks them up via its keyword filter.
+    the estimator. For ``training`` with ``run_mode='tuned'`` we map to
+    ``hyperparameter_tuner`` and flatten the nested ``tuning_config`` fields
+    so ``TuningCalculator.fit`` picks them up via its keyword filter.
     """
     algorithm = str(model.params.get("algorithm") or model.params.get("type") or "")
     clean_params = strip_internal_params(model.params)
@@ -457,14 +457,14 @@ _TUNING_TRIAL_CALLBACK_SRC = (
 
 
 def _modeling_cell_tuning(model: _NodeIn, algo: str, config_json: str, metrics_var: str) -> str:
-    """Render an `advanced_tuning` cell that mirrors the engine's runner.
+    """Render a tuned training cell that mirrors the engine's runner.
 
     The engine's unified `_run_training` (run_mode='tuned') wraps the base
-    calculator/applier in
-    `TuningCalculator`/`TuningApplier` before invoking `fit_predict`. Without
-    that wrap the base estimator silently ignores `tuning_config` and runs a
-    single default-param fit. We also pass `log_callback=print` and a small
-    `progress_callback` so each trial is visible in the notebook output.
+    calculator/applier in `TuningCalculator`/`TuningApplier` before invoking
+    `fit_predict`. Without that wrap the base estimator silently ignores
+    `tuning_config` and runs a single default-param fit. We also pass
+    `log_callback=print` and a small `progress_callback` so each trial is
+    visible in the notebook output.
     """
     return (
         "from skyulf.data.dataset import SplitDataset\n"

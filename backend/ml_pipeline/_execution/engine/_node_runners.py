@@ -1,9 +1,8 @@
 """Per-step node-runner methods for :class:`PipelineEngine`.
 
 Mixin slice — owns: ``_run_data_loader``, ``_run_training`` (unified
-fixed/tuned training entry point, replacing the old separate
-``_run_basic_training``/``_run_advanced_tuning``), ``_run_transformer``,
-``_run_data_preview``, the algorithm-component factory
+fixed/tuned training entry point, replacing the old unified approach),
+``_run_transformer``, ``_run_data_preview``, the algorithm-component factory
 ``_get_model_components``, and the shared post-fit orchestration helper
 ``_finalize_training_run``.
 
