@@ -542,7 +542,8 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
 
     const cfg = convertGraphToPipelineConfig(nodes, edges);
     const ens = cfg.nodes.find((n) => n.node_id === 'ens');
-    expect(ens?.step_type).toBe('advanced_tuning');
+    expect(ens?.step_type).toBe('training');
+    expect(ens?.params.run_mode).toBe('tuned');
     const tuning = ens?.params.tuning_config as Record<string, unknown>;
     expect(tuning.base_estimators).toEqual(['gradient_boosting']);
     expect(tuning.base_estimator_params).toMatchObject({
@@ -637,5 +638,79 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     expect(hp.base_estimators).toEqual(['random_forest']);
     // Both model sources are still excluded from the data inputs.
     expect(ens?.inputs).toEqual(['ds']);
+  });
+
+  it('emits training step_type with fixed run_mode for basic EnsembleNode', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'basic',
+        base_estimators: ['random_forest'],
+        base_estimator_params: {},
+        cv_enabled: false,
+        cv_folds: 5,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 0,
+        voting: 'soft',
+        execution_mode: 'parallel',
+        n_jobs: -1,
+      }),
+    ];
+    const edges = [edge('ds', 'ens')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    expect(ens?.step_type).toBe('training');
+    expect(ens?.params.run_mode).toBe('fixed');
+  });
+
+  it('emits training step_type with tuned run_mode for advanced EnsembleNode', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'advanced',
+        search_strategy: 'random',
+        n_trials: 20,
+        base_estimators: ['random_forest'],
+        base_estimator_params: {},
+        voting: 'soft',
+        execution_mode: 'parallel',
+        n_jobs: -1,
+      }),
+    ];
+    const edges = [edge('ds', 'ens')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    expect(ens?.step_type).toBe('training');
+    expect(ens?.params.run_mode).toBe('tuned');
+  });
+});
+
+describe('convertGraphToPipelineConfig — SegmentationNode', () => {
+  it('emits training step_type with fixed run_mode for SegmentationNode', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('seg', 'SegmentationNode', {
+        model_type: 'kmeans',
+        hyperparameters: { n_clusters: 3 },
+        cv_enabled: false,
+        execution_mode: 'parallel',
+        reference_column: undefined,
+      }),
+    ];
+    const edges = [edge('ds', 'seg')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const seg = cfg.nodes.find((n) => n.node_id === 'seg');
+    expect(seg?.step_type).toBe('training');
+    expect(seg?.params.run_mode).toBe('fixed');
   });
 });
