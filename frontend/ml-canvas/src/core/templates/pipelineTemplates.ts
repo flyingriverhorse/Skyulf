@@ -14,7 +14,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { v4 as uuidv4 } from 'uuid';
 import { registry } from '../registry/NodeRegistry';
-import { Layers, LineChart, FileText, Boxes } from 'lucide-react';
+import { Layers, LineChart, FileText, Boxes, Combine } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /** A node entry inside a template — just enough to materialise via `addNode`. */
@@ -39,7 +39,7 @@ export interface PipelineTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'classification' | 'regression' | 'forecast' | 'text' | 'clustering';
+  category: 'classification' | 'regression' | 'forecast' | 'text' | 'clustering' | 'ensemble';
   icon: LucideIcon;
   nodes: TemplateNode[];
   edges: TemplateEdge[];
@@ -203,9 +203,36 @@ const CUSTOMER_SEGMENTATION: PipelineTemplate = {
   ],
 };
 
+const ENSEMBLE_CLASSIFICATION: PipelineTemplate = {
+  id: 'ensemble_classification',
+  name: 'Ensemble Classification',
+  description:
+    'Combine multiple models for stronger predictions: dataset → drop ids → impute → encode → scale → split → Ensemble (Voting Classifier). Bind your dataset, set the target column on the split node, adjust base models if needed, then Run All.',
+  category: 'ensemble',
+  icon: Combine,
+  nodes: [
+    { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
+    { localId: 'drop', type: 'drop_missing_columns', position: { x: col(1), y: row(0) } },
+    { localId: 'imp', type: 'imputation_node', position: { x: col(2), y: row(0) } },
+    { localId: 'enc', type: 'encoding', position: { x: col(3), y: row(0) } },
+    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(4), y: row(0) } },
+    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(5), y: row(0) } },
+    { localId: 'train', type: 'EnsembleNode', position: { x: col(6), y: row(0) } },
+  ],
+  edges: [
+    { source: 'ds', target: 'drop' },
+    { source: 'drop', target: 'imp' },
+    { source: 'imp', target: 'enc' },
+    { source: 'enc', target: 'scl' },
+    { source: 'scl', target: 'split' },
+    { source: 'split', target: 'train' },
+  ],
+};
+
 export const PIPELINE_TEMPLATES: PipelineTemplate[] = [
   TABULAR_CLASSIFICATION,
   TABULAR_REGRESSION,
   TEXT_CLASSIFICATION,
   CUSTOMER_SEGMENTATION,
+  ENSEMBLE_CLASSIFICATION,
 ];
