@@ -4,6 +4,7 @@ import { X, RefreshCw, ChevronDown, Zap, CheckCircle2, Search, Filter } from 'lu
 import { JobInfo } from '../../core/api/jobs';
 import { RegistryItem, registryApi } from '../../core/api/registry';
 import { getTaskForModelType } from '../pages/ExperimentsPage/utils/jobMeta';
+import { getEnsembleSubTask } from '../../core/utils/format';
 import { TaskType } from '../../core/types/taskType';
 import { useEscapeKey } from '../../core/hooks/useEscapeKey';
 import { VirtualList } from '../shared/VirtualList';
@@ -16,6 +17,7 @@ const TASK_TABS: { task: TaskType; label: string }[] = [
   { task: 'regression', label: 'Regression' },
   { task: 'text_classification', label: 'Text Classification' },
   { task: 'segmentation', label: 'Segmentation' },
+  { task: 'ensemble', label: 'Ensemble' },
 ];
 
 const TASK_LABELS: Record<TaskType, string> = {
@@ -23,7 +25,15 @@ const TASK_LABELS: Record<TaskType, string> = {
   regression: 'regression',
   text_classification: 'text classification',
   segmentation: 'segmentation',
+  ensemble: 'ensemble',
 };
+
+/** Sub-filter options shown only while the Ensemble tab is active. */
+const ENSEMBLE_SUB_FILTERS: { value: 'all' | 'classification' | 'regression'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'classification', label: 'Classification' },
+  { value: 'regression', label: 'Regression' },
+];
 
 export const JobsDrawer: React.FC = () => {
   const {
@@ -44,6 +54,7 @@ export const JobsDrawer: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [modelFilter, setModelFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [ensembleSubFilter, setEnsembleSubFilter] = useState<'all' | 'classification' | 'regression'>('all');
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
 
   // One-time fetch of registry items (mirrors ExperimentsPage.tsx's
@@ -113,6 +124,10 @@ export const JobsDrawer: React.FC = () => {
   }, [isDrawerOpen, activeTab]);
 
   useEffect(() => {
+    if (activeTab !== 'ensemble') setEnsembleSubFilter('all');
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!isDrawerOpen || isLoading || !hasMore) return;
     if (autoLoadAttemptsRef.current >= MAX_AUTO_LOAD_ATTEMPTS) return;
     const tabCount = jobs.filter(j => getTaskForModelType(j.model_type, registryItems) === activeTab).length;
@@ -124,7 +139,9 @@ export const JobsDrawer: React.FC = () => {
 
   if (!isDrawerOpen) return null;
 
-  const tabJobs = jobs.filter(job => getTaskForModelType(job.model_type, registryItems) === activeTab);
+  const tabJobs = jobs
+    .filter(job => getTaskForModelType(job.model_type, registryItems) === activeTab)
+    .filter(job => activeTab !== 'ensemble' || ensembleSubFilter === 'all' || getEnsembleSubTask(job.model_type) === ensembleSubFilter);
 
   // Derive unique model types and statuses from current tab's jobs
   const modelTypes = [...new Set(tabJobs.map(j => j.model_type).filter(Boolean))] as string[];
@@ -246,6 +263,25 @@ export const JobsDrawer: React.FC = () => {
                     </button>
                 ))}
                 </div>
+
+                {/* Ensemble sub-filter pill (only shown on the Ensemble tab) */}
+                {activeTab === 'ensemble' && (
+                  <div className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    {ENSEMBLE_SUB_FILTERS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        onClick={() => setEnsembleSubFilter(value)}
+                        className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                          ensembleSubFilter === value
+                            ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+                            : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* Filter Bar */}
                 <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-2">
