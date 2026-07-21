@@ -97,13 +97,11 @@ DEFAULT_SEARCH_SPACES: dict[str, Any] = {
         "penalty": ["l1", "l2", "elasticnet"],
         "solver": ["saga"],
         "max_iter": [100, 200, 500, 1000],
-        "l1_ratio": [0.1, 0.5, 0.7, 0.9],  # Only used for elasticnet
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge", "modified_huber"],
         "penalty": ["l1", "l2", "elasticnet"],
         "alpha": [1e-5, 1e-4, 1e-3, 1e-2],
-        "l1_ratio": [0.05, 0.15, 0.3],
         "max_iter": [500, 1000, 2000],
     },
     "random_forest_classifier": {

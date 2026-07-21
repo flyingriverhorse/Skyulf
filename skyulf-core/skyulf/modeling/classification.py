@@ -111,6 +111,24 @@ class LogisticRegressionCalculator(SklearnCalculator):
         self._validate_solver_penalty(config)
         return super().fit(X, y, config, progress_callback, log_callback, validation_data)
 
+    def _resolve_fit_params(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Merges fit params, then normalizes `l1_ratio` alongside `penalty='l1'`.
+
+        sklearn >=1.8 deprecates the `penalty` constructor arg in favor of
+        `l1_ratio`/`C`, and its own default `l1_ratio` is now `0.0` (the
+        L2-equivalent value). Since we still expose `penalty` as the public
+        config field, an explicit `penalty='l1'` left with that default
+        `l1_ratio=0.0` is now internally inconsistent and sklearn raises a
+        spurious "Inconsistent values" `UserWarning` at fit time. Set the
+        sklearn-documented equivalent (`l1_ratio=1.0`) explicitly whenever the
+        caller didn't already provide their own `l1_ratio` — this doesn't
+        change fitted behavior, it just avoids the warning.
+        """
+        params = super()._resolve_fit_params(config)
+        if params.get("penalty") == "l1" and "l1_ratio" not in params:
+            params = {**params, "l1_ratio": 1.0}
+        return params
+
     @classmethod
     def _extract_solver_penalty_params(cls, config: dict[str, Any] | None) -> dict[str, Any] | None:
         """Returns the params dict from config, or None if unavailable/not a dict."""
