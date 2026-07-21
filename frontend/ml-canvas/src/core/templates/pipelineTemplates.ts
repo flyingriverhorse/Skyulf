@@ -115,7 +115,7 @@ const TABULAR_CLASSIFICATION: PipelineTemplate = {
     { localId: 'enc', type: 'encoding', position: { x: col(3), y: row(0) } },
     { localId: 'scl', type: 'scale_numeric_features', position: { x: col(4), y: row(0) } },
     { localId: 'split', type: 'TrainTestSplitter', position: { x: col(5), y: row(0) } },
-    { localId: 'train', type: 'basic_training', position: { x: col(6), y: row(0) } },
+    { localId: 'train', type: 'classification', position: { x: col(6), y: row(0) } },
   ],
   edges: [
     { source: 'ds', target: 'drop' },
@@ -142,7 +142,7 @@ const TABULAR_REGRESSION: PipelineTemplate = {
     { localId: 'split', type: 'TrainTestSplitter', position: { x: col(4), y: row(0) } },
     {
       localId: 'train',
-      type: 'basic_training',
+      type: 'regression',
       position: { x: col(5), y: row(0) },
       data: { model_type: 'linear_regression' },
     },
@@ -170,7 +170,7 @@ const TEXT_CLASSIFICATION: PipelineTemplate = {
     { localId: 'split', type: 'TrainTestSplitter', position: { x: col(3), y: row(0) } },
     {
       localId: 'train',
-      type: 'basic_training',
+      type: 'text_classification',
       position: { x: col(4), y: row(0) },
       data: { model_type: 'logistic_regression' },
     },
