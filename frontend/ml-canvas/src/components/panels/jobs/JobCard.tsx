@@ -75,7 +75,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
         )}
         {isEnsemble && (
           <span className="px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 whitespace-nowrap">
-            {ensembleStrategy} · {ensembleSubTask === 'regression' ? 'Regression' : 'Classification'}
+            Ensemble · {ensembleStrategy} · {ensembleSubTask === 'regression' ? 'Regression' : 'Classification'}
           </span>
         )}
       </div>
