@@ -587,6 +587,7 @@ function TargetSelector({ config, update, columns }: {
 /** Tuning controls shown in Advanced mode: search strategy, trial budget, metric. */
 function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
   const [showStrategyModal, setShowStrategyModal] = useState(false);
+  const [showBaseTuningDetails, setShowBaseTuningDetails] = useState(false);
   const showStrategyBtn =
     config.search_strategy === 'halving_grid' ||
     config.search_strategy === 'halving_random' ||
@@ -605,7 +606,7 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
               Search Strategy
               <HelpTooltip
                 placement="bottom-left"
-                text="This searches the ensemble's own params (e.g. voting/cv). There's no per-model search-space editor here — with several base learners at once, you set fixed values for each in Basic mode instead. Check &quot;Tune base model hyperparameters&quot; below to also auto-search each selected model's default range (the same ranges used for standalone Classification/Regression tuning)."
+                text="Searches the ensemble's own params (e.g. voting/cv), not each base model. Enable &quot;Tune base model hyperparameters&quot; below to also search each model's params."
               />
             </span>
             {showStrategyBtn && (
@@ -664,12 +665,28 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
           onChange={(e) => { update({ tune_base_models: e.target.checked }); }}
           className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
         />
-        <span>
-          <strong>Tune base model hyperparameters</strong> — automatically searches each selected
-          base learner&apos;s default parameter range (e.g. <code>random_forest__n_estimators</code>),
-          in addition to the ensemble&apos;s own params. Ranges are picked automatically per model —
-          uncheck this to tune only the ensemble-level params and keep base models at the fixed
-          values set in Basic mode.
+        <span className="flex-1">
+          <span className="inline-flex items-center gap-1">
+            <strong>Tune base model hyperparameters</strong>
+            <button
+              type="button"
+              onClick={() => { setShowBaseTuningDetails(!showBaseTuningDetails); }}
+              className="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+              title={showBaseTuningDetails ? 'Hide details' : 'Show details'}
+            >
+              <ChevronRight
+                className={`w-3 h-3 transition-transform ${showBaseTuningDetails ? 'rotate-90' : ''}`}
+              />
+            </button>
+          </span>
+          {showBaseTuningDetails && (
+            <span className="block mt-1 text-gray-500 dark:text-gray-400">
+              Automatically searches each selected base learner&apos;s default parameter range
+              (e.g. <code>random_forest__n_estimators</code>), in addition to the ensemble&apos;s own
+              params. Ranges are picked automatically per model — uncheck this to tune only the
+              ensemble-level params and keep base models at the fixed values set in Basic mode.
+            </span>
+          )}
         </span>
       </label>
 
