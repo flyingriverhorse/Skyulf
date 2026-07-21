@@ -19,6 +19,10 @@ class HyperparameterField:
     options: list[dict[str, Any]] | None = (
         None  # For 'select' type: [{"label": "L1", "value": "l1"}]
     )
+    depends_on: dict[str, Any] | None = (
+        None  # Only relevant/shown when another param equals a given value,
+        # e.g. {"param": "penalty", "value": "elasticnet"} for `l1_ratio`.
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -63,6 +63,7 @@ LOGISTIC_REGRESSION_PARAMS = [
             "The ElasticNet mixing parameter, with 0 <= l1_ratio <= 1. "
             "Only used if penalty='elasticnet'."
         ),
+        depends_on={"param": "penalty", "value": "elasticnet"},
     ),
 ]
 
@@ -218,6 +219,7 @@ SGD_CLASSIFIER_PARAMS = [
         max=1.0,
         step=0.05,
         description="The ElasticNet mixing parameter, with 0 <= l1_ratio <= 1. Only used if penalty='elasticnet'.",
+        depends_on={"param": "penalty", "value": "elasticnet"},
     ),
     HyperparameterField(
         name="max_iter",

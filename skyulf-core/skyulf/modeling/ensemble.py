@@ -73,6 +73,7 @@ except ImportError:
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
+from ._sklearn_compat import normalize_logistic_regression_params
 
 logger = logging.getLogger(__name__)
 
@@ -343,11 +344,18 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     def _apply_params(estimator: BaseEstimator, params: Any, name: str) -> BaseEstimator:
         """Apply a ``{param: value}`` map to *estimator*, ignoring bad params."""
         if isinstance(params, dict) and params:
+            if isinstance(estimator, LogisticRegression):
+                # sklearn >=1.8 deprecates LogisticRegression(penalty=...) in
+                # favor of l1_ratio/C — translate here too, since ensembles
+                # apply base/final-estimator params via set_params(), bypassing
+                # LogisticRegressionCalculator's own normalization entirely.
+                params = normalize_logistic_regression_params(params)
             try:
                 estimator.set_params(**params)
             except (ValueError, TypeError) as exc:
                 logger.warning("Invalid params for estimator '%s': %s", name, exc)
         return estimator
+
 
     def _resolve_final_estimator(self, key: Any, params: Any = None) -> BaseEstimator:
         """Resolve the stacking meta-learner key, defaulting on unknown/missing."""
