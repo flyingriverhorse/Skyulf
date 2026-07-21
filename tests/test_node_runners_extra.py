@@ -813,7 +813,7 @@ def test_basic_training_kmeans_without_target_column_succeeds(pipeline_data_csv,
     assert "feature_importances" not in train_res.metrics
     assert "shap_explanation" not in train_res.metrics
     # cv_ metrics should not appear even though cv_enabled defaults False on a
-    # bare basic_training node (clustering skips CV entirely regardless).
+    # bare training node (clustering skips CV entirely regardless).
     assert not [k for k in train_res.metrics if k.startswith("cv_")]
 
 

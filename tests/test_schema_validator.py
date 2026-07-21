@@ -110,7 +110,7 @@ def test_basic_training_target_column_optional_not_flagged() -> None:
 
 
 def test_training_target_column_optional_not_flagged() -> None:
-    """Same as `test_basic_training_target_column_optional_not_flagged` but
+    """Same as the target_column optional validation but
     for the unified `"training"` step_type (Finding 3): its `target_column`
     must also be treated as optional, not a false-positive amber warning."""
     config = _config(

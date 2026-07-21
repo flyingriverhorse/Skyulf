@@ -154,8 +154,7 @@ class TestMultipleTerminals:
 
     def test_shared_prefix_included_in_both_unified_training(self):
         """Same as test_shared_prefix_included_in_both but using the unified
-        `training` step_type (with differing run_mode values) instead of the
-        legacy `basic_training`/`advanced_tuning` literals — partitioning
+        `training` step_type with differing run_mode values — partitioning
         must still recognize each as its own terminal."""
         nodes = [
             _make_node("ds", "data_loader"),

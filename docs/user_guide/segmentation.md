@@ -146,10 +146,6 @@ Same thing via a pipeline config:
 }
 ```
 
-(The legacy `step_type: "basic_training"` value is still accepted by the
-dispatcher as a backward-compat alias for already-saved pipelines, but new
-configs should use `"training"` + `run_mode`.)
-
 ## Notes
 
 - **Only genuinely deployable algorithms are included.** K-Means,
