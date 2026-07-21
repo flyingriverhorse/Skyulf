@@ -2,23 +2,13 @@
 export enum StepType {
   DATA_LOADER = 'data_loader',
   FEATURE_ENGINEERING = 'feature_engineering',
-  BASIC_TRAINING = 'basic_training',
-  ADVANCED_TUNING = 'advanced_tuning',
-  // Backend Phase 2b superset ("training", run_mode: fixed|tuned). Used only
-  // as the canvas `definitionType` for the unified `TrainingNode` (Phase 3);
-  // it is never submitted as a job `job_type` — the node still submits
-  // BASIC_TRAINING/ADVANCED_TUNING depending on its `run_mode`, same as
-  // before, so the backend dispatcher doesn't need to understand this value.
+  // Every training-family canvas node (the generic node plus the
+  // task-scoped Classification/Regression/Text Classification/Segmentation/
+  // Ensemble nodes) submits this same canonical step_type, discriminated by
+  // a `run_mode: 'fixed' | 'tuned'` param — the backend doesn't need to know
+  // which canvas node produced the job.
   TRAINING = 'training',
-  // Task-scoped canvas nodes (Phase 3 Part B, plan §0.6). Like TRAINING,
-  // these are canvas-only `definitionType`s — never submitted as a job
-  // `job_type`. Each still resolves to BASIC_TRAINING/ADVANCED_TUNING based
-  // on `run_mode`, exactly like TRAINING; the backend doesn't need to know
-  // which task-scoped node produced the job.
   CLASSIFICATION = 'classification',
   REGRESSION = 'regression',
   TEXT_CLASSIFICATION = 'text_classification',
 }
-
-// Additional legacy or frontend-specific types can be added here if needed,
-// but the goal is to align specifically with the backend execution engine.

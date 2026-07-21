@@ -36,9 +36,14 @@ const BANDS: Record<PerfFamily, PerfBands> = {
   tuner: { fastMaxMs: 60_000, mediumMaxMs: 600_000 },
 };
 
-export function getPerfFamily(definitionType: string): PerfFamily {
-  if (definitionType === 'advanced_tuning') return 'tuner';
-  if (definitionType === 'basic_training') return 'trainer';
+export function getPerfFamily(definitionType: string, runMode?: string): PerfFamily {
+  if (['training', 'classification', 'regression', 'text_classification'].includes(definitionType)) {
+    // Node-level `data.run_mode` uses the UI toggle values 'basic'/'advanced'
+    // (see ClassificationNode.tsx/RegressionNode.tsx/TextClassificationNode.tsx/
+    // TrainingNode.ts/EnsembleNode.ts defaultConfig: `run_mode: 'basic'`) —
+    // NOT the backend dispatch values 'fixed'/'tuned'. Do not confuse the two.
+    return runMode === 'advanced' ? 'tuner' : 'trainer';
+  }
   return 'preprocess';
 }
 

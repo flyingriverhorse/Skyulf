@@ -52,7 +52,7 @@ describe('useUpstreamData', () => {
       [
         { id: 'a', type: 'custom', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node', datasetId: 'ds-a' } },
         { id: 'b', type: 'custom', position: { x: 0, y: 0 }, data: { definitionType: 'dataset_node', datasetId: 'ds-b' } },
-        { id: 't', type: 'custom', position: { x: 0, y: 0 }, data: { definitionType: 'basic_training' } },
+        { id: 't', type: 'custom', position: { x: 0, y: 0 }, data: { definitionType: 'training' } },
       ],
       [
         { id: 'a-t', source: 'a', target: 't' },

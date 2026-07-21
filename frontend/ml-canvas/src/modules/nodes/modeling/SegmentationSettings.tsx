@@ -8,7 +8,6 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
 import { getIncomers } from '@xyflow/react';
-import { StepType } from '../../../core/constants/stepTypes';
 import { HelpTooltip } from './components/HelpTooltip';
 import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
@@ -170,7 +169,7 @@ export const SegmentationSettings: React.FC<{
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         target_node_id: nodeId,
-        job_type: StepType.BASIC_TRAINING
+        job_type: 'basic_training'
       });
       const jobCount = response.job_ids?.length || 1;
       if (jobCount > 1) {

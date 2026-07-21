@@ -19,10 +19,10 @@ const TERMINAL_TYPES = new Set([...EXECUTION_MODE_AWARE_TYPES]);
 // experiment, so it must not get its own branch color / Path tab — the
 // ensemble's branch already covers the whole `data → model → ensemble` chain.
 const MODEL_SOURCE_TYPES = new Set([
-  'model_training',
-  'basic_training',
-  'hyperparameter_tuning',
-  'advanced_tuning',
+  'training',
+  'classification',
+  'regression',
+  'text_classification',
 ]);
 
 // The ensemble meta-model node. It is the real terminal whenever base models
