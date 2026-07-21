@@ -1,9 +1,7 @@
-"""Tests for unified `training` step_type support in notebook export.
+"""Tests for the canonical `training` step_type + `run_mode` param support in notebook export.
 
-Mirrors the existing `basic_training`/`advanced_tuning` coverage but with the
-canonical `step_type="training"` + `run_mode` param the frontend now emits,
-to guard against the node being silently misclassified as a preprocessing
-step (Finding 2a/2b) or exported without its tuning_config (Finding 2c).
+Guards against the node being silently misclassified as a preprocessing step
+(Finding 2a/2b) or exported without its tuning_config (Finding 2c).
 """
 
 from backend.ml_pipeline._internal._routers import notebook_export as ne
