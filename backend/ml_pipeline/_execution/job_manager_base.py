@@ -78,13 +78,19 @@ class TrainingJobManagerBase:
 
     @staticmethod
     async def _cancel_job(
-        session: AsyncSession, model: type[Any], job_id: str
+        session: AsyncSession, model: type[Any], job_id: str, run_mode: str | None = None
     ) -> bool:
         """Cancel a QUEUED/RUNNING job row and revoke its Celery task.
+
+        `run_mode`, when given, scopes the lookup to that mode so a caller
+        scoped to "fixed" jobs (e.g. BasicTrainingManager) never cancels a
+        "tuned" row that happens to share the same underlying table.
 
         Returns True if the job was found and cancelled, False otherwise.
         """
         stmt = select(model).where(model.id == job_id)
+        if run_mode is not None:
+            stmt = stmt.where(model.run_mode == run_mode)
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -115,14 +121,20 @@ class TrainingJobManagerBase:
             [Any, JobStatus | None, str | None, list[str] | None, dict[str, Any] | None],
             None,
         ],
+        run_mode: str | None = None,
     ) -> bool:
         """Update a job row; guard against overwriting a CANCELLED status.
 
         *apply_fields_fn* is the model-specific hook that writes
-        status/error/logs/result onto the concrete job row.  Returns True if
-        the job was found, False otherwise.
+        status/error/logs/result onto the concrete job row. `run_mode`, when
+        given, scopes the lookup to that mode (see `_cancel_job` for why this
+        matters now that both modes share one table). Returns True if the
+        job was found, False otherwise.
         """
-        job = session.query(model).filter(model.id == job_id).first()
+        query = session.query(model).filter(model.id == job_id)
+        if run_mode is not None:
+            query = query.filter(model.run_mode == run_mode)
+        job = query.first()
         if not job:
             return False
 
