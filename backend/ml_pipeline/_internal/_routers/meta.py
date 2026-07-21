@@ -18,10 +18,9 @@ from backend.data.catalog import FileSystemCatalog
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
 from backend.database.models import (
-    AdvancedTuningJob,
-    BasicTrainingJob,
     DataSource,
     Deployment,
+    TrainingJob,
 )
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._internal._advisor import AnalysisProfile, DataProfiler
@@ -79,8 +78,12 @@ def _build_node_registry() -> list[RegistryItem]:
 @router.get("/stats", response_model=dict[str, int])
 async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     """Return high-level system statistics for the dashboard."""
-    training_count = await session.scalar(select(func.count(BasicTrainingJob.id)))
-    tuning_count = await session.scalar(select(func.count(AdvancedTuningJob.id)))
+    training_count = await session.scalar(
+        select(func.count(TrainingJob.id)).where(TrainingJob.run_mode == "fixed")
+    )
+    tuning_count = await session.scalar(
+        select(func.count(TrainingJob.id)).where(TrainingJob.run_mode == "tuned")
+    )
     deployment_count = await session.scalar(
         select(func.count(Deployment.id)).where(Deployment.is_active)
     )
