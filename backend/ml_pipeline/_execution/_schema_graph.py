@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 _PASSTHROUGH_STEP_TYPES = {
     "basic_training",
     "advanced_tuning",
+    "training",
     "data_preview",
 }
 

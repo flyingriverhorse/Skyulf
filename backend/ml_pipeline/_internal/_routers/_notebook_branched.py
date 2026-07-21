@@ -66,6 +66,7 @@ _SPLIT_OR_MODEL = {
     "TrainTestSplitter",
     "basic_training",
     "advanced_tuning",
+    "training",
 }
 
 

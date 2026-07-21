@@ -91,6 +91,41 @@ def test_target_field_string_reference() -> None:
     assert broken[0]["column"] == "ghost"
 
 
+def test_basic_training_target_column_optional_not_flagged() -> None:
+    """`basic_training`'s `target_column` is metadata, not a feature reference:
+    it should never be flagged even though it's absent from the upstream
+    schema (the FeatureTargetSplitter dropped it upstream in real pipelines).
+    """
+    config = _config(
+        NodeConfig(
+            node_id="trainer",
+            step_type="basic_training",
+            params={"target_column": "ghost"},
+            inputs=["loader"],
+        )
+    )
+    predicted = predict_schemas(config, initial_schemas={"loader": _seed()})
+
+    assert find_broken_references(config, predicted) == []
+
+
+def test_training_target_column_optional_not_flagged() -> None:
+    """Same as `test_basic_training_target_column_optional_not_flagged` but
+    for the unified `"training"` step_type (Finding 3): its `target_column`
+    must also be treated as optional, not a false-positive amber warning."""
+    config = _config(
+        NodeConfig(
+            node_id="trainer",
+            step_type="training",
+            params={"target_column": "ghost", "run_mode": "fixed"},
+            inputs=["loader"],
+        )
+    )
+    predicted = predict_schemas(config, initial_schemas={"loader": _seed()})
+
+    assert find_broken_references(config, predicted) == []
+
+
 def test_column_types_dict_keys_validated() -> None:
     """`column_types` dict keys are checked too."""
     config = _config(

@@ -152,6 +152,33 @@ class TestMultipleTerminals:
             assert "ds" in ids
             assert "clean" in ids
 
+    def test_shared_prefix_included_in_both_unified_training(self):
+        """Same as test_shared_prefix_included_in_both but using the unified
+        `training` step_type (with differing run_mode values) instead of the
+        legacy `basic_training`/`advanced_tuning` literals — partitioning
+        must still recognize each as its own terminal."""
+        nodes = [
+            _make_node("ds", "data_loader"),
+            _make_node("clean", inputs=["ds"]),
+            _make_node("scale", inputs=["clean"]),
+            _make_node("pca", inputs=["clean"]),
+            _make_node(
+                "trainA", "training", inputs=["scale"], params={"target_column": "y", "run_mode": "fixed"}
+            ),
+            _make_node(
+                "trainB", "training", inputs=["pca"], params={"target_column": "y", "run_mode": "tuned"}
+            ),
+        ]
+        config = _make_config(nodes)
+        result = partition_parallel_pipeline(config)
+
+        assert len(result) == 2
+        # Both branches include ds and clean
+        for sub in result:
+            ids = {n.node_id for n in sub.nodes}
+            assert "ds" in ids
+            assert "clean" in ids
+
     def test_pipeline_ids_include_branch_index(self):
         nodes = [
             _make_node("ds", "data_loader"),
