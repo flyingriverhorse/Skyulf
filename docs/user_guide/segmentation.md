@@ -134,8 +134,9 @@ Same thing via a pipeline config:
 ```python
 {
     "node_id": "segment_customers",
-    "step_type": "basic_training",
+    "step_type": "training",
     "params": {
+        "run_mode": "fixed",          # clustering always runs in fixed mode
         "target_column": "",          # sentinel for "no target"
         "model_type": "gaussian_mixture",
         "hyperparameters": {"n_components": 4, "covariance_type": "full"},
@@ -144,6 +145,10 @@ Same thing via a pipeline config:
     },
 }
 ```
+
+(The legacy `step_type: "basic_training"` value is still accepted by the
+dispatcher as a backward-compat alias for already-saved pipelines, but new
+configs should use `"training"` + `run_mode`.)
 
 ## Notes
 
