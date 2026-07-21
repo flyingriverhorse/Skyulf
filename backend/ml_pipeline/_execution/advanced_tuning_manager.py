@@ -20,7 +20,6 @@ from backend.ml_pipeline._execution.utils import (
     parse_branch_info,
     resolve_dataset_name,
 )
-from backend.ml_pipeline.constants import StepType
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
@@ -94,7 +93,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
             node_id=job.node_id,
             dataset_id=type_cast(str | None, job.dataset_source_id),
             dataset_name=dataset_name,
-            job_type=StepType.ADVANCED_TUNING.value,
+            job_type="tuning",
             status=JobStatus(job.status),
             start_time=job.started_at,
             end_time=job.finished_at,

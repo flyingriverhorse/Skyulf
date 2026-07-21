@@ -124,23 +124,13 @@ def _resolve_model_and_job_type(
 ) -> tuple[str, Any]:
     """Determine model type and job type from the sub-pipeline's terminal node."""
     model_type = "unknown"
-    job_type = requested_job_type or StepType.BASIC_TRAINING
+    job_type = requested_job_type or "training"
     for n in sub.nodes:
         if n.node_id != target_node_id:
             continue
-        if n.step_type == StepType.BASIC_TRAINING:
-            model_type = n.params.get("model_type", n.params.get("algorithm", "unknown"))
-            job_type = StepType.BASIC_TRAINING
-        elif n.step_type == StepType.ADVANCED_TUNING:
+        if n.step_type == StepType.TRAINING:
             model_type = n.params.get("algorithm", n.params.get("model_type", "unknown"))
-            job_type = StepType.ADVANCED_TUNING
-        elif n.step_type == StepType.TRAINING:
-            model_type = n.params.get("algorithm", n.params.get("model_type", "unknown"))
-            job_type = (
-                StepType.ADVANCED_TUNING
-                if n.params.get("run_mode", "fixed") == "tuned"
-                else StepType.BASIC_TRAINING
-            )
+            job_type = "tuning" if n.params.get("run_mode", "fixed") == "tuned" else "training"
         elif n.step_type == "data_preview":
             model_type = "preview"
             job_type = "preview"

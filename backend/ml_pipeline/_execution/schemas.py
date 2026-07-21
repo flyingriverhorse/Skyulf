@@ -23,7 +23,7 @@ class JobInfo(BaseModel):
     node_id: str
     dataset_id: str | None = None
     dataset_name: str | None = None
-    job_type: Literal["training", "tuning", "preview", "basic_training", "advanced_tuning"]
+    job_type: Literal["training", "tuning", "preview"]
     status: JobStatus
     start_time: datetime | None
     end_time: datetime | None = None

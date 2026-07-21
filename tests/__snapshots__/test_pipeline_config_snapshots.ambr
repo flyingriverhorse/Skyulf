@@ -1,7 +1,7 @@
 # serializer version: 1
 # name: test_linear_pipeline_snapshot
   dict({
-    'job_type': <StepType.BASIC_TRAINING: 'basic_training'>,
+    'job_type': 'training',
     'metadata': dict({
       'label': 'snapshot linear',
     }),
@@ -87,9 +87,9 @@
 # ---
 # name: test_parallel_branches_pipeline_snapshot
   dict({
-    'job_type': <StepType.BASIC_TRAINING: 'basic_training'>,
+    'job_type': 'training',
     'metadata': dict({
-      'job_type': 'basic_training',
+      'job_type': 'training',
     }),
     'nodes': list([
       dict({
@@ -207,7 +207,7 @@
             'type': 'null',
           }),
         ]),
-        'default': 'basic_training',
+        'default': 'training',
         'title': 'Job Type',
       }),
       'metadata': dict({
@@ -251,7 +251,7 @@
 # ---
 # name: test_preprocessing_pipeline_snapshot
   dict({
-    'job_type': <StepType.BASIC_TRAINING: 'basic_training'>,
+    'job_type': 'training',
     'metadata': dict({
     }),
     'nodes': list([

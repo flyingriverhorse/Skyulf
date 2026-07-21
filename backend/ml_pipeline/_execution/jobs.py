@@ -31,7 +31,7 @@ class JobManager:
         session: AsyncSession,
         pipeline_id: str,
         node_id: str,
-        job_type: Literal["basic_training", "advanced_tuning", "preview"],
+        job_type: Literal["training", "tuning", "preview"],
         dataset_id: str = "unknown",
         user_id: int | None = None,
         model_type: str = "unknown",
@@ -39,7 +39,7 @@ class JobManager:
         branch_index: int = 0,
     ) -> str:
         """Creates a new job in the database (Async)."""
-        if job_type == "basic_training":
+        if job_type == "training":
             return await BasicTrainingManager.create_training_job(
                 session,
                 pipeline_id,
@@ -50,7 +50,7 @@ class JobManager:
                 graph,
                 branch_index=branch_index,
             )
-        elif job_type == "advanced_tuning":
+        elif job_type == "tuning":
             return await AdvancedTuningManager.create_tuning_job(
                 session,
                 pipeline_id,
@@ -191,9 +191,9 @@ class JobManager:
         """
         jobs = []
 
-        if job_type in ["basic_training", "training"]:
+        if job_type == "training":
             jobs = await BasicTrainingManager.list_training_jobs(session, limit, skip)
-        elif job_type in ["advanced_tuning", "tuning"]:
+        elif job_type == "tuning":
             jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
             max_skip = get_settings().MAX_CROSS_TABLE_SKIP
