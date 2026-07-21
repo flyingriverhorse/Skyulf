@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
-from backend.database.models import BasicTrainingJob
+from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
 from backend.ml_pipeline._execution.job_manager_base import TrainingJobManagerBase
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
@@ -48,13 +48,14 @@ class BasicTrainingManager(TrainingJobManagerBase):
             )
             model_type_val = model_type
 
-        job = BasicTrainingJob(
+        job = TrainingJob(
             id=job_id,
             pipeline_id=pipeline_id,
             node_id=node_id,
             dataset_source_id=dataset_id,
             user_id=user_id,
             status=JobStatus.QUEUED.value,
+            run_mode="fixed",
             version=version,
             model_type=model_type_val,
             graph=graph,
@@ -67,7 +68,7 @@ class BasicTrainingManager(TrainingJobManagerBase):
         return job_id
 
     @staticmethod
-    def map_training_job_to_info(job: BasicTrainingJob, dataset_name: str | None) -> JobInfo:
+    def map_training_job_to_info(job: TrainingJob, dataset_name: str | None) -> JobInfo:
         # Extract details from graph
         (
             hyperparameters,
@@ -126,10 +127,12 @@ class BasicTrainingManager(TrainingJobManagerBase):
         training". The `update_status_sync` cancelled-state guard further
         protects against any late writes that race past the revoke.
         """
-        return await TrainingJobManagerBase._cancel_job(session, BasicTrainingJob, job_id)
+        return await TrainingJobManagerBase._cancel_job(
+            session, TrainingJob, job_id, run_mode="fixed"
+        )
 
     @staticmethod
-    def _update_training_result(job: BasicTrainingJob, result: dict[str, Any]):
+    def _update_training_result(job: TrainingJob, result: dict[str, Any]):
         if "metrics" in result:
             job.metrics = result["metrics"]
         if "artifact_uri" in result:
@@ -138,20 +141,20 @@ class BasicTrainingManager(TrainingJobManagerBase):
             job.hyperparameters = result["hyperparameters"]
 
     @staticmethod
-    def _append_job_logs(job: BasicTrainingJob, logs: list[str]) -> None:
+    def _append_job_logs(job: TrainingJob, logs: list[str]) -> None:
         """Appends new log lines to a job's existing logs list, in place."""
         TrainingJobManagerBase._append_job_logs(job, logs)
 
     @staticmethod
     def _handle_cancelled_status_update(
-        session: Session, job: BasicTrainingJob, logs: list[str] | None
+        session: Session, job: TrainingJob, logs: list[str] | None
     ) -> bool:
         """Handle a status update for an already-cancelled job: only append logs, never revive it."""
         return TrainingJobManagerBase._handle_cancelled_status_update(session, job, logs)
 
     @staticmethod
     def _apply_status_update_fields(
-        job: BasicTrainingJob,
+        job: TrainingJob,
         status: JobStatus | None,
         error: str | None,
         logs: list[str] | None,
@@ -188,20 +191,23 @@ class BasicTrainingManager(TrainingJobManagerBase):
         """Updates training job status (Sync). Returns True if job found and updated."""
         return TrainingJobManagerBase._update_status_sync(
             session,
-            BasicTrainingJob,
+            TrainingJob,
             job_id,
             status,
             error,
             result,
             logs,
             BasicTrainingManager._apply_status_update_fields,
+            run_mode="fixed",
         )
 
     @staticmethod
     async def get_training_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves a training job by ID."""
         # 1. Fetch Job
-        stmt = select(BasicTrainingJob).where(BasicTrainingJob.id == job_id)
+        stmt = select(TrainingJob).where(
+            TrainingJob.id == job_id, TrainingJob.run_mode == "fixed"
+        )
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
@@ -226,9 +232,9 @@ class BasicTrainingManager(TrainingJobManagerBase):
 
         # 2. Fetch Jobs
         result_train = await session.execute(
-            select(BasicTrainingJob)
-            .where(BasicTrainingJob.model_type != "preview")
-            .order_by(BasicTrainingJob.started_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "fixed", TrainingJob.model_type != "preview")
+            .order_by(TrainingJob.started_at.desc())
             .limit(effective_limit)
             .offset(skip)
         )
