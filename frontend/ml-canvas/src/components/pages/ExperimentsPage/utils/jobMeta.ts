@@ -162,9 +162,9 @@ export function getTaskForModelType(
  * 'advanced_tuning'` directly (plan §0.5: task type and tuning metadata are
  * decoupled concepts from the job's `job_type` string). `search_strategy`
  * is the reliable signal here \u2014 it's a column that only exists on the
- * backend's `AdvancedTuningJob` model (`nullable=False` there), so it's
- * always populated for tuned runs and always absent/undefined for basic
- * training runs, independent of the `job_type` string.
+ * backend's `TrainingJob` model when `run_mode === "tuned"` (`nullable=False`
+ * there), so it's always populated for tuned runs and always absent/undefined
+ * for basic training runs, independent of the `job_type` string.
  */
 export function hasTuningMetadata(job: { job_type?: string; search_strategy?: string }): boolean {
   return job.search_strategy != null || job.job_type === 'advanced_tuning';
