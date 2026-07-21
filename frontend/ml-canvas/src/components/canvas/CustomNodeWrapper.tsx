@@ -88,7 +88,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
   const perfBucket: 'fast' | 'medium' | 'slow' | null =
     perfDurationMs === null
       ? null
-      : bucketDuration(perfDurationMs, getPerfFamily(definitionType));
+      : bucketDuration(perfDurationMs, getPerfFamily(definitionType, data.run_mode as string | undefined));
   const perfRingClass =
     perfBucket === 'fast'
       ? 'ring-2 ring-green-500/60 ring-offset-1 ring-offset-background'

@@ -7,7 +7,7 @@ import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineCon
 import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
 import { toast } from '../../../../core/toast';
 
-const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
+const TRAINING_TYPES = new Set(['training', 'classification', 'regression', 'text_classification']);
 
 export interface RunControls {
   isRunning: boolean;

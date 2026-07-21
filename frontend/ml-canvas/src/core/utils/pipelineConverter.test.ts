@@ -37,7 +37,8 @@ describe('convertGraphToPipelineConfig', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('imp', 'imputation_node', { method: 'simple', strategy: 'mean', columns: ['x'] }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: {},
@@ -127,10 +128,11 @@ describe('convertGraphToPipelineConfig', () => {
     expect(imp?.params).not.toHaveProperty('_merge_strategy');
   });
 
-  it('forwards execution_mode through legacy basic_training params (now emitted as canonical training/fixed)', () => {
+  it('forwards execution_mode through Classification node params (canonical training/fixed)', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: { C: 1 },
@@ -154,19 +156,11 @@ describe('convertGraphToPipelineConfig', () => {
     });
   });
 
-  // Phase 7 merge regression guard: a real saved-canvas AdvancedTuningNode
-  // (`AdvancedTuningNode.ts`'s `defaultConfig`) never sets a `run_mode` field —
-  // only the newer unified TrainingNode/task-scoped nodes do. Post-merge, this
-  // legacy definitionType must still resolve to a *tuned* run purely from the
-  // node's identity, inferring `run_mode: 'tuned'` since the field itself is
-  // absent. This is the exact case a naive branch-merge (dispatching
-  // everything through `node.data.run_mode === 'advanced'` alone) would
-  // silently break: with no `run_mode` field, `undefined !== 'advanced'` and
-  // the merged logic would wrongly treat it as a fixed run.
-  it('emits a canonical training/tuned step for a legacy hyperparameter_tuning node with no run_mode field', () => {
+  it('emits a canonical training/tuned step for a Classification node with run_mode=advanced', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('tune', 'hyperparameter_tuning', {
+      node('tune', 'classification', {
+        run_mode: 'advanced',
         target_column: 'y',
         model_type: 'logistic_regression',
         search_space: { C: [0.1, 1, 10] },
@@ -197,18 +191,16 @@ describe('convertGraphToPipelineConfig', () => {
     });
   });
 
-  // Same regression guard using the canonical BackendStepType.ADVANCED_TUNING
-  // literal definitionType (the `AdvancedTuningNode.ts` registration's own
-  // `type`), not just the older 'hyperparameter_tuning' string alias.
-  it('emits a canonical training/tuned step for a legacy advanced_tuning-typed node with no run_mode field', () => {
+  it('emits a canonical training/tuned step for a Regression node with run_mode=advanced', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('tune', 'advanced_tuning', {
+      node('tune', 'regression', {
+        run_mode: 'advanced',
         target_column: 'y',
-        model_type: 'random_forest_classifier',
+        model_type: 'random_forest_regressor',
         search_space: { n_estimators: [50, 100] },
         search_strategy: 'grid',
-        metric: 'f1',
+        metric: 'r2',
         n_trials: 8,
         cv_enabled: true,
         cv_folds: 5,
@@ -224,23 +216,20 @@ describe('convertGraphToPipelineConfig', () => {
     expect(tune?.params).toMatchObject({
       run_mode: 'tuned',
       target_column: 'y',
-      algorithm: 'random_forest_classifier',
+      algorithm: 'random_forest_regressor',
     });
     expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
       strategy: 'grid',
-      metric: 'f1',
+      metric: 'r2',
       n_trials: 8,
     });
   });
 
-  // Mirrors the two tests above for the fixed/basic side: a legacy
-  // BasicTrainingNode also never sets `run_mode`, but here `undefined !==
-  // 'advanced'` happens to fall into the correct (fixed) branch, now emitting
-  // the canonical `training` step_type + `run_mode: 'fixed'`.
-  it('emits a canonical training/fixed step for a legacy model_training node with no run_mode field', () => {
+  it('emits a canonical training/fixed step for a TextClassification node with run_mode=basic', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('train', 'model_training', {
+      node('train', 'text_classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: { C: 1 },
@@ -355,7 +344,8 @@ describe('convertGraphToPipelineConfig', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('imp', 'imputation_node', { method: 'simple', strategy: 'mean' }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'rf',
         hyperparameters: {},
@@ -417,7 +407,8 @@ describe('convertGraphToPipelineConfig', () => {
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       // Training branch: ds → impA → train
       node('impA', 'imputation_node', { method: 'simple', strategy: 'mean' }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'rf',
         hyperparameters: {},
@@ -452,12 +443,12 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       // Two model nodes feed the ensemble purely as base-learner specs.
-      node('rf', 'basic_training', {
+      node('rf', 'classification', {
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: { n_estimators: 200 },
       }),
-      node('lr', 'basic_training', {
+      node('lr', 'classification', {
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: { C: 0.5 },
@@ -523,7 +514,7 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
   it('threads wired base learners into advanced tuning_config', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('gb', 'basic_training', {
+      node('gb', 'regression', {
         target_column: 'y',
         model_type: 'gradient_boosting_regressor',
         hyperparameters: { learning_rate: 0.1 },
@@ -560,12 +551,12 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('split', 'TrainTestSplitter', {}),
-      node('rf', 'basic_training', {
+      node('rf', 'classification', {
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: {},
       }),
-      node('lr', 'basic_training', {
+      node('lr', 'classification', {
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: {},
@@ -605,12 +596,12 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       // calibrated_classifier is a meta-model with no ensemble base-key mapping
       // → skipped as a base learner.
-      node('cal', 'basic_training', {
+      node('cal', 'classification', {
         target_column: 'y',
         model_type: 'calibrated_classifier',
         hyperparameters: {},
       }),
-      node('rf', 'basic_training', {
+      node('rf', 'classification', {
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: {},

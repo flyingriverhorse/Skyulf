@@ -11,10 +11,6 @@ import { registry } from '../registry/NodeRegistry';
 // sklearn Voting/Stacking always refit their base estimators, so only the recipe
 // (not the fitted weights) is reused.
 const MODEL_SOURCE_TYPES = new Set([
-  'model_training',
-  'basic_training',
-  'hyperparameter_tuning',
-  'advanced_tuning',
   'training',
   'classification',
   'regression',
@@ -37,26 +33,10 @@ const RUN_MODE_TRAINING_TYPES = new Set<string>([
   BackendStepType.TEXT_CLASSIFICATION,
 ]);
 
-// Legacy hidden node `definitionType`s (Phase 7 merge): these predate the
-// `run_mode` field entirely (see `BasicTrainingNode.ts`/`AdvancedTuningNode.ts`
-// `defaultConfig` — neither ever sets `run_mode`), so their fixed/tuned intent
-// must be read off the definitionType itself rather than `node.data.run_mode`.
-const LEGACY_FIXED_TRAINING_TYPES = new Set<string>([
-  'model_training',
-  BackendStepType.BASIC_TRAINING,
-]);
-const LEGACY_TUNED_TRAINING_TYPES = new Set<string>([
-  'hyperparameter_tuning',
-  BackendStepType.ADVANCED_TUNING,
-]);
-
 // All definitionTypes that flow through the single shared fixed/tuned
-// training dispatch below (Phase 7 merge of the legacy + unified branches).
-const ALL_TRAINING_DISPATCH_TYPES = new Set<string>([
-  ...RUN_MODE_TRAINING_TYPES,
-  ...LEGACY_FIXED_TRAINING_TYPES,
-  ...LEGACY_TUNED_TRAINING_TYPES,
-]);
+// training dispatch below: the generic TrainingNode plus the 3 task-scoped
+// supervised nodes.
+const ALL_TRAINING_DISPATCH_TYPES = RUN_MODE_TRAINING_TYPES;
 
 // Maps a full training-node `model_type` back to the short ensemble base-learner
 // key the core resolver understands. Mirrors `_BASE_KEY_TO_REGISTRY_*` in
@@ -144,9 +124,9 @@ const collectWiredBaseSpecs = (
 };
 
 /**
- * Fixed-mode ("basic_training") training params shared by the plain
- * `model_training`/`basic_training` node and the unified `TrainingNode`
- * (Phase 3) when its `run_mode` is `'basic'`.
+ * Fixed-mode training params shared by the unified `TrainingNode` and the
+ * task-scoped Classification/Regression/Text Classification nodes when
+ * their `run_mode` is `'basic'`.
  */
 const buildFixedTrainingParams = (data: Record<string, unknown>): Record<string, unknown> => ({
     target_column: data.target_column,
@@ -417,22 +397,11 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           stepType = 'InvalidValueReplacement';
           params = node.data;
       } else if (ALL_TRAINING_DISPATCH_TYPES.has(node.data.definitionType as string)) {
-          // Unified TrainingNode, the task-scoped Classification/Regression/
-          // Text Classification nodes (Phase 3 Part B), AND the legacy
-          // hidden BasicTrainingNode/AdvancedTuningNode (Phase 7 merge):
-          // all dispatch through the same fixed/tuned param-building
-          // helpers and emit the canonical `training` step_type.
-          //
-          // The legacy nodes never populate `node.data.run_mode` at all
-          // (only the newer unified TrainingNode defaults one) - so the
-          // "advanced" intent must be inferred from the node's
-          // `definitionType` itself for those old node shapes. Do not
-          // simplify this to `node.data.run_mode === 'advanced'` alone;
-          // that would silently reclassify every saved legacy
-          // AdvancedTuningNode as a fixed/basic run.
-          const isAdvanced = node.data.run_mode
-              ? node.data.run_mode === 'advanced'
-              : LEGACY_TUNED_TRAINING_TYPES.has(node.data.definitionType as string);
+          // The generic TrainingNode and the 3 task-scoped Classification/
+          // Regression/Text Classification nodes all dispatch through the
+          // same fixed/tuned param-building helpers and emit the canonical
+          // `training` step_type.
+          const isAdvanced = node.data.run_mode === 'advanced';
           if (isAdvanced) {
               stepType = BackendStepType.TRAINING;
               params = {
@@ -645,8 +614,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
     // keep only ancestors. When no explicit terminals exist, infer from
     // graph leaves so parallel preview branches survive.
     const terminalTypes = new Set([
-      BackendStepType.BASIC_TRAINING,
-      BackendStepType.ADVANCED_TUNING,
+      BackendStepType.TRAINING,
       'data_preview',
     ]);
     let seeds = sortedNodes.filter(n => terminalTypes.has(n.step_type));

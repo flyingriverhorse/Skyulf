@@ -773,7 +773,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
 
     for (const edge of incomingEdges) {
       const src = nodes.find((n) => n.id === edge.source);
-      if (src && ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'].includes(src.data.definitionType as string)) {
+      if (src && ['training', 'classification', 'regression', 'text_classification'].includes(src.data.definitionType as string)) {
         incomingModels.push(src);
       }
     }
@@ -799,12 +799,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
     let detectedTrials = config.n_trials;
     let detectedMetric = config.metric;
 
-    const advancedNode = incomingModels.find(
-      (m) =>
-        m.data.definitionType === 'advanced_tuning' ||
-        m.data.definitionType === 'hyperparameter_tuning' ||
-        m.data.run_mode === 'advanced'
-    );
+    const advancedNode = incomingModels.find((m) => m.data.run_mode === 'advanced');
 
     if (advancedNode) {
       detectedRunMode = 'advanced';
@@ -967,7 +962,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
       const src = nodes.find((n) => n.id === e.source);
       return (
         !!src &&
-        ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'].includes(
+        ['training', 'classification', 'regression', 'text_classification'].includes(
           src.data.definitionType as string,
         )
       );
