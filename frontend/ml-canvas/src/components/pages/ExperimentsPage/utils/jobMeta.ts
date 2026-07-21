@@ -3,6 +3,7 @@
  * Pure functions only — no React, no API calls.
  */
 import type { TaskType } from '../../../../core/types/taskType';
+import { isEnsembleModelType } from '../../../../core/utils/format';
 import type { ThresholdMetric } from './classificationCharts';
 export type { ThresholdMetric };
 
@@ -132,11 +133,15 @@ export type ExperimentsTask = TaskType | 'other';
 /**
  * Resolves a job's task type from its `model_type`, using the same
  * `RegistryItem.tags` data `TrainingSettings.tsx` uses to filter each task
- * node's model dropdown (clustering \u2192 segmentation, classification \u2192
- * classification, regression \u2192 regression, text/nlp \u2192 text_classification).
+ * node's model dropdown (clustering → segmentation, classification →
+ * classification, regression → regression, text/nlp → text_classification).
+ *
+ * Ensemble model types (voting/stacking classifier/regressor) are checked
+ * first via `isEnsembleModelType` and always resolve to `'ensemble'`,
+ * regardless of their underlying classification/regression tags.
  *
  * `logistic_regression` is dual-tagged (`classification` + `text`/`nlp`,
- * since it's usable directly on vectorized text features too) \u2014 with no
+ * since it's usable directly on vectorized text features too) — with no
  * other signal to disambiguate, this defaults it to `classification` (the
  * more common case). Naive Bayes (`multinomial_nb`/`bernoulli_nb`) and
  * `sgd_classifier` are tagged `text`/`nlp` only, so they always resolve to
@@ -147,6 +152,7 @@ export function getTaskForModelType(
   registryItems: { id: string; tags?: string[] }[],
 ): ExperimentsTask {
   if (!modelType) return 'other';
+  if (isEnsembleModelType(modelType)) return 'ensemble';
   const tags = registryItems.find(r => r.id === modelType)?.tags ?? [];
   if (tags.includes('clustering')) return 'segmentation';
   if (modelType === 'logistic_regression') return 'classification';

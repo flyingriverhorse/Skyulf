@@ -10,4 +10,4 @@
  * `ExperimentsPage/utils/jobMeta.ts` to avoid a page-utility module being
  * imported by the more foundational `core/store/useJobStore.ts`.
  */
-export type TaskType = 'classification' | 'regression' | 'text_classification' | 'segmentation';
+export type TaskType = 'classification' | 'regression' | 'text_classification' | 'segmentation' | 'ensemble';
