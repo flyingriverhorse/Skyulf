@@ -153,12 +153,119 @@ describe('convertGraphToPipelineConfig', () => {
     });
   });
 
+  // Phase 7 groundwork regression guard: a real saved-canvas AdvancedTuningNode
+  // (`AdvancedTuningNode.ts`'s `defaultConfig`) never sets a `run_mode` field —
+  // only the newer unified TrainingNode/task-scoped nodes do. This legacy
+  // literal-definitionType branch must resolve to a tuned run purely from the
+  // node's *identity* (definitionType), not from a `run_mode` field that these
+  // old nodes never carry. This is the exact case a naive Phase 7 branch-merge
+  // (dispatching everything through the unified `run_mode === 'advanced'`
+  // check) would silently break: with no `run_mode` field, `undefined !==
+  // 'advanced'` and the merged logic would wrongly treat it as a fixed run.
+  it('emits an advanced_tuning step for a legacy hyperparameter_tuning node with no run_mode field', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'hyperparameter_tuning', {
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        search_space: { C: [0.1, 1, 10] },
+        search_strategy: 'random',
+        metric: 'accuracy',
+        n_trials: 5,
+        cv_enabled: true,
+        cv_folds: 3,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 42,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect(tune?.step_type).toBe('advanced_tuning');
+    expect(tune?.params).not.toHaveProperty('run_mode');
+    expect(tune?.params).toMatchObject({
+      target_column: 'y',
+      algorithm: 'logistic_regression',
+    });
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      strategy: 'random',
+      metric: 'accuracy',
+      n_trials: 5,
+      search_space: { C: [0.1, 1, 10] },
+    });
+  });
+
+  // Same regression guard using the canonical BackendStepType.ADVANCED_TUNING
+  // literal definitionType (the `AdvancedTuningNode.ts` registration's own
+  // `type`), not just the older 'hyperparameter_tuning' string alias.
+  it('emits an advanced_tuning step for a legacy advanced_tuning-typed node with no run_mode field', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'advanced_tuning', {
+        target_column: 'y',
+        model_type: 'random_forest_classifier',
+        search_space: { n_estimators: [50, 100] },
+        search_strategy: 'grid',
+        metric: 'f1',
+        n_trials: 8,
+        cv_enabled: true,
+        cv_folds: 5,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 42,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect(tune?.step_type).toBe('advanced_tuning');
+    expect(tune?.params).toMatchObject({
+      target_column: 'y',
+      algorithm: 'random_forest_classifier',
+    });
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      strategy: 'grid',
+      metric: 'f1',
+      n_trials: 8,
+    });
+  });
+
+  // Mirrors the two tests above for the fixed/basic side: a legacy
+  // BasicTrainingNode also never sets `run_mode`, but here `undefined !==
+  // 'advanced'` happens to fall into the correct (fixed) branch today — this
+  // locks that in explicitly so a future merge can't silently invert it.
+  it('emits a basic_training step for a legacy model_training node with no run_mode field', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('train', 'model_training', {
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        hyperparameters: { C: 1 },
+        cv_enabled: true,
+        cv_folds: 3,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 42,
+      }),
+    ];
+    const edges = [edge('ds', 'train')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const train = cfg.nodes.find((n) => n.node_id === 'train');
+    expect(train?.step_type).toBe('basic_training');
+    expect(train?.params).toMatchObject({
+      target_column: 'y',
+      model_type: 'logistic_regression',
+      hyperparameters: { C: 1 },
+    });
+  });
+
   // Phase 3 Part B (plan §0.6): the generic TrainingNode and the 3
   // task-scoped nodes (Classification/Regression/Text Classification) all
   // share the same run_mode-keyed dispatch — only the model dropdown they
   // expose differs, the submitted step_type/params must be identical.
   it.each(['training', 'classification', 'regression', 'text_classification'])(
-    '%s definitionType in basic run_mode submits a basic_training step',
+    '%s definitionType in basic run_mode submits a training step with run_mode=fixed',
     (definitionType) => {
       const nodes = [
         node('ds', 'dataset_node', { datasetId: 'd1' }),
@@ -188,7 +295,7 @@ describe('convertGraphToPipelineConfig', () => {
   );
 
   it.each(['training', 'classification', 'regression', 'text_classification'])(
-    '%s definitionType in advanced run_mode submits an advanced_tuning step',
+    '%s definitionType in advanced run_mode submits a training step with run_mode=tuned',
     (definitionType) => {
       const nodes = [
         node('ds', 'dataset_node', { datasetId: 'd1' }),
