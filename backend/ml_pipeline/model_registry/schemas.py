@@ -9,7 +9,7 @@ class ModelVersion(BaseModel):
     pipeline_id: str
     node_id: str
     model_type: str
-    version: int | str  # version for training, run_number for tuning
+    version: int | str  # shared version sequence for both "fixed" and "tuned" run_modes
     source: str  # "training" or "tuning"
     status: str
     metrics: dict[str, Any] | None = None
