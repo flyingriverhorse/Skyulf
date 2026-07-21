@@ -35,9 +35,15 @@ def _make_job(status: str, logs: list[str] | None = None, task_id: str | None = 
 
 
 def _make_sync_session(job=None):
-    """Return a mock sync Session whose .query().filter().first() returns *job*."""
+    """Return a mock sync Session whose .query().filter()...first() returns *job*.
+
+    `_update_status_sync` may chain a second `.filter()` call for the
+    `run_mode` scoping (see `job_manager_base.py`), so both the single- and
+    double-filter chains are wired to resolve to the same *job*.
+    """
     session = MagicMock()
     session.query.return_value.filter.return_value.first.return_value = job
+    session.query.return_value.filter.return_value.filter.return_value.first.return_value = job
     return session
 
 
