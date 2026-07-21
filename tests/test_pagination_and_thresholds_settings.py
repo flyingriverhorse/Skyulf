@@ -28,11 +28,10 @@ from sqlalchemy.orm import sessionmaker
 
 from backend.data_ingestion.serialization import AsyncJSONSafeSerializer
 from backend.database.models import (
-    AdvancedTuningJob,
     Base,
-    BasicTrainingJob,
     DataSource,
     Deployment,
+    TrainingJob,
 )
 from backend.database.repository import BaseRepository
 from backend.eda.router import FilterRequest
@@ -59,8 +58,8 @@ async def async_session():
     await engine.dispose()
 
 
-def _make_training_job(idx: int) -> BasicTrainingJob:
-    return BasicTrainingJob(
+def _make_training_job(idx: int) -> TrainingJob:
+    return TrainingJob(
         id=str(uuid.uuid4()),
         pipeline_id=f"p{idx}",
         node_id=f"n{idx}",
@@ -68,12 +67,13 @@ def _make_training_job(idx: int) -> BasicTrainingJob:
         status="completed",
         model_type="classifier",
         graph={},
+        run_mode="fixed",
         version=1,
     )
 
 
-def _make_tuning_job(idx: int, model_type: str = "classifier") -> AdvancedTuningJob:
-    return AdvancedTuningJob(
+def _make_tuning_job(idx: int, model_type: str = "classifier") -> TrainingJob:
+    return TrainingJob(
         id=str(uuid.uuid4()),
         pipeline_id=f"p{idx}",
         node_id=f"n{idx}",
@@ -81,7 +81,8 @@ def _make_tuning_job(idx: int, model_type: str = "classifier") -> AdvancedTuning
         status=JobStatus.COMPLETED.value,
         model_type=model_type,
         graph={},
-        run_number=1,
+        run_mode="tuned",
+        version=1,
         search_strategy="random",
         finished_at=datetime.now(UTC).replace(tzinfo=None),
     )

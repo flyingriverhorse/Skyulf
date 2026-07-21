@@ -15,7 +15,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from backend.database.models import Base, BasicTrainingJob
+from backend.database.models import Base, TrainingJob
 from backend.ml_pipeline._execution.jobs import JobManager
 from backend.ml_pipeline._execution.schemas import JobStatus
 
@@ -37,9 +37,9 @@ async def async_session():
 
 
 async def _insert_running_job(session: AsyncSession, created_at: datetime) -> str:
-    """Insert a minimal running BasicTrainingJob row with a specific created_at."""
+    """Insert a minimal running TrainingJob row (run_mode='fixed') with a specific created_at."""
     job_id = str(uuid.uuid4())
-    job = BasicTrainingJob(
+    job = TrainingJob(
         id=job_id,
         pipeline_id="p1",
         node_id="n1",
@@ -47,6 +47,7 @@ async def _insert_running_job(session: AsyncSession, created_at: datetime) -> st
         status=JobStatus.RUNNING.value,
         model_type="classifier",
         graph={},
+        run_mode="fixed",
         job_metadata={"branch_index": 0},
         created_at=created_at,
     )

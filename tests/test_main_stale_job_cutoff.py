@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import create_engine
 
-from backend.database.models import AdvancedTuningJob, Base, BasicTrainingJob
+from backend.database.models import Base, TrainingJob
 
 
 def _make_engine(db_path):
@@ -17,22 +17,23 @@ def _make_engine(db_path):
     engine = create_engine(f"sqlite:///{db_path}")
     Base.metadata.create_all(
         engine,
-        tables=[BasicTrainingJob.__table__, AdvancedTuningJob.__table__],
+        tables=[TrainingJob.__table__],
     )
     return engine
 
 
 def _insert_running_job(engine, job_id: str, started_at: datetime) -> None:
-    """Insert a minimal 'running' BasicTrainingJob row started at the given time."""
+    """Insert a minimal 'running' TrainingJob row (run_mode='fixed') started at the given time."""
     with engine.begin() as conn:
         conn.execute(
-            BasicTrainingJob.__table__.insert().values(
+            TrainingJob.__table__.insert().values(
                 id=job_id,
                 pipeline_id="p1",
                 node_id="n1",
                 dataset_source_id="d1",
                 status="running",
                 model_type="classifier",
+                run_mode="fixed",
                 graph={},
                 started_at=started_at,
             )
@@ -60,7 +61,7 @@ def test_reset_stale_jobs_uses_configured_orphan_stale_hours(tmp_path, monkeypat
 
     with engine.begin() as conn:
         row = conn.execute(
-            BasicTrainingJob.__table__.select().where(BasicTrainingJob.__table__.c.id == "job-90m")
+            TrainingJob.__table__.select().where(TrainingJob.__table__.c.id == "job-90m")
         ).one()
     # 90 minutes < 3-hour cutoff => job should NOT have been marked failed.
     assert row.status == "running"
@@ -74,7 +75,7 @@ def test_reset_stale_jobs_uses_configured_orphan_stale_hours(tmp_path, monkeypat
 
     with engine.begin() as conn:
         row = conn.execute(
-            BasicTrainingJob.__table__.select().where(BasicTrainingJob.__table__.c.id == "job-90m")
+            TrainingJob.__table__.select().where(TrainingJob.__table__.c.id == "job-90m")
         ).one()
     # 90 minutes > 1-hour cutoff => job should now be marked failed.
     assert row.status == "failed"
