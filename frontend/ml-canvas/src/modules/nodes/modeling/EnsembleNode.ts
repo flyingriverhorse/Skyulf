@@ -6,7 +6,7 @@ import { createModelingNode } from '../../../core/factories/nodeFactory';
  * Dedicated ensemble model node. Combines several base learners via Voting or
  * Stacking (classification or regression). Reuses the shared training plumbing
  * (`useTrainingNodeContext`) and runs either through the standard
- * `basic_training` path or, in advanced mode, the `advanced_tuning` engine —
+ * `training` path or, in advanced mode, the `tuning` engine —
  * which can also tune the base models' hyperparameters via nested search keys.
  */
 export const EnsembleNode = createModelingNode({

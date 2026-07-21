@@ -48,7 +48,7 @@ export function applyDiffStylingToSide(
       : d.status === 'removed' && side === 'right' ? 'unchanged'
       : d.status;
     const data = (n.data ?? {}) as Record<string, unknown>;
-    // Prefer the human-friendly step type (e.g. "basic_training",
+    // Prefer the human-friendly step type (e.g. "training",
     // "outlier_handling") as the primary label and demote the raw
     // node id to a smaller monospace sub-line. This avoids the
     // "label vs id collision" the user flagged where both lines

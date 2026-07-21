@@ -54,7 +54,7 @@ const SCORE_METRIC_PRIORITY: Record<'classification' | 'text_classification' | '
   segmentation: ['silhouette_score', 'calinski_harabasz_score', 'davies_bouldin_score'],
 };
 
-// Preferred split order when reading a `basic_training` job's flat
+// Preferred split order when reading a `training` job's flat
 // `{split}_{metric}` keys (e.g. `test_accuracy`). Mirrors the backend's own
 // headline-metric search order in `_execution/summary.py`: held-out
 // performance (test) is more meaningful than train-set performance, which
@@ -75,10 +75,10 @@ export interface DisplayScore {
  * segmentation) and preferring held-out splits (test > val > train) over
  * the train split alone.
  *
- * - `advanced_tuning` jobs: use the cross-validated `best_score` + the
+ * - `tuning` jobs: use the cross-validated `best_score` + the
  *   scoring metric that was actually optimized (unambiguous, already
  *   task-appropriate since the user picked it).
- * - `basic_training` jobs: scan `result.metrics`'s flat `{split}_{metric}`
+ * - `training` jobs: scan `result.metrics`'s flat `{split}_{metric}`
  *   keys using the task's metric priority list and the split priority
  *   above, so e.g. a classification job shows `test_f1_weighted` before
  *   falling back to `train_accuracy`.
@@ -124,7 +124,7 @@ export function shortRunId(job: { pipeline_id: string; parent_pipeline_id?: stri
 
 /**
  * Task-type filter values shown as Job History / Experiments tabs
- * (plan §0.5/§0.6: group jobs by task, not by basic_training/advanced_tuning
+ * (plan §0.5/§0.6: group jobs by task, not by training/tuning
  * engine). "other" covers any model_type not resolvable via registry tags
  * (e.g. registry not loaded yet, or a model added without task tags).
  */
