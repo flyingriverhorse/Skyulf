@@ -55,6 +55,7 @@ _OPTIONAL_PARAM_KEYS: dict[str, set[str]] = {
     # The X features DataFrame passed to them never contains it.
     "basic_training": {"target_column"},
     "advanced_tuning": {"target_column"},
+    "training": {"target_column"},
     # Encoders: target_column is the y series input for supervised encoders
     # (TargetEncoder). X features no longer contain it when
     # FeatureTargetSplitter is upstream.

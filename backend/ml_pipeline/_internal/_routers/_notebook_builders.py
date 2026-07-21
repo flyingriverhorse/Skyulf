@@ -158,6 +158,14 @@ def _model_label(model: _NodeIn | None) -> str:
     return _model_algorithm(model)
 
 
+def _is_tuning_model(model: _NodeIn) -> bool:
+    """True for a legacy `advanced_tuning` node, or a unified `training`
+    node whose `run_mode` param is `"tuned"`."""
+    if model.step_type == "advanced_tuning":
+        return True
+    return model.step_type == "training" and model.params.get("run_mode") == "tuned"
+
+
 def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
     """Map a model `_NodeIn` to a SkyulfPipeline-compatible modeling dict.
 
@@ -169,7 +177,7 @@ def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
     """
     algorithm = str(model.params.get("algorithm") or model.params.get("type") or "")
     clean_params = strip_internal_params(model.params)
-    if model.step_type == "advanced_tuning" and algorithm:
+    if _is_tuning_model(model) and algorithm:
         tuning_cfg = clean_params.pop("tuning_config", {}) or {}
         return {
             "type": "hyperparameter_tuner",
@@ -504,7 +512,7 @@ def modeling_cells(
     algo = _model_algorithm(model)
     h = "###" if in_branch else "## 6."
     metrics_var = f"metrics_{branch_letter}" if branch_letter else "report"
-    is_tuning = model.step_type == "advanced_tuning"
+    is_tuning = _is_tuning_model(model)
     cell_src = (
         _modeling_cell_tuning(model, algo, config_json, metrics_var)
         if is_tuning
