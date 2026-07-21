@@ -6,8 +6,8 @@ interface HeaderProps {
   datasets: { id: string; name: string }[];
   selectedDatasetId: string;
   setSelectedDatasetId: (v: string) => void;
-  filterType: 'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation';
-  setFilterType: (v: 'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation') => void;
+  filterType: 'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation' | 'ensemble';
+  setFilterType: (v: 'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation' | 'ensemble') => void;
 }
 
 export const ExperimentsHeader: React.FC<HeaderProps> = ({
@@ -36,13 +36,14 @@ export const ExperimentsHeader: React.FC<HeaderProps> = ({
       <select
         className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
         value={filterType}
-        onChange={(e) => { setFilterType(e.target.value as 'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation'); }}
+        onChange={(e) => { setFilterType(e.target.value as 'all' | 'classification' | 'regression' | 'text_classification' | 'segmentation' | 'ensemble'); }}
       >
         <option value="all">All Experiments</option>
         <option value="classification">Classification</option>
         <option value="regression">Regression</option>
         <option value="text_classification">Text Classification</option>
         <option value="segmentation">Segmentation</option>
+        <option value="ensemble">Ensemble</option>
       </select>
     </div>
   </div>
