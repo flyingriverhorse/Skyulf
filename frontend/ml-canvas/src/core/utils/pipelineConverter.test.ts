@@ -177,8 +177,9 @@ describe('convertGraphToPipelineConfig', () => {
       const edges = [edge('ds', 'train')];
       const cfg = convertGraphToPipelineConfig(nodes, edges);
       const train = cfg.nodes.find((n) => n.node_id === 'train');
-      expect(train?.step_type).toBe('basic_training');
+      expect(train?.step_type).toBe('training');
       expect(train?.params).toMatchObject({
+        run_mode: 'fixed',
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: { C: 1 },
@@ -209,8 +210,9 @@ describe('convertGraphToPipelineConfig', () => {
       const edges = [edge('ds', 'train')];
       const cfg = convertGraphToPipelineConfig(nodes, edges);
       const train = cfg.nodes.find((n) => n.node_id === 'train');
-      expect(train?.step_type).toBe('advanced_tuning');
+      expect(train?.step_type).toBe('training');
       expect(train?.params).toMatchObject({
+        run_mode: 'tuned',
         target_column: 'y',
         algorithm: 'logistic_regression',
       });

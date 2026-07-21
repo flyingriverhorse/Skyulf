@@ -406,8 +406,9 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           // toggle. The task split only affects which models the settings
           // panel offers — the submitted params/step_type are identical.
           if (node.data.run_mode === 'advanced') {
-              stepType = BackendStepType.ADVANCED_TUNING;
+              stepType = BackendStepType.TRAINING;
               params = {
+                  run_mode: 'tuned',
                   target_column: node.data.target_column,
                   algorithm: node.data.model_type,
                   execution_mode: node.data.execution_mode,
@@ -417,8 +418,11 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   }
               };
           } else {
-              stepType = BackendStepType.BASIC_TRAINING;
-              params = buildFixedTrainingParams(node.data);
+              stepType = BackendStepType.TRAINING;
+              params = {
+                  run_mode: 'fixed',
+                  ...buildFixedTrainingParams(node.data)
+              };
           }
       } else if (node.data.definitionType === 'SegmentationNode') {
           stepType = BackendStepType.BASIC_TRAINING;
