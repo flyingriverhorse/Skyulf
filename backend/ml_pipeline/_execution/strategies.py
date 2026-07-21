@@ -144,8 +144,8 @@ class AdvancedTuningStrategy(JobStrategy):
 
     def get_initial_log(self, job: MLJob) -> str:
         timestamp = datetime.now().strftime("%H:%M:%S")
-        run_number = getattr(job, "run_number", "unknown")
-        return f"[{timestamp}] Tuning Job Run: {run_number}"
+        version = getattr(job, "version", "unknown")
+        return f"[{timestamp}] Tuning Job Run: {version}"
 
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
         # Call base to set standard metrics
