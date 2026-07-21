@@ -204,7 +204,7 @@ def _reset_stale_jobs() -> None:
             hours=get_settings().JOB_ORPHAN_STALE_HOURS
         )
         with engine.begin() as conn:
-            for table in ("basic_training_jobs", "advanced_tuning_jobs"):
+            for table in ("training_jobs",):
                 # `table` is drawn only from the fixed tuple above (never user input),
                 # so the identifier interpolation below is not injectable.
                 result = conn.execute(

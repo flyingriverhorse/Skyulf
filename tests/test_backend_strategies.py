@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob
+from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.schemas import (
     JobStatus,
     NodeExecutionResult,
@@ -47,11 +47,12 @@ class TestBasicTrainingStrategy(unittest.TestCase):
     def setUp(self):
         self.strategy = BasicTrainingStrategy()
         # Mock a Job object
-        self.job = MagicMock(spec=BasicTrainingJob)
+        self.job = MagicMock(spec=TrainingJob)
+        self.job.run_mode = "fixed"
         self.job.metrics = {}  # Start with empty metrics
 
     def test_get_job_model(self):
-        self.assertEqual(self.strategy.get_job_model(), BasicTrainingJob)
+        self.assertEqual(self.strategy.get_job_model(), TrainingJob)
 
     def test_get_initial_log(self):
         self.job.version = "1.0.0"
@@ -88,14 +89,15 @@ class TestBasicTrainingStrategy(unittest.TestCase):
 class TestAdvancedTuningStrategy(unittest.TestCase):
     def setUp(self):
         self.strategy = AdvancedTuningStrategy()
-        self.job = MagicMock(spec=AdvancedTuningJob)
+        self.job = MagicMock(spec=TrainingJob)
+        self.job.run_mode = "tuned"
         self.job.metrics = {}
         # Mock specific tuning fields
         self.job.best_params = {}
         self.job.best_score = 0.0
 
     def test_get_job_model(self):
-        self.assertEqual(self.strategy.get_job_model(), AdvancedTuningJob)
+        self.assertEqual(self.strategy.get_job_model(), TrainingJob)
 
     def test_handle_success_tuning_fields(self):
         # Result simulates a Tuning node output
