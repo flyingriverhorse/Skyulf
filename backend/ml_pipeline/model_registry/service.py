@@ -7,11 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.database.models import (
-    AdvancedTuningJob,
-    BasicTrainingJob,
     DataSource,
     Deployment,
     ModelVersionCounter,
+    TrainingJob,
 )
 from backend.ml_pipeline._services.job_service import JobService
 
@@ -30,21 +29,14 @@ class ModelRegistryService:
         the counter table, so historical jobs created before the counter
         existed keep receiving version numbers that continue their sequence.
         """
-        stmt_train = select(func.max(BasicTrainingJob.version)).where(
-            BasicTrainingJob.dataset_source_id == dataset_id,
-            BasicTrainingJob.model_type == model_type,
+        stmt = select(func.max(TrainingJob.version)).where(
+            TrainingJob.dataset_source_id == dataset_id,
+            TrainingJob.model_type == model_type,
         )
-        result_train = await session.execute(stmt_train)
-        max_train = result_train.scalar() or 0
+        result = await session.execute(stmt)
+        max_version = result.scalar() or 0
 
-        stmt_tune = select(func.max(AdvancedTuningJob.run_number)).where(
-            AdvancedTuningJob.dataset_source_id == dataset_id,
-            AdvancedTuningJob.model_type == model_type,
-        )
-        result_tune = await session.execute(stmt_tune)
-        max_tune = result_tune.scalar() or 0
-
-        return max(max_train, max_tune) + 1
+        return max_version + 1
 
     @staticmethod
     async def get_next_version(
@@ -52,8 +44,8 @@ class ModelRegistryService:
     ) -> int:
         """Atomically allocates the next version number for a dataset/model_type pair.
 
-        Versions are shared between ``BasicTrainingJob.version`` and
-        ``AdvancedTuningJob.run_number`` (same sequence), backed by a single
+        Both "fixed" and "tuned" run_modes of ``TrainingJob`` share the same
+        ``version`` column and sequence, backed by a single
         ``ModelVersionCounter`` row per (dataset_id, model_type). The previous
         implementation computed ``max(...) + 1`` via a plain SELECT with no
         locking, so two concurrent job submissions for the same dataset/model
@@ -110,10 +102,14 @@ class ModelRegistryService:
 
         # Count total versions (completed jobs)
         train_count = await session.scalar(
-            select(func.count(BasicTrainingJob.id)).where(BasicTrainingJob.status == "completed")
+            select(func.count(TrainingJob.id)).where(
+                TrainingJob.run_mode == "fixed", TrainingJob.status == "completed"
+            )
         )
         tune_count = await session.scalar(
-            select(func.count(AdvancedTuningJob.id)).where(AdvancedTuningJob.status == "completed")
+            select(func.count(TrainingJob.id)).where(
+                TrainingJob.run_mode == "tuned", TrainingJob.status == "completed"
+            )
         )
 
         # Count active deployments
@@ -151,28 +147,28 @@ class ModelRegistryService:
         return ds_map
 
     @staticmethod
-    async def _fetch_completed_train_jobs(session: AsyncSession) -> list[BasicTrainingJob]:
-        """Fetches completed training jobs ordered by newest first."""
+    async def _fetch_completed_train_jobs(session: AsyncSession) -> list[TrainingJob]:
+        """Fetches completed fixed-mode training jobs ordered by newest first."""
         train_jobs_result = await session.execute(
-            select(BasicTrainingJob)
-            .where(BasicTrainingJob.status == "completed")
-            .order_by(BasicTrainingJob.created_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "fixed", TrainingJob.status == "completed")
+            .order_by(TrainingJob.created_at.desc())
         )
         return list(train_jobs_result.scalars().all())
 
     @staticmethod
-    async def _fetch_completed_tune_jobs(session: AsyncSession) -> list[AdvancedTuningJob]:
-        """Fetches completed tuning jobs ordered by newest first."""
+    async def _fetch_completed_tune_jobs(session: AsyncSession) -> list[TrainingJob]:
+        """Fetches completed tuned-mode tuning jobs ordered by newest first."""
         tune_jobs_result = await session.execute(
-            select(AdvancedTuningJob)
-            .where(AdvancedTuningJob.status == "completed")
-            .order_by(AdvancedTuningJob.created_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "tuned", TrainingJob.status == "completed")
+            .order_by(TrainingJob.created_at.desc())
         )
         return list(tune_jobs_result.scalars().all())
 
     @staticmethod
     def _train_job_to_version(
-        job: BasicTrainingJob, deployed_job_ids: dict[Any, Any]
+        job: TrainingJob, deployed_job_ids: dict[Any, Any]
     ) -> ModelVersion:
         """Converts a completed training job into a ModelVersion entry."""
         return ModelVersion(
@@ -193,11 +189,10 @@ class ModelRegistryService:
 
     @staticmethod
     def _tune_job_to_version(
-        job: AdvancedTuningJob, deployed_job_ids: dict[Any, Any]
+        job: TrainingJob, deployed_job_ids: dict[Any, Any]
     ) -> ModelVersion:
-        """Converts a completed tuning job into a ModelVersion entry, using run_number as version."""
-        # For tuning jobs, we use run_number as version
-        # And best_params as hyperparameters
+        """Converts a completed tuning job into a ModelVersion entry, using version as the version."""
+        # For tuning jobs, best_params is used as hyperparameters
         metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})
         if job.best_score is not None:
             metrics["best_score"] = job.best_score
@@ -207,7 +202,7 @@ class ModelRegistryService:
             pipeline_id=job.pipeline_id,
             node_id=job.node_id,
             model_type=cast(str, job.model_type or "unknown"),
-            version=job.run_number,
+            version=job.version,
             source="tuning",
             status=job.status,
             metrics=metrics,
@@ -220,8 +215,8 @@ class ModelRegistryService:
 
     @staticmethod
     def _group_versions_by_model_and_dataset(
-        train_jobs: list[BasicTrainingJob],
-        tune_jobs: list[AdvancedTuningJob],
+        train_jobs: list[TrainingJob],
+        tune_jobs: list[TrainingJob],
         deployed_job_ids: dict[Any, Any],
     ) -> dict[tuple[str, str], list[ModelVersion]]:
         """Groups training and tuning job versions by (model_type, dataset_source_id)."""
@@ -289,7 +284,7 @@ class ModelRegistryService:
     ) -> list[ModelRegistryEntry]:
         """
         Lists all model types and their versions.
-        Aggregates BasicTrainingJob and AdvancedTuningJob by (model_type, dataset_source_id).
+        Aggregates TrainingJob by (model_type, dataset_source_id), scoped by run_mode.
         """
         deployed_job_ids = await ModelRegistryService._get_deployed_job_ids(session)
         ds_map = await ModelRegistryService._build_dataset_map(session)
@@ -332,12 +327,13 @@ class ModelRegistryService:
 
         versions = []
 
-        # Training Jobs
+        # Training Jobs (fixed mode)
         train_jobs = await session.execute(
-            select(BasicTrainingJob)
-            .where(BasicTrainingJob.status == "completed")
-            .where(BasicTrainingJob.model_type == model_type)
-            .order_by(BasicTrainingJob.created_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "fixed")
+            .where(TrainingJob.status == "completed")
+            .where(TrainingJob.model_type == model_type)
+            .order_by(TrainingJob.created_at.desc())
         )
         versions.extend(
             ModelVersion(
@@ -358,12 +354,13 @@ class ModelRegistryService:
             for job in train_jobs.scalars().all()
         )
 
-        # Tuning Jobs
+        # Tuning Jobs (tuned mode)
         tune_jobs = await session.execute(
-            select(AdvancedTuningJob)
-            .where(AdvancedTuningJob.status == "completed")
-            .where(AdvancedTuningJob.model_type == model_type)
-            .order_by(AdvancedTuningJob.created_at.desc())
+            select(TrainingJob)
+            .where(TrainingJob.run_mode == "tuned")
+            .where(TrainingJob.status == "completed")
+            .where(TrainingJob.model_type == model_type)
+            .order_by(TrainingJob.created_at.desc())
         )
         for job in tune_jobs.scalars().all():
             metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})
@@ -376,7 +373,7 @@ class ModelRegistryService:
                     pipeline_id=job.pipeline_id,
                     node_id=job.node_id,
                     model_type=model_type,
-                    version=job.run_number,
+                    version=job.version,
                     source="tuning",
                     status=job.status,
                     metrics=metrics,
