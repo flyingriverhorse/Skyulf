@@ -52,7 +52,7 @@ def test_pipeline_execution_flow(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["node_features"],
                 params={
                     "target_column": "target",
@@ -115,9 +115,10 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
             ),
             NodeConfig(
                 node_id="node_tuning",
-                step_type=StepType.ADVANCED_TUNING,
+                step_type=StepType.TRAINING,
                 inputs=["node_features"],
                 params={
+                    "run_mode": "tuned",
                     "target_column": "target",
                     "algorithm": "logistic_regression",
                     "tuning_config": {

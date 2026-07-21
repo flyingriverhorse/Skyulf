@@ -32,8 +32,6 @@ logger = logging.getLogger(__name__)
 # Training/tuning leaves don't have downstream consumers but we still record
 # the input schema so the run record carries something useful.
 _PASSTHROUGH_STEP_TYPES = {
-    "basic_training",
-    "advanced_tuning",
     "training",
     "data_preview",
 }

@@ -78,7 +78,7 @@ def test_target_field_string_reference() -> None:
     config = _config(
         NodeConfig(
             node_id="trainer",
-            step_type="basic_training",
+            step_type="training",
             params={"target": "ghost"},
             inputs=["loader"],
         )
@@ -92,14 +92,14 @@ def test_target_field_string_reference() -> None:
 
 
 def test_basic_training_target_column_optional_not_flagged() -> None:
-    """`basic_training`'s `target_column` is metadata, not a feature reference:
+    """`training`'s `target_column` is metadata, not a feature reference:
     it should never be flagged even though it's absent from the upstream
     schema (the FeatureTargetSplitter dropped it upstream in real pipelines).
     """
     config = _config(
         NodeConfig(
             node_id="trainer",
-            step_type="basic_training",
+            step_type="training",
             params={"target_column": "ghost"},
             inputs=["loader"],
         )

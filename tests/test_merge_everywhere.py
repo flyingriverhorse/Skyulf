@@ -385,7 +385,7 @@ class TestTrainingMerge:
                 ),
                 NodeConfig(
                     node_id="training",
-                    step_type=StepType.BASIC_TRAINING,
+                    step_type=StepType.TRAINING,
                     inputs=["scaler_a", "scaler_b"],
                     params={
                         "target_column": "target",
@@ -435,7 +435,7 @@ class TestTrainingMerge:
                 ),
                 NodeConfig(
                     node_id="training",
-                    step_type=StepType.BASIC_TRAINING,
+                    step_type=StepType.TRAINING,
                     inputs=["scaler_a", "scaler_b"],
                     params={
                         "target_column": "target",

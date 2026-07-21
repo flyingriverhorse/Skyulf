@@ -73,8 +73,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
         return any(
-            node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING]
-            for node in self._node_configs.values()
+            node.step_type == StepType.TRAINING for node in self._node_configs.values()
         )
 
     def _predict_schemas_safe(self, config: PipelineConfig) -> dict[str, dict[str, Any] | None]:
@@ -245,7 +244,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             return self._run_data_loader(node, job_id=job_id), metrics
         if node.step_type == StepType.FEATURE_ENGINEERING:
             return self._dispatch_feature_engineering(node, job_id)
-        if node.step_type in (StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, StepType.TRAINING):
+        if node.step_type == StepType.TRAINING:
             return self._run_training(node, job_id=job_id)
         if node.step_type == "data_preview":
             return self._run_data_preview(node)

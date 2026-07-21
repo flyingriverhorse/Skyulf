@@ -105,8 +105,6 @@ def _resolve_branch_target_node_id(
     """Identify the terminal node for a sub-pipeline (training/tuning/preview leaf)."""
     target_node_id = requested_target_node_id
     terminal_types = {
-        StepType.BASIC_TRAINING,
-        StepType.ADVANCED_TUNING,
         StepType.TRAINING,
         "data_preview",
     }

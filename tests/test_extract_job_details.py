@@ -2,9 +2,8 @@
 ``backend.ml_pipeline._execution.graph_utils``.
 
 Covers `target_column` extraction from a raw job `graph` dict for
-training/tuning terminal node types, including the unified
-`StepType.TRAINING` node introduced alongside the legacy
-`BASIC_TRAINING`/`ADVANCED_TUNING` step types.
+training terminal node types, including the unified `StepType.TRAINING`
+node with ``run_mode`` fixed and tuned.
 """
 
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
@@ -17,8 +16,8 @@ def test_extract_job_details_basic_training_target_column():
             {"node_id": "n1", "step_type": StepType.DATA_LOADER.value, "params": {}},
             {
                 "node_id": "n2",
-                "step_type": StepType.BASIC_TRAINING.value,
-                "params": {"target_column": "y", "model_type": "random_forest"},
+                "step_type": StepType.TRAINING.value,
+                "params": {"run_mode": "fixed", "target_column": "y", "model_type": "random_forest"},
             },
         ]
     }
@@ -32,8 +31,8 @@ def test_extract_job_details_advanced_tuning_target_column():
             {"node_id": "n1", "step_type": StepType.DATA_LOADER.value, "params": {}},
             {
                 "node_id": "n2",
-                "step_type": StepType.ADVANCED_TUNING.value,
-                "params": {"target_column": "y", "algorithm": "random_forest"},
+                "step_type": StepType.TRAINING.value,
+                "params": {"run_mode": "tuned", "target_column": "y", "algorithm": "random_forest"},
             },
         ]
     }
