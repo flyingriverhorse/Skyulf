@@ -2,7 +2,7 @@ import React from 'react';
 import { Database } from 'lucide-react';
 import { JobInfo } from '../../../core/api/jobs';
 import { clickableProps } from '../../../core/utils/a11y';
-import { formatMetricName, formatDuration } from '../../../core/utils/format';
+import { formatMetricName, formatDuration, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { StatusBadge } from '../../shared/StatusBadge';
 import { getDisplayScore, getTaskForModelType, type ExperimentsTask } from '../../pages/ExperimentsPage/utils/jobMeta';
 import type { RegistryItem } from '../../../core/api/registry';
@@ -42,7 +42,15 @@ interface JobCardProps {
 
 export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems }) => {
   const task: ExperimentsTask = getTaskForModelType(job.model_type, registryItems);
-  const score = job.status === 'completed' && !job.error ? getDisplayScore(job, task) : null;
+  // Ensemble jobs are scored on their underlying classification/regression
+  // metrics — resolve the effective task for metric-priority lookup so
+  // getDisplayScore picks the right list (there is no 'ensemble' entry in
+  // SCORE_METRIC_PRIORITY).
+  const metricTask: ExperimentsTask = task === 'ensemble' ? (getEnsembleSubTask(job.model_type) ?? 'classification') : task;
+  const score = job.status === 'completed' && !job.error ? getDisplayScore(job, metricTask) : null;
+  const isEnsemble = isEnsembleModelType(job.model_type);
+  const ensembleStrategy = getEnsembleStrategy(job.model_type);
+  const ensembleSubTask = getEnsembleSubTask(job.model_type);
 
   return (
   <div
@@ -60,10 +68,15 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
         <Database className="w-3 h-3" />
         <span className="truncate">{job.dataset_name || job.dataset_id || '-'}</span>
       </div>
-      <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500">
+      <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 flex-wrap">
         <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
         {job.job_type === 'advanced_tuning' && job.search_strategy && (
           <span className="text-gray-400 truncate">({job.search_strategy})</span>
+        )}
+        {isEnsemble && (
+          <span className="px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 whitespace-nowrap">
+            {ensembleStrategy} · {ensembleSubTask === 'regression' ? 'Regression' : 'Classification'}
+          </span>
         )}
       </div>
     </div>
