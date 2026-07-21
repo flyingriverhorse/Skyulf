@@ -601,7 +601,13 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
       <div className="grid grid-cols-2 gap-3">
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Search Strategy</span>
+            <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+              Search Strategy
+              <HelpTooltip
+                placement="bottom-left"
+                text="This searches the ensemble's own params (e.g. voting/cv). There's no per-model search-space editor here — with several base learners at once, you set fixed values for each in Basic mode instead. Check &quot;Tune base model hyperparameters&quot; below to also auto-search each selected model's default range (the same ranges used for standalone Classification/Regression tuning)."
+              />
+            </span>
             {showStrategyBtn && (
               <button
                 type="button"
@@ -659,8 +665,11 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
           className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
         />
         <span>
-          <strong>Tune base model hyperparameters</strong> — searches each base learner&apos;s params
-          (e.g. <code>random_forest__n_estimators</code>) in addition to the ensemble&apos;s own.
+          <strong>Tune base model hyperparameters</strong> — automatically searches each selected
+          base learner&apos;s default parameter range (e.g. <code>random_forest__n_estimators</code>),
+          in addition to the ensemble&apos;s own params. Ranges are picked automatically per model —
+          uncheck this to tune only the ensemble-level params and keep base models at the fixed
+          values set in Basic mode.
         </span>
       </label>
 
