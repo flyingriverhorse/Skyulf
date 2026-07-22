@@ -204,9 +204,7 @@ class BasicTrainingManager(TrainingJobManagerBase):
     async def get_training_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves a training job by ID."""
         # 1. Fetch Job
-        stmt = select(TrainingJob).where(
-            TrainingJob.id == job_id, TrainingJob.run_mode == "fixed"
-        )
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id, TrainingJob.run_mode == "fixed")
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 

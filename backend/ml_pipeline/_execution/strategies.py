@@ -24,9 +24,7 @@ class JobStrategy(ABC):
         """Fetches the job from the database, scoped to this strategy's `run_mode`."""
         model = self.get_job_model()
         return (
-            session.query(model)
-            .filter(model.id == job_id, model.run_mode == self.run_mode)
-            .first()
+            session.query(model).filter(model.id == job_id, model.run_mode == self.run_mode).first()
         )
 
     @abstractmethod

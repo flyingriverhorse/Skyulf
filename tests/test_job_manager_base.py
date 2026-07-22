@@ -119,7 +119,9 @@ class TestCancelTrainingJob(unittest.IsolatedAsyncioTestCase):
     async def _run_cancel(self, job):
         session = _make_async_session(job)
         mock_stmt = MagicMock()
-        with patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt):
+        with patch(
+            "backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt
+        ):
             result = await BasicTrainingManager.cancel_training_job(session, "job-123")
         return result, session
 
@@ -152,7 +154,9 @@ class TestCancelTrainingJob(unittest.IsolatedAsyncioTestCase):
     async def test_returns_false_when_job_not_found(self):
         session = _make_async_session(None)
         mock_stmt = MagicMock()
-        with patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt):
+        with patch(
+            "backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt
+        ):
             result = await BasicTrainingManager.cancel_training_job(session, "missing-id")
         self.assertFalse(result)
 
@@ -161,8 +165,10 @@ class TestCancelTrainingJob(unittest.IsolatedAsyncioTestCase):
         session = _make_async_session(job)
         mock_celery = MagicMock()
         mock_stmt = MagicMock()
-        with patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt), \
-             patch("backend.celery_app.celery_app", mock_celery):
+        with (
+            patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt),
+            patch("backend.celery_app.celery_app", mock_celery),
+        ):
             await BasicTrainingManager.cancel_training_job(session, "job-123")
         mock_celery.control.revoke.assert_called_once_with(
             "celery-abc", terminate=True, signal="SIGTERM"
@@ -175,8 +181,10 @@ class TestCancelTrainingJob(unittest.IsolatedAsyncioTestCase):
         mock_celery = MagicMock()
         mock_celery.control.revoke.side_effect = RuntimeError("broker down")
         mock_stmt = MagicMock()
-        with patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt), \
-             patch("backend.celery_app.celery_app", mock_celery):
+        with (
+            patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt),
+            patch("backend.celery_app.celery_app", mock_celery),
+        ):
             result = await BasicTrainingManager.cancel_training_job(session, "job-123")
         self.assertTrue(result)
 
@@ -192,7 +200,9 @@ class TestCancelTuningJob(unittest.IsolatedAsyncioTestCase):
     async def _run_cancel(self, job):
         session = _make_async_session(job)
         mock_stmt = MagicMock()
-        with patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt):
+        with patch(
+            "backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt
+        ):
             result = await AdvancedTuningManager.cancel_tuning_job(session, "job-123")
         return result, session
 
@@ -215,7 +225,9 @@ class TestCancelTuningJob(unittest.IsolatedAsyncioTestCase):
     async def test_returns_false_when_job_not_found(self):
         session = _make_async_session(None)
         mock_stmt = MagicMock()
-        with patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt):
+        with patch(
+            "backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt
+        ):
             result = await AdvancedTuningManager.cancel_tuning_job(session, "missing")
         self.assertFalse(result)
 
@@ -224,9 +236,10 @@ class TestCancelTuningJob(unittest.IsolatedAsyncioTestCase):
         session = _make_async_session(job)
         mock_celery = MagicMock()
         mock_stmt = MagicMock()
-        with patch(
-            "backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt
-        ), patch("backend.celery_app.celery_app", mock_celery):
+        with (
+            patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt),
+            patch("backend.celery_app.celery_app", mock_celery),
+        ):
             await AdvancedTuningManager.cancel_tuning_job(session, "job-123")
         mock_celery.control.revoke.assert_called_once_with(
             "celery-xyz", terminate=True, signal="SIGTERM"
@@ -238,9 +251,10 @@ class TestCancelTuningJob(unittest.IsolatedAsyncioTestCase):
         mock_celery = MagicMock()
         mock_celery.control.revoke.side_effect = OSError("no broker")
         mock_stmt = MagicMock()
-        with patch(
-            "backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt
-        ), patch("backend.celery_app.celery_app", mock_celery):
+        with (
+            patch("backend.ml_pipeline._execution.job_manager_base.select", return_value=mock_stmt),
+            patch("backend.celery_app.celery_app", mock_celery),
+        ):
             result = await AdvancedTuningManager.cancel_tuning_job(session, "job-123")
         self.assertTrue(result)
 

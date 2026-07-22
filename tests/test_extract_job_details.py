@@ -17,7 +17,11 @@ def test_extract_job_details_basic_training_target_column():
             {
                 "node_id": "n2",
                 "step_type": StepType.TRAINING.value,
-                "params": {"run_mode": "fixed", "target_column": "y", "model_type": "random_forest"},
+                "params": {
+                    "run_mode": "fixed",
+                    "target_column": "y",
+                    "model_type": "random_forest",
+                },
             },
         ]
     }

@@ -374,14 +374,22 @@ class NodeRunnersMixin:
             if swallow_evaluate_errors:
                 try:
                     self._evaluate_and_save_report(
-                        estimator, eval_data, target_col, job_id, metrics,
+                        estimator,
+                        eval_data,
+                        target_col,
+                        job_id,
+                        metrics,
                         reference_column=reference_col,
                     )
                 except Exception:
                     logger.exception("Failed to evaluate tuned model")
             else:
                 self._evaluate_and_save_report(
-                    estimator, eval_data, target_col, job_id, metrics,
+                    estimator,
+                    eval_data,
+                    target_col,
+                    job_id,
+                    metrics,
                     reference_column=reference_col,
                 )
 
@@ -465,7 +473,9 @@ class NodeRunnersMixin:
             "random_state": node.params.get("random_state", 42),
         }
 
-    def _run_training(self, node: NodeConfig, job_id: str = "unknown") -> tuple[str, dict[str, Any]]:
+    def _run_training(
+        self, node: NodeConfig, job_id: str = "unknown"
+    ) -> tuple[str, dict[str, Any]]:
         """Unified training entry point for both run modes (Phase 2b merge).
 
         Dispatches to the plain direct-fit path for clustering (no scorer to

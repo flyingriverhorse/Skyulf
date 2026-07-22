@@ -167,9 +167,7 @@ class ModelRegistryService:
         return list(tune_jobs_result.scalars().all())
 
     @staticmethod
-    def _train_job_to_version(
-        job: TrainingJob, deployed_job_ids: dict[Any, Any]
-    ) -> ModelVersion:
+    def _train_job_to_version(job: TrainingJob, deployed_job_ids: dict[Any, Any]) -> ModelVersion:
         """Converts a completed training job into a ModelVersion entry."""
         return ModelVersion(
             job_id=job.id,
@@ -188,9 +186,7 @@ class ModelRegistryService:
         )
 
     @staticmethod
-    def _tune_job_to_version(
-        job: TrainingJob, deployed_job_ids: dict[Any, Any]
-    ) -> ModelVersion:
+    def _tune_job_to_version(job: TrainingJob, deployed_job_ids: dict[Any, Any]) -> ModelVersion:
         """Converts a completed tuning job into a ModelVersion entry, using version as the version."""
         # For tuning jobs, best_params is used as hyperparameters
         metrics = dict(cast(dict[str, Any] | None, job.metrics) or {})

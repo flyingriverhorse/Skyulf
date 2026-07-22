@@ -21,9 +21,7 @@ def test_resolve_branch_target_node_id_basic_training_terminal():
         pipeline_id="p",
         nodes=[
             NodeConfig(node_id="n1", step_type=StepType.DATA_LOADER, params={}, inputs=[]),
-            NodeConfig(
-                node_id="n2", step_type=StepType.TRAINING, params={}, inputs=["n1"]
-            ),
+            NodeConfig(node_id="n2", step_type=StepType.TRAINING, params={}, inputs=["n1"]),
         ],
     )
     assert run_pipeline_mod._resolve_branch_target_node_id(sub, None) == "n2"

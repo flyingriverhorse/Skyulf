@@ -451,8 +451,8 @@ if XGBOOST_AVAILABLE:
         category="Modeling",
         description="Extreme Gradient Boosting classifier.",
         params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
-    tags=["classification"],
-)
+        tags=["classification"],
+    )
     class XGBClassifierCalculator(SklearnCalculator):
         """XGBoost Classifier Calculator."""
 
@@ -576,7 +576,7 @@ if LIGHTGBM_AVAILABLE:
         description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
         tags=["classification"],
-)
+    )
     class LGBMClassifierCalculator(SklearnCalculator):
         """LightGBM Classifier Calculator."""
 
