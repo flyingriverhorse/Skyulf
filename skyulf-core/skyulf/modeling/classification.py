@@ -147,25 +147,30 @@ class LogisticRegressionCalculator(SklearnCalculator):
             f"{compatible_solvers or 'none'}."
         )
 
-    @classmethod
-    def _validate_solver_penalty(cls, config: dict[str, Any] | None) -> None:
+    def _validate_solver_penalty(self, config: dict[str, Any] | None) -> None:
         """Raise a clear, actionable error for an invalid solver/penalty pair.
 
         sklearn's own error for this (e.g. "Solver lbfgs supports only 'l2' or
         None penalties") is only raised deep inside `LogisticRegression.fit`,
         after data has already been split/validated upstream. Failing fast
         here with the full list of compatible solvers is more actionable.
+
+        Validates against the *merged* effective params (``default_params``
+        overlaid with the config's overrides), not just the raw config —
+        otherwise overriding only ``penalty`` (very common; ``solver``
+        defaults to ``"lbfgs"``) would skip validation entirely since
+        ``solver`` never appears in the raw override dict, letting an
+        incompatible combo reach sklearn's own opaque error at fit time.
         """
-        params = cls._extract_solver_penalty_params(config)
-        if params is None:
-            return
+        overrides = self._extract_solver_penalty_params(config) or {}
+        params = {**self.default_params, **overrides}
         solver = params.get("solver")
-        penalty = params.get("penalty")
         if solver is None or "penalty" not in params:
             return
-        compatible = cls._SOLVER_PENALTIES.get(solver)
+        penalty = params.get("penalty")
+        compatible = self._SOLVER_PENALTIES.get(solver)
         if compatible is not None and penalty not in compatible:
-            cls._raise_incompatible_solver_penalty(solver, penalty)
+            self._raise_incompatible_solver_penalty(solver, penalty)
 
 
 # --- Calibrated Classifier ---

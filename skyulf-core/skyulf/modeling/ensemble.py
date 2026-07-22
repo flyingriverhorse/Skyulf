@@ -73,6 +73,7 @@ except ImportError:
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
 from ._sklearn_compat import normalize_logistic_regression_params
+from .classification import LogisticRegressionCalculator
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 logger = logging.getLogger(__name__)
@@ -345,6 +346,22 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         """Apply a ``{param: value}`` map to *estimator*, ignoring bad params."""
         if isinstance(params, dict) and params:
             if isinstance(estimator, LogisticRegression):
+                # An incompatible solver/penalty pair here would otherwise
+                # only surface as sklearn's own opaque ValueError deep inside
+                # fit() — validate against the merged (current-attrs +
+                # override) params first, mirroring
+                # LogisticRegressionCalculator._validate_solver_penalty, since
+                # ensembles apply base/final-estimator params via
+                # set_params(), bypassing that calculator's validation
+                # entirely.
+                if "penalty" in params:
+                    solver = params.get("solver", estimator.get_params().get("solver"))
+                    penalty = params["penalty"]
+                    compatible = LogisticRegressionCalculator._SOLVER_PENALTIES.get(solver)
+                    if compatible is not None and penalty not in compatible:
+                        LogisticRegressionCalculator._raise_incompatible_solver_penalty(
+                            solver, penalty
+                        )
                 # sklearn >=1.8 deprecates LogisticRegression(penalty=...) in
                 # favor of l1_ratio/C — translate here too, since ensembles
                 # apply base/final-estimator params via set_params(), bypassing
