@@ -1,13 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGraphStore } from '../../../../core/store/useGraphStore';
 import { useJobStore } from '../../../../core/store/useJobStore';
-import { runPipelinePreview } from '../../../../core/api/client';
+import { runPipelinePreview, PipelineConfigModel } from '../../../../core/api/client';
 import { jobsApi } from '../../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
+import {
+  findPreprocessingBeforeSplitIssues,
+  formatLeakageIssueMessage,
+} from '../../../../core/utils/pipelineLeakageValidation';
 import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
 import { toast } from '../../../../core/toast';
 
 const TRAINING_TYPES = new Set(['training', 'classification', 'regression', 'text_classification']);
+
+/**
+ * Client-side pre-flight check, mirroring the backend's hard-block: warns
+ * (and aborts) instantly on the canvas instead of waiting on a round trip
+ * for the job to fail. Returns `true` if a leakage issue was found (and a
+ * toast shown), `false` if the pipeline is safe to submit.
+ */
+function warnAndBlockOnLeakage(pipelineConfig: PipelineConfigModel): boolean {
+  const issues = findPreprocessingBeforeSplitIssues(pipelineConfig.nodes);
+  if (issues.length === 0) return false;
+  toast.error('Data leakage risk detected', formatLeakageIssueMessage(issues[0]!));
+  return true;
+}
 
 export interface RunControls {
   isRunning: boolean;
@@ -73,6 +90,7 @@ export function useRunControls(): RunControls {
         (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
       );
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const result = await runPipelinePreview(pipelineConfig);
       setExecutionResult(result);
     } catch (error) {
@@ -100,6 +118,7 @@ export function useRunControls(): RunControls {
         (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
       );
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         job_type: 'training',

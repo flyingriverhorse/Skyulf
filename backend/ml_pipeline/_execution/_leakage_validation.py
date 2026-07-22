@@ -17,12 +17,7 @@ an ancestor of a splitter, meaning it necessarily runs and fits *before*
 the split).
 """
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from .schemas import NodeConfig
+from .schemas import NodeConfig
 
 # Step types whose ``.fit()`` learns parameters from the statistical
 # distribution of the data it's given (means/std, learned categories,
