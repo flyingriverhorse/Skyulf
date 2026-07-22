@@ -7,6 +7,7 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
+import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
 import { getIncomers } from '@xyflow/react';
 import { HelpTooltip } from './components/HelpTooltip';
 import { HyperparameterInput } from './components/HyperparameterInput';
@@ -166,6 +167,7 @@ export const SegmentationSettings: React.FC<{
     }
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         target_node_id: nodeId,
