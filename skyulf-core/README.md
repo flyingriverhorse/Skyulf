@@ -103,8 +103,45 @@ predictions = SkyulfPipeline.load("customer_model.pkl").predict(
 )
 ```
 
-See [`examples/01_quickstart.py`](examples/01_quickstart.py) for a complete,
-executed save/load round trip.
+See [`examples/00_quickstart.ipynb`](examples/00_quickstart.ipynb) for a
+complete, executed save/load round trip.
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    subgraph Input
+        A[Polars DataFrame]
+    end
+    subgraph SkyulfPipeline
+        B[FeatureEngineer<br/>preprocessing steps]
+        C[ModelEstimator<br/>sklearn-backed model]
+    end
+    subgraph Output
+        D[Fitted artifact<br/>.pkl]
+        E[Metrics report]
+        F[Predictions]
+    end
+    A --> B --> C
+    C --> E
+    B -.fit once, reuse.-> D
+    D --> C
+    A2[New data] --> B
+    C --> F
+
+    style A fill:#e8f4fd,stroke:#1a73e8
+    style A2 fill:#e8f4fd,stroke:#1a73e8
+    style D fill:#fef7e0,stroke:#f9ab00
+    style E fill:#e6f4ea,stroke:#188038
+    style F fill:#e6f4ea,stroke:#188038
+```
+
+`SkyulfPipeline` wraps two collaborators: a `FeatureEngineer` that runs the
+declared preprocessing steps in order, and a `ModelEstimator` that fits/
+applies the configured sklearn-backed model. `fit()` runs both once and
+returns a metrics report; `predict()` re-applies the *already-fitted*
+preprocessing artifacts (no re-fitting, no leakage) before calling the
+model.
 
 ## Data leakage safety
 
@@ -116,37 +153,74 @@ a `SplitDataset` first and then fit `FeatureEngineer`/`SkyulfPipeline`.
 
 The larger Skyulf platform validates DAGs and hard-blocks data-dependent nodes
 upstream of a train/test split. Skyulf Core is also useful on its own, so the
-same ordering is an essential API-level contract. Read and run
-[`examples/05_leakage_safe_pipeline.py`](examples/05_leakage_safe_pipeline.py)
-for an executable poisoned-holdout proof.
+same ordering is an essential API-level contract.
+
+```mermaid
+sequenceDiagram
+    participant D as Raw data
+    participant S as TrainTestSplitter
+    participant Tr as Train split
+    participant Te as Test split
+    participant P as Learned steps<br/>(Imputer/Encoder/Scaler/...)
+    participant M as Model
+
+    D->>S: full dataset
+    S->>Tr: train rows
+    S->>Te: test rows (held out, untouched)
+    Tr->>P: fit(train)
+    P->>Tr: transform(train)
+    Tr->>M: fit(model)
+    P->>Te: transform(test)  Note over P,Te: uses train-fitted statistics only
+    Te->>M: evaluate (honest, unseen)
+```
+
+Any step that *learns* a statistic (imputer medians, encoder categories,
+scaler mean/std, TF-IDF vocabulary, feature selectors, outlier detectors,
+learned binning) must come **after** the split in the preprocessing list.
+Deterministic, row-independent parses (string splitting, unit conversions,
+date-part extraction) are safe before the split. Read and run
+[`examples/01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb)
+to see this pattern applied to a real Kaggle dataset, including a
+deliberate pre-split/post-split split of "safe" vs. "learned" feature steps.
 
 ## Polars-native, no hidden pandas
 
 Users can pass `polars.DataFrame` inputs directly. `PolarsEngine` and
 `SklearnBridge` convert Polars straight to NumPy at the sklearn boundary—there
 is no user-facing pandas round trip. Arrow integrations use the explicit
-`to_arrow()` path (and therefore `pyarrow`). Run
-[`examples/01_quickstart.py`](examples/01_quickstart.py) and
-[`examples/07_eda_and_polars.py`](examples/07_eda_and_polars.py) to see both
-paths without importing pandas in user code.
+`to_arrow()` path (and therefore `pyarrow`). Every notebook in
+[`examples/`](examples/) uses Polars + NumPy only — no pandas import appears
+anywhere in the example code.
 
 ## Examples
 
-All scripts run from the repository root with
-`python skyulf-core/examples/<file>.py`.
+Runnable Jupyter notebooks in [`examples/`](examples/), covering the full
+feature set end-to-end on real datasets. Open with `jupyter lab` or
+`jupyter notebook` from the repository root — see
+[`examples/README.md`](examples/README.md) for dataset sourcing notes and a
+per-notebook breakdown of what's demonstrated.
 
-1. [`01_quickstart.py`](examples/01_quickstart.py) — Polars-native pipeline configuration, fit, save, load, predict, NumPy bridge, and Arrow.
-2. [`02_preprocessing_recipes.py`](examples/02_preprocessing_recipes.py) — Imputation, encoding, scaling, outliers, selection, binning, casting, cleaning, date/geo/rolling/lag/math/interaction features.
-3. [`03_modeling_evaluation.py`](examples/03_modeling_evaluation.py) — Classification, regression, voting/stacking ensembles, four clustering models, Grid/Random/Optuna tuning, metrics, and SHAP.
-4. [`04_validation_vs_sklearn.py`](examples/04_validation_vs_sklearn.py) — Exact prediction-equivalence check against an equivalent raw sklearn pipeline.
-5. [`05_leakage_safe_pipeline.py`](examples/05_leakage_safe_pipeline.py) — Split-first guidance and train-only fitted-artifact proof under poisoned holdout data.
-6. [`06_text_nlp_vectorization.py`](examples/06_text_nlp_vectorization.py) — Tokenizer, Count/TF-IDF/Hashing vectorizers, Naive Bayes, and SentenceEmbedder guidance.
-7. [`07_eda_and_polars.py`](examples/07_eda_and_polars.py) — Automated `EDAAnalyzer` profiling and the explicit Polars-to-Arrow path.
-8. [`08_kaggle_spaceship_titanic.py`](examples/08_kaggle_spaceship_titanic.py) — Offline Kaggle-style, leakage-safe Spaceship Titanic feature engineering, CV tuning, and honest held-out scoring.
+| # | Notebook | Dataset | Task | Highlights |
+|---|----------|---------|------|------------|
+| 00 | [`00_quickstart.ipynb`](examples/00_quickstart.ipynb) | Synthetic | Classification | Config, fit, save/load, predict |
+| 01 | [`01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb) | Kaggle House Prices | Regression | EDA, leakage-safe null handling, Optuna tuning, SHAP, Kaggle submission |
+| 02 | [`02_disaster_tweets_text_classification.ipynb`](examples/02_disaster_tweets_text_classification.ipynb) | Kaggle Disaster Tweets | Text classification | TF-IDF, hash encoding, Naive Bayes vs. tuned LogReg, Kaggle submission |
+| 03 | [`03_mall_customers_segmentation.ipynb`](examples/03_mall_customers_segmentation.ipynb) | Mall Customers | Clustering | Unsupervised EDA, k-selection by silhouette, multi-algorithm comparison |
+| 04 | [`04_forest_cover_multiclass_ensemble.ipynb`](examples/04_forest_cover_multiclass_ensemble.ipynb) | Covertype | Multiclass | Ensembles, tuning, per-class metrics |
+| 05 | [`05_santander_imbalanced_classification.ipynb`](examples/05_santander_imbalanced_classification.ipynb) | Santander | Imbalanced classification | Drift checks, resampling-aware evaluation |
+| 06 | [`06_credit_card_fraud_extreme_imbalance.ipynb`](examples/06_credit_card_fraud_extreme_imbalance.ipynb) | Credit Card Fraud | Extreme imbalance | PR-AUC focus, precision/recall tradeoffs |
+| 07 | [`07_spaceship_titanic_classification.ipynb`](examples/07_spaceship_titanic_classification.ipynb) | Kaggle Spaceship Titanic | Classification | Structured-string feature parsing, voting + stacking ensembles, Kaggle submission |
+| 08 | [`08_online_retail_customer_segmentation.ipynb`](examples/08_online_retail_customer_segmentation.ipynb) | UCI Online Retail | Clustering (RFM segmentation) | Raw-transaction-to-RFM feature engineering, 4-algorithm comparison, business-named segments |
+
+Notebooks 01, 02, and 07 generate real `submission.csv` files ready to
+upload to their respective Kaggle competitions.
 
 ## Automated EDA
 
-Skyulf Core includes automated exploratory data analysis for Polars frames.
+Skyulf Core includes automated exploratory data analysis for Polars frames —
+data quality, distributions, outliers, correlations/target-association,
+optional temporal/geospatial analysis, and a PCA-based exploratory
+clustering pass, all from one `.analyze()` call.
 
 ```python
 import polars as pl
@@ -155,16 +229,84 @@ from skyulf.profiling.visualizer import EDAVisualizer
 
 df = pl.read_csv("data.csv")
 profile = EDAAnalyzer(df).analyze(
-    target_col="target",
-    date_col="timestamp",  # Optional
-    lat_col="latitude",  # Optional
-    lon_col="longitude",  # Optional
+    target_col="target",     # Optional: unlocks target-association analysis
+    date_col="timestamp",    # Optional: unlocks temporal analysis
+    lat_col="latitude",      # Optional: unlocks geospatial analysis
+    lon_col="longitude",     # Optional
 )
 
-EDAVisualizer(profile, df).summary()  # Requires skyulf-core[viz]
+EDAVisualizer(profile, df).summary()  # Rich terminal dashboard (skyulf-core[viz])
+EDAVisualizer(profile, df).plot()     # Matplotlib figures (skyulf-core[viz])
 ```
 
+Everything the visualizer renders is also available as plain data on
+`profile`, so you can build your own dashboards, logs, or CI gates:
+
+```python
+print(f"Rows: {profile.row_count}  Missing cells: {profile.missing_cells_percentage:.2f}%")
+
+# Human-readable, prioritized data-quality findings
+for alert in profile.alerts[:5]:
+    print("-", alert.message)
+
+# Actionable next-step suggestions (e.g. "consider log-transforming X")
+for rec in profile.recommendations[:5]:
+    print(f"- [{rec.action}] {rec.column or ''}: {rec.reason} -> {rec.suggestion}")
+
+# Outlier detection (IsolationForest by default) across numeric columns
+if profile.outliers is not None:
+    print(f"Outliers: {profile.outliers.outlier_percentage:.1f}% ({profile.outliers.method})")
+
+# Feature-vs-target association (ANOVA-style p-value + boxplot data)
+income_interaction = next(
+    (ti for ti in (profile.target_interactions or []) if ti.feature == "income"), None
+)
+if income_interaction is not None and income_interaction.p_value is not None:
+    print(f"income vs target -> p-value: {income_interaction.p_value:.2e}")
+
+# Rule-tree feature importances (a fast, model-free "what matters" signal)
+if profile.rule_tree is not None:
+    top = sorted(profile.rule_tree.feature_importances, key=lambda d: -d["importance"])[:5]
+    for f in top:
+        print(f"  {f['feature']:20s} {f['importance']:.4f}")
+```
+
+See any of [`examples/00_quickstart.ipynb`](examples/00_quickstart.ipynb)
+through [`08_online_retail_customer_segmentation.ipynb`](examples/08_online_retail_customer_segmentation.ipynb)
+for the full EDA pass run against real datasets, both with and without a
+target column.
+
 ## Features
+
+```mermaid
+mindmap
+  root((Skyulf Core))
+    Preprocessing
+      Imputation / Encoding / Scaling
+      Outlier detection / Binning
+      Date, geospatial, lag/rolling, interaction features
+      Text cleaning + Count/TF-IDF/Hashing vectorizers
+    Modeling
+      Classification / Regression
+      Clustering
+      Voting + Stacking ensembles
+      Naive Bayes (text)
+    Tuning
+      Grid Search
+      Random Search
+      Optuna
+    Evaluation
+      Standardized metrics
+      SHAP explainability
+    EDA
+      Data quality / distributions
+      Outliers / temporal / geospatial
+      Target correlation + rule-tree importances
+    Engine
+      Polars-native
+      NumPy bridge to sklearn
+      Explicit Arrow export
+```
 
 - **Unified pipelines**: Serializable preprocessing and model artifacts with
   readable descriptions, fingerprints, model cards, and prediction APIs.
