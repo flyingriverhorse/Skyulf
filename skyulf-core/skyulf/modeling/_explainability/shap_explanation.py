@@ -237,6 +237,7 @@ def compute_shap_explanation(
     """
     try:
         import shap
+        import shap.maskers
     except ImportError:
         return None
 
