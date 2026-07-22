@@ -93,6 +93,10 @@ desktop.ini
 # Small, hand-built/generated fixture datasets checked in for skyulf-core
 # tests are the exception — they're tiny, synthetic, and non-sensitive.
 !skyulf-core/tests/data/*.csv
+# Bundled Kaggle Spaceship Titanic dataset (~1.1MB, public competition data)
+# used by skyulf-core/examples/08_kaggle_spaceship_titanic.py so the example
+# runs out-of-the-box without requiring a separate download step.
+!skyulf-core/examples/data/spaceship_titanic/*.csv
 
 # === Application Data & Uploads ===
 cache/
