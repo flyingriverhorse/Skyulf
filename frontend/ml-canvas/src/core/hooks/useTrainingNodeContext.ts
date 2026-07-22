@@ -5,6 +5,7 @@ import { useJobStore } from '../store/useJobStore';
 import { useUpstreamData } from './useUpstreamData';
 import { useDatasetSchema } from './useDatasetSchema';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
+import { warnAndBlockOnLeakage } from '../utils/pipelineLeakageValidation';
 import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
 import type { TaskType } from '../types/taskType';
@@ -78,6 +79,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
       if (!nodeId) return;
       try {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
+        if (warnAndBlockOnLeakage(cfg)) return;
         const res = await jobsApi.runPipeline({
           ...cfg,
           target_node_id: nodeId,

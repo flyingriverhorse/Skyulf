@@ -1,4 +1,5 @@
-import { NodeConfigModel } from '../api/client';
+import { NodeConfigModel, PipelineConfigModel } from '../api/client';
+import { toast } from '../toast';
 
 /**
  * Client-side mirror of the backend's pre-execution leakage guard
@@ -125,4 +126,19 @@ export function formatLeakageIssueMessage(issue: LeakageIssue): string {
     `dataset before the '${issue.splitterNodeId}' train/test split downstream. Move it ` +
     'so it runs AFTER the train/test splitter (Splitter -> Preprocessing -> Model).'
   );
+}
+
+/**
+ * Shared pre-flight gate: call this before submitting ANY pipeline run
+ * (preview, per-node train/tune, segmentation, etc.) so every submission
+ * path gives the same instant canvas feedback instead of only the
+ * backend's server-side job failure. Shows a toast and returns `true`
+ * (caller should abort) if a leakage issue was found; returns `false`
+ * (safe to proceed) otherwise.
+ */
+export function warnAndBlockOnLeakage(pipelineConfig: Pick<PipelineConfigModel, 'nodes'>): boolean {
+  const issues = findPreprocessingBeforeSplitIssues(pipelineConfig.nodes);
+  if (issues.length === 0) return false;
+  toast.error('Data leakage risk detected', formatLeakageIssueMessage(issues[0]!));
+  return true;
 }
