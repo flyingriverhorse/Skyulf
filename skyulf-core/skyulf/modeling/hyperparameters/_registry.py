@@ -100,7 +100,11 @@ DEFAULT_SEARCH_SPACES: dict[str, Any] = {
         # sane zero-config default. Users can still pick it manually.
         "penalty": ["l1", "l2"],
         "solver": ["saga"],
-        "max_iter": [100, 200, 500, 1000],
+        # "saga" needs more iterations than lbfgs/liblinear to converge,
+        # especially on unscaled features. 100/200 are kept as fast trial
+        # options for well-scaled data, but the ceiling is raised so
+        # candidates aren't forced to stop before convergence on harder data.
+        "max_iter": [100, 200, 500, 1000, 2000, 5000],
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge", "modified_huber"],
@@ -128,6 +132,11 @@ DEFAULT_SEARCH_SPACES: dict[str, Any] = {
         "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
         "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
         "fit_intercept": [True, False],
+        # sag/saga default to sklearn's built-in max_iter (1000) when unset,
+        # which is often too low on unscaled features. Give the tuner an
+        # explicit, generous ceiling so it can pick a value that actually
+        # converges instead of always hitting the low default.
+        "max_iter": [1000, 2000, 5000],
     },
     "lasso_regression": {
         "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
@@ -309,7 +318,9 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
         "C": [0.01, 0.1, 1.0, 10.0],
         "penalty": ["l1", "l2"],
         "solver": ["saga"],
-        "max_iter": [200, 500],
+        # Raised from 500 so saga trials have a real chance to converge on
+        # unscaled/harder data instead of always hitting the ceiling.
+        "max_iter": [500, 2000],
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge"],
@@ -337,6 +348,10 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
         "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
         "solver": ["auto", "saga"],
         "fit_intercept": [True, False],
+        # Single fixed value (not a range) to keep the grid's cartesian
+        # product size unchanged while still giving sag/saga enough
+        # iterations to converge instead of relying on sklearn's default.
+        "max_iter": [2000],
     },
     "lasso_regression": {
         "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
