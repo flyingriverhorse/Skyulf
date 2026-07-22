@@ -93,7 +93,16 @@ desktop.ini
 # Small, hand-built/generated fixture datasets checked in for skyulf-core
 # tests are the exception — they're tiny, synthetic, and non-sensitive.
 !skyulf-core/tests/data/*.csv
+# Real (or verified, disclosed subsamples of real) Kaggle/UCI datasets bundled
+# for the skyulf-core example notebooks — see each folder's SOURCE.md for
+# provenance and sampling disclosure.
 !skyulf-core/examples/data/spaceship_titanic/*.csv
+!skyulf-core/examples/data/house_prices/*.csv
+!skyulf-core/examples/data/disaster_tweets/*.csv
+!skyulf-core/examples/data/mall_customers/*.csv
+!skyulf-core/examples/data/forest_cover/*.zip
+!skyulf-core/examples/data/santander/*.csv
+!skyulf-core/examples/data/credit_card_fraud/*.csv
 
 # === Application Data & Uploads ===
 cache/
