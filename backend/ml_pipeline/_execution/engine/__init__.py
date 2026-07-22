@@ -28,6 +28,7 @@ from skyulf.data.catalog import DataCatalog
 
 from ...artifacts.store import ArtifactStore
 from ...constants import StepType
+from .._leakage_validation import validate_no_preprocessing_before_split
 from .._schema_graph import predict_schemas, schemas_to_dict
 from ..schemas import (
     NodeConfig,
@@ -182,6 +183,14 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         Executes the pipeline defined by the configuration.
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+
+        # Fail fast (before any node runs / any fitting happens) if a
+        # data-dependent preprocessing node is wired upstream of a
+        # train/test splitter — that ordering fits the transformer's
+        # statistics on the whole dataset (train+test), leaking test data
+        # into what should be train-only parameters.
+        validate_no_preprocessing_before_split(config.nodes)
+
         _, pipeline_result = self._init_run_state(config, dataset_name)
 
         # C7 Phase B: walk the topology once and ask each Calculator's
