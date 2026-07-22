@@ -683,7 +683,15 @@ class EDAVisualizer:
             return
 
         numeric_cols = self._scatter_matrix_numeric_cols(self.df)
-        pdf = self.df.select(numeric_cols).to_pandas()
+        # pandas' scatter_matrix drops NaNs per column-pair internally (via a
+        # boolean mask) but forwards our `c` color array untouched, so any
+        # missing values in the selected columns cause a shape mismatch
+        # between the (shorter, NaN-filtered) x/y arrays and the (full-length)
+        # colors array. Drop rows with any NaN across the selected columns
+        # up front so colors and coordinates always stay aligned.
+        pdf = self.df.select(numeric_cols).to_pandas().dropna()
+        if pdf.empty:
+            return
         colors = self._scatter_matrix_colors(pdf)
 
         plt.figure(figsize=(10, 10))

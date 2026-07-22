@@ -202,15 +202,15 @@ per-notebook breakdown of what's demonstrated.
 
 | # | Notebook | Dataset | Task | Highlights |
 |---|----------|---------|------|------------|
-| 00 | [`00_quickstart.ipynb`](examples/00_quickstart.ipynb) | Synthetic | Classification | Config, fit, save/load, predict |
-| 01 | [`01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb) | Kaggle House Prices | Regression | EDA, leakage-safe null handling, Optuna tuning, SHAP, Kaggle submission |
+| 00 | [`00_quickstart.ipynb`](examples/00_quickstart.ipynb) | Synthetic | Classification | Config, fit, save/load, predict, geo features (`GeoDistance` + `H3Index`) |
+| 01 | [`01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb) | Kaggle House Prices | Regression | EDA, leakage-safe null handling, outlier handling (Winsorize vs. IQR removal), Optuna tuning, SHAP, Kaggle submission |
 | 02 | [`02_disaster_tweets_text_classification.ipynb`](examples/02_disaster_tweets_text_classification.ipynb) | Kaggle Disaster Tweets | Text classification | TF-IDF, hash encoding, Naive Bayes vs. tuned LogReg vs. stacking, char n-gram experiment, sentence embeddings, Kaggle submission |
 | 03 | [`03_mall_customers_segmentation.ipynb`](examples/03_mall_customers_segmentation.ipynb) | Mall Customers | Clustering | Unsupervised EDA, k-selection by silhouette, multi-algorithm comparison |
 | 04 | [`04_forest_cover_multiclass_ensemble.ipynb`](examples/04_forest_cover_multiclass_ensemble.ipynb) | Covertype | Multiclass | Ensembles, tuning, per-class metrics |
-| 05 | [`05_santander_imbalanced_classification.ipynb`](examples/05_santander_imbalanced_classification.ipynb) | Santander | Imbalanced classification | Drift checks, resampling-aware evaluation |
+| 05 | [`05_santander_imbalanced_classification.ipynb`](examples/05_santander_imbalanced_classification.ipynb) | Santander | Imbalanced classification | Drift checks, feature selection strategies (Variance/Correlation vs. Univariate vs. Model-Based), resampling-aware evaluation |
 | 06 | [`06_credit_card_fraud_extreme_imbalance.ipynb`](examples/06_credit_card_fraud_extreme_imbalance.ipynb) | Credit Card Fraud | Extreme imbalance | PR-AUC focus, precision/recall tradeoffs |
-| 07 | [`07_spaceship_titanic_classification.ipynb`](examples/07_spaceship_titanic_classification.ipynb) | Kaggle Spaceship Titanic | Classification | Structured-string feature parsing, Grid vs. Random Search tuning, voting + stacking ensembles, Kaggle submission |
-| 08 | [`08_online_retail_customer_segmentation.ipynb`](examples/08_online_retail_customer_segmentation.ipynb) | UCI Online Retail | Clustering (RFM segmentation) | Raw-transaction-to-RFM feature engineering, 4-algorithm comparison, business-named segments |
+| 07 | [`07_spaceship_titanic_classification.ipynb`](examples/07_spaceship_titanic_classification.ipynb) | Kaggle Spaceship Titanic | Classification | Structured-string feature parsing, feature generation (interactions + polynomial), Grid vs. Random Search tuning, voting + stacking ensembles, Kaggle submission |
+| 08 | [`08_online_retail_customer_segmentation.ipynb`](examples/08_online_retail_customer_segmentation.ipynb) | UCI Online Retail | Clustering (RFM segmentation) | Raw-transaction-to-RFM feature engineering, 4-algorithm comparison, business-named segments, bonus time-series features (`DateFeatures`/`LagFeatures`/`RollingAggregate`) |
 
 Notebooks 01, 02, and 07 generate real `submission.csv` files ready to
 upload to their respective Kaggle competitions.
