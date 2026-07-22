@@ -20,9 +20,7 @@ async def test_unified_versioning():
         model_type = "rf_unified"
 
         # Cleanup
-        await session.execute(
-            delete(TrainingJob).where(TrainingJob.pipeline_id == pipeline_id)
-        )
+        await session.execute(delete(TrainingJob).where(TrainingJob.pipeline_id == pipeline_id))
         # The version counter now lives in its own table (fixes the
         # get_next_version race condition) - it must be reset too, since it's
         # no longer derived purely from the job rows deleted above.

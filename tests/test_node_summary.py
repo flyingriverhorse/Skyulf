@@ -205,9 +205,7 @@ def test_training_summary_prefers_acc_plus_f1() -> None:
 
 
 def test_training_summary_falls_back_to_accuracy_only() -> None:
-    out = build_summary(
-        step_type="training", output=None, metrics={"metrics": {"accuracy": 0.9}}
-    )
+    out = build_summary(step_type="training", output=None, metrics={"metrics": {"accuracy": 0.9}})
     assert out == "acc 0.90"
 
 

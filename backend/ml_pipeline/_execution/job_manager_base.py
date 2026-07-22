@@ -37,9 +37,7 @@ class TrainingJobManagerBase:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _handle_cancelled_status_update(
-        session: Session, job: Any, logs: list[str] | None
-    ) -> bool:
+    def _handle_cancelled_status_update(session: Session, job: Any, logs: list[str] | None) -> bool:
         """Append logs to a cancelled job; never revive its status.
 
         Returns True so callers can propagate the result unchanged.

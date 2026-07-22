@@ -162,10 +162,16 @@ class TestMultipleTerminals:
             _make_node("scale", inputs=["clean"]),
             _make_node("pca", inputs=["clean"]),
             _make_node(
-                "trainA", "training", inputs=["scale"], params={"target_column": "y", "run_mode": "fixed"}
+                "trainA",
+                "training",
+                inputs=["scale"],
+                params={"target_column": "y", "run_mode": "fixed"},
             ),
             _make_node(
-                "trainB", "training", inputs=["pca"], params={"target_column": "y", "run_mode": "tuned"}
+                "trainB",
+                "training",
+                inputs=["pca"],
+                params={"target_column": "y", "run_mode": "tuned"},
             ),
         ]
         config = _make_config(nodes)
@@ -359,9 +365,7 @@ class TestConnectedComponents:
             # Subgraph 1: Dataset A → Training 1
             _make_node("dsA", "data_loader"),
             _make_node("scaleA", inputs=["dsA"]),
-            _make_node(
-                "trainA", "training", inputs=["scaleA"], params={"target_column": "y"}
-            ),
+            _make_node("trainA", "training", inputs=["scaleA"], params={"target_column": "y"}),
             # Subgraph 2: Dataset B → Training 2 (no connection to A)
             _make_node("dsB", "data_loader"),
             _make_node("encB", inputs=["dsB"]),

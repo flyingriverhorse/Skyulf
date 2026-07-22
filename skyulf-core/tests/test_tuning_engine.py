@@ -1287,7 +1287,9 @@ _CHARACTERIZATION_CASES = [
 ]
 
 
-@pytest.mark.parametrize("calculator, applier, problem_type, params, metric", _CHARACTERIZATION_CASES)
+@pytest.mark.parametrize(
+    "calculator, applier, problem_type, params, metric", _CHARACTERIZATION_CASES
+)
 def test_fixed_mode_tuning_reproduces_direct_fit(calculator, applier, problem_type, params, metric):
     """A single-value ("fixed") tuning search space must reproduce direct calculator.fit().
 
@@ -1313,7 +1315,9 @@ def test_fixed_mode_tuning_reproduces_direct_fit(calculator, applier, problem_ty
     )
 
 
-@pytest.mark.parametrize("calculator, applier, problem_type, params, metric", _CHARACTERIZATION_CASES)
+@pytest.mark.parametrize(
+    "calculator, applier, problem_type, params, metric", _CHARACTERIZATION_CASES
+)
 def test_empty_search_space_silently_ignores_user_hyperparams(
     calculator, applier, problem_type, params, metric
 ):

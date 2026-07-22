@@ -71,9 +71,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
 
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
-        return any(
-            node.step_type == StepType.TRAINING for node in self._node_configs.values()
-        )
+        return any(node.step_type == StepType.TRAINING for node in self._node_configs.values())
 
     def _predict_schemas_safe(self, config: PipelineConfig) -> dict[str, dict[str, Any] | None]:
         """C7 Phase B helper: best-effort pre-run schema prediction.

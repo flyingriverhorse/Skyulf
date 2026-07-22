@@ -356,7 +356,6 @@ class _BaseEnsembleCalculator(SklearnCalculator):
                 logger.warning("Invalid params for estimator '%s': %s", name, exc)
         return estimator
 
-
     def _resolve_final_estimator(self, key: Any, params: Any = None) -> BaseEstimator:
         """Resolve the stacking meta-learner key, defaulting on unknown/missing."""
         factory = self.BASE_ESTIMATORS.get(key) if isinstance(key, str) else None

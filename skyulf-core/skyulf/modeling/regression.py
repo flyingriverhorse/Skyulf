@@ -430,8 +430,8 @@ if LIGHTGBM_AVAILABLE:
         category="Modeling",
         description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
-    tags=["regression"],
-)
+        tags=["regression"],
+    )
     class LGBMRegressorCalculator(SklearnCalculator):
         """LightGBM Regressor Calculator."""
 
@@ -488,7 +488,7 @@ if XGBOOST_AVAILABLE:
         description="Extreme Gradient Boosting regressor.",
         params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
         tags=["regression"],
-)
+    )
     class XGBRegressorCalculator(SklearnCalculator):
         """XGBoost Regressor Calculator."""
 

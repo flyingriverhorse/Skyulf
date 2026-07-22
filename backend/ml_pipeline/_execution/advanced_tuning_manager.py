@@ -212,9 +212,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
     @staticmethod
     async def get_tuning_job(session: AsyncSession, job_id: str) -> JobInfo | None:
         """Retrieves a tuning job by ID."""
-        stmt = select(TrainingJob).where(
-            TrainingJob.id == job_id, TrainingJob.run_mode == "tuned"
-        )
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id, TrainingJob.run_mode == "tuned")
         result = await session.execute(stmt)
         job = result.scalar_one_or_none()
 
