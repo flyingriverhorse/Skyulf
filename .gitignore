@@ -103,6 +103,7 @@ desktop.ini
 !skyulf-core/examples/data/forest_cover/*.zip
 !skyulf-core/examples/data/santander/*.csv
 !skyulf-core/examples/data/credit_card_fraud/*.csv
+!skyulf-core/examples/data/online_retail/*.csv
 
 # === Application Data & Uploads ===
 cache/
