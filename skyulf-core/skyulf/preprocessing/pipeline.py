@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
@@ -157,7 +158,16 @@ class FeatureEngineer:
 
         if transformer_type == "TrainTestSplitter":
             logger.debug("Handling TrainTestSplitter")
-            if isinstance(current_data, (pd.DataFrame, SkyulfDataFrame, tuple)):
+            # A raw (unwrapped) polars DataFrame satisfies neither `pd.DataFrame`
+            # nor the `SkyulfDataFrame` protocol (it has no `.copy()`, uses
+            # `.clone()` instead) even though it's a fully-supported "not yet
+            # split" input -- `SplitCalculator`/`SplitApplier` already handle it
+            # correctly via their own polars round-trip. Without this extra
+            # check, a raw polars DataFrame passed straight to
+            # `SkyulfPipeline.fit()` (the advertised polars-native usage) would
+            # silently skip the split entirely and fit/evaluate on the whole
+            # dataset with no held-out test set.
+            if isinstance(current_data, (pd.DataFrame, SkyulfDataFrame, tuple, pl.DataFrame)):
                 params = calculator.fit(current_data, params)
                 current_data = applier.apply(current_data, params)
             else:
