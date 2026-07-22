@@ -133,7 +133,7 @@ export const SearchSpaceInput: React.FC<SearchSpaceInputProps> = ({ def, value, 
                         {def.options
                             ?.filter(o => def.exclusive_options?.includes(o.value))
                             .map(o => `"${o.label}"`)
-                            .join(', ')} can't be combined with other options here — selecting it clears the rest.
+                            .join(', ')} can&apos;t be combined with other options here — selecting it clears the rest.
                     </p>
                 )}
             </div>

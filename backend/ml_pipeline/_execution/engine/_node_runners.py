@@ -32,8 +32,8 @@ from skyulf.modeling.base import StatefulEstimator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
-from ..schemas import NodeConfig
 from ...constants import StepType
+from ..schemas import NodeConfig
 
 if TYPE_CHECKING:
     from ...artifacts.store import ArtifactStore
@@ -405,7 +405,13 @@ class NodeRunnersMixin:
         (hyperparameter search) for this ``StepType.TRAINING`` node, from its
         ``run_mode`` param.
         """
-        return node.params.get("run_mode", "fixed")
+        run_mode = node.params.get("run_mode", "fixed")
+        if run_mode not in ("fixed", "tuned"):
+            raise ValueError(
+                f"Unsupported run_mode {run_mode!r} resolved for node "
+                f"{getattr(node, 'name', '<unknown>')!r}. Expected 'fixed' or 'tuned'."
+            )
+        return run_mode
 
     def _default_metric_for_problem_type(self, problem_type: str) -> str:
         """Internal-only default scoring metric for ``run_mode='fixed'``.

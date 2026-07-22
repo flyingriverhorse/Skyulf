@@ -786,7 +786,7 @@ export const TrainingSettings: React.FC<{
                         />
                         {def.depends_on && (
                             <p className="mt-1 text-[10px] text-gray-400 italic">
-                                Shown because "{def.depends_on.param}" search space includes "{String(def.depends_on.value)}".
+                                Shown because &quot;{def.depends_on.param}&quot; search space includes &quot;{String(def.depends_on.value)}&quot;.
                             </p>
                         )}
                     </div>
