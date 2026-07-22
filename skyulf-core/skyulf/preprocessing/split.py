@@ -114,7 +114,9 @@ class SplitApplier(BaseApplier):
         # (df, None) shape that gets silently collapsed by transformers.
         if target_col and hasattr(df, "columns") and target_col in list(cast(Any, df).columns):
             frame = cast(Any, df)
-            X = frame.drop(columns=[target_col])
+            # `.drop(columns=[...])` is pandas-only syntax; polars' `.drop()`
+            # takes column names positionally and has no `columns=` kwarg.
+            X = frame.drop(target_col) if is_polars(frame) else frame.drop(columns=[target_col])
             y = frame[target_col]
             return splitter.split_xy(X, y)
 

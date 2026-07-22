@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
+import polars as pl
 
 from skyulf.pipeline import SkyulfPipeline
 
@@ -67,3 +68,47 @@ def test_end_to_end_pipeline(sample_classification_data):
     finally:
         if Path(save_path).exists():
             Path(save_path).unlink()
+
+
+def test_train_test_split_step_actually_splits_a_raw_polars_dataframe():
+    """Regression test: a raw (unwrapped) polars DataFrame fed straight into
+    `SkyulfPipeline.fit()` — the advertised polars-native usage — must
+    actually get split by a configured `TrainTestSplitter` step, not silently
+    skipped.
+
+    A raw `pl.DataFrame` satisfies neither `pd.DataFrame` nor the
+    `SkyulfDataFrame` protocol (it lacks `.copy()`, using `.clone()`
+    instead), so the internal "is this already split?" guard in
+    `FeatureEngineer._run_step` previously failed to recognize it and
+    silently skipped the splitter entirely. The pipeline then fit AND
+    evaluated the model on the *entire* dataset with no held-out test
+    set at all — a real, silent leakage bug, not merely a missing feature.
+    """
+    df = pl.DataFrame(
+        {
+            "feature1": list(range(100)),
+            "feature2": [float(i) * 1.5 for i in range(100)],
+            "target": [i % 2 for i in range(100)],
+        }
+    )
+
+    pipeline_config = {
+        "preprocessing": [
+            {
+                "name": "split",
+                "transformer": "TrainTestSplitter",
+                "params": {"test_size": 0.25, "random_state": 42},
+            },
+        ],
+        "modeling": {"type": "logistic_regression", "params": {}},
+    }
+
+    pipeline = SkyulfPipeline(pipeline_config)
+    metrics = pipeline.fit(df, target_column="target")
+
+    splits = metrics["modeling"]["splits"]
+    assert "train" in splits
+    assert "test" in splits, (
+        "TrainTestSplitter did not produce a held-out test split for a raw "
+        "polars DataFrame input — the split step was silently skipped."
+    )
