@@ -11,6 +11,7 @@ from joblib import parallel_backend
 
 # Explicitly enable experimental halving search cv
 from sklearn.experimental import enable_halving_search_cv  # noqa
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (
     HalvingGridSearchCV,
     HalvingRandomSearchCV,
@@ -24,6 +25,7 @@ from sklearn.model_selection import (
 
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
+from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
 from .schemas import TuningConfig, TuningResult
 
@@ -126,6 +128,17 @@ class TuningCalculator(BaseModelCalculator):
         """
         flat, nested = TuningCalculator._split_flat_and_nested_params(params)
         flat = TuningCalculator._filter_params_to_signature(model_class, flat)
+
+        # LogisticRegression-only: sklearn >=1.8 deprecates the ``penalty``
+        # constructor arg. The tuning engine builds estimators directly
+        # (bypassing LogisticRegressionCalculator._resolve_fit_params), so a
+        # ``penalty`` coming from the search space/best_params would otherwise
+        # reach sklearn unnormalized and trigger the FutureWarning on every
+        # fold fit and the final refit. Other models (e.g. SGDClassifier) also
+        # have a ``penalty`` param with different, non-deprecated semantics,
+        # so this must stay scoped to LogisticRegression specifically.
+        if model_class is LogisticRegression:
+            flat = normalize_logistic_regression_params(flat)
 
         model = model_class(**flat)
         if nested:
