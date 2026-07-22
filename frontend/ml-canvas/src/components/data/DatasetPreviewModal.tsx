@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FileText, Database, Columns, AlignJustify } from 'lucide-react';
-import { DatasetService } from '../../core/api/datasets';
+import { DatasetService, DatasetApiError } from '../../core/api/datasets';
 import { Dataset } from '../../core/types/api';
 import { formatBytes } from '../../core/utils/format';
 import { ModalShell } from '../shared';
@@ -76,7 +76,11 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
     } catch (err) {
       console.error('Failed to fetch data:', err);
       if (myRequestId === requestIdRef.current) {
-        setError('Failed to load dataset preview.');
+        if (err instanceof DatasetApiError && err.status === 404) {
+          setError('This dataset is no longer available. It may have been deleted — try re-uploading it or removing this reference.');
+        } else {
+          setError('Failed to load dataset preview.');
+        }
       }
     } finally {
       if (myRequestId === requestIdRef.current) {
