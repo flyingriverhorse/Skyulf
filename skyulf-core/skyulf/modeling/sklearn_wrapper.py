@@ -1,10 +1,12 @@
 """Wrapper for Scikit-Learn models."""
 
 import logging
+import warnings
 from typing import Any
 
 import pandas as pd
 from sklearn.base import BaseEstimator
+from sklearn.exceptions import ConvergenceWarning
 
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
@@ -61,7 +63,27 @@ class SklearnCalculator(BaseModelCalculator):
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
-        model.fit(X_np, y_np)
+        # sklearn's ConvergenceWarning (raised via `warnings.warn`, not the
+        # `logging` module) would otherwise only reach the server's stderr
+        # and never surface to the user — unlike the skyulf-core node
+        # advisories already routed through `WarningCaptureHandler` via
+        # `logger.warning(...)`. Capture everything sklearn emits during
+        # `fit`, re-route ConvergenceWarning through this model's own
+        # (``skyulf.*``-tree) logger so every sklearn-backed model gets the
+        # same UI-visible treatment regardless of solver/estimator, and
+        # re-emit any other warning category unchanged so existing
+        # console/log behavior for those is preserved.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            model.fit(X_np, y_np)
+        for w in caught:
+            if issubclass(w.category, ConvergenceWarning):
+                conv_msg = f"{self.model_class.__name__} did not fully converge: {w.message}"
+                logger.warning(conv_msg)
+                if log_callback:
+                    log_callback(conv_msg)
+            else:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
 
         return model
 

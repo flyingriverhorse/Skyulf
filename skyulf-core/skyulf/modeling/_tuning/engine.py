@@ -8,6 +8,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 from joblib import parallel_backend
+from sklearn.exceptions import ConvergenceWarning
 
 # Explicitly enable experimental halving search cv
 from sklearn.experimental import enable_halving_search_cv  # noqa
@@ -209,9 +210,21 @@ class TuningCalculator(BaseModelCalculator):
         # ``a__b`` keys — e.g. an ensemble's tuned base-model params — through
         # ``set_params`` so they are not silently dropped.
         model = self._instantiate_model(model_cls, final_params)
-        with warnings.catch_warnings():
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
             warnings.filterwarnings("ignore", message=".*valid feature names.*")
             model.fit(X_np, y_np)
+        for w in caught:
+            if issubclass(w.category, ConvergenceWarning):
+                conv_msg = (
+                    f"Final refit of {model_cls.__name__} with the best params did not "
+                    f"fully converge: {w.message}"
+                )
+                logger.warning(conv_msg)
+                if log_callback:
+                    log_callback(conv_msg)
+            else:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
 
         return model
 
@@ -265,14 +278,38 @@ class TuningCalculator(BaseModelCalculator):
             X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
             validation_data_np = (X_val_np, y_val_np)
 
-        tuning_result = self.tune(
-            X_np,
-            y_np,
-            tuning_config,
-            progress_callback=progress_callback,
-            log_callback=log_callback,
-            validation_data=validation_data_np,
-        )
+        # Wrap the whole candidate/fold search: sklearn's ConvergenceWarning
+        # (raised via `warnings.warn`, not the `logging` module) would
+        # otherwise only reach the server's stderr, once per fold/candidate,
+        # and never surface to the user. Aggregate into a single summary log
+        # line instead of one per fold (a full grid/random search can run
+        # hundreds of fold fits) and re-emit any other warning category
+        # unchanged so existing behavior for those is preserved.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            tuning_result = self.tune(
+                X_np,
+                y_np,
+                tuning_config,
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+                validation_data=validation_data_np,
+            )
+        convergence_count = 0
+        for w in caught:
+            if issubclass(w.category, ConvergenceWarning):
+                convergence_count += 1
+            else:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+        if convergence_count:
+            conv_msg = (
+                f"{convergence_count} candidate fit(s) during hyperparameter search did not "
+                "fully converge (max_iter reached). Consider increasing max_iter, scaling "
+                "features, or picking a different solver."
+            )
+            logger.warning(conv_msg)
+            if log_callback:
+                log_callback(conv_msg)
 
         # Refit the best model on the full dataset
         model = self._refit_best_model(tuning_result, tuning_config, X_np, y_np, log_callback)
