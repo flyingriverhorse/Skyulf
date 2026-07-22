@@ -14,7 +14,6 @@ from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingM
 from backend.ml_pipeline._execution.job_manager_base import TrainingJobManagerBase
 from backend.ml_pipeline._execution.schemas import JobStatus
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

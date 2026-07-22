@@ -17,12 +17,10 @@ from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig
 from skyulf.modeling.base import BaseModelCalculator
 from skyulf.modeling.classification import (
-    LogisticRegressionApplier,
-    LogisticRegressionCalculator,
-)
-from skyulf.modeling.classification import (
     KNeighborsClassifierApplier,
     KNeighborsClassifierCalculator,
+    LogisticRegressionApplier,
+    LogisticRegressionCalculator,
     RandomForestClassifierApplier,
     RandomForestClassifierCalculator,
 )

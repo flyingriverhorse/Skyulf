@@ -35,9 +35,9 @@ from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.graph_utils import partition_parallel_pipeline
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
-from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline._internal._routers import notebook_export as ne
 from backend.ml_pipeline._internal._routers._notebook_builders import _NodeIn, _PipelineIn
+from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 
 # ── artifact output dir (within project, not /tmp) ──────────────────────────
 ARTIFACT_DIR = REPO / "tests" / "artifacts" / "smoke_task9"

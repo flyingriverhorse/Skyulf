@@ -49,8 +49,8 @@ except ImportError:
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
-from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 from ._sklearn_compat import normalize_logistic_regression_params
+from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 logger = logging.getLogger(__name__)
 
