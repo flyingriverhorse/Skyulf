@@ -4,22 +4,22 @@
     "unsupported_degree_five": {
       "columns": ["x1", "x2"],
       "degree": 5,
-      "error_match": "only supports degree 2, 3 or 4"
+      "error_match": "Valid choices"
     },
     "unsupported_degree_zero": {
       "columns": ["x1", "x2"],
       "degree": 0,
-      "error_match": "only supports degree 2, 3 or 4"
+      "error_match": "Valid choices"
     },
     "unsupported_degree_one": {
       "columns": ["x1", "x2"],
       "degree": 1,
-      "error_match": "only supports degree 2, 3 or 4"
+      "error_match": "Valid choices"
     },
     "unsupported_degree_negative": {
       "columns": ["x1", "x2"],
       "degree": -2,
-      "error_match": "only supports degree 2, 3 or 4"
+      "error_match": "Valid choices"
     },
     "non_numeric_column": {
       "columns": ["x1", "cat"],

@@ -214,8 +214,9 @@ def test_polars_apply_include_missing_fills_null_token() -> None:
 
 
 class TestApplyExceptionPropagates:
-    """A transform-time exception in the apply path propagates (raised), with the
-    dispatcher logging the failure. Scenarios (pandas/polars) loaded from
+    """A transform-time input error propagates and is logged without a traceback.
+
+    Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_one_hot.json`` (group ``apply_exception``).
     """
 
@@ -234,7 +235,7 @@ class TestApplyExceptionPropagates:
             "encoder_object": _BrokenEncoder(),
             "feature_names": ["color_x"],
         }
-        with caplog.at_level("ERROR"), pytest.raises(ValueError, match="boom"):
+        with caplog.at_level("DEBUG"), pytest.raises(ValueError, match="boom"):
             if engine == "polars":
                 df = pl.DataFrame({"color": ["red", "blue"]})
                 OneHotEncoderApplier().apply(df, dict(params))
@@ -242,7 +243,10 @@ class TestApplyExceptionPropagates:
                 df = pd.DataFrame({"color": ["red", "blue"]})
                 OneHotEncoderApplier().apply(df, dict(params))
 
-        assert any("engine apply failed" in rec.message for rec in caplog.records)
+        records = [rec for rec in caplog.records if "engine apply failed" in rec.message]
+        assert len(records) == 1
+        assert records[0].levelname == "DEBUG"
+        assert records[0].exc_info is None
 
 
 def test_to_dense_handles_pandas_wrapped_output() -> None:

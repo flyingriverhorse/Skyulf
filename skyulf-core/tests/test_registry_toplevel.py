@@ -84,12 +84,50 @@ def test_get_applier_unknown_name_raises_value_error():
         NodeRegistry.get_applier("totally_unregistered_node_xyz")
 
 
+def test_split_alias_warns_and_canonical_splitter_does_not(recwarn):
+    """The deprecated Split alias must resolve with a warning only."""
+    with pytest.warns(DeprecationWarning, match="TrainTestSplitter"):
+        alias_calculator = NodeRegistry.get_calculator("Split")
+    with pytest.warns(DeprecationWarning, match="TrainTestSplitter"):
+        alias_applier = NodeRegistry.get_applier("Split")
+
+    canonical_calculator = NodeRegistry.get_calculator("TrainTestSplitter")
+    canonical_applier = NodeRegistry.get_applier("TrainTestSplitter")
+
+    assert alias_calculator is canonical_calculator
+    assert alias_applier is canonical_applier
+    assert not recwarn
+
+
 def test_get_all_metadata_returns_snapshot_not_live_reference():
     """get_all_metadata() should return a copy, so mutating it doesn't affect the registry."""
     NodeRegistry.register("dummy_node_snapshot", _DummyApplier)(_DummyCalculatorWithMeta)
     snapshot = NodeRegistry.get_all_metadata()
     snapshot["dummy_node_snapshot"] = {"tampered": True}
     assert NodeRegistry.get_all_metadata()["dummy_node_snapshot"] != {"tampered": True}
+
+
+def test_list_nodes_filters_metadata_by_modeling_category(monkeypatch):
+    """Node-listing helpers should separate models and filter transformer categories."""
+    metadata = {
+        "preprocessor": {"category": "Preprocessing"},
+        "feature_engineer": {"category": "Feature Engineering"},
+        "model": {"category": "Modeling"},
+    }
+    monkeypatch.setattr(NodeRegistry, "get_all_metadata", classmethod(lambda cls: metadata))
+
+    assert NodeRegistry.list_transformers() == ["preprocessor", "feature_engineer"]
+    assert NodeRegistry.list_transformers("Preprocessing") == ["preprocessor"]
+    assert NodeRegistry.list_models() == ["model"]
+    assert NodeRegistry.list_models("Modeling") == ["model"]
+    assert NodeRegistry.list_models("Preprocessing") == []
+
+
+def test_node_registry_is_reexported_from_package_top_level():
+    """NodeRegistry should be discoverable from the package's top-level namespace."""
+    import skyulf
+
+    assert skyulf.NodeRegistry is NodeRegistry
 
 
 def test_register_is_thread_safe_under_concurrent_registration():

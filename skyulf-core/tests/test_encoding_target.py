@@ -278,8 +278,7 @@ def test_polars_apply_no_valid_columns_is_noop() -> None:
 def test_polars_apply_exception_propagates(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform-time exception in the polars apply path propagates (raised), with
-    the dispatcher logging the failure."""
+    """A polars input error propagates and is logged without a traceback."""
     X_pl = pl.DataFrame({"city": ["a", "b", "a"]})
     y_pl = pl.Series("target", [1, 0, 1])
 
@@ -288,17 +287,19 @@ def test_polars_apply_exception_propagates(
             raise ValueError("boom")
 
     params = {"columns": ["city"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level(logging.ERROR), pytest.raises(ValueError, match="boom"):
+    with caplog.at_level(logging.DEBUG), pytest.raises(ValueError, match="boom"):
         TargetEncoderApplier().apply((X_pl, y_pl), dict(params))
 
-    assert any("engine apply failed" in rec.message for rec in caplog.records)
+    records = [rec for rec in caplog.records if "engine apply failed" in rec.message]
+    assert len(records) == 1
+    assert records[0].levelno == logging.DEBUG
+    assert records[0].exc_info is None
 
 
 def test_pandas_apply_exception_propagates(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A transform-time exception in the pandas apply path propagates (raised), with
-    the dispatcher logging the failure."""
+    """A pandas input error propagates and is logged without a traceback."""
     X_pd = pd.DataFrame({"city": ["a", "b", "a"]})
     y_pd = pd.Series([1, 0, 1], name="target")
 
@@ -307,10 +308,13 @@ def test_pandas_apply_exception_propagates(
             raise ValueError("boom")
 
     params = {"columns": ["city"], "encoder_object": _BrokenEncoder()}
-    with caplog.at_level(logging.ERROR), pytest.raises(ValueError, match="boom"):
+    with caplog.at_level(logging.DEBUG), pytest.raises(ValueError, match="boom"):
         TargetEncoderApplier().apply((X_pd, y_pd), dict(params))
 
-    assert any("engine apply failed" in rec.message for rec in caplog.records)
+    records = [rec for rec in caplog.records if "engine apply failed" in rec.message]
+    assert len(records) == 1
+    assert records[0].levelno == logging.DEBUG
+    assert records[0].exc_info is None
 
 
 def test_polars_fit_extracts_y_from_target_column() -> None:

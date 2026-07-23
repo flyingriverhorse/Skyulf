@@ -5,8 +5,21 @@ Skyulf Core SDK
 from importlib.metadata import PackageNotFoundError, version
 
 from .data.dataset import SplitDataset
+from .leakage import validate_leakage_safety
 from .pipeline import SkyulfPipeline
 from .preprocessing.pipeline import FeatureEngineer
+from .profiling import (
+    DatasetProfile,
+    DriftCalculator,
+    EDAAnalyzer,
+    EDAVisualizer,
+    ExpectationError,
+    expect_columns_exist,
+    expect_no_nulls,
+    expect_unique,
+    expect_value_range,
+)
+from .registry import NodeRegistry
 
 try:
     # Single source of truth is setup.py's `version=`; setuptools records it in
@@ -20,4 +33,14 @@ __all__ = [
     "SkyulfPipeline",
     "SplitDataset",
     "FeatureEngineer",
+    "NodeRegistry",
+    "EDAAnalyzer",
+    "EDAVisualizer",
+    "ExpectationError",
+    "DatasetProfile",
+    "DriftCalculator",
+    "expect_columns_exist",
+    "expect_no_nulls",
+    "expect_unique",
+    "expect_value_range",
 ]

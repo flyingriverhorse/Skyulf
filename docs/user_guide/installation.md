@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- **Python 3.12**
+- **Python >=3.12**
 - pip 21 or newer
 
 ## Install from PyPI
@@ -19,15 +19,26 @@ Install only what you need:
 |---|---|---|
 | `viz` | Matplotlib, Rich (visualisation helpers) | `pip install skyulf-core[viz]` |
 | `eda` | VADER sentiment, causal-learn | `pip install skyulf-core[eda]` |
+| `text` | VADER sentiment (text features) | `pip install skyulf-core[text]` |
+| `nlp` | Sentence-transformers (dense embeddings) | `pip install skyulf-core[nlp]` |
+| `geo` | GeoPandas, H3, spatial stats (native deps) | `pip install skyulf-core[geo]` |
 | `tuning` | Optuna + Optuna-integration | `pip install skyulf-core[tuning]` |
 | `modeling-xgboost` | XGBoost estimators | `pip install skyulf-core[modeling-xgboost]` |
+| `modeling-lightgbm` | LightGBM estimators | `pip install skyulf-core[modeling-lightgbm]` |
 | `preprocessing-imbalanced` | imbalanced-learn (SMOTE, etc.) | `pip install skyulf-core[preprocessing-imbalanced]` |
+| `explainability` | SHAP explainability | `pip install skyulf-core[explainability]` |
 | `dev` | pytest, twine, build | `pip install skyulf-core[dev]` |
 
-Install everything at once:
+Install all non-geospatial optional runtime features:
 
 ```bash
-pip install skyulf-core[viz,eda,tuning,modeling-xgboost,preprocessing-imbalanced]
+pip install skyulf-core[all]
+```
+
+Install geospatial functionality separately because it has native dependencies:
+
+```bash
+pip install skyulf-core[geo]
 ```
 
 ## Editable install (contributor workflow)
@@ -53,56 +64,16 @@ These are pulled in automatically by `pip install skyulf-core`:
 - **scipy** >= 1.10
 - **statsmodels** >= 0.14
 
-## Full platform (Docker)
+## Self-hosted platform
 
-To run the complete Skyulf platform (backend + frontend + Celery workers):
-
-### 1. Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Key variables to review:
-
-| Variable | Default | Description |
-|---|---|---|
-| `DB_TYPE` | `sqlite` | Database backend (`sqlite` or `postgres`) |
-| `USE_CELERY` | `true` | Set `false` to skip Redis and run tasks in-process |
-| `CELERY_BROKER_URL` | `redis://localhost:6379/1` | Redis URL for Celery |
-| `SECRET_KEY` | *(placeholder)* | **Change this** in production |
-
-> **Quick start:** For local development with no Redis, just set `USE_CELERY=false` in `.env`.
-
-### 2. Launch with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-This starts three containers:
-
-| Service | Port | Purpose |
-|---|---|---|
-| `api` | `8000` | FastAPI backend + static frontend |
-| `redis` | `6379` | Message broker for Celery |
-| `worker` | — | Celery worker for background training |
-
-### 3. Verify
-
-- Dashboard: [http://127.0.0.1:8000](http://127.0.0.1:8000)
-- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- Health check: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
-- Authentication is not yet enabled — the platform is open by default in this release.
-
-For the full manual setup (without Docker), see the [Platform Setup guide](../guides/platform_setup.md).
+[Run the separate self-hosted platform](../guides/platform_setup.md)
 
 ## Import check
 
 Verify the installation:
 
 ```python
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 from skyulf.data.dataset import SplitDataset
 
 print("skyulf-core installed successfully")

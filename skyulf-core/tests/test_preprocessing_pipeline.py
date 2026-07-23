@@ -231,10 +231,13 @@ def test_metrics_rows_in_out(numeric_df: pd.DataFrame) -> None:
 
 
 def test_unknown_transformer_raises(numeric_df: pd.DataFrame) -> None:
-    """A step with an unregistered transformer type must raise ValueError."""
+    """An unknown transformer should include the registry's available-node hint."""
     steps = _steps(_step("bogus", "NonExistentTransformer123"))
     fe = FeatureEngineer(steps_config=steps)
-    with pytest.raises(ValueError, match="Unknown transformer type"):
+    with pytest.raises(
+        ValueError,
+        match="Unknown transformer type: NonExistentTransformer123.*Available nodes:",
+    ):
         fe.fit_transform(numeric_df)
 
 

@@ -85,6 +85,17 @@ jobs:
               --cov=skyulf-core/skyulf --cov-branch --cov-report=term-missing \
               --cov-report=xml --cov-fail-under=45
 
+      - name: Build and verify distributable wheel
+        run: |
+          echo "::group::Build skyulf-core wheel"
+          python -m pip install --upgrade build
+          rm -rf skyulf-core/dist
+          python -m build --outdir skyulf-core/dist skyulf-core
+          echo "::endgroup::"
+          bash .github/scripts/run_check.sh "isolated skyulf-core wheel install" \
+            python .github/scripts/verify_skyulf_core_distribution.py \
+              skyulf-core/dist/*.whl
+
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:

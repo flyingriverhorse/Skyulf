@@ -146,10 +146,10 @@ After `fit_predict` completes, the cell calls `estimator.evaluate()` and renders
 If you want to run tuning in a plain Python script or existing notebook:
 
 ```python
+from skyulf import NodeRegistry
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
-from skyulf.registry import NodeRegistry
 
 ALGORITHM = "xgboost_classifier"
 base_calc = NodeRegistry.get_calculator(ALGORITHM)()

@@ -93,8 +93,7 @@ If you want an HTML artifact you can email around, Skyulf is not trying to repla
 
 ```python
 import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 # 1. Load Data
 df = pl.read_csv("your_dataset.csv")

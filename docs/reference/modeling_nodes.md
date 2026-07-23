@@ -252,7 +252,7 @@ Ensemble nodes are registered like any other modeling step, so they slot into th
 
 ```python
 import pandas as pd
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 config = {
     "preprocessing": [
@@ -297,7 +297,7 @@ A **VotingClassifier** is configured the same way — swap the `type` for `votin
 You can also drive the underlying calculator/applier directly for low-level usage via the `NodeRegistry`:
 
 ```python
-from skyulf.registry import NodeRegistry
+from skyulf import NodeRegistry
 
 calc = NodeRegistry.get_calculator("stacking_classifier")()
 applier = NodeRegistry.get_applier("stacking_classifier")()

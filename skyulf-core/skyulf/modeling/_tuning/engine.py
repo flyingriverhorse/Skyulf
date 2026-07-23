@@ -24,6 +24,7 @@ from sklearn.model_selection import (
     TimeSeriesSplit,
 )
 
+from ..._validation import raise_invalid_choice
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from .._sklearn_compat import normalize_logistic_regression_params
@@ -72,7 +73,19 @@ if HAS_OPTUNA:
 
 
 class TuningCalculator(BaseModelCalculator):
-    """Calculator for hyperparameter tuning."""
+    """Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.
+
+    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,
+    ``n_trials``, ``search_space`` (a mapping of parameter names to candidate
+    lists), and optional cross-validation and ``strategy_params`` settings.
+    ``grid`` and ``random`` use Skyulf's candidate loop; ``halving_grid`` and
+    ``halving_random`` use sklearn searchers; ``optuna`` uses OptunaSearchCV
+    and requires the Optuna integration package.
+
+    Examples:
+        >>> tuner = TuningCalculator(LogisticRegressionCalculator())
+        >>> model, result = tuner.fit(X, y, {"strategy": "random", "search_space": {"C": [0.1, 1.0]}})
+    """
 
     def __init__(self, model_calculator: BaseModelCalculator):
         self.model_calculator = model_calculator
@@ -1133,7 +1146,11 @@ class TuningCalculator(BaseModelCalculator):
                 config, base_estimator, cv, metric, progress_callback, log_callback
             )
         else:
-            raise ValueError(f"Unknown tuning strategy: {config.strategy}")
+            raise_invalid_choice(
+                config.strategy,
+                ("grid", "random", "halving_grid", "halving_random", "optuna"),
+                "tuning strategy",
+            )
 
         # 4. Run Search
         # Ensure numpy

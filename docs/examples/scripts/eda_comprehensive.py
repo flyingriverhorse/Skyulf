@@ -20,7 +20,7 @@ from rich.panel import Panel
 from rich.table import Table
 from sklearn.datasets import load_iris
 
-from skyulf.profiling.analyzer import EDAAnalyzer
+from skyulf import EDAAnalyzer
 
 console = Console()
 

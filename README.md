@@ -152,8 +152,7 @@ Skyulf isn't just a web application; its core logic is available as a standalone
 
 ```python
 import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 # 1. Load Data
 df = pl.read_csv("your_dataset.csv")

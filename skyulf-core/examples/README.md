@@ -1,6 +1,6 @@
 # Skyulf Core — Examples
 
-Eight end-to-end Jupyter notebooks showing `skyulf-core` on real Kaggle
+Nine end-to-end Jupyter notebooks showing `skyulf-core` on real Kaggle
 datasets — regression, text classification, clustering, multiclass +
 ensembling, imbalanced classification, extreme-imbalance classification, and
 binary classification. Every notebook is **Polars + NumPy only** (no
@@ -14,10 +14,9 @@ compares at least two models honestly (including a tuned or ensembled one).
 
 ```bash
 cd skyulf-core
-pip install -e ".[dev]"          # or your usual editable install
+pip install -e ".[dev,viz,eda,tuning,preprocessing-imbalanced,modeling-xgboost,modeling-lightgbm,explainability]"
+python -m pip install jupyter
 jupyter nbconvert --to notebook --execute --inplace examples/<name>.ipynb
-# or just open them normally:
-jupyter lab examples/
 ```
 
 Each notebook is self-contained and reads its dataset from `examples/data/`

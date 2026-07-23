@@ -1,5 +1,11 @@
 """Modeling module for Skyulf."""
 
+from ._evaluation import (
+    calculate_classification_metrics,
+    calculate_clustering_metrics,
+    calculate_regression_metrics,
+)
+from ._explainability import compute_shap_explanation
 from .base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .classification import (
     CalibratedClassifierApplier,
@@ -78,6 +84,10 @@ __all__ = [
     "BernoulliNBApplier",
     "KMeansCalculator",
     "KMeansApplier",
+    "calculate_classification_metrics",
+    "calculate_regression_metrics",
+    "calculate_clustering_metrics",
+    "compute_shap_explanation",
 ]
 
 # NOTE: Imports above are intentionally explicit. Every node module is imported

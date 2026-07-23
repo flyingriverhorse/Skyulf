@@ -682,7 +682,7 @@ def test_evaluate_unknown_problem_type_raises():
         node_id="u1",
     )
     estimator.fit_predict(dataset, "target", config={})
-    with pytest.raises(ValueError, match="Unknown problem type"):
+    with pytest.raises(ValueError, match=r"Valid choices: .*'classification'.*'clustering'"):
         estimator.evaluate(dataset, "target")
 
 
