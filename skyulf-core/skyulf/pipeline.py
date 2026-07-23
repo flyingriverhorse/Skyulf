@@ -7,6 +7,7 @@ import pickle  # nosec B403 - used only for internal pipeline serialization (see
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
 from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
@@ -175,7 +176,9 @@ class SkyulfPipeline:
         )
 
     def fit(
-        self, data: pd.DataFrame | SkyulfDataFrame | SplitDataset, target_column: str
+        self,
+        data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
+        target_column: str,
     ) -> dict[str, Any]:
         """
         Fit the pipeline.
