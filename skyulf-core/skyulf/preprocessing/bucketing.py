@@ -77,11 +77,10 @@ def _polars_one_col_expr(
         return None
 
     col_custom_labels = custom_labels_map.get(col)
-    labels = (
-        col_custom_labels
-        if col_custom_labels and len(col_custom_labels) == len(sorted_edges) - 1
-        else None
+    has_valid_custom_labels = (
+        bool(col_custom_labels) and len(col_custom_labels) == len(sorted_edges) - 1
     )
+    labels = col_custom_labels if has_valid_custom_labels else None
     if labels is None and label_format == "range":
         # Reconstruct the same bracket-string labels pandas produces, instead
         # of relying on pl.cut()'s own default interval-label text.
@@ -89,7 +88,7 @@ def _polars_one_col_expr(
 
     cut_expr = _polars_cut_expr(col, sorted_edges, labels)
     target_col_name = f"{col}{output_suffix}"
-    if label_format in ("ordinal", "bin_index") and not col_custom_labels:
+    if label_format in ("ordinal", "bin_index") and not has_valid_custom_labels:
         # Polars cut returns Categorical; cast → physical index.
         return cut_expr.cast(pl.UInt32).alias(target_col_name)
     return cut_expr.alias(target_col_name)
@@ -243,12 +242,12 @@ def _bucketing_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any
     for col, edges in bin_edges_map.items():
         if col not in df_out.columns:
             continue
-        processed_cols.append(col)
         try:
             binned_series = _bin_one_column_pandas(
                 df_out[col], edges, params, custom_labels_map.get(col)
             )
             df_out[f"{col}{output_suffix}"] = binned_series
+            processed_cols.append(col)
         except Exception:
             # Skip columns that fail (e.g. degenerate edges, dtype mismatch),
             # but log so a silently-unbinned column isn't a total mystery.
