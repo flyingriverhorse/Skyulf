@@ -2,7 +2,7 @@
 
 ## Requirements
 
-- **Python 3.12**
+- **Python >=3.12**
 - pip 21 or newer
 
 ## Install from PyPI

@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for suggesting a new feature!
-        Please check the [Roadmap](https://github.com/flyingriverhorse/Skyulf/blob/master/ROADMAP.md) first to see if it's already planned.
+        Please search [existing issues](https://github.com/flyingriverhorse/Skyulf/issues) and [GitHub Discussions](https://github.com/flyingriverhorse/Skyulf/discussions) before submitting.
 
   - type: input
     id: summary
