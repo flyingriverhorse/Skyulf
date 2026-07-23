@@ -15,7 +15,7 @@
       "lat2_col": "lat2",
       "lon2_col": "lon2",
       "extra_config": {"method": "manhattan"},
-      "error_match": "only supports"
+      "error_match": "Valid choices"
     },
     "unsupported_unit": {
       "lat1_col": "lat1",
@@ -23,7 +23,7 @@
       "lat2_col": "lat2",
       "lon2_col": "lon2",
       "extra_config": {"unit": "furlongs"},
-      "error_match": "only supports"
+      "error_match": "Valid choices"
     }
   }
 }

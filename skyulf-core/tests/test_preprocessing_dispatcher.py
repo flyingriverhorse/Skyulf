@@ -74,25 +74,40 @@ def test_apply_dual_engine_propagates_pandas_exception():
         apply_dual_engine(df, {}, _polars_apply, _raising)
 
 
-def test_apply_dual_engine_pandas_exception_is_logged(caplog):
-    """A pandas_func failure should be logged (with traceback) before propagating.
-
-    Regression test: the dispatcher previously had a dead
-    ``try/except: raise e`` with the actual logging call commented out,
-    meaning engine-dispatch failures went completely unlogged at this
-    central chokepoint used by ~50 preprocessing nodes.
-    """
+def test_apply_dual_engine_pandas_value_error_is_logged_without_traceback(caplog):
+    """A routine input error should be logged without a traceback before propagating."""
 
     def _raising(X, y, params):
         raise ValueError("boom")
 
     df = pd.DataFrame({"a": [1, 2, 3]})
     with (
-        caplog.at_level(logging.ERROR, logger="skyulf.preprocessing.dispatcher"),
+        caplog.at_level(logging.DEBUG, logger="skyulf.preprocessing.dispatcher"),
         pytest.raises(ValueError, match="boom"),
     ):
         apply_dual_engine(df, {}, _polars_apply, _raising)
-    assert any("Pandas engine apply failed" in rec.message for rec in caplog.records)
+    records = [rec for rec in caplog.records if "Pandas engine apply failed" in rec.message]
+    assert len(records) == 1
+    assert records[0].levelno == logging.DEBUG
+    assert records[0].exc_info is None
+
+
+def test_apply_dual_engine_pandas_unexpected_exception_is_logged_with_traceback(caplog):
+    """An unexpected failure should retain exception-level traceback logging."""
+
+    def _raising(X, y, params):
+        raise RuntimeError("boom")
+
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    with (
+        caplog.at_level(logging.DEBUG, logger="skyulf.preprocessing.dispatcher"),
+        pytest.raises(RuntimeError, match="boom"),
+    ):
+        apply_dual_engine(df, {}, _polars_apply, _raising)
+    records = [rec for rec in caplog.records if "Pandas engine apply failed" in rec.message]
+    assert len(records) == 1
+    assert records[0].levelno == logging.ERROR
+    assert records[0].exc_info is not None
 
 
 def test_apply_dual_engine_propagates_polars_exception():

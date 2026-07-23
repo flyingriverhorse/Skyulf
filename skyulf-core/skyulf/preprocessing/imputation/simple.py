@@ -19,6 +19,13 @@ from ._common import (
 
 
 class SimpleImputerApplier(BaseApplier):
+    """Apply fitted Simple Imputer fill values to missing values in selected columns.
+
+    The calculator artifact records per-column values for ``mean``, ``median``,
+    ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.
+    Missing columns seen during fitting are restored with their stored value.
+    """
+
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
         return apply_dual_engine(X, params, self._apply_polars, self._apply_pandas)
@@ -76,6 +83,15 @@ class SimpleImputerApplier(BaseApplier):
     params={"strategy": "mean", "fill_value": None, "columns": []},
 )
 class SimpleImputerCalculator(BaseCalculator):
+    """Fit per-column values for filling missing data with sklearn-compatible strategies.
+
+    Supported ``strategy`` values are ``mean``, ``median``, ``most_frequent``,
+    and ``constant``; ``mode`` is normalized to ``most_frequent``. Use
+    ``columns`` to select columns and ``fill_value`` with ``constant``.
+    Mean and median operate on numeric columns, while the other strategies can
+    operate on all selected columns.
+    """
+
     def infer_output_schema(
         self, input_schema: SkyulfSchema, config: dict[str, Any]
     ) -> SkyulfSchema:

@@ -8,8 +8,10 @@ from typing import Any, cast
 
 import pandas as pd
 
+from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
+from .leakage import validate_leakage_safety
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .modeling.classification import (
@@ -66,6 +68,10 @@ class SkyulfPipeline:
     Encapsulates:
     1. Feature Engineering (Preprocessing)
     2. Modeling (Training/Inference)
+
+    Examples:
+        >>> pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {}})
+        >>> metrics = pipeline.fit(data, target_column="target")
     """
 
     def __init__(self, config: PipelineConfig | dict[str, Any]):
@@ -76,11 +82,12 @@ class SkyulfPipeline:
             config: Pipeline configuration dictionary.
                     Must contain 'preprocessing' (list) and 'modeling' (dict).
         """
+        validate_pipeline_config(config)
         self.config = config
         self.preprocessing_steps = config.get("preprocessing", [])
         self.modeling_config = config.get("modeling", {})
 
-        self.feature_engineer = FeatureEngineer(self.preprocessing_steps)
+        self.feature_engineer = FeatureEngineer(self.preprocessing_steps, _validated=True)
         self.model_estimator: StatefulEstimator | None = None
         self._fit_metrics: dict[str, Any] | None = None
         self._target_column: str | None = None
@@ -287,6 +294,10 @@ class SkyulfPipeline:
             lines.append("  (none)")
 
         return "\n".join(lines)
+
+    def validate_leakage_safety(self) -> list[str]:
+        """Return warnings for preprocessing steps ordered before the train/test split."""
+        return validate_leakage_safety(self.config)
 
     def to_mermaid(self) -> str:
         """Render the pipeline as a Mermaid ``flowchart`` string.

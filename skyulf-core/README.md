@@ -143,6 +143,19 @@ returns a metrics report; `predict()` re-applies the *already-fitted*
 preprocessing artifacts (no re-fitting, no leakage) before calling the
 model.
 
+**Which API?** Use `SkyulfPipeline` (above) by default. The `Calculator`/
+`Applier` pairs it wraps (e.g. `SimpleImputerCalculator`/`Applier`) are
+lower-level — only use them directly to embed a single step in a custom
+(e.g. sklearn) pipeline.
+
+**Naming:** preprocessing names are `PascalCase` (`SimpleImputer`,
+`TrainTestSplitter`), modeling names are `snake_case` (`logistic_regression`).
+A few preprocessing nodes are `snake_case` exceptions: `feature_target_split`,
+`tokenizer`, `tfidf_vectorizer`, `count_vectorizer`, `hashing_vectorizer`,
+`sentence_embedder`, `feature_selection`. Unsure of a name? Use
+`NodeRegistry.list_transformers()`/`.list_models()`. `"Split"` is a
+deprecated alias for `"TrainTestSplitter"`.
+
 ## Data leakage safety
 
 **Split before any data-dependent preprocessing.** Fitting an imputer, scaler,
@@ -182,6 +195,13 @@ date-part extraction) are safe before the split. Read and run
 [`examples/01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb)
 to see this pattern applied to a real Kaggle dataset, including a
 deliberate pre-split/post-split split of "safe" vs. "learned" feature steps.
+
+Use the opt-in static check before fitting:
+
+```python
+warnings = skyulf.validate_leakage_safety(config)
+warnings = SkyulfPipeline(config).validate_leakage_safety()
+```
 
 ## Polars-native, no hidden pandas
 

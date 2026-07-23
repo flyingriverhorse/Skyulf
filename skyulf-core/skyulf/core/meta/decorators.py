@@ -20,7 +20,11 @@ def node_meta(
     params: dict[str, Any] | None = None,
     tags: list[str] | None = None,
 ):
+    """Attach registry metadata and a fallback docstring to a node class."""
+
     def decorator(cls):
+        if not cls.__doc__:
+            cls.__doc__ = description
         cls.__node_meta__ = NodeMetadata(
             id=id,
             name=name,

@@ -128,8 +128,8 @@ def test_polars_stat_for_strategy_builds_expected_expr(
 
 
 def test_polars_stat_for_strategy_unknown_raises_value_error() -> None:
-    """An unrecognized strategy name must raise a descriptive ValueError."""
-    with pytest.raises(ValueError, match="Unknown strategy"):
+    """An unrecognized strategy name must enumerate the supported strategies."""
+    with pytest.raises(ValueError, match=r"Valid choices: .*'constant'.*'mean'.*'median'"):
         _polars_stat_for_strategy("bogus", None)
 
 
