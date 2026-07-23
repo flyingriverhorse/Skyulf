@@ -34,6 +34,17 @@ def _callable_name(func: Callable[..., Any]) -> str:
     return getattr(func, "__qualname__", getattr(func, "__name__", repr(func)))
 
 
+def _log_dispatch_failure(
+    exc: Exception, engine: str, operation: str, func: Callable[..., Any]
+) -> None:
+    """Log expected input errors quietly and unexpected dispatcher failures with a traceback."""
+    message = "%s engine %s failed in %s"
+    if isinstance(exc, ValueError):
+        logger.debug(message + ": %s", engine, operation, _callable_name(func), exc)
+    else:
+        logger.exception(message, engine, operation, _callable_name(func))
+
+
 # Type definitions for the processing functions
 # They receive (X, y, params)
 # Apply returns (X_transformed, y_transformed)
@@ -71,8 +82,8 @@ def apply_dual_engine(
         # We pass X directly. The func should handle typing (X_pl: Any = X)
         try:
             X_out, y_out = polars_func(X, y, params)
-        except Exception:
-            logger.exception("Polars engine apply failed in %s", _callable_name(polars_func))
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Polars", "apply", polars_func)
             raise
     else:
         # Pandas path
@@ -81,8 +92,8 @@ def apply_dual_engine(
 
         try:
             X_out, y_out = pandas_func(X_pd, y, params)
-        except Exception:
-            logger.exception("Pandas engine apply failed in %s", _callable_name(pandas_func))
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Pandas", "apply", pandas_func)
             raise
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
@@ -112,13 +123,13 @@ def fit_dual_engine(
     if engine.name == EngineName.POLARS:
         try:
             return dict(polars_func(X, y, params))
-        except Exception:
-            logger.exception("Polars engine fit failed in %s", _callable_name(polars_func))
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Polars", "fit", polars_func)
             raise
     else:
         X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:
             return dict(pandas_func(X_pd, y, params))
-        except Exception:
-            logger.exception("Pandas engine fit failed in %s", _callable_name(pandas_func))
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Pandas", "fit", pandas_func)
             raise

@@ -1,4 +1,5 @@
 import logging
+import warnings
 from threading import Lock
 from typing import Any
 
@@ -9,6 +10,7 @@ class NodeRegistry:
     _calculators: dict[str, type] = {}
     _appliers: dict[str, type] = {}
     _metadata: dict[str, dict[str, Any]] = {}
+    _DEPRECATED_ALIASES: dict[str, str] = {"Split": "TrainTestSplitter"}
     _lock = Lock()
 
     @classmethod
@@ -53,6 +55,7 @@ class NodeRegistry:
 
     @classmethod
     def get_calculator(cls, name: str) -> type:
+        cls._warn_if_deprecated_alias(name)
         if name not in cls._calculators:
             raise ValueError(
                 f"Node '{name}' not found in registry. Available nodes: {list(cls._calculators.keys())}"
@@ -61,9 +64,21 @@ class NodeRegistry:
 
     @classmethod
     def get_applier(cls, name: str) -> type:
+        cls._warn_if_deprecated_alias(name)
         if name not in cls._appliers:
             raise ValueError(f"Node '{name}' not found in registry.")
         return cls._appliers[name]
+
+    @classmethod
+    def _warn_if_deprecated_alias(cls, name: str) -> None:
+        """Warn when a deprecated node alias is resolved."""
+        if canonical_name := cls._DEPRECATED_ALIASES.get(name):
+            warnings.warn(
+                f"'{name}' is a deprecated alias for '{canonical_name}'; "
+                f"use '{canonical_name}' instead.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
 
     @classmethod
     def get_all_metadata(cls) -> dict[str, dict[str, Any]]:

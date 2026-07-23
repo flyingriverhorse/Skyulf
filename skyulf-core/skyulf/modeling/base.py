@@ -6,6 +6,7 @@ from typing import Any, cast
 import pandas as pd
 
 # Use relative imports assuming the structure is preserved
+from .._validation import raise_invalid_choice
 from ..data.dataset import SplitDataset
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
@@ -586,4 +587,6 @@ class StatefulEstimator:
                 reference_column=reference_column,
             )
         else:
-            raise ValueError(f"Unknown problem type: {problem_type}")
+            raise_invalid_choice(
+                problem_type, ("classification", "regression", "clustering"), "problem type"
+            )

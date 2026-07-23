@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 import polars as pl
 
+from ..config_validation import validate_preprocessing_steps
 from ..data.dataset import SplitDataset
 from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
@@ -22,6 +23,10 @@ logger = logging.getLogger(__name__)
 class FeatureEngineer:
     """
     Orchestrates a sequence of feature engineering steps.
+
+    Examples:
+        >>> engineer = FeatureEngineer([])
+        >>> transformed, metrics = engineer.fit_transform(data)
     """
 
     # Resampling steps (SMOTE/undersampling) must only ever run on the train
@@ -35,8 +40,12 @@ class FeatureEngineer:
     def __init__(
         self,
         steps_config: Sequence[PreprocessingStepConfig | dict[str, Any]],
+        *,
+        _validated: bool = False,
     ):
         # `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].
+        if not _validated:
+            validate_preprocessing_steps(steps_config)
         self.steps_config = steps_config
         self.fitted_steps: list[dict[str, Any]] = []
 

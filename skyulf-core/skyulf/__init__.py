@@ -5,6 +5,7 @@ Skyulf Core SDK
 from importlib.metadata import PackageNotFoundError, version
 
 from .data.dataset import SplitDataset
+from .leakage import validate_leakage_safety
 from .pipeline import SkyulfPipeline
 from .preprocessing.pipeline import FeatureEngineer
 from .profiling import (

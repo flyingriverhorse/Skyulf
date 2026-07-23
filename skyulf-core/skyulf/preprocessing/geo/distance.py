@@ -11,6 +11,7 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 
+from ..._validation import raise_invalid_choice
 from ...core.artifacts import GeoDistanceArtifact
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -127,10 +128,10 @@ def _validate_geo_distance_columns(X_pd: pd.DataFrame, cols: list[str]) -> None:
 def _validate_geo_distance_method_unit(method: str, unit: str) -> None:
     """Raise ValueError if `method` or `unit` aren't in the supported sets."""
     if method not in _SUPPORTED_METHODS:
-        raise ValueError(f"GeoDistance only supports {_SUPPORTED_METHODS}, got {method!r}")
+        raise_invalid_choice(method, _SUPPORTED_METHODS, "GeoDistance method")
 
     if unit not in _SUPPORTED_UNITS:
-        raise ValueError(f"GeoDistance only supports units {_SUPPORTED_UNITS}, got {unit!r}")
+        raise_invalid_choice(unit, _SUPPORTED_UNITS, "GeoDistance unit")
 
 
 class GeoDistanceApplier(BaseApplier):
