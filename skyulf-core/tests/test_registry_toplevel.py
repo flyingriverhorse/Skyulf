@@ -92,6 +92,29 @@ def test_get_all_metadata_returns_snapshot_not_live_reference():
     assert NodeRegistry.get_all_metadata()["dummy_node_snapshot"] != {"tampered": True}
 
 
+def test_list_nodes_filters_metadata_by_modeling_category(monkeypatch):
+    """Node-listing helpers should separate models and filter transformer categories."""
+    metadata = {
+        "preprocessor": {"category": "Preprocessing"},
+        "feature_engineer": {"category": "Feature Engineering"},
+        "model": {"category": "Modeling"},
+    }
+    monkeypatch.setattr(NodeRegistry, "get_all_metadata", classmethod(lambda cls: metadata))
+
+    assert NodeRegistry.list_transformers() == ["preprocessor", "feature_engineer"]
+    assert NodeRegistry.list_transformers("Preprocessing") == ["preprocessor"]
+    assert NodeRegistry.list_models() == ["model"]
+    assert NodeRegistry.list_models("Modeling") == ["model"]
+    assert NodeRegistry.list_models("Preprocessing") == []
+
+
+def test_node_registry_is_reexported_from_package_top_level():
+    """NodeRegistry should be discoverable from the package's top-level namespace."""
+    import skyulf
+
+    assert skyulf.NodeRegistry is NodeRegistry
+
+
 def test_register_is_thread_safe_under_concurrent_registration():
     """Regression test: concurrent registration must not interleave a
     calculator/applier pair from different registration calls (which would

@@ -19,7 +19,7 @@ class EDAVisualizer:
             from rich.panel import Panel  # ty: ignore[unresolved-import]
             from rich.table import Table  # ty: ignore[unresolved-import]
         except ImportError:
-            print("Please install 'rich' to use the terminal summary: pip install rich")
+            print("Please install 'rich' to use the terminal summary: pip install skyulf-core[viz]")
             return
 
         console = Console()
@@ -485,7 +485,7 @@ class EDAVisualizer:
         try:
             import matplotlib.pyplot as plt  # ty: ignore[unresolved-import]
         except ImportError:
-            print("Please install 'matplotlib' to use plotting: pip install matplotlib")
+            print("Please install 'matplotlib' to use plotting: pip install skyulf-core[viz]")
             return
 
         # Track figures created by *this* call so we only close the ones we

@@ -550,5 +550,5 @@ class FeatureEngineer:
                 NodeRegistry.get_calculator(type_name)(),
                 NodeRegistry.get_applier(type_name)(),
             )
-        except ValueError:
-            raise ValueError(f"Unknown transformer type: {type_name}") from None
+        except ValueError as exc:
+            raise ValueError(f"Unknown transformer type: {type_name}. {exc}") from exc

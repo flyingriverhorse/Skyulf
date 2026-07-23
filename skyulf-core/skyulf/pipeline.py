@@ -83,6 +83,7 @@ class SkyulfPipeline:
         self.feature_engineer = FeatureEngineer(self.preprocessing_steps)
         self.model_estimator: StatefulEstimator | None = None
         self._fit_metrics: dict[str, Any] | None = None
+        self._target_column: str | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -156,6 +157,10 @@ class SkyulfPipeline:
                 calculator, applier = self._resolve_from_hardcoded_map(model_type)
 
         if calculator is None or applier is None:
+            try:
+                NodeRegistry.get_calculator(model_type)
+            except ValueError as exc:
+                raise ValueError(f"Unknown model type: {model_type}. {exc}") from exc
             raise ValueError(f"Unknown model type: {model_type}")
 
         self.model_estimator = StatefulEstimator(
@@ -218,6 +223,7 @@ class SkyulfPipeline:
                 metrics["modeling_error"] = str(e)
 
         self._fit_metrics = metrics
+        self._target_column = target_column
         return metrics
 
     def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
@@ -229,7 +235,16 @@ class SkyulfPipeline:
 
         Returns:
             Series of predictions.
+
+        Raises:
+            ValueError: If the input still contains the target column used during fit.
         """
+        if self._target_column is not None and self._target_column in data.columns:
+            raise ValueError(
+                f"predict() input still contains the target column '{self._target_column}' "
+                "used during fit(); drop it before calling predict()."
+            )
+
         # 1. Feature Engineering (Transform only)
         transformed_data = self.feature_engineer.transform(data)
 

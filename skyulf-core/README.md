@@ -224,8 +224,7 @@ clustering pass, all from one `.analyze()` call.
 
 ```python
 import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 df = pl.read_csv("data.csv")
 profile = EDAAnalyzer(df).analyze(
