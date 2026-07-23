@@ -69,3 +69,23 @@ class NodeRegistry:
     def get_all_metadata(cls) -> dict[str, dict[str, Any]]:
         """Return a snapshot of all registered node metadata, keyed by node ID."""
         return dict(cls._metadata)
+
+    @classmethod
+    def list_transformers(cls, category: str | None = None) -> list[str]:
+        """Return non-model node IDs, optionally limited to a category."""
+        return [
+            node_id
+            for node_id, metadata in cls.get_all_metadata().items()
+            if metadata["category"] != "Modeling"
+            and (category is None or metadata["category"] == category)
+        ]
+
+    @classmethod
+    def list_models(cls, category: str | None = None) -> list[str]:
+        """Return model node IDs, optionally limited to a category."""
+        return [
+            node_id
+            for node_id, metadata in cls.get_all_metadata().items()
+            if metadata["category"] == "Modeling"
+            and (category is None or metadata["category"] == category)
+        ]

@@ -5,8 +5,37 @@ from pathlib import Path
 
 import pandas as pd
 import polars as pl
+import pytest
 
 from skyulf.pipeline import SkyulfPipeline
+
+
+@pytest.mark.parametrize("data_factory", [pd.DataFrame, pl.DataFrame])
+def test_predict_rejects_input_containing_fitted_target_column(data_factory):
+    """predict() identifies labels accidentally retained in pandas and Polars input."""
+    data = data_factory(
+        {
+            "feature1": [0, 1, 2, 3, 4, 5, 6, 7],
+            "feature2": [1, 1, 2, 2, 3, 3, 4, 4],
+            "purchased": [0, 0, 0, 1, 0, 1, 1, 1],
+        }
+    )
+    pipeline = SkyulfPipeline(
+        {
+            "preprocessing": [
+                {
+                    "name": "split",
+                    "transformer": "TrainTestSplitter",
+                    "params": {"test_size": 0.25, "random_state": 42},
+                }
+            ],
+            "modeling": {"type": "logistic_regression"},
+        }
+    )
+    pipeline.fit(data, target_column="purchased")
+
+    with pytest.raises(ValueError, match=r"(?i)predict.*purchased"):
+        pipeline.predict(data)
 
 
 def test_end_to_end_pipeline(sample_classification_data):
