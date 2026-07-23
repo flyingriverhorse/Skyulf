@@ -722,6 +722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3344,8 +3372,7 @@
 <p><strong>Note:</strong> This requires the visualization extras: <code>pip install skyulf-core[viz]</code></p>
 </blockquote>
 <pre><code class="language-python">import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 # 1. Load Data
 df = pl.read_csv(&quot;your_dataset.csv&quot;)
@@ -3368,7 +3395,7 @@ viz.plot()     # Opens Matplotlib plots (Distributions, Correlations, PCA, etc.)
 <h3 id="the-manual-way-accessing-raw-stats">The Manual Way (Accessing Raw Stats)</h3>
 <p>If you want to build custom reports or integrate into a pipeline, you can access the raw <code>DatasetProfile</code> object.</p>
 <pre><code class="language-python">import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
+from skyulf import EDAAnalyzer
 
 # 1. Load your data into a Polars DataFrame
 df = pl.read_csv(&quot;your_dataset.csv&quot;)
@@ -3610,7 +3637,7 @@ profile = analyzer.analyze(
 <p><strong>Script:</strong> <a href="../examples/scripts/data_drift_check.py"><code>docs/examples/scripts/data_drift_check.py</code></a></p>
 <p>You can also use the drift detection engine programmatically within your own scripts or pipelines using <code>skyulf-core</code>.</p>
 <pre><code class="language-python">import polars as pl
-from skyulf.profiling.drift import DriftCalculator
+from skyulf import DriftCalculator
 
 # 1. Load Data (Reference vs Current)
 # Reference: The data your model was trained on

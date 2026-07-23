@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/platform_walkthrough.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/core-release.html">
       
       
-        <link rel="prev" href="platform_setup.html">
+        <link rel="prev" href="getting_started.html">
       
       
-        <link rel="next" href="backend_api.html">
+        <link rel="next" href="multi_path_pipelines.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Platform Walkthrough - Skyulf</title>
+        <title>Core Release Process - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#platform-walkthrough" class="md-skip">
+        <a href="#releasing-skyulf-core" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Platform Walkthrough
+              Core Release Process
             
           </span>
         </div>
@@ -240,12 +240,10 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="platform_setup.html" class="md-tabs__link">
           
   
@@ -262,10 +260,12 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="getting_started.html" class="md-tabs__link">
           
   
@@ -436,31 +436,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
             
   
   
@@ -478,7 +475,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -521,37 +518,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Platform Walkthrough
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="platform_walkthrough.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="platform_walkthrough.html" class="md-nav__link">
         
   
   
@@ -567,275 +537,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#architecture-overview" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Architecture overview
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-1-upload-data" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 1: Upload data
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-2-explore-data-eda" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 2: Explore data (EDA)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-3-build-a-pipeline-ml-canvas" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 3: Build a pipeline (ML Canvas)
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step 3: Build a pipeline (ML Canvas)">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#available-node-categories" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Available node categories:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#building-a-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Building a pipeline:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#recommended-pipeline-order" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Recommended pipeline order:
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multi-path-pipelines-v030" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multi-path pipelines (v0.3.0+)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-4-execute-the-pipeline" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 4: Execute the pipeline
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step 4: Execute the pipeline">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#single-training-node" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Single training node
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multiple-training-nodes-v040" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multiple training nodes (v0.4.0+)
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#mergeparallel-toggle-v040" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Merge/Parallel toggle (v0.4.0+)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-5-review-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 5: Review results
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-5b-export-to-jupyter-notebook" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 5b: Export to Jupyter Notebook
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Step 5b: Export to Jupyter Notebook">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#what-the-exported-notebook-contains" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What the exported notebook contains
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#multi-branch-pipelines" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Multi-branch pipelines
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-6-deploy-the-model" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 6: Deploy the model
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-7-run-predictions-inference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 7: Run predictions (inference)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#step-8-monitor-for-drift" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Step 8: Monitor for drift
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#api-quick-reference" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        API quick reference
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#whats-next" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What's next?
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -936,28 +637,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
@@ -975,7 +679,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1018,10 +722,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="core-release.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="core-release.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1037,6 +768,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#preconditions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preconditions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#local-distribution-verification" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Local distribution verification
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Publishing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-release-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Post-release checks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3241,333 +3036,28 @@
   
 
 
-<h1 id="platform-walkthrough">Platform Walkthrough</h1>
-<p>This guide walks through the full Skyulf web platform — from uploading a CSV to deploying a trained model. No screenshots yet, but every step maps to a specific page and API endpoint.</p>
-<blockquote>
-<p><strong>Prerequisite:</strong> The platform is running (<code>python run_skyulf.py</code> or <code>docker-compose up</code>). Open <a href="http://127.0.0.1:8000">http://127.0.0.1:8000</a> in your browser.</p>
-</blockquote>
-<hr />
-<h2 id="architecture-overview">Architecture overview</h2>
-<pre><code>Browser (React SPA)
-    |
-    v
-FastAPI Backend (REST API)
-    |
-    +-- Celery Workers (async jobs: pipeline execution, EDA)
-    +-- Redis (message broker + result backend)
-    +-- SQLite / PostgreSQL (metadata, job history)
-    +-- File Storage (uploads/, exports/)
-    |
-    v
-skyulf-core (ML engine)
-</code></pre>
-<hr />
-<h2 id="step-1-upload-data">Step 1: Upload data</h2>
-<p><strong>Page:</strong> <code>/data</code> (Data Sources)</p>
-<ol>
-<li>Navigate to the <strong>Data Sources</strong> page.</li>
-<li>Click <strong>Upload</strong> and select a CSV file.</li>
-<li>The backend ingests the file asynchronously (<code>POST /api/ingestion/upload</code>).</li>
-<li>Once ingested, the dataset appears in the list with row count, column count, and status.</li>
-</ol>
-<p><strong>API equivalent:</strong></p>
-<pre><code class="language-bash">curl -X POST http://127.0.0.1:8000/api/ingestion/upload \
-  -F &quot;file=@my_dataset.csv&quot;
-</code></pre>
-<p>You can preview sample rows via the <strong>sample</strong> button or API:</p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/data/api/sources/{source_id}/sample
-</code></pre>
-<hr />
-<h2 id="step-2-explore-data-eda">Step 2: Explore data (EDA)</h2>
-<p><strong>Page:</strong> <code>/eda</code> (Exploratory Data Analysis)</p>
-<ol>
-<li>Select a dataset from the dropdown.</li>
-<li>Click <strong>Analyze</strong> to trigger a full automated EDA (<code>POST /api/eda/{dataset_id}/analyze</code>).</li>
-<li>The backend runs the analysis asynchronously — using Celery if <code>USE_CELERY=true</code>, or FastAPI BackgroundTasks otherwise.</li>
-<li>View the report: data quality summary, column statistics, distributions, correlations, outlier detection, and smart alerts.</li>
-</ol>
-<p><strong>What the EDA covers:</strong></p>
+<h1 id="releasing-skyulf-core">Releasing skyulf-core</h1>
+<h2 id="preconditions">Preconditions</h2>
 <ul>
-<li>Missing value analysis per column</li>
-<li>Numeric distributions (mean, std, skewness, kurtosis)</li>
-<li>Cardinality analysis for categorical columns</li>
-<li>Correlation matrix (Pearson, Spearman)</li>
-<li>Outlier detection (IQR, ZScore)</li>
-<li>Target variable analysis (classification balance / regression distribution)</li>
-<li>PCA loadings and explained variance</li>
-<li>Smart alerts (high cardinality, constant columns, high correlation pairs)</li>
+<li>The target change is merged to <code>master</code>.</li>
+<li>The skyulf-core test workflow, static checks, security scan, and documentation build are green.</li>
+<li>The version in <code>skyulf-core/setup.py</code> follows semantic versioning and is not already tagged as <code>core-v&lt;version&gt;</code>.</li>
+<li><code>CHANGELOG.md</code> and the applicable <code>changelog/&lt;series&gt;.md</code> entry describe user-visible changes.</li>
 </ul>
-<hr />
-<h2 id="step-3-build-a-pipeline-ml-canvas">Step 3: Build a pipeline (ML Canvas)</h2>
-<p><strong>Page:</strong> <code>/canvas</code> (ML Canvas)</p>
-<p>This is the core of Skyulf. The canvas is a React Flow-based visual editor where you build ML pipelines by connecting nodes.</p>
-<h3 id="available-node-categories">Available node categories:</h3>
-<table>
-<thead>
-<tr>
-<th>Category</th>
-<th>Examples</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Data</strong></td>
-<td>Dataset selector (connects to uploaded data)</td>
-</tr>
-<tr>
-<td><strong>Splitting</strong></td>
-<td>TrainTestSplitter</td>
-</tr>
-<tr>
-<td><strong>Cleaning</strong></td>
-<td>TextCleaning, ValueReplacement, Deduplicate</td>
-</tr>
-<tr>
-<td><strong>Imputation</strong></td>
-<td>SimpleImputer, KNNImputer, IterativeImputer</td>
-</tr>
-<tr>
-<td><strong>Encoding</strong></td>
-<td>OneHotEncoder, OrdinalEncoder, LabelEncoder, TargetEncoder</td>
-</tr>
-<tr>
-<td><strong>Scaling</strong></td>
-<td>StandardScaler, MinMaxScaler, RobustScaler</td>
-</tr>
-<tr>
-<td><strong>Outliers</strong></td>
-<td>IQR, ZScore, Winsorize, EllipticEnvelope</td>
-</tr>
-<tr>
-<td><strong>Feature Engineering</strong></td>
-<td>PolynomialFeatures, FeatureGeneration, FeatureSelection</td>
-</tr>
-<tr>
-<td><strong>Resampling</strong></td>
-<td>SMOTE, ADASYN, RandomUndersampling</td>
-</tr>
-<tr>
-<td><strong>Modeling</strong></td>
-<td>All 20 classifiers and regressors</td>
-</tr>
-<tr>
-<td><strong>Tuning</strong></td>
-<td>Hyperparameter tuner (grid, random, Optuna, halving)</td>
-</tr>
-</tbody>
-</table>
-<h3 id="building-a-pipeline">Building a pipeline:</h3>
-<ol>
-<li><strong>Add a data node</strong> and select your uploaded dataset.</li>
-<li><strong>Add preprocessing nodes</strong> from the sidebar (drag onto the canvas).</li>
-<li><strong>Connect nodes</strong> by dragging edges from output ports to input ports.</li>
-<li><strong>Configure each node</strong> by clicking it and setting parameters in the side panel.</li>
-<li><strong>Add a modeling node</strong> at the end (e.g., <code>random_forest_classifier</code>).</li>
-<li>Optionally, toggle the modeling node's <strong>Advanced mode</strong> (<code>run_mode: "advanced"</code>) and configure the search strategy.</li>
-</ol>
-<h3 id="recommended-pipeline-order">Recommended pipeline order:</h3>
-<pre><code>Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
+<h2 id="local-distribution-verification">Local distribution verification</h2>
+<pre><code class="language-bash">rm -rf skyulf-core/dist
+python -m pip install --upgrade build twine
+python -m build --outdir skyulf-core/dist skyulf-core
+twine check skyulf-core/dist/*
+python .github/scripts/verify_skyulf_core_distribution.py skyulf-core/dist/*.whl
 </code></pre>
-<blockquote>
-<p><strong>Tip:</strong> Always place <code>TrainTestSplitter</code> early to prevent data leakage. Skyulf's Calculator/Applier pattern ensures preprocessing statistics are learned only from the training split.</p>
-</blockquote>
-<h3 id="multi-path-pipelines-v030">Multi-path pipelines <em>(v0.3.0+)</em></h3>
-<p>You can build pipelines with <strong>multiple branches</strong>:</p>
-<ul>
-<li><strong>Merge branches</strong> — Route data through different preprocessing paths (e.g., Scaling + Encoding), then connect both into a single training node. The node displays a <strong>⊕ Merge</strong> badge showing how many inputs are being combined.</li>
-<li><strong>Parallel experiments</strong> — Connect the dataset to multiple separate training nodes (e.g., RandomForest and XGBoost). Each runs as an independent experiment.</li>
-<li><strong>Copy-paste nodes</strong> — Select nodes and press <strong>Ctrl+C / Ctrl+V</strong> to duplicate them with their internal edges.</li>
-</ul>
-<blockquote>
-<p><strong>Note:</strong> Model-to-model connections are blocked. See the <a href="multi_path_pipelines.html">Multi-Path Pipelines guide</a> for details.</p>
-</blockquote>
-<hr />
-<h2 id="step-4-execute-the-pipeline">Step 4: Execute the pipeline</h2>
-<p><strong>From the canvas:</strong> Click the <strong>Run Preview</strong> button to preview the pipeline, or use <strong>Train</strong> on an individual training node.</p>
-<h3 id="single-training-node">Single training node</h3>
-<p>The frontend converts your visual graph into a pipeline config and sends it to the backend:</p>
-<pre><code>POST /api/pipeline/run
+<h2 id="publishing">Publishing</h2>
+<p>Merge the version change to <code>master</code>. The <code>Release skyulf-core</code> workflow uses PyPI Trusted Publishing, publishes the already-validated distribution, and creates the <code>core-v&lt;version&gt;</code> tag. Do not add a PyPI API token to the repository.</p>
+<h2 id="post-release-checks">Post-release checks</h2>
+<pre><code class="language-bash">python -m venv /tmp/skyulf-core-release-check
+/tmp/skyulf-core-release-check/bin/python -m pip install --upgrade pip skyulf-core
+/tmp/skyulf-core-release-check/bin/python -c &quot;from skyulf import SkyulfPipeline; print(SkyulfPipeline)&quot;
 </code></pre>
-<p>The backend validates the config, queues the job (Celery if <code>USE_CELERY=true</code>, otherwise FastAPI BackgroundTasks), and returns a <code>job_id</code>.</p>
-<h3 id="multiple-training-nodes-v040">Multiple training nodes <em>(v0.4.0+)</em></h3>
-<p>When your canvas has 2+ training nodes on separate branches:</p>
-<ul>
-<li><strong>Individual Train buttons</strong> — Each node's Train button runs only that branch (using <code>target_node_id</code> filtering).</li>
-<li><strong>Run All Experiments</strong> — A 🚀 <strong>Run All Experiments</strong> button appears in the toolbar if two separate branches connected to two separate training nodes. Clicking it queues all branches at once, returning <code>job_ids</code> for each.</li>
-</ul>
-<h3 id="mergeparallel-toggle-v040">Merge/Parallel toggle <em>(v0.4.0+)</em></h3>
-<p>Training nodes with 2+ incoming connections show a <strong>Merge / Parallel</strong> toggle:</p>
-<ul>
-<li><strong>Merge</strong>: Combines upstream data before training.</li>
-<li><strong>Parallel</strong>: Each incoming branch becomes a separate experiment job.</li>
-</ul>
-<p><strong>Monitoring progress:</strong></p>
-<ul>
-<li>The <strong>Jobs</strong> page (<code>/jobs</code>) shows all running and completed jobs.</li>
-<li>Poll job status: <code>GET /api/pipeline/jobs/{job_id}</code></li>
-<li>For tuning jobs, real-time progress updates show trial-by-trial results.</li>
-</ul>
-<hr />
-<h2 id="step-5-review-results">Step 5: Review results</h2>
-<p><strong>Page:</strong> <code>/jobs</code> (Jobs)</p>
-<p>Once a job completes, view:</p>
-<ul>
-<li><strong>Preprocessing metrics:</strong> Per-step artifacts (what was learned, e.g., imputed means, encoder categories).</li>
-<li><strong>Modeling metrics:</strong> accuracy, F1, precision, recall, ROC-AUC (classification) or MSE, RMSE, R2, MAE (regression).</li>
-<li><strong>Tuning results:</strong> Best parameters, trial history, convergence.</li>
-</ul>
-<p><strong>API equivalent:</strong></p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/api/pipeline/jobs/{job_id}/evaluation
-</code></pre>
-<hr />
-<h2 id="step-5b-export-to-jupyter-notebook">Step 5b: Export to Jupyter Notebook</h2>
-<p><strong>From the canvas:</strong> Click the <strong>Export Notebook</strong> button (toolbar, top-right area) to download a ready-to-run <code>.ipynb</code> file for any completed or configured pipeline.</p>
-<p>Two export modes are available:</p>
-<table>
-<thead>
-<tr>
-<th>Mode</th>
-<th>When to use</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Full</strong></td>
-<td>One section per preprocessing node + one training section per branch. Best for exploration and debugging — each preprocessing step is its own cell so you can tweak parameters and inspect intermediate state.</td>
-</tr>
-<tr>
-<td><strong>Compact</strong></td>
-<td>All preprocessing steps collapsed into a single <code>SkyulfPipeline.fit()</code> call per branch. Best for sharing clean, readable notebooks or running in CI.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="what-the-exported-notebook-contains">What the exported notebook contains</h3>
-<ol>
-<li><strong>Imports &amp; helper cell</strong> — injects <code>_summarize_metrics(m)</code> which flattens Skyulf's nested metric return shapes into a tidy <code>(split × metric)</code> DataFrame.</li>
-<li><strong>Data loading</strong> — loads the same dataset you used on the canvas via <code>pd.read_csv</code> / Parquet.</li>
-<li><strong>Preprocessing cells</strong> — one cell per node (Full mode) or a single pipeline config block (Compact mode).</li>
-<li><strong>Training cell</strong> — wired up to run the same algorithm the canvas node was configured for:</li>
-<li><strong>Training nodes in Basic mode</strong> (<code>run_mode: "basic"</code>) call <code>estimator.fit_predict()</code> with <code>log_callback=print</code>.</li>
-<li><strong>Training nodes in Advanced mode</strong> (<code>run_mode: "advanced"</code>) automatically use <code>TuningCalculator</code>/<code>TuningApplier</code> wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
-     <code>Trial 1/10 — score=0.9221
-     Trial 2/10 — score=0.9306
-     ...
-     Tuning Completed (optuna). Best Score: 0.9497
-     Best Params: {'n_estimators': 500, ...}
-     Refitting best model with params: {...}</code></li>
-<li><strong>Metrics cell</strong> — renders a coloured <code>train vs test</code> table (green = high, red = low) via pandas Styler <code>background_gradient</code>.</li>
-<li><strong>Multi-branch comparison</strong> (if 2+ training nodes) — a <code>(branch × split)</code> metrics table after all branches have run, so you can compare experiments side-by-side.</li>
-<li><strong>Inference cell</strong> — shows how to reload the saved <code>.pkl</code> artifact and call <code>estimator.predict(new_df)</code>.</li>
-</ol>
-<h3 id="multi-branch-pipelines">Multi-branch pipelines</h3>
-<p>If your canvas has multiple training nodes (e.g., five parallel XGBoost variants), the exporter detects each branch independently — including branches produced by <strong>parallel</strong> trainer nodes (one branch per incoming data path). Every branch gets its own labelled section (<code>## Branch A</code>, <code>## Branch B</code>, …) so metrics are never mixed.</p>
-<hr />
-<h2 id="step-6-deploy-the-model">Step 6: Deploy the model</h2>
-<p><strong>Page:</strong> <code>/deployments</code> (Deployments)</p>
-<ol>
-<li>From a completed job, click <strong>Deploy</strong>.</li>
-<li>The backend registers the model artifact and activates it (<code>POST /api/deployment/deploy/{job_id}</code>).</li>
-<li>Only one model can be active at a time. Deploying a new model deactivates the previous one.</li>
-</ol>
-<p><strong>Check active deployment:</strong></p>
-<pre><code class="language-bash">curl http://127.0.0.1:8000/api/deployment/active
-</code></pre>
-<hr />
-<h2 id="step-7-run-predictions-inference">Step 7: Run predictions (inference)</h2>
-<p><strong>Page:</strong> <code>/deployments</code> (Deployments) — Inference testing panel</p>
-<p>Send new data to the active model:</p>
-<pre><code class="language-bash">curl -X POST http://127.0.0.1:8000/api/deployment/predict \
-  -H &quot;Content-Type: application/json&quot; \
-  -d '{&quot;data&quot;: [{&quot;age&quot;: 25, &quot;income&quot;: 60000, &quot;city&quot;: &quot;London&quot;}]}'
-</code></pre>
-<p>The deployed model applies the full preprocessing pipeline (imputation, encoding, scaling) and returns predictions.</p>
-<hr />
-<h2 id="step-8-monitor-for-drift">Step 8: Monitor for drift</h2>
-<p><strong>Page:</strong> <code>/drift</code> (Data Drift)</p>
-<p>After your model is in production, monitor whether incoming data has shifted:</p>
-<ol>
-<li>Navigate to the <strong>Drift</strong> page.</li>
-<li>Select the reference dataset (training data) and current dataset (new data).</li>
-<li>Click <strong>Calculate Drift</strong> (<code>POST /api/monitoring/drift/calculate</code>).</li>
-<li>Review per-column drift metrics (Wasserstein distance, KS test, PSI, KL divergence).</li>
-</ol>
-<p>If significant drift is detected, consider retraining the model.</p>
-<hr />
-<h2 id="api-quick-reference">API quick reference</h2>
-<table>
-<thead>
-<tr>
-<th>Action</th>
-<th>Method</th>
-<th>Endpoint</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Upload data</td>
-<td>POST</td>
-<td><code>/api/ingestion/upload</code></td>
-</tr>
-<tr>
-<td>List datasets</td>
-<td>GET</td>
-<td><code>/data/api/sources</code></td>
-</tr>
-<tr>
-<td>Preview data</td>
-<td>GET</td>
-<td><code>/data/api/sources/{id}/sample</code></td>
-</tr>
-<tr>
-<td>Run EDA</td>
-<td>POST</td>
-<td><code>/api/eda/{dataset_id}/analyze</code></td>
-</tr>
-<tr>
-<td>Execute pipeline</td>
-<td>POST</td>
-<td><code>/api/pipeline/run</code></td>
-</tr>
-<tr>
-<td>Job status</td>
-<td>GET</td>
-<td><code>/api/pipeline/jobs/{job_id}</code></td>
-</tr>
-<tr>
-<td>Evaluation metrics</td>
-<td>GET</td>
-<td><code>/api/pipeline/jobs/{job_id}/evaluation</code></td>
-</tr>
-<tr>
-<td>Deploy model</td>
-<td>POST</td>
-<td><code>/api/deployment/deploy/{job_id}</code></td>
-</tr>
-<tr>
-<td>Active deployment</td>
-<td>GET</td>
-<td><code>/api/deployment/active</code></td>
-</tr>
-<tr>
-<td>Predict</td>
-<td>POST</td>
-<td><code>/api/deployment/predict</code></td>
-</tr>
-<tr>
-<td>Calculate drift</td>
-<td>POST</td>
-<td><code>/api/monitoring/drift/calculate</code></td>
-</tr>
-</tbody>
-</table>
-<hr />
-<h2 id="whats-next">What's next?</h2>
-<ul>
-<li><a href="getting_started.html">Getting Started</a> — Quickest path to a working pipeline (Python library).</li>
-<li><a href="../user_guide/configuration.html">Configuration</a> — All models and config keys.</li>
-<li><a href="faq.html">FAQ &amp; Comparison</a> — How Skyulf compares to MLflow, Kubeflow, etc.</li>
-<li><a href="../user_guide/troubleshooting.html">Troubleshooting</a> — Common issues and fixes.</li>
-</ul>
 
 
 

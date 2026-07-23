@@ -18,8 +18,7 @@ import polars as pl
 from rich.console import Console
 from rich.panel import Panel
 
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 console = Console()
 

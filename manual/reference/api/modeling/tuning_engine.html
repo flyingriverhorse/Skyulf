@@ -720,6 +720,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3097,24 +3125,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1164</span>
-<span class="normal">1165</span>
-<span class="normal">1166</span>
-<span class="normal">1167</span>
-<span class="normal">1168</span>
-<span class="normal">1169</span>
-<span class="normal">1170</span>
-<span class="normal">1171</span>
-<span class="normal">1172</span>
-<span class="normal">1173</span>
-<span class="normal">1174</span>
-<span class="normal">1175</span>
-<span class="normal">1176</span>
-<span class="normal">1177</span>
-<span class="normal">1178</span>
-<span class="normal">1179</span>
-<span class="normal">1180</span>
-<span class="normal">1181</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1181</span>
 <span class="normal">1182</span>
 <span class="normal">1183</span>
 <span class="normal">1184</span>
@@ -3132,7 +3143,24 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">1196</span>
 <span class="normal">1197</span>
 <span class="normal">1198</span>
-<span class="normal">1199</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
+<span class="normal">1199</span>
+<span class="normal">1200</span>
+<span class="normal">1201</span>
+<span class="normal">1202</span>
+<span class="normal">1203</span>
+<span class="normal">1204</span>
+<span class="normal">1205</span>
+<span class="normal">1206</span>
+<span class="normal">1207</span>
+<span class="normal">1208</span>
+<span class="normal">1209</span>
+<span class="normal">1210</span>
+<span class="normal">1211</span>
+<span class="normal">1212</span>
+<span class="normal">1213</span>
+<span class="normal">1214</span>
+<span class="normal">1215</span>
+<span class="normal">1216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningApplier</span><span class="p">(</span><span class="n">BaseModelApplier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Applier for TuningCalculator.</span>
 <span class="sd">    Wraps the base model applier to provide predictions using the refitted best model.</span>
@@ -3209,7 +3237,19 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
 
 
-        <p>Calculator for hyperparameter tuning.</p>
+        <p>Tune a plain <code>BaseModelCalculator</code> and refit it with the best parameters.</p>
+<p><code>fit</code> accepts a <code>TuningConfig</code> or dict with <code>strategy</code>, <code>metric</code>,
+<code>n_trials</code>, <code>search_space</code> (a mapping of parameter names to candidate
+lists), and optional cross-validation and <code>strategy_params</code> settings.
+<code>grid</code> and <code>random</code> use Skyulf's candidate loop; <code>halving_grid</code> and
+<code>halving_random</code> use sklearn searchers; <code>optuna</code> uses OptunaSearchCV
+and requires the Optuna integration package.</p>
+
+
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">tuner</span> <span class="o">=</span> <span class="n">TuningCalculator</span><span class="p">(</span><span class="n">LogisticRegressionCalculator</span><span class="p">())</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">model</span><span class="p">,</span> <span class="n">result</span> <span class="o">=</span> <span class="n">tuner</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="s2">&quot;random&quot;</span><span class="p">,</span> <span class="s2">&quot;search_space&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;C&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]}})</span>
+</code></pre></div>
 
 
 
@@ -3220,8 +3260,7 @@ Wraps the base model applier to provide predictions using the refitted best mode
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  74</span>
-<span class="normal">  75</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  75</span>
 <span class="normal">  76</span>
 <span class="normal">  77</span>
 <span class="normal">  78</span>
@@ -4307,8 +4346,37 @@ Wraps the base model applier to provide predictions using the refitted best mode
 <span class="normal">1158</span>
 <span class="normal">1159</span>
 <span class="normal">1160</span>
-<span class="normal">1161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for hyperparameter tuning.&quot;&quot;&quot;</span>
+<span class="normal">1161</span>
+<span class="normal">1162</span>
+<span class="normal">1163</span>
+<span class="normal">1164</span>
+<span class="normal">1165</span>
+<span class="normal">1166</span>
+<span class="normal">1167</span>
+<span class="normal">1168</span>
+<span class="normal">1169</span>
+<span class="normal">1170</span>
+<span class="normal">1171</span>
+<span class="normal">1172</span>
+<span class="normal">1173</span>
+<span class="normal">1174</span>
+<span class="normal">1175</span>
+<span class="normal">1176</span>
+<span class="normal">1177</span>
+<span class="normal">1178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">TuningCalculator</span><span class="p">(</span><span class="n">BaseModelCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tune a plain ``BaseModelCalculator`` and refit it with the best parameters.</span>
+
+<span class="sd">    ``fit`` accepts a ``TuningConfig`` or dict with ``strategy``, ``metric``,</span>
+<span class="sd">    ``n_trials``, ``search_space`` (a mapping of parameter names to candidate</span>
+<span class="sd">    lists), and optional cross-validation and ``strategy_params`` settings.</span>
+<span class="sd">    ``grid`` and ``random`` use Skyulf&#39;s candidate loop; ``halving_grid`` and</span>
+<span class="sd">    ``halving_random`` use sklearn searchers; ``optuna`` uses OptunaSearchCV</span>
+<span class="sd">    and requires the Optuna integration package.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; tuner = TuningCalculator(LogisticRegressionCalculator())</span>
+<span class="sd">        &gt;&gt;&gt; model, result = tuner.fit(X, y, {&quot;strategy&quot;: &quot;random&quot;, &quot;search_space&quot;: {&quot;C&quot;: [0.1, 1.0]}})</span>
+<span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_calculator</span><span class="p">:</span> <span class="n">BaseModelCalculator</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">model_calculator</span> <span class="o">=</span> <span class="n">model_calculator</span>
@@ -5369,7 +5437,11 @@ Wraps the base model applier to provide predictions using the refitted best mode
                 <span class="n">config</span><span class="p">,</span> <span class="n">base_estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">progress_callback</span><span class="p">,</span> <span class="n">log_callback</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown tuning strategy: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">raise_invalid_choice</span><span class="p">(</span>
+                <span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="p">,</span>
+                <span class="p">(</span><span class="s2">&quot;grid&quot;</span><span class="p">,</span> <span class="s2">&quot;random&quot;</span><span class="p">,</span> <span class="s2">&quot;halving_grid&quot;</span><span class="p">,</span> <span class="s2">&quot;halving_random&quot;</span><span class="p">,</span> <span class="s2">&quot;optuna&quot;</span><span class="p">),</span>
+                <span class="s2">&quot;tuning strategy&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
 
         <span class="c1"># 4. Run Search</span>
         <span class="c1"># Ensure numpy</span>
@@ -5428,20 +5500,7 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">244</span>
 <span class="normal">245</span>
 <span class="normal">246</span>
 <span class="normal">247</span>
@@ -5514,7 +5573,20 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">314</span>
 <span class="normal">315</span>
 <span class="normal">316</span>
-<span class="normal">317</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span>
+<span class="normal">327</span>
+<span class="normal">328</span>
+<span class="normal">329</span>
+<span class="normal">330</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span>
@@ -5623,20 +5695,7 @@ Adapts the generic fit interface to the specific tune method.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/_tuning/engine.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1080</span>
-<span class="normal">1081</span>
-<span class="normal">1082</span>
-<span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
-<span class="normal">1087</span>
-<span class="normal">1088</span>
-<span class="normal">1089</span>
-<span class="normal">1090</span>
-<span class="normal">1091</span>
-<span class="normal">1092</span>
-<span class="normal">1093</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1093</span>
 <span class="normal">1094</span>
 <span class="normal">1095</span>
 <span class="normal">1096</span>
@@ -5704,7 +5763,24 @@ Adapts the generic fit interface to the specific tune method.</p>
 <span class="normal">1158</span>
 <span class="normal">1159</span>
 <span class="normal">1160</span>
-<span class="normal">1161</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
+<span class="normal">1161</span>
+<span class="normal">1162</span>
+<span class="normal">1163</span>
+<span class="normal">1164</span>
+<span class="normal">1165</span>
+<span class="normal">1166</span>
+<span class="normal">1167</span>
+<span class="normal">1168</span>
+<span class="normal">1169</span>
+<span class="normal">1170</span>
+<span class="normal">1171</span>
+<span class="normal">1172</span>
+<span class="normal">1173</span>
+<span class="normal">1174</span>
+<span class="normal">1175</span>
+<span class="normal">1176</span>
+<span class="normal">1177</span>
+<span class="normal">1178</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">tune</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="n">y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
@@ -5760,7 +5836,11 @@ Adapts the generic fit interface to the specific tune method.</p>
             <span class="n">config</span><span class="p">,</span> <span class="n">base_estimator</span><span class="p">,</span> <span class="n">cv</span><span class="p">,</span> <span class="n">metric</span><span class="p">,</span> <span class="n">progress_callback</span><span class="p">,</span> <span class="n">log_callback</span>
         <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown tuning strategy: </span><span class="si">{</span><span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">raise_invalid_choice</span><span class="p">(</span>
+            <span class="n">config</span><span class="o">.</span><span class="n">strategy</span><span class="p">,</span>
+            <span class="p">(</span><span class="s2">&quot;grid&quot;</span><span class="p">,</span> <span class="s2">&quot;random&quot;</span><span class="p">,</span> <span class="s2">&quot;halving_grid&quot;</span><span class="p">,</span> <span class="s2">&quot;halving_random&quot;</span><span class="p">,</span> <span class="s2">&quot;optuna&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;tuning strategy&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="c1"># 4. Run Search</span>
     <span class="c1"># Ensure numpy</span>

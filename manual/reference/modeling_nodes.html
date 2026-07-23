@@ -722,6 +722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3604,7 +3632,7 @@
 <h3 id="python-example-programmatic-usage-in-skyulf-core">Python Example — Programmatic Usage in <code>skyulf-core</code></h3>
 <p>Ensemble nodes are registered like any other modeling step, so they slot into the <code>modeling</code> block of a <code>SkyulfPipeline</code> config:</p>
 <pre><code class="language-python">import pandas as pd
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 config = {
     &quot;preprocessing&quot;: [
@@ -3643,7 +3671,7 @@ predictions = pipeline.predict(new_df)               # feature-only dataframe
 }
 </code></pre>
 <p>You can also drive the underlying calculator/applier directly for low-level usage via the <code>NodeRegistry</code>:</p>
-<pre><code class="language-python">from skyulf.registry import NodeRegistry
+<pre><code class="language-python">from skyulf import NodeRegistry
 
 calc = NodeRegistry.get_calculator(&quot;stacking_classifier&quot;)()
 applier = NodeRegistry.get_applier(&quot;stacking_classifier&quot;)()

@@ -722,6 +722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3140,12 +3168,12 @@ automatically. You call them yourself in two main places:</p>
 </table>
 <h2 id="example-a-dataset-contract-in-ci">Example: a dataset contract in CI</h2>
 <pre><code class="language-python">import pandas as pd
-from skyulf.profiling.expect import (
+from skyulf import (
+    ExpectationError,
     expect_columns_exist,
     expect_no_nulls,
-    expect_value_range,
     expect_unique,
-    ExpectationError,
+    expect_value_range,
 )
 
 
@@ -3162,7 +3190,7 @@ def validate_customers(df: pd.DataFrame) -&gt; None:
     validate_customers(df)  # raises ExpectationError on violation → test fails
 </code></pre>
 <h2 id="example-a-pipeline-guard">Example: a pipeline guard</h2>
-<pre><code class="language-python">from skyulf.profiling.expect import expect_no_nulls
+<pre><code class="language-python">from skyulf import expect_no_nulls
 
 def run(df):
     # Fail fast with a clear message before an expensive fit.

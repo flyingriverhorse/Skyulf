@@ -722,6 +722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3019,7 +3047,7 @@ instead of failing the training job.</p>
 <pre><code class="language-bash">pip install skyulf-core[explainability]
 </code></pre>
 <pre><code class="language-python">from sklearn.ensemble import RandomForestClassifier
-from skyulf.modeling._explainability import compute_shap_explanation
+from skyulf.modeling import compute_shap_explanation
 
 model = RandomForestClassifier(random_state=42).fit(X_train, y_train)
 explanation = compute_shap_explanation(model, X_train)

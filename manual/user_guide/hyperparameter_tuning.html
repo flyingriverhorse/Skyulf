@@ -722,6 +722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3392,10 +3420,10 @@ Refitting best model with params: {...}
 <p>After <code>fit_predict</code> completes, the cell calls <code>estimator.evaluate()</code> and renders a coloured <code>train vs test</code> metrics DataFrame (accuracy, F1, ROC-AUC, PR-AUC, and more) using pandas Styler <code>background_gradient</code>.</p>
 <h3 id="using-tuning-directly-without-the-canvas">Using tuning directly (without the canvas)</h3>
 <p>If you want to run tuning in a plain Python script or existing notebook:</p>
-<pre><code class="language-python">from skyulf.data.dataset import SplitDataset
+<pre><code class="language-python">from skyulf import NodeRegistry
+from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
-from skyulf.registry import NodeRegistry
 
 ALGORITHM = &quot;xgboost_classifier&quot;
 base_calc = NodeRegistry.get_calculator(ALGORITHM)()

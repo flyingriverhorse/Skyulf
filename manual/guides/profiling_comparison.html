@@ -725,6 +725,34 @@
   
   
     <li class="md-nav__item">
+      <a href="core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -3279,8 +3307,7 @@
 <hr />
 <h2 id="quick-start-with-skyulf">Quick Start with Skyulf</h2>
 <pre><code class="language-python">import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 # 1. Load Data
 df = pl.read_csv(&quot;your_dataset.csv&quot;)

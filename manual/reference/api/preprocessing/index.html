@@ -722,6 +722,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../guides/core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../guides/multi_path_pipelines.html" class="md-nav__link">
         
   
@@ -2372,6 +2400,28 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.SimpleImputerApplier" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimpleImputerApplier
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skyulf.preprocessing.SimpleImputerCalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SimpleImputerCalculator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#skyulf.preprocessing.SkyulfSchema" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3720,6 +3770,12 @@ callers should fall back to runtime introspection.</p>
         <p>Orchestrates a sequence of feature engineering steps.</p>
 
 
+<p><span class="doc-section-title">Examples:</span></p>
+    <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">engineer</span> <span class="o">=</span> <span class="n">FeatureEngineer</span><span class="p">([])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">transformed</span><span class="p">,</span> <span class="n">metrics</span> <span class="o">=</span> <span class="n">engineer</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+</code></pre></div>
+
+
 
 
 
@@ -3728,8 +3784,7 @@ callers should fall back to runtime introspection.</p>
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>skyulf-core/skyulf/preprocessing/pipeline.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 22</span>
-<span class="normal"> 23</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 23</span>
 <span class="normal"> 24</span>
 <span class="normal"> 25</span>
 <span class="normal"> 26</span>
@@ -4260,9 +4315,22 @@ callers should fall back to runtime introspection.</p>
 <span class="normal">551</span>
 <span class="normal">552</span>
 <span class="normal">553</span>
-<span class="normal">554</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Orchestrates a sequence of feature engineering steps.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; engineer = FeatureEngineer([])</span>
+<span class="sd">        &gt;&gt;&gt; transformed, metrics = engineer.fit_transform(data)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="c1"># Resampling steps (SMOTE/undersampling) must only ever run on the train</span>
@@ -4276,8 +4344,12 @@ callers should fall back to runtime introspection.</p>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">steps_config</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">PreprocessingStepConfig</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">_validated</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="c1"># `Sequence` (covariant) accepts list[dict] or list[PreprocessingStepConfig].</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">_validated</span><span class="p">:</span>
+            <span class="n">validate_preprocessing_steps</span><span class="p">(</span><span class="n">steps_config</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">steps_config</span> <span class="o">=</span> <span class="n">steps_config</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -4791,8 +4863,8 @@ callers should fall back to runtime introspection.</p>
                 <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_calculator</span><span class="p">(</span><span class="n">type_name</span><span class="p">)(),</span>
                 <span class="n">NodeRegistry</span><span class="o">.</span><span class="n">get_applier</span><span class="p">(</span><span class="n">type_name</span><span class="p">)(),</span>
             <span class="p">)</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown transformer type: </span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown transformer type: </span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">. </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -4826,16 +4898,7 @@ Returns: (transformed_data, metrics_dict)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 68</span>
-<span class="normal"> 69</span>
-<span class="normal"> 70</span>
-<span class="normal"> 71</span>
-<span class="normal"> 72</span>
-<span class="normal"> 73</span>
-<span class="normal"> 74</span>
-<span class="normal"> 75</span>
-<span class="normal"> 76</span>
-<span class="normal"> 77</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 77</span>
 <span class="normal"> 78</span>
 <span class="normal"> 79</span>
 <span class="normal"> 80</span>
@@ -4885,7 +4948,16 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">124</span>
 <span class="normal">125</span>
 <span class="normal">126</span>
-<span class="normal">127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Runs the pipeline on data.</span>
 <span class="sd">    Returns: (transformed_data, metrics_dict)</span>
@@ -4967,16 +5039,7 @@ Returns: (transformed_data, metrics_dict)</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/preprocessing/pipeline.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">52</span>
 <span class="normal">53</span>
 <span class="normal">54</span>
 <span class="normal">55</span>
@@ -4990,7 +5053,16 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">63</span>
 <span class="normal">64</span>
 <span class="normal">65</span>
-<span class="normal">66</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">:</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Apply fitted transformations to new data.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -5402,6 +5474,416 @@ relative order than expected (only when order checking is requested).</p>
         <span class="bp">self</span><span class="o">.</span><span class="n">unexpected</span> <span class="o">=</span> <span class="n">unexpected</span> <span class="ow">or</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dtype_mismatches</span> <span class="o">=</span> <span class="n">dtype_mismatches</span> <span class="ow">or</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">order_mismatch</span> <span class="o">=</span> <span class="n">order_mismatch</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.SimpleImputerApplier" class="doc doc-heading">
+            <code>SimpleImputerApplier</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseApplier (skyulf.preprocessing.base.BaseApplier)" href="base.html#skyulf.preprocessing.base.BaseApplier">BaseApplier</a></code></p>
+
+
+
+        <p>Apply fitted Simple Imputer fill values to missing values in selected columns.</p>
+<p>The calculator artifact records per-column values for <code>mean</code>, <code>median</code>,
+<code>most_frequent</code> (also accepted as <code>mode</code>), or <code>constant</code> strategies.
+Missing columns seen during fitting are restored with their stored value.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerApplier</span><span class="p">(</span><span class="n">BaseApplier</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply fitted Simple Imputer fill values to missing values in selected columns.</span>
+
+<span class="sd">    The calculator artifact records per-column values for ``mean``, ``median``,</span>
+<span class="sd">    ``most_frequent`` (also accepted as ``mode``), or ``constant`` strategies.</span>
+<span class="sd">    Missing columns seen during fitting are restored with their stored value.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@apply_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+        <span class="k">return</span> <span class="n">apply_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_polars</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_pandas</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_polars</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">polars</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pl</span>
+
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;columns&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">fill_values</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fill_values&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">_y</span>
+
+        <span class="n">exprs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span> <span class="ow">and</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">fill_values</span><span class="p">:</span>
+                <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">)</span><span class="o">.</span><span class="n">fill_null</span><span class="p">(</span><span class="n">fill_values</span><span class="p">[</span><span class="n">col</span><span class="p">])</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pl</span><span class="o">.</span><span class="n">col</span><span class="p">(</span><span class="n">col</span><span class="p">))</span>
+
+        <span class="c1"># Restore columns that were present at fit time but missing in input X.</span>
+        <span class="n">exprs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="n">pl</span><span class="o">.</span><span class="n">lit</span><span class="p">(</span><span class="n">fill_values</span><span class="p">[</span><span class="n">col</span><span class="p">])</span><span class="o">.</span><span class="n">alias</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">X</span><span class="o">.</span><span class="n">columns</span> <span class="ow">and</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">fill_values</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">X</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">exprs</span><span class="p">),</span> <span class="n">_y</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;columns&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">fill_values</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fill_values&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">_y</span>
+
+        <span class="n">X_out</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">:</span>
+            <span class="n">val</span> <span class="o">=</span> <span class="n">fill_values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">X_out</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">X_out</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">X_out</span><span class="p">,</span> <span class="n">_y</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="skyulf.preprocessing.SimpleImputerCalculator" class="doc doc-heading">
+            <code>SimpleImputerCalculator</code>
+
+
+</h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="BaseCalculator (skyulf.preprocessing.base.BaseCalculator)" href="base.html#skyulf.preprocessing.base.BaseCalculator">BaseCalculator</a></code></p>
+
+
+
+        <p>Fit per-column values for filling missing data with sklearn-compatible strategies.</p>
+<p>Supported <code>strategy</code> values are <code>mean</code>, <code>median</code>, <code>most_frequent</code>,
+and <code>constant</code>; <code>mode</code> is normalized to <code>most_frequent</code>. Use
+<code>columns</code> to select columns and <code>fill_value</code> with <code>constant</code>.
+Mean and median operate on numeric columns, while the other strategies can
+operate on all selected columns.</p>
+
+
+
+
+
+
+
+
+              <details class="mkdocstrings-source">
+                <summary>Source code in <code>skyulf-core/skyulf/preprocessing/imputation/simple.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@NodeRegistry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;SimpleImputer&quot;</span><span class="p">,</span> <span class="n">SimpleImputerApplier</span><span class="p">)</span>
+<span class="nd">@node_meta</span><span class="p">(</span>
+    <span class="nb">id</span><span class="o">=</span><span class="s2">&quot;SimpleImputer&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Simple Imputer&quot;</span><span class="p">,</span>
+    <span class="n">category</span><span class="o">=</span><span class="s2">&quot;Preprocessing&quot;</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Imputes missing values using mean, median, or constant.&quot;</span><span class="p">,</span>
+    <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="s2">&quot;fill_value&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="p">[]},</span>
+<span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SimpleImputerCalculator</span><span class="p">(</span><span class="n">BaseCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fit per-column values for filling missing data with sklearn-compatible strategies.</span>
+
+<span class="sd">    Supported ``strategy`` values are ``mean``, ``median``, ``most_frequent``,</span>
+<span class="sd">    and ``constant``; ``mode`` is normalized to ``most_frequent``. Use</span>
+<span class="sd">    ``columns`` to select columns and ``fill_value`` with ``constant``.</span>
+<span class="sd">    Mean and median operate on numeric columns, while the other strategies can</span>
+<span class="sd">    operate on all selected columns.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">infer_output_schema</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">input_schema</span><span class="p">:</span> <span class="n">SkyulfSchema</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SkyulfSchema</span><span class="p">:</span>
+        <span class="c1"># Imputers fill NaNs in place; column set and order are preserved.</span>
+        <span class="k">return</span> <span class="n">input_schema</span>
+
+    <span class="nd">@fit_method</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">SimpleImputerArtifact</span><span class="p">:</span>  <span class="c1"># pylint: disable=arguments-differ</span>
+        <span class="k">if</span> <span class="n">user_picked_no_columns</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="n">strategy</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;strategy&quot;</span><span class="p">,</span> <span class="s2">&quot;mean&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="s2">&quot;mode&quot;</span><span class="p">:</span>
+            <span class="n">strategy</span> <span class="o">=</span> <span class="s2">&quot;most_frequent&quot;</span>
+        <span class="n">fill_value</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;fill_value&quot;</span><span class="p">)</span>
+
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">_resolve_simple_columns</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="c1"># Stash resolved-once values into params so dispatched fits don&#39;t redo work.</span>
+        <span class="n">merged</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+        <span class="n">merged</span><span class="p">[</span><span class="s2">&quot;_resolved_strategy&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">strategy</span>
+        <span class="n">merged</span><span class="p">[</span><span class="s2">&quot;_resolved_cols&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span>
+        <span class="n">merged</span><span class="p">[</span><span class="s2">&quot;_resolved_fill_value&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fill_value</span>
+
+        <span class="k">return</span> <span class="n">cast</span><span class="p">(</span>
+            <span class="n">SimpleImputerArtifact</span><span class="p">,</span>
+            <span class="n">fit_dual_engine</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">merged</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_polars</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fit_pandas</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fit_polars</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;_resolved_cols&quot;</span><span class="p">]</span>
+        <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;_resolved_strategy&quot;</span><span class="p">]</span>
+        <span class="n">fill_value</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;_resolved_fill_value&quot;</span><span class="p">]</span>
+
+        <span class="n">fill_values</span> <span class="o">=</span> <span class="n">_compute_polars_fill_values</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">cols</span><span class="p">,</span> <span class="n">strategy</span><span class="p">,</span> <span class="n">fill_value</span><span class="p">)</span>
+        <span class="n">missing_counts</span><span class="p">,</span> <span class="n">total_missing</span> <span class="o">=</span> <span class="n">_polars_missing_counts</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">cols</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;simple_imputer&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="n">strategy</span><span class="p">,</span>
+            <span class="s2">&quot;fill_values&quot;</span><span class="p">:</span> <span class="n">fill_values</span><span class="p">,</span>
+            <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="n">cols</span><span class="p">,</span>
+            <span class="s2">&quot;missing_counts&quot;</span><span class="p">:</span> <span class="n">missing_counts</span><span class="p">,</span>
+            <span class="s2">&quot;total_missing&quot;</span><span class="p">:</span> <span class="n">total_missing</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fit_pandas</span><span class="p">(</span><span class="n">X</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_y</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="n">cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;_resolved_cols&quot;</span><span class="p">]</span>
+        <span class="n">strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;_resolved_strategy&quot;</span><span class="p">]</span>
+        <span class="n">fill_value</span> <span class="o">=</span> <span class="n">params</span><span class="p">[</span><span class="s2">&quot;_resolved_fill_value&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Mean/median: extra safety filter to numeric columns only.</span>
+        <span class="k">if</span> <span class="n">strategy</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="s2">&quot;median&quot;</span><span class="p">):</span>
+            <span class="n">numeric</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">detect_numeric_columns</span><span class="p">(</span><span class="n">X</span><span class="p">))</span>
+            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cols</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">numeric</span><span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">cols</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="n">imputer</span> <span class="o">=</span> <span class="n">SimpleImputer</span><span class="p">(</span><span class="n">strategy</span><span class="o">=</span><span class="n">strategy</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">)</span>
+        <span class="n">imputer</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">])</span>
+
+        <span class="n">statistics</span> <span class="o">=</span> <span class="n">imputer</span><span class="o">.</span><span class="n">statistics_</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="n">fill_values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">cols</span><span class="p">,</span> <span class="n">statistics</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="n">missing_counts</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span><span class="o">.</span><span class="n">isnull</span><span class="p">()</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">total_missing</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">missing_counts</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;simple_imputer&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;strategy&quot;</span><span class="p">:</span> <span class="n">strategy</span><span class="p">,</span>
+            <span class="s2">&quot;fill_values&quot;</span><span class="p">:</span> <span class="n">fill_values</span><span class="p">,</span>
+            <span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="n">cols</span><span class="p">,</span>
+            <span class="s2">&quot;missing_counts&quot;</span><span class="p">:</span> <span class="n">missing_counts</span><span class="p">,</span>
+            <span class="s2">&quot;total_missing&quot;</span><span class="p">:</span> <span class="n">total_missing</span><span class="p">,</span>
+        <span class="p">}</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
