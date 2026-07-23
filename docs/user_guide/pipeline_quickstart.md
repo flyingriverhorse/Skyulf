@@ -31,7 +31,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 # 1) Define a pipeline config
 # Each preprocessing step is:

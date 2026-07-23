@@ -16,7 +16,7 @@ pip install skyulf-core[explainability]
 
 ```python
 from sklearn.ensemble import RandomForestClassifier
-from skyulf.modeling._explainability import compute_shap_explanation
+from skyulf.modeling import compute_shap_explanation
 
 model = RandomForestClassifier(random_state=42).fit(X_train, y_train)
 explanation = compute_shap_explanation(model, X_train)

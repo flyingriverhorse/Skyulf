@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 # In real usage you'd likely load a file:
 # df = pd.read_csv("your_data.csv")
@@ -101,7 +101,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 df = pd.DataFrame(
     {
