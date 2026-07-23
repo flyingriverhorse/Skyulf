@@ -154,9 +154,9 @@ class StatefulEstimator:
     def _extract_xy_from_tuple(self, data: tuple[Any, Any], target_column: str) -> tuple[Any, Any]:
         """Extracts X/y from a ``(X, y)`` tuple, pulling ``y`` out of ``X`` if it's missing."""
         X, y = data[0], data[1]
-        # If y is None but X is a DataFrame containing the target, extract it
-        if y is None and hasattr(X, "columns") and target_column in X.columns:
-            return self._extract_xy(X, target_column)
+        if hasattr(X, "columns") and target_column in X.columns:
+            features, embedded_y = self._extract_xy(X, target_column)
+            return features, embedded_y if y is None else y
         return X, y
 
     @staticmethod
@@ -273,7 +273,11 @@ class StatefulEstimator:
         if isinstance(dataset, tuple):
             # Check if it's (train_df, test_df) or (X, y)
             elem0 = dataset[0]
-            if isinstance(elem0, pd.DataFrame) and target_column in elem0.columns:
+            if (
+                isinstance(elem0, pd.DataFrame)
+                and isinstance(dataset[1], pd.DataFrame)
+                and target_column in elem0.columns
+            ):
                 # It's (train_df, test_df)
                 train_df, test_df = dataset
                 return SplitDataset(train=train_df, test=test_df, validation=None)  # type: ignore

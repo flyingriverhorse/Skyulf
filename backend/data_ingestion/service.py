@@ -543,4 +543,18 @@ class DataIngestionService:
             raise HTTPException(status_code=404, detail="DataSource not found")
 
         metadata: dict[str, Any] = cast(dict[str, Any], source.source_metadata) or {}
-        return cast(dict[str, Any], metadata.get("ingestion_status", {"status": "unknown"}))
+        default_status = {
+            "status": "unknown",
+            "progress": 0.0,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        stored_status = metadata.get("ingestion_status")
+        if not isinstance(stored_status, dict):
+            return default_status
+
+        status = {**default_status, **stored_status}
+        if status["progress"] is None:
+            status["progress"] = default_status["progress"]
+        if status["updated_at"] is None:
+            status["updated_at"] = default_status["updated_at"]
+        return status

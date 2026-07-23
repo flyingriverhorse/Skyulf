@@ -155,3 +155,15 @@ site/
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
 .superpowers/
+sast/architecture.md
+sast/final-report.md
+sast/hardcodedsecrets-results.md
+sast/idor-results.md
+sast/jwt-results.md
+sast/missingauth-results.md
+sast/pathtraversal-results.md
+sast/rce-results.md
+sast/sqli-results.md
+sast/ssrf-results.md
+sast/xss-recon.md
+sast/xss-results.md

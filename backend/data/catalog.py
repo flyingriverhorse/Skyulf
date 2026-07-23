@@ -224,15 +224,22 @@ class S3Catalog(DataCatalog):
                 opts["client_kwargs"]["region_name"] = region
 
     def _apply_s3_endpoint(self, opts: dict) -> None:
-        """Move endpoint_url/aws_endpoint_url into client_kwargs['endpoint_url'], in place."""
-        # s3fs expects endpoint_url in client_kwargs usually, or top level in newer versions
-        # To be safe, put it in client_kwargs if present
-        endpoint = opts.pop("endpoint_url", None) or opts.pop("aws_endpoint_url", None)
-        if endpoint:
+        """Set client_kwargs['endpoint_url'] from server-side config only, in place.
+
+        Caller-supplied `endpoint_url`/`aws_endpoint_url` (from per-request
+        `storage_options`) is intentionally ignored and discarded here: trusting it
+        would let a caller redirect outbound S3 requests to an arbitrary host,
+        including internal services or cloud metadata endpoints (SSRF). Only an
+        operator-configured endpoint (`AWS_ENDPOINT_URL` setting) is ever used, e.g.
+        for a self-hosted S3-compatible store such as MinIO.
+        """
+        opts.pop("endpoint_url", None)
+        opts.pop("aws_endpoint_url", None)
+        configured_endpoint = get_settings().AWS_ENDPOINT_URL
+        if configured_endpoint:
             if "client_kwargs" not in opts:
                 opts["client_kwargs"] = {}
-            if "endpoint_url" not in opts["client_kwargs"]:
-                opts["client_kwargs"]["endpoint_url"] = endpoint
+            opts["client_kwargs"]["endpoint_url"] = configured_endpoint
 
     def _get_s3_path(self, dataset_id: str) -> str:
         # If it already starts with s3://, use it

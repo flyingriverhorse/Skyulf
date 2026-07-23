@@ -14,7 +14,10 @@ so each branch is exercised in isolation, independent of the router/HTTP
 integration tests elsewhere in the suite.
 """
 
+import threading
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -22,6 +25,7 @@ from fastapi import BackgroundTasks, HTTPException
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from backend.config import get_settings
+from backend.data_ingestion.schemas.ingestion import IngestionStatus
 from backend.data_ingestion.service import DataIngestionService
 from backend.exceptions.core import SkyulfException
 
@@ -140,6 +144,61 @@ async def test_sample_s3_or_parquet_local_path_delegates_to_local_parquet(db_ses
     service = DataIngestionService(session=db_session)
     rows = await service._sample_s3_or_parquet(str(parquet_path), {}, limit=10)
     assert rows == [{"x": 1}]
+
+
+@pytest.mark.asyncio
+async def test_get_ingestion_status_supplies_schema_defaults_for_legacy_source():
+    """Legacy sources without ingestion metadata must still produce a valid status response."""
+    source = MagicMock(source_metadata={})
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = source
+    session = AsyncMock()
+    session.execute.return_value = result
+
+    status = await DataIngestionService(session=session).get_ingestion_status(1)
+
+    assert IngestionStatus.model_validate(status).status == "unknown"
+    assert status["progress"] == 0.0
+
+
+def test_ingestion_get_db_session_initializes_one_engine_under_concurrency():
+    """Concurrent ingestion tasks must share one lazily-created SQLAlchemy engine."""
+    import backend.data_ingestion.tasks as tasks_module
+
+    tasks_module._sync_engine = None
+    tasks_module._sync_session_factory = None
+    created_engines = []
+
+    def fake_create_engine(*_args, **_kwargs):
+        time.sleep(0.02)
+        engine = MagicMock()
+        created_engines.append(engine)
+        return engine
+
+    try:
+        with (
+            patch("backend.data_ingestion.tasks.create_engine", side_effect=fake_create_engine),
+            patch("backend.data_ingestion.tasks.sessionmaker", return_value=MagicMock()),
+            patch("backend.data_ingestion.tasks.get_settings") as mock_settings,
+        ):
+            mock_settings.return_value.DATABASE_URL = "sqlite+aiosqlite:///test.db"
+
+            barrier = threading.Barrier(12)
+
+            def create_session():
+                """Wait for peers, then request a session concurrently."""
+                barrier.wait()
+                return tasks_module.get_db_session()
+
+            with ThreadPoolExecutor(max_workers=12) as pool:
+                futures = [pool.submit(create_session) for _ in range(12)]
+                for future in futures:
+                    future.result()
+
+        assert len(created_engines) == 1
+    finally:
+        tasks_module._sync_engine = None
+        tasks_module._sync_session_factory = None
 
 
 # ── _trigger_ingestion ───────────────────────────────────────────────────
