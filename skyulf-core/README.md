@@ -61,7 +61,12 @@ pip install skyulf-core[geo]
 
 # For text sentiment features
 pip install skyulf-core[text]
+
+# All non-geo optional runtime features
+pip install skyulf-core[all]
 ```
+
+`all` intentionally excludes the native geospatial stack; add `[geo]` only when you need geospatial nodes.
 
 ## Quick start
 
@@ -232,8 +237,7 @@ per-notebook breakdown of what's demonstrated.
 | 07 | [`07_spaceship_titanic_classification.ipynb`](examples/07_spaceship_titanic_classification.ipynb) | Kaggle Spaceship Titanic | Classification | Structured-string feature parsing, feature generation (interactions + polynomial), Grid vs. Random Search tuning, voting + stacking ensembles, Kaggle submission |
 | 08 | [`08_online_retail_customer_segmentation.ipynb`](examples/08_online_retail_customer_segmentation.ipynb) | UCI Online Retail | Clustering (RFM segmentation) | Raw-transaction-to-RFM feature engineering, 4-algorithm comparison, business-named segments, bonus time-series features (`DateFeatures`/`LagFeatures`/`RollingAggregate`) |
 
-Notebooks 01, 02, and 07 generate real `submission.csv` files ready to
-upload to their respective Kaggle competitions.
+For the first public showcase, publish notebooks 01 (House Prices), 02 (Disaster Tweets), and 07 (Spaceship Titanic); each produces a competition-ready submission file.
 
 ## Automated EDA
 
