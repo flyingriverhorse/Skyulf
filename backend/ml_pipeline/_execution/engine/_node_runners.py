@@ -32,7 +32,6 @@ from skyulf.modeling.base import StatefulEstimator
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
-from ...constants import StepType
 from ..schemas import NodeConfig
 
 if TYPE_CHECKING:
@@ -410,7 +409,7 @@ class NodeRunnersMixin:
 
     def _resolve_run_mode(self, node: NodeConfig) -> str:
         """Derive ``'fixed'`` (plain, single hyperparameter set) vs ``'tuned'``
-        (hyperparameter search) for this ``StepType.TRAINING`` node, from its
+        (hyperparameter search) for this training node, from its
         ``run_mode`` param.
         """
         run_mode = node.params.get("run_mode", "fixed")

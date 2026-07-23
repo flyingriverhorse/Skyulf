@@ -167,7 +167,7 @@ class FeatureEngineer:
             # `SkyulfPipeline.fit()` (the advertised polars-native usage) would
             # silently skip the split entirely and fit/evaluate on the whole
             # dataset with no held-out test set.
-            if isinstance(current_data, (pd.DataFrame, SkyulfDataFrame, tuple, pl.DataFrame)):
+            if isinstance(current_data, pd.DataFrame | SkyulfDataFrame | tuple | pl.DataFrame):
                 params = calculator.fit(current_data, params)
                 current_data = applier.apply(current_data, params)
             else:
