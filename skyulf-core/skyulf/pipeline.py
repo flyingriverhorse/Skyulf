@@ -7,9 +7,12 @@ import pickle  # nosec B403 - used only for internal pipeline serialization (see
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
+from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
+from .leakage import validate_leakage_safety
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
 from .modeling.classification import (
@@ -66,6 +69,10 @@ class SkyulfPipeline:
     Encapsulates:
     1. Feature Engineering (Preprocessing)
     2. Modeling (Training/Inference)
+
+    Examples:
+        >>> pipeline = SkyulfPipeline({"preprocessing": [], "modeling": {}})
+        >>> metrics = pipeline.fit(data, target_column="target")
     """
 
     def __init__(self, config: PipelineConfig | dict[str, Any]):
@@ -76,13 +83,15 @@ class SkyulfPipeline:
             config: Pipeline configuration dictionary.
                     Must contain 'preprocessing' (list) and 'modeling' (dict).
         """
+        validate_pipeline_config(config)
         self.config = config
         self.preprocessing_steps = config.get("preprocessing", [])
         self.modeling_config = config.get("modeling", {})
 
-        self.feature_engineer = FeatureEngineer(self.preprocessing_steps)
+        self.feature_engineer = FeatureEngineer(self.preprocessing_steps, _validated=True)
         self.model_estimator: StatefulEstimator | None = None
         self._fit_metrics: dict[str, Any] | None = None
+        self._target_column: str | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -156,6 +165,10 @@ class SkyulfPipeline:
                 calculator, applier = self._resolve_from_hardcoded_map(model_type)
 
         if calculator is None or applier is None:
+            try:
+                NodeRegistry.get_calculator(model_type)
+            except ValueError as exc:
+                raise ValueError(f"Unknown model type: {model_type}. {exc}") from exc
             raise ValueError(f"Unknown model type: {model_type}")
 
         self.model_estimator = StatefulEstimator(
@@ -163,7 +176,9 @@ class SkyulfPipeline:
         )
 
     def fit(
-        self, data: pd.DataFrame | SkyulfDataFrame | SplitDataset, target_column: str
+        self,
+        data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
+        target_column: str,
     ) -> dict[str, Any]:
         """
         Fit the pipeline.
@@ -218,6 +233,7 @@ class SkyulfPipeline:
                 metrics["modeling_error"] = str(e)
 
         self._fit_metrics = metrics
+        self._target_column = target_column
         return metrics
 
     def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
@@ -229,7 +245,16 @@ class SkyulfPipeline:
 
         Returns:
             Series of predictions.
+
+        Raises:
+            ValueError: If the input still contains the target column used during fit.
         """
+        if self._target_column is not None and self._target_column in data.columns:
+            raise ValueError(
+                f"predict() input still contains the target column '{self._target_column}' "
+                "used during fit(); drop it before calling predict()."
+            )
+
         # 1. Feature Engineering (Transform only)
         transformed_data = self.feature_engineer.transform(data)
 
@@ -272,6 +297,10 @@ class SkyulfPipeline:
             lines.append("  (none)")
 
         return "\n".join(lines)
+
+    def validate_leakage_safety(self) -> list[str]:
+        """Return warnings for preprocessing steps ordered before the train/test split."""
+        return validate_leakage_safety(self.config)
 
     def to_mermaid(self) -> str:
         """Render the pipeline as a Mermaid ``flowchart`` string.

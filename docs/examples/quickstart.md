@@ -12,8 +12,6 @@ import pandas as pd
 from skyulf import SkyulfPipeline
 ```
 
-> **Tip:** You can also use `from skyulf.pipeline import SkyulfPipeline`.
-
 ## 2. Create Dummy Data
 
 We'll create a synthetic dataset with some missing values and categorical features.

@@ -61,7 +61,12 @@ pip install skyulf-core[geo]
 
 # For text sentiment features
 pip install skyulf-core[text]
+
+# All non-geo optional runtime features
+pip install skyulf-core[all]
 ```
+
+`all` intentionally excludes the native geospatial stack; add `[geo]` only when you need geospatial nodes.
 
 ## Quick start
 
@@ -143,6 +148,19 @@ returns a metrics report; `predict()` re-applies the *already-fitted*
 preprocessing artifacts (no re-fitting, no leakage) before calling the
 model.
 
+**Which API?** Use `SkyulfPipeline` (above) by default. The `Calculator`/
+`Applier` pairs it wraps (e.g. `SimpleImputerCalculator`/`Applier`) are
+lower-level — only use them directly to embed a single step in a custom
+(e.g. sklearn) pipeline.
+
+**Naming:** preprocessing names are `PascalCase` (`SimpleImputer`,
+`TrainTestSplitter`), modeling names are `snake_case` (`logistic_regression`).
+A few preprocessing nodes are `snake_case` exceptions: `feature_target_split`,
+`tokenizer`, `tfidf_vectorizer`, `count_vectorizer`, `hashing_vectorizer`,
+`sentence_embedder`, `feature_selection`. Unsure of a name? Use
+`NodeRegistry.list_transformers()`/`.list_models()`. `"Split"` is a
+deprecated alias for `"TrainTestSplitter"`.
+
 ## Data leakage safety
 
 **Split before any data-dependent preprocessing.** Fitting an imputer, scaler,
@@ -180,8 +198,15 @@ learned binning) must come **after** the split in the preprocessing list.
 Deterministic, row-independent parses (string splitting, unit conversions,
 date-part extraction) are safe before the split. Read and run
 [`examples/01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb)
-to see this pattern applied to a real Kaggle dataset, including a
+to see this pattern applied to a real regression dataset, including a
 deliberate pre-split/post-split split of "safe" vs. "learned" feature steps.
+
+Use the opt-in static check before fitting:
+
+```python
+warnings = skyulf.validate_leakage_safety(config)
+warnings = SkyulfPipeline(config).validate_leakage_safety()
+```
 
 ## Polars-native, no hidden pandas
 
@@ -203,17 +228,14 @@ per-notebook breakdown of what's demonstrated.
 | # | Notebook | Dataset | Task | Highlights |
 |---|----------|---------|------|------------|
 | 00 | [`00_quickstart.ipynb`](examples/00_quickstart.ipynb) | Synthetic | Classification | Config, fit, save/load, predict, geo features (`GeoDistance` + `H3Index`) |
-| 01 | [`01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb) | Kaggle House Prices | Regression | EDA, leakage-safe null handling, outlier handling (Winsorize vs. IQR removal), Optuna tuning, SHAP, Kaggle submission |
-| 02 | [`02_disaster_tweets_text_classification.ipynb`](examples/02_disaster_tweets_text_classification.ipynb) | Kaggle Disaster Tweets | Text classification | TF-IDF, hash encoding, Naive Bayes vs. tuned LogReg vs. stacking, char n-gram experiment, sentence embeddings, Kaggle submission |
+| 01 | [`01_house_prices_regression.ipynb`](examples/01_house_prices_regression.ipynb) | House Prices | Regression | EDA, leakage-safe null handling, outlier handling (Winsorize vs. IQR removal), Optuna tuning, SHAP |
+| 02 | [`02_disaster_tweets_text_classification.ipynb`](examples/02_disaster_tweets_text_classification.ipynb) | Disaster Tweets | Text classification | TF-IDF, hash encoding, Naive Bayes vs. tuned LogReg vs. stacking, char n-gram experiment, sentence embeddings |
 | 03 | [`03_mall_customers_segmentation.ipynb`](examples/03_mall_customers_segmentation.ipynb) | Mall Customers | Clustering | Unsupervised EDA, k-selection by silhouette, multi-algorithm comparison |
 | 04 | [`04_forest_cover_multiclass_ensemble.ipynb`](examples/04_forest_cover_multiclass_ensemble.ipynb) | Covertype | Multiclass | Ensembles, tuning, per-class metrics |
 | 05 | [`05_santander_imbalanced_classification.ipynb`](examples/05_santander_imbalanced_classification.ipynb) | Santander | Imbalanced classification | Drift checks, feature selection strategies (Variance/Correlation vs. Univariate vs. Model-Based), resampling-aware evaluation |
 | 06 | [`06_credit_card_fraud_extreme_imbalance.ipynb`](examples/06_credit_card_fraud_extreme_imbalance.ipynb) | Credit Card Fraud | Extreme imbalance | PR-AUC focus, precision/recall tradeoffs |
-| 07 | [`07_spaceship_titanic_classification.ipynb`](examples/07_spaceship_titanic_classification.ipynb) | Kaggle Spaceship Titanic | Classification | Structured-string feature parsing, feature generation (interactions + polynomial), Grid vs. Random Search tuning, voting + stacking ensembles, Kaggle submission |
+| 07 | [`07_spaceship_titanic_classification.ipynb`](examples/07_spaceship_titanic_classification.ipynb) | Spaceship Titanic | Classification | Structured-string feature parsing, feature generation (interactions + polynomial), Grid vs. Random Search tuning, voting + stacking ensembles |
 | 08 | [`08_online_retail_customer_segmentation.ipynb`](examples/08_online_retail_customer_segmentation.ipynb) | UCI Online Retail | Clustering (RFM segmentation) | Raw-transaction-to-RFM feature engineering, 4-algorithm comparison, business-named segments, bonus time-series features (`DateFeatures`/`LagFeatures`/`RollingAggregate`) |
-
-Notebooks 01, 02, and 07 generate real `submission.csv` files ready to
-upload to their respective Kaggle competitions.
 
 ## Automated EDA
 
@@ -224,8 +246,7 @@ clustering pass, all from one `.analyze()` call.
 
 ```python
 import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 df = pl.read_csv("data.csv")
 profile = EDAAnalyzer(df).analyze(

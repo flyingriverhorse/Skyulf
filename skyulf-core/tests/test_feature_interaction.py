@@ -142,6 +142,13 @@ class TestValidation:
         with pytest.raises(ValueError, match=error_match):
             calc.fit(df, {"columns": columns, "degree": degree})
 
+    def test_invalid_degree_lists_valid_choices(self) -> None:
+        """An unsupported interaction degree must enumerate valid choices."""
+        with pytest.raises(ValueError, match=r"Valid choices: .*2.*3.*4"):
+            FeatureInteractionCalculator().fit(
+                _sample_pandas_df(), {"columns": ["x1", "x2"], "degree": 5}
+            )
+
 
 class TestFitApplyRoundTrip:
     """Full fit -> apply round trip."""

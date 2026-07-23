@@ -235,8 +235,9 @@ def test_ordinal_apply_engine_parity_on_unseen_category() -> None:
 
 
 class TestApplyFeaturesExceptionPropagates:
-    """A transform-time exception in the feature-apply path propagates (raised),
-    with the dispatcher logging the failure. Scenarios (pandas/polars) loaded from
+    """A transform-time feature input error propagates and is logged without a traceback.
+
+    Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_features_exception``).
     """
 
@@ -253,7 +254,7 @@ class TestApplyFeaturesExceptionPropagates:
                 raise ValueError("boom")
 
         params = {"columns": ["category"], "encoder_object": _BrokenEncoder()}
-        with caplog.at_level("ERROR"), pytest.raises(ValueError, match="boom"):
+        with caplog.at_level("DEBUG"), pytest.raises(ValueError, match="boom"):
             if engine == "polars":
                 X = pl.DataFrame({"category": ["a", "b"]})
                 OrdinalEncoderApplier().apply(X, dict(params))
@@ -261,7 +262,10 @@ class TestApplyFeaturesExceptionPropagates:
                 X = pd.DataFrame({"category": ["a", "b"]})
                 OrdinalEncoderApplier().apply(X, dict(params))
 
-        assert any("engine apply failed" in rec.message for rec in caplog.records)
+        records = [rec for rec in caplog.records if "engine apply failed" in rec.message]
+        assert len(records) == 1
+        assert records[0].levelname == "DEBUG"
+        assert records[0].exc_info is None
 
 
 def test_apply_target_polars_encodes_y_correctly() -> None:
@@ -281,8 +285,9 @@ def test_apply_target_polars_encodes_y_correctly() -> None:
 
 
 class TestApplyTargetExceptionPropagates:
-    """A transform-time exception in the target-apply path propagates (raised),
-    with the dispatcher logging the failure. Scenarios (pandas/polars) loaded from
+    """A transform-time target input error propagates and is logged without a traceback.
+
+    Scenarios (pandas/polars) loaded from
     ``tests/test_cases/preprocessing/encoding_ordinal.json`` (group ``apply_target_exception``).
     """
 
@@ -303,7 +308,7 @@ class TestApplyTargetExceptionPropagates:
             "encoder_object": None,
             "encoders": {"__target__": _BrokenEncoder()},
         }
-        with caplog.at_level("ERROR"), pytest.raises(ValueError, match="boom"):
+        with caplog.at_level("DEBUG"), pytest.raises(ValueError, match="boom"):
             if engine == "polars":
                 y = pl.Series("target", ["yes", "no"])
                 X = pl.DataFrame({"other": [1, 2]})
@@ -312,7 +317,10 @@ class TestApplyTargetExceptionPropagates:
                 X = pd.DataFrame({"other": [1, 2]})
             OrdinalEncoderApplier().apply((X, y), dict(params))
 
-        assert any("engine apply failed" in rec.message for rec in caplog.records)
+        records = [rec for rec in caplog.records if "engine apply failed" in rec.message]
+        assert len(records) == 1
+        assert records[0].levelname == "DEBUG"
+        assert records[0].exc_info is None
 
 
 def test_polars_apply_returns_input_when_nothing_to_do() -> None:

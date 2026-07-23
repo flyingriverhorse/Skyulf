@@ -1,7 +1,7 @@
 import numpy as np
 import polars as pl
 
-from skyulf.profiling.drift import DriftCalculator
+from skyulf import DriftCalculator
 
 
 def generate_synthetic_data():

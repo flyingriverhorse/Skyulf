@@ -963,7 +963,7 @@ def test_tune_unknown_strategy_raises():
         search_space={"C": [1.0]},
         cv_folds=2,
     )
-    with pytest.raises(ValueError, match="Unknown tuning strategy"):
+    with pytest.raises(ValueError, match=r"Valid choices: .*'grid'.*'random'"):
         tuner.fit(X, y, config=cfg.__dict__)
 
 

@@ -32,12 +32,12 @@ automatically. You call them yourself in two main places:
 
 ```python
 import pandas as pd
-from skyulf.profiling.expect import (
+from skyulf import (
+    ExpectationError,
     expect_columns_exist,
     expect_no_nulls,
-    expect_value_range,
     expect_unique,
-    ExpectationError,
+    expect_value_range,
 )
 
 
@@ -60,7 +60,7 @@ def test_customers_contract():
 ## Example: a pipeline guard
 
 ```python
-from skyulf.profiling.expect import expect_no_nulls
+from skyulf import expect_no_nulls
 
 def run(df):
     # Fail fast with a clear message before an expensive fit.

@@ -8,6 +8,7 @@ from sklearn.linear_model import BayesianRidge
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.tree import DecisionTreeRegressor
 
+from ..._validation import raise_invalid_choice
 from ...engines.sklearn_bridge import SklearnBridge
 from ...utils import detect_numeric_columns, resolve_columns
 
@@ -36,7 +37,7 @@ def _polars_stat_for_strategy(strategy: str, fill_value: Any) -> Any:
         # sklearn/scipy break ties by picking the smallest value; polars' .mode()
         # has no guaranteed tie-break order, so sort ascending before taking first.
         return lambda c: pl.col(c).mode().sort().first()
-    raise ValueError(f"Unknown strategy: {strategy}")
+    raise_invalid_choice(strategy, ("constant", "mean", "median", "most_frequent"), "strategy")
 
 
 def _compute_polars_fill_values(

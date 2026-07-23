@@ -155,6 +155,7 @@ site/
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
 .superpowers/
+.worktrees/
 sast/architecture.md
 sast/final-report.md
 sast/hardcodedsecrets-results.md

@@ -192,7 +192,7 @@ def test_summary_prints_message_when_rich_missing(
     visualizer.summary()
 
     captured = capsys.readouterr()
-    assert "rich" in captured.out.lower()
+    assert "pip install skyulf-core[viz]" in captured.out
 
 
 def test_render_numeric_stats_prints_message_without_numeric_columns(
@@ -417,7 +417,7 @@ def test_plot_prints_message_when_matplotlib_missing(
     visualizer.plot()
 
     captured = capsys.readouterr()
-    assert "matplotlib" in captured.out.lower()
+    assert "pip install skyulf-core[viz]" in captured.out
 
 
 def test_plot_correlations_returns_early_without_correlations(

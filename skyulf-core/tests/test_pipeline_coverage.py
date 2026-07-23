@@ -189,8 +189,11 @@ def test_init_model_estimator_hyperparameter_tuner_unknown_base_raises(
 
 
 def test_init_model_estimator_unknown_model_type_raises(force_registry_miss) -> None:
-    """A model type unresolvable via registry or the manual dispatch must raise."""
-    with pytest.raises(ValueError, match="Unknown model type"):
+    """An unknown model should retain the registry's diagnostic context."""
+    with pytest.raises(
+        ValueError,
+        match="Unknown model type: no_such_model_at_all.*forced registry miss for test",
+    ):
         SkyulfPipeline({"modeling": {"type": "no_such_model_at_all"}})
 
 

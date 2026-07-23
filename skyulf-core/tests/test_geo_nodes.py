@@ -183,6 +183,30 @@ class TestGeoDistanceValidation:
                 df, {"lat1_col": "lat1", "lon1_col": "lon1", "lat2_col": "lat2", "lon2_col": "lon2"}
             )
 
+    @pytest.mark.parametrize(
+        ("config", "valid_choice"),
+        [
+            ({"method": "manhattan"}, "'euclidean'"),
+            ({"unit": "furlongs"}, "'mi'"),
+        ],
+    )
+    def test_invalid_enum_config_lists_valid_choices(
+        self, config: dict[str, str], valid_choice: str
+    ) -> None:
+        """Unsupported method and unit values must enumerate valid choices."""
+        with pytest.raises(ValueError, match=r"Valid choices:") as exc_info:
+            GeoDistanceCalculator().fit(
+                _cities_df(),
+                {
+                    "lat1_col": "lat1",
+                    "lon1_col": "lon1",
+                    "lat2_col": "lat2",
+                    "lon2_col": "lon2",
+                    **config,
+                },
+            )
+        assert valid_choice in str(exc_info.value)
+
 
 class TestGeoDistanceEngineParity:
     """Pandas and polars engines must produce numerically identical output."""

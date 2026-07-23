@@ -11,6 +11,7 @@ from typing import Any, cast
 
 import pandas as pd
 
+from ..._validation import raise_invalid_choice
 from ...core.artifacts import FeatureInteractionArtifact
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
@@ -131,7 +132,7 @@ def _validate_interaction_columns(X_pd: pd.DataFrame, cols: list[str]) -> None:
 def _validate_interaction_degree(degree: int) -> None:
     """Raise ValueError if degree is not one of the supported interaction degrees."""
     if degree not in _SUPPORTED_DEGREES:
-        raise ValueError(f"FeatureInteraction only supports degree 2, 3 or 4, got {degree}")
+        raise_invalid_choice(degree, _SUPPORTED_DEGREES, "FeatureInteraction degree")
 
 
 def _build_interaction_feature_names(
