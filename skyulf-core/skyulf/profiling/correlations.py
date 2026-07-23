@@ -96,12 +96,19 @@ def calculate_correlations(df: pl.LazyFrame, numeric_cols: list[str]) -> Correla
         # Re-select only valid columns
         subset = subset.select(valid_cols)
 
+        # Polars DataFrame.corr() returns NaN for every cell when any column
+        # contains null values (unlike pandas which uses pairwise deletion).
+        # Drop rows with any null before computing the correlation matrix.
+        subset_clean = subset.drop_nulls()
+        if len(subset_clean) < 2:
+            return None
+
         # Suppress numpy warnings that might occur during correlation calculation
         import warnings
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            corr_df = subset.corr()
+            corr_df = subset_clean.corr()
 
         # Convert to our schema
         matrix = _clean_correlation_rows(corr_df)

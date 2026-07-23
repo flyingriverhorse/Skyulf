@@ -59,7 +59,7 @@ def _tokenizer_apply_pandas(
     for col in valid_cols:
         text = X_out[col].fillna("").astype(str)
         tokens = text.map(analyze)
-        X_out[f"{col}__tokens"] = tokens.map(lambda toks: " ".join(toks))
+        X_out[f"{col}__tokens"] = tokens.map(lambda toks: " ".join(toks))  # ty: ignore[no-matching-overload]
         if add_token_count:
             X_out[f"{col}__token_count"] = tokens.map(len)
 

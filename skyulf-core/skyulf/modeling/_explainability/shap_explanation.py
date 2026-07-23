@@ -160,7 +160,7 @@ def _compute_interaction_summary(
     Returns `None` if the model isn't tree-based or computation fails.
     """
     try:
-        import shap
+        import shap  # ty: ignore[unresolved-import]
 
         explainer = shap.TreeExplainer(model)
         raw = explainer.shap_interaction_values(sample)
@@ -236,8 +236,8 @@ def compute_shap_explanation(
         }
     """
     try:
-        import shap
-        import shap.maskers
+        import shap  # ty: ignore[unresolved-import]
+        import shap.maskers  # ty: ignore[unresolved-import]
     except ImportError:
         return None
 

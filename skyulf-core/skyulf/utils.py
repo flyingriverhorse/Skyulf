@@ -74,7 +74,7 @@ def get_data_stats(
         payload = cast(Any, data)
         return int(payload.shape[0]), set(payload.columns)
     if isinstance(data, tuple) and len(data) == 2:
-        return _data_stats_from_tuple(data)
+        return _data_stats_from_tuple(cast("tuple[Any, Any]", data))
     if isinstance(data, SplitDataset):
         return _data_stats_from_split_dataset(data)
 
