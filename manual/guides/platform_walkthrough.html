@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -3335,7 +3335,7 @@ skyulf-core (ML engine)
 <li><strong>Connect nodes</strong> by dragging edges from output ports to input ports.</li>
 <li><strong>Configure each node</strong> by clicking it and setting parameters in the side panel.</li>
 <li><strong>Add a modeling node</strong> at the end (e.g., <code>random_forest_classifier</code>).</li>
-<li>Optionally, add an <strong>Advanced Tuning node</strong> and configure the search strategy.</li>
+<li>Optionally, toggle the modeling node's <strong>Advanced mode</strong> (<code>run_mode: "advanced"</code>) and configure the search strategy.</li>
 </ol>
 <h3 id="recommended-pipeline-order">Recommended pipeline order:</h3>
 <pre><code>Dataset → TrainTestSplitter → Imputer → Encoder → Scaler → Model
@@ -3419,8 +3419,8 @@ skyulf-core (ML engine)
 <li><strong>Data loading</strong> — loads the same dataset you used on the canvas via <code>pd.read_csv</code> / Parquet.</li>
 <li><strong>Preprocessing cells</strong> — one cell per node (Full mode) or a single pipeline config block (Compact mode).</li>
 <li><strong>Training cell</strong> — wired up to run the same algorithm the canvas node was configured for:</li>
-<li><strong>Basic Training nodes</strong> call <code>estimator.fit_predict()</code> with <code>log_callback=print</code>.</li>
-<li><strong>Advanced Tuning nodes</strong> automatically use <code>TuningCalculator</code>/<code>TuningApplier</code> wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
+<li><strong>Training nodes in Basic mode</strong> (<code>run_mode: "basic"</code>) call <code>estimator.fit_predict()</code> with <code>log_callback=print</code>.</li>
+<li><strong>Training nodes in Advanced mode</strong> (<code>run_mode: "advanced"</code>) automatically use <code>TuningCalculator</code>/<code>TuningApplier</code> wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
      <code>Trial 1/10 — score=0.9221
      Trial 2/10 — score=0.9306
      ...
@@ -3594,7 +3594,7 @@ skyulf-core (ML engine)
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

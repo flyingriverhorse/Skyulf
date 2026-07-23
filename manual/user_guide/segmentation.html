@@ -17,7 +17,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -25,7 +25,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -3029,7 +3029,8 @@ practice only ever fires for clustering: it's populated from
 Regression models never pass anything here, so this has no effect on them.</p>
 <h2 id="via-the-pipeline-node-graph">Via the pipeline / node graph</h2>
 <p>In the UI, drag a <strong>Segmentation</strong> node onto the canvas (found alongside
-other Modeling nodes) instead of Basic Training. It has its own
+other Modeling nodes) instead of a Classification/Regression/Text
+Classification node. It has its own
 model/hyperparameter picker (all four algorithms above), an optional
 <strong>Reference Column</strong> selector, and no target-column/CV UI at all (neither
 applies to unsupervised clustering). Results appear in a dedicated
@@ -3040,8 +3041,9 @@ reference column was set — a breakdown of that column's values per cluster.</p
 <p>Same thing via a pipeline config:</p>
 <pre><code class="language-python">{
     &quot;node_id&quot;: &quot;segment_customers&quot;,
-    &quot;step_type&quot;: &quot;basic_training&quot;,
+    &quot;step_type&quot;: &quot;training&quot;,
     &quot;params&quot;: {
+        &quot;run_mode&quot;: &quot;fixed&quot;,          # clustering always runs in fixed mode
         &quot;target_column&quot;: &quot;&quot;,          # sentinel for &quot;no target&quot;
         &quot;model_type&quot;: &quot;gaussian_mixture&quot;,
         &quot;hyperparameters&quot;: {&quot;n_components&quot;: 4, &quot;covariance_type&quot;: &quot;full&quot;},
@@ -3059,9 +3061,11 @@ reference column was set — a breakdown of that column's values per cluster.</p
 <li><strong>Metrics need real clusters.</strong> Silhouette/Calinski-Harabasz/Davies-Bouldin
   are only computed when there's more than 1 cluster and fewer clusters than
   rows — otherwise they're omitted rather than raising.</li>
-<li><strong>Advanced Tuning doesn't apply.</strong> Hyperparameter tuning scores candidates
-  with a supervised metric (accuracy, R², etc.), which clustering has no
-  equivalent of — the model dropdown there excludes all clustering models.</li>
+<li><strong>Advanced mode (hyperparameter tuning) doesn't apply.</strong> Tuning scores
+  candidates with a supervised metric (accuracy, R², etc.), which clustering
+  has no equivalent of — Segmentation has no <code>run_mode</code> toggle at all, and
+  the model dropdowns on the tuning-capable nodes exclude all clustering
+  models.</li>
 <li><strong>Reference column dtype doesn't matter.</strong> Whether it's text (species
   name) or numeric (a segment code), it's excluded from training by name,
   not just by non-numeric filtering.</li>
@@ -3120,7 +3124,7 @@ reference column was set — a breakdown of that column's values per cluster.</p
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

@@ -21,7 +21,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -29,7 +29,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -3352,7 +3352,7 @@
 </table>
 <blockquote>
 <p><strong>Nested CV</strong> runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at <code>n_folds - 1</code>) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.</p>
-<p><strong>With Advanced Tuning:</strong> When <code>nested_cv</code> is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.</p>
+<p><strong>With tuning enabled (<code>run_mode: "advanced"</code>):</strong> When <code>nested_cv</code> is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses <code>stratified_k_fold</code> (classification) or <code>k_fold</code> (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.</p>
 </blockquote>
 <h3 id="time-column-for-time-series-split">Time column for Time Series Split</h3>
 <p>When using <code>time_series_split</code>, Skyulf auto-sorts your data chronologically:</p>
@@ -3375,7 +3375,7 @@
 <li>The fitted model is stored in the pipeline and used for <code>predict()</code> / <code>save()</code>.</li>
 </ol>
 <h2 id="notebook-export-seeing-tuning-in-action">Notebook export — seeing tuning in action</h2>
-<p>When you export a canvas pipeline that includes an <strong>Advanced Tuning</strong> node, Skyulf generates a fully self-contained Jupyter notebook. The exported training cell mirrors exactly what the backend engine does:</p>
+<p>When you export a canvas pipeline that includes a training node (Classification / Regression / Text Classification / Segmentation) with <code>run_mode: "advanced"</code>, Skyulf generates a fully self-contained Jupyter notebook. The exported training cell mirrors exactly what the backend engine does:</p>
 <ul>
 <li>Wraps the base calculator/applier in <code>TuningCalculator</code> / <code>TuningApplier</code> so <code>fit_predict</code> actually runs the search (Optuna, grid, random, etc.) instead of a single default fit.</li>
 <li>Passes a <code>progress_callback</code> that prints <code>Trial N/M — score=0.9306</code> for each completed trial directly in the notebook output.</li>
@@ -3508,7 +3508,7 @@ metrics = estimator.evaluate(dataset=dataset, target_column=&quot;target&quot;)
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
