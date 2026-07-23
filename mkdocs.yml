@@ -51,6 +51,8 @@ nav:
     - Job Idempotency: guides/job_idempotency.md
   - Guides:
     - Getting Started: guides/getting_started.md
+    - Core Release Process: guides/core-release.md
+    - Kaggle Publication: guides/kaggle-publication.md
     - Multi-Path Pipelines: guides/multi_path_pipelines.md
     - FAQ & Comparison: guides/faq.md
     - Recipes: guides/recipes.md
