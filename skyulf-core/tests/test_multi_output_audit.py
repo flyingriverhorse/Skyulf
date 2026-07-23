@@ -219,21 +219,16 @@ class TestResamplingMultiOutputY:
         )
         return X, y
 
-    def test_random_oversampler_passes_through_multi_output_y_unchanged(
-        self, multi_output_binary_data
-    ):
-        """RandomOverSampler only duplicates existing rows (no synthetic
-        generation), so it tolerates a 2-column y and returns a 2-column
-        DataFrame back — this already "just works" today, incidentally."""
+    def test_random_oversampler_rejects_multi_output_y(self, multi_output_binary_data):
+        """RandomOverSampler, like SMOTE, rejects multi-output labels."""
         X, y = multi_output_binary_data
         config = {"method": "random_over", "target_column": "target_a"}
 
         artifact = OversamplingCalculator().fit((X, y), config)
-        X_res, y_res = OversamplingApplier().apply((X, y), artifact)
-
-        assert isinstance(y_res, pd.DataFrame)
-        assert list(y_res.columns) == ["target_a", "target_b"]
-        assert len(X_res) == len(y_res)
+        with pytest.raises(
+            ValueError, match="Multilabel and multioutput targets are not supported"
+        ):
+            OversamplingApplier().apply((X, y), artifact)
 
     def test_smote_raises_on_multi_output_y(self, multi_output_binary_data):
         """SMOTE (and its variants) explicitly reject multi-output targets —
