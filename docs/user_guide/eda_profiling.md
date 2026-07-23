@@ -12,8 +12,7 @@ Skyulf provides a `EDAVisualizer` helper that automatically generates a rich ter
 
 ```python
 import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
-from skyulf.profiling.visualizer import EDAVisualizer
+from skyulf import EDAAnalyzer, EDAVisualizer
 
 # 1. Load Data
 df = pl.read_csv("your_dataset.csv")
@@ -40,7 +39,7 @@ If you want to build custom reports or integrate into a pipeline, you can access
 
 ```python
 import polars as pl
-from skyulf.profiling.analyzer import EDAAnalyzer
+from skyulf import EDAAnalyzer
 
 # 1. Load your data into a Polars DataFrame
 df = pl.read_csv("your_dataset.csv")
@@ -335,7 +334,7 @@ You can also use the drift detection engine programmatically within your own scr
 
 ```python
 import polars as pl
-from skyulf.profiling.drift import DriftCalculator
+from skyulf import DriftCalculator
 
 # 1. Load Data (Reference vs Current)
 # Reference: The data your model was trained on

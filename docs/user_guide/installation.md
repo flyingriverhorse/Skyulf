@@ -102,7 +102,7 @@ For the full manual setup (without Docker), see the [Platform Setup guide](../gu
 Verify the installation:
 
 ```python
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 from skyulf.data.dataset import SplitDataset
 
 print("skyulf-core installed successfully")

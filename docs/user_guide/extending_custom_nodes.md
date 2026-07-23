@@ -15,9 +15,9 @@ from typing import Any, Dict, Tuple, Union
 
 import pandas as pd
 
+from skyulf import NodeRegistry
 from skyulf.preprocessing.base import BaseApplier, BaseCalculator
 from skyulf.core.meta.decorators import node_meta
-from skyulf.registry import NodeRegistry
 from skyulf.utils import pack_pipeline_output, unpack_pipeline_input
 
 

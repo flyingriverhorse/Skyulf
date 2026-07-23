@@ -39,7 +39,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from skyulf.data.dataset import SplitDataset
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 df = pd.DataFrame(
   {

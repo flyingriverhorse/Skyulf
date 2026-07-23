@@ -20,7 +20,7 @@ pip install skyulf-core[viz,eda,tuning,modeling-xgboost,preprocessing-imbalanced
 
 ```python
 import pandas as pd
-from skyulf.pipeline import SkyulfPipeline
+from skyulf import SkyulfPipeline
 
 df = pd.DataFrame({
     "age": [10, 20, None, 40, 50, 60, None, 80],
