@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob
+from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.schemas import (
     JobStatus,
     NodeExecutionResult,
@@ -10,7 +10,6 @@ from backend.ml_pipeline._execution.schemas import (
 from backend.ml_pipeline._execution.strategies import (
     AdvancedTuningStrategy,
     BasicTrainingStrategy,
-    JobStrategyFactory,
 )
 from backend.ml_pipeline.constants import StepType
 
@@ -21,37 +20,24 @@ class TestEnumStrSemantics(unittest.TestCase):
     `(str, Enum)`)."""
 
     def test_step_type_str_returns_value(self):
-        self.assertEqual(str(StepType.BASIC_TRAINING), "basic_training")
-        self.assertEqual(f"{StepType.ADVANCED_TUNING}", "advanced_tuning")
+        self.assertEqual(str(StepType.TRAINING), "training")
+        self.assertEqual(f"{StepType.DATA_LOADER}", "data_loader")
 
     def test_job_status_str_returns_value(self):
         self.assertEqual(str(JobStatus.QUEUED), "queued")
         self.assertEqual(f"{JobStatus.COMPLETED}", "completed")
 
 
-class TestJobStrategyFactory(unittest.TestCase):
-    def test_get_basic_strategy(self):
-        strategy = JobStrategyFactory.get_strategy(StepType.BASIC_TRAINING)
-        self.assertIsInstance(strategy, BasicTrainingStrategy)
-
-    def test_get_tuning_strategy(self):
-        strategy = JobStrategyFactory.get_strategy(StepType.ADVANCED_TUNING)
-        self.assertIsInstance(strategy, AdvancedTuningStrategy)
-
-    def test_invalid_strategy(self):
-        with self.assertRaises(ValueError):
-            JobStrategyFactory.get_strategy("INVALID_TYPE")
-
-
 class TestBasicTrainingStrategy(unittest.TestCase):
     def setUp(self):
         self.strategy = BasicTrainingStrategy()
         # Mock a Job object
-        self.job = MagicMock(spec=BasicTrainingJob)
+        self.job = MagicMock(spec=TrainingJob)
+        self.job.run_mode = "fixed"
         self.job.metrics = {}  # Start with empty metrics
 
     def test_get_job_model(self):
-        self.assertEqual(self.strategy.get_job_model(), BasicTrainingJob)
+        self.assertEqual(self.strategy.get_job_model(), TrainingJob)
 
     def test_get_initial_log(self):
         self.job.version = "1.0.0"
@@ -88,14 +74,15 @@ class TestBasicTrainingStrategy(unittest.TestCase):
 class TestAdvancedTuningStrategy(unittest.TestCase):
     def setUp(self):
         self.strategy = AdvancedTuningStrategy()
-        self.job = MagicMock(spec=AdvancedTuningJob)
+        self.job = MagicMock(spec=TrainingJob)
+        self.job.run_mode = "tuned"
         self.job.metrics = {}
         # Mock specific tuning fields
         self.job.best_params = {}
         self.job.best_score = 0.0
 
     def test_get_job_model(self):
-        self.assertEqual(self.strategy.get_job_model(), AdvancedTuningJob)
+        self.assertEqual(self.strategy.get_job_model(), TrainingJob)
 
     def test_handle_success_tuning_fields(self):
         # Result simulates a Tuning node output

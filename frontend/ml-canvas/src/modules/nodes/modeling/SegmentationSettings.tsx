@@ -7,8 +7,8 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
+import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
 import { getIncomers } from '@xyflow/react';
-import { StepType } from '../../../core/constants/stepTypes';
 import { HelpTooltip } from './components/HelpTooltip';
 import { HyperparameterInput } from './components/HyperparameterInput';
 import type { HyperparameterDef } from './components/types';
@@ -167,10 +167,11 @@ export const SegmentationSettings: React.FC<{
     }
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         target_node_id: nodeId,
-        job_type: StepType.BASIC_TRAINING
+        job_type: 'training'
       });
       const jobCount = response.job_ids?.length || 1;
       if (jobCount > 1) {
@@ -180,7 +181,7 @@ export const SegmentationSettings: React.FC<{
       } else {
         toast.success('Segmentation job submitted');
       }
-      setTab('basic_training');
+      setTab('segmentation');
       toggleJobDrawer(true);
     } catch (error) {
       console.error('Failed to submit segmentation job:', error);

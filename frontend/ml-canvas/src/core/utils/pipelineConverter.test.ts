@@ -37,7 +37,8 @@ describe('convertGraphToPipelineConfig', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('imp', 'imputation_node', { method: 'simple', strategy: 'mean', columns: ['x'] }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: {},
@@ -54,7 +55,7 @@ describe('convertGraphToPipelineConfig', () => {
     const ids = cfg.nodes.map((n) => n.node_id);
     expect(ids).toEqual(['ds', 'imp', 'train']);
     expect(cfg.nodes[1]?.step_type).toBe('SimpleImputer');
-    expect(cfg.nodes[2]?.step_type).toBe('basic_training');
+    expect(cfg.nodes[2]?.step_type).toBe('training');
     expect(cfg.nodes[2]?.inputs).toEqual(['imp']);
   });
 
@@ -127,10 +128,11 @@ describe('convertGraphToPipelineConfig', () => {
     expect(imp?.params).not.toHaveProperty('_merge_strategy');
   });
 
-  it('forwards execution_mode through basic_training params', () => {
+  it('forwards execution_mode through Classification node params (canonical training/fixed)', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: { C: 1 },
@@ -145,13 +147,182 @@ describe('convertGraphToPipelineConfig', () => {
     const edges = [edge('ds', 'train')];
     const cfg = convertGraphToPipelineConfig(nodes, edges);
     const train = cfg.nodes.find((n) => n.node_id === 'train');
-    expect(train?.step_type).toBe('basic_training');
+    expect(train?.step_type).toBe('training');
     expect(train?.params).toMatchObject({
+      run_mode: 'fixed',
       target_column: 'y',
       model_type: 'logistic_regression',
       execution_mode: 'parallel',
     });
   });
+
+  it('emits a canonical training/tuned step for a Classification node with run_mode=advanced', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'classification', {
+        run_mode: 'advanced',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        search_space: { C: [0.1, 1, 10] },
+        search_strategy: 'random',
+        metric: 'accuracy',
+        n_trials: 5,
+        cv_enabled: true,
+        cv_folds: 3,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 42,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect(tune?.step_type).toBe('training');
+    expect(tune?.params).toMatchObject({
+      run_mode: 'tuned',
+      target_column: 'y',
+      algorithm: 'logistic_regression',
+    });
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      strategy: 'random',
+      metric: 'accuracy',
+      n_trials: 5,
+      search_space: { C: [0.1, 1, 10] },
+    });
+  });
+
+  it('emits a canonical training/tuned step for a Regression node with run_mode=advanced', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('tune', 'regression', {
+        run_mode: 'advanced',
+        target_column: 'y',
+        model_type: 'random_forest_regressor',
+        search_space: { n_estimators: [50, 100] },
+        search_strategy: 'grid',
+        metric: 'r2',
+        n_trials: 8,
+        cv_enabled: true,
+        cv_folds: 5,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 42,
+      }),
+    ];
+    const edges = [edge('ds', 'tune')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const tune = cfg.nodes.find((n) => n.node_id === 'tune');
+    expect(tune?.step_type).toBe('training');
+    expect(tune?.params).toMatchObject({
+      run_mode: 'tuned',
+      target_column: 'y',
+      algorithm: 'random_forest_regressor',
+    });
+    expect((tune?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+      strategy: 'grid',
+      metric: 'r2',
+      n_trials: 8,
+    });
+  });
+
+  it('emits a canonical training/fixed step for a TextClassification node with run_mode=basic', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('train', 'text_classification', {
+        run_mode: 'basic',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        hyperparameters: { C: 1 },
+        cv_enabled: true,
+        cv_folds: 3,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 42,
+      }),
+    ];
+    const edges = [edge('ds', 'train')];
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const train = cfg.nodes.find((n) => n.node_id === 'train');
+    expect(train?.step_type).toBe('training');
+    expect(train?.params).toMatchObject({
+      run_mode: 'fixed',
+      target_column: 'y',
+      model_type: 'logistic_regression',
+      hyperparameters: { C: 1 },
+    });
+  });
+
+  // Phase 3 Part B (plan §0.6): the generic TrainingNode and the 3
+  // task-scoped nodes (Classification/Regression/Text Classification) all
+  // share the same run_mode-keyed dispatch — only the model dropdown they
+  // expose differs, the submitted step_type/params must be identical.
+  it.each(['training', 'classification', 'regression', 'text_classification'])(
+    '%s definitionType in basic run_mode submits a training step with run_mode=fixed',
+    (definitionType) => {
+      const nodes = [
+        node('ds', 'dataset_node', { datasetId: 'd1' }),
+        node('train', definitionType, {
+          run_mode: 'basic',
+          target_column: 'y',
+          model_type: 'logistic_regression',
+          hyperparameters: { C: 1 },
+          cv_enabled: true,
+          cv_folds: 3,
+          cv_type: 'kfold',
+          cv_shuffle: true,
+          cv_random_state: 42,
+        }),
+      ];
+      const edges = [edge('ds', 'train')];
+      const cfg = convertGraphToPipelineConfig(nodes, edges);
+      const train = cfg.nodes.find((n) => n.node_id === 'train');
+      expect(train?.step_type).toBe('training');
+      expect(train?.params).toMatchObject({
+        run_mode: 'fixed',
+        target_column: 'y',
+        model_type: 'logistic_regression',
+        hyperparameters: { C: 1 },
+      });
+    },
+  );
+
+  it.each(['training', 'classification', 'regression', 'text_classification'])(
+    '%s definitionType in advanced run_mode submits a training step with run_mode=tuned',
+    (definitionType) => {
+      const nodes = [
+        node('ds', 'dataset_node', { datasetId: 'd1' }),
+        node('train', definitionType, {
+          run_mode: 'advanced',
+          target_column: 'y',
+          model_type: 'logistic_regression',
+          search_space: { C: [0.1, 1, 10] },
+          search_strategy: 'random',
+          metric: 'accuracy',
+          n_trials: 5,
+          cv_enabled: true,
+          cv_folds: 3,
+          cv_type: 'kfold',
+          cv_shuffle: true,
+          cv_random_state: 42,
+        }),
+      ];
+      const edges = [edge('ds', 'train')];
+      const cfg = convertGraphToPipelineConfig(nodes, edges);
+      const train = cfg.nodes.find((n) => n.node_id === 'train');
+      expect(train?.step_type).toBe('training');
+      expect(train?.params).toMatchObject({
+        run_mode: 'tuned',
+        target_column: 'y',
+        algorithm: 'logistic_regression',
+      });
+      expect((train?.params as { tuning_config?: Record<string, unknown> })?.tuning_config).toMatchObject({
+        strategy: 'random',
+        metric: 'accuracy',
+        n_trials: 5,
+        search_space: { C: [0.1, 1, 10] },
+      });
+    },
+  );
 
   it('emits a data_preview step with empty params', () => {
     const nodes = [
@@ -173,7 +344,8 @@ describe('convertGraphToPipelineConfig', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('imp', 'imputation_node', { method: 'simple', strategy: 'mean' }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'rf',
         hyperparameters: {},
@@ -235,7 +407,8 @@ describe('convertGraphToPipelineConfig', () => {
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       // Training branch: ds → impA → train
       node('impA', 'imputation_node', { method: 'simple', strategy: 'mean' }),
-      node('train', 'basic_training', {
+      node('train', 'classification', {
+        run_mode: 'basic',
         target_column: 'y',
         model_type: 'rf',
         hyperparameters: {},
@@ -270,12 +443,12 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       // Two model nodes feed the ensemble purely as base-learner specs.
-      node('rf', 'basic_training', {
+      node('rf', 'classification', {
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: { n_estimators: 200 },
       }),
-      node('lr', 'basic_training', {
+      node('lr', 'classification', {
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: { C: 0.5 },
@@ -341,7 +514,7 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
   it('threads wired base learners into advanced tuning_config', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
-      node('gb', 'basic_training', {
+      node('gb', 'regression', {
         target_column: 'y',
         model_type: 'gradient_boosting_regressor',
         hyperparameters: { learning_rate: 0.1 },
@@ -360,7 +533,8 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
 
     const cfg = convertGraphToPipelineConfig(nodes, edges);
     const ens = cfg.nodes.find((n) => n.node_id === 'ens');
-    expect(ens?.step_type).toBe('advanced_tuning');
+    expect(ens?.step_type).toBe('training');
+    expect(ens?.params.run_mode).toBe('tuned');
     const tuning = ens?.params.tuning_config as Record<string, unknown>;
     expect(tuning.base_estimators).toEqual(['gradient_boosting']);
     expect(tuning.base_estimator_params).toMatchObject({
@@ -377,12 +551,12 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     const nodes = [
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       node('split', 'TrainTestSplitter', {}),
-      node('rf', 'basic_training', {
+      node('rf', 'classification', {
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: {},
       }),
-      node('lr', 'basic_training', {
+      node('lr', 'classification', {
         target_column: 'y',
         model_type: 'logistic_regression',
         hyperparameters: {},
@@ -422,12 +596,12 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
       node('ds', 'dataset_node', { datasetId: 'd1' }),
       // calibrated_classifier is a meta-model with no ensemble base-key mapping
       // → skipped as a base learner.
-      node('cal', 'basic_training', {
+      node('cal', 'classification', {
         target_column: 'y',
         model_type: 'calibrated_classifier',
         hyperparameters: {},
       }),
-      node('rf', 'basic_training', {
+      node('rf', 'classification', {
         target_column: 'y',
         model_type: 'random_forest_classifier',
         hyperparameters: {},
@@ -455,5 +629,79 @@ describe('convertGraphToPipelineConfig — ensemble wiring (Phase 2)', () => {
     expect(hp.base_estimators).toEqual(['random_forest']);
     // Both model sources are still excluded from the data inputs.
     expect(ens?.inputs).toEqual(['ds']);
+  });
+
+  it('emits training step_type with fixed run_mode for basic EnsembleNode', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'basic',
+        base_estimators: ['random_forest'],
+        base_estimator_params: {},
+        cv_enabled: false,
+        cv_folds: 5,
+        cv_type: 'kfold',
+        cv_shuffle: true,
+        cv_random_state: 0,
+        voting: 'soft',
+        execution_mode: 'parallel',
+        n_jobs: -1,
+      }),
+    ];
+    const edges = [edge('ds', 'ens')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    expect(ens?.step_type).toBe('training');
+    expect(ens?.params.run_mode).toBe('fixed');
+  });
+
+  it('emits training step_type with tuned run_mode for advanced EnsembleNode', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('ens', 'EnsembleNode', {
+        task: 'classification',
+        target_column: 'y',
+        model_type: 'voting_classifier',
+        run_mode: 'advanced',
+        search_strategy: 'random',
+        n_trials: 20,
+        base_estimators: ['random_forest'],
+        base_estimator_params: {},
+        voting: 'soft',
+        execution_mode: 'parallel',
+        n_jobs: -1,
+      }),
+    ];
+    const edges = [edge('ds', 'ens')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const ens = cfg.nodes.find((n) => n.node_id === 'ens');
+    expect(ens?.step_type).toBe('training');
+    expect(ens?.params.run_mode).toBe('tuned');
+  });
+});
+
+describe('convertGraphToPipelineConfig — SegmentationNode', () => {
+  it('emits training step_type with fixed run_mode for SegmentationNode', () => {
+    const nodes = [
+      node('ds', 'dataset_node', { datasetId: 'd1' }),
+      node('seg', 'SegmentationNode', {
+        model_type: 'kmeans',
+        hyperparameters: { n_clusters: 3 },
+        cv_enabled: false,
+        execution_mode: 'parallel',
+        reference_column: undefined,
+      }),
+    ];
+    const edges = [edge('ds', 'seg')];
+
+    const cfg = convertGraphToPipelineConfig(nodes, edges);
+    const seg = cfg.nodes.find((n) => n.node_id === 'seg');
+    expect(seg?.step_type).toBe('training');
+    expect(seg?.params.run_mode).toBe('fixed');
   });
 });

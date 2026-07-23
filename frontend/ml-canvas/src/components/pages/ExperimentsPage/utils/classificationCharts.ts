@@ -93,33 +93,172 @@ export function applyThreshold(
   return calculateConfusionMatrix(yTrue, yPred, proba?.classes);
 }
 
-/** Best classification threshold: scans every unique prediction score and returns the one maximising F1 for targetClass. */
-export function findBestF1Threshold(
+/** Metric that a best-threshold scan can optimize for. `f1`/`precision`/`recall`
+ * are the binary positive-class ("bare") metrics — matching the backend's own
+ * naming in `_add_binary_unweighted_metrics` — and fall back to their
+ * support-weighted multiclass equivalent when the split has >2 classes, since
+ * the unweighted binary form doesn't exist there. `accuracy` and `f1_weighted`
+ * are well-defined for both. */
+export type ThresholdMetric = 'accuracy' | 'f1' | 'f1_weighted' | 'precision' | 'recall';
+
+/**
+ * The dropdown's selectable metric list for a given class count. Binary jobs
+ * show the plain positive-class metrics (Accuracy/F1/Precision/Recall) since
+ * "weighted" vs "bare" are genuinely different numbers there. Multiclass
+ * jobs show `f1_weighted` instead of `f1` — for multiclass there's no
+ * unweighted form, so showing both would just repeat the same number twice
+ * under two different labels. Precision/Recall are the same underlying
+ * `ThresholdMetric` value in both cases; only their *label* changes (see
+ * `metricLabel` below) since the multiclass computation is already the
+ * weighted average.
+ */
+export function thresholdMetricOptions(isBinary: boolean): ThresholdMetric[] {
+  return isBinary
+    ? ['accuracy', 'f1', 'precision', 'recall']
+    : ['accuracy', 'f1_weighted', 'precision', 'recall'];
+}
+
+/**
+ * Human-readable label for a metric, aware of whether Precision/Recall/F1
+ * mean the plain positive-class value (binary) or the support-weighted
+ * multiclass average — so the dropdown/badges never show a bare label next
+ * to a number that was actually computed as a weighted average.
+ */
+export function metricLabel(metric: ThresholdMetric, isBinary: boolean): string {
+  if (isBinary) {
+    return { accuracy: 'Accuracy', f1: 'F1', f1_weighted: 'F1 Weighted', precision: 'Precision', recall: 'Recall' }[metric];
+  }
+  return { accuracy: 'Accuracy', f1: 'F1 Weighted', f1_weighted: 'F1 Weighted', precision: 'Precision (Weighted)', recall: 'Recall (Weighted)' }[metric];
+}
+
+/**
+ * Coerces a metric selection to one that's actually offered for the given
+ * class count — e.g. a binary job's saved `f1` selection becomes
+ * `f1_weighted` when switching to view a multiclass job (same underlying
+ * value either way is fine computationally, this just keeps the <select>'s
+ * value in sync with its visible <option> list).
+ */
+export function normalizeThresholdMetric(metric: ThresholdMetric, isBinary: boolean): ThresholdMetric {
+  if (isBinary) return metric === 'f1_weighted' ? 'f1' : metric;
+  return metric === 'f1' ? 'f1_weighted' : metric;
+}
+
+interface BinaryCounts { tp: number; fp: number; fn: number; tn: number; }
+
+/** Derives the requested metric from 2x2 confusion counts for the positive class. */
+function binaryMetricValue(counts: BinaryCounts, metric: ThresholdMetric): number {
+  const { tp, fp, fn, tn } = counts;
+  const total = tp + fp + fn + tn;
+  if (total === 0) return 0;
+  if (metric === 'accuracy') return (tp + tn) / total;
+  const precisionPos = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+  const recallPos = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+  const f1Pos = (precisionPos + recallPos) > 0 ? (2 * precisionPos * recallPos) / (precisionPos + recallPos) : 0;
+  if (metric === 'precision') return precisionPos;
+  if (metric === 'recall') return recallPos;
+  if (metric === 'f1') return f1Pos;
+  // f1_weighted: support-weighted average of the pos/neg per-class F1 (mirrors sklearn's average='weighted')
+  const precisionNeg = (tn + fn) > 0 ? tn / (tn + fn) : 0;
+  const recallNeg = (tn + fp) > 0 ? tn / (tn + fp) : 0;
+  const f1Neg = (precisionNeg + recallNeg) > 0 ? (2 * precisionNeg * recallNeg) / (precisionNeg + recallNeg) : 0;
+  const supportPos = tp + fn, supportNeg = tn + fp;
+  return (supportPos + supportNeg) > 0 ? (f1Pos * supportPos + f1Neg * supportNeg) / (supportPos + supportNeg) : 0;
+}
+
+/** Derives the requested metric from a full multiclass confusion matrix (support-weighted average). */
+function multiclassMetricValue(
+  classes: (string | number)[],
+  matrix: number[][],
+  metric: ThresholdMetric,
+): number {
+  const k = classes.length;
+  const total = matrix.reduce((s, row) => s + row.reduce((rs, v) => rs + v, 0), 0);
+  if (total === 0) return 0;
+  if (metric === 'accuracy') {
+    let correct = 0;
+    for (let i = 0; i < k; i++) correct += matrix[i]?.[i] ?? 0;
+    return correct / total;
+  }
+  let weightedPrecision = 0, weightedRecall = 0, weightedF1 = 0;
+  for (let i = 0; i < k; i++) {
+    const tp = matrix[i]?.[i] ?? 0;
+    let fp = 0, fn = 0, support = 0;
+    for (let j = 0; j < k; j++) {
+      if (j !== i) fp += matrix[j]?.[i] ?? 0;
+      support += matrix[i]?.[j] ?? 0;
+    }
+    fn = support - tp;
+    const precision = (tp + fp) > 0 ? tp / (tp + fp) : 0;
+    const recall = (tp + fn) > 0 ? tp / (tp + fn) : 0;
+    const f1 = (precision + recall) > 0 ? (2 * precision * recall) / (precision + recall) : 0;
+    weightedPrecision += precision * support;
+    weightedRecall += recall * support;
+    weightedF1 += f1 * support;
+  }
+  if (metric === 'precision') return weightedPrecision / total;
+  if (metric === 'recall') return weightedRecall / total;
+  // `f1` and `f1_weighted` are numerically identical here — multiclass has no
+  // unweighted "bare" F1, so both fall back to the same weighted-average value.
+  return weightedF1 / total;
+}
+
+/**
+ * Best classification threshold for `targetClass`: scans every unique
+ * prediction score and returns the one maximising the requested `metric`.
+ *
+ * Binary splits use a fast O(n) per-candidate scan (tp/fp/fn/tn counters).
+ * Multiclass splits reuse `applyThreshold`'s OvR-reassignment + confusion
+ * matrix (the same logic already used to render the confusion matrix chart),
+ * capped to ~300 sampled candidate thresholds to bound the O(n² · k) cost on
+ * large validation sets.
+ */
+export function findBestThreshold(
   y_true: (string | number)[],
   y_proba: YProba,
   targetClass: string | number,
-): { threshold: number; f1: number } | null {
+  metric: ThresholdMetric,
+): { threshold: number; value: number } | null {
   const classIdx = findClassIndex(y_proba, targetClass);
   if (classIdx === -1) return null;
   const targetStr = String(targetClass);
   const scores = y_proba.values.map(v => v[classIdx] ?? 0);
-  const actual = y_true.map(y => String(y) === targetStr ? 1 : 0);
-  if (!actual.some(a => a === 1)) return null;
-  const candidates = [...new Set(scores)].sort((a, b) => a - b);
-  let bestF1 = -1, bestT = 0.5;
-  for (const t of candidates) {
-    let tp = 0, fp = 0, fn = 0;
-    for (let i = 0; i < scores.length; i++) {
-      const pred = (scores[i]! >= t) ? 1 : 0;
-      if (pred === 1 && actual[i] === 1) tp++;
-      else if (pred === 1 && actual[i] === 0) fp++;
-      else if (pred === 0 && actual[i] === 1) fn++;
+  const isBinary = y_proba.classes.length === 2;
+
+  if (isBinary) {
+    const actual = y_true.map(y => String(y) === targetStr ? 1 : 0);
+    if (!actual.some(a => a === 1)) return null;
+    const candidates = [...new Set(scores)].sort((a, b) => a - b);
+    let bestValue = -1, bestT = 0.5;
+    for (const t of candidates) {
+      let tp = 0, fp = 0, fn = 0, tn = 0;
+      for (let i = 0; i < scores.length; i++) {
+        const pred = (scores[i]! >= t) ? 1 : 0;
+        if (pred === 1 && actual[i] === 1) tp++;
+        else if (pred === 1 && actual[i] === 0) fp++;
+        else if (pred === 0 && actual[i] === 1) fn++;
+        else tn++;
+      }
+      const value = binaryMetricValue({ tp, fp, fn, tn }, metric);
+      if (value > bestValue) { bestValue = value; bestT = t; }
     }
-    const denom = 2 * tp + fp + fn;
-    const f1 = denom > 0 ? (2 * tp) / denom : 0;
-    if (f1 > bestF1) { bestF1 = f1; bestT = t; }
+    return { threshold: Math.round(bestT * 100) / 100, value: bestValue };
   }
-  return { threshold: Math.round(bestT * 100) / 100, f1: bestF1 };
+
+  if (!y_true.some(y => String(y) === targetStr)) return null;
+  let candidates = [...new Set(scores)].sort((a, b) => a - b);
+  const MAX_CANDIDATES = 300;
+  if (candidates.length > MAX_CANDIDATES) {
+    const step = (candidates.length - 1) / (MAX_CANDIDATES - 1);
+    candidates = Array.from({ length: MAX_CANDIDATES }, (_, i) => candidates[Math.round(i * step)]!);
+  }
+  const pseudoSplit: EvaluationSplit = { y_true, y_pred: y_true, y_proba };
+  let bestValue = -1, bestT = 0.5;
+  for (const t of candidates) {
+    const { classes, matrix } = applyThreshold(pseudoSplit, targetStr, t);
+    const value = multiclassMetricValue(classes, matrix, metric);
+    if (value > bestValue) { bestValue = value; bestT = t; }
+  }
+  return { threshold: Math.round(bestT * 100) / 100, value: bestValue };
 }
 
 /** ROC points (FPR, TPR) for one class vs all others. Returns null if either side is empty in the split. */

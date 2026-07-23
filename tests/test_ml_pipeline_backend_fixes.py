@@ -21,7 +21,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from backend.config import get_settings
-from backend.database.models import BasicTrainingJob
+from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.strategies import JobStrategyFactory
 from backend.ml_pipeline.deployment.api import predict
 from backend.ml_pipeline.deployment.schemas import PredictionRequest
@@ -283,7 +283,7 @@ def test_run_pipeline_task_marks_job_failed_when_execute_pipeline_raises_unexpec
     contract, e.g. an infra-level bug), the job's status must still end up
     as 'failed' instead of being stuck at 'running'/'queued'."""
     job_id = str(uuid.uuid4())
-    job = BasicTrainingJob(id=job_id, status="running")
+    job = TrainingJob(id=job_id, status="running", run_mode="fixed")
 
     session = MagicMock()
 
@@ -309,7 +309,7 @@ def test_run_pipeline_task_marks_job_failed_when_execute_pipeline_raises_unexpec
 def test_run_pipeline_batch_task_marks_job_failed_when_execute_pipeline_raises_unexpectedly():
     """Same fallback behavior for the batch-task's `_run_one` inner function."""
     job_id = str(uuid.uuid4())
-    job = BasicTrainingJob(id=job_id, status="running")
+    job = TrainingJob(id=job_id, status="running", run_mode="fixed")
 
     session = MagicMock()
 

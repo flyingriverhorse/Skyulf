@@ -5,10 +5,12 @@ import { useJobStore } from '../store/useJobStore';
 import { useUpstreamData } from './useUpstreamData';
 import { useDatasetSchema } from './useDatasetSchema';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
+import { warnAndBlockOnLeakage } from '../utils/pipelineLeakageValidation';
 import { jobsApi } from '../api/jobs';
 import { toast } from '../toast';
+import type { TaskType } from '../types/taskType';
 
-type JobType = 'basic_training' | 'advanced_tuning';
+type JobType = 'training' | 'tuning';
 
 /**
  * Walk upstream (multi-hop) to find the dataset id feeding a training-style
@@ -73,10 +75,11 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
     | undefined;
 
   const runJob = useCallback(
-    async (jobType: JobType) => {
+    async (jobType: JobType, task: TaskType) => {
       if (!nodeId) return;
       try {
         const cfg = convertGraphToPipelineConfig(nodes, edges);
+        if (warnAndBlockOnLeakage(cfg)) return;
         const res = await jobsApi.runPipeline({
           ...cfg,
           target_node_id: nodeId,
@@ -90,7 +93,7 @@ export function useTrainingNodeContext(nodeId: string | undefined) {
         } else {
           toast.success('Training job submitted');
         }
-        setTab(jobType);
+        setTab(task);
         toggleDrawer(true);
       } catch (error) {
         console.error('Failed to submit job:', error);

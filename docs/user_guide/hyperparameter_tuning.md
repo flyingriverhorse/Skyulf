@@ -91,7 +91,7 @@ Pass these inside `"strategy_params"`:
 
 > **Nested CV** runs a dual-loop: an outer K-Fold evaluates the model on held-out data, while an inner 3-fold CV (capped at `n_folds - 1`) trains within each outer training set. This prevents optimistic bias when tuning and evaluating on the same splits.
 >
-> **With Advanced Tuning:** When `nested_cv` is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses `stratified_k_fold` (classification) or `k_fold` (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.
+> **With tuning enabled (`run_mode: "advanced"`):** When `nested_cv` is selected, the tuning search uses the inner CV folds to score candidates. After finding the best parameters, the post-tuning evaluation automatically uses `stratified_k_fold` (classification) or `k_fold` (regression) instead of re-running the full nested loop — because the inner loop already ran during the search.
 
 ### Time column for Time Series Split
 
@@ -122,7 +122,7 @@ Grid, random, and halving strategies work out of the box (scikit-learn only).
 
 ## Notebook export — seeing tuning in action
 
-When you export a canvas pipeline that includes an **Advanced Tuning** node, Skyulf generates a fully self-contained Jupyter notebook. The exported training cell mirrors exactly what the backend engine does:
+When you export a canvas pipeline that includes a training node (Classification / Regression / Text Classification / Segmentation) with `run_mode: "advanced"`, Skyulf generates a fully self-contained Jupyter notebook. The exported training cell mirrors exactly what the backend engine does:
 
 - Wraps the base calculator/applier in `TuningCalculator` / `TuningApplier` so `fit_predict` actually runs the search (Optuna, grid, random, etc.) instead of a single default fit.
 - Passes a `progress_callback` that prints `Trial N/M — score=0.9306` for each completed trial directly in the notebook output.

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob
+from backend.database.models import TrainingJob
 from backend.ml_pipeline._execution.advanced_tuning_manager import AdvancedTuningManager
 from backend.ml_pipeline._execution.basic_training_manager import BasicTrainingManager
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
@@ -31,7 +31,7 @@ class JobManager:
         session: AsyncSession,
         pipeline_id: str,
         node_id: str,
-        job_type: Literal["basic_training", "advanced_tuning", "preview"],
+        job_type: Literal["training", "tuning", "preview"],
         dataset_id: str = "unknown",
         user_id: int | None = None,
         model_type: str = "unknown",
@@ -39,7 +39,7 @@ class JobManager:
         branch_index: int = 0,
     ) -> str:
         """Creates a new job in the database (Async)."""
-        if job_type == "basic_training":
+        if job_type == "training":
             return await BasicTrainingManager.create_training_job(
                 session,
                 pipeline_id,
@@ -50,7 +50,7 @@ class JobManager:
                 graph,
                 branch_index=branch_index,
             )
-        elif job_type == "advanced_tuning":
+        elif job_type == "tuning":
             return await AdvancedTuningManager.create_tuning_job(
                 session,
                 pipeline_id,
@@ -99,25 +99,24 @@ class JobManager:
             seconds=get_settings().JOB_IDEMPOTENCY_WINDOW_SECONDS
         )
         active = {JobStatus.QUEUED.value, JobStatus.RUNNING.value}
-        for model in (BasicTrainingJob, AdvancedTuningJob):
-            # Fetch all recent active candidates then filter by branch_index
-            # in Python — avoids cross-db JSON operator differences.
-            stmt = (
-                select(model.id, model.job_metadata)
-                .where(
-                    model.dataset_source_id == dataset_id,
-                    model.node_id == node_id,
-                    model.status.in_(active),
-                    model.created_at >= cutoff,
-                )
-                .with_for_update(skip_locked=True)
-                .limit(20)
+        # Fetch all recent active candidates (either run_mode) then filter by
+        # branch_index in Python — avoids cross-db JSON operator differences.
+        stmt = (
+            select(TrainingJob.id, TrainingJob.job_metadata)
+            .where(
+                TrainingJob.dataset_source_id == dataset_id,
+                TrainingJob.node_id == node_id,
+                TrainingJob.status.in_(active),
+                TrainingJob.created_at >= cutoff,
             )
-            rows = (await session.execute(stmt)).all()
-            for job_id, meta in rows:
-                stored_idx = (meta or {}).get("branch_index", 0)
-                if stored_idx == branch_index:
-                    return job_id
+            .with_for_update(skip_locked=True)
+            .limit(20)
+        )
+        rows = (await session.execute(stmt)).all()
+        for job_id, meta in rows:
+            stored_idx = (meta or {}).get("branch_index", 0)
+            if stored_idx == branch_index:
+                return job_id
         return None
 
     @staticmethod
@@ -134,20 +133,18 @@ class JobManager:
         """Stash the Celery task id on the job's metadata so cancel_job can revoke it.
 
         Stored under `job_metadata.celery_task_id` to avoid a schema migration.
-        Tries BasicTrainingJob first, then AdvancedTuningJob; silently no-ops
-        if the job row doesn't exist (job creation race shouldn't break submit).
+        Queries the unified TrainingJob table directly; silently no-ops if the
+        job row doesn't exist (job creation race shouldn't break submit).
         """
-        for model in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model).where(model.id == job_id)
-            result = await session.execute(stmt)
-            job = result.scalar_one_or_none()
-            if job is None:
-                continue
-            meta = dict(job.job_metadata) if isinstance(job.job_metadata, dict) else {}
-            meta["celery_task_id"] = task_id
-            job.job_metadata = meta
-            await session.commit()
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        result = await session.execute(stmt)
+        job = result.scalar_one_or_none()
+        if job is None:
             return
+        meta = dict(job.job_metadata) if isinstance(job.job_metadata, dict) else {}
+        meta["celery_task_id"] = task_id
+        job.job_metadata = meta
+        await session.commit()
 
     @staticmethod
     def update_status_sync(
@@ -194,9 +191,9 @@ class JobManager:
         """
         jobs = []
 
-        if job_type in ["basic_training", "training"]:
+        if job_type == "training":
             jobs = await BasicTrainingManager.list_training_jobs(session, limit, skip)
-        elif job_type in ["advanced_tuning", "tuning"]:
+        elif job_type == "tuning":
             jobs = await AdvancedTuningManager.list_tuning_jobs(session, limit, skip)
         else:
             max_skip = get_settings().MAX_CROSS_TABLE_SKIP
@@ -368,27 +365,25 @@ class JobManager:
     @staticmethod
     async def promote_job(session: AsyncSession, job_id: str) -> bool:
         """Marks a completed job as promoted (winner)."""
-        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model_cls).where(model_cls.id == job_id)
-            result = await session.execute(stmt)
-            job = result.scalar_one_or_none()
-            if job:
-                if job.status != "completed":
-                    return False
-                job.promoted_at = datetime.now(UTC)  # type: ignore[assignment]
-                await session.commit()
-                return True
-        return False
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        result = await session.execute(stmt)
+        job = result.scalar_one_or_none()
+        if job is None:
+            return False
+        if job.status != "completed":
+            return False
+        job.promoted_at = datetime.now(UTC)  # type: ignore[assignment]
+        await session.commit()
+        return True
 
     @staticmethod
     async def unpromote_job(session: AsyncSession, job_id: str) -> bool:
         """Removes promotion from a job."""
-        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model_cls).where(model_cls.id == job_id)
-            result = await session.execute(stmt)
-            job = result.scalar_one_or_none()
-            if job:
-                job.promoted_at = None  # type: ignore[assignment]
-                await session.commit()
-                return True
-        return False
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        result = await session.execute(stmt)
+        job = result.scalar_one_or_none()
+        if job is None:
+            return False
+        job.promoted_at = None  # type: ignore[assignment]
+        await session.commit()
+        return True

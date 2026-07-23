@@ -3,6 +3,18 @@ import { Dataset, IngestionJobResponse, IngestionStatus, DataSourceCreate } from
 const API_BASE = '/data/api';
 const INGESTION_BASE = '/api/ingestion';
 
+/** Fetch error carrying the HTTP status, so callers can distinguish e.g. a
+ * 404 (dataset no longer exists) from a transient network/server failure. */
+export class DatasetApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = 'DatasetApiError';
+  }
+}
+
 export const DatasetService = {
   getAll: async (): Promise<Dataset[]> => {
     const response = await fetch(`${API_BASE}/sources`);
@@ -131,7 +143,7 @@ export const DatasetService = {
     const params = new URLSearchParams({ limit: limit.toString() });
     const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}/sample?${params.toString()}`);
     if (!response.ok) {
-      throw new Error('Failed to fetch dataset sample');
+      throw new DatasetApiError('Failed to fetch dataset sample', response.status);
     }
     const data = await response.json();
     return data.data;
@@ -141,7 +153,7 @@ export const DatasetService = {
   getProfile: async (id: string): Promise<DatasetProfile> => {
     const response = await fetch(`/api/pipeline/datasets/${encodeURIComponent(id)}/schema`);
     if (!response.ok) {
-      throw new Error('Failed to fetch dataset profile');
+      throw new DatasetApiError('Failed to fetch dataset profile', response.status);
     }
     const data = await response.json();
 

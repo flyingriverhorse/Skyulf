@@ -147,7 +147,7 @@ def test_training_node_is_passthrough() -> None:
             NodeConfig(node_id="loader", step_type="data_loader", params={}, inputs=[]),
             NodeConfig(
                 node_id="train",
-                step_type="basic_training",
+                step_type="training",
                 params={},
                 inputs=["loader"],
             ),

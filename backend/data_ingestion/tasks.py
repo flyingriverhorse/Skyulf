@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from datetime import UTC, datetime
 
 from celery import shared_task
@@ -18,20 +19,25 @@ logger = logging.getLogger(__name__)
 # Module-level cache — same rationale as ml_pipeline/tasks.py.
 _sync_engine = None
 _sync_session_factory = None
+_engine_init_lock = threading.Lock()
 
 
 def get_db_session():
     global _sync_engine, _sync_session_factory
     if _sync_session_factory is None:
-        settings = get_settings()
-        if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
-            sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
-        else:
-            sync_url = settings.DATABASE_URL.replace(
-                "postgresql+asyncpg://", "postgresql+psycopg2://"
-            )
-        _sync_engine = create_engine(sync_url, pool_pre_ping=True)
-        _sync_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=_sync_engine)
+        with _engine_init_lock:
+            if _sync_session_factory is None:
+                settings = get_settings()
+                if settings.DATABASE_URL.startswith("sqlite+aiosqlite://"):
+                    sync_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+                else:
+                    sync_url = settings.DATABASE_URL.replace(
+                        "postgresql+asyncpg://", "postgresql+psycopg2://"
+                    )
+                _sync_engine = create_engine(sync_url, pool_pre_ping=True)
+                _sync_session_factory = sessionmaker(
+                    autocommit=False, autoflush=False, bind=_sync_engine
+                )
     return _sync_session_factory()
 
 

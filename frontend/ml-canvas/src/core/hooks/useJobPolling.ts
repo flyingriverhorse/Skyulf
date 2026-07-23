@@ -50,7 +50,7 @@ export interface UseJobPollingResult {
   jobs: Record<string, JobInfo>;
   /**
    * Aggregate status across all polled jobs:
-   *  - `failed` if any single job failed
+   *  - `failed` if any job failed or all jobs reached an unsuccessful terminal state
    *  - `running` if any is still queued/running/pending
    *  - `completed` only when every job is in a terminal success state
    *  - `idle` when there are no job IDs to poll
@@ -165,6 +165,7 @@ export function useJobPolling(
         if (anyFailed) setAggregateStatus('failed');
         else if (anyGaveUp) setAggregateStatus('error');
         else if (allCompleted && allTerminal) setAggregateStatus('completed');
+        else if (allTerminal) setAggregateStatus('failed');
         else setAggregateStatus('running');
 
         if (stopOnTerminal && allTerminal && interval) {

@@ -94,16 +94,22 @@ def get_hyperparameters(model_key: str) -> list[dict[str, Any]]:
 DEFAULT_SEARCH_SPACES: dict[str, Any] = {
     "logistic_regression": {
         "C": [0.001, 0.01, 0.1, 1.0, 10.0, 100.0],
-        "penalty": ["l1", "l2", "elasticnet"],
+        # No "elasticnet" here by default — it's mutually exclusive with
+        # "l1"/"l2" (see `exclusive_options` on the penalty field) and only
+        # makes sense paired with an explicit l1_ratio range, which isn't a
+        # sane zero-config default. Users can still pick it manually.
+        "penalty": ["l1", "l2"],
         "solver": ["saga"],
-        "max_iter": [100, 200, 500, 1000],
-        "l1_ratio": [0.1, 0.5, 0.7, 0.9],  # Only used for elasticnet
+        # "saga" needs more iterations than lbfgs/liblinear to converge,
+        # especially on unscaled features. 100/200 are kept as fast trial
+        # options for well-scaled data, but the ceiling is raised so
+        # candidates aren't forced to stop before convergence on harder data.
+        "max_iter": [100, 200, 500, 1000, 2000, 5000],
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge", "modified_huber"],
-        "penalty": ["l1", "l2", "elasticnet"],
+        "penalty": ["l1", "l2"],
         "alpha": [1e-5, 1e-4, 1e-3, 1e-2],
-        "l1_ratio": [0.05, 0.15, 0.3],
         "max_iter": [500, 1000, 2000],
     },
     "random_forest_classifier": {
@@ -126,6 +132,11 @@ DEFAULT_SEARCH_SPACES: dict[str, Any] = {
         "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
         "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"],
         "fit_intercept": [True, False],
+        # sag/saga default to sklearn's built-in max_iter (1000) when unset,
+        # which is often too low on unscaled features. Give the tuner an
+        # explicit, generous ceiling so it can pick a value that actually
+        # converges instead of always hitting the low default.
+        "max_iter": [1000, 2000, 5000],
     },
     "lasso_regression": {
         "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],
@@ -307,11 +318,15 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
         "C": [0.01, 0.1, 1.0, 10.0],
         "penalty": ["l1", "l2"],
         "solver": ["saga"],
-        "max_iter": [200, 500],
+        # Raised from 500 so saga trials have a real chance to converge on
+        # unscaled/harder data instead of always hitting the ceiling.
+        "max_iter": [500, 2000],
     },
     "sgd_classifier": {
         "loss": ["log_loss", "hinge"],
-        "penalty": ["l2", "elasticnet"],
+        # No "elasticnet" here — mutually exclusive with "l2" (see
+        # `exclusive_options`); a grid trial pairing them makes no sense.
+        "penalty": ["l2"],
         "alpha": [1e-4, 1e-3],
         "max_iter": [1000],
     },
@@ -333,6 +348,10 @@ GRID_SEARCH_SPACES: dict[str, Any] = {
         "alpha": [0.01, 0.1, 1.0, 10.0, 100.0],
         "solver": ["auto", "saga"],
         "fit_intercept": [True, False],
+        # Single fixed value (not a range) to keep the grid's cartesian
+        # product size unchanged while still giving sag/saga enough
+        # iterations to converge instead of relying on sklearn's default.
+        "max_iter": [2000],
     },
     "lasso_regression": {
         "alpha": [0.001, 0.01, 0.1, 1.0, 10.0],

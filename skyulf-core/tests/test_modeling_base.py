@@ -44,6 +44,18 @@ class _DummyApplier(BaseModelApplier):
         return pd.Series(np.zeros(len(df), dtype=int))
 
 
+class _ColumnsRecordingCalculator(_DummyCalculator):
+    """Record the feature columns received during fitting."""
+
+    def __init__(self):
+        self.feature_columns: list[str] = []
+
+    def fit(self, X, y, config, progress_callback=None, log_callback=None, validation_data=None):
+        """Record the fitted feature columns and return the dummy artifact."""
+        self.feature_columns = list(X.columns)
+        return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -525,6 +537,20 @@ def test_fit_predict_tuple_xy_fallback_warns():
     preds = estimator.fit_predict((X, y), "target", config={}, log_callback=messages.append)
     assert len(preds["train"]) == 4
     assert any("No test set provided" in m for m in messages)
+
+
+def test_fit_predict_tuple_xy_with_embedded_target_is_not_misclassified_as_split():
+    """An X/y tuple with an embedded target must not use y as a test split."""
+    X = pd.DataFrame({"a": [1, 2, 3, 4], "target": [0, 1, 0, 1]})
+    y = X["target"].copy()
+    calculator = _ColumnsRecordingCalculator()
+    estimator = StatefulEstimator(calculator=calculator, applier=_DummyApplier(), node_id="t2b")
+
+    predictions = estimator.fit_predict((X, y), "target", config={})
+
+    assert len(predictions["train"]) == 4
+    assert "test" not in predictions
+    assert calculator.feature_columns == ["a"]
 
 
 def test_fit_predict_test_split_as_tuple_with_y():

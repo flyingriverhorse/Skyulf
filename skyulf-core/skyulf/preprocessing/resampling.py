@@ -154,6 +154,7 @@ def _import_over_samplers() -> dict[str, Any]:
             SVMSMOTE,
             BorderlineSMOTE,
             KMeansSMOTE,
+            RandomOverSampler,
         )
     except ImportError as exc:
         logger.error("imblearn is required for oversampling. `pip install imbalanced-learn`")
@@ -161,6 +162,7 @@ def _import_over_samplers() -> dict[str, Any]:
             "imblearn is required for oversampling. `pip install imbalanced-learn`"
         ) from exc
     return {
+        "random_over": RandomOverSampler,
         "smote": SMOTE,
         "adasyn": ADASYN,
         "borderline_smote": BorderlineSMOTE,
@@ -170,17 +172,22 @@ def _import_over_samplers() -> dict[str, Any]:
     }
 
 
-def _build_oversampler(method: str, params: dict[str, Any]) -> Any | None:
-    """Construct an over-sampler by ``method`` name; return ``None`` if unknown."""
+def _build_oversampler(method: str, params: dict[str, Any]) -> Any:
+    """Construct an over-sampler by ``method`` name."""
     classes = _import_over_samplers()
     cls = classes.get(method)
     if cls is None:
-        return None
+        raise ValueError(
+            f"Unsupported resampling method {method!r}. Supported oversampling methods: "
+            f"{', '.join(sorted(classes))}."
+        )
 
     strategy = params.get("sampling_strategy", "auto")
     random_state = params.get("random_state", 42)
     k_neighbors = params.get("k_neighbors", 5)
 
+    if method == "random_over":
+        return cls(sampling_strategy=strategy, random_state=random_state)
     if method == "smote":
         return cls(sampling_strategy=strategy, random_state=random_state, k_neighbors=k_neighbors)
     if method == "adasyn":
@@ -286,12 +293,15 @@ def _import_under_samplers() -> dict[str, Any]:
     }
 
 
-def _build_undersampler(method: str, params: dict[str, Any]) -> Any | None:
-    """Construct an under-sampler by ``method`` name; return ``None`` if unknown."""
+def _build_undersampler(method: str, params: dict[str, Any]) -> Any:
+    """Construct an under-sampler by ``method`` name."""
     classes = _import_under_samplers()
     cls = classes.get(method)
     if cls is None:
-        return None
+        raise ValueError(
+            f"Unsupported resampling method {method!r}. Supported undersampling methods: "
+            f"{', '.join(sorted(classes))}."
+        )
 
     strategy = params.get("sampling_strategy", "auto")
 

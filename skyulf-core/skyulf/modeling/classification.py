@@ -49,6 +49,7 @@ except ImportError:
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
+from ._sklearn_compat import normalize_logistic_regression_params
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,10 @@ class LogisticRegressionApplier(SklearnApplier):
     category="Modeling",
     description="Linear model for classification.",
     params={"max_iter": 1000, "solver": "lbfgs", "random_state": 42},
-    tags=["requires_scaling"],
+    # "text": logistic regression on TF-IDF/vectorized features is a common,
+    # well-performing baseline for text classification (alongside Naive Bayes
+    # and the SGD-based linear SVM approximation below).
+    tags=["requires_scaling", "classification", "text", "nlp"],
 )
 class LogisticRegressionCalculator(SklearnCalculator):
     """Logistic Regression Calculator."""
@@ -108,6 +112,19 @@ class LogisticRegressionCalculator(SklearnCalculator):
         self._validate_solver_penalty(config)
         return super().fit(X, y, config, progress_callback, log_callback, validation_data)
 
+    def _resolve_fit_params(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Merges fit params, then normalizes ``penalty`` for sklearn >=1.8.
+
+        sklearn >=1.8 deprecates the ``penalty`` constructor arg entirely (in
+        favor of ``l1_ratio``/``C``) and will remove it in sklearn 1.10. We
+        keep ``penalty`` ("l1"/"l2"/"elasticnet"/None) as our own public
+        config/UI field unchanged — it's translated to the newer kwargs here,
+        right before the sklearn estimator is constructed, so we never pass a
+        bare ``penalty=`` to sklearn regardless of installed sklearn version.
+        """
+        params = super()._resolve_fit_params(config)
+        return normalize_logistic_regression_params(params)
+
     @classmethod
     def _extract_solver_penalty_params(cls, config: dict[str, Any] | None) -> dict[str, Any] | None:
         """Returns the params dict from config, or None if unavailable/not a dict."""
@@ -130,25 +147,30 @@ class LogisticRegressionCalculator(SklearnCalculator):
             f"{compatible_solvers or 'none'}."
         )
 
-    @classmethod
-    def _validate_solver_penalty(cls, config: dict[str, Any] | None) -> None:
+    def _validate_solver_penalty(self, config: dict[str, Any] | None) -> None:
         """Raise a clear, actionable error for an invalid solver/penalty pair.
 
         sklearn's own error for this (e.g. "Solver lbfgs supports only 'l2' or
         None penalties") is only raised deep inside `LogisticRegression.fit`,
         after data has already been split/validated upstream. Failing fast
         here with the full list of compatible solvers is more actionable.
+
+        Validates against the *merged* effective params (``default_params``
+        overlaid with the config's overrides), not just the raw config —
+        otherwise overriding only ``penalty`` (very common; ``solver``
+        defaults to ``"lbfgs"``) would skip validation entirely since
+        ``solver`` never appears in the raw override dict, letting an
+        incompatible combo reach sklearn's own opaque error at fit time.
         """
-        params = cls._extract_solver_penalty_params(config)
-        if params is None:
-            return
+        overrides = self._extract_solver_penalty_params(config) or {}
+        params = {**self.default_params, **overrides}
         solver = params.get("solver")
-        penalty = params.get("penalty")
         if solver is None or "penalty" not in params:
             return
-        compatible = cls._SOLVER_PENALTIES.get(solver)
+        penalty = params.get("penalty")
+        compatible = self._SOLVER_PENALTIES.get(solver)
         if compatible is not None and penalty not in compatible:
-            cls._raise_incompatible_solver_penalty(solver, penalty)
+            self._raise_incompatible_solver_penalty(solver, penalty)
 
 
 # --- Calibrated Classifier ---
@@ -166,7 +188,7 @@ class CalibratedClassifierApplier(SklearnApplier):
         "probabilities are well-calibrated (Platt/sigmoid or isotonic)."
     ),
     params={"base_estimator": "logistic_regression", "method": "sigmoid", "cv": 5},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "classification"],
 )
 class CalibratedClassifierCalculator(SklearnCalculator):
     """Calibrated Classifier Calculator with a selectable base estimator.
@@ -251,6 +273,7 @@ class RandomForestClassifierApplier(SklearnApplier):
     category="Modeling",
     description="Ensemble of decision trees.",
     params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5},
+    tags=["classification"],
 )
 class RandomForestClassifierCalculator(SklearnCalculator):
     """Random Forest Classifier Calculator."""
@@ -282,7 +305,7 @@ class SVCApplier(SklearnApplier):
     category="Modeling",
     description="C-Support Vector Classification.",
     params={"C": 1.0, "kernel": "rbf", "gamma": "scale"},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "classification"],
 )
 class SVCCalculator(SklearnCalculator):
     """SVC Calculator."""
@@ -313,7 +336,7 @@ class KNeighborsClassifierApplier(SklearnApplier):
     category="Modeling",
     description="Classifier implementing the k-nearest neighbors vote.",
     params={"n_neighbors": 5, "weights": "uniform", "algorithm": "auto"},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "classification"],
 )
 class KNeighborsClassifierCalculator(SklearnCalculator):
     """K-Neighbors Classifier Calculator."""
@@ -343,6 +366,7 @@ class DecisionTreeClassifierApplier(SklearnApplier):
     category="Modeling",
     description="A non-parametric supervised learning method used for classification.",
     params={"max_depth": None, "min_samples_split": 2, "criterion": "gini"},
+    tags=["classification"],
 )
 class DecisionTreeClassifierCalculator(SklearnCalculator):
     """Decision Tree Classifier Calculator."""
@@ -372,6 +396,7 @@ class GradientBoostingClassifierApplier(SklearnApplier):
     category="Modeling",
     description="Gradient Boosting for classification.",
     params={"n_estimators": 100, "learning_rate": 0.1, "max_depth": 3},
+    tags=["classification"],
 )
 class GradientBoostingClassifierCalculator(SklearnCalculator):
     """Gradient Boosting Classifier Calculator."""
@@ -401,6 +426,7 @@ class AdaBoostClassifierApplier(SklearnApplier):
     category="Modeling",
     description="An AdaBoost classifier.",
     params={"n_estimators": 50, "learning_rate": 1.0},
+    tags=["classification"],
 )
 class AdaBoostClassifierCalculator(SklearnCalculator):
     """AdaBoost Classifier Calculator."""
@@ -430,6 +456,7 @@ if XGBOOST_AVAILABLE:
         category="Modeling",
         description="Extreme Gradient Boosting classifier.",
         params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
+        tags=["classification"],
     )
     class XGBClassifierCalculator(SklearnCalculator):
         """XGBoost Classifier Calculator."""
@@ -462,6 +489,7 @@ class ExtraTreesClassifierApplier(SklearnApplier):
     category="Modeling",
     description="Extremely randomised trees — faster than Random Forest, often comparably accurate.",
     params={"n_estimators": 100, "max_depth": None, "min_samples_split": 2},
+    tags=["classification"],
 )
 class ExtraTreesClassifierCalculator(SklearnCalculator):
     """Extra Trees Classifier Calculator."""
@@ -495,6 +523,7 @@ class HistGradientBoostingClassifierApplier(SklearnApplier):
     category="Modeling",
     description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation.",
     params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
+    tags=["classification"],
 )
 class HistGradientBoostingClassifierCalculator(SklearnCalculator):
     """HistGradientBoosting Classifier Calculator."""
@@ -551,6 +580,7 @@ if LIGHTGBM_AVAILABLE:
         category="Modeling",
         description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
+        tags=["classification"],
     )
     class LGBMClassifierCalculator(SklearnCalculator):
         """LightGBM Classifier Calculator."""
@@ -606,6 +636,7 @@ class GaussianNBApplier(SklearnApplier):
     category="Modeling",
     description="Gaussian Naive Bayes (GaussianNB).",
     params={"var_smoothing": 1e-9},
+    tags=["classification"],
 )
 class GaussianNBCalculator(SklearnCalculator):
     """Gaussian Naive Bayes Calculator."""
@@ -641,7 +672,13 @@ class SGDClassifierApplier(SklearnApplier):
         "max_iter": 1000,
         "random_state": 42,
     },
-    tags=["text", "nlp", "classification", "linear", "requires_scaling"],
+    # Text-classification-scoped only (no "classification" tag): SGD with
+    # hinge/log loss is a fast linear-SVM/logistic-regression approximation
+    # that excels on sparse high-dimensional text features (TF-IDF/counts),
+    # so it's offered via the Text Classification node rather than the
+    # general Classification node, which already has logistic_regression and
+    # other dense-feature-friendly linear models covering that role.
+    tags=["text", "nlp", "linear", "requires_scaling"],
 )
 class SGDClassifierCalculator(SklearnCalculator):
     """SGD Classifier Calculator."""

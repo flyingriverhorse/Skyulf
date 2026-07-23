@@ -57,7 +57,7 @@ class LinearRegressionApplier(SklearnApplier):
     category="Modeling",
     description="Ordinary least squares Linear Regression.",
     params={"fit_intercept": True, "copy_X": True, "n_jobs": -1},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class LinearRegressionCalculator(SklearnCalculator):
     """Linear Regression Calculator."""
@@ -86,7 +86,7 @@ class RidgeRegressionApplier(SklearnApplier):
     category="Modeling",
     description="Linear least squares with l2 regularization.",
     params={"alpha": 1.0, "solver": "auto", "random_state": 42},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class RidgeRegressionCalculator(SklearnCalculator):
     """Ridge Regression Calculator."""
@@ -115,6 +115,7 @@ class RandomForestRegressorApplier(SklearnApplier):
     category="Modeling",
     description="Ensemble of decision trees for regression.",
     params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5},
+    tags=["regression"],
 )
 class RandomForestRegressorCalculator(SklearnCalculator):
     """Random Forest Regressor Calculator."""
@@ -146,7 +147,7 @@ class LassoRegressionApplier(SklearnApplier):
     category="Modeling",
     description="Linear Model trained with L1 prior as regularizer.",
     params={"alpha": 1.0, "selection": "cyclic"},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class LassoRegressionCalculator(SklearnCalculator):
     """Lasso Regression Calculator."""
@@ -171,7 +172,7 @@ class ElasticNetRegressionApplier(SklearnApplier):
     category="Modeling",
     description="Linear regression with combined L1 and L2 priors.",
     params={"alpha": 1.0, "l1_ratio": 0.5, "selection": "cyclic"},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class ElasticNetRegressionCalculator(SklearnCalculator):
     """ElasticNet Regression Calculator."""
@@ -201,7 +202,7 @@ class SVRApplier(SklearnApplier):
     category="Modeling",
     description="Epsilon-Support Vector Regression.",
     params={"C": 1.0, "kernel": "rbf", "gamma": "scale"},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class SVRCalculator(SklearnCalculator):
     """SVR Calculator."""
@@ -226,7 +227,7 @@ class KNeighborsRegressorApplier(SklearnApplier):
     category="Modeling",
     description="Regression based on k-nearest neighbors.",
     params={"n_neighbors": 5, "weights": "uniform", "algorithm": "auto"},
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class KNeighborsRegressorCalculator(SklearnCalculator):
     """K-Neighbors Regressor Calculator."""
@@ -256,6 +257,7 @@ class DecisionTreeRegressorApplier(SklearnApplier):
     category="Modeling",
     description="A decision tree regressor.",
     params={"max_depth": None, "min_samples_split": 2, "criterion": "squared_error"},
+    tags=["regression"],
 )
 class DecisionTreeRegressorCalculator(SklearnCalculator):
     """Decision Tree Regressor Calculator."""
@@ -285,6 +287,7 @@ class GradientBoostingRegressorApplier(SklearnApplier):
     category="Modeling",
     description="Gradient Boosting for regression.",
     params={"n_estimators": 100, "learning_rate": 0.1, "max_depth": 3},
+    tags=["regression"],
 )
 class GradientBoostingRegressorCalculator(SklearnCalculator):
     """Gradient Boosting Regressor Calculator."""
@@ -314,6 +317,7 @@ class AdaBoostRegressorApplier(SklearnApplier):
     category="Modeling",
     description="An AdaBoost regressor.",
     params={"n_estimators": 50, "learning_rate": 1.0},
+    tags=["regression"],
 )
 class AdaBoostRegressorCalculator(SklearnCalculator):
     """AdaBoost Regressor Calculator."""
@@ -342,6 +346,7 @@ class ExtraTreesRegressorApplier(SklearnApplier):
     category="Modeling",
     description="Extremely randomised trees — faster than Random Forest, often comparably accurate.",
     params={"n_estimators": 100, "max_depth": None, "min_samples_split": 2},
+    tags=["regression"],
 )
 class ExtraTreesRegressorCalculator(SklearnCalculator):
     """Extra Trees Regressor Calculator."""
@@ -375,6 +380,7 @@ class HistGradientBoostingRegressorApplier(SklearnApplier):
     category="Modeling",
     description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation.",
     params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
+    tags=["regression"],
 )
 class HistGradientBoostingRegressorCalculator(SklearnCalculator):
     """HistGradientBoosting Regressor Calculator."""
@@ -424,6 +430,7 @@ if LIGHTGBM_AVAILABLE:
         category="Modeling",
         description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
+        tags=["regression"],
     )
     class LGBMRegressorCalculator(SklearnCalculator):
         """LightGBM Regressor Calculator."""
@@ -480,6 +487,7 @@ if XGBOOST_AVAILABLE:
         category="Modeling",
         description="Extreme Gradient Boosting regressor.",
         params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
+        tags=["regression"],
     )
     class XGBRegressorCalculator(SklearnCalculator):
         """XGBoost Regressor Calculator."""

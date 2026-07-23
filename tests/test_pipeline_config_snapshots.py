@@ -124,7 +124,7 @@ def _parallel_branches_pipeline() -> PipelineConfigModel:
                 inputs=["spl_b"],
             ),
         ],
-        metadata={"job_type": "basic_training"},
+        metadata={"job_type": "training"},
     )
 
 

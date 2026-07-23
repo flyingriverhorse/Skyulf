@@ -25,6 +25,9 @@ async def test_artifact_routing_logic():
         job = MagicMock()
         # Ensure dataset_source_id is None to avoid query logic that returns a mock
         job.dataset_source_id = None
+        # run_mode must be a concrete value ("fixed"/"tuned") so
+        # JobStrategyFactory.get_strategy_by_job can dispatch on it.
+        job.run_mode = "fixed"
         session.query.return_value.filter.return_value.first.return_value = job
 
         # Setup Settings

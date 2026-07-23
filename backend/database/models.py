@@ -295,34 +295,25 @@ class MLJob(Base, TimestampMixin):
         }
 
 
-class BasicTrainingJob(MLJob):
-    """Background model training jobs triggered from the feature canvas."""
+class TrainingJob(MLJob):
+    """Unified background training/tuning job, discriminated by `run_mode`.
 
-    __tablename__ = "basic_training_jobs"
+    `run_mode="fixed"` is a single fixed-hyperparameter fit (formerly
+    `BasicTrainingJob`); `run_mode="tuned"` is a hyperparameter search
+    (formerly `AdvancedTuningJob`). Both share one id-space/table so a job's
+    id alone never ambiguously refers to two different rows.
+    """
 
+    __tablename__ = "training_jobs"
+
+    run_mode: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+
+    # fixed-mode only
     hyperparameters: Mapped[Any | None] = mapped_column(JSON, nullable=True)
 
-    owner = relationship("User", backref="basic_training_jobs")
-
-    def to_dict(self) -> dict:
-        data = self.to_dict_base()
-        data.update(
-            {
-                "version": self.version,
-                "hyperparameters": self.hyperparameters,
-            }
-        )
-        return data
-
-
-class AdvancedTuningJob(MLJob):
-    """Asynchronous hyperparameter tuning jobs triggered from the feature canvas."""
-
-    __tablename__ = "advanced_tuning_jobs"
-
-    run_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    search_strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="random")
+    # tuned-mode only (nullable; unused when run_mode == "fixed")
+    search_strategy: Mapped[str | None] = mapped_column(String(20), nullable=True)
     search_space: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     baseline_hyperparameters: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     n_iterations: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -333,13 +324,15 @@ class AdvancedTuningJob(MLJob):
     best_params: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     best_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
-    owner = relationship("User", backref="advanced_tuning_jobs")
+    owner = relationship("User", backref="training_jobs")
 
     def to_dict(self) -> dict:
         data = self.to_dict_base()
         data.update(
             {
-                "run_number": self.run_number,
+                "run_mode": self.run_mode,
+                "version": self.version,
+                "hyperparameters": self.hyperparameters,
                 "search_strategy": self.search_strategy,
                 "search_space": self.search_space,
                 "baseline_hyperparameters": self.baseline_hyperparameters,
@@ -379,8 +372,10 @@ class Deployment(Base, TimestampMixin):
     __tablename__ = "deployments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    # ID of the TrainingJob or HyperparameterTuningJob
-    job_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # ID of the unified TrainingJob (fixed or tuned run_mode)
+    job_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("training_jobs.id"), nullable=False, index=True
+    )
     model_type: Mapped[str] = mapped_column(String(100), nullable=False)
     artifact_uri: Mapped[str] = mapped_column(String(500), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

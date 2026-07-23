@@ -5,7 +5,10 @@ import { useViewStore } from '../../core/store/useViewStore';
 import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
-  const nodes = registry.getAll();
+  // Legacy node types (e.g. the old Basic Training / Advanced Tuning nodes,
+  // superseded by the unified `TrainingNode`) stay registered for backward
+  // compatibility but are excluded from the drag-and-drop palette.
+  const nodes = registry.getAll().filter((n) => !n.hidden);
   const addNode = useGraphStore((state) => state.addNode);
   const { isSidebarOpen, setSidebarOpen } = useViewStore();
   const [searchTerm, setSearchTerm] = useState('');

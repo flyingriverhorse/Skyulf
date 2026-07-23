@@ -39,7 +39,7 @@ from backend.monitoring.router import (
 
 
 def _make_job_row(**kwargs):
-    """Build a lightweight mock standing in for a BasicTrainingJob/AdvancedTuningJob row."""
+    """Build a lightweight mock standing in for a TrainingJob row."""
     row = MagicMock()
     row.id = kwargs.get("id", "job-1")
     row.model_type = kwargs.get("model_type", "RandomForest")
@@ -63,14 +63,11 @@ def _make_db_execute_result(scalars_list):
 
 
 async def test_fetch_drift_job_rows_merges_both_tables():
-    """Rows from both BasicTrainingJob and AdvancedTuningJob are merged by id."""
+    """Rows from both run_modes ("fixed" and "tuned") are merged by id."""
     db = AsyncMock()
     row1 = _make_job_row(id="job-1")
     row2 = _make_job_row(id="job-2")
-    db.execute.side_effect = [
-        _make_db_execute_result([row1]),
-        _make_db_execute_result([row2]),
-    ]
+    db.execute.return_value = _make_db_execute_result([row1, row2])
 
     db_jobs = await _fetch_drift_job_rows(db, ["job-1", "job-2"])
     assert set(db_jobs.keys()) == {"job-1", "job-2"}
@@ -591,14 +588,11 @@ def test_accumulate_node_timing_missing_step_type_defaults_unknown():
 
 
 async def test_scan_slow_node_jobs_aggregates_across_tables():
-    """Completed jobs from both tables are scanned and their node_timings aggregated."""
+    """Completed jobs from the unified table are scanned and their node_timings aggregated."""
     db = AsyncMock()
     job1 = MagicMock(metrics={"node_timings": [{"step_type": "impute", "execution_time": 1.0}]})
     job2 = MagicMock(metrics={"node_timings": [{"step_type": "impute", "execution_time": 2.0}]})
-    db.execute.side_effect = [
-        _make_db_execute_result([job1]),
-        _make_db_execute_result([job2]),
-    ]
+    db.execute.return_value = _make_db_execute_result([job1, job2])
 
     cutoff = datetime.now(UTC) - timedelta(days=7)
     by_step, sample_node, jobs_scanned, runs_seen = await _scan_slow_node_jobs(db, cutoff)
@@ -613,10 +607,7 @@ async def test_scan_slow_node_jobs_skips_jobs_without_node_timings():
     db = AsyncMock()
     job_no_metrics = MagicMock(metrics=None)
     job_bad_shape = MagicMock(metrics={"node_timings": "not-a-list"})
-    db.execute.side_effect = [
-        _make_db_execute_result([job_no_metrics]),
-        _make_db_execute_result([job_bad_shape]),
-    ]
+    db.execute.return_value = _make_db_execute_result([job_no_metrics, job_bad_shape])
 
     cutoff = datetime.now(UTC) - timedelta(days=7)
     by_step, sample_node, jobs_scanned, runs_seen = await _scan_slow_node_jobs(db, cutoff)

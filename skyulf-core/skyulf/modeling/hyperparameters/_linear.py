@@ -25,6 +25,7 @@ LOGISTIC_REGRESSION_PARAMS = [
             {"label": "None", "value": None},
         ],
         description="Norm used in the penalization.",
+        exclusive_options=["elasticnet"],
     ),
     HyperparameterField(
         name="solver",
@@ -63,6 +64,7 @@ LOGISTIC_REGRESSION_PARAMS = [
             "The ElasticNet mixing parameter, with 0 <= l1_ratio <= 1. "
             "Only used if penalty='elasticnet'."
         ),
+        depends_on={"param": "penalty", "value": "elasticnet"},
     ),
 ]
 
@@ -199,6 +201,7 @@ SGD_CLASSIFIER_PARAMS = [
             {"label": "ElasticNet", "value": "elasticnet"},
         ],
         description="The regularization term to use.",
+        exclusive_options=["elasticnet"],
     ),
     HyperparameterField(
         name="alpha",
@@ -218,6 +221,7 @@ SGD_CLASSIFIER_PARAMS = [
         max=1.0,
         step=0.05,
         description="The ElasticNet mixing parameter, with 0 <= l1_ratio <= 1. Only used if penalty='elasticnet'.",
+        depends_on={"param": "penalty", "value": "elasticnet"},
     ),
     HyperparameterField(
         name="max_iter",

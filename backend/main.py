@@ -204,12 +204,12 @@ def _reset_stale_jobs() -> None:
             hours=get_settings().JOB_ORPHAN_STALE_HOURS
         )
         with engine.begin() as conn:
-            for table in ("basic_training_jobs", "advanced_tuning_jobs"):
+            for table in ("training_jobs",):
                 # `table` is drawn only from the fixed tuple above (never user input),
                 # so the identifier interpolation below is not injectable.
                 result = conn.execute(
                     text(
-                        f"UPDATE {table} SET status='failed', finished_at=CURRENT_TIMESTAMP,"  # nosec B608 nosemgrep: hardcoded-sql-expression, avoid-sqlalchemy-text -- `table` is only ever one of the two hardcoded literals above
+                        f"UPDATE {table} SET status='failed', finished_at=CURRENT_TIMESTAMP,"  # nosec B608 nosemgrep: hardcoded-sql-expression, avoid-sqlalchemy-text -- `table` is only ever the single hardcoded literal above
                         f" error_message=:msg"
                         f" WHERE status IN ('running','queued')"
                         f" AND (started_at IS NULL OR started_at < :cutoff)"

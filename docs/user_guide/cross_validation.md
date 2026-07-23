@@ -137,18 +137,18 @@ Nested CV adds `inner_cv_mean` to each fold entry and `inner_folds` to `cv_confi
 
 ## ML Canvas UI
 
-Both the **Basic Training** and **Advanced Tuning** nodes expose a CV type dropdown with all five methods. When Time Series Split is selected, an additional date column picker appears with a warning to verify the selected column.
+Every training node (Classification, Regression, Text Classification, Segmentation) exposes a CV type dropdown with all five methods. When Time Series Split is selected, an additional date column picker appears with a warning to verify the selected column.
 
 ## Integration with tuning
 
-When using the **Advanced Tuning** node, cross-validation plays two distinct roles:
+When a training node's `run_mode` is set to `"advanced"`, cross-validation plays two distinct roles:
 
 1. **During the search:** The CV splitter is passed directly to the search strategy (GridSearchCV, OptunaSearchCV, etc.). Each candidate hyperparameter set is scored using inner CV folds. For `nested_cv`, the inner splitter uses fewer folds (3 or `cv_folds - 1`, whichever is smaller) to keep the search fast.
 
 2. **After the search (post-tuning evaluation):** A separate `cross_validate()` call runs with the `best_params` found by tuning. This gives you the unbiased `cv_*_mean` / `cv_*_std` metrics shown in Experiments.
 
-> **Important:** When `nested_cv` is selected with advanced tuning, the post-tuning evaluation automatically downgrades to `stratified_k_fold` (classification) or `k_fold` (regression). This avoids re-running the inner CV loop that already ran during the search — saving computation without losing evaluation quality.
+> **Important:** When `nested_cv` is selected with `run_mode: "advanced"`, the post-tuning evaluation automatically downgrades to `stratified_k_fold` (classification) or `k_fold` (regression). This avoids re-running the inner CV loop that already ran during the search — saving computation without losing evaluation quality.
 
-For basic training (no tuning), `nested_cv` runs the full dual-loop as described above.
+For `run_mode: "basic"` (no tuning), `nested_cv` runs the full dual-loop as described above.
 
 See [Hyperparameter Tuning](hyperparameter_tuning.md) for tuning-specific configuration.

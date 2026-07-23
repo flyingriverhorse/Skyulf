@@ -237,6 +237,7 @@ def compute_shap_explanation(
     """
     try:
         import shap
+        import shap.maskers
     except ImportError:
         return None
 
@@ -250,7 +251,13 @@ def compute_shap_explanation(
         if not feature_names:
             return None
 
-        explainer = shap.Explainer(model, sample)
+        # `shap.Explainer(model, sample)` builds a default `Independent` masker
+        # whose own `max_samples` defaults to 100, independent of the `sample`
+        # trimming above — so a `sample` between 101 and `max_samples` rows
+        # would silently get re-subsampled a second time and warn. Build the
+        # masker explicitly so it matches the size we already chose.
+        masker = shap.maskers.Independent(sample, max_samples=len(sample))
+        explainer = shap.Explainer(model, masker)
         explanation = explainer(sample)
         shap_values = getattr(explanation, "values", explanation)
 

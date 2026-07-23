@@ -16,8 +16,8 @@ describe('executionMode helpers', () => {
   });
 
   it('lists the modeling-node toggle types', () => {
-    expect(EXECUTION_MODE_AWARE_TYPES.has('basic_training')).toBe(true);
-    expect(EXECUTION_MODE_AWARE_TYPES.has('advanced_tuning')).toBe(true);
+    expect(EXECUTION_MODE_AWARE_TYPES.has('classification')).toBe(true);
+    expect(EXECUTION_MODE_AWARE_TYPES.has('regression')).toBe(true);
     // A non-modeling node must NOT report toggle support, otherwise the
     // Properties Panel would render an unusable mode selector.
     expect(EXECUTION_MODE_AWARE_TYPES.has('imputation_node')).toBe(false);
@@ -28,10 +28,10 @@ describe('executionMode helpers', () => {
   });
 
   it('supportsExecutionModeToggle / isAutoParallelType narrow correctly', () => {
-    expect(supportsExecutionModeToggle('basic_training')).toBe(true);
+    expect(supportsExecutionModeToggle('classification')).toBe(true);
     expect(supportsExecutionModeToggle('data_preview')).toBe(false);
     expect(isAutoParallelType('data_preview')).toBe(true);
-    expect(isAutoParallelType('basic_training')).toBe(false);
+    expect(isAutoParallelType('classification')).toBe(false);
   });
 
   it('getExecutionMode falls back to "merge" for missing/invalid input', () => {
@@ -46,11 +46,18 @@ describe('executionMode helpers', () => {
 
   it('isParallelExecution: training nodes need the explicit toggle', () => {
     expect(
-      isParallelExecution({ definitionType: 'basic_training', execution_mode: 'parallel' }, 2),
+      isParallelExecution({ definitionType: 'classification', execution_mode: 'parallel' }, 2),
     ).toBe(true);
     expect(
-      isParallelExecution({ definitionType: 'basic_training', execution_mode: 'merge' }, 2),
+      isParallelExecution({ definitionType: 'classification', execution_mode: 'merge' }, 2),
     ).toBe(false);
+  });
+
+  it('supportsExecutionModeToggle recognizes canonical task-scoped node types', () => {
+    expect(supportsExecutionModeToggle('classification')).toBe(true);
+    expect(supportsExecutionModeToggle('regression')).toBe(true);
+    expect(supportsExecutionModeToggle('text_classification')).toBe(true);
+    expect(supportsExecutionModeToggle('training')).toBe(true);
   });
 
   it('isParallelExecution: auto-parallel terminals need 2+ upstream sources', () => {

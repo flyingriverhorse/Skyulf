@@ -42,10 +42,10 @@ _DICT_KEY_REF_KEYS = ("column_types", "column_mapping", "rename_map")
 # When a FeatureTargetSplitter is upstream the target has already been
 # dropped from the predicted schema so the column will never be found.
 #
-# basic_training / advanced_tuning: target_column is metadata that tells
-# the training strategy which column to use as y. The input to these nodes
-# is a SplitDataset where X already has the target separated out, so the
-# column is intentionally absent from the predicted feature schema.
+# training: target_column is metadata that tells the training strategy
+# which column to use as y. The input to these nodes is a SplitDataset
+# where X already has the target separated out, so the column is
+# intentionally absent from the predicted feature schema.
 _OPTIONAL_PARAM_KEYS: dict[str, set[str]] = {
     # TrainTestSplitter: target_column is only for stratification; optional.
     # When FeatureTargetSplitter is upstream the target is already dropped.
@@ -53,8 +53,7 @@ _OPTIONAL_PARAM_KEYS: dict[str, set[str]] = {
     "Split": {"target_column"},
     # Training nodes: target_column is metadata (which column to use as y).
     # The X features DataFrame passed to them never contains it.
-    "basic_training": {"target_column"},
-    "advanced_tuning": {"target_column"},
+    "training": {"target_column"},
     # Encoders: target_column is the y series input for supervised encoders
     # (TargetEncoder). X features no longer contain it when
     # FeatureTargetSplitter is upstream.

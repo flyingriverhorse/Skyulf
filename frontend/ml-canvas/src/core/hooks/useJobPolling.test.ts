@@ -9,7 +9,7 @@ const makeJob = (id: string, status: JobStatus): JobInfo => ({
   job_id: id,
   pipeline_id: 'p1',
   node_id: 'n1',
-  job_type: 'basic_training',
+  job_type: 'training',
   status,
   start_time: null,
   end_time: null,
@@ -72,6 +72,19 @@ describe('useJobPolling', () => {
 
     await waitFor(() => {
       expect(result.current.aggregateStatus).toBe('failed');
+    });
+  });
+
+  it('settles as failed when every tracked job is cancelled', async () => {
+    vi.spyOn(jobsApi, 'getJob').mockResolvedValue(makeJob('cancelled', 'cancelled'));
+
+    const { result } = renderHook(() => useJobPolling(['cancelled'], { intervalMs: 100 }));
+
+    await waitFor(() => {
+      expect(result.current.aggregateStatus).toBe('failed');
+    });
+    await waitFor(() => {
+      expect(result.current.isPolling).toBe(false);
     });
   });
 

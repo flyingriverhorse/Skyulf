@@ -4,6 +4,7 @@ from typing import cast
 
 import polars as pl
 
+from backend.config import get_settings
 from backend.data_ingestion.connectors.base import BaseConnector
 from backend.exceptions.core import ForbiddenException, ResourceNotFoundException
 
@@ -50,12 +51,29 @@ class S3Connector(BaseConnector):
 
         return options
 
+    @staticmethod
+    def _apply_trusted_endpoint(options: dict) -> dict:
+        """Drop any caller-supplied S3 endpoint and use only the operator-configured one.
+
+        `endpoint_url`/`aws_endpoint_url` in per-request `storage_options` would let a
+        caller redirect outbound S3 requests to an arbitrary host (SSRF, including
+        cloud metadata endpoints). The endpoint is only ever trusted from server-side
+        config (`AWS_ENDPOINT_URL`), never from request-supplied storage options.
+        """
+        options.pop("endpoint_url", None)
+        options.pop("aws_endpoint_url", None)
+        configured_endpoint = get_settings().AWS_ENDPOINT_URL
+        if configured_endpoint:
+            options["endpoint_url"] = configured_endpoint
+        return options
+
     def _get_storage_options(self) -> dict[str, str]:
         """
         Ensure all storage options are strings for Polars and map common keys.
         """
         options = self.storage_options.copy() if self.storage_options else {}
         options = self._map_storage_option_keys(options)
+        options = self._apply_trusted_endpoint(options)
 
         # Convert to strings for Polars
         return {k: str(v) for k, v in options.items() if v is not None}
