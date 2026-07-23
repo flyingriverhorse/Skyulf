@@ -31,11 +31,15 @@ class HealthResponse(BaseModel):
 
 
 class DetailedHealthResponse(HealthResponse):
-    """Detailed health check with additional information."""
+    """Detailed health check with additional information.
 
-    database_status: str
-    cache_status: str
-    external_services: dict
+    This endpoint has no authentication, so the response intentionally stays
+    coarse (aggregate booleans only) rather than naming specific backends,
+    integrations, or connection details — avoiding disclosure of internal
+    architecture/topology to anonymous callers.
+    """
+
+    dependencies_healthy: bool
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -57,19 +61,24 @@ async def health_check(settings: Settings = Depends(get_config)):
 async def detailed_health_check(settings: Settings = Depends(get_config)):
     """
     Detailed health check endpoint.
-    Includes status of various system components.
+
+    Reports a single aggregate `dependencies_healthy` boolean rather than
+    naming individual backends/integrations, since this endpoint has no
+    authentication (see sast/missingauth-results.md).
     """
+    dependencies_healthy = True
+
     # Check database connectivity
     try:
         from backend.database.engine import health_check as db_health_check
 
-        database_status = "healthy" if await db_health_check() else "unhealthy"
+        if not await db_health_check():
+            dependencies_healthy = False
     except Exception:
         logging.getLogger(__name__).debug("Database health check failed", exc_info=True)
-        database_status = "error"
+        dependencies_healthy = False
 
     # Check cache connectivity
-    cache_status = "healthy"
     if settings.USE_CELERY:
         try:
             import redis  # ty: ignore[unresolved-import]
@@ -81,22 +90,15 @@ async def detailed_health_check(settings: Settings = Depends(get_config)):
             r.ping()
         except Exception:
             logging.getLogger(__name__).debug("Cache health check failed", exc_info=True)
-            cache_status = "unhealthy"
-
-    # Check external services
-    external_services = {
-        "snowflake": "not_configured" if not settings.SNOWFLAKE_ACCOUNT else "healthy",
-    }
+            dependencies_healthy = False
 
     return DetailedHealthResponse(
-        status="healthy" if database_status == "healthy" else "degraded",
+        status="healthy" if dependencies_healthy else "degraded",
         timestamp=datetime.now(UTC),
         version=settings.APP_VERSION,
         environment=settings.environment_name,
         uptime_seconds=time.time() - START_TIME,
-        database_status=database_status,
-        cache_status=cache_status,
-        external_services=external_services,
+        dependencies_healthy=dependencies_healthy,
     )
 
 

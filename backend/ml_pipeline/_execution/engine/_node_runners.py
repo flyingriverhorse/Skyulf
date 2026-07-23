@@ -752,18 +752,11 @@ class NodeRunnersMixin:
             job_id=job_id,
         )
 
-        # Finalize and save artifacts
-        self._finalize_training_artifacts(data, job_id, target_col, node.node_id, estimator.model)
-
         completion_log = (
             "Model training finished."
             if run_mode == "fixed"
             else "Tuning and final model retraining finished."
         )
-        self.log(completion_log)
-
-        # Bundle transformers with the model for inference
-        self._bundle_model_with_transformers(node, job_id, target_col, data)
 
         # Extract metrics from tuning result (populates best_params/best_score/
         # trials for BOTH modes, so fixed-mode jobs report the effective

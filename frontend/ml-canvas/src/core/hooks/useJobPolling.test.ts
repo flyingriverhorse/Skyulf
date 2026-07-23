@@ -75,6 +75,19 @@ describe('useJobPolling', () => {
     });
   });
 
+  it('settles as failed when every tracked job is cancelled', async () => {
+    vi.spyOn(jobsApi, 'getJob').mockResolvedValue(makeJob('cancelled', 'cancelled'));
+
+    const { result } = renderHook(() => useJobPolling(['cancelled'], { intervalMs: 100 }));
+
+    await waitFor(() => {
+      expect(result.current.aggregateStatus).toBe('failed');
+    });
+    await waitFor(() => {
+      expect(result.current.isPolling).toBe(false);
+    });
+  });
+
   it('reports "running" while at least one job is still in flight', async () => {
     vi.spyOn(jobsApi, 'getJob').mockImplementation(async (id: string) =>
       id === 'slow' ? makeJob('slow', 'running') : makeJob(id, 'completed'),

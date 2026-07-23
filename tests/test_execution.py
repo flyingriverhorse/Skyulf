@@ -8,6 +8,19 @@ from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.constants import StepType
 
 
+class CountingArtifactStore(LocalArtifactStore):
+    """Track artifact writes while retaining LocalArtifactStore behavior."""
+
+    def __init__(self, base_path: str):
+        super().__init__(base_path)
+        self.saved_keys: list[str] = []
+
+    def save(self, key: str, data):
+        """Record an artifact key before saving it locally."""
+        self.saved_keys.append(key)
+        super().save(key, data)
+
+
 @pytest.fixture
 def pipeline_data_csv(tmp_path):
     df = pd.DataFrame(
@@ -89,7 +102,7 @@ def test_pipeline_execution_flow(pipeline_data_csv, tmp_path):
 
 
 def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
-    artifact_store = LocalArtifactStore(str(tmp_path / "artifacts_tuning"))
+    artifact_store = CountingArtifactStore(str(tmp_path / "artifacts_tuning"))
 
     config = PipelineConfig(
         pipeline_id="test_pipeline_tuning",
@@ -134,8 +147,9 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
 
     catalog = FileSystemCatalog()
     engine = PipelineEngine(artifact_store, catalog=catalog)
-    result = engine.run(config)
+    result = engine.run(config, job_id="tuning-job")
 
     assert result.status == "success"
     assert result.node_results["node_tuning"].status == "success"
     assert "best_score" in result.node_results["node_tuning"].metrics
+    assert artifact_store.saved_keys.count("node_tuning") == 1
