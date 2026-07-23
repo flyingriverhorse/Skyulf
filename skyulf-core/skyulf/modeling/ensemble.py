@@ -72,6 +72,8 @@ except ImportError:
 
 from ..core.meta.decorators import node_meta
 from ..registry import NodeRegistry
+from ._sklearn_compat import normalize_logistic_regression_params
+from .classification import LogisticRegressionCalculator
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
 logger = logging.getLogger(__name__)
@@ -139,6 +141,28 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     IS_STACKING: bool = False
     HAS_VOTING: bool = False  # Only VotingClassifier exposes the ``voting`` param.
 
+    # Config keys absorbed into `_tuning_base_config`/`default_params` by
+    # `prepare_tuning_params` rather than left as literal search-space
+    # candidates. Callers building a single-candidate "fixed run" search
+    # space (see `PipelineEngine._build_fixed_run_params`) must exclude
+    # these from that space — passing e.g. a raw `final_estimator` string
+    # through the grid overrides the resolved estimator instance and
+    # crashes sklearn's parameter validation.
+    STRUCTURAL_TUNING_KEYS: tuple[str, ...] = (
+        "base_estimators",
+        "final_estimator",
+        "voting",
+        "cv",
+        "passthrough",
+        "weights",
+        "n_jobs",
+        "calibrate_base_models",
+        "calibration_method",
+        "calibration_cv",
+        "base_estimator_params",
+        "final_estimator_params",
+    )
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Structural config remembered when tuning so the meta-estimator can be
@@ -189,21 +213,7 @@ class _BaseEnsembleCalculator(SklearnCalculator):
         """Remember the structural selection so the tuner can build the model."""
         src = config.get("params") if isinstance(config.get("params"), dict) else config
         src = src or {}
-        keep = (
-            "base_estimators",
-            "final_estimator",
-            "voting",
-            "cv",
-            "passthrough",
-            "weights",
-            "n_jobs",
-            "calibrate_base_models",
-            "calibration_method",
-            "calibration_cv",
-            "base_estimator_params",
-            "final_estimator_params",
-        )
-        self._tuning_base_config = {k: src[k] for k in keep if k in src}
+        self._tuning_base_config = {k: src[k] for k in self.STRUCTURAL_TUNING_KEYS if k in src}
 
     def build_tuning_search_space(self, config: dict[str, Any], strategy: str) -> dict[str, Any]:
         """Auto-build the ensemble's tuning space.
@@ -335,6 +345,28 @@ class _BaseEnsembleCalculator(SklearnCalculator):
     def _apply_params(estimator: BaseEstimator, params: Any, name: str) -> BaseEstimator:
         """Apply a ``{param: value}`` map to *estimator*, ignoring bad params."""
         if isinstance(params, dict) and params:
+            if isinstance(estimator, LogisticRegression):
+                # An incompatible solver/penalty pair here would otherwise
+                # only surface as sklearn's own opaque ValueError deep inside
+                # fit() — validate against the merged (current-attrs +
+                # override) params first, mirroring
+                # LogisticRegressionCalculator._validate_solver_penalty, since
+                # ensembles apply base/final-estimator params via
+                # set_params(), bypassing that calculator's validation
+                # entirely.
+                if "penalty" in params:
+                    solver = params.get("solver", estimator.get_params().get("solver"))
+                    penalty = params["penalty"]
+                    compatible = LogisticRegressionCalculator._SOLVER_PENALTIES.get(solver)
+                    if compatible is not None and penalty not in compatible:
+                        LogisticRegressionCalculator._raise_incompatible_solver_penalty(
+                            solver, penalty
+                        )
+                # sklearn >=1.8 deprecates LogisticRegression(penalty=...) in
+                # favor of l1_ratio/C — translate here too, since ensembles
+                # apply base/final-estimator params via set_params(), bypassing
+                # LogisticRegressionCalculator's own normalization entirely.
+                params = normalize_logistic_regression_params(params)
             try:
                 estimator.set_params(**params)
             except (ValueError, TypeError) as exc:
@@ -477,7 +509,7 @@ class VotingClassifierApplier(SklearnApplier):
         "base_estimators": ["random_forest", "logistic_regression", "gradient_boosting"],
         "voting": "soft",
     },
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "classification"],
 )
 class VotingClassifierCalculator(_BaseEnsembleCalculator):
     """Voting Classifier Calculator with selectable base learners."""
@@ -514,7 +546,7 @@ class StackingClassifierApplier(SklearnApplier):
         "final_estimator": "logistic_regression",
         "cv": 5,
     },
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "classification"],
 )
 class StackingClassifierCalculator(_BaseEnsembleCalculator):
     """Stacking Classifier Calculator with selectable base + final learners."""
@@ -550,7 +582,7 @@ class VotingRegressorApplier(SklearnApplier):
     params={
         "base_estimators": ["linear_regression", "random_forest", "gradient_boosting"],
     },
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class VotingRegressorCalculator(_BaseEnsembleCalculator):
     """Voting Regressor Calculator with selectable base learners."""
@@ -586,7 +618,7 @@ class StackingRegressorApplier(SklearnApplier):
         "final_estimator": "ridge",
         "cv": 5,
     },
-    tags=["requires_scaling"],
+    tags=["requires_scaling", "regression"],
 )
 class StackingRegressorCalculator(_BaseEnsembleCalculator):
     """Stacking Regressor Calculator with selectable base + final learners."""

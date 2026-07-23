@@ -145,9 +145,9 @@ def config_fingerprint(cfg: _PipelineIn) -> str:
 def _model_algorithm(model: _NodeIn) -> str:
     """Resolve the registry key for a modeling node.
 
-    `basic_training` / `advanced_tuning` are job-router step types — the real
-    NodeRegistry key lives in `params.algorithm` (e.g. `xgboost_classifier`).
-    Falls back to `step_type` for nodes that ARE direct registry entries.
+    `training` is a job-router step type — the real NodeRegistry key lives
+    in `params.algorithm` (e.g. `xgboost_classifier`). Falls back to
+    `step_type` for nodes that ARE direct registry entries.
     """
     return str(model.params.get("algorithm") or model.params.get("type") or model.step_type)
 
@@ -158,18 +158,23 @@ def _model_label(model: _NodeIn | None) -> str:
     return _model_algorithm(model)
 
 
+def _is_tuning_model(model: _NodeIn) -> bool:
+    """True for a `training` node whose `run_mode` param is `"tuned"`."""
+    return model.step_type == "training" and model.params.get("run_mode") == "tuned"
+
+
 def _build_modeling_block(model: _NodeIn) -> dict[str, Any]:
     """Map a model `_NodeIn` to a SkyulfPipeline-compatible modeling dict.
 
     Re-injects ``type`` from ``params.algorithm`` (the engine's routing key,
     stripped from runtime params) so ``_init_model_estimator`` can resolve
-    the estimator. For ``advanced_tuning`` we map to ``hyperparameter_tuner``
-    and flatten the nested ``tuning_config`` fields so ``TuningCalculator.fit``
-    picks them up via its keyword filter.
+    the estimator. For ``training`` with ``run_mode='tuned'`` we map to
+    ``hyperparameter_tuner`` and flatten the nested ``tuning_config`` fields
+    so ``TuningCalculator.fit`` picks them up via its keyword filter.
     """
     algorithm = str(model.params.get("algorithm") or model.params.get("type") or "")
     clean_params = strip_internal_params(model.params)
-    if model.step_type == "advanced_tuning" and algorithm:
+    if _is_tuning_model(model) and algorithm:
         tuning_cfg = clean_params.pop("tuning_config", {}) or {}
         return {
             "type": "hyperparameter_tuner",
@@ -452,13 +457,14 @@ _TUNING_TRIAL_CALLBACK_SRC = (
 
 
 def _modeling_cell_tuning(model: _NodeIn, algo: str, config_json: str, metrics_var: str) -> str:
-    """Render an `advanced_tuning` cell that mirrors the engine's runner.
+    """Render a tuned training cell that mirrors the engine's runner.
 
-    The engine's `_run_advanced_tuning` wraps the base calculator/applier in
-    `TuningCalculator`/`TuningApplier` before invoking `fit_predict`. Without
-    that wrap the base estimator silently ignores `tuning_config` and runs a
-    single default-param fit. We also pass `log_callback=print` and a small
-    `progress_callback` so each trial is visible in the notebook output.
+    The engine's unified `_run_training` (run_mode='tuned') wraps the base
+    calculator/applier in `TuningCalculator`/`TuningApplier` before invoking
+    `fit_predict`. Without that wrap the base estimator silently ignores
+    `tuning_config` and runs a single default-param fit. We also pass
+    `log_callback=print` and a small `progress_callback` so each trial is
+    visible in the notebook output.
     """
     return (
         "from skyulf.data.dataset import SplitDataset\n"
@@ -503,7 +509,7 @@ def modeling_cells(
     algo = _model_algorithm(model)
     h = "###" if in_branch else "## 6."
     metrics_var = f"metrics_{branch_letter}" if branch_letter else "report"
-    is_tuning = model.step_type == "advanced_tuning"
+    is_tuning = _is_tuning_model(model)
     cell_src = (
         _modeling_cell_tuning(model, algo, config_json, metrics_var)
         if is_tuning

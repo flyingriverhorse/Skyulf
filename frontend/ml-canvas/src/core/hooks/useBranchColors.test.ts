@@ -44,7 +44,7 @@ describe('useBranchColors', () => {
     // Single training terminal, single input — no parallel branches.
     const nodes = [
       node('ds', 'dataset_node'),
-      node('train', 'basic_training'),
+      node('train', 'classification'),
     ];
     const edges = [edge('ds-train', 'ds', 'train')];
     const { result } = renderHook(() => useBranchColors(nodes, edges));
@@ -57,7 +57,7 @@ describe('useBranchColors', () => {
     const nodes = [
       node('a', 'dataset_node'),
       node('b', 'dataset_node'),
-      node('train', 'basic_training'),
+      node('train', 'classification'),
     ];
     const edges = [
       edge('a-train', 'a', 'train'),
@@ -71,7 +71,7 @@ describe('useBranchColors', () => {
     const nodes = [
       node('a', 'dataset_node'),
       node('b', 'dataset_node'),
-      node('train', 'basic_training', { execution_mode: 'parallel', model_type: 'random_forest_classifier' }),
+      node('train', 'classification', { execution_mode: 'parallel', model_type: 'random_forest_classifier' }),
     ];
     const edges = [
       edge('a-train', 'a', 'train'),
@@ -115,8 +115,8 @@ describe('useBranchColors', () => {
     const nodes = [
       node('ds', 'dataset_node'),
       node('imp', 'imputation_node'),
-      node('train_a', 'basic_training', { execution_mode: 'parallel' }),
-      node('train_b', 'basic_training', { execution_mode: 'parallel' }),
+      node('train_a', 'classification', { execution_mode: 'parallel' }),
+      node('train_b', 'classification', { execution_mode: 'parallel' }),
       node('extra', 'dataset_node'),
     ];
     const edges = [
@@ -138,10 +138,10 @@ describe('useBranchColors', () => {
     // training node on the same data keeps its own branch so 2 branches remain.
     const nodes = [
       node('ds', 'dataset_node'),
-      node('rf', 'advanced_tuning', { model_type: 'random_forest_classifier' }),
-      node('lr', 'advanced_tuning', { model_type: 'logistic_regression' }),
+      node('rf', 'classification', { model_type: 'random_forest_classifier' }),
+      node('lr', 'classification', { model_type: 'logistic_regression' }),
       node('ens', 'EnsembleNode', { model_type: 'voting_classifier' }),
-      node('solo', 'basic_training', { model_type: 'xgboost_classifier' }),
+      node('solo', 'classification', { model_type: 'xgboost_classifier' }),
     ];
     const edges = [
       edge('ds-rf', 'ds', 'rf'),
@@ -172,7 +172,7 @@ describe('useBranchColors', () => {
     const nodes = [
       node('ds', 'dataset_node'),
       node('ens', 'EnsembleNode', { model_type: 'stacking_classifier' }),
-      node('solo', 'basic_training', { model_type: 'random_forest_classifier' }),
+      node('solo', 'classification', { model_type: 'random_forest_classifier' }),
     ];
     const edges = [
       edge('ds-ens', 'ds', 'ens'),

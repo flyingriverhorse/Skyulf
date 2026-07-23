@@ -17,11 +17,10 @@ from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 
 logger = logging.getLogger(__name__)
 from backend.database.models import (
-    AdvancedTuningJob,
-    BasicTrainingJob,
     DriftCheckResult,
     ErrorEvent,
     PipelineRunLog,
+    TrainingJob,
 )
 from backend.dependencies import get_db
 from backend.ml_pipeline._execution.graph_utils import extract_job_details
@@ -43,23 +42,20 @@ class DriftJobOption(BaseModel):
     best_metric: str | None = None
 
 
-async def _fetch_drift_job_rows(
-    db: AsyncSession, job_ids: list[str]
-) -> dict[str, BasicTrainingJob | AdvancedTuningJob]:
-    """Look up training/tuning job rows for the given ids across both job tables."""
-    db_jobs: dict[str, BasicTrainingJob | AdvancedTuningJob] = {}
+async def _fetch_drift_job_rows(db: AsyncSession, job_ids: list[str]) -> dict[str, TrainingJob]:
+    """Look up training/tuning job rows (either run_mode) for the given ids."""
+    db_jobs: dict[str, TrainingJob] = {}
     try:
-        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model_cls).where(model_cls.id.in_(job_ids))
-            result = await db.execute(stmt)
-            for row in result.scalars().all():
-                db_jobs[str(row.id)] = row
+        stmt = select(TrainingJob).where(TrainingJob.id.in_(job_ids))
+        result = await db.execute(stmt)
+        for row in result.scalars().all():
+            db_jobs[str(row.id)] = row
     except Exception:
         logger.warning("Could not enrich drift jobs from DB", exc_info=True)
     return db_jobs
 
 
-def _extract_drift_target_column(db_row: BasicTrainingJob | AdvancedTuningJob) -> str | None:
+def _extract_drift_target_column(db_row: TrainingJob) -> str | None:
     """Resolve the target column for a job row from its stored graph, if possible."""
     try:
         graph: dict[str, Any] = cast(dict[str, Any], db_row.graph or {})
@@ -90,7 +86,7 @@ def _build_drift_metric_summary(metrics: dict[str, Any]) -> str | None:
     return " | ".join(metric_parts) if metric_parts else None
 
 
-def _enrich_drift_job(job: DriftJobOption, db_row: BasicTrainingJob | AdvancedTuningJob) -> None:
+def _enrich_drift_job(job: DriftJobOption, db_row: TrainingJob) -> None:
     """Fill in `job`'s model/target/description/metric fields from its DB row, in place."""
     job.model_type = db_row.model_type
     job.target_column = _extract_drift_target_column(db_row)
@@ -155,18 +151,17 @@ async def update_job_description(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     """Update a training job's description via job_metadata JSON."""
-    for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-        stmt = select(model_cls).where(model_cls.id == job_id)
-        result = await db.execute(stmt)
-        row = result.scalar_one_or_none()
-        if row:
-            meta_raw: dict[str, Any] = cast(dict[str, Any], row.job_metadata or {})
-            if not isinstance(meta_raw, dict):
-                meta_raw = {}
-            meta_raw["description"] = body.description
-            row.job_metadata = cast(Any, meta_raw)
-            await db.commit()
-            return {"status": "ok"}
+    stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row:
+        meta_raw: dict[str, Any] = cast(dict[str, Any], row.job_metadata or {})
+        if not isinstance(meta_raw, dict):
+            meta_raw = {}
+        meta_raw["description"] = body.description
+        row.job_metadata = cast(Any, meta_raw)
+        await db.commit()
+        return {"status": "ok"}
 
     raise HTTPException(status_code=404, detail="Job not found")
 
@@ -313,15 +308,13 @@ async def _load_feature_importances(db: AsyncSession, job_id: str) -> dict[str, 
     """Look up feature importances recorded on the training job's metrics, if any."""
     feature_importances: dict[str, float] | None = None
     try:
-        for model_cls in (BasicTrainingJob, AdvancedTuningJob):
-            stmt = select(model_cls).where(model_cls.id == job_id)
-            result = await db.execute(stmt)
-            row = result.scalar_one_or_none()
-            if row:
-                job_metrics: dict[str, Any] = cast(dict[str, Any], row.metrics or {})
-                if "feature_importances" in job_metrics:
-                    feature_importances = job_metrics["feature_importances"]
-                break
+        stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        result = await db.execute(stmt)
+        row = result.scalar_one_or_none()
+        if row:
+            job_metrics: dict[str, Any] = cast(dict[str, Any], row.metrics or {})
+            if "feature_importances" in job_metrics:
+                feature_importances = job_metrics["feature_importances"]
     except Exception:
         logger.warning("Could not load feature importances for job %s", job_id)
     return feature_importances
@@ -781,23 +774,22 @@ async def _scan_slow_node_jobs(
     jobs_scanned = 0
     runs_seen = 0
 
-    # Scan both job tables — same metrics shape, different rows.
-    for model in (BasicTrainingJob, AdvancedTuningJob):
-        stmt = select(model).where(
-            model.status == "completed",
-            model.finished_at.isnot(None),
-            model.finished_at >= cutoff,
-        )
-        result = await db.execute(stmt)
-        for job in result.scalars().all():
-            jobs_scanned += 1
-            metrics = job.metrics or {}
-            timings = metrics.get("node_timings") if isinstance(metrics, dict) else None
-            if not isinstance(timings, list):
-                continue
-            for entry in timings:
-                if _accumulate_node_timing(entry, by_step, sample_node):
-                    runs_seen += 1
+    # Scan the unified table — both run_modes share the same metrics shape.
+    stmt = select(TrainingJob).where(
+        TrainingJob.status == "completed",
+        TrainingJob.finished_at.isnot(None),
+        TrainingJob.finished_at >= cutoff,
+    )
+    result = await db.execute(stmt)
+    for job in result.scalars().all():
+        jobs_scanned += 1
+        metrics = job.metrics or {}
+        timings = metrics.get("node_timings") if isinstance(metrics, dict) else None
+        if not isinstance(timings, list):
+            continue
+        for entry in timings:
+            if _accumulate_node_timing(entry, by_step, sample_node):
+                runs_seen += 1
 
     return by_step, sample_node, jobs_scanned, runs_seen
 

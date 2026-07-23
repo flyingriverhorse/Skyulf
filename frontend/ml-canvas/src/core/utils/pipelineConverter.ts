@@ -11,11 +11,32 @@ import { registry } from '../registry/NodeRegistry';
 // sklearn Voting/Stacking always refit their base estimators, so only the recipe
 // (not the fitted weights) is reused.
 const MODEL_SOURCE_TYPES = new Set([
-  'model_training',
-  'basic_training',
-  'hyperparameter_tuning',
-  'advanced_tuning',
+  'training',
+  'classification',
+  'regression',
+  'text_classification',
 ]);
+
+/**
+ * `definitionType`s that share the unified `TrainingNode`'s fixed/tuned
+ * `run_mode` dispatch (Phase 3 Part B, plan §0.6): the generic `TrainingNode`
+ * plus the 3 task-scoped supervised nodes (Segmentation is unsupervised and
+ * has no `run_mode` — see `SegmentationNode`). All submit the same
+ * canonical `training` backend `step_type` — the task split is purely a
+ * frontend/UX concern (model-list filtering), the backend doesn't need to
+ * know which task node produced the job.
+ */
+const RUN_MODE_TRAINING_TYPES = new Set<string>([
+  BackendStepType.TRAINING,
+  BackendStepType.CLASSIFICATION,
+  BackendStepType.REGRESSION,
+  BackendStepType.TEXT_CLASSIFICATION,
+]);
+
+// All definitionTypes that flow through the single shared fixed/tuned
+// training dispatch below: the generic TrainingNode plus the 3 task-scoped
+// supervised nodes.
+const ALL_TRAINING_DISPATCH_TYPES = RUN_MODE_TRAINING_TYPES;
 
 // Maps a full training-node `model_type` back to the short ensemble base-learner
 // key the core resolver understands. Mirrors `_BASE_KEY_TO_REGISTRY_*` in
@@ -101,6 +122,45 @@ const collectWiredBaseSpecs = (
 
   return { baseEstimators, baseParams, modelSourceIds };
 };
+
+/**
+ * Fixed-mode training params shared by the unified `TrainingNode` and the
+ * task-scoped Classification/Regression/Text Classification nodes when
+ * their `run_mode` is `'basic'`.
+ */
+const buildFixedTrainingParams = (data: Record<string, unknown>): Record<string, unknown> => ({
+    target_column: data.target_column,
+    model_type: data.model_type,
+    hyperparameters: data.hyperparameters,
+    cv_enabled: data.cv_enabled,
+    cv_folds: data.cv_folds,
+    cv_type: data.cv_type,
+    cv_shuffle: data.cv_shuffle,
+    cv_random_state: data.cv_random_state,
+    cv_time_column: data.cv_time_column,
+    execution_mode: data.execution_mode,
+});
+
+/**
+ * The tuning-config fields common to every tuning-engine consumer (the plain
+ * `tuning` node, the unified `TrainingNode`
+ * in advanced mode, and `EnsembleNode`'s advanced mode). Callers add their
+ * own structural fields on top (`search_space` for plain training nodes,
+ * `base_estimators`/`final_estimator`/etc. for the ensemble).
+ */
+const buildBaseTuningConfig = (data: Record<string, unknown>): Record<string, unknown> => ({
+    strategy: data.search_strategy,
+    strategy_params: data.strategy_params || {},
+    metric: data.metric,
+    n_trials: data.n_trials,
+    cv_enabled: data.cv_enabled,
+    cv_folds: data.cv_folds,
+    cv_type: data.cv_type,
+    cv_shuffle: data.cv_shuffle,
+    cv_random_state: data.cv_random_state,
+    cv_time_column: data.cv_time_column,
+    random_state: data.random_state,
+});
 
 export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): PipelineConfigModel => {
     const sortedNodes: NodeConfigModel[] = [];
@@ -336,23 +396,35 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
       } else if (node.data.definitionType === 'InvalidValueReplacement') {
           stepType = 'InvalidValueReplacement';
           params = node.data;
-      } else if (node.data.definitionType === 'model_training' || node.data.definitionType === BackendStepType.BASIC_TRAINING) {
-          stepType = BackendStepType.BASIC_TRAINING;
-          params = {
-              target_column: node.data.target_column,
-              model_type: node.data.model_type,
-              hyperparameters: node.data.hyperparameters,
-              cv_enabled: node.data.cv_enabled,
-              cv_folds: node.data.cv_folds,
-              cv_type: node.data.cv_type,
-              cv_shuffle: node.data.cv_shuffle,
-              cv_random_state: node.data.cv_random_state,
-              cv_time_column: node.data.cv_time_column,
-              execution_mode: node.data.execution_mode
-          };
+      } else if (ALL_TRAINING_DISPATCH_TYPES.has(node.data.definitionType as string)) {
+          // The generic TrainingNode and the 3 task-scoped Classification/
+          // Regression/Text Classification nodes all dispatch through the
+          // same fixed/tuned param-building helpers and emit the canonical
+          // `training` step_type.
+          const isAdvanced = node.data.run_mode === 'advanced';
+          if (isAdvanced) {
+              stepType = BackendStepType.TRAINING;
+              params = {
+                  run_mode: 'tuned',
+                  target_column: node.data.target_column,
+                  algorithm: node.data.model_type,
+                  execution_mode: node.data.execution_mode,
+                  tuning_config: {
+                      ...buildBaseTuningConfig(node.data),
+                      search_space: node.data.search_space
+                  }
+              };
+          } else {
+              stepType = BackendStepType.TRAINING;
+              params = {
+                  run_mode: 'fixed',
+                  ...buildFixedTrainingParams(node.data)
+              };
+          }
       } else if (node.data.definitionType === 'SegmentationNode') {
-          stepType = BackendStepType.BASIC_TRAINING;
+          stepType = BackendStepType.TRAINING;
           params = {
+              run_mode: 'fixed',
               // No target_column — clustering is unsupervised. The backend
               // treats an empty string as the "no target" sentinel.
               target_column: '',
@@ -423,16 +495,14 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
           // ensemble through the hyperparameter search engine (the backend
           // auto-builds a nested `<name>__<param>` space when none is sent).
           if (node.data.run_mode === 'advanced') {
-              stepType = BackendStepType.ADVANCED_TUNING;
+              stepType = BackendStepType.TRAINING;
               params = {
+                  run_mode: 'tuned',
                   target_column: node.data.target_column,
                   algorithm: node.data.model_type,
                   execution_mode: node.data.execution_mode,
                   tuning_config: {
-                      strategy: node.data.search_strategy,
-                      strategy_params: node.data.strategy_params || {},
-                      metric: node.data.metric,
-                      n_trials: node.data.n_trials,
+                      ...buildBaseTuningConfig(node.data),
                       // Structural selection the backend resolves into the model.
                       base_estimators: baseEstimators,
                       final_estimator: node.data.final_estimator,
@@ -447,18 +517,12 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                       tune_base_models: node.data.tune_base_models,
                       base_estimator_params: baseEstimatorParams,
                       final_estimator_params: node.data.final_estimator_params,
-                      cv_enabled: node.data.cv_enabled,
-                      cv_folds: node.data.cv_folds,
-                      cv_type: node.data.cv_type,
-                      cv_shuffle: node.data.cv_shuffle,
-                      cv_random_state: node.data.cv_random_state,
-                      cv_time_column: node.data.cv_time_column,
-                      random_state: node.data.random_state
                   }
               };
           } else {
-              stepType = BackendStepType.BASIC_TRAINING;
+              stepType = BackendStepType.TRAINING;
               params = {
+                  run_mode: 'fixed',
                   target_column: node.data.target_column,
                   model_type: node.data.model_type,
                   hyperparameters: {
@@ -484,26 +548,6 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
                   execution_mode: node.data.execution_mode
               };
           }
-      } else if (node.data.definitionType === 'hyperparameter_tuning' || node.data.definitionType === BackendStepType.ADVANCED_TUNING) {
-          stepType = BackendStepType.ADVANCED_TUNING;
-          params = {
-              target_column: node.data.target_column,
-              algorithm: node.data.model_type,
-              execution_mode: node.data.execution_mode,
-              tuning_config: {
-                  strategy: node.data.search_strategy,                    strategy_params: node.data.strategy_params,
-                    metric: node.data.metric,
-                  n_trials: node.data.n_trials,
-                  search_space: node.data.search_space,
-                  cv_enabled: node.data.cv_enabled,
-                  cv_folds: node.data.cv_folds,
-                  cv_type: node.data.cv_type,
-                  cv_shuffle: node.data.cv_shuffle,
-                  cv_random_state: node.data.cv_random_state,
-                  cv_time_column: node.data.cv_time_column,
-                  random_state: node.data.random_state
-              }
-          };
       } else if (node.data.definitionType === 'data_preview') {
           stepType = 'data_preview';
           params = {};
@@ -570,8 +614,7 @@ export const convertGraphToPipelineConfig = (nodes: Node[], edges: Edge[]): Pipe
     // keep only ancestors. When no explicit terminals exist, infer from
     // graph leaves so parallel preview branches survive.
     const terminalTypes = new Set([
-      BackendStepType.BASIC_TRAINING,
-      BackendStepType.ADVANCED_TUNING,
+      BackendStepType.TRAINING,
       'data_preview',
     ]);
     let seeds = sortedNodes.filter(n => terminalTypes.has(n.step_type));

@@ -100,7 +100,7 @@ This is the core of Skyulf. The canvas is a React Flow-based visual editor where
 3. **Connect nodes** by dragging edges from output ports to input ports.
 4. **Configure each node** by clicking it and setting parameters in the side panel.
 5. **Add a modeling node** at the end (e.g., `random_forest_classifier`).
-6. Optionally, add an **Advanced Tuning node** and configure the search strategy.
+6. Optionally, toggle the modeling node's **Advanced mode** (`run_mode: "advanced"`) and configure the search strategy.
 
 ### Recommended pipeline order:
 
@@ -193,8 +193,8 @@ Two export modes are available:
 2. **Data loading** — loads the same dataset you used on the canvas via `pd.read_csv` / Parquet.
 3. **Preprocessing cells** — one cell per node (Full mode) or a single pipeline config block (Compact mode).
 4. **Training cell** — wired up to run the same algorithm the canvas node was configured for:
-   - **Basic Training nodes** call `estimator.fit_predict()` with `log_callback=print`.
-   - **Advanced Tuning nodes** automatically use `TuningCalculator`/`TuningApplier` wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
+   - **Training nodes in Basic mode** (`run_mode: "basic"`) call `estimator.fit_predict()` with `log_callback=print`.
+   - **Training nodes in Advanced mode** (`run_mode: "advanced"`) automatically use `TuningCalculator`/`TuningApplier` wrappers so the Optuna / grid / random search actually runs. Each trial prints its progress in the notebook output:
      ```
      Trial 1/10 — score=0.9221
      Trial 2/10 — score=0.9306

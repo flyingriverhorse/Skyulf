@@ -4,6 +4,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { Activity, CheckCircle, AlertCircle, Play, GitBranch } from 'lucide-react';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../core/utils/pipelineConverter';
+import { warnAndBlockOnLeakage } from '../../../core/utils/pipelineLeakageValidation';
 import { generateBranchColors } from '../../../core/hooks/useBranchColors';
 import { useJobPolling } from '../../../core/hooks/useJobPolling';
 import { toast } from '../../../core/toast';
@@ -124,6 +125,8 @@ export const DataPreviewSettings: React.FC<{ config: DataPreviewConfig; onChange
     setIsRunning(true);
     try {
       const pipelineConfig = convertGraphToPipelineConfig(nodes, edges);
+
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
 
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,

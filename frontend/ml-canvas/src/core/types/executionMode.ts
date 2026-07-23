@@ -1,8 +1,9 @@
 /**
  * Single source of truth for the modeling-node `execution_mode` field.
  *
- * Background: training nodes (`basic_training`, `advanced_tuning`) and
- * auto-parallel terminals (`data_preview`) can either merge multiple
+ * Background: canonical training nodes (`training`, `classification`,
+ * `regression`, `text_classification`) and auto-parallel terminals
+ * (`data_preview`) can either merge multiple
  * upstream inputs into one dataset or fan out and run each input as a
  * separate experiment. Before this module the constant set was duplicated
  * across `PropertiesPanel`, `CustomNodeWrapper`, `useBranchColors`, and
@@ -24,8 +25,10 @@ export const DEFAULT_EXECUTION_MODE: ExecutionMode = 'merge';
  * stays cheap and adding new training-style nodes only touches this file.
  */
 export const EXECUTION_MODE_AWARE_TYPES: ReadonlySet<string> = new Set([
-  'basic_training',
-  'advanced_tuning',
+  'training',
+  'classification',
+  'regression',
+  'text_classification',
 ]);
 
 /**

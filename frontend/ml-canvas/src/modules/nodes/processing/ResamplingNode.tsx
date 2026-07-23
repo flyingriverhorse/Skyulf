@@ -205,6 +205,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 >
                     {config.type === 'oversampling' ? (
                         <>
+                            <option value="random_over">Random Over Sampler</option>
                             <option value="smote">SMOTE</option>
                             <option value="adasyn">ADASYN</option>
                             <option value="borderline_smote">Borderline SMOTE</option>
@@ -223,7 +224,7 @@ const ResamplingSettings: React.FC<{ config: ResamplingConfig; onChange: (c: Res
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                     {config.type === 'oversampling'
-                        ? 'Generate synthetic samples for the minority class.'
+                        ? 'Balance minority classes with duplicated or synthetic samples.'
                         : 'Remove samples from the majority class.'}
                 </p>
             </div>

@@ -439,7 +439,7 @@ def test_scenario_06_training_with_multiple_preprocessor_branches(tmp_path: Path
             ),
             NodeConfig(
                 node_id="training",
-                step_type=StepType.BASIC_TRAINING,
+                step_type=StepType.TRAINING,
                 inputs=["scaler_a", "scaler_b"],
                 params={
                     "target_column": "Species",
@@ -530,7 +530,7 @@ def test_scenario_08_full_three_path_canvas(tmp_path: Path) -> None:
                 ),
                 NodeConfig(
                     node_id=f"train_{tag}",
-                    step_type=StepType.BASIC_TRAINING,
+                    step_type=StepType.TRAINING,
                     inputs=[f"split_{tag}"],
                     params={
                         "target_column": "Species",

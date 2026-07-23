@@ -139,6 +139,15 @@ class TestOversamplingFit:
 
 
 class TestOversamplingApply:
+    def test_random_over_increases_minority_count(self, imbalanced_pandas: Any) -> None:
+        """RandomOverSampler must balance a standard single-output target."""
+        X, y = imbalanced_pandas
+        art = OversamplingCalculator().fit((X, y), {"method": "random_over"})
+
+        _, y_res = OversamplingApplier().apply((X, y), art)
+
+        assert y_res.value_counts()[1] == y_res.value_counts()[0]
+
     def test_smote_increases_minority_count(self, imbalanced_pandas: Any) -> None:
         """SMOTE must increase minority class count to match (or approach) majority."""
         X, y = imbalanced_pandas
@@ -344,21 +353,19 @@ class TestMissingTargetReturnsUnchanged:
         pd.testing.assert_frame_equal(result, X)
 
 
-class TestUnknownMethodReturnsUnchanged:
+class TestUnknownMethodRaises:
     """Scenarios loaded from
     ``tests/test_cases/preprocessing/resampling.json`` (group ``unknown_method_validation``).
     """
 
     @pytest.mark.parametrize(*_unknown_method_cases)
-    def test_unknown_method_returns_unchanged(
-        self, kind: str, method: str, imbalanced_pandas: Any
-    ) -> None:
-        """An unknown method name must return the data unchanged (no sampler built)."""
+    def test_unknown_method_raises(self, kind: str, method: str, imbalanced_pandas: Any) -> None:
+        """An unknown method must fail instead of silently skipping resampling."""
         X, y = imbalanced_pandas
         art = _CALCULATORS[kind]().fit((X, y), {"method": method})
         art["method"] = "totally_unknown_method"
-        X_res, y_res = _APPLIERS[kind]().apply((X, y), art)
-        assert len(X_res) == len(X)
+        with pytest.raises(ValueError, match="Unsupported resampling method"):
+            _APPLIERS[kind]().apply((X, y), art)
 
 
 # ---------------------------------------------------------------------------
@@ -589,18 +596,15 @@ class TestResamplePolarsEdgeCases:
         assert isinstance(result, pl.DataFrame)
         assert result.shape == pl_X.shape
 
-    def test_oversampling_polars_unknown_method_returns_unchanged(
-        self, imbalanced_pandas: Any
-    ) -> None:
-        """Polars input with an unknown sampler method must return the data unchanged."""
+    def test_oversampling_polars_unknown_method_raises(self, imbalanced_pandas: Any) -> None:
+        """Polars input with an unknown sampler method must fail loudly."""
         X, y = imbalanced_pandas
         art = OversamplingCalculator().fit((X, y), {"method": "smote"})
         art["method"] = "totally_unknown_method"
         pl_X = pl.from_pandas(X)
         pl_y = pl.from_pandas(y.to_frame()).to_series()
-        X_res, y_res = OversamplingApplier().apply((pl_X, pl_y), art)
-        assert isinstance(X_res, pl.DataFrame)
-        assert X_res.shape[0] == pl_X.shape[0]
+        with pytest.raises(ValueError, match="Unsupported resampling method"):
+            OversamplingApplier().apply((pl_X, pl_y), art)
 
 
 # ---------------------------------------------------------------------------

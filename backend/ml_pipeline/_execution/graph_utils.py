@@ -7,7 +7,7 @@ from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 
 logger = logging.getLogger(__name__)
 
-TERMINAL_STEP_TYPES = {"basic_training", "advanced_tuning"}
+TERMINAL_STEP_TYPES = {"training"}
 # Step types that should be treated as terminal sinks when splitting a graph
 # into parallel sub-pipelines for execution. Includes ``data_preview`` so a
 # preview leaf coexisting with a training/tuning terminal gets its own
@@ -549,9 +549,7 @@ def extract_job_details(
             "train_test_split",
             "TrainTestSplitter",
             "feature_target_split",
-            StepType.BASIC_TRAINING,
-            StepType.ADVANCED_TUNING,
-            "hyperparameter_tuning",
+            StepType.TRAINING,
         ] and params.get("target_column"):
             target_column = params.get("target_column")
 

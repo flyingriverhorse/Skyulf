@@ -58,7 +58,7 @@ ExportMode = Literal["full", "compact"]
 # Step types that are NOT preprocessing transformations. They get rendered
 # as dedicated sections (data load, splits, modeling).
 _DATA_LOADER_STEPS = {"data_loader"}
-_MODELING_STEPS = {"basic_training", "advanced_tuning"}
+_MODELING_STEPS = {"training"}
 _RESAMPLER_STEPS = {"Oversampling", "Undersampling"}
 # Visual / preview-only nodes that have no runtime effect.
 _PREVIEW_STEPS = {"data_preview", "Unknown"}

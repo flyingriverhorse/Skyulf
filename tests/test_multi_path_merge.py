@@ -96,7 +96,7 @@ class TestResolveAllInputs:
 
         node = NodeConfig(
             node_id="test_node",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["upstream_1"],
         )
         # Need topo order
@@ -114,7 +114,7 @@ class TestResolveAllInputs:
 
         node = NodeConfig(
             node_id="test_node",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["node_b", "node_a"],  # Out of topo order
         )
         engine._topo_order = {"node_a": 0, "node_b": 1, "test_node": 2}
@@ -128,7 +128,7 @@ class TestResolveAllInputs:
     def test_no_inputs_raises(self, engine):
         node = NodeConfig(
             node_id="test_node",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=[],
         )
         with pytest.raises(ValueError, match="has no inputs"):
@@ -145,7 +145,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="merge_test",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1"],
         )
         engine._topo_order = {"up_1": 0, "merge_test": 1}
@@ -163,7 +163,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["scaler", "encoder"],
         )
         engine._topo_order = {"scaler": 0, "encoder": 1, "train": 2}
@@ -182,7 +182,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1", "up_2"],
         )
         engine._topo_order = {"up_1": 0, "up_2": 1, "train": 2}
@@ -201,7 +201,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1", "up_2"],
         )
         engine._topo_order = {"up_1": 0, "up_2": 1, "train": 2}
@@ -220,7 +220,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1", "up_2"],
         )
         engine._topo_order = {"up_1": 0, "up_2": 1, "train": 2}
@@ -237,7 +237,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1", "up_2"],
         )
         engine._topo_order = {"up_1": 0, "up_2": 1, "train": 2}
@@ -254,7 +254,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1", "up_2"],
         )
         engine._topo_order = {"up_1": 0, "up_2": 1, "train": 2}
@@ -273,7 +273,7 @@ class TestMergeInputs:
 
         node = NodeConfig(
             node_id="train",
-            step_type=StepType.BASIC_TRAINING,
+            step_type=StepType.TRAINING,
             inputs=["up_1", "up_2", "up_3"],
         )
         engine._topo_order = {"up_1": 0, "up_2": 1, "up_3": 2, "train": 3}
@@ -332,7 +332,7 @@ class TestMultiPathPipeline:
                 ),
                 NodeConfig(
                     node_id="training",
-                    step_type=StepType.BASIC_TRAINING,
+                    step_type=StepType.TRAINING,
                     inputs=["scaler", "scaler2"],
                     params={
                         "target_column": "target",
@@ -386,7 +386,7 @@ class TestMultiPathPipeline:
                 ),
                 NodeConfig(
                     node_id="training",
-                    step_type=StepType.BASIC_TRAINING,
+                    step_type=StepType.TRAINING,
                     inputs=["split"],
                     params={
                         "target_column": "target",

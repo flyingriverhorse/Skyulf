@@ -44,7 +44,8 @@ describe('convertGraphToPipelineConfig — snapshots', () => {
                 strategy: 'mean',
                 columns: ['x', 'y'],
             }),
-            node('train', 'basic_training', {
+            node('train', 'classification', {
+                run_mode: 'basic',
                 target_column: 'target',
                 model_type: 'random_forest_classifier',
                 hyperparameters: { n_estimators: 100 },
@@ -91,7 +92,8 @@ describe('convertGraphToPipelineConfig — snapshots', () => {
         const nodes = [
             node('ds', 'dataset_node', { datasetId: 'd1' }),
             node('impA', 'imputation_node', { method: 'simple', strategy: 'mean' }),
-            node('train', 'basic_training', {
+            node('train', 'classification', {
+                run_mode: 'basic',
                 target_column: 'y',
                 model_type: 'rf',
                 hyperparameters: {},

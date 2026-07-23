@@ -3,10 +3,9 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob, MLJob
+from backend.database.models import MLJob, TrainingJob
 from backend.ml_pipeline._execution.schemas import PipelineExecutionResult
 from backend.ml_pipeline._execution.summary import build_summary
-from backend.ml_pipeline.constants import StepType
 
 
 class JobStrategy(ABC):
@@ -15,13 +14,18 @@ class JobStrategy(ABC):
     Encapsulates logic specific to different job types (Training, Tuning, etc.).
     """
 
-    @abstractmethod
+    run_mode: str
+
     def get_job_model(self) -> type[MLJob]:
         """Returns the SQLAlchemy model class for this job type."""
+        return TrainingJob
 
     def get_job(self, session: Session, job_id: str) -> MLJob | None:
-        """Fetches the job from the database."""
-        return session.query(self.get_job_model()).filter(self.get_job_model().id == job_id).first()
+        """Fetches the job from the database, scoped to this strategy's `run_mode`."""
+        model = self.get_job_model()
+        return (
+            session.query(model).filter(model.id == job_id, model.run_mode == self.run_mode).first()
+        )
 
     @abstractmethod
     def get_initial_log(self, job: MLJob) -> str:
@@ -124,25 +128,21 @@ class JobStrategy(ABC):
 
 
 class BasicTrainingStrategy(JobStrategy):
-    def get_job_model(self) -> type[MLJob]:
-        return BasicTrainingJob
+    run_mode = "fixed"
 
     def get_initial_log(self, job: MLJob) -> str:
         timestamp = datetime.now().strftime("%H:%M:%S")
-        # Cast to BasicTrainingJob to access specific fields if needed,
-        # though 'version' is on the model
         version = getattr(job, "version", "unknown")
         return f"[{timestamp}] Training Job Version: {version}"
 
 
 class AdvancedTuningStrategy(JobStrategy):
-    def get_job_model(self) -> type[MLJob]:
-        return AdvancedTuningJob
+    run_mode = "tuned"
 
     def get_initial_log(self, job: MLJob) -> str:
         timestamp = datetime.now().strftime("%H:%M:%S")
-        run_number = getattr(job, "run_number", "unknown")
-        return f"[{timestamp}] Tuning Job Run: {run_number}"
+        version = getattr(job, "version", "unknown")
+        return f"[{timestamp}] Tuning Job Run: {version}"
 
     def handle_success(self, job: MLJob, result: PipelineExecutionResult) -> None:
         # Call base to set standard metrics
@@ -162,35 +162,28 @@ class AdvancedTuningStrategy(JobStrategy):
 
 class JobStrategyFactory:
     _strategies: dict[str, JobStrategy] = {
-        StepType.BASIC_TRAINING: BasicTrainingStrategy(),
-        StepType.ADVANCED_TUNING: AdvancedTuningStrategy(),
+        "training": BasicTrainingStrategy(),
+        "tuning": AdvancedTuningStrategy(),
         # Add more strategies here as needed
     }
 
     @classmethod
-    def get_strategy(cls, job_type: str) -> JobStrategy:
-        """Returns the strategy for the given job type."""
-        if job_type in cls._strategies:
-            return cls._strategies[job_type]
-        raise ValueError(f"Unknown job type: {job_type}")
-
-    @classmethod
     def get_strategy_by_job(cls, job: MLJob) -> JobStrategy:
-        if isinstance(job, BasicTrainingJob):
-            return cls._strategies[StepType.BASIC_TRAINING]
-        elif isinstance(job, AdvancedTuningJob):
-            return cls._strategies[StepType.ADVANCED_TUNING]
+        run_mode = getattr(job, "run_mode", None)
+        if run_mode == "fixed":
+            return cls._strategies["training"]
+        elif run_mode == "tuned":
+            return cls._strategies["tuning"]
         else:
-            raise ValueError(f"Unknown job type: {type(job)}")
+            raise ValueError(f"Unknown job run_mode: {run_mode!r} (job type: {type(job)})")
 
     @classmethod
     def find_job(cls, session: Session, job_id: str) -> tuple[MLJob | None, JobStrategy | None]:
         """
-        Tries to find the job in all known tables.
-        Returns (job, strategy) or (None, None).
+        Looks up the job by id (single shared table) and resolves its strategy
+        from `run_mode`. Returns (job, strategy) or (None, None).
         """
-        for strategy in cls._strategies.values():
-            job = strategy.get_job(session, job_id)
-            if job:
-                return job, strategy
-        return None, None
+        job = session.query(TrainingJob).filter(TrainingJob.id == job_id).first()
+        if job is None:
+            return None, None
+        return job, cls.get_strategy_by_job(job)

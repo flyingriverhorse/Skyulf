@@ -462,6 +462,23 @@ def test_apply_polars_degenerate_edges_produce_no_expr() -> None:
     assert "x_binned" not in result.columns
 
 
+def test_apply_polars_ignores_invalid_custom_labels_like_pandas() -> None:
+    """Mismatched custom labels must fall back to ordinal bins on both engines."""
+    df_pd = pd.DataFrame({"x": [1.0, 6.0]})
+    params: dict[str, Any] = {
+        "bin_edges": {"x": [0.0, 5.0, 10.0]},
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "ordinal",
+        "custom_labels": {"x": ["only_one_label"]},
+    }
+
+    pandas_result = GeneralBinningApplier().apply(df_pd, params)
+    polars_result = GeneralBinningApplier().apply(pl.from_pandas(df_pd), params).to_pandas()
+
+    assert polars_result["x_binned"].tolist() == pandas_result["x_binned"].tolist()
+
+
 def test_apply_polars_missing_column_is_skipped() -> None:
     """A bin_edges entry for a column absent from the polars frame must be skipped."""
     df_pl = pl.DataFrame({"y": [1, 2, 3]})
@@ -549,6 +566,27 @@ def test_apply_pandas_degenerate_edges_column_is_skipped() -> None:
         "custom_labels": {},
     }
     result = GeneralBinningApplier().apply(df, params)
+    assert "x_binned" not in result.columns
+    assert "x" in result.columns
+
+
+def test_apply_pandas_failed_binning_preserves_source_with_drop_original() -> None:
+    """A failed bin must not drop the only usable source column."""
+    df = pd.DataFrame({"x": [1.0, 2.0, 3.0]})
+    params: dict[str, Any] = {
+        "bin_edges": {"x": [5.0, 5.0]},
+        "output_suffix": "_binned",
+        "drop_original": True,
+        "label_format": "ordinal",
+        "missing_strategy": "keep",
+        "missing_label": "Missing",
+        "include_lowest": True,
+        "precision": 3,
+        "custom_labels": {},
+    }
+
+    result = GeneralBinningApplier().apply(df, params)
+
     assert "x_binned" not in result.columns
     assert "x" in result.columns
 

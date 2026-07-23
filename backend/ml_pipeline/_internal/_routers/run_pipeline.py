@@ -104,7 +104,10 @@ def _resolve_branch_target_node_id(
 ) -> str | None:
     """Identify the terminal node for a sub-pipeline (training/tuning/preview leaf)."""
     target_node_id = requested_target_node_id
-    terminal_types = {StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING, "data_preview"}
+    terminal_types = {
+        StepType.TRAINING,
+        "data_preview",
+    }
     for n in reversed(sub.nodes):
         if n.step_type in terminal_types:
             target_node_id = n.node_id
@@ -119,16 +122,13 @@ def _resolve_model_and_job_type(
 ) -> tuple[str, Any]:
     """Determine model type and job type from the sub-pipeline's terminal node."""
     model_type = "unknown"
-    job_type = requested_job_type or StepType.BASIC_TRAINING
+    job_type = requested_job_type or "training"
     for n in sub.nodes:
         if n.node_id != target_node_id:
             continue
-        if n.step_type == StepType.BASIC_TRAINING:
-            model_type = n.params.get("model_type", n.params.get("algorithm", "unknown"))
-            job_type = StepType.BASIC_TRAINING
-        elif n.step_type == StepType.ADVANCED_TUNING:
+        if n.step_type == StepType.TRAINING:
             model_type = n.params.get("algorithm", n.params.get("model_type", "unknown"))
-            job_type = StepType.ADVANCED_TUNING
+            job_type = "tuning" if n.params.get("run_mode", "fixed") == "tuned" else "training"
         elif n.step_type == "data_preview":
             model_type = "preview"
             job_type = "preview"
@@ -198,7 +198,7 @@ async def _submit_or_dedupe_branch_job(
             session=db,
             pipeline_id=sub.pipeline_id,
             node_id=target_node_id or "unknown",
-            job_type=cast(Literal["basic_training", "advanced_tuning", "preview"], job_type),
+            job_type=cast(Literal["training", "tuning", "preview"], job_type),
             dataset_id=dataset_id,
             model_type=model_type,
             graph=branch_graph,

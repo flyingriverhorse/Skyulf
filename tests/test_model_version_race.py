@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import delete
 
 from backend.database import engine
-from backend.database.models import AdvancedTuningJob, BasicTrainingJob, ModelVersionCounter
+from backend.database.models import ModelVersionCounter, TrainingJob
 from backend.ml_pipeline.model_registry.service import ModelRegistryService
 
 
@@ -22,10 +22,7 @@ async def _cleanup(dataset_id: str, model_type: str) -> None:
     await engine.init_db()
     async with engine.async_session_factory() as session:
         await session.execute(
-            delete(BasicTrainingJob).where(BasicTrainingJob.dataset_source_id == dataset_id)
-        )
-        await session.execute(
-            delete(AdvancedTuningJob).where(AdvancedTuningJob.dataset_source_id == dataset_id)
+            delete(TrainingJob).where(TrainingJob.dataset_source_id == dataset_id)
         )
         await session.execute(
             delete(ModelVersionCounter).where(
@@ -65,7 +62,7 @@ async def test_concurrent_get_next_version_never_duplicates() -> None:
 @pytest.mark.asyncio
 async def test_get_next_version_seeds_from_existing_job_history() -> None:
     """When no counter row exists yet, the first allocation must seed from
-    the max of pre-existing BasicTrainingJob.version / AdvancedTuningJob.run_number
+    the max of pre-existing TrainingJob.version rows (either run_mode)
     (backward compatibility for jobs created before the counter table existed)."""
     dataset_id = "ds_race_seed"
     model_type = "rf_race_seed"
@@ -73,7 +70,7 @@ async def test_get_next_version_seeds_from_existing_job_history() -> None:
 
     async with engine.async_session_factory() as session:
         session.add(
-            BasicTrainingJob(
+            TrainingJob(
                 id="job-seed-1",
                 pipeline_id="p1",
                 node_id="n1",
@@ -81,6 +78,7 @@ async def test_get_next_version_seeds_from_existing_job_history() -> None:
                 status="completed",
                 version=5,
                 model_type=model_type,
+                run_mode="fixed",
                 graph={},
             )
         )

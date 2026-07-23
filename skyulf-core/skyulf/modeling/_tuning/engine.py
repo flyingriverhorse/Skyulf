@@ -8,9 +8,11 @@ from typing import Any, cast
 import numpy as np
 import pandas as pd
 from joblib import parallel_backend
+from sklearn.exceptions import ConvergenceWarning
 
 # Explicitly enable experimental halving search cv
 from sklearn.experimental import enable_halving_search_cv  # noqa
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (
     HalvingGridSearchCV,
     HalvingRandomSearchCV,
@@ -24,6 +26,7 @@ from sklearn.model_selection import (
 
 from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
+from .._sklearn_compat import normalize_logistic_regression_params
 from ..base import BaseModelApplier, BaseModelCalculator
 from .schemas import TuningConfig, TuningResult
 
@@ -127,6 +130,17 @@ class TuningCalculator(BaseModelCalculator):
         flat, nested = TuningCalculator._split_flat_and_nested_params(params)
         flat = TuningCalculator._filter_params_to_signature(model_class, flat)
 
+        # LogisticRegression-only: sklearn >=1.8 deprecates the ``penalty``
+        # constructor arg. The tuning engine builds estimators directly
+        # (bypassing LogisticRegressionCalculator._resolve_fit_params), so a
+        # ``penalty`` coming from the search space/best_params would otherwise
+        # reach sklearn unnormalized and trigger the FutureWarning on every
+        # fold fit and the final refit. Other models (e.g. SGDClassifier) also
+        # have a ``penalty`` param with different, non-deprecated semantics,
+        # so this must stay scoped to LogisticRegression specifically.
+        if model_class is LogisticRegression:
+            flat = normalize_logistic_regression_params(flat)
+
         model = model_class(**flat)
         if nested:
             model.set_params(**nested)
@@ -196,9 +210,21 @@ class TuningCalculator(BaseModelCalculator):
         # ``a__b`` keys — e.g. an ensemble's tuned base-model params — through
         # ``set_params`` so they are not silently dropped.
         model = self._instantiate_model(model_cls, final_params)
-        with warnings.catch_warnings():
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
             warnings.filterwarnings("ignore", message=".*valid feature names.*")
             model.fit(X_np, y_np)
+        for w in caught:
+            if issubclass(w.category, ConvergenceWarning):
+                conv_msg = (
+                    f"Final refit of {model_cls.__name__} with the best params did not "
+                    f"fully converge: {w.message}"
+                )
+                logger.warning(conv_msg)
+                if log_callback:
+                    log_callback(conv_msg)
+            else:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
 
         return model
 
@@ -252,14 +278,38 @@ class TuningCalculator(BaseModelCalculator):
             X_val_np, y_val_np = SklearnBridge.to_sklearn((X_val, y_val))
             validation_data_np = (X_val_np, y_val_np)
 
-        tuning_result = self.tune(
-            X_np,
-            y_np,
-            tuning_config,
-            progress_callback=progress_callback,
-            log_callback=log_callback,
-            validation_data=validation_data_np,
-        )
+        # Wrap the whole candidate/fold search: sklearn's ConvergenceWarning
+        # (raised via `warnings.warn`, not the `logging` module) would
+        # otherwise only reach the server's stderr, once per fold/candidate,
+        # and never surface to the user. Aggregate into a single summary log
+        # line instead of one per fold (a full grid/random search can run
+        # hundreds of fold fits) and re-emit any other warning category
+        # unchanged so existing behavior for those is preserved.
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            tuning_result = self.tune(
+                X_np,
+                y_np,
+                tuning_config,
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+                validation_data=validation_data_np,
+            )
+        convergence_count = 0
+        for w in caught:
+            if issubclass(w.category, ConvergenceWarning):
+                convergence_count += 1
+            else:
+                warnings.warn_explicit(w.message, w.category, w.filename, w.lineno)
+        if convergence_count:
+            conv_msg = (
+                f"{convergence_count} candidate fit(s) during hyperparameter search did not "
+                "fully converge (max_iter reached). Consider increasing max_iter, scaling "
+                "features, or picking a different solver."
+            )
+            logger.warning(conv_msg)
+            if log_callback:
+                log_callback(conv_msg)
 
         # Refit the best model on the full dataset
         model = self._refit_best_model(tuning_result, tuning_config, X_np, y_np, log_callback)

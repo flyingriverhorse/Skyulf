@@ -160,3 +160,43 @@ class TestS3Catalog:
             mock_read_csv.assert_called_with(
                 "s3://my-bucket/data.csv", nrows=None, storage_options={}
             )
+
+    def test_caller_supplied_endpoint_url_is_dropped(self):
+        """SSRF fix: a caller-supplied endpoint_url must never reach s3fs unless the
+        server operator has configured AWS_ENDPOINT_URL themselves."""
+        with (
+            patch.dict("sys.modules", {"s3fs": MagicMock()}),
+            patch("backend.data.catalog.get_settings") as mock_get_settings,
+        ):
+            mock_get_settings.return_value = MagicMock(AWS_ENDPOINT_URL=None)
+            catalog = S3Catalog(
+                bucket_name="my-bucket",
+                storage_options={"endpoint_url": "http://169.254.169.254/latest/meta-data/"},
+            )
+
+            prepared = catalog._prepare_s3fs_options(catalog.storage_options)
+
+            assert "client_kwargs" not in prepared or "endpoint_url" not in prepared.get(
+                "client_kwargs", {}
+            )
+
+    def test_server_configured_endpoint_url_is_used_instead(self):
+        """When AWS_ENDPOINT_URL is configured server-side, it wins over whatever the
+        caller supplied — the caller's value is discarded, not merged."""
+        with (
+            patch.dict("sys.modules", {"s3fs": MagicMock()}),
+            patch("backend.data.catalog.get_settings") as mock_get_settings,
+        ):
+            mock_get_settings.return_value = MagicMock(
+                AWS_ENDPOINT_URL="https://trusted-minio.internal:9000"
+            )
+            catalog = S3Catalog(
+                bucket_name="my-bucket",
+                storage_options={"endpoint_url": "http://169.254.169.254/latest/meta-data/"},
+            )
+
+            prepared = catalog._prepare_s3fs_options(catalog.storage_options)
+
+            assert (
+                prepared["client_kwargs"]["endpoint_url"] == "https://trusted-minio.internal:9000"
+            )

@@ -64,8 +64,7 @@ _SPLIT_OR_MODEL = {
     "data_loader",
     "feature_target_split",
     "TrainTestSplitter",
-    "basic_training",
-    "advanced_tuning",
+    "training",
 }
 
 

@@ -10,7 +10,7 @@ The :class:`PipelineEngine` orchestrates execution of pipelines defined by
 * :class:`._feature_eng.FeatureEngMixin` — composite FeatureEngineer building,
   ``_run_feature_engineering``, and inference-bundle assembly.
 * :class:`._node_runners.NodeRunnersMixin` — per-step runners
-  (``_run_data_loader``, ``_run_basic_training``, ``_run_advanced_tuning``,
+  (``_run_data_loader``, ``_run_training`` — unified fixed/tuned training,
   ``_run_transformer``, ``_run_data_preview``).
 
 This module owns the public API (``run``), per-node dispatch (``_execute_node``),
@@ -28,6 +28,7 @@ from skyulf.data.catalog import DataCatalog
 
 from ...artifacts.store import ArtifactStore
 from ...constants import StepType
+from .._leakage_validation import validate_no_preprocessing_before_split
 from .._schema_graph import predict_schemas, schemas_to_dict
 from ..schemas import (
     NodeConfig,
@@ -71,10 +72,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
 
     def _pipeline_has_training_node(self) -> bool:
         """Checks if the current pipeline workflow includes a model training step."""
-        return any(
-            node.step_type in [StepType.BASIC_TRAINING, StepType.ADVANCED_TUNING]
-            for node in self._node_configs.values()
-        )
+        return any(node.step_type == StepType.TRAINING for node in self._node_configs.values())
 
     def _predict_schemas_safe(self, config: PipelineConfig) -> dict[str, dict[str, Any] | None]:
         """C7 Phase B helper: best-effort pre-run schema prediction.
@@ -185,6 +183,14 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         Executes the pipeline defined by the configuration.
         """
         self.log(f"Starting pipeline execution: {config.pipeline_id} (Job: {job_id})")
+
+        # Fail fast (before any node runs / any fitting happens) if a
+        # data-dependent preprocessing node is wired upstream of a
+        # train/test splitter — that ordering fits the transformer's
+        # statistics on the whole dataset (train+test), leaking test data
+        # into what should be train-only parameters.
+        validate_no_preprocessing_before_split(config.nodes)
+
         _, pipeline_result = self._init_run_state(config, dataset_name)
 
         # C7 Phase B: walk the topology once and ask each Calculator's
@@ -244,10 +250,8 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
             return self._run_data_loader(node, job_id=job_id), metrics
         if node.step_type == StepType.FEATURE_ENGINEERING:
             return self._dispatch_feature_engineering(node, job_id)
-        if node.step_type == StepType.BASIC_TRAINING:
-            return self._run_basic_training(node, job_id=job_id)
-        if node.step_type == StepType.ADVANCED_TUNING:
-            return self._run_advanced_tuning(node, job_id=job_id)
+        if node.step_type == StepType.TRAINING:
+            return self._run_training(node, job_id=job_id)
         if node.step_type == "data_preview":
             return self._run_data_preview(node)
 

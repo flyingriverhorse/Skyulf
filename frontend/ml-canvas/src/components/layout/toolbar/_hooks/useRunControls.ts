@@ -4,10 +4,11 @@ import { useJobStore } from '../../../../core/store/useJobStore';
 import { runPipelinePreview } from '../../../../core/api/client';
 import { jobsApi } from '../../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
+import { warnAndBlockOnLeakage } from '../../../../core/utils/pipelineLeakageValidation';
 import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
 import { toast } from '../../../../core/toast';
 
-const TRAINING_TYPES = new Set(['basic_training', 'advanced_tuning']);
+const TRAINING_TYPES = new Set(['training', 'classification', 'regression', 'text_classification']);
 
 export interface RunControls {
   isRunning: boolean;
@@ -73,6 +74,7 @@ export function useRunControls(): RunControls {
         (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
       );
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const result = await runPipelinePreview(pipelineConfig);
       setExecutionResult(result);
     } catch (error) {
@@ -100,9 +102,10 @@ export function useRunControls(): RunControls {
         (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
       );
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
+      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
-        job_type: 'basic_training',
+        job_type: 'training',
       });
       const count = response.job_ids?.length || 1;
       if (response.job_ids?.length > 1) {

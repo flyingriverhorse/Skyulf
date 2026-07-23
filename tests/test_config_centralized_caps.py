@@ -90,6 +90,21 @@ def test_error_timeline_hours_clamped_to_default_setting(client):
     assert len(response.json()) == 168
 
 
+def test_detailed_health_check_returns_only_aggregate_status(client):
+    """/health/detailed must not disclose per-backend/integration names or details
+    to anonymous callers — only a coarse ``dependencies_healthy`` boolean.
+    """
+    response = client.get("/health/detailed")
+    assert response.status_code == 200
+    body = response.json()
+    assert "dependencies_healthy" in body
+    assert isinstance(body["dependencies_healthy"], bool)
+    # These previously-leaked per-backend/integration fields must be gone.
+    assert "database_status" not in body
+    assert "cache_status" not in body
+    assert "external_services" not in body
+
+
 def test_error_timeline_hours_clamped_to_configured_setting(client, monkeypatch):
     """Lowering MONITORING_MAX_TIMELINE_HOURS should tighten the clamp."""
     _patched_settings(monkeypatch, MONITORING_MAX_TIMELINE_HOURS=5)

@@ -134,9 +134,14 @@ def _drop_selected_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, 
 
 
 def _extract_target(X_pd: pd.DataFrame, y: Any, target_col: str | None) -> pd.Series | None:
-    """Return ``y`` if provided; else pull ``target_col`` from the (pandas) frame."""
+    """Return ``y`` if provided; else pull ``target_col`` from the (pandas) frame.
+
+    ``y`` may arrive as a Polars Series when the pipeline runs on the Polars
+    engine; the rest of this module (``_infer_problem_type``, ``pd.factorize``,
+    etc.) assumes a pandas Series, so normalize here rather than in every caller.
+    """
     if y is not None:
-        return y
+        return y.to_pandas() if hasattr(y, "to_pandas") else y
     if not target_col or target_col not in X_pd.columns:
         return None
     return X_pd[target_col]
@@ -188,10 +193,29 @@ _UNIVARIATE_SELECTOR_BUILDERS: dict[str, Callable[[Any, dict[str, Any]], Any]] =
     ),
 }
 
+# The node's documented default (``params={"method": "SelectKBest", ...}`` in
+# @node_meta) uses sklearn's own PascalCase class names, but the builder dict
+# above is keyed by snake_case aliases. Without this alias map, the
+# documented default silently no-ops (unknown method -> no selector built).
+_UNIVARIATE_METHOD_ALIASES: dict[str, str] = {
+    "selectkbest": "select_k_best",
+    "selectpercentile": "select_percentile",
+    "selectfpr": "select_fpr",
+    "selectfdr": "select_fdr",
+    "selectfwe": "select_fwe",
+    "genericunivariateselect": "generic_univariate_select",
+}
+
+
+def _normalize_univariate_method(method: str) -> str:
+    """Map either snake_case or sklearn PascalCase method names to the internal key."""
+    key = method.lower().replace("_", "")
+    return _UNIVARIATE_METHOD_ALIASES.get(key, method)
+
 
 def _build_univariate_selector(method: str, score_func: Any, config: dict[str, Any]) -> Any | None:
     """Construct the sklearn univariate selector named by ``method``."""
-    builder = _UNIVARIATE_SELECTOR_BUILDERS.get(method)
+    builder = _UNIVARIATE_SELECTOR_BUILDERS.get(_normalize_univariate_method(method))
     return builder(score_func, config) if builder else None
 
 

@@ -587,6 +587,7 @@ function TargetSelector({ config, update, columns }: {
 /** Tuning controls shown in Advanced mode: search strategy, trial budget, metric. */
 function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; update: UpdateFn }) {
   const [showStrategyModal, setShowStrategyModal] = useState(false);
+  const [showBaseTuningDetails, setShowBaseTuningDetails] = useState(false);
   const showStrategyBtn =
     config.search_strategy === 'halving_grid' ||
     config.search_strategy === 'halving_random' ||
@@ -601,7 +602,13 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
       <div className="grid grid-cols-2 gap-3">
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">Search Strategy</span>
+            <span className="flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+              Search Strategy
+              <HelpTooltip
+                placement="bottom-left"
+                text="Searches the ensemble's own params (e.g. voting/cv), not each base model. Enable &quot;Tune base model hyperparameters&quot; below to also search each model's params."
+              />
+            </span>
             {showStrategyBtn && (
               <button
                 type="button"
@@ -658,9 +665,28 @@ function AdvancedTuningOptions({ config, update }: { config: EnsembleConfig; upd
           onChange={(e) => { update({ tune_base_models: e.target.checked }); }}
           className="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
         />
-        <span>
-          <strong>Tune base model hyperparameters</strong> — searches each base learner&apos;s params
-          (e.g. <code>random_forest__n_estimators</code>) in addition to the ensemble&apos;s own.
+        <span className="flex-1">
+          <span className="inline-flex items-center gap-1">
+            <strong>Tune base model hyperparameters</strong>
+            <button
+              type="button"
+              onClick={() => { setShowBaseTuningDetails(!showBaseTuningDetails); }}
+              className="text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+              title={showBaseTuningDetails ? 'Hide details' : 'Show details'}
+            >
+              <ChevronRight
+                className={`w-3 h-3 transition-transform ${showBaseTuningDetails ? 'rotate-90' : ''}`}
+              />
+            </button>
+          </span>
+          {showBaseTuningDetails && (
+            <span className="block mt-1 text-gray-500 dark:text-gray-400">
+              Automatically searches each selected base learner&apos;s default parameter range
+              (e.g. <code>random_forest__n_estimators</code>), in addition to the ensemble&apos;s own
+              params. Ranges are picked automatically per model — uncheck this to tune only the
+              ensemble-level params and keep base models at the fixed values set in Basic mode.
+            </span>
+          )}
         </span>
       </label>
 
@@ -773,7 +799,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
 
     for (const edge of incomingEdges) {
       const src = nodes.find((n) => n.id === edge.source);
-      if (src && ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'].includes(src.data.definitionType as string)) {
+      if (src && ['training', 'classification', 'regression', 'text_classification'].includes(src.data.definitionType as string)) {
         incomingModels.push(src);
       }
     }
@@ -799,12 +825,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
     let detectedTrials = config.n_trials;
     let detectedMetric = config.metric;
 
-    const advancedNode = incomingModels.find(
-      (m) =>
-        m.data.definitionType === 'advanced_tuning' ||
-        m.data.definitionType === 'hyperparameter_tuning' ||
-        m.data.run_mode === 'advanced'
-    );
+    const advancedNode = incomingModels.find((m) => m.data.run_mode === 'advanced');
 
     if (advancedNode) {
       detectedRunMode = 'advanced';
@@ -967,7 +988,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
       const src = nodes.find((n) => n.id === e.source);
       return (
         !!src &&
-        ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'].includes(
+        ['training', 'classification', 'regression', 'text_classification'].includes(
           src.data.definitionType as string,
         )
       );
@@ -1131,7 +1152,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
       <div className="pt-4 mt-auto border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3 items-center">
         <button
           type="button"
-          onClick={() => { void runJob(isAdvanced ? 'advanced_tuning' : 'basic_training'); }}
+          onClick={() => { void runJob(isAdvanced ? 'tuning' : 'training', 'ensemble'); }}
           disabled={!config.target_column || tooFewModels}
           className="w-full max-w-xs flex items-center justify-center gap-2 px-6 py-2.5 text-white rounded-lg shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
           style={{ background: 'var(--main-gradient)' }}

@@ -81,40 +81,54 @@ def test_full_inference_pipeline():
         )
     )
 
-    # Node 3: Simple Imputer (Imputation)
-    # Fill missing age with median
-    nodes.append(
-        NodeConfig(
-            node_id="impute_age",
-            step_type="SimpleImputer",
-            params={"strategy": "median", "columns": ["age"]},
-            inputs=["clean_city"],
-        )
-    )
-
-    # Node 4: Manual Bounds (Outliers)
+    # Node 3: Manual Bounds (Outliers)
     # Clip age to 0-100
     nodes.append(
         NodeConfig(
             node_id="clip_age",
             step_type="ManualBounds",
             params={"bounds": {"age": {"lower": 0, "upper": 100}}},
-            inputs=["impute_age"],
+            inputs=["clean_city"],
         )
     )
 
-    # Node 5: One Hot Encoder (Encoding)
+    # Node 4: Splitter
+    # Moved up (right after stateless cleaning/clipping) so every
+    # data-dependent preprocessing node below fits only on the train
+    # portion and is merely applied to test — avoids leaking test-set
+    # statistics into imputation/encoding/scaling/feature-selection params.
+    nodes.append(
+        NodeConfig(
+            node_id="splitter",
+            step_type="TrainTestSplitter",
+            params={"test_size": 0.2, "random_state": 42},
+            inputs=["clip_age"],
+        )
+    )
+
+    # Node 5: Simple Imputer (Imputation)
+    # Fill missing age with median (fit on train only, applied to test too)
+    nodes.append(
+        NodeConfig(
+            node_id="impute_age",
+            step_type="SimpleImputer",
+            params={"strategy": "median", "columns": ["age"]},
+            inputs=["splitter"],
+        )
+    )
+
+    # Node 6: One Hot Encoder (Encoding)
     # Encode city and gender
     nodes.append(
         NodeConfig(
             node_id="encode_cats",
             step_type="OneHotEncoder",
             params={"columns": ["city", "gender"], "handle_unknown": "ignore"},
-            inputs=["clip_age"],
+            inputs=["impute_age"],
         )
     )
 
-    # Node 6: Standard Scaler (Scaling)
+    # Node 7: Standard Scaler (Scaling)
     # Scale income
     nodes.append(
         NodeConfig(
@@ -125,7 +139,7 @@ def test_full_inference_pipeline():
         )
     )
 
-    # Node 7: Variance Threshold (Feature Selection)
+    # Node 8: Variance Threshold (Feature Selection)
     # Remove low variance features (dummy check)
     nodes.append(
         NodeConfig(
@@ -136,23 +150,13 @@ def test_full_inference_pipeline():
         )
     )
 
-    # Node 8: Splitter
-    nodes.append(
-        NodeConfig(
-            node_id="splitter",
-            step_type="TrainTestSplitter",
-            params={"test_size": 0.2, "random_state": 42},
-            inputs=["select_features"],
-        )
-    )
-
     # Node 9: Model
     nodes.append(
         NodeConfig(
             node_id="model",
-            step_type="basic_training",
+            step_type="training",
             params={"algorithm": "logistic_regression", "target_column": "target"},
-            inputs=["splitter"],
+            inputs=["select_features"],
         )
     )
 

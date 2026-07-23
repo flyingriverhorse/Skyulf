@@ -180,7 +180,7 @@ export const useGraphStore = create<GraphState>()(
       const targetType = targetNode.data.definitionType as string;
 
       // Block: connecting a training/tuning output into another training/tuning node
-      const modelTypes = ['basic_training', 'advanced_tuning'];
+      const modelTypes = ['classification', 'regression', 'text_classification', 'SegmentationNode', 'EnsembleNode'];
       if (modelTypes.includes(sourceType) && modelTypes.includes(targetType)) {
         toast.error(
           'Invalid connection',
@@ -193,7 +193,7 @@ export const useGraphStore = create<GraphState>()(
       // ensemble. Base learners are spec-only (the ensemble refits them on its
       // own data), so mixing models trained on unrelated datasets is almost
       // always a wiring mistake — surface it before the edge is committed.
-      const modelSourceTypes = ['basic_training', 'advanced_tuning', 'model_training', 'hyperparameter_tuning'];
+      const modelSourceTypes = ['classification', 'regression', 'text_classification', 'SegmentationNode'];
       if (targetType === 'EnsembleNode' && modelSourceTypes.includes(sourceType)) {
         // Trace a node back to the dataset_node root(s) it derives from.
         const rootsOf = (startId: string): Set<string> => {

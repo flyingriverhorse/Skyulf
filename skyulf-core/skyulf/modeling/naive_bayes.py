@@ -7,6 +7,14 @@ when paired with a vectorization node (CountVectorizer or TfidfVectorizer).
 Note: MultinomialNB requires **non-negative** features (raw counts or TF-IDF
 scores work; TF-IDF with ``sublinear_tf=True`` still gives non-negative values).
 BernoulliNB works with binary or boolean feature matrices as well as counts.
+
+Both are tagged ``text``/``nlp`` only (no ``classification`` tag) so the
+frontend's task-scoped "Classification" node doesn't offer them as a general
+classifier: MultinomialNB errors at fit time on arbitrary negative-valued
+features, and BernoulliNB is a text/binary-indicator model that isn't a good
+general-purpose default even though it won't crash. They remain available in
+the "Text Classification" node, whose model list is filtered on the ``text``
+tag.
 """
 
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
@@ -33,7 +41,7 @@ class MultinomialNBApplier(SklearnApplier):
         "Requires non-negative input features."
     ),
     params={"alpha": 1.0, "fit_prior": True},
-    tags=["text", "nlp", "classification", "naive_bayes"],
+    tags=["text", "nlp", "naive_bayes"],
 )
 class MultinomialNBCalculator(SklearnCalculator):
     """Multinomial Naive Bayes Calculator."""
@@ -68,7 +76,7 @@ class BernoulliNBApplier(SklearnApplier):
         "Also works with continuous features via a binarization threshold."
     ),
     params={"alpha": 1.0, "binarize": 0.0, "fit_prior": True},
-    tags=["text", "nlp", "classification", "naive_bayes"],
+    tags=["text", "nlp", "naive_bayes"],
 )
 class BernoulliNBCalculator(SklearnCalculator):
     """Bernoulli Naive Bayes Calculator."""

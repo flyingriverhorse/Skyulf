@@ -93,6 +93,17 @@ desktop.ini
 # Small, hand-built/generated fixture datasets checked in for skyulf-core
 # tests are the exception — they're tiny, synthetic, and non-sensitive.
 !skyulf-core/tests/data/*.csv
+# Real (or verified, disclosed subsamples of real) Kaggle/UCI datasets bundled
+# for the skyulf-core example notebooks — see each folder's SOURCE.md for
+# provenance and sampling disclosure.
+!skyulf-core/examples/data/spaceship_titanic/*.csv
+!skyulf-core/examples/data/house_prices/*.csv
+!skyulf-core/examples/data/disaster_tweets/*.csv
+!skyulf-core/examples/data/mall_customers/*.csv
+!skyulf-core/examples/data/forest_cover/*.zip
+!skyulf-core/examples/data/santander/*.csv
+!skyulf-core/examples/data/credit_card_fraud/*.csv
+!skyulf-core/examples/data/online_retail/*.csv
 
 # === Application Data & Uploads ===
 cache/
@@ -143,3 +154,16 @@ site/
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+.superpowers/
+sast/architecture.md
+sast/final-report.md
+sast/hardcodedsecrets-results.md
+sast/idor-results.md
+sast/jwt-results.md
+sast/missingauth-results.md
+sast/pathtraversal-results.md
+sast/rce-results.md
+sast/sqli-results.md
+sast/ssrf-results.md
+sast/xss-recon.md
+sast/xss-results.md

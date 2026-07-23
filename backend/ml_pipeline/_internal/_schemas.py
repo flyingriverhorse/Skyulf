@@ -12,7 +12,6 @@ from typing import Any
 from pydantic import BaseModel
 
 from backend.ml_pipeline._internal._advisor import Recommendation
-from backend.ml_pipeline.constants import StepType
 
 
 class RegistryItem(BaseModel):
@@ -38,8 +37,8 @@ class PipelineConfigModel(BaseModel):
     nodes: list[NodeConfigModel]
     metadata: dict[str, Any] = {}
     target_node_id: str | None = None
-    # "basic_training", "advanced_tuning", or "preview".
-    job_type: str | None = StepType.BASIC_TRAINING
+    # "training", "tuning", or "preview".
+    job_type: str | None = "training"
 
 
 class RunPipelineResponse(BaseModel):
