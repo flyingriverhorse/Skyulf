@@ -478,7 +478,7 @@ def test_artifact_shape(
     extra_keys = set(result.keys()) - declared_keys
     assert not extra_keys, (
         f"{calc_cls.__name__}.fit returned undeclared keys "
-        f"{sorted(extra_keys)} (declared: {sorted(declared_keys)})"
+        f"{sorted(extra_keys)} (declared: {sorted(declared_keys)})"  # ty: ignore[invalid-argument-type]
     )
 
 

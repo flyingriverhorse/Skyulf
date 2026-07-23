@@ -203,4 +203,4 @@ class RecommendationsMixin(_AnalyzerState):
             .len(name="count")
             .collect()
         )
-        return counts_df["count"].to_list()
+        return counts_df["count"].to_list()  # ty: ignore[not-subscriptable]

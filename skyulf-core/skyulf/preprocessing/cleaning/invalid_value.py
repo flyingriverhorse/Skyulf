@@ -107,7 +107,7 @@ def _normalize_rule(
             min_value if min_value is not None else default_min,
             max_value if max_value is not None else default_max,
         )
-    return _RULE_ALIASES.get(raw_rule, raw_rule), min_value, max_value
+    return _RULE_ALIASES.get(raw_rule, raw_rule), min_value, max_value  # ty: ignore[no-matching-overload]
 
 
 class InvalidValueReplacementApplier(BaseApplier):
