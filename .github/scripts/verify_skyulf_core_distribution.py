@@ -11,7 +11,11 @@ from pathlib import Path
 
 def run(command: list[str], *, cwd: Path) -> None:
     """Run a checked command in the isolated verification directory."""
-    subprocess.run(command, cwd=cwd, check=True)
+    subprocess.run(  # nosec B603 nosemgrep: dangerous-subprocess-use-audit -- validated local wheel; shell is never invoked
+        command,
+        cwd=cwd,
+        check=True,
+    )
 
 
 def main() -> None:
