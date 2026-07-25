@@ -152,3 +152,19 @@ def test_optimize_thresholds_raises_on_unknown_strategy():
     y_proba = np.array([[0.6, 0.4], [0.4, 0.6]])
     with pytest.raises(ValueError, match="strategy"):
         optimize_thresholds(y_true, y_proba, metric=f1_score, strategy="bogus")
+
+
+def test_optimize_thresholds_and_apply_thresholds_exported_from_evaluation_package():
+    from skyulf.modeling._evaluation import apply_thresholds as ev_apply
+    from skyulf.modeling._evaluation import optimize_thresholds as ev_optimize
+
+    assert ev_optimize is optimize_thresholds
+    assert ev_apply is apply_thresholds
+
+
+def test_optimize_thresholds_and_apply_thresholds_exported_from_modeling_top_level():
+    from skyulf.modeling import apply_thresholds as top_apply
+    from skyulf.modeling import optimize_thresholds as top_optimize
+
+    assert top_optimize is optimize_thresholds
+    assert top_apply is apply_thresholds
