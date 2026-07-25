@@ -60,3 +60,39 @@ def test_optimize_thresholds_raises_if_pipeline_not_fitted(sample_classification
             data["target"],
             metric=lambda a, b: f1_score(a, b, average="macro"),
         )
+
+
+def test_predict_use_tuned_thresholds_raises_before_tuning(sample_classification_data):
+    data = sample_classification_data.drop(columns=["category"])
+    pipeline = SkyulfPipeline(_binary_config())
+    pipeline.fit(data, target_column="target")
+    X_test = data.drop(columns=["target"])
+
+    with pytest.raises(ValueError, match="optimize_thresholds"):
+        pipeline.predict(X_test, use_tuned_thresholds=True)
+
+
+def test_predict_use_tuned_thresholds_applies_stored_thresholds(sample_classification_data):
+    data = sample_classification_data.drop(columns=["category"])
+    pipeline = SkyulfPipeline(_binary_config())
+    pipeline.fit(data, target_column="target")
+    _, _, X_val, y_val = pipeline.get_fitted_split(data, target_column="target")
+    pipeline.optimize_thresholds(X_val, y_val, metric=lambda a, b: f1_score(a, b, average="macro"))
+
+    X_test = data.drop(columns=["target"])
+    tuned_preds = pipeline.predict(X_test, use_tuned_thresholds=True)
+    assert len(tuned_preds) == len(X_test)
+    assert set(np.unique(tuned_preds)).issubset(set(np.unique(data["target"])))
+
+
+def test_predict_default_behavior_unchanged_when_flag_is_false(sample_classification_data):
+    """Regression check: use_tuned_thresholds=False (the default) must behave
+    exactly like predict() did before this feature existed."""
+    data = sample_classification_data.drop(columns=["category"])
+    pipeline = SkyulfPipeline(_binary_config())
+    pipeline.fit(data, target_column="target")
+    X_test = data.drop(columns=["target"])
+
+    default_preds = pipeline.predict(X_test)
+    explicit_false_preds = pipeline.predict(X_test, use_tuned_thresholds=False)
+    np.testing.assert_array_equal(np.asarray(default_preds), np.asarray(explicit_false_preds))
