@@ -4,8 +4,10 @@ import hashlib
 import json
 import logging
 import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
+from collections.abc import Callable
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -13,6 +15,7 @@ from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
 from .leakage import validate_leakage_safety
+from .modeling._evaluation.thresholds import optimize_thresholds
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
 from .modeling.classification import (
@@ -102,6 +105,7 @@ class SkyulfPipeline:
         self.model_estimator: StatefulEstimator | None = None
         self._fit_metrics: dict[str, Any] | None = None
         self._target_column: str | None = None
+        self._tuned_thresholds: dict[Any, float] | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -292,6 +296,89 @@ class SkyulfPipeline:
             _to_pandas(X_test),
             _to_pandas(y_test),
         )
+
+    def _predict_proba_transformed(self, transformed_data: pd.DataFrame | SkyulfDataFrame) -> Any:
+        """Run predict_proba on already-transformed data, raising if unsupported."""
+        if self.model_estimator is None or self.model_estimator.model is None:
+            raise ValueError("Pipeline not fitted or no model configured.")
+        proba = self.model_estimator.applier.predict_proba(
+            transformed_data, self.model_estimator.model
+        )
+        if proba is None:
+            raise ValueError(
+                "The configured model does not support predict_proba(); "
+                "threshold tuning requires predicted class probabilities."
+            )
+        return proba
+
+    def optimize_thresholds(
+        self,
+        X_val: pd.DataFrame | SkyulfDataFrame,
+        y_val: pd.Series | Any,
+        metric: Callable[[Any, Any], float],
+        strategy: str | None = None,
+        grid_points: int = 101,
+    ) -> dict[Any, float]:
+        """
+        Search for per-class decision thresholds that maximize ``metric`` on
+        caller-supplied validation data, and store the result for later use
+        by ``predict(use_tuned_thresholds=True)``.
+
+        Always uses the *explicit* ``(X_val, y_val)`` the caller passes in —
+        never the pipeline's internal train/test split. Get a clean,
+        independent holdout via ``get_fitted_split()`` (or your own split)
+        before calling this, the same way you would for any other
+        out-of-sample evaluation.
+
+        Args:
+            X_val: Validation features, *not* yet transformed (this method
+                runs the pipeline's fitted preprocessing on it internally).
+            y_val: Validation true labels.
+            metric: Callable ``(y_true, y_pred) -> float`` to maximize.
+            strategy: ``"grid"`` or ``"nelder-mead"``. If ``None``,
+                auto-selects based on the number of classes (see
+                ``skyulf.modeling.optimize_thresholds``).
+            grid_points: Number of grid candidates for the ``"grid"``
+                strategy.
+
+        Returns:
+            Dict mapping each class label to its tuned threshold. Also
+            stored on ``self._tuned_thresholds`` for
+            ``predict(use_tuned_thresholds=True)`` to use.
+
+        Raises:
+            ValueError: If the pipeline isn't fitted, or the underlying
+                model doesn't support ``predict_proba``.
+        """
+        if self.model_estimator is None or self.model_estimator.model is None:
+            raise ValueError(
+                "Pipeline not fitted or no model configured. Call fit() before "
+                "optimize_thresholds()."
+            )
+
+        model = self.model_estimator.model
+        model_classes = getattr(model, "classes_", None)
+        if model_classes is None:
+            raise ValueError(
+                "The fitted model does not expose class labels (classes_); "
+                "threshold tuning requires a classifier."
+            )
+
+        transformed_val = self.feature_engineer.transform(X_val)
+        proba_df = self._predict_proba_transformed(transformed_val)
+        classes = np.asarray(model_classes)
+        y_proba = np.asarray(proba_df)[:, : len(classes)]
+
+        thresholds = optimize_thresholds(
+            y_val,
+            y_proba,
+            metric=metric,
+            classes=classes,
+            strategy=strategy,
+            grid_points=grid_points,
+        )
+        self._tuned_thresholds = thresholds
+        return thresholds
 
     def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
         """
