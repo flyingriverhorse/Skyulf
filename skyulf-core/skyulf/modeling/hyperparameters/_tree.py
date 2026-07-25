@@ -58,7 +58,9 @@ RANDOM_FOREST_PARAMS = [
     ),
 ]
 
-# Classifier-only addition: criterion for split quality.
+# Classifier-only additions: criterion for split quality, and class_weight
+# for imbalanced targets (regression has no such concept, so this is not
+# part of the shared RANDOM_FOREST_PARAMS base list).
 RANDOM_FOREST_CLASSIFIER_PARAMS = RANDOM_FOREST_PARAMS + [
     HyperparameterField(
         name="criterion",
@@ -71,7 +73,21 @@ RANDOM_FOREST_CLASSIFIER_PARAMS = RANDOM_FOREST_PARAMS + [
             {"label": "Log Loss", "value": "log_loss"},
         ],
         description="The function to measure the quality of a split.",
-    )
+    ),
+    HyperparameterField(
+        name="class_weight",
+        label="Class Weight",
+        type="select",
+        default=None,
+        options=[
+            {"label": "None (equal weight)", "value": None},
+            {"label": "Balanced", "value": "balanced"},
+        ],
+        description=(
+            "Automatically adjusts weights inversely proportional to class "
+            "frequencies in the training data, useful for imbalanced targets."
+        ),
+    ),
 ]
 
 # --- Decision Tree ---
@@ -312,6 +328,30 @@ XGBOOST_PARAMS = [
         max=10.0,
         step=0.1,
         description="L2 regularization term on leaf weights. Default sklearn XGBoost is 1.",
+    ),
+]
+
+# Classifier-only addition: class_weight for imbalanced targets. XGBoost's
+# sklearn wrapper has no native class_weight support (regression has no such
+# concept either), so this is deliberately not part of the shared
+# XGBOOST_PARAMS base list — `SklearnCalculator.fit()` translates it into a
+# `sample_weight` array at fit time (see sklearn_wrapper.py).
+XGBOOST_CLASSIFIER_PARAMS = XGBOOST_PARAMS + [
+    HyperparameterField(
+        name="class_weight",
+        label="Class Weight",
+        type="select",
+        default=None,
+        options=[
+            {"label": "None (equal weight)", "value": None},
+            {"label": "Balanced", "value": "balanced"},
+        ],
+        description=(
+            "Automatically adjusts weights inversely proportional to class "
+            "frequencies in the training data, useful for imbalanced targets. "
+            "XGBoost has no native support for this, so it is applied as a "
+            "computed sample_weight at fit time."
+        ),
     ),
 ]
 
@@ -576,6 +616,26 @@ LGBM_PARAMS = [
         description=(
             "GBDT is standard gradient boosting. DART adds dropout. "
             "GOSS samples by gradient magnitude."
+        ),
+    ),
+]
+
+# Classifier-only addition: class_weight for imbalanced targets (regression
+# has no such concept, so this is not part of the shared LGBM_PARAMS base
+# list). LightGBM's sklearn wrapper supports class_weight natively.
+LGBM_CLASSIFIER_PARAMS = LGBM_PARAMS + [
+    HyperparameterField(
+        name="class_weight",
+        label="Class Weight",
+        type="select",
+        default=None,
+        options=[
+            {"label": "None (equal weight)", "value": None},
+            {"label": "Balanced", "value": "balanced"},
+        ],
+        description=(
+            "Automatically adjusts weights inversely proportional to class "
+            "frequencies in the training data, useful for imbalanced targets."
         ),
     ),
 ]
