@@ -1,5 +1,6 @@
 """Wrapper for Scikit-Learn models."""
 
+import inspect
 import logging
 import warnings
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.exceptions import ConvergenceWarning
+from sklearn.utils.class_weight import compute_sample_weight
 
 from ..engines import SkyulfDataFrame
 from ..engines.sklearn_bridge import SklearnBridge
@@ -50,6 +52,28 @@ class SklearnCalculator(BaseModelCalculator):
         # 1. Merge Config with Defaults
         params = self._resolve_fit_params(config)
 
+        # A generic <select> UI element always submits its option value as a
+        # string, so a "None" option (e.g. "no class weighting") arrives here
+        # as the literal string "None", not Python None. Normalize that back
+        # to None before anything below decides whether class weighting was
+        # actually requested.
+        if params.get("class_weight") in ("None", "none", ""):
+            params["class_weight"] = None
+
+        # Some estimators (e.g. XGBoost's sklearn wrapper) accept arbitrary
+        # **kwargs in their constructor but have no built-in notion of class
+        # weighting: a `class_weight` kwarg is silently stored and ignored at
+        # fit time (no error — just a native warning). Detect that case up
+        # front (by checking whether `class_weight` is an explicitly named
+        # constructor parameter, not just swallowed by **kwargs) and, if the
+        # value isn't None, translate it into a `sample_weight` array passed
+        # to `.fit()` instead, so "balanced"/dict class weighting behaves the
+        # same regardless of whether the underlying library supports it
+        # natively.
+        class_weight_to_apply = None
+        if "class_weight" in params and not self._constructor_accepts_class_weight():
+            class_weight_to_apply = params.pop("class_weight")
+
         msg = f"Initializing {self.model_class.__name__} with params: {params}"
         logger.info(msg)
         if log_callback:
@@ -63,6 +87,12 @@ class SklearnCalculator(BaseModelCalculator):
         # Convert to Numpy using Bridge (handles Polars/Pandas/Wrappers)
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
+        sample_weight = None
+        if class_weight_to_apply is not None:
+            sample_weight = self._compute_sample_weight_for_fit(
+                model, class_weight_to_apply, y_np
+            )
+
         # sklearn's ConvergenceWarning (raised via `warnings.warn`, not the
         # `logging` module) would otherwise only reach the server's stderr
         # and never surface to the user — unlike the skyulf-core node
@@ -75,7 +105,10 @@ class SklearnCalculator(BaseModelCalculator):
         # console/log behavior for those is preserved.
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            model.fit(X_np, y_np)
+            if sample_weight is not None:
+                model.fit(X_np, y_np, sample_weight=sample_weight)
+            else:
+                model.fit(X_np, y_np)
         for w in caught:
             if issubclass(w.category, ConvergenceWarning):
                 conv_msg = f"{self.model_class.__name__} did not fully converge: {w.message}"
@@ -135,8 +168,6 @@ class SklearnCalculator(BaseModelCalculator):
         Skips filtering when the constructor accepts ``**kwargs`` (e.g. XGBoost 2.x),
         since every named param would otherwise fail the membership check even though valid.
         """
-        import inspect
-
         sig = inspect.signature(self.model_class)
         accepts_kwargs = any(
             p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
@@ -152,6 +183,28 @@ class SklearnCalculator(BaseModelCalculator):
                 f"Dropped parameters not supported by {self.model_class.__name__}: {dropped}"
             )
         return valid_params
+
+    def _constructor_accepts_class_weight(self) -> bool:
+        """True if the wrapped model's constructor explicitly declares a
+        `class_weight` parameter (e.g. RandomForestClassifier, LGBMClassifier,
+        LogisticRegression) — as opposed to merely accepting arbitrary
+        **kwargs (e.g. XGBoost's sklearn wrapper) that silently swallow it."""
+        sig = inspect.signature(self.model_class)
+        return "class_weight" in sig.parameters
+
+    def _compute_sample_weight_for_fit(self, model: Any, class_weight: Any, y_np: Any) -> Any:
+        """Translate a `class_weight` value into a per-sample weight array for
+        models with no native `class_weight` support, raising a clear error
+        instead of silently no-op'ing if the model's `.fit()` doesn't accept
+        `sample_weight` either."""
+        fit_sig = inspect.signature(model.fit)
+        if "sample_weight" not in fit_sig.parameters:
+            raise ValueError(
+                f"{self.model_class.__name__} does not support 'class_weight' natively "
+                "and its fit() method does not accept 'sample_weight' either, so "
+                "class weighting cannot be applied to this model."
+            )
+        return compute_sample_weight(class_weight, y_np)
 
 
 class SklearnApplier(BaseModelApplier):

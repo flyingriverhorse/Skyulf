@@ -66,6 +66,100 @@ def test_fit_merges_nested_params_dict(clf_data):
     assert model.C == 5.0
 
 
+def test_fit_native_class_weight_passed_through_unchanged(clf_data):
+    """A model whose constructor declares `class_weight` natively (e.g.
+    LogisticRegression) should receive it directly at construction time —
+    no sample_weight translation should occur."""
+    X, y = clf_data
+    calc = SklearnCalculator(LogisticRegression, {}, "classification")
+    model = calc.fit(X, y, {"class_weight": "balanced"})
+    assert model.class_weight == "balanced"
+
+
+def test_fit_class_weight_none_string_normalized_to_none(clf_data):
+    """A stringified 'None' (as a native <select> element would submit for a
+    null-valued option) should be treated the same as Python None."""
+    X, y = clf_data
+    calc = SklearnCalculator(LogisticRegression, {}, "classification")
+    model = calc.fit(X, y, {"class_weight": "None"})
+    assert model.class_weight is None
+
+
+def test_fit_kwargs_constructor_class_weight_translated_to_sample_weight():
+    """A model whose constructor accepts **kwargs but has no real
+    'class_weight' parameter (mirrors XGBoost's sklearn wrapper) should have
+    class_weight popped before construction and converted into a
+    sample_weight array passed to fit(), rather than silently no-op'ing."""
+    captured = {}
+
+    class _NoNativeClassWeightModel:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def fit(self, X, y, sample_weight=None):
+            captured["sample_weight"] = sample_weight
+            captured["kwargs"] = self.kwargs
+            self.classes_ = sorted(set(y))
+            return self
+
+    rng = np.random.RandomState(3)
+    # Deliberately imbalanced: 27 zeros, 3 ones.
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 30)})
+    y = pd.Series([0] * 27 + [1] * 3)
+    calc = SklearnCalculator(_NoNativeClassWeightModel, {}, "classification")
+    model = calc.fit(X, y, {"class_weight": "balanced"})
+
+    assert isinstance(model, _NoNativeClassWeightModel)
+    assert "class_weight" not in captured["kwargs"]
+    assert captured["sample_weight"] is not None
+    assert len(captured["sample_weight"]) == 30
+    # Minority class (label 1) should get a larger weight than the majority.
+    minority_weight = captured["sample_weight"][y.to_numpy() == 1][0]
+    majority_weight = captured["sample_weight"][y.to_numpy() == 0][0]
+    assert minority_weight > majority_weight
+
+
+def test_fit_kwargs_constructor_class_weight_none_is_noop():
+    """class_weight=None for a non-natively-supporting model should not
+    compute or pass any sample_weight at all."""
+    captured = {}
+
+    class _NoNativeClassWeightModel:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def fit(self, X, y, sample_weight=None):
+            captured["sample_weight"] = sample_weight
+            return self
+
+    rng = np.random.RandomState(4)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 20)})
+    y = pd.Series((X["f1"] > 0).astype(int))
+    calc = SklearnCalculator(_NoNativeClassWeightModel, {}, "classification")
+    calc.fit(X, y, {"class_weight": None})
+    assert captured["sample_weight"] is None
+
+
+def test_fit_kwargs_constructor_class_weight_without_sample_weight_support_raises():
+    """If the model has no native class_weight support AND its fit() doesn't
+    accept sample_weight either, raise a clear ValueError instead of
+    silently dropping the requested class weighting."""
+
+    class _NoWeightingSupportAtAllModel:
+        def __init__(self, **kwargs):
+            pass
+
+        def fit(self, X, y):
+            return self
+
+    rng = np.random.RandomState(5)
+    X = pd.DataFrame({"f1": rng.normal(0, 1, 20)})
+    y = pd.Series((X["f1"] > 0).astype(int))
+    calc = SklearnCalculator(_NoWeightingSupportAtAllModel, {}, "classification")
+    with pytest.raises(ValueError, match="class_weight"):
+        calc.fit(X, y, {"class_weight": "balanced"})
+
+
 def test_predict_returns_pandas_series_preserving_index(clf_data):
     """predict() should return a pandas Series preserving the original DataFrame index."""
     X, y = clf_data
