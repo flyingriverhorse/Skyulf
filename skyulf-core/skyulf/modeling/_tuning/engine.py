@@ -40,15 +40,10 @@ logger = logging.getLogger(__name__)
 # merely importing `skyulf`/`skyulf.modeling` never imports optuna or emits
 # its "OptunaSearchCV not found" warning for users who never use this
 # strategy.
-import sys as _sys
-
 HAS_OPTUNA = False
 OptunaSearchCV: Any = None
 optuna: Any = None
 _optuna_load_attempted = False
-# Capture sys.modules at load time so test mocks can be used even after
-# _load_engine_variant restores sys.modules
-_sys_modules_snapshot = dict(_sys.modules)
 
 
 def _ensure_optuna_loaded() -> bool:
@@ -68,48 +63,40 @@ def _ensure_optuna_loaded() -> bool:
         return HAS_OPTUNA
     _optuna_load_attempted = True
 
-    # Use captured sys.modules to respect mocks from test setup
-    saved_modules = _sys.modules.copy()
-    _sys.modules.update(_sys_modules_snapshot)
+    try:
+        import optuna as _optuna  # ty: ignore[unresolved-import]
+
+        optuna = _optuna
+        HAS_OPTUNA = True
+    except ImportError:
+        return HAS_OPTUNA
 
     try:
-        try:
-            import optuna as _optuna  # ty: ignore[unresolved-import]
+        from optuna.integration import (  # ty: ignore[unresolved-import]
+            OptunaSearchCV as _OptunaSearchCV,
+        )
 
-            optuna = _optuna
-            HAS_OPTUNA = True
-        except ImportError:
-            return HAS_OPTUNA
-
+        OptunaSearchCV = _OptunaSearchCV
+    except ImportError:
         try:
-            from optuna.integration import (  # ty: ignore[unresolved-import]
+            from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]
                 OptunaSearchCV as _OptunaSearchCV,
             )
 
             OptunaSearchCV = _OptunaSearchCV
         except ImportError:
             try:
-                from optuna.integration.sklearn import (  # ty: ignore[unresolved-import]
+                from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]
                     OptunaSearchCV as _OptunaSearchCV,
                 )
 
                 OptunaSearchCV = _OptunaSearchCV
             except ImportError:
-                try:
-                    from optuna_integration.sklearn import (  # ty: ignore[unresolved-import]
-                        OptunaSearchCV as _OptunaSearchCV,
-                    )
-
-                    OptunaSearchCV = _OptunaSearchCV
-                except ImportError:
-                    HAS_OPTUNA = False
-                    logger.warning(
-                        "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
-                    )
-        return HAS_OPTUNA
-    finally:
-        _sys.modules.clear()
-        _sys.modules.update(saved_modules)
+                HAS_OPTUNA = False
+                logger.warning(
+                    "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
+                )
+    return HAS_OPTUNA
 
 
 class TuningCalculator(BaseModelCalculator):
