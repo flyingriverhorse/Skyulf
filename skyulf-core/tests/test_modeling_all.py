@@ -294,14 +294,10 @@ class TestXGBClassifier:
 
         rng = np.random.RandomState(7)
         n = 300
-        X = pd.DataFrame(
-            {"f1": rng.normal(0, 1, n), "f2": rng.normal(0, 1, n)}
-        )
+        X = pd.DataFrame({"f1": rng.normal(0, 1, n), "f2": rng.normal(0, 1, n)})
         # Strongly imbalanced target where the minority class (10%) is still
         # separably related to f1, so weighting has room to help recall.
-        y = pd.Series(
-            ((X["f1"] > 1.2) & (rng.random(n) > 0.1)).astype(int)
-        )
+        y = pd.Series(((X["f1"] > 1.2) & (rng.random(n) > 0.1)).astype(int))
         assert y.sum() < n * 0.2  # sanity check: genuinely imbalanced
 
         unweighted = XGBClassifierCalculator().fit(
