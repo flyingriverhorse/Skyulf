@@ -43,5 +43,6 @@ def test_class_weight_field_default_and_options():
     rf_field = next(f for f in RANDOM_FOREST_CLASSIFIER_PARAMS if f.name == "class_weight")
     assert rf_field.default is None
     assert rf_field.type == "select"
+    assert rf_field.options is not None
     values = {opt["value"] for opt in rf_field.options}
     assert values == {None, "balanced"}
