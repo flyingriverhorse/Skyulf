@@ -106,7 +106,11 @@ def test_fit_kwargs_constructor_class_weight_translated_to_sample_weight():
     # Deliberately imbalanced: 27 zeros, 3 ones.
     X = pd.DataFrame({"f1": rng.normal(0, 1, 30)})
     y = pd.Series([0] * 27 + [1] * 3)
-    calc = SklearnCalculator(_NoNativeClassWeightModel, {}, "classification")
+    calc = SklearnCalculator(
+        _NoNativeClassWeightModel,  # ty: ignore[invalid-argument-type]
+        {},
+        "classification",
+    )
     model = calc.fit(X, y, {"class_weight": "balanced"})
 
     assert isinstance(model, _NoNativeClassWeightModel)
@@ -135,7 +139,11 @@ def test_fit_kwargs_constructor_class_weight_none_is_noop():
     rng = np.random.RandomState(4)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 20)})
     y = pd.Series((X["f1"] > 0).astype(int))
-    calc = SklearnCalculator(_NoNativeClassWeightModel, {}, "classification")
+    calc = SklearnCalculator(
+        _NoNativeClassWeightModel,  # ty: ignore[invalid-argument-type]
+        {},
+        "classification",
+    )
     calc.fit(X, y, {"class_weight": None})
     assert captured["sample_weight"] is None
 
@@ -155,7 +163,11 @@ def test_fit_kwargs_constructor_class_weight_without_sample_weight_support_raise
     rng = np.random.RandomState(5)
     X = pd.DataFrame({"f1": rng.normal(0, 1, 20)})
     y = pd.Series((X["f1"] > 0).astype(int))
-    calc = SklearnCalculator(_NoWeightingSupportAtAllModel, {}, "classification")
+    calc = SklearnCalculator(
+        _NoWeightingSupportAtAllModel,  # ty: ignore[invalid-argument-type]
+        {},
+        "classification",
+    )
     with pytest.raises(ValueError, match="class_weight"):
         calc.fit(X, y, {"class_weight": "balanced"})
 
