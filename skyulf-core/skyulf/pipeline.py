@@ -14,7 +14,7 @@ from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
 from .leakage import validate_leakage_safety
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
-from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
+from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
 from .modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
@@ -60,6 +60,16 @@ def _artifact_digest(obj: Any) -> bytes:
         return hashlib.sha256(pickle.dumps(obj)).digest()  # nosec B301 nosemgrep: avoid-pickle -- trusted in-process artifact hashing, not attacker-controlled deserialization
     except Exception:
         return hashlib.sha256(repr(obj).encode("utf-8")).digest()
+
+
+def _to_pandas(obj: Any) -> Any:
+    """Convert a Polars DataFrame/Series (or any object exposing ``to_pandas()``)
+    to its pandas equivalent; pass pandas objects (or ``None``) through unchanged."""
+    if obj is None:
+        return None
+    if hasattr(obj, "to_pandas"):
+        return obj.to_pandas()
+    return obj
 
 
 class SkyulfPipeline:
@@ -235,6 +245,53 @@ class SkyulfPipeline:
         self._fit_metrics = metrics
         self._target_column = target_column
         return metrics
+
+    def get_fitted_split(
+        self,
+        data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
+        target_column: str,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+        """
+        Run this pipeline's configured preprocessing chain and return the
+        resulting train/test split as plain pandas objects.
+
+        Runs ``self.feature_engineer.fit_transform(data)`` — the same
+        preprocessing ``fit()`` uses internally — and extracts
+        ``(X_train, y_train, X_test, y_test)`` from the resulting split using
+        ``target_column``, converting any Polars/SkyulfDataFrame frames to
+        pandas. Saves callers from re-implementing this split/convert step
+        themselves for custom evaluation harnesses (e.g. comparing multiple
+        raw sklearn-style estimators against the same preprocessed split).
+
+        Args:
+            data: Input data (DataFrame or SplitDataset).
+            target_column: Name of the target column.
+
+        Returns:
+            ``(X_train, y_train, X_test, y_test)`` as pandas DataFrame/Series.
+
+        Raises:
+            ValueError: If the configured preprocessing steps don't produce a
+                train/test split (e.g. no Splitter node configured).
+        """
+        transformed_data, _ = self.feature_engineer.fit_transform(data)
+
+        if not isinstance(transformed_data, SplitDataset):
+            raise ValueError(
+                "get_fitted_split() requires the configured preprocessing steps "
+                "to produce a train/test split (e.g. via a Splitter node); got "
+                "a single, unsplit DataFrame instead."
+            )
+
+        X_train, y_train = extract_xy(transformed_data.train, target_column)
+        X_test, y_test = extract_xy(transformed_data.test, target_column)
+
+        return (
+            _to_pandas(X_train),
+            _to_pandas(y_train),
+            _to_pandas(X_test),
+            _to_pandas(y_test),
+        )
 
     def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
         """
