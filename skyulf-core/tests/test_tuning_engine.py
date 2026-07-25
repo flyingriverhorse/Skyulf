@@ -515,6 +515,7 @@ def _load_engine_variant(extra_sys_modules: dict[str, Any]):
 def test_optuna_import_failure_disables_optuna():
     """If 'optuna' itself cannot be imported, HAS_OPTUNA should end up False."""
     variant = _load_engine_variant({"optuna": None})
+    assert variant._ensure_optuna_loaded() is False
     assert variant.HAS_OPTUNA is False
 
 
@@ -529,6 +530,7 @@ def test_optuna_integration_import_all_fallbacks_fail():
             "optuna_integration.sklearn": None,
         }
     )
+    assert variant._ensure_optuna_loaded() is False
     assert variant.HAS_OPTUNA is False
 
 
@@ -543,6 +545,7 @@ def test_optuna_integration_second_fallback_path_succeeds():
     variant = _load_engine_variant(
         {"optuna.integration": None, "optuna.integration.sklearn": fake_module}
     )
+    assert variant._ensure_optuna_loaded() is True
     assert variant.HAS_OPTUNA is True
     assert variant.OptunaSearchCV is fake_module.OptunaSearchCV
 
@@ -563,8 +566,21 @@ def test_optuna_integration_third_fallback_path_succeeds():
             "optuna_integration.sklearn": fake_module,
         }
     )
+    assert variant._ensure_optuna_loaded() is True
     assert variant.HAS_OPTUNA is True
     assert variant.OptunaSearchCV is fake_module.OptunaSearchCV
+
+
+def test_importing_engine_does_not_eagerly_resolve_optuna():
+    """Merely loading the module (as any `import skyulf`/`skyulf.modeling`
+    transitively does) must not attempt to import optuna or log its
+    "OptunaSearchCV not found" warning — only calling `_ensure_optuna_loaded()`
+    (from `_build_optuna_searcher`, i.e. only when strategy='optuna' is
+    actually requested) should trigger resolution."""
+    variant = _load_engine_variant({"optuna": None})
+    assert variant.HAS_OPTUNA is False
+    assert variant.OptunaSearchCV is None
+    assert variant._optuna_load_attempted is False
 
 
 # ---------------------------------------------------------------------------
