@@ -169,6 +169,20 @@ X_train, y_train, X_test, y_test = pipeline.get_fitted_split(
 )
 ```
 
+**Threshold tuning:** the default decision rule (argmax for multiclass, 0.5
+for binary) is rarely optimal for imbalanced classes or a metric you actually
+care about (F1, MCC, balanced accuracy, ...). `pipeline.optimize_thresholds(
+X_val, y_val, metric=...)` searches per-class thresholds against a metric you
+supply — evaluated on validation data you pass in explicitly (never the
+pipeline's internal split; get a clean holdout via `get_fitted_split()` above)
+— and `predict(use_tuned_thresholds=True)` then applies them. The same search
+is available as standalone array-level functions,
+`from skyulf.modeling import optimize_thresholds, apply_thresholds`, for use
+outside a pipeline. See the
+[Threshold Tuning guide](https://flyingriverhorse.github.io/Skyulf/user_guide/threshold_tuning.html)
+for signatures, a full example, and how the binary grid / multiclass
+Nelder-Mead search works.
+
 **Naming:** preprocessing names are `PascalCase` (`SimpleImputer`,
 `TrainTestSplitter`), modeling names are `snake_case` (`logistic_regression`).
 A few preprocessing nodes are `snake_case` exceptions: `feature_target_split`,
