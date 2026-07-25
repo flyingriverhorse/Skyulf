@@ -80,6 +80,7 @@ nav:
     - Hyperparameter Tuning: user_guide/hyperparameter_tuning.md
     - SHAP Explainability: user_guide/shap_explainability.md
     - Cross-Validation: user_guide/cross_validation.md
+    - Threshold Tuning: user_guide/threshold_tuning.md
     - SplitDataset & Leakage: user_guide/splitdataset_and_leakage.md
     - Drift Monitoring: user_guide/drift_monitoring.md
     - Serialization: user_guide/serialization.md
