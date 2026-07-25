@@ -484,12 +484,22 @@ def test_fit_halving_grid_search():
 # ---------------------------------------------------------------------------
 
 
-def _load_engine_variant(extra_sys_modules: dict[str, Any]):
+def _load_engine_variant(extra_sys_modules: dict[str, Any], resolve_optuna: bool = True):
     """Execute engine.py's module source fresh, under a distinct module
     object (not registered in ``sys.modules`` under the canonical name), so
     the optuna-import fallback branches can be exercised without touching —
     or corrupting coverage tracking of — the real cached
     ``skyulf.modeling._tuning.engine`` module used by the rest of the suite.
+
+    When ``resolve_optuna`` is True (the default), ``_ensure_optuna_loaded()``
+    is called on the fresh variant *while the injected ``extra_sys_modules``
+    mocks are still active in ``sys.modules``* — before this function's
+    ``finally`` block restores the real ``sys.modules`` — so the lazy loader
+    resolves against the test's mocks rather than the real environment.
+    Callers exercising laziness itself (i.e. asserting resolution has NOT
+    happened yet) should pass ``resolve_optuna=False`` and call
+    ``variant._ensure_optuna_loaded()`` themselves, understanding that by
+    then ``sys.modules`` has already been restored to the real environment.
     """
     saved: dict[str, Any] = {}
     sentinel = object()
@@ -503,6 +513,8 @@ def _load_engine_variant(extra_sys_modules: dict[str, Any]):
         assert spec is not None and spec.loader is not None
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
+        if resolve_optuna:
+            module._ensure_optuna_loaded()
         return module
     finally:
         for name, old in saved.items():
@@ -515,7 +527,6 @@ def _load_engine_variant(extra_sys_modules: dict[str, Any]):
 def test_optuna_import_failure_disables_optuna():
     """If 'optuna' itself cannot be imported, HAS_OPTUNA should end up False."""
     variant = _load_engine_variant({"optuna": None})
-    assert variant._ensure_optuna_loaded() is False
     assert variant.HAS_OPTUNA is False
 
 
@@ -530,7 +541,6 @@ def test_optuna_integration_import_all_fallbacks_fail():
             "optuna_integration.sklearn": None,
         }
     )
-    assert variant._ensure_optuna_loaded() is False
     assert variant.HAS_OPTUNA is False
 
 
@@ -545,7 +555,6 @@ def test_optuna_integration_second_fallback_path_succeeds():
     variant = _load_engine_variant(
         {"optuna.integration": None, "optuna.integration.sklearn": fake_module}
     )
-    assert variant._ensure_optuna_loaded() is True
     assert variant.HAS_OPTUNA is True
     assert variant.OptunaSearchCV is fake_module.OptunaSearchCV
 
@@ -566,7 +575,6 @@ def test_optuna_integration_third_fallback_path_succeeds():
             "optuna_integration.sklearn": fake_module,
         }
     )
-    assert variant._ensure_optuna_loaded() is True
     assert variant.HAS_OPTUNA is True
     assert variant.OptunaSearchCV is fake_module.OptunaSearchCV
 
@@ -577,7 +585,7 @@ def test_importing_engine_does_not_eagerly_resolve_optuna():
     "OptunaSearchCV not found" warning — only calling `_ensure_optuna_loaded()`
     (from `_build_optuna_searcher`, i.e. only when strategy='optuna' is
     actually requested) should trigger resolution."""
-    variant = _load_engine_variant({"optuna": None})
+    variant = _load_engine_variant({"optuna": None}, resolve_optuna=False)
     assert variant.HAS_OPTUNA is False
     assert variant.OptunaSearchCV is None
     assert variant._optuna_load_attempted is False
