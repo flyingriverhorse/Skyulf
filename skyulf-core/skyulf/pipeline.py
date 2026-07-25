@@ -15,7 +15,7 @@ from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
 from .leakage import validate_leakage_safety
-from .modeling._evaluation.thresholds import optimize_thresholds
+from .modeling._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
 from .modeling.classification import (
@@ -380,18 +380,31 @@ class SkyulfPipeline:
         self._tuned_thresholds = thresholds
         return thresholds
 
-    def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
+    def predict(
+        self,
+        data: pd.DataFrame | SkyulfDataFrame,
+        use_tuned_thresholds: bool = False,
+    ) -> Any:
         """
         Generate predictions.
 
         Args:
             data: Input DataFrame.
+            use_tuned_thresholds: If True, apply the decision thresholds
+                stored by a prior ``optimize_thresholds()`` call instead of
+                the model's default decision rule (argmax/0.5). Requires
+                ``optimize_thresholds()`` to have been called on this
+                pipeline instance first.
 
         Returns:
-            Series of predictions.
+            Series (or array, when ``use_tuned_thresholds=True``) of
+            predictions.
 
         Raises:
-            ValueError: If the input still contains the target column used during fit.
+            ValueError: If the input still contains the target column used
+                during fit(); if the pipeline isn't fitted; or if
+                ``use_tuned_thresholds=True`` but ``optimize_thresholds()``
+                was never called on this instance.
         """
         if self._target_column is not None and self._target_column in data.columns:
             raise ValueError(
@@ -403,12 +416,24 @@ class SkyulfPipeline:
         transformed_data = self.feature_engineer.transform(data)
 
         # 2. Modeling
-        if self.model_estimator and self.model_estimator.model is not None:
+        if not (self.model_estimator and self.model_estimator.model is not None):
+            raise ValueError("Pipeline not fitted or no model configured.")
+
+        if not use_tuned_thresholds:
             return self.model_estimator.applier.predict(
                 transformed_data, self.model_estimator.model
             )
-        else:
-            raise ValueError("Pipeline not fitted or no model configured.")
+
+        if self._tuned_thresholds is None:
+            raise ValueError(
+                "use_tuned_thresholds=True but optimize_thresholds() was never "
+                "called on this pipeline instance. Call optimize_thresholds() first."
+            )
+
+        proba_df = self._predict_proba_transformed(transformed_data)
+        classes = np.asarray(self.model_estimator.model.classes_)
+        y_proba = np.asarray(proba_df)[:, : len(classes)]
+        return apply_thresholds(y_proba, self._tuned_thresholds, classes=classes)
 
     def describe(self) -> str:
         """Return a human-readable, multi-line summary of the pipeline.
