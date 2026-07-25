@@ -89,9 +89,7 @@ class SklearnCalculator(BaseModelCalculator):
 
         sample_weight = None
         if class_weight_to_apply is not None:
-            sample_weight = self._compute_sample_weight_for_fit(
-                model, class_weight_to_apply, y_np
-            )
+            sample_weight = self._compute_sample_weight_for_fit(model, class_weight_to_apply, y_np)
 
         # sklearn's ConvergenceWarning (raised via `warnings.warn`, not the
         # `logging` module) would otherwise only reach the server's stderr
