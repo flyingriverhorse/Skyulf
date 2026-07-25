@@ -20,6 +20,7 @@ from .schemas import (
     RegressionEvaluation,
     ResidualsData,
 )
+from .thresholds import apply_thresholds, optimize_thresholds
 
 __all__ = [
     "evaluate_classification_model",
@@ -30,6 +31,8 @@ __all__ = [
     "calculate_clustering_metrics",
     "downsample_curve",
     "sanitize_metrics",
+    "optimize_thresholds",
+    "apply_thresholds",
     "ModelEvaluationReport",
     "ClassificationEvaluation",
     "RegressionEvaluation",
