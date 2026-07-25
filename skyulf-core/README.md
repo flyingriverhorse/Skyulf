@@ -153,6 +153,22 @@ model.
 lower-level — only use them directly to embed a single step in a custom
 (e.g. sklearn) pipeline.
 
+**Custom evaluation harnesses:** if you want to compare raw sklearn/XGBoost/
+CatBoost/etc. estimators against the *exact* preprocessed split
+`SkyulfPipeline` would use internally — instead of reimplementing the
+split/target-extraction/Polars-to-pandas conversion yourself and risking a
+different split than `fit()` actually used — call
+`pipeline.get_fitted_split(data, target_column="...")`. It runs the same
+configured preprocessing chain and returns
+`(X_train, y_train, X_test, y_test)` as plain pandas objects, raising a clear
+error if the config doesn't include a `TrainTestSplitter` step:
+
+```python
+X_train, y_train, X_test, y_test = pipeline.get_fitted_split(
+    customers, target_column="purchased"
+)
+```
+
 **Naming:** preprocessing names are `PascalCase` (`SimpleImputer`,
 `TrainTestSplitter`), modeling names are `snake_case` (`logistic_regression`).
 A few preprocessing nodes are `snake_case` exceptions: `feature_target_split`,
