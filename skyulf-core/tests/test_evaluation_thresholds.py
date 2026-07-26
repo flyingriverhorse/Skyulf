@@ -116,6 +116,69 @@ def test_optimize_thresholds_multiclass_nelder_mead_improves_on_argmax():
 
         return balanced_accuracy_score(y_t, y_p)
 
+
+def test_optimize_thresholds_multiclass_nelder_mead_actually_escapes_argmax_start():
+    """Regression test for a real bug: scipy's default Nelder-Mead initial
+    simplex for a zero-valued starting point (log(1.0) == 0, i.e. plain
+    argmax) perturbs by a minuscule ~0.00025 log-units. `apply_thresholds`'s
+    scaled-argmax rule is piecewise-constant, so that tiny step almost never
+    crosses a real decision boundary -- the optimizer used to see a flat
+    plateau in every direction and "converge" immediately at the untouched
+    starting point, silently never tuning anything, *regardless of which
+    metric was requested*. This dataset has a clear, fixable class-1 bias
+    (every row's probabilities are pushed toward class 1), so a real optimum
+    strictly better than plain argmax exists and must actually be found.
+    """
+    rng = np.random.default_rng(0)
+    n = 300
+    y_true = rng.integers(0, 3, n)
+    y_proba = np.empty((n, 3))
+    for i in range(n):
+        base = rng.dirichlet([1, 1, 1])
+        base[1] += 0.3  # systematically over-predict class 1
+        y_proba[i] = base / base.sum()
+    classes = np.array([0, 1, 2])
+
+    def f1_weighted(y_t, y_p):
+        return f1_score(y_t, y_p, average="weighted")
+
+    argmax_pred = classes[np.argmax(y_proba, axis=1)]
+    argmax_score = f1_weighted(y_true, argmax_pred)
+
+    thresholds = optimize_thresholds(
+        y_true, y_proba, metric=f1_weighted, classes=classes, strategy="nelder-mead"
+    )
+    tuned_pred = apply_thresholds(y_proba, thresholds, classes=classes)
+    tuned_score = f1_weighted(y_true, tuned_pred)
+
+    # Must not just tie the untouched argmax baseline (that's the bug) -- it
+    # must find a real, better solution to this clearly fixable bias.
+    assert tuned_score > argmax_score + 0.01
+    assert not np.allclose(list(thresholds.values()), 1.0)
+
+
+def test_optimize_thresholds_multiclass_nelder_mead_never_worse_than_argmax():
+    """Whatever the search finds, it must never regress below plain argmax."""
+    rng = np.random.default_rng(1)
+    classes = np.array(["a", "b", "c"])
+    n_per_class = [300, 50, 50]
+    y_true_parts = []
+    proba_parts = []
+    for i, n in enumerate(n_per_class):
+        y_true_parts.append(np.full(n, classes[i]))
+        base = rng.dirichlet(alpha=[1, 1, 1], size=n)
+        # Bias each row's own-class column upward so there's real signal.
+        base[:, i] += 1.5
+        base = base / base.sum(axis=1, keepdims=True)
+        proba_parts.append(base)
+    y_true = np.concatenate(y_true_parts)
+    y_proba = np.concatenate(proba_parts)
+
+    def balanced_acc(y_t, y_p):
+        from sklearn.metrics import balanced_accuracy_score
+
+        return balanced_accuracy_score(y_t, y_p)
+
     thresholds = optimize_thresholds(
         y_true, y_proba, metric=balanced_acc, classes=classes, strategy="nelder-mead"
     )
