@@ -108,13 +108,36 @@ export function applyThreshold(
  *
  * If `y_proba` is missing, no reassignment is possible and the split's
  * original y_true/y_pred are used, matching `applyThreshold`'s convention.
+ *
+ * When the split reports `y_proba.labels` distinct from `y_proba.classes`
+ * (label-encoded targets, e.g. numeric class codes vs. human-readable
+ * label strings), `y_true` is in label space while `y_proba.classes[idx]`
+ * (the argmax predictions) is in class space. `applyThreshold` handles this
+ * by remapping `y_true`/`y_pred` from label space to class space before
+ * computing the confusion matrix — this function mirrors that same
+ * label->class remapping for `y_true` so the returned predictions and
+ * ground truth are always in the same space (matching diagonal cells for
+ * correct predictions instead of a silently-empty diagonal).
  */
 export function applyMulticlassThresholds(
   splitData: EvaluationSplit,
   thresholds: Record<string, number>,
 ): { classes: (string | number)[]; matrix: number[][] } {
-  const { y_true, y_pred, y_proba } = splitData;
-  if (!y_proba) return calculateConfusionMatrix(y_true, y_pred);
+  const { y_pred, y_proba } = splitData;
+  let yTrue: (string | number)[] = splitData.y_true;
+  if (!y_proba) return calculateConfusionMatrix(yTrue, y_pred);
+
+  // Map string labels back to their class values, when the split reports
+  // labels separately from classes (e.g. label-encoded targets) — mirrors
+  // `applyThreshold`'s remapping so predictions and y_true stay comparable.
+  if (y_proba.labels && y_proba.labels.length === y_proba.classes.length) {
+    const labelToClass = new Map<string, string | number>();
+    y_proba.labels.forEach((label, idx) => {
+      const cls = y_proba.classes[idx];
+      if (cls !== undefined) labelToClass.set(String(label), cls);
+    });
+    yTrue = yTrue.map(y => labelToClass.get(String(y)) ?? y);
+  }
 
   const yPred = y_proba.values.map(row => {
     let bestIdx = 0;
@@ -131,7 +154,7 @@ export function applyMulticlassThresholds(
     return y_proba.classes[bestIdx]!;
   });
 
-  return calculateConfusionMatrix(y_true, yPred, y_proba.classes);
+  return calculateConfusionMatrix(yTrue, yPred, y_proba.classes);
 }
 
 /** Metric that a best-threshold scan can optimize for. `f1`/`precision`/`recall`
