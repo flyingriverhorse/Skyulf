@@ -87,6 +87,34 @@ def _fake_evaluation_data() -> dict:
     }
 
 
+def _fake_binary_evaluation_data() -> dict:
+    """Builds a raw (undecoded) 2-class evaluation payload for roc_auc coverage."""
+    return {
+        "job_id": "job-1",
+        "problem_type": "classification",
+        "splits": {
+            "validation": {
+                "y_true": [0, 1, 0, 1, 1, 0, 1, 0],
+                "y_pred": [0, 1, 0, 0, 1, 0, 1, 1],
+                "y_proba": {
+                    "classes": ["0", "1"],
+                    "values": [
+                        [0.9, 0.1],
+                        [0.2, 0.8],
+                        [0.7, 0.3],
+                        [0.55, 0.45],
+                        [0.1, 0.9],
+                        [0.6, 0.4],
+                        [0.3, 0.7],
+                        [0.4, 0.6],
+                    ],
+                },
+            },
+            "test": None,
+        },
+    }
+
+
 @pytest.mark.asyncio
 async def test_preview_returns_thresholds_for_valid_job(async_session):
     """preview() returns thresholds/classes/metric/split_used using the validation split."""
@@ -104,6 +132,64 @@ async def test_preview_returns_thresholds_for_valid_job(async_session):
     assert set(result["classes"]) == {0, 1, 2}
     assert set(result["thresholds"].keys()) == {"0", "1", "2"}
     assert all(isinstance(v, float) for v in result["thresholds"].values())
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("metric", ["precision", "recall", "balanced_accuracy"])
+async def test_preview_returns_thresholds_for_other_metrics(async_session, metric):
+    """preview() works end-to-end for precision/recall/balanced_accuracy metrics too."""
+    await _insert_job(async_session, "job-1")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_evaluation_data(), None)),
+    ):
+        result = await ThresholdTuningService.preview(async_session, "job-1", metric=metric)
+
+    assert result["metric"] == metric
+    assert set(result["classes"]) == {0, 1, 2}
+    assert set(result["thresholds"].keys()) == {"0", "1", "2"}
+    assert all(isinstance(v, float) for v in result["thresholds"].values())
+
+
+@pytest.mark.asyncio
+async def test_preview_roc_auc_works_for_binary_classification(async_session):
+    """preview() succeeds with roc_auc for a binary (2-class) job."""
+    await _insert_job(async_session, "job-1")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_binary_evaluation_data(), None)),
+    ):
+        result = await ThresholdTuningService.preview(async_session, "job-1", metric="roc_auc")
+
+    assert result["metric"] == "roc_auc"
+    assert set(result["classes"]) == {0, 1}
+    assert set(result["thresholds"].keys()) == {"0", "1"}
+
+
+@pytest.mark.asyncio
+async def test_preview_roc_auc_raises_threshold_tuning_error_for_multiclass(async_session):
+    """preview() raises ThresholdTuningError (not a raw ValueError) for roc_auc + 3+ classes.
+
+    optimize_thresholds() always scores hard, post-threshold class predictions
+    (never probability scores), and roc_auc_score() on discrete multiclass
+    labels raises ValueError internally (it needs a 2D probability matrix for
+    multi_class="ovr"/"ovo"), so this must be guarded against explicitly.
+    """
+    await _insert_job(async_session, "job-1")
+
+    with (
+        patch(
+            "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+            "._load_raw_evaluation_data",
+            new=AsyncMock(return_value=(_fake_evaluation_data(), None)),
+        ),
+        pytest.raises(ThresholdTuningError),
+    ):
+        await ThresholdTuningService.preview(async_session, "job-1", metric="roc_auc")
 
 
 @pytest.mark.asyncio

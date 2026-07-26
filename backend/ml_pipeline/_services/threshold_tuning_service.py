@@ -117,6 +117,17 @@ class ThresholdTuningService:
             split_data["y_proba"]
         )
 
+        if metric == "roc_auc" and len(classes) > 2:
+            # optimize_thresholds() always scores hard, post-threshold class
+            # predictions (never probability scores), and roc_auc_score on
+            # discrete multiclass labels raises ValueError (it requires a 2D
+            # probability matrix for multi_class="ovr"/"ovo"). Binary is fine
+            # since it reduces to a 0/1 label comparison.
+            raise ThresholdTuningError(
+                "roc_auc is only supported for binary classification threshold tuning "
+                f"(job has {len(classes)} classes)."
+            )
+
         thresholds = optimize_thresholds(y_true, y_proba_values, metric=scorer, classes=classes)
 
         return {
