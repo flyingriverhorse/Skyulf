@@ -207,6 +207,12 @@ async def _run_migrations() -> None:
         # v0.5.0 — Promote Winner
         ("0.5.0", "ALTER TABLE basic_training_jobs ADD COLUMN promoted_at DATETIME"),
         ("0.5.0", "ALTER TABLE advanced_tuning_jobs ADD COLUMN promoted_at DATETIME"),
+        # v0.6.0 — Threshold Tuning Phase 2
+        ("0.6.0", "ALTER TABLE training_jobs ADD COLUMN tuned_thresholds JSON"),
+        (
+            "0.6.0",
+            "ALTER TABLE training_jobs ADD COLUMN tuned_thresholds_enabled BOOLEAN NOT NULL DEFAULT 0",
+        ),
     ]
 
     applied = 0
