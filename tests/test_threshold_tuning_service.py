@@ -1,0 +1,212 @@
+"""Tests for ThresholdTuningService: preview/save/toggle/clear."""
+
+from unittest.mock import AsyncMock, patch
+
+import pytest
+import pytest_asyncio
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+
+from backend.database.models import Base, TrainingJob
+from backend.ml_pipeline._services.threshold_tuning_service import (
+    ThresholdTuningError,
+    ThresholdTuningService,
+)
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest_asyncio.fixture
+async def async_session():
+    """Provides an in-memory async SQLite session with all tables created."""
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    async_session_maker = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with async_session_maker() as session:
+        yield session
+
+    await engine.dispose()
+
+
+async def _insert_job(session: AsyncSession, job_id: str) -> None:
+    """Inserts a minimal `training_jobs` row via raw SQL (ORM defaults don't apply to raw INSERT)."""
+    await session.execute(
+        text(
+            """
+        INSERT INTO training_jobs (id, pipeline_id, node_id, dataset_source_id, user_id, status, run_mode, version, model_type, graph, artifact_uri, error_message, progress, current_step, started_at, finished_at, created_at, updated_at)
+        VALUES (:id, :pipeline_id, :node_id, :ds_id, :user_id, :status, :run_mode, :version, :model_type, :graph, :artifact_uri, :error_message, :progress, :current_step, :started_at, :finished_at, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """
+        ),
+        {
+            "id": job_id,
+            "pipeline_id": "pipe-1",
+            "node_id": "node-1",
+            "ds_id": "ds-1",
+            "user_id": None,
+            "status": "completed",
+            "run_mode": "fixed",
+            "version": 1,
+            "model_type": "random_forest",
+            "graph": "{}",
+            "artifact_uri": job_id,
+            "error_message": None,
+            "progress": 100,
+            "current_step": None,
+            "started_at": None,
+            "finished_at": None,
+        },
+    )
+    await session.commit()
+
+
+def _fake_evaluation_data() -> dict:
+    """Builds a raw (undecoded) evaluation payload matching EvaluationService's real shape."""
+    return {
+        "job_id": "job-1",
+        "problem_type": "classification",
+        "splits": {
+            "validation": {
+                "y_true": [0, 1, 2, 2, 1],
+                "y_pred": [0, 1, 2, 2, 0],
+                "y_proba": {
+                    "classes": ["0", "1", "2"],
+                    "values": [
+                        [0.5, 0.3, 0.2],
+                        [0.2, 0.6, 0.2],
+                        [0.34, 0.33, 0.33],
+                        [0.1, 0.1, 0.8],
+                        [0.4, 0.4, 0.2],
+                    ],
+                },
+            },
+            "test": None,
+        },
+    }
+
+
+@pytest.mark.asyncio
+async def test_preview_returns_thresholds_for_valid_job(async_session):
+    """preview() returns thresholds/classes/metric/split_used using the validation split."""
+    await _insert_job(async_session, "job-1")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_evaluation_data(), None)),
+    ):
+        result = await ThresholdTuningService.preview(async_session, "job-1", metric="f1")
+
+    assert result["metric"] == "f1"
+    assert result["split_used"] == "validation"
+    assert set(result["classes"]) == {0, 1, 2}
+    assert set(result["thresholds"].keys()) == {"0", "1", "2"}
+    assert all(isinstance(v, float) for v in result["thresholds"].values())
+
+
+@pytest.mark.asyncio
+async def test_preview_falls_back_to_test_split_when_no_validation(async_session):
+    """preview() silently falls back to the test split when validation is absent."""
+    await _insert_job(async_session, "job-1")
+    data = _fake_evaluation_data()
+    data["splits"]["test"] = data["splits"].pop("validation")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(data, None)),
+    ):
+        result = await ThresholdTuningService.preview(async_session, "job-1", metric="accuracy")
+
+    assert result["split_used"] == "test"
+
+
+@pytest.mark.asyncio
+async def test_preview_raises_for_missing_job(async_session):
+    """preview() raises ThresholdTuningError when the job doesn't exist."""
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.preview(async_session, "nonexistent", metric="f1")
+
+
+@pytest.mark.asyncio
+async def test_preview_raises_for_unsupported_metric(async_session):
+    """preview() raises ThresholdTuningError for a metric outside the supported set."""
+    await _insert_job(async_session, "job-1")
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.preview(async_session, "job-1", metric="not_a_metric")
+
+
+@pytest.mark.asyncio
+async def test_preview_raises_when_no_splits_available(async_session):
+    """preview() raises ThresholdTuningError when neither validation nor test splits exist."""
+    await _insert_job(async_session, "job-1")
+    data = {"job_id": "job-1", "problem_type": "classification", "splits": {"train": {}}}
+
+    with (
+        patch(
+            "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+            "._load_raw_evaluation_data",
+            new=AsyncMock(return_value=(data, None)),
+        ),
+        pytest.raises(ThresholdTuningError),
+    ):
+        await ThresholdTuningService.preview(async_session, "job-1", metric="f1")
+
+
+@pytest.mark.asyncio
+async def test_save_toggle_clear_round_trip(async_session):
+    """save() persists+enables thresholds; toggle() flips the flag; clear() removes them."""
+    await _insert_job(async_session, "job-2")
+
+    saved = await ThresholdTuningService.save(
+        async_session,
+        "job-2",
+        thresholds={"0": 0.6, "1": 0.5, "2": 0.3},
+        classes=[0, 1, 2],
+        metric="f1",
+        split_used="validation",
+    )
+    assert saved is True
+
+    job = (
+        await async_session.execute(select(TrainingJob).where(TrainingJob.id == "job-2"))
+    ).scalar_one()
+    assert job.tuned_thresholds_enabled is True
+    assert job.tuned_thresholds["thresholds"] == {"0": 0.6, "1": 0.5, "2": 0.3}
+
+    await ThresholdTuningService.toggle(async_session, "job-2", enabled=False)
+    await async_session.refresh(job)
+    assert job.tuned_thresholds_enabled is False
+
+    await ThresholdTuningService.clear(async_session, "job-2")
+    await async_session.refresh(job)
+    assert job.tuned_thresholds is None
+    assert job.tuned_thresholds_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_toggle_raises_when_no_saved_thresholds(async_session):
+    """toggle() raises ThresholdTuningError when the job has no saved tuned thresholds yet."""
+    await _insert_job(async_session, "job-3")
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.toggle(async_session, "job-3", enabled=True)
+
+
+@pytest.mark.asyncio
+async def test_save_toggle_clear_raise_for_missing_job(async_session):
+    """save()/toggle()/clear() all raise ThresholdTuningError for an unknown job id."""
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.save(
+            async_session,
+            "nonexistent",
+            thresholds={"0": 0.5},
+            classes=[0],
+            metric="f1",
+            split_used="validation",
+        )
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.toggle(async_session, "nonexistent", enabled=True)
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.clear(async_session, "nonexistent")
