@@ -197,4 +197,32 @@ describe('applyMulticlassThresholds', () => {
       [0, 0, 2],
     ]);
   });
+
+  it('remaps y_true from label space to class space when y_proba.labels differs from y_proba.classes', () => {
+    // Label-encoded target: y_true holds human-readable label strings while
+    // y_proba.classes holds the numeric class codes used for prediction.
+    // Verified via the real Python apply_thresholds() that the class-space
+    // predictions for this y_proba/thresholds pair are [0, 1, 2, 2, 1].
+    const labelSplit: EvaluationSplit = {
+      y_true: ['setosa', 'versicolor', 'virginica', 'virginica', 'versicolor'],
+      y_pred: ['setosa', 'versicolor', 'virginica', 'virginica', 'versicolor'],
+      y_proba: {
+        values: yProbaValues,
+        classes,
+        labels: ['setosa', 'versicolor', 'virginica'],
+      },
+    };
+
+    const result = applyMulticlassThresholds(labelSplit, thresholds);
+
+    // Predictions land in class space (0/1/2); y_true is remapped from
+    // label space ('setosa'/'versicolor'/'virginica') into the same class
+    // space, so every sample is a correct prediction -> pure diagonal.
+    expect(result.classes).toEqual(classes);
+    expect(result.matrix).toEqual([
+      [1, 0, 0],
+      [0, 2, 0],
+      [0, 0, 2],
+    ]);
+  });
 });
