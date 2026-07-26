@@ -6,6 +6,49 @@ import { apiClient } from './client';
 // the thresholdTuningApi wrapper sends the right URL/method/payload and
 // reshapes responses correctly, matching the pattern used by jobs.test.ts.
 
+describe('thresholdTuningApi.get', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('GETs /thresholds and returns the saved state', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({
+      data: {
+        thresholds: { '0': 0.6, '1': 0.4 },
+        classes: [0, 1],
+        metric: 'f1',
+        split_used: 'validation',
+        computed_at: '2026-01-01T00:00:00Z',
+        enabled: true,
+      },
+    } as unknown as Awaited<ReturnType<typeof apiClient.get>>);
+
+    const result = await thresholdTuningApi.get('job-1');
+
+    expect(get).toHaveBeenCalledWith('/pipeline/jobs/job-1/thresholds');
+    expect(result.enabled).toBe(true);
+    expect(result.thresholds).toEqual({ '0': 0.6, '1': 0.4 });
+  });
+
+  it('returns an all-null disabled shell when nothing has been saved', async () => {
+    vi.spyOn(apiClient, 'get').mockResolvedValue({
+      data: {
+        thresholds: null,
+        classes: null,
+        metric: null,
+        split_used: null,
+        computed_at: null,
+        enabled: false,
+      },
+    } as unknown as Awaited<ReturnType<typeof apiClient.get>>);
+
+    const result = await thresholdTuningApi.get('job-1');
+
+    expect(result.enabled).toBe(false);
+    expect(result.thresholds).toBeNull();
+  });
+});
+
 describe('thresholdTuningApi.preview', () => {
   beforeEach(() => {
     vi.restoreAllMocks();

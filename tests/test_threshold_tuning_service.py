@@ -281,6 +281,59 @@ async def test_toggle_raises_when_no_saved_thresholds(async_session):
 
 
 @pytest.mark.asyncio
+async def test_get_saved_returns_empty_shell_when_nothing_saved(async_session):
+    """get_saved() returns an all-None/disabled shell for a job with no saved thresholds."""
+    await _insert_job(async_session, "job-4")
+
+    result = await ThresholdTuningService.get_saved(async_session, "job-4")
+
+    assert result == {
+        "thresholds": None,
+        "classes": None,
+        "metric": None,
+        "split_used": None,
+        "computed_at": None,
+        "enabled": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_saved_reflects_saved_and_toggled_state(async_session):
+    """get_saved() reflects the saved thresholds and current enabled flag after save()/toggle()."""
+    await _insert_job(async_session, "job-5")
+
+    await ThresholdTuningService.save(
+        async_session,
+        "job-5",
+        thresholds={"0": 0.6, "1": 0.5, "2": 0.3},
+        classes=[0, 1, 2],
+        metric="f1",
+        split_used="validation",
+    )
+
+    result = await ThresholdTuningService.get_saved(async_session, "job-5")
+    assert result["thresholds"] == {"0": 0.6, "1": 0.5, "2": 0.3}
+    assert result["classes"] == [0, 1, 2]
+    assert result["metric"] == "f1"
+    assert result["split_used"] == "validation"
+    assert result["computed_at"] is not None
+    assert result["enabled"] is True
+
+    await ThresholdTuningService.toggle(async_session, "job-5", enabled=False)
+    result = await ThresholdTuningService.get_saved(async_session, "job-5")
+    assert result["enabled"] is False
+    # Thresholds themselves stay intact even when disabled — only the flag flips.
+    assert result["thresholds"] == {"0": 0.6, "1": 0.5, "2": 0.3}
+
+
+@pytest.mark.asyncio
+async def test_get_saved_raises_for_missing_job(async_session):
+    """get_saved() raises ThresholdTuningError when the job doesn't exist."""
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.get_saved(async_session, "nonexistent")
+
+
+@pytest.mark.asyncio
 async def test_save_toggle_clear_raise_for_missing_job(async_session):
     """save()/toggle()/clear() all raise ThresholdTuningError for an unknown job id."""
     with pytest.raises(ThresholdTuningError):

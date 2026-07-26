@@ -251,6 +251,27 @@ export const ExperimentsPage: React.FC = () => {
     } finally {
       setIsEvalLoading(false);
     }
+    // Hydrate the Tuning tab from whatever this job already has saved
+    // server-side, instead of always starting unchecked/empty — without
+    // this, reopening a job that already has tuned thresholds saved and
+    // enabled would silently show the toggle off even though real
+    // /predict calls for it are already using those thresholds.
+    try {
+      const saved = await thresholdTuningApi.get(jobId);
+      if (saved.thresholds && saved.classes && saved.metric && saved.split_used) {
+        setTuningPreview({
+          thresholds: saved.thresholds,
+          classes: saved.classes,
+          metric: saved.metric,
+          split_used: saved.split_used,
+        });
+        setSelectedTuningMetric(saved.metric);
+        setUseTunedThresholds(saved.enabled);
+      }
+    } catch (err: unknown) {
+      // Non-fatal — the Tuning tab just starts from its reset defaults.
+      console.error('Failed to fetch saved tuned thresholds', err);
+    }
   };
 
   const handlePreviewThresholds = async () => {
