@@ -111,6 +111,19 @@ def _grid_search_binary(
     return {classes[0]: 1.0 - best_threshold, classes[1]: best_threshold}
 
 
+# Initial-simplex step sizes (log-threshold units) tried by
+# `_nelder_mead_multiclass`. `apply_thresholds`'s scaled-argmax rule makes the
+# objective piecewise-constant (a plateau) around any point, and scipy's
+# default initial simplex for a zero-valued starting coordinate perturbs by a
+# minuscule ~0.00025 log-units (~0.025% threshold change) -- almost never
+# enough to cross a real decision boundary. Left at scipy's default, the
+# optimizer sees a flat plateau in every direction and immediately
+# "converges" at the untouched starting point (plain argmax), silently never
+# tuning anything. These larger steps (~exp(0.75)=2.1x up to exp(3.0)=20x
+# threshold swings) give Nelder-Mead a real gradient to follow.
+_INITIAL_SIMPLEX_STEPS: tuple[float, ...] = (0.75, 1.5, 3.0)
+
+
 def _nelder_mead_multiclass(
     y_true: np.ndarray,
     y_proba: np.ndarray,
@@ -122,6 +135,12 @@ def _nelder_mead_multiclass(
     Optimizes in log-space (``x = log(threshold)``) so the raw optimizer
     variables can be any real number while the resulting thresholds stay
     strictly positive, matching apply_thresholds()'s division-based rule.
+
+    Runs from several initial simplex sizes (see `_INITIAL_SIMPLEX_STEPS`)
+    and keeps whichever run scores best, always compared against the
+    untouched starting point -- so the result is guaranteed never worse than
+    plain argmax, and trying multiple simplex sizes reduces the risk of the
+    search getting stuck on the flat plateau surrounding any single scale.
     """
     n_classes = len(classes)
     x0 = np.zeros(n_classes)  # log(1.0) == 0 for every class: starts at plain argmax
@@ -131,8 +150,22 @@ def _nelder_mead_multiclass(
         pred = apply_thresholds(y_proba, thresholds, classes=classes)
         return -metric(y_true, pred)
 
-    result = minimize(negative_score, x0, method="Nelder-Mead")
-    return {c: float(np.exp(xi)) for c, xi in zip(classes, result.x, strict=True)}
+    best_x = x0
+    best_score = negative_score(x0)
+    identity = np.eye(n_classes)
+    for step in _INITIAL_SIMPLEX_STEPS:
+        initial_simplex = np.vstack([x0, *(x0 + step * identity[i] for i in range(n_classes))])
+        result = minimize(
+            negative_score,
+            x0,
+            method="Nelder-Mead",
+            options={"initial_simplex": initial_simplex},
+        )
+        if result.fun < best_score:
+            best_score = result.fun
+            best_x = result.x
+
+    return {c: float(np.exp(xi)) for c, xi in zip(classes, best_x, strict=True)}
 
 
 def optimize_thresholds(
