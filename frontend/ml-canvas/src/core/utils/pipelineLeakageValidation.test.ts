@@ -107,6 +107,33 @@ describe('findPreprocessingBeforeSplitIssues', () => {
       expect(issues.map((i) => i.nodeId)).toEqual(['encode_features']);
     },
   );
+
+  it.each(['LabelEncoder', 'OrdinalEncoder'])(
+    'allows %s with columns == [target_column] (explicit target pick) before the splitter',
+    (stepType) => {
+      const nodes = [
+        node('load', 'DataLoader'),
+        node('encode_target', stepType, ['load'], { columns: ['species'] }),
+        node('split', 'TrainTestSplitter', ['encode_target'], { target_column: 'species' }),
+        node('model', 'LogisticRegression', ['split']),
+      ];
+      expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+    },
+  );
+
+  it.each(['LabelEncoder', 'OrdinalEncoder'])(
+    'still flags %s mixing the target column with real feature columns',
+    (stepType) => {
+      const nodes = [
+        node('load', 'DataLoader'),
+        node('encode_mixed', stepType, ['load'], { columns: ['species', 'city'] }),
+        node('split', 'TrainTestSplitter', ['encode_mixed'], { target_column: 'species' }),
+        node('model', 'LogisticRegression', ['split']),
+      ];
+      const issues = findPreprocessingBeforeSplitIssues(nodes);
+      expect(issues.map((i) => i.nodeId)).toEqual(['encode_mixed']);
+    },
+  );
 });
 
 describe('formatLeakageIssueMessage', () => {

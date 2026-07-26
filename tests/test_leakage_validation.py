@@ -123,3 +123,50 @@ def test_feature_column_label_or_ordinal_encoding_before_split_still_raises(step
     ]
     with pytest.raises(ValueError, match="Data leakage risk"):
         validate_no_preprocessing_before_split(nodes)
+
+
+@pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])
+def test_explicit_target_column_selection_before_split_is_allowed(step_type):
+    """Users commonly pick the target column explicitly from the column
+    picker (columns == [target_column]) instead of leaving `columns` empty -
+    this is still target-only encoding, not a leakage risk."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("encode_target", step_type, ["load"], params={"columns": ["species"]}),
+        _node(
+            "split",
+            "TrainTestSplitter",
+            ["encode_target"],
+            params={"target_column": "species"},
+        ),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+@pytest.mark.parametrize("step_type", ["LabelEncoder", "OrdinalEncoder"])
+def test_target_plus_feature_columns_before_split_still_raises(step_type):
+    """Mixing the target column with real feature columns still fits feature
+    statistics on the whole dataset - the leakage risk remains."""
+    nodes = [
+        _node(
+            "load",
+            "DataLoader",
+            [],
+        ),
+        _node(
+            "encode_mixed",
+            step_type,
+            ["load"],
+            params={"columns": ["species", "city"]},
+        ),
+        _node(
+            "split",
+            "TrainTestSplitter",
+            ["encode_mixed"],
+            params={"target_column": "species"},
+        ),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
