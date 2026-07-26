@@ -9,13 +9,17 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
-from backend.database.models import Deployment
+from backend.database.models import Deployment, TrainingJob
 from backend.ml_pipeline._services.job_service import JobService
 from backend.ml_pipeline._services.prediction_utils import extract_target_label_encoder
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.artifacts.s3 import S3ArtifactStore
 
 logger = logging.getLogger(__name__)
+
+
+class OverrideThresholdMismatch(ValueError):
+    """Raised when override_thresholds keys don't match the model's classes."""
 
 
 def _maybe_decode_predictions(
@@ -286,18 +290,80 @@ class DeploymentService:
             raise ValueError(f"Feature engineering failed: {str(e)}") from e
 
     @staticmethod
+    def _validate_override_thresholds(
+        override_thresholds: dict[str, float], estimator_classes: Any
+    ) -> None:
+        """Raise OverrideThresholdMismatch unless the override keys match the model's classes exactly."""
+        expected = {str(c) for c in (estimator_classes if estimator_classes is not None else [])}
+        provided = set(override_thresholds.keys())
+        if provided != expected:
+            raise OverrideThresholdMismatch(
+                f"override_thresholds keys {sorted(provided)} do not match "
+                f"model classes {sorted(expected)}"
+            )
+
+    @staticmethod
+    def _resolve_thresholds_for_predict(
+        override_thresholds: dict[str, float] | None,
+        job: TrainingJob | None,
+        estimator_classes: Any,
+    ) -> dict[str, float] | None:
+        """Resolve which per-class thresholds to apply: override > saved+enabled > None.
+
+        Returns a str-keyed dict (matching the JSON/response shape) or None.
+        """
+        if override_thresholds is not None:
+            DeploymentService._validate_override_thresholds(override_thresholds, estimator_classes)
+            return dict(override_thresholds)
+
+        if (
+            job is not None
+            and job.tuned_thresholds_enabled
+            and job.tuned_thresholds
+            and estimator_classes is not None
+        ):
+            saved = job.tuned_thresholds.get("thresholds", {})
+            resolved = {str(c): saved[str(c)] for c in estimator_classes if str(c) in saved}
+            if len(resolved) == len(list(estimator_classes)):
+                return resolved
+            logger.warning("Saved tuned thresholds do not cover every model class; skipping them.")
+        return None
+
+    @staticmethod
     def _predict_and_decode(
-        estimator: Any, X_transformed: Any, feature_engineer: Any, target_col: str | None
-    ) -> list:
-        """Runs the estimator's predict and decodes labels, wrapping failures in ValueError."""
+        estimator: Any,
+        X_transformed: Any,
+        feature_engineer: Any,
+        target_col: str | None,
+        thresholds: dict[str, float] | None = None,
+    ) -> tuple[list, dict[str, float] | None]:
+        """Runs the estimator's predict (or threshold-applied predict) and decodes labels.
+
+        When ``thresholds`` is provided, uses ``predict_proba`` +
+        ``apply_thresholds`` instead of the estimator's default decision rule.
+        Returns ``(predictions, thresholds_applied)``.
+        """
         try:
-            predictions = estimator.predict(X_transformed)
+            if thresholds is not None:
+                from skyulf.modeling import apply_thresholds
+
+                y_proba = estimator.predict_proba(X_transformed)
+                # apply_thresholds requires dict keys that exactly match
+                # estimator.classes_ (dtype included); saved/override thresholds
+                # arrive with str keys, so reconcile by string identity.
+                reconciled = {c: float(thresholds[str(c)]) for c in estimator.classes_}
+                predictions = apply_thresholds(y_proba, reconciled, classes=estimator.classes_)
+            else:
+                predictions = estimator.predict(X_transformed)
+
             predictions = _maybe_decode_predictions(
                 predictions, feature_engineer, target_column=target_col
             )
             if hasattr(predictions, "tolist"):
-                return cast(list[Any], predictions.tolist())
-            return list(predictions)
+                return cast(list[Any], predictions.tolist()), thresholds
+            return list(predictions), thresholds
+        except OverrideThresholdMismatch:
+            raise
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
             raise ValueError(f"Prediction failed: {str(e)}") from e
@@ -320,7 +386,9 @@ class DeploymentService:
             )
 
     @staticmethod
-    def _predict_with_bundled_artifact(artifact: dict, df: pd.DataFrame) -> list:
+    def _predict_with_bundled_artifact(
+        artifact: dict, df: pd.DataFrame, thresholds: dict[str, float] | None = None
+    ) -> tuple[list, dict[str, float] | None]:
         """Predicts using the new SDK bundled artifact format: {"feature_engineer": ..., "model": ...}."""
         feature_engineer = artifact["feature_engineer"]
         estimator = artifact["model"]
@@ -340,7 +408,7 @@ class DeploymentService:
         X_transformed = DeploymentService._transform_bundled_features(feature_engineer, df)
 
         return DeploymentService._predict_and_decode(
-            estimator, X_transformed, feature_engineer, target_col
+            estimator, X_transformed, feature_engineer, target_col, thresholds=thresholds
         )
 
     @staticmethod
@@ -366,7 +434,11 @@ class DeploymentService:
         return list(predictions)
 
     @staticmethod
-    async def predict(session: AsyncSession, data: list[dict]) -> list:
+    async def predict(
+        session: AsyncSession,
+        data: list[dict],
+        override_thresholds: dict[str, float] | None = None,
+    ) -> tuple[list, dict[str, float] | None]:
         # 1. Get active deployment
         deployment = await DeploymentService.get_active_deployment(session)
         if not deployment:
@@ -381,14 +453,36 @@ class DeploymentService:
         # 4. Predict
         # Check for new SDK format: {"feature_engineer": ..., "model": ...}
         if isinstance(artifact, dict) and "feature_engineer" in artifact and "model" in artifact:
-            return DeploymentService._predict_with_bundled_artifact(artifact, df)
+            # Threshold application is only supported on the bundled artifact
+            # path. Resolve which thresholds (if any) to apply, honouring the
+            # priority: explicit override > saved+enabled tuned thresholds.
+            estimator = DeploymentService._unwrap_tuple_estimator(artifact["model"])
+            job = await DeploymentService._get_job_for_deployment(session, deployment.job_id)
+            thresholds = DeploymentService._resolve_thresholds_for_predict(
+                override_thresholds, job, getattr(estimator, "classes_", None)
+            )
+            return DeploymentService._predict_with_bundled_artifact(
+                artifact, df, thresholds=thresholds
+            )
         # Legacy support or direct model loading (if artifact is just the model)
         elif hasattr(artifact, "predict"):
-            return DeploymentService._predict_with_legacy_artifact(artifact, df)
+            if override_thresholds is not None:
+                raise OverrideThresholdMismatch(
+                    "override_thresholds is not supported for this deployed model "
+                    "(legacy artifact without probability outputs)."
+                )
+            predictions = DeploymentService._predict_with_legacy_artifact(artifact, df)
+            return predictions, None
         else:
             raise ValueError(
                 "Loaded artifact is not a valid predictor or recognized pipeline format"
             )
+
+    @staticmethod
+    async def _get_job_for_deployment(session: AsyncSession, job_id: str) -> TrainingJob | None:
+        """Fetches the TrainingJob backing a deployment (for tuned-threshold lookup)."""
+        result = await session.execute(select(TrainingJob).where(TrainingJob.id == job_id))
+        return result.scalar_one_or_none()
 
     @staticmethod
     def _load_artifact_from_s3_for_details(artifact_uri: str) -> Any:

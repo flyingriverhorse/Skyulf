@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 from backend.database.models import get_database_session
 
 from .schemas import DeploymentInfo, PredictionRequest, PredictionResponse
-from .service import DeploymentService
+from .service import DeploymentService, OverrideThresholdMismatch
 
 router = APIRouter(prefix="/deployment", tags=["Deployment"])
 
@@ -102,11 +102,24 @@ async def predict(
         if not deployment:
             raise HTTPException(status_code=404, detail="No active deployment found")
 
-        predictions = await DeploymentService.predict(session, prediction_request.data)
+        predictions, thresholds_applied = await DeploymentService.predict(
+            session,
+            prediction_request.data,
+            override_thresholds=prediction_request.override_thresholds,
+        )
 
-        return PredictionResponse(predictions=predictions, model_version=deployment.job_id)
+        return PredictionResponse(
+            predictions=predictions,
+            model_version=deployment.job_id,
+            thresholds_applied=thresholds_applied,
+        )
     except HTTPException:
         raise
+    except OverrideThresholdMismatch as e:
+        # Must be caught BEFORE the generic ValueError handler below:
+        # OverrideThresholdMismatch subclasses ValueError, and Python matches
+        # the first compatible except, so ordering here maps it to 422 (not 400).
+        raise HTTPException(status_code=422, detail=str(e)) from e
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception:
