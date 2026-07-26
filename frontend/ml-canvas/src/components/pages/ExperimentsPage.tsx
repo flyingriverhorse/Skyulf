@@ -12,6 +12,7 @@ import type { EvaluationData, ShapExplanationData } from './ExperimentsPage/type
 import { getJobScoringMetric, getTaskForModelType, mapJobMetricToDropdown, shortRunId, type ThresholdMetric } from './ExperimentsPage/utils/jobMeta';
 import { registryApi, type RegistryItem } from '../../core/api/registry';
 import { findBestThreshold } from './ExperimentsPage/utils/classificationCharts';
+import { thresholdTuningApi, type ThresholdPreviewResult } from '../../core/api/thresholdTuning';
 import { ComparisonTableView } from './ExperimentsPage/components/ComparisonTableView';
 import { FeatureImportanceView } from './ExperimentsPage/components/FeatureImportanceView';
 import { ShapExplainabilityView } from './ExperimentsPage/components/ShapExplainabilityView';
@@ -76,6 +77,13 @@ export const ExperimentsPage: React.FC = () => {
   const [selectedRocClass, setSelectedRocClass] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.5);
   const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
+  // Threshold Tuning panel state (Phase 2) — the preview/save/toggle/clear
+  // flow is a per-class dict persisted server-side, distinct from the
+  // single client-only `threshold` slider above.
+  const [selectedTuningMetric, setSelectedTuningMetric] = useState<string>('f1');
+  const [tuningPreview, setTuningPreview] = useState<ThresholdPreviewResult | null>(null);
+  const [useTunedThresholds, setUseTunedThresholds] = useState(false);
+  const [tuningError, setTuningError] = useState<string | null>(null);
   const [selectedRegressionSplit, setSelectedRegressionSplit] = useState<string | null>(null);
   // Which metric the classification best-threshold scan optimizes for.
   // Reset per-job in fetchEvaluationData below, defaulting to the job's
@@ -221,6 +229,12 @@ export const ExperimentsPage: React.FC = () => {
     // always F1) — the user can still change it afterward for this job.
     const job = jobsRef.current.find(j => j.job_id === jobId);
     setSelectedThresholdMetric(mapJobMetricToDropdown(job ? getJobScoringMetric(job) : undefined));
+    // Reset threshold-tuning UI state — a preview/tuned-thresholds state
+    // from a previously viewed job must not leak onto the newly selected
+    // one (they're keyed per-job server-side too).
+    setTuningPreview(null);
+    setUseTunedThresholds(false);
+    setTuningError(null);
     try {
       const res = await apiClient.get(`/pipeline/jobs/${jobId}/evaluation`);
       setEvaluationData(res.data);
@@ -230,6 +244,55 @@ export const ExperimentsPage: React.FC = () => {
       setEvaluationData(null);
     } finally {
       setIsEvalLoading(false);
+    }
+  };
+
+  const handlePreviewThresholds = async () => {
+    if (!evalJobId) return;
+    setTuningError(null);
+    try {
+      const result = await thresholdTuningApi.preview(evalJobId, selectedTuningMetric);
+      setTuningPreview(result);
+    } catch (err: unknown) {
+      console.error('Failed to preview thresholds', err);
+      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to preview thresholds');
+    }
+  };
+
+  const handleSaveThresholds = async () => {
+    if (!evalJobId || !tuningPreview) return;
+    setTuningError(null);
+    try {
+      await thresholdTuningApi.save(evalJobId, tuningPreview);
+      setUseTunedThresholds(true);
+    } catch (err: unknown) {
+      console.error('Failed to save thresholds', err);
+      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to save thresholds');
+    }
+  };
+
+  const handleToggleThresholds = async (enabled: boolean) => {
+    if (!evalJobId) return;
+    setTuningError(null);
+    try {
+      await thresholdTuningApi.toggle(evalJobId, enabled);
+      setUseTunedThresholds(enabled);
+    } catch (err: unknown) {
+      console.error('Failed to toggle thresholds', err);
+      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to toggle thresholds');
+    }
+  };
+
+  const handleClearThresholds = async () => {
+    if (!evalJobId) return;
+    setTuningError(null);
+    try {
+      await thresholdTuningApi.clear(evalJobId);
+      setTuningPreview(null);
+      setUseTunedThresholds(false);
+    } catch (err: unknown) {
+      console.error('Failed to clear thresholds', err);
+      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to clear thresholds');
     }
   };
 
@@ -474,6 +537,15 @@ export const ExperimentsPage: React.FC = () => {
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
+                  selectedTuningMetric={selectedTuningMetric}
+                  onSelectedTuningMetricChange={setSelectedTuningMetric}
+                  tuningPreview={tuningPreview}
+                  tuningError={tuningError}
+                  useTunedThresholds={useTunedThresholds}
+                  onPreviewThresholds={handlePreviewThresholds}
+                  onSaveThresholds={handleSaveThresholds}
+                  onToggleThresholds={handleToggleThresholds}
+                  onClearThresholds={handleClearThresholds}
                 />
               )}
 

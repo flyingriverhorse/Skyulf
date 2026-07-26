@@ -4,6 +4,7 @@ import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationData, EvaluationSplit } from '../types';
 import type { ThresholdMetric } from '../utils/jobMeta';
 import { thresholdMetricOptions, metricLabel, normalizeThresholdMetric } from '../utils/classificationCharts';
+import type { ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
 import { RegressionChartsForSplit } from './RegressionChartsForSplit';
 import { ClassificationChartsForSplit } from './ClassificationChartsForSplit';
 import { PerClassConfusionMatrix } from './PerClassConfusionMatrix';
@@ -42,6 +43,15 @@ interface Props {
   handleDownload: (elementId: string, fileName: string) => Promise<void>;
   downloadingChart: string | null;
   doneChart: string | null;
+  selectedTuningMetric: string;
+  onSelectedTuningMetricChange: (v: string) => void;
+  tuningPreview: ThresholdPreviewResult | null;
+  tuningError: string | null;
+  useTunedThresholds: boolean;
+  onPreviewThresholds: () => void | Promise<void>;
+  onSaveThresholds: () => void | Promise<void>;
+  onToggleThresholds: (enabled: boolean) => void | Promise<void>;
+  onClearThresholds: () => void | Promise<void>;
 }
 
 export const EvaluationView: React.FC<Props> = ({
@@ -71,6 +81,15 @@ export const EvaluationView: React.FC<Props> = ({
   handleDownload,
   downloadingChart,
   doneChart,
+  selectedTuningMetric,
+  onSelectedTuningMetricChange,
+  tuningPreview,
+  tuningError,
+  useTunedThresholds,
+  onPreviewThresholds,
+  onSaveThresholds,
+  onToggleThresholds,
+  onClearThresholds,
 }) => {
   // Regression split tabs (Train/Test/Validation). Hoisted here and
   // memoized because this exact derivation was previously duplicated
@@ -327,6 +346,67 @@ export const EvaluationView: React.FC<Props> = ({
             })()}
           </div>
 
+          {evaluationData.problem_type === 'classification' && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Threshold Tuning</h4>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
+                <select
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
+                  value={selectedTuningMetric}
+                  onChange={(e) => { onSelectedTuningMetricChange(e.target.value); }}
+                >
+                  <option value="accuracy">Accuracy</option>
+                  <option value="f1">F1</option>
+                  <option value="precision">Precision</option>
+                  <option value="recall">Recall</option>
+                  <option value="balanced_accuracy">Balanced Accuracy</option>
+                  <option value="roc_auc">ROC AUC</option>
+                </select>
+              </div>
+              <button
+                onClick={() => { void onPreviewThresholds(); }}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+              >
+                Preview
+              </button>
+              {tuningPreview && (
+                <>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Computed from {tuningPreview.split_used} split
+                    {tuningPreview.split_used === 'test' && (
+                      <em className="ml-1">(no validation split available — using test split)</em>
+                    )}
+                  </span>
+                  <button
+                    onClick={() => { void onSaveThresholds(); }}
+                    className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                  >
+                    Save
+                  </button>
+                </>
+              )}
+              <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={useTunedThresholds}
+                  onChange={(e) => { void onToggleThresholds(e.target.checked); }}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                />
+                <span className="text-gray-700 dark:text-gray-300">Use tuned thresholds at prediction time</span>
+              </label>
+              <button
+                onClick={() => { void onClearThresholds(); }}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                Clear
+              </button>
+              {tuningError && (
+                <span className="text-xs text-red-600 dark:text-red-400">{tuningError}</span>
+              )}
+            </div>
+          )}
+
           {(evaluationData.problem_type === 'regression' || cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2) && (
             <div className="flex flex-col gap-6">
               {/* Charts per split */}
@@ -381,6 +461,8 @@ export const EvaluationView: React.FC<Props> = ({
               handleDownload={handleDownload}
               downloadingChart={downloadingChart}
               doneChart={doneChart}
+              tunedThresholds={tuningPreview?.thresholds ?? null}
+              useTunedThresholds={useTunedThresholds}
             />
           )}
         </div>
