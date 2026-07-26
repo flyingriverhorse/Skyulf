@@ -110,6 +110,7 @@ class BasicTrainingManager(TrainingJobManagerBase):
             logs=t_cast(list[str] | None, job.logs),
             graph=type_cast(dict[str, Any], job.graph),
             promoted_at=job.promoted_at,
+            tuned_thresholds_enabled=job.tuned_thresholds_enabled,
             parent_pipeline_id=parse_branch_info(job.pipeline_id)[0],
             branch_index=parse_branch_info(job.pipeline_id)[1],
         )

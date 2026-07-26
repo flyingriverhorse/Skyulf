@@ -43,6 +43,7 @@ class JobInfo(BaseModel):
     graph: dict[str, Any] | None = None
     config: dict[str, Any] | None = None
     promoted_at: datetime | None = None
+    tuned_thresholds_enabled: bool | None = None
 
     # Parallel branch metadata
     branch_index: int | None = None
