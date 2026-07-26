@@ -36,9 +36,10 @@ async def test_deployment_predict_s3_creds():
                 mock_store.load.return_value = mock_model
 
                 # Call predict
-                preds = await DeploymentService.predict(session, [{"f1": 1}])
+                preds, thresholds_applied = await DeploymentService.predict(session, [{"f1": 1}])
 
                 assert preds == [1, 0]
+                assert thresholds_applied is None
 
                 # Verify S3Store init
                 MockS3Store.assert_called_once()
