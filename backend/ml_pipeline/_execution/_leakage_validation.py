@@ -90,6 +90,34 @@ DATA_DEPENDENT_FIT_STEP_TYPES: frozenset[str] = frozenset(
 # preprocessing before it is not a leakage concern.
 TRAIN_TEST_SPLIT_STEP_TYPES: frozenset[str] = frozenset({"TrainTestSplitter", "Split"})
 
+# Encoder step types that can operate purely on the target column (y)
+# instead of feature columns, depending on their config.
+TARGET_CAPABLE_ENCODER_STEP_TYPES: frozenset[str] = frozenset({"LabelEncoder", "OrdinalEncoder"})
+
+
+def _is_target_only_encoding(step_type: str, params: dict) -> bool:
+    """True if a Label/Ordinal encoder node is configured to encode *only* the
+    target column (y), with no feature ``columns`` selected.
+
+    Per ``skyulf-core``'s ``LabelEncoderCalculator``/``OrdinalEncoderCalculator``
+    (see ``_maybe_fit_target``/``_ordinal_fit_no_columns``), an empty/missing
+    ``columns`` param means the node fits *only* on ``y`` — it never touches
+    feature columns at all. Encoding the target this way is not a leakage risk
+    even when it runs before the train/test split: it's a deterministic
+    category-label -> integer mapping (sklearn's ``LabelEncoder``/
+    ``OrdinalEncoder`` assign ids from sorted class order, not from any
+    train/test-dependent statistic), and every downstream consumer needs the
+    target already numeric/consistent before a split can even be stratified
+    on it. This is standard practice, not test-set contamination.
+
+    If ``columns`` IS populated, the node also (or instead) encodes those
+    feature columns by learning a vocabulary from whichever rows it sees —
+    that part remains a genuine leakage risk and is not exempted here.
+    """
+    if step_type not in TARGET_CAPABLE_ENCODER_STEP_TYPES:
+        return False
+    return not params.get("columns")
+
 
 def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
     """Returns ``{node_id: {ids reachable by following outgoing/forward edges}}``.
@@ -148,6 +176,8 @@ def validate_no_preprocessing_before_split(nodes: list[NodeConfig]) -> None:
 
     for n in nodes:
         if n.step_type not in DATA_DEPENDENT_FIT_STEP_TYPES:
+            continue
+        if _is_target_only_encoding(n.step_type, n.params):
             continue
         leaking_splitters = descendants.get(n.node_id, set()) & splitter_ids
         if leaking_splitters:

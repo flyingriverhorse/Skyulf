@@ -62,6 +62,25 @@ export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
 // features (X) from the target (y) and creates no train/test boundary.
 export const TRAIN_TEST_SPLIT_STEP_TYPES = new Set<string>(['TrainTestSplitter', 'Split']);
 
+// Encoder step types that can operate purely on the target column (y)
+// instead of feature columns, depending on their config.
+export const TARGET_CAPABLE_ENCODER_STEP_TYPES = new Set<string>(['LabelEncoder', 'OrdinalEncoder']);
+
+/**
+ * True if a Label/Ordinal encoder node is configured to encode *only* the
+ * target column (y), with no feature `columns` selected. Mirrors the
+ * backend's `_is_target_only_encoding` (see
+ * `backend/ml_pipeline/_execution/_leakage_validation.py`) — an empty/missing
+ * `columns` param means the node fits only on `y`, a deterministic
+ * category->integer mapping that isn't a leakage risk even before the
+ * train/test split. Keep in sync with the backend check.
+ */
+export function isTargetOnlyEncoding(stepType: string, params: Record<string, unknown>): boolean {
+  if (!TARGET_CAPABLE_ENCODER_STEP_TYPES.has(stepType)) return false;
+  const columns = params.columns;
+  return !columns || (Array.isArray(columns) && columns.length === 0);
+}
+
 export interface LeakageIssue {
   nodeId: string;
   stepType: string;
@@ -110,6 +129,7 @@ export function findPreprocessingBeforeSplitIssues(nodes: NodeConfigModel[]): Le
   const issues: LeakageIssue[] = [];
   for (const n of nodes) {
     if (!DATA_DEPENDENT_FIT_STEP_TYPES.has(n.step_type)) continue;
+    if (isTargetOnlyEncoding(n.step_type, n.params)) continue;
     const reachable = collect(n.node_id);
     const hitSplitter = [...splitterIds].find((id) => reachable.has(id));
     if (hitSplitter) {

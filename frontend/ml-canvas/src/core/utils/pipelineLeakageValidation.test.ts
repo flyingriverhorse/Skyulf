@@ -5,10 +5,15 @@ import {
   formatLeakageIssueMessage,
 } from './pipelineLeakageValidation';
 
-const node = (node_id: string, step_type: string, inputs: string[] = []): NodeConfigModel => ({
+const node = (
+  node_id: string,
+  step_type: string,
+  inputs: string[] = [],
+  params: Record<string, unknown> = {},
+): NodeConfigModel => ({
   node_id,
   step_type,
-  params: {},
+  params,
   inputs,
 });
 
@@ -75,6 +80,33 @@ describe('findPreprocessingBeforeSplitIssues', () => {
     const issues = findPreprocessingBeforeSplitIssues(nodes);
     expect(issues.map((i) => i.nodeId)).toEqual(['impute']);
   });
+
+  it.each(['LabelEncoder', 'OrdinalEncoder'])(
+    'allows target-only %s (no columns selected) before the splitter',
+    (stepType) => {
+      const nodes = [
+        node('load', 'DataLoader'),
+        node('encode_target', stepType, ['load'], {}),
+        node('split', 'TrainTestSplitter', ['encode_target']),
+        node('model', 'LogisticRegression', ['split']),
+      ];
+      expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+    },
+  );
+
+  it.each(['LabelEncoder', 'OrdinalEncoder'])(
+    'still flags %s with explicit feature columns before the splitter',
+    (stepType) => {
+      const nodes = [
+        node('load', 'DataLoader'),
+        node('encode_features', stepType, ['load'], { columns: ['city', 'country'] }),
+        node('split', 'TrainTestSplitter', ['encode_features']),
+        node('model', 'LogisticRegression', ['split']),
+      ];
+      const issues = findPreprocessingBeforeSplitIssues(nodes);
+      expect(issues.map((i) => i.nodeId)).toEqual(['encode_features']);
+    },
+  );
 });
 
 describe('formatLeakageIssueMessage', () => {
