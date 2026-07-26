@@ -107,3 +107,67 @@ describe('PerClassConfusionMatrix — tuned threshold redraw', () => {
     expect(cPanel.querySelector('[title="TP=1"]')).not.toBeNull();
   });
 });
+
+const binaryEvaluationData: Extract<EvaluationData, { problem_type: 'classification' | 'regression' }> = {
+  problem_type: 'classification' as const,
+  splits: {
+    train: {
+      y_true: ['yes', 'no', 'yes', 'no'],
+      y_pred: ['yes', 'no', 'yes', 'no'],
+      y_proba: {
+        classes: ['yes', 'no'],
+        values: [
+          [0.8, 0.2],
+          [0.3, 0.7],
+          [0.9, 0.1],
+          [0.4, 0.6],
+        ],
+      },
+    },
+  },
+};
+
+describe('PerClassConfusionMatrix — binary classification support', () => {
+  it('no longer returns null for a 2-class job', () => {
+    const { container } = render(
+      <PerClassConfusionMatrix
+        evaluationData={binaryEvaluationData}
+        selectedRocClass={null}
+        threshold={0.5}
+        showTrainMetrics
+        showTestMetrics={false}
+        showValMetrics={false}
+        handleDownload={noop}
+        downloadingChart={null}
+        doneChart={null}
+        tunedThresholds={{ yes: 1, no: 1 }}
+        useTunedThresholds
+      />,
+    );
+    expect(container.firstChild).not.toBeNull();
+  });
+
+  it('renders one plain matrix (not "vs Rest" mirror panels) for a binary job', () => {
+    render(
+      <PerClassConfusionMatrix
+        evaluationData={binaryEvaluationData}
+        selectedRocClass={null}
+        threshold={0.5}
+        showTrainMetrics
+        showTestMetrics={false}
+        showValMetrics={false}
+        handleDownload={noop}
+        downloadingChart={null}
+        doneChart={null}
+        tunedThresholds={{ yes: 1, no: 1 }}
+        useTunedThresholds
+      />,
+    );
+    // Equal thresholds (all 1) reduce applyMulticlassThresholds to plain
+    // argmax, matching y_true exactly here — both classes get 2/2 correct.
+    expect(screen.queryByText('yes vs Rest')).not.toBeInTheDocument();
+    expect(screen.queryByText('no vs Rest')).not.toBeInTheDocument();
+    expect(screen.getByTitle('true=yes, pred=yes: 2')).toBeInTheDocument();
+    expect(screen.getByTitle('true=no, pred=no: 2')).toBeInTheDocument();
+  });
+});
