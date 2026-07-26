@@ -11,7 +11,7 @@ import React, { useMemo } from 'react';
 import { Loader2, Check, Download } from 'lucide-react';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationSplit, EvaluationData } from '../types';
-import { applyThreshold } from '../utils/classificationCharts';
+import { applyThreshold, applyMulticlassThresholds } from '../utils/classificationCharts';
 
 interface Props {
   evaluationData: Extract<EvaluationData, { problem_type: 'classification' | 'regression' }>;
@@ -23,6 +23,10 @@ interface Props {
   handleDownload: (elementId: string, fileName: string) => Promise<void>;
   downloadingChart: string | null;
   doneChart: string | null;
+  /** Tuned per-class thresholds (keyed by class label as string), applied instead of the single OvR `threshold` when `useTunedThresholds` is true. */
+  tunedThresholds?: Record<string, number> | null;
+  /** When true (and `tunedThresholds` is present), redraws every split's matrix via `applyMulticlassThresholds` instead of the single-class OvR `applyThreshold` path. */
+  useTunedThresholds?: boolean;
 }
 
 export const PerClassConfusionMatrix: React.FC<Props> = ({
@@ -35,6 +39,8 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   handleDownload,
   downloadingChart,
   doneChart,
+  tunedThresholds,
+  useTunedThresholds,
 }) => {
   // Reassigning predictions via OvR threshold scans the full sample array
   // for every split, so it's memoised on the split data + selected class +
@@ -43,10 +49,12 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   const matrixBySplit = useMemo(() => {
     const result: Record<string, { classes: (string | number)[]; matrix: number[][] }> = {};
     for (const [name, splitData] of Object.entries(evaluationData.splits)) {
-      result[name] = applyThreshold(splitData, selectedRocClass, threshold);
+      result[name] = useTunedThresholds && tunedThresholds
+        ? applyMulticlassThresholds(splitData, tunedThresholds)
+        : applyThreshold(splitData, selectedRocClass, threshold);
     }
     return result;
-  }, [evaluationData.splits, selectedRocClass, threshold]);
+  }, [evaluationData.splits, selectedRocClass, threshold, tunedThresholds, useTunedThresholds]);
 
   if ((evaluationData.splits.train?.y_proba?.classes.length ?? 0) <= 2) return null;
 
