@@ -229,7 +229,27 @@ export const EvaluationView: React.FC<Props> = ({
                 ))}
               </div>
             )}
-            {/* Split visibility toggles — classification only */}
+            {/* Classification: Threshold Slider / Threshold Tuning tab switch —
+                decides which control panel + confusion-matrix view below is
+                shown. Independent of the "Splits:" checkboxes just below,
+                which stay shared across both tabs. */}
+            {evaluationData.problem_type === 'classification' && (
+              <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-medium">
+                <button
+                  onClick={() => setActiveTab('slider')}
+                  className={`px-3 py-1.5 transition-colors ${activeTab === 'slider' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                >
+                  Threshold Slider
+                </button>
+                <button
+                  onClick={() => setActiveTab('tuning')}
+                  className={`px-3 py-1.5 transition-colors border-l border-gray-200 dark:border-gray-700 ${activeTab === 'tuning' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                >
+                  Threshold Tuning
+                </button>
+              </div>
+            )}
+            {/* Split visibility toggles — classification only, shared by both tabs */}
             {evaluationData.problem_type !== 'regression' && (<>
               <div className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Splits:</div>
               {hasTrainSplit && (
@@ -252,188 +272,203 @@ export const EvaluationView: React.FC<Props> = ({
               )}
             </>)}
 
-            {/* Classification controls + Threshold Tuning tabs */}
-            {evaluationData.problem_type === 'classification' && (() => {
-              // Some test fixtures may not include train.y_proba; fall back to top-level classes
-              const proba = evaluationData.splits.train?.y_proba ?? { classes: (evaluationData as any).classes ?? [], labels: undefined };
+            {/* Classification controls — Tab 1 (Threshold Slider) only */}
+            {activeTab === 'slider' && evaluationData.problem_type === 'classification' && evaluationData.splits.train?.y_proba && (() => {
+              const proba = evaluationData.splits.train.y_proba!;
               const isBinary = proba.classes.length === 2;
               return (
                 <>
                   <div className="w-px h-5 bg-gray-200 dark:bg-gray-600" />
-
-                  {/* Tabs */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-medium">
-                      <button
-                        onClick={() => setActiveTab('slider')}
-                        className={`px-3 py-1.5 transition-colors ${activeTab === 'slider' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                        Threshold Slider
-                      </button>
-                      <button
-                        onClick={() => setActiveTab('tuning')}
-                        className={`px-3 py-1.5 transition-colors border-l border-gray-200 dark:border-gray-700 ${activeTab === 'tuning' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                        Threshold Tuning
-                      </button>
-                    </div>
-
-                    {/* Class selector — hidden for binary: both classes always shown inline */}
-                    {!isBinary && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Class:</span>
-                        <select
-                          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
-                          value={selectedRocClass || ''}
-                          onChange={(e) => { setSelectedRocClass(e.target.value); }}
-                        >
-                          {proba.classes.map((c: string | number, idx: number) => {
-                            const label = proba.labels?.[idx] ?? c;
-                            return <option key={String(c)} value={String(label)}>{String(label)}</option>;
-                          })}
-                        </select>
-                      </div>
-                    )}
-
-                  </div>
-
-                  {/* Tab content */}
-                  {activeTab === 'slider' ? (
-                    <div className="mt-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
-                        <select
-                          className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
-                          value={normalizeThresholdMetric(selectedMetric, isBinary)}
-                          onChange={(e) => { setSelectedMetric(normalizeThresholdMetric(e.target.value as ThresholdMetric, isBinary)); }}
-                        >
-                          {thresholdMetricOptions(isBinary).map(m => (
-                            <option key={m} value={m}>{metricLabel(m, isBinary)}</option>
-                          ))}
-                        </select>
-                        <InfoTooltip text={`Which metric the best-threshold badges below and ROC/PR-based scan optimize for. Precision/Recall/F1 use the selected class as positive for binary jobs, and a support-weighted average across all classes for multiclass jobs (accuracy is unaffected either way).`} align="center" />
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Threshold:</span>
-                        <InfoTooltip text={`Threshold (t): a sample is predicted as the selected class when P(class) ≥ t.\n\n↑ Raise t → fewer positives predicted → lower recall, higher precision (fewer false alarms, more misses).\n↓ Lower t → more positives predicted → higher recall, lower precision (fewer misses, more false alarms).\n\nDefault 0.5 works well for balanced classes. Adjust for imbalanced data or when the cost of false positives ≠ false negatives.`} align="center" />
-                        <input type="range" min={0.01} max={0.99} step={0.01} value={threshold} onChange={(e) => { setThreshold(parseFloat(e.target.value)); }} className="w-28 accent-blue-500" />
-                        <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>
-                        {bestMetricInfos.map(info => {
-                          const colors: Record<string, string> = {
-                            train: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50',
-                            test: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
-                            validation: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/50',
-                          };
-                          const isActive = Math.abs(threshold - info.threshold) < 0.001;
-                          const badgeMetricLabel = metricLabel(info.metricName as ThresholdMetric, isBinary);
-                          return (
-                            <button key={info.splitLabel} onClick={() => { setThreshold(info.threshold); }} className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${colors[info.splitLabel] ?? colors.test} ${isActive ? 'ring-2 ring-offset-1 ring-current' : ''}`} title={`Best ${badgeMetricLabel}=${info.value.toFixed(3)} on ${info.splitLabel} split — click to apply`}>
-                              ★ {info.splitLabel} {badgeMetricLabel}: {info.threshold.toFixed(2)}
-                            </button>
-                          );
+                  {/* Class selector — hidden for binary: both classes always shown inline */}
+                  {!isBinary && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Class:</span>
+                      <select
+                        className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
+                        value={selectedRocClass || ''}
+                        onChange={(e) => { setSelectedRocClass(e.target.value); }}
+                      >
+                        {proba.classes.map((c: string | number, idx: number) => {
+                          const label = proba.labels?.[idx] ?? c;
+                          return <option key={String(c)} value={String(label)}>{String(label)}</option>;
                         })}
-                        {bestMetricInfos.length > 0 && (
-                          <InfoTooltip text={`Each badge shows the threshold that maximises ${metricLabel(bestMetricInfos[0]!.metricName as ThresholdMetric, isBinary)} for the selected class on that split (found by scanning every unique prediction score, same method sklearn uses internally) — one per split currently checked in "Splits:" above. Click a badge to snap the slider to that split's optimal value.`} align="center" />
-                        )}
-                      </div>
-
-                      {proba.labels && proba.labels.length === proba.classes.length && (
-                        <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap mt-1">({proba.classes.map((c, idx) => `${String(c)}→${String(proba.labels?.[idx] ?? c)}`).join(', ')})</div>
-                      )}
-
-                      {/* Overall / Per Class toggle — hidden for binary */}
-                      {!isBinary && (
-                        <div className="mt-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-medium">
-                              <button onClick={() => setCmView('overall')} className={`px-3 py-1.5 transition-colors ${cmView === 'overall' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>Overall</button>
-                              <button onClick={() => setCmView('per-class')} className={`px-3 py-1.5 transition-colors border-l border-gray-200 dark:border-gray-700 ${cmView === 'per-class' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>Per Class</button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* If per-class selected, render PerClassConfusionMatrix with no tuned thresholds for Slider tab */}
-                      {cmView === 'per-class' && (
-                        <div className="mt-4">
-                          <PerClassConfusionMatrix
-                            evaluationData={evaluationData}
-                            selectedRocClass={selectedRocClass}
-                            threshold={threshold}
-                            showTrainMetrics={showTrainMetrics}
-                            showTestMetrics={showTestMetrics}
-                            showValMetrics={showValMetrics}
-                            handleDownload={handleDownload}
-                            downloadingChart={downloadingChart}
-                            doneChart={doneChart}
-                            tunedThresholds={null}
-                            useTunedThresholds={false}
-                          />
-                        </div>
-                      )}
+                      </select>
                     </div>
-                  ) : (
-                    <div className="mt-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
-                        <select className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5" value={selectedTuningMetric} onChange={(e) => { onSelectedTuningMetricChange(e.target.value); }}>
-                          <option value="accuracy">Accuracy</option>
-                          <option value="f1">F1</option>
-                          <option value="precision">Precision</option>
-                          <option value="recall">Recall</option>
-                          <option value="balanced_accuracy">Balanced Accuracy</option>
-                          <option value="roc_auc">ROC AUC</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-2">
-                        <button onClick={() => { void onPreviewThresholds(); }} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors">Preview</button>
-                        {tuningPreview && (
-                          <>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">Computed from {tuningPreview.split_used} split{tuningPreview.split_used === 'test' && (<em className="ml-1">(no validation split available — using test split)</em>)}</span>
-                            <button onClick={() => { void onSaveThresholds(); }} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors">Save</button>
-                          </>
-                        )}
-
-                        <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                          <input type="checkbox" checked={useTunedThresholds} onChange={(e) => { void onToggleThresholds(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
-                          <span className="text-gray-700 dark:text-gray-300">Use tuned thresholds at prediction time</span>
-                        </label>
-
-                        <button onClick={() => { void onClearThresholds(); }} className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Clear</button>
-                        {tuningError && (<span className="text-xs text-red-600 dark:text-red-400">{tuningError}</span>)}
-                      </div>
-
-                      <div className="mt-4">
-                        {tuningPreview ? (
-                          <PerClassConfusionMatrix
-                            evaluationData={evaluationData}
-                            selectedRocClass={selectedRocClass}
-                            threshold={threshold}
-                            showTrainMetrics={showTrainMetrics}
-                            showTestMetrics={showTestMetrics}
-                            showValMetrics={showValMetrics}
-                            handleDownload={handleDownload}
-                            downloadingChart={downloadingChart}
-                            doneChart={doneChart}
-                            tunedThresholds={tuningPreview.thresholds}
-                            useTunedThresholds
-                          />
-                        ) : (
-                          <div className="text-sm text-gray-500">Click Preview above to see tuned thresholds applied to your confusion matrix.</div>
-                        )}
-                      </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
+                    <select
+                      className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
+                      value={normalizeThresholdMetric(selectedMetric, isBinary)}
+                      onChange={(e) => { setSelectedMetric(normalizeThresholdMetric(e.target.value as ThresholdMetric, isBinary)); }}
+                    >
+                      {thresholdMetricOptions(isBinary).map(m => (
+                        <option key={m} value={m}>{metricLabel(m, isBinary)}</option>
+                      ))}
+                    </select>
+                    <InfoTooltip
+                      text={`Which metric the best-threshold badges below and ROC/PR-based scan optimize for. Precision/Recall/F1 use the selected class as positive for binary jobs, and a support-weighted average across all classes for multiclass jobs (accuracy is unaffected either way).`}
+                      align="center"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Threshold:</span>
+                    <InfoTooltip
+                      text={`Threshold (t): a sample is predicted as the selected class when P(class) ≥ t.\n\n↑ Raise t → fewer positives predicted → lower recall, higher precision (fewer false alarms, more misses).\n↓ Lower t → more positives predicted → higher recall, lower precision (fewer misses, more false alarms).\n\nDefault 0.5 works well for balanced classes. Adjust for imbalanced data or when the cost of false positives ≠ false negatives.`}
+                      align="center"
+                    />
+                    <input
+                      type="range" min={0.01} max={0.99} step={0.01}
+                      value={threshold}
+                      onChange={(e) => { setThreshold(parseFloat(e.target.value)); }}
+                      className="w-28 accent-blue-500"
+                    />
+                    <span className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400 w-9">{threshold.toFixed(2)}</span>
+                    {bestMetricInfos.map(info => {
+                      const colors: Record<string, string> = {
+                        train: 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/50',
+                        test: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50',
+                        validation: 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-700 hover:bg-orange-100 dark:hover:bg-orange-900/50',
+                      };
+                      const isActive = Math.abs(threshold - info.threshold) < 0.001;
+                      const badgeMetricLabel = metricLabel(info.metricName as ThresholdMetric, isBinary);
+                      return (
+                        <button
+                          key={info.splitLabel}
+                          onClick={() => { setThreshold(info.threshold); }}
+                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${colors[info.splitLabel] ?? colors.test} ${isActive ? 'ring-2 ring-offset-1 ring-current' : ''}`}
+                          title={`Best ${badgeMetricLabel}=${info.value.toFixed(3)} on ${info.splitLabel} split — click to apply`}
+                        >
+                          ★ {info.splitLabel} {badgeMetricLabel}: {info.threshold.toFixed(2)}
+                        </button>
+                      );
+                    })}
+                    {bestMetricInfos.length > 0 && (
+                      <InfoTooltip
+                        text={`Each badge shows the threshold that maximises ${metricLabel(bestMetricInfos[0]!.metricName as ThresholdMetric, isBinary)} for the selected class on that split (found by scanning every unique prediction score, same method sklearn uses internally) — one per split currently checked in "Splits:" above. Click a badge to snap the slider to that split's optimal value.`}
+                        align="center"
+                      />
+                    )}
+                  </div>
+                  {proba.labels && proba.labels.length === proba.classes.length && (
+                    <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                      ({proba.classes.map((c, idx) => `${String(c)}→${String(proba.labels?.[idx] ?? c)}`).join(', ')})
                     </div>
+                  )}
+                  {/* Overall / Per Class toggle — hidden for binary */}
+                  {!isBinary && (
+                    <>
+                      <div className="w-px h-5 bg-gray-200 dark:bg-gray-600" />
+                      <div className="flex items-center rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-medium">
+                        <button onClick={() => setCmView('overall')} className={`px-3 py-1.5 transition-colors ${cmView === 'overall' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>Overall</button>
+                        <button onClick={() => setCmView('per-class')} className={`px-3 py-1.5 transition-colors border-l border-gray-200 dark:border-gray-700 ${cmView === 'per-class' ? 'bg-blue-500 text-white' : 'bg-white dark:bg-gray-900 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>Per Class</button>
+                      </div>
+                    </>
                   )}
                 </>
               );
             })()}
-
           </div>
 
-          {(evaluationData.problem_type === 'regression' ||
-            (evaluationData.problem_type === 'classification' &&
-              activeTab === 'slider' &&
-              (cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2))) && (
+          {/* Tab-level one-line description of what's driving the charts below */}
+          {evaluationData.problem_type === 'classification' && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 italic px-1">
+              {activeTab === 'slider'
+                ? 'Manually explore how a single threshold changes predictions — nothing here is saved or used for real predictions.'
+                : "Let the optimizer find the best per-class threshold(s) for a metric you choose, preview its effect, then save it to actually change how this model predicts."}
+            </p>
+          )}
+
+          {activeTab === 'tuning' && evaluationData.problem_type === 'classification' && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-white dark:bg-gray-800 px-4 py-3 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Threshold Tuning</h4>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Metric:</span>
+                <select
+                  className="bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-1.5"
+                  value={selectedTuningMetric}
+                  onChange={(e) => { onSelectedTuningMetricChange(e.target.value); }}
+                >
+                  <option value="accuracy">Accuracy</option>
+                  <option value="f1">F1</option>
+                  <option value="precision">Precision</option>
+                  <option value="recall">Recall</option>
+                  <option value="balanced_accuracy">Balanced Accuracy</option>
+                  <option value="roc_auc">ROC AUC</option>
+                </select>
+                <InfoTooltip
+                  text="Which metric the optimizer maximizes when you click Preview. Uses your validation split if available, otherwise test."
+                  align="center"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { void onPreviewThresholds(); }}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+                >
+                  Preview
+                </button>
+                <InfoTooltip
+                  text="Runs the optimizer now and shows the result below — does not save or affect real predictions yet."
+                  align="center"
+                />
+              </div>
+              {tuningPreview && (
+                <>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Computed from {tuningPreview.split_used} split
+                    {tuningPreview.split_used === 'test' && (
+                      <em className="ml-1">(no validation split available — using test split)</em>
+                    )}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => { void onSaveThresholds(); }}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                    >
+                      Save
+                    </button>
+                    <InfoTooltip
+                      text="Persists the previewed thresholds to this model version. Still inactive until you also enable 'Use tuned thresholds.'"
+                      align="center"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="flex items-center gap-1">
+                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={useTunedThresholds}
+                    onChange={(e) => { void onToggleThresholds(e.target.checked); }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Use tuned thresholds at prediction time</span>
+                </label>
+                <InfoTooltip
+                  text="When ON, every real /predict call for this model uses these saved thresholds instead of the default 0.5/argmax rule."
+                  align="center"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => { void onClearThresholds(); }}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                >
+                  Clear
+                </button>
+                <InfoTooltip
+                  text="Deletes saved thresholds entirely and reverts predictions to the default rule."
+                  align="center"
+                />
+              </div>
+              {tuningError && (
+                <span className="text-xs text-red-600 dark:text-red-400">{tuningError}</span>
+              )}
+            </div>
+          )}
+
+          {(evaluationData.problem_type === 'regression' || (activeTab === 'slider' && (cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2))) && (
             <div className="flex flex-col gap-6">
               {/* Charts per split */}
               {Object.entries(evaluationData.splits)
@@ -475,6 +510,42 @@ export const EvaluationView: React.FC<Props> = ({
                   </div>
                 ))}
             </div>
+          )}
+          {activeTab === 'slider' && evaluationData.problem_type === 'classification' && cmView === 'per-class' && (
+            <PerClassConfusionMatrix
+              evaluationData={evaluationData}
+              selectedRocClass={selectedRocClass}
+              threshold={threshold}
+              showTrainMetrics={showTrainMetrics}
+              showTestMetrics={showTestMetrics}
+              showValMetrics={showValMetrics}
+              handleDownload={handleDownload}
+              downloadingChart={downloadingChart}
+              doneChart={doneChart}
+              tunedThresholds={null}
+              useTunedThresholds={false}
+            />
+          )}
+          {activeTab === 'tuning' && evaluationData.problem_type === 'classification' && (
+            tuningPreview ? (
+              <PerClassConfusionMatrix
+                evaluationData={evaluationData}
+                selectedRocClass={selectedRocClass}
+                threshold={threshold}
+                showTrainMetrics={showTrainMetrics}
+                showTestMetrics={showTestMetrics}
+                showValMetrics={showValMetrics}
+                handleDownload={handleDownload}
+                downloadingChart={downloadingChart}
+                doneChart={doneChart}
+                tunedThresholds={tuningPreview.thresholds}
+                useTunedThresholds
+              />
+            ) : (
+              <div className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                Click Preview above to see tuned thresholds applied to your confusion matrix.
+              </div>
+            )
           )}
         </div>
       )}
