@@ -430,7 +430,10 @@ export const EvaluationView: React.FC<Props> = ({
 
           </div>
 
-          {(evaluationData.problem_type === 'regression' || cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2) && (
+          {(evaluationData.problem_type === 'regression' ||
+            (evaluationData.problem_type === 'classification' &&
+              activeTab === 'slider' &&
+              (cmView === 'overall' || evaluationData.splits.train?.y_proba?.classes.length === 2))) && (
             <div className="flex flex-col gap-6">
               {/* Charts per split */}
               {Object.entries(evaluationData.splits)
