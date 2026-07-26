@@ -110,6 +110,9 @@ const TrainTestSplitSettings: React.FC<{ config: TrainTestSplitConfig; onChange:
             <p className="text-xs text-muted-foreground">
               {Math.round(trainSize * 100)}% Training, {Math.round(valSize * 100)}% Validation, {Math.round(config.test_size * 100)}% Testing
             </p>
+            <p className="text-xs text-muted-foreground">
+              Setting a validation size enables threshold tuning to compute against a held-out validation split instead of falling back to the test split.
+            </p>
             {trainSize <= 0 && (
               <p className="text-xs text-red-500 font-medium">
                 Error: Total split size exceeds 100%
