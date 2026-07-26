@@ -77,6 +77,12 @@ export const ExperimentsPage: React.FC = () => {
   const [selectedRocClass, setSelectedRocClass] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.5);
   const [cmView, setCmView] = useState<'overall' | 'per-class'>('overall');
+  // Evaluation page tab switch: "Threshold Slider" (today's manual,
+  // client-side slider) vs "Threshold Tuning" (server-side optimizer
+  // preview/save flow). Lifted here, not reset on job switch, mirroring
+  // how `cmView` above already behaves — the threshold-tuning-specific
+  // state (`tuningPreview` etc.) is separately reset per job already.
+  const [activeTab, setActiveTab] = useState<'slider' | 'tuning'>('slider');
   // Threshold Tuning panel state (Phase 2) — the preview/save/toggle/clear
   // flow is a per-class dict persisted server-side, distinct from the
   // single client-only `threshold` slider above.
@@ -531,6 +537,8 @@ export const ExperimentsPage: React.FC = () => {
                   setSelectedRocClass={setSelectedRocClass}
                   cmView={cmView}
                   setCmView={setCmView}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
                   selectedMetric={selectedThresholdMetric}
                   setSelectedMetric={setSelectedThresholdMetric}
                   bestMetricInfos={bestMetricInfos}
