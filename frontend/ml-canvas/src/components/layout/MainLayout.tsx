@@ -59,7 +59,18 @@ export const MainLayout: React.FC = () => {
       <JobsDrawer />
       <Navbar />
 
-      {activeView === 'canvas' ? (
+      {/* All three top-level views stay mounted at all times (toggled via
+       * `display: contents`/`none` instead of conditional rendering) so
+       * that switching Canvas <-> Experiments <-> Inference never tears
+       * down their component trees. Each page keeps its own local state
+       * (selected job, active evaluation tab, inference form, etc.)
+       * exactly as the user left it when they navigate away and back —
+       * previously this ternary unmounted the inactive views, resetting
+       * all of that state on every switch. `display: contents` makes the
+       * wrapper invisible to layout so the active view's own root element
+       * behaves as if it were still a direct child of this flex column,
+       * matching the pre-existing layout exactly. */}
+      <div style={{ display: activeView === 'canvas' ? 'contents' : 'none' }}>
         <div className="flex flex-1 overflow-hidden relative">
           {!readOnly && <Sidebar />}
           <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
@@ -72,11 +83,13 @@ export const MainLayout: React.FC = () => {
           </main>
           {!readOnly && <PropertiesPanel />}
         </div>
-      ) : activeView === 'experiments' ? (
+      </div>
+      <div style={{ display: activeView === 'experiments' ? 'contents' : 'none' }}>
         <ExperimentsPage />
-      ) : (
+      </div>
+      <div style={{ display: activeView === 'inference' ? 'contents' : 'none' }}>
         <InferencePage />
-      )}
+      </div>
       <ShortcutsOverlay
         open={showShortcuts}
         onClose={() => setShowShortcuts(false)}
