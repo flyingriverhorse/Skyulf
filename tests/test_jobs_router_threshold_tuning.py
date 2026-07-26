@@ -168,6 +168,64 @@ async def test_full_threshold_tuning_http_flow(async_session, client):
     assert clear.json() == {"status": "cleared"}
 
 
+def test_get_endpoint_returns_400_for_missing_job(client):
+    """GET .../thresholds returns 400 when the job doesn't exist."""
+    response = client.get(f"{BASE}/jobs/nonexistent/thresholds")
+    assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_get_endpoint_returns_disabled_shell_before_any_save(async_session, client):
+    """GET .../thresholds returns an all-null/disabled shell before anything is saved."""
+    await _insert_job(async_session, "job-1")
+
+    response = client.get(f"{BASE}/jobs/job-1/thresholds")
+    assert response.status_code == 200
+    assert response.json() == {
+        "thresholds": None,
+        "classes": None,
+        "metric": None,
+        "split_used": None,
+        "computed_at": None,
+        "enabled": False,
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_endpoint_reflects_state_after_save_and_toggle(async_session, client):
+    """GET .../thresholds reflects the saved thresholds and enabled flag after save/toggle."""
+    await _insert_job(async_session, "job-1")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_evaluation_data(), None)),
+    ):
+        preview = client.post(f"{BASE}/jobs/job-1/thresholds/preview", json={"metric": "f1"})
+    body = preview.json()
+
+    client.post(
+        f"{BASE}/jobs/job-1/thresholds/save",
+        json={
+            "thresholds": body["thresholds"],
+            "classes": body["classes"],
+            "metric": body["metric"],
+            "split_used": body["split_used"],
+        },
+    )
+
+    get_response = client.get(f"{BASE}/jobs/job-1/thresholds")
+    assert get_response.status_code == 200
+    saved = get_response.json()
+    assert saved["enabled"] is True
+    assert saved["metric"] == "f1"
+    assert set(saved["thresholds"].keys()) == {"0", "1", "2"}
+
+    client.post(f"{BASE}/jobs/job-1/thresholds/toggle", json={"enabled": False})
+    get_response = client.get(f"{BASE}/jobs/job-1/thresholds")
+    assert get_response.json()["enabled"] is False
+
+
 def test_save_endpoint_returns_400_for_missing_job(client):
     """POST .../thresholds/save returns 400 when the job doesn't exist."""
     response = client.post(

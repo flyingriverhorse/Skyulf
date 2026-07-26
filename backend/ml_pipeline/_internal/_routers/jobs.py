@@ -62,6 +62,17 @@ class ThresholdTuningToggleRequest(BaseModel):
     enabled: bool
 
 
+class ThresholdTuningGetResponse(BaseModel):
+    """Response body describing a job's currently saved tuned thresholds, if any."""
+
+    thresholds: dict[str, float] | None = None
+    classes: list | None = None
+    metric: str | None = None
+    split_used: str | None = None
+    computed_at: str | None = None
+    enabled: bool = False
+
+
 @router.get("/jobs/node-summaries", response_model=dict[str, list[dict[str, Any]]])
 async def get_node_summaries(limit: int = 200, session: AsyncSession = Depends(get_async_session)):
     """Per-node card summaries from the latest completed run group.
@@ -143,6 +154,22 @@ async def get_job_evaluation(  # noqa: C901
     except Exception:
         logger.exception("Failed to retrieve evaluation for job %s", job_id)
         raise SkyulfException(message="Failed to retrieve evaluation data") from None
+
+
+@router.get("/jobs/{job_id}/thresholds", response_model=ThresholdTuningGetResponse)
+async def get_thresholds(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Return the job's currently saved tuned thresholds (if any) and whether they're enabled.
+
+    Lets the Evaluation tab restore its "Use tuned thresholds" toggle/preview
+    on load instead of always starting unchecked, and lets the Inference page
+    show what's already active for a deployment before the user runs a
+    prediction.
+    """
+    try:
+        result = await ThresholdTuningService.get_saved(session, job_id)
+    except ThresholdTuningError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ThresholdTuningGetResponse(**result)
 
 
 @router.post("/jobs/{job_id}/thresholds/preview", response_model=ThresholdTuningPreviewResponse)

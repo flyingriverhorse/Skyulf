@@ -99,6 +99,35 @@ class ThresholdTuningService:
         return job
 
     @staticmethod
+    async def get_saved(session: AsyncSession, job_id: str) -> dict:
+        """Return the job's currently saved tuned thresholds (if any) and enabled flag.
+
+        Returns an all-``None``/``enabled: False`` shell when nothing has
+        been saved yet, so callers don't need to special-case a 404.
+        """
+        job = await ThresholdTuningService._get_job_or_raise(session, job_id)
+
+        if not job.tuned_thresholds:
+            return {
+                "thresholds": None,
+                "classes": None,
+                "metric": None,
+                "split_used": None,
+                "computed_at": None,
+                "enabled": False,
+            }
+
+        saved = job.tuned_thresholds
+        return {
+            "thresholds": saved.get("thresholds"),
+            "classes": saved.get("classes"),
+            "metric": saved.get("metric"),
+            "split_used": saved.get("split_used"),
+            "computed_at": saved.get("computed_at"),
+            "enabled": bool(job.tuned_thresholds_enabled),
+        }
+
+    @staticmethod
     async def preview(session: AsyncSession, job_id: str, metric: str) -> dict:
         """Compute (without saving) tuned per-class thresholds for a job's evaluation data."""
         scorer = _METRIC_SCORERS.get(metric)

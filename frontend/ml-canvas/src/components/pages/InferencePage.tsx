@@ -24,6 +24,7 @@ import {
 import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
 import { jobsApi } from '../../core/api/jobs';
 import { DatasetService } from '../../core/api/datasets';
+import { thresholdTuningApi, SavedThresholdInfo } from '../../core/api/thresholdTuning';
 import { useConfirm } from '../shared';
 import { toast } from '../../core/toast';
 
@@ -515,6 +516,11 @@ export const InferencePage: React.FC = () => {
     const [newOverrideClass, setNewOverrideClass] = useState('');
     const [newOverrideThreshold, setNewOverrideThreshold] = useState('0.5');
 
+    /** Tuned thresholds already saved for the active deployment's job (from the
+     * Evaluation tab's Threshold Tuning panel) — these are applied automatically
+     * at /predict time whenever `enabled` is true and no ad-hoc override is set. */
+    const [savedThresholds, setSavedThresholds] = useState<SavedThresholdInfo | null>(null);
+
     const [autoFilterInfo, setAutoFilterInfo] = useState<string | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
 
@@ -597,6 +603,7 @@ export const InferencePage: React.FC = () => {
             if (!deployment) {
                 setDatasetId(null);
                 setExcludedColumns(new Set());
+                setSavedThresholds(null);
                 return;
             }
 
@@ -615,6 +622,13 @@ export const InferencePage: React.FC = () => {
             }
 
             if (deployment.job_id) {
+                thresholdTuningApi.get(deployment.job_id)
+                    .then(setSavedThresholds)
+                    .catch(err => {
+                        console.warn('Failed to fetch saved tuned thresholds', err);
+                        setSavedThresholds(null);
+                    });
+
                 try {
                     const job = await jobsApi.getJob(deployment.job_id);
                     const targetColumn = job.target_column;
@@ -653,6 +667,8 @@ export const InferencePage: React.FC = () => {
                 } catch (err) {
                     console.warn('Failed to fetch dataset sample', err);
                 }
+            } else {
+                setSavedThresholds(null);
             }
 
             setExcludedColumns(excluded);
@@ -934,6 +950,16 @@ export const InferencePage: React.FC = () => {
         const num = Number(value);
         if (!Number.isFinite(num)) return;
         setOverrideThresholdsValue(prev => ({ ...prev, [cls]: num }));
+    };
+
+    /** Copy the deployment's already-saved tuned thresholds into the ad-hoc
+     * override editor and enable it — lets the user start from what's
+     * already active server-side and tweak individual classes instead of
+     * typing every value from scratch. */
+    const handlePrefillFromSavedThresholds = () => {
+        if (!savedThresholds?.thresholds) return;
+        setOverrideThresholdsValue({ ...savedThresholds.thresholds });
+        setOverrideThresholdsEnabled(true);
     };
 
     /** Pre-fill the override editor with classes seen in the last single-row
@@ -1247,6 +1273,32 @@ export const InferencePage: React.FC = () => {
                             <Sparkles className="w-3.5 h-3.5" /> Advanced: override thresholds
                         </summary>
                         <div className="px-3 pb-3 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-700">
+                            {savedThresholds?.enabled && savedThresholds.thresholds && (
+                                <div className="p-2 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 text-[11px] text-blue-700 dark:text-blue-300">
+                                    <p className="mb-1">
+                                        This model already has <strong>tuned thresholds saved and enabled</strong> from
+                                        the Evaluation tab — they&apos;re applied automatically to every real prediction
+                                        unless you turn on an override below:
+                                    </p>
+                                    <div className="flex flex-wrap gap-1 mb-1.5">
+                                        {Object.entries(savedThresholds.thresholds).map(([cls, thr]) => (
+                                            <span
+                                                key={cls}
+                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 font-mono"
+                                            >
+                                                {cls}: {thr}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={handlePrefillFromSavedThresholds}
+                                        className="text-blue-700 dark:text-blue-300 hover:underline font-medium"
+                                    >
+                                        Copy into override editor to tweak
+                                    </button>
+                                </div>
+                            )}
+
                             <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                                 <input
                                     type="checkbox"

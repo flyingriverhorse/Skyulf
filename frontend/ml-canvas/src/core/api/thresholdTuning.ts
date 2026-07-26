@@ -14,7 +14,26 @@ export interface ThresholdSavePayload {
   split_used: string;
 }
 
+/** A job's currently saved tuned thresholds, if any (`thresholds` etc. are
+ * `null` and `enabled` is `false` when nothing has been saved yet). */
+export interface SavedThresholdInfo {
+  thresholds: Record<string, number> | null;
+  classes: number[] | null;
+  metric: string | null;
+  split_used: string | null;
+  computed_at: string | null;
+  enabled: boolean;
+}
+
 export const thresholdTuningApi = {
+  /** Fetch the job's currently saved tuned thresholds (if any) and enabled flag. */
+  get: async (jobId: string): Promise<SavedThresholdInfo> => {
+    const response = await apiClient.get<SavedThresholdInfo>(
+      `/pipeline/jobs/${jobId}/thresholds`,
+    );
+    return response.data;
+  },
+
   /** Compute (without saving) tuned per-class thresholds for a job's evaluation data. */
   preview: async (jobId: string, metric: string): Promise<ThresholdPreviewResult> => {
     const response = await apiClient.post<ThresholdPreviewResult>(
