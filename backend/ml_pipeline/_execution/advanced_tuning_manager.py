@@ -118,6 +118,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
             graph=type_cast(dict[str, Any], job.graph),
             config=node_params,
             promoted_at=job.promoted_at,
+            tuned_thresholds_enabled=job.tuned_thresholds_enabled,
             parent_pipeline_id=parse_branch_info(job.pipeline_id)[0],
             branch_index=parse_branch_info(job.pipeline_id)[1],
         )
