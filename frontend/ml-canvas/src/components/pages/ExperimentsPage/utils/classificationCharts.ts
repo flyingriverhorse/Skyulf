@@ -93,6 +93,47 @@ export function applyThreshold(
   return calculateConfusionMatrix(yTrue, yPred, proba?.classes);
 }
 
+/**
+ * Redraws a multiclass confusion matrix client-side using tuned per-class
+ * thresholds, without a backend round-trip.
+ *
+ * This is the frontend parity implementation of skyulf-core's
+ * `apply_thresholds()` (see `skyulf-core/skyulf/modeling/_evaluation/thresholds.py`):
+ * for 3+ classes, that function is a scaled argmax —
+ * `classes[argmax(y_proba / thresholds, axis=1)]` — where `thresholds` is a
+ * dict covering every class. Equal thresholds across all classes reduce to
+ * plain argmax, matching the Python implementation exactly (including its
+ * "first max wins" tie-break, since both `np.argmax` and this function's
+ * strict `>` comparison keep the first index on a tie).
+ *
+ * If `y_proba` is missing, no reassignment is possible and the split's
+ * original y_true/y_pred are used, matching `applyThreshold`'s convention.
+ */
+export function applyMulticlassThresholds(
+  splitData: EvaluationSplit,
+  thresholds: Record<string, number>,
+): { classes: (string | number)[]; matrix: number[][] } {
+  const { y_true, y_pred, y_proba } = splitData;
+  if (!y_proba) return calculateConfusionMatrix(y_true, y_pred);
+
+  const yPred = y_proba.values.map(row => {
+    let bestIdx = 0;
+    let bestScore = -Infinity;
+    row.forEach((value, idx) => {
+      const classLabel = y_proba.classes[idx];
+      const threshold = thresholds[String(classLabel)] ?? 1;
+      const score = value / threshold;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = idx;
+      }
+    });
+    return y_proba.classes[bestIdx]!;
+  });
+
+  return calculateConfusionMatrix(y_true, yPred, y_proba.classes);
+}
+
 /** Metric that a best-threshold scan can optimize for. `f1`/`precision`/`recall`
  * are the binary positive-class ("bare") metrics — matching the backend's own
  * naming in `_add_binary_unweighted_metrics` — and fall back to their
