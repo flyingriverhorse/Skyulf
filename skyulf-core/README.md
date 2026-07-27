@@ -103,9 +103,7 @@ pipeline = SkyulfPipeline(
 
 pipeline.fit(customers, target_column="purchased")
 pipeline.save("customer_model.pkl")
-predictions = SkyulfPipeline.load("customer_model.pkl").predict(
-    pl.read_csv("new_customers.csv")
-)
+predictions = SkyulfPipeline.load("customer_model.pkl").predict(pl.read_csv("new_customers.csv"))
 ```
 
 See [`examples/00_quickstart.ipynb`](examples/00_quickstart.ipynb) for a
@@ -164,9 +162,7 @@ configured preprocessing chain and returns
 error if the config doesn't include a `TrainTestSplitter` step:
 
 ```python
-X_train, y_train, X_test, y_test = pipeline.get_fitted_split(
-    customers, target_column="purchased"
-)
+X_train, y_train, X_test, y_test = pipeline.get_fitted_split(customers, target_column="purchased")
 ```
 
 **Threshold tuning:** the default decision rule (argmax for multiclass, 0.5
@@ -280,14 +276,14 @@ from skyulf import EDAAnalyzer, EDAVisualizer
 
 df = pl.read_csv("data.csv")
 profile = EDAAnalyzer(df).analyze(
-    target_col="target",     # Optional: unlocks target-association analysis
-    date_col="timestamp",    # Optional: unlocks temporal analysis
-    lat_col="latitude",      # Optional: unlocks geospatial analysis
-    lon_col="longitude",     # Optional
+    target_col="target",  # Optional: unlocks target-association analysis
+    date_col="timestamp",  # Optional: unlocks temporal analysis
+    lat_col="latitude",  # Optional: unlocks geospatial analysis
+    lon_col="longitude",  # Optional
 )
 
 EDAVisualizer(profile, df).summary()  # Rich terminal dashboard (skyulf-core[viz])
-EDAVisualizer(profile, df).plot()     # Matplotlib figures (skyulf-core[viz])
+EDAVisualizer(profile, df).plot()  # Matplotlib figures (skyulf-core[viz])
 ```
 
 Everything the visualizer renders is also available as plain data on
