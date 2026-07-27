@@ -269,6 +269,10 @@ class MLJob(Base, TimestampMixin):
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     promoted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    tuned_thresholds: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
+    tuned_thresholds_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     def to_dict_base(self) -> dict:
         """Convert common model fields to dictionary."""

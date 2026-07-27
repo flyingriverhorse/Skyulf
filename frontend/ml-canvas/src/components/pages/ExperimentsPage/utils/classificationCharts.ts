@@ -93,6 +93,70 @@ export function applyThreshold(
   return calculateConfusionMatrix(yTrue, yPred, proba?.classes);
 }
 
+/**
+ * Redraws a multiclass confusion matrix client-side using tuned per-class
+ * thresholds, without a backend round-trip.
+ *
+ * This is the frontend parity implementation of skyulf-core's
+ * `apply_thresholds()` (see `skyulf-core/skyulf/modeling/_evaluation/thresholds.py`):
+ * for 3+ classes, that function is a scaled argmax —
+ * `classes[argmax(y_proba / thresholds, axis=1)]` — where `thresholds` is a
+ * dict covering every class. Equal thresholds across all classes reduce to
+ * plain argmax, matching the Python implementation exactly (including its
+ * "first max wins" tie-break, since both `np.argmax` and this function's
+ * strict `>` comparison keep the first index on a tie).
+ *
+ * If `y_proba` is missing, no reassignment is possible and the split's
+ * original y_true/y_pred are used, matching `applyThreshold`'s convention.
+ *
+ * When the split reports `y_proba.labels` distinct from `y_proba.classes`
+ * (label-encoded targets, e.g. numeric class codes vs. human-readable
+ * label strings), `y_true` is in label space while `y_proba.classes[idx]`
+ * (the argmax predictions) is in class space. `applyThreshold` handles this
+ * by remapping `y_true`/`y_pred` from label space to class space before
+ * computing the confusion matrix — this function mirrors that same
+ * label->class remapping for `y_true` so the returned predictions and
+ * ground truth are always in the same space (matching diagonal cells for
+ * correct predictions instead of a silently-empty diagonal).
+ */
+export function applyMulticlassThresholds(
+  splitData: EvaluationSplit,
+  thresholds: Record<string, number>,
+): { classes: (string | number)[]; matrix: number[][] } {
+  const { y_pred, y_proba } = splitData;
+  let yTrue: (string | number)[] = splitData.y_true;
+  if (!y_proba) return calculateConfusionMatrix(yTrue, y_pred);
+
+  // Map string labels back to their class values, when the split reports
+  // labels separately from classes (e.g. label-encoded targets) — mirrors
+  // `applyThreshold`'s remapping so predictions and y_true stay comparable.
+  if (y_proba.labels && y_proba.labels.length === y_proba.classes.length) {
+    const labelToClass = new Map<string, string | number>();
+    y_proba.labels.forEach((label, idx) => {
+      const cls = y_proba.classes[idx];
+      if (cls !== undefined) labelToClass.set(String(label), cls);
+    });
+    yTrue = yTrue.map(y => labelToClass.get(String(y)) ?? y);
+  }
+
+  const yPred = y_proba.values.map(row => {
+    let bestIdx = 0;
+    let bestScore = -Infinity;
+    row.forEach((value, idx) => {
+      const classLabel = y_proba.classes[idx];
+      const threshold = thresholds[String(classLabel)] ?? 1;
+      const score = value / threshold;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = idx;
+      }
+    });
+    return y_proba.classes[bestIdx]!;
+  });
+
+  return calculateConfusionMatrix(yTrue, yPred, y_proba.classes);
+}
+
 /** Metric that a best-threshold scan can optimize for. `f1`/`precision`/`recall`
  * are the binary positive-class ("bare") metrics — matching the backend's own
  * naming in `_add_binary_unweighted_metrics` — and fall back to their

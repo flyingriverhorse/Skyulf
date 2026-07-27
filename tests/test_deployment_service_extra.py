@@ -390,10 +390,11 @@ def test_predict_and_decode_plain_list_without_tolist():
         def predict(self, X):
             return (1, 2, 3)  # tuple has no .tolist()
 
-    result = DeploymentService._predict_and_decode(
+    result, thresholds_applied = DeploymentService._predict_and_decode(
         _PlainListPredictor(), pd.DataFrame({"a": [1]}), _NoEncoderEngineer(), None
     )
     assert result == [1, 2, 3]
+    assert thresholds_applied is None
 
 
 # ---------------------------------------------------------------------------

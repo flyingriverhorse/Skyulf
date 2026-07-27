@@ -4,8 +4,10 @@ import hashlib
 import json
 import logging
 import pickle  # nosec B403 - used only for internal pipeline serialization (see save/load below)
+from collections.abc import Callable
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 import polars as pl
 
@@ -13,8 +15,9 @@ from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
 from .leakage import validate_leakage_safety
+from .modeling._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
-from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
+from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
 from .modeling.classification import (
     LogisticRegressionApplier,
     LogisticRegressionCalculator,
@@ -62,6 +65,16 @@ def _artifact_digest(obj: Any) -> bytes:
         return hashlib.sha256(repr(obj).encode("utf-8")).digest()
 
 
+def _to_pandas(obj: Any) -> Any:
+    """Convert a Polars DataFrame/Series (or any object exposing ``to_pandas()``)
+    to its pandas equivalent; pass pandas objects (or ``None``) through unchanged."""
+    if obj is None:
+        return None
+    if hasattr(obj, "to_pandas"):
+        return obj.to_pandas()
+    return obj
+
+
 class SkyulfPipeline:
     """
     End-to-end ML Pipeline.
@@ -92,6 +105,7 @@ class SkyulfPipeline:
         self.model_estimator: StatefulEstimator | None = None
         self._fit_metrics: dict[str, Any] | None = None
         self._target_column: str | None = None
+        self._tuned_thresholds: dict[Any, float] | None = None
 
         # Initialize model estimator if config is present
         if self.modeling_config:
@@ -236,18 +250,161 @@ class SkyulfPipeline:
         self._target_column = target_column
         return metrics
 
-    def predict(self, data: pd.DataFrame | SkyulfDataFrame) -> Any:
+    def get_fitted_split(
+        self,
+        data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | SplitDataset,
+        target_column: str,
+    ) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+        """
+        Run this pipeline's configured preprocessing chain and return the
+        resulting train/test split as plain pandas objects.
+
+        Runs ``self.feature_engineer.fit_transform(data)`` — the same
+        preprocessing ``fit()`` uses internally — and extracts
+        ``(X_train, y_train, X_test, y_test)`` from the resulting split using
+        ``target_column``, converting any Polars/SkyulfDataFrame frames to
+        pandas. Saves callers from re-implementing this split/convert step
+        themselves for custom evaluation harnesses (e.g. comparing multiple
+        raw sklearn-style estimators against the same preprocessed split).
+
+        Args:
+            data: Input data (DataFrame or SplitDataset).
+            target_column: Name of the target column.
+
+        Returns:
+            ``(X_train, y_train, X_test, y_test)`` as pandas DataFrame/Series.
+
+        Raises:
+            ValueError: If the configured preprocessing steps don't produce a
+                train/test split (e.g. no Splitter node configured).
+        """
+        transformed_data, _ = self.feature_engineer.fit_transform(data)
+
+        if not isinstance(transformed_data, SplitDataset):
+            raise ValueError(
+                "get_fitted_split() requires the configured preprocessing steps "
+                "to produce a train/test split (e.g. via a Splitter node); got "
+                "a single, unsplit DataFrame instead."
+            )
+
+        X_train, y_train = extract_xy(transformed_data.train, target_column)
+        X_test, y_test = extract_xy(transformed_data.test, target_column)
+
+        return (
+            _to_pandas(X_train),
+            _to_pandas(y_train),
+            _to_pandas(X_test),
+            _to_pandas(y_test),
+        )
+
+    def _predict_proba_transformed(self, transformed_data: pd.DataFrame | SkyulfDataFrame) -> Any:
+        """Run predict_proba on already-transformed data, raising if unsupported."""
+        if self.model_estimator is None or self.model_estimator.model is None:
+            raise ValueError("Pipeline not fitted or no model configured.")
+        proba = self.model_estimator.applier.predict_proba(
+            transformed_data, self.model_estimator.model
+        )
+        if proba is None:
+            raise ValueError(
+                "The configured model does not support predict_proba(); "
+                "threshold tuning requires predicted class probabilities."
+            )
+        return proba
+
+    def optimize_thresholds(
+        self,
+        X_val: pd.DataFrame | SkyulfDataFrame,
+        y_val: pd.Series | Any,
+        metric: Callable[[Any, Any], float],
+        strategy: str | None = None,
+        grid_points: int = 101,
+    ) -> dict[Any, float]:
+        """
+        Search for per-class decision thresholds that maximize ``metric`` on
+        caller-supplied validation data, and store the result for later use
+        by ``predict(use_tuned_thresholds=True)``.
+
+        Always uses the *explicit* ``(X_val, y_val)`` the caller passes in —
+        never the pipeline's internal train/test split. Get a clean,
+        independent holdout via ``get_fitted_split()`` (or your own split)
+        before calling this, the same way you would for any other
+        out-of-sample evaluation.
+
+        Args:
+            X_val: Validation features, *not* yet transformed (this method
+                runs the pipeline's fitted preprocessing on it internally).
+            y_val: Validation true labels.
+            metric: Callable ``(y_true, y_pred) -> float`` to maximize.
+            strategy: ``"grid"`` or ``"nelder-mead"``. If ``None``,
+                auto-selects based on the number of classes (see
+                ``skyulf.modeling.optimize_thresholds``).
+            grid_points: Number of grid candidates for the ``"grid"``
+                strategy.
+
+        Returns:
+            Dict mapping each class label to its tuned threshold. Also
+            stored on ``self._tuned_thresholds`` for
+            ``predict(use_tuned_thresholds=True)`` to use.
+
+        Raises:
+            ValueError: If the pipeline isn't fitted, or the underlying
+                model doesn't support ``predict_proba``.
+        """
+        if self.model_estimator is None or self.model_estimator.model is None:
+            raise ValueError(
+                "Pipeline not fitted or no model configured. Call fit() before "
+                "optimize_thresholds()."
+            )
+
+        model = self.model_estimator.model
+        model_classes = getattr(model, "classes_", None)
+        if model_classes is None:
+            raise ValueError(
+                "The fitted model does not expose class labels (classes_); "
+                "threshold tuning requires a classifier."
+            )
+
+        transformed_val = self.feature_engineer.transform(X_val)
+        proba_df = self._predict_proba_transformed(transformed_val)
+        classes = np.asarray(model_classes)
+        y_proba = np.asarray(proba_df)[:, : len(classes)]
+
+        thresholds = optimize_thresholds(
+            y_val,
+            y_proba,
+            metric=metric,
+            classes=classes,
+            strategy=strategy,
+            grid_points=grid_points,
+        )
+        self._tuned_thresholds = thresholds
+        return thresholds
+
+    def predict(
+        self,
+        data: pd.DataFrame | SkyulfDataFrame,
+        use_tuned_thresholds: bool = False,
+    ) -> Any:
         """
         Generate predictions.
 
         Args:
             data: Input DataFrame.
+            use_tuned_thresholds: If True, apply the decision thresholds
+                stored by a prior ``optimize_thresholds()`` call instead of
+                the model's default decision rule (argmax/0.5). Requires
+                ``optimize_thresholds()`` to have been called on this
+                pipeline instance first.
 
         Returns:
-            Series of predictions.
+            Series (or array, when ``use_tuned_thresholds=True``) of
+            predictions.
 
         Raises:
-            ValueError: If the input still contains the target column used during fit.
+            ValueError: If the input still contains the target column used
+                during fit(); if the pipeline isn't fitted; or if
+                ``use_tuned_thresholds=True`` but ``optimize_thresholds()``
+                was never called on this instance.
         """
         if self._target_column is not None and self._target_column in data.columns:
             raise ValueError(
@@ -259,12 +416,24 @@ class SkyulfPipeline:
         transformed_data = self.feature_engineer.transform(data)
 
         # 2. Modeling
-        if self.model_estimator and self.model_estimator.model is not None:
+        if not (self.model_estimator and self.model_estimator.model is not None):
+            raise ValueError("Pipeline not fitted or no model configured.")
+
+        if not use_tuned_thresholds:
             return self.model_estimator.applier.predict(
                 transformed_data, self.model_estimator.model
             )
-        else:
-            raise ValueError("Pipeline not fitted or no model configured.")
+
+        if self._tuned_thresholds is None:
+            raise ValueError(
+                "use_tuned_thresholds=True but optimize_thresholds() was never "
+                "called on this pipeline instance. Call optimize_thresholds() first."
+            )
+
+        proba_df = self._predict_proba_transformed(transformed_data)
+        classes = np.asarray(self.model_estimator.model.classes_)
+        y_proba = np.asarray(proba_df)[:, : len(classes)]
+        return apply_thresholds(y_proba, self._tuned_thresholds, classes=classes)
 
     def describe(self) -> str:
         """Return a human-readable, multi-line summary of the pipeline.

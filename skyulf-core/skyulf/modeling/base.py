@@ -18,6 +18,66 @@ from ..engines import EngineName, SkyulfDataFrame, get_engine
 logger = logging.getLogger(__name__)
 
 
+def extract_xy(data: Any, target_column: str) -> tuple[Any, Any]:
+    """Extract ``(X, y)`` from a DataFrame (pandas or Polars) or an ``(X, y)``
+    tuple, given the target column name.
+
+    An empty/falsy ``target_column`` is the established "no target" sentinel
+    (see ``_node_runners.py``'s ``target_col=""`` for data-preview-only
+    inputs): unsupervised calculators (e.g. clustering) rely on this to get
+    the whole frame back as ``X`` with ``y=None``.
+    """
+    if not target_column:
+        X = data[0] if isinstance(data, tuple) else data
+        return X, None
+
+    if isinstance(data, tuple) and len(data) == 2:
+        return _extract_xy_from_tuple(data, target_column)
+
+    engine = get_engine(data)
+
+    if engine.name == EngineName.POLARS:
+        return _extract_xy_polars(data, target_column)
+
+    return _extract_xy_pandas_like(data, target_column)
+
+
+def _extract_xy_from_tuple(data: tuple[Any, Any], target_column: str) -> tuple[Any, Any]:
+    """Extracts X/y from a ``(X, y)`` tuple, pulling ``y`` out of ``X`` if it's missing."""
+    X, y = data[0], data[1]
+    if hasattr(X, "columns") and target_column in X.columns:
+        features, embedded_y = extract_xy(X, target_column)
+        return features, embedded_y if y is None else y
+    return X, y
+
+
+def _extract_xy_polars(data: Any, target_column: str) -> tuple[Any, Any]:
+    """Extracts X/y from a Polars DataFrame by dropping/selecting ``target_column``."""
+    if target_column not in data.columns:
+        raise ValueError(f"Target column '{target_column}' not found in data")
+    X = data.drop([target_column])
+    y = data.select(target_column).to_series()
+    return X, y
+
+
+def _extract_xy_pandas_like(data: Any, target_column: str) -> tuple[Any, Any]:
+    """Extracts X/y from a pandas or generic DataFrame-like object."""
+    if hasattr(data, "columns"):
+        if target_column not in data.columns:
+            raise ValueError(f"Target column '{target_column}' not found in data")
+
+        if hasattr(data, "drop"):
+            try:
+                return data.drop(columns=[target_column]), data[target_column]
+            except TypeError:
+                pass
+
+        if hasattr(data, target_column):
+            return data, getattr(data, target_column)
+
+    raise ValueError(f"Unexpected data type: {type(data)}")
+
+
 class BaseModelCalculator(ABC):
     @property
     @abstractmethod
@@ -128,71 +188,9 @@ class StatefulEstimator:
             return False
 
     def _extract_xy(self, data: Any, target_column: str) -> tuple[Any, Any]:
-        """Helper to extract X and y from DataFrame or Tuple.
-
-        An empty/falsy ``target_column`` is the established "no target"
-        sentinel already used elsewhere in this codebase (see
-        ``_node_runners.py``'s ``target_col=""`` for data-preview-only
-        inputs). Unsupervised calculators (e.g. clustering) rely on this to
-        get the whole frame back as ``X`` with ``y=None``, without touching
-        the existing "raise on missing target" contract that classification/
-        regression depend on below.
-        """
-        if not target_column:
-            X = data[0] if isinstance(data, tuple) else data
-            return X, None
-
-        if isinstance(data, tuple) and len(data) == 2:
-            return self._extract_xy_from_tuple(data, target_column)
-
-        engine = get_engine(data)
-
-        if engine.name == EngineName.POLARS:
-            return self._extract_xy_polars(data, target_column)
-
-        return self._extract_xy_pandas_like(data, target_column)
-
-    def _extract_xy_from_tuple(self, data: tuple[Any, Any], target_column: str) -> tuple[Any, Any]:
-        """Extracts X/y from a ``(X, y)`` tuple, pulling ``y`` out of ``X`` if it's missing."""
-        X, y = data[0], data[1]
-        if hasattr(X, "columns") and target_column in X.columns:
-            features, embedded_y = self._extract_xy(X, target_column)
-            return features, embedded_y if y is None else y
-        return X, y
-
-    @staticmethod
-    def _extract_xy_polars(data: Any, target_column: str) -> tuple[Any, Any]:
-        """Extracts X/y from a Polars DataFrame by dropping/selecting ``target_column``."""
-        if target_column not in data.columns:
-            raise ValueError(f"Target column '{target_column}' not found in data")
-        X = data.drop([target_column])
-        y = data.select(target_column).to_series()
-        return X, y
-
-    @staticmethod
-    def _extract_xy_pandas_like(data: Any, target_column: str) -> tuple[Any, Any]:
-        """Extracts X/y from a pandas or generic DataFrame-like object."""
-        # Check for DataFrame-like
-        if hasattr(data, "columns"):
-            if target_column not in data.columns:
-                raise ValueError(f"Target column '{target_column}' not found in data")
-
-            # Fallback for pure Pandas or Generic DataFrame
-            # If we reached here without matching Polars explicitly, treat as generic/pandas
-            # Try generic drop if available
-            if hasattr(data, "drop"):
-                # Handle pandas-like drop
-                try:
-                    return data.drop(columns=[target_column]), data[target_column]
-                except TypeError:
-                    # Maybe it doesn't support columns= kwarg, try position or list
-                    pass
-
-            # Simple attribute access fallback
-            if hasattr(data, target_column):
-                return data, getattr(data, target_column)
-
-        raise ValueError(f"Unexpected data type: {type(data)}")
+        """Instance-method wrapper around the module-level ``extract_xy()``,
+        kept for backward compatibility with existing call sites/tests."""
+        return extract_xy(data, target_column)
 
     def cross_validate(
         self,

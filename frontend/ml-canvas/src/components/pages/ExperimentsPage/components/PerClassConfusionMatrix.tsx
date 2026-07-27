@@ -11,7 +11,7 @@ import React, { useMemo } from 'react';
 import { Loader2, Check, Download } from 'lucide-react';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationSplit, EvaluationData } from '../types';
-import { applyThreshold } from '../utils/classificationCharts';
+import { applyThreshold, applyMulticlassThresholds } from '../utils/classificationCharts';
 
 interface Props {
   evaluationData: Extract<EvaluationData, { problem_type: 'classification' | 'regression' }>;
@@ -23,6 +23,10 @@ interface Props {
   handleDownload: (elementId: string, fileName: string) => Promise<void>;
   downloadingChart: string | null;
   doneChart: string | null;
+  /** Tuned per-class thresholds (keyed by class label as string), applied instead of the single OvR `threshold` when `useTunedThresholds` is true. */
+  tunedThresholds?: Record<string, number> | null;
+  /** When true (and `tunedThresholds` is present), redraws every split's matrix via `applyMulticlassThresholds` instead of the single-class OvR `applyThreshold` path. */
+  useTunedThresholds?: boolean;
 }
 
 export const PerClassConfusionMatrix: React.FC<Props> = ({
@@ -35,6 +39,8 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   handleDownload,
   downloadingChart,
   doneChart,
+  tunedThresholds,
+  useTunedThresholds,
 }) => {
   // Reassigning predictions via OvR threshold scans the full sample array
   // for every split, so it's memoised on the split data + selected class +
@@ -43,12 +49,92 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
   const matrixBySplit = useMemo(() => {
     const result: Record<string, { classes: (string | number)[]; matrix: number[][] }> = {};
     for (const [name, splitData] of Object.entries(evaluationData.splits)) {
-      result[name] = applyThreshold(splitData, selectedRocClass, threshold);
+      result[name] = useTunedThresholds && tunedThresholds
+        ? applyMulticlassThresholds(splitData, tunedThresholds)
+        : applyThreshold(splitData, selectedRocClass, threshold);
     }
     return result;
-  }, [evaluationData.splits, selectedRocClass, threshold]);
+  }, [evaluationData.splits, selectedRocClass, threshold, tunedThresholds, useTunedThresholds]);
 
-  if ((evaluationData.splits.train?.y_proba?.classes.length ?? 0) <= 2) return null;
+  // Only bail out for genuinely invalid data (0 or 1 classes) — 2-class
+  // (binary) jobs now render via `renderSplitBinary` below instead of the
+  // "N vs Rest" multiclass grid.
+  if ((evaluationData.splits.train?.y_proba?.classes.length ?? 0) < 2) return null;
+
+                            // Binary jobs: one plain N×N (2×2) matrix with real class
+                            // names on both axes, instead of two redundant "vs Rest"
+                            // mirror panels (which carry no extra information for only
+                            // 2 classes). Precision/Recall/F1 chips are still shown
+                            // per class below the grid, using the same tp/fp/fn
+                            // formulas as the multiclass per-class panels.
+                            const renderSplitBinary = (splitName: string, splitData: EvaluationSplit) => {
+                                const { classes, matrix } = matrixBySplit[splitName] ?? applyThreshold(splitData, selectedRocClass, threshold);
+                                const splitId = `binary-cm-${splitName}`;
+                                const perClass = classes.map((cls, idx) => {
+                                    const tp = matrix[idx]?.[idx] ?? 0;
+                                    const fp = matrix.reduce((s, row, ri) => (ri !== idx ? s + (row[idx] ?? 0) : s), 0);
+                                    const fn = (matrix[idx] ?? []).reduce((s, v, ci) => (ci !== idx ? s + v : s), 0);
+                                    const prec = tp + fp > 0 ? tp / (tp + fp) : 0;
+                                    const rec = tp + fn > 0 ? tp / (tp + fn) : 0;
+                                    const f1c = prec + rec > 0 ? (2 * prec * rec) / (prec + rec) : 0;
+                                    return { cls, prec, rec, f1: f1c };
+                                });
+                                const scoreColor = (v: number) => (v >= 0.8 ? 'text-green-500' : v >= 0.6 ? 'text-yellow-500' : 'text-red-500');
+                                return (
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-700 pb-1.5 mb-1">
+                                            <h4 className="text-sm font-semibold text-gray-600 dark:text-gray-300 capitalize">{splitName} Set</h4>
+                                            <button
+                                                id={`${splitId}-dl`}
+                                                onClick={() => void handleDownload(splitId, `${splitName}_binary_tuned`)}
+                                                disabled={downloadingChart === splitId}
+                                                className="p-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-400 hover:text-blue-600 disabled:opacity-50"
+                                                title="Download Confusion Matrix"
+                                            >
+                                                {downloadingChart === splitId ? <Loader2 className="w-3 h-3 animate-spin" /> : doneChart === splitId ? <Check className="w-3 h-3 text-green-500" /> : <Download className="w-3 h-3" />}
+                                            </button>
+                                        </div>
+                                        <div id={splitId} className="flex flex-col items-center">
+                                            <div className="flex flex-col">
+                                                <div className="flex mb-0.5 gap-0.5" style={{ marginLeft: '70px' }}>
+                                                    {classes.map(c => (
+                                                        <span key={String(c)} className="w-16 text-center text-[10px] text-gray-500 dark:text-gray-400 truncate font-medium" title={String(c)}>{String(c)}</span>
+                                                    ))}
+                                                </div>
+                                                {matrix.map((row, ri) => (
+                                                    <div key={ri} className="flex items-center gap-0.5 mb-0.5">
+                                                        <span className="text-right text-[10px] text-gray-500 dark:text-gray-400 pr-1 truncate font-medium" style={{ width: '70px' }} title={String(classes[ri])}>{String(classes[ri])}</span>
+                                                        {row.map((count, ci) => {
+                                                            const isCorrect = ri === ci;
+                                                            const rowMax = Math.max(...row, 1);
+                                                            const bg = isCorrect
+                                                                ? `rgba(34,197,94,${Math.min((count / rowMax) * 0.75 + 0.1, 0.85)})`
+                                                                : `rgba(239,68,68,${Math.min((count / rowMax) * 0.65 + 0.05, 0.75)})`;
+                                                            return (
+                                                                <div key={ci} className="w-16 h-14 flex flex-col items-center justify-center rounded border border-gray-100 dark:border-gray-700 cursor-default" style={{ backgroundColor: bg }} title={`true=${String(classes[ri])}, pred=${String(classes[ci])}: ${count}`}>
+                                                                    <span className="text-sm font-mono font-bold leading-none">{count}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-2 grid grid-cols-2 gap-2 text-[10px] w-full max-w-xs">
+                                                {perClass.map(({ cls, prec, rec, f1 }) => (
+                                                    <div key={String(cls)} className="flex flex-col items-center bg-gray-50 dark:bg-gray-900 rounded py-1.5 px-1">
+                                                        <span className="text-gray-500 dark:text-gray-400 font-medium truncate w-full text-center" title={String(cls)}>{String(cls)}</span>
+                                                        <div className="flex gap-2 mt-0.5">
+                                                            <span title="Precision">P:<span className={`font-mono font-semibold ml-0.5 ${scoreColor(prec)}`}>{prec.toFixed(2)}</span></span>
+                                                            <span title="Recall">R:<span className={`font-mono font-semibold ml-0.5 ${scoreColor(rec)}`}>{rec.toFixed(2)}</span></span>
+                                                            <span title="F1">F1:<span className={`font-mono font-semibold ml-0.5 ${scoreColor(f1)}`}>{f1.toFixed(2)}</span></span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            };
 
                             const renderSplitPerClass = (splitName: string, splitData: EvaluationSplit) => {
                                 const { classes, matrix } = matrixBySplit[splitName] ?? applyThreshold(splitData, selectedRocClass, threshold);
@@ -153,19 +239,21 @@ export const PerClassConfusionMatrix: React.FC<Props> = ({
                             const trainEntry = showTrainMetrics ? allSplitEntries.find(([n]) => n === 'train') : undefined;
                             const testEntry  = showTestMetrics  ? allSplitEntries.find(([n]) => n === 'test')  : undefined;
                             const valEntry   = showValMetrics   ? allSplitEntries.find(([n]) => n === 'validation') : undefined;
+                            const isBinary = (evaluationData.splits.train?.y_proba?.classes.length ?? 0) === 2;
+                            const renderSplit = isBinary ? renderSplitBinary : renderSplitPerClass;
 
                             return (
                                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {trainEntry && renderSplitPerClass(trainEntry[0], trainEntry[1])}
-                                        {testEntry  && renderSplitPerClass(testEntry[0],  testEntry[1])}
+                                        {trainEntry && renderSplit(trainEntry[0], trainEntry[1])}
+                                        {testEntry  && renderSplit(testEntry[0],  testEntry[1])}
                                         {!trainEntry && !testEntry && (
                                             <p className="col-span-2 text-xs text-gray-400 text-center py-8">Enable Train or Test splits above to compare.</p>
                                         )}
                                     </div>
                                     {valEntry && (
                                         <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
-                                            {renderSplitPerClass(valEntry[0], valEntry[1])}
+                                            {renderSplit(valEntry[0], valEntry[1])}
                                         </div>
                                     )}
                                 </div>
