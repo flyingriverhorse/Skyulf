@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/installation.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/user_guide/threshold_tuning.html">
       
       
-        <link rel="prev" href="overview.html">
+        <link rel="prev" href="cross_validation.html">
       
       
-        <link rel="next" href="pipeline_quickstart.html">
+        <link rel="next" href="splitdataset_and_leakage.html">
       
       
         
@@ -25,7 +25,7 @@
     
     
       
-        <title>Installation - Skyulf</title>
+        <title>Threshold Tuning - Skyulf</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#installation" class="md-skip">
+        <a href="#threshold-tuning" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Installation
+              Threshold Tuning
             
           </span>
         </div>
@@ -1353,37 +1353,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Installation
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="installation.html" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
         
   
   
@@ -1399,103 +1372,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#requirements" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Requirements
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#install-from-pypi" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Install from PyPI
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#optional-extras" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Optional extras
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#editable-install-contributor-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Editable install (contributor workflow)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#runtime-dependencies-auto-installed" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Runtime dependencies (auto-installed)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#self-hosted-platform" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Self-hosted platform
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#import-check" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Import check
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1757,10 +1633,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="threshold_tuning.html" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="threshold_tuning.html" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1776,6 +1679,115 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#pipeline-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pipeline usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#skyulfpipelineoptimize_thresholds-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SkyulfPipeline.optimize_thresholds signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#array-level-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Array-level usage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Array-level usage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optimize_thresholds-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        optimize_thresholds signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#apply_thresholds-signature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_thresholds signature
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-the-search-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How the search works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3097,116 +3109,132 @@
   
 
 
-<h1 id="installation">Installation</h1>
-<h2 id="requirements">Requirements</h2>
+<h1 id="threshold-tuning">Threshold Tuning</h1>
+<p><code>predict()</code>'s default decision rule — <code>argmax</code> for multiclass, <code>0.5</code> for
+binary — is rarely optimal for imbalanced classes or for a metric you
+actually care about (F1, MCC, balanced accuracy, a custom business metric, …).
+Skyulf can search for <strong>per-class decision thresholds</strong> that maximize a metric
+you supply, evaluated on held-out validation data.</p>
+<p>The functionality is available at two levels:</p>
 <ul>
-<li><strong>Python &gt;=3.12</strong></li>
-<li>pip 21 or newer</li>
+<li><strong>Pipeline level:</strong> <code>SkyulfPipeline.optimize_thresholds()</code> +
+  <code>predict(use_tuned_thresholds=True)</code> — handles preprocessing and
+  <code>predict_proba</code> for you.</li>
+<li><strong>Array level:</strong> <code>skyulf.modeling.optimize_thresholds()</code> /
+  <code>apply_thresholds()</code> — plain NumPy in/out, for use outside a pipeline (e.g.
+  with a raw sklearn estimator).</li>
 </ul>
-<h2 id="install-from-pypi">Install from PyPI</h2>
-<pre><code class="language-bash">pip install skyulf-core
+<h2 id="pipeline-usage">Pipeline usage</h2>
+<p>Tune against explicit, out-of-sample validation data — <strong>never</strong> the
+pipeline's internal train/test split. Get a clean holdout via
+<a href="validation_vs_sklearn.html"><code>get_fitted_split()</code></a> (or your own split) first:</p>
+<pre><code class="language-python">from sklearn.metrics import f1_score
+
+# Clean, independent holdout for tuning (uses the pipeline's configured preprocessing).
+X_train, y_train, X_val, y_val = pipeline.get_fitted_split(
+    customers, target_column=&quot;purchased&quot;
+)
+pipeline.fit(customers, target_column=&quot;purchased&quot;)
+
+thresholds = pipeline.optimize_thresholds(
+    X_val,
+    y_val,
+    metric=lambda y_true, y_pred: f1_score(y_true, y_pred, average=&quot;macro&quot;),
+)
+# thresholds: {False: 0.62, True: 0.38} (binary)
+#             or one entry per class (multiclass)
+
+# Later, predict using the stored thresholds instead of the default rule:
+tuned_predictions = pipeline.predict(new_customers, use_tuned_thresholds=True)
 </code></pre>
-<h2 id="optional-extras">Optional extras</h2>
-<p>Install only what you need:</p>
+<p><code>optimize_thresholds()</code> runs the pipeline's already-fitted preprocessing on
+<code>X_val</code> internally, calls the model's <code>predict_proba</code>, searches thresholds,
+and stores the result on the pipeline. <code>predict(use_tuned_thresholds=True)</code>
+then applies those stored thresholds; it raises a <code>ValueError</code> if
+<code>optimize_thresholds()</code> was never called, and requires a model that supports
+<code>predict_proba</code>.</p>
+<h3 id="skyulfpipelineoptimize_thresholds-signature"><code>SkyulfPipeline.optimize_thresholds</code> signature</h3>
+<pre><code class="language-python">pipeline.optimize_thresholds(
+    X_val,                 # validation features, NOT yet transformed
+    y_val,                 # validation true labels
+    metric,                # Callable (y_true, y_pred) -&gt; float, to maximize
+    strategy=None,         # &quot;grid&quot; | &quot;nelder-mead&quot; | None (auto-select)
+    grid_points=101,       # candidates for the &quot;grid&quot; strategy
+) -&gt; dict[Any, float]      # {class_label: threshold}
+</code></pre>
+<h2 id="array-level-usage">Array-level usage</h2>
+<p>Use these directly when you are not going through a <code>SkyulfPipeline</code> — for
+example, tuning a raw sklearn estimator's thresholds:</p>
+<pre><code class="language-python">from skyulf.modeling import optimize_thresholds, apply_thresholds
+from sklearn.metrics import f1_score
+
+y_proba = model.predict_proba(X_val)  # shape (n_samples, n_classes)
+
+thresholds = optimize_thresholds(
+    y_val,
+    y_proba,
+    metric=lambda y_true, y_pred: f1_score(y_true, y_pred, average=&quot;macro&quot;),
+)
+
+y_pred = apply_thresholds(model.predict_proba(X_test), thresholds)
+</code></pre>
+<h3 id="optimize_thresholds-signature"><code>optimize_thresholds</code> signature</h3>
+<pre><code class="language-python">optimize_thresholds(
+    y_true,                # 1D array-like of true labels
+    y_proba,               # (n_samples, n_classes) predicted probabilities
+    metric,                # Callable (y_true, y_pred) -&gt; float, to maximize
+    classes=None,          # explicit class order; defaults to sorted(unique(y_true))
+    strategy=None,         # &quot;grid&quot; | &quot;nelder-mead&quot; | None (auto-select)
+    grid_points=101,       # candidates for the &quot;grid&quot; strategy, over (0, 1) exclusive
+) -&gt; dict[Any, float]
+</code></pre>
+<h3 id="apply_thresholds-signature"><code>apply_thresholds</code> signature</h3>
+<pre><code class="language-python">apply_thresholds(
+    y_proba,               # (n_samples, n_classes) predicted probabilities
+    thresholds,            # a single float (binary) or {class_label: threshold} dict
+    classes=None,          # explicit class order; required for 3+ classes with a dict
+) -&gt; np.ndarray            # 1D array of predicted class labels
+</code></pre>
+<h2 id="how-the-search-works">How the search works</h2>
 <table>
 <thead>
 <tr>
-<th>Extra</th>
-<th>What it adds</th>
-<th>Command</th>
+<th>Classes</th>
+<th>Default strategy</th>
+<th>Decision rule</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td><code>viz</code></td>
-<td>Matplotlib, Rich (visualisation helpers)</td>
-<td><code>pip install skyulf-core[viz]</code></td>
+<td>Binary (2)</td>
+<td><code>grid</code></td>
+<td>positive class when <code>y_proba[:, 1] &gt;= threshold</code>, else negative</td>
 </tr>
 <tr>
-<td><code>eda</code></td>
-<td>VADER sentiment, causal-learn</td>
-<td><code>pip install skyulf-core[eda]</code></td>
-</tr>
-<tr>
-<td><code>text</code></td>
-<td>VADER sentiment (text features)</td>
-<td><code>pip install skyulf-core[text]</code></td>
-</tr>
-<tr>
-<td><code>nlp</code></td>
-<td>Sentence-transformers (dense embeddings)</td>
-<td><code>pip install skyulf-core[nlp]</code></td>
-</tr>
-<tr>
-<td><code>geo</code></td>
-<td>GeoPandas, H3, spatial stats (native deps)</td>
-<td><code>pip install skyulf-core[geo]</code></td>
-</tr>
-<tr>
-<td><code>tuning</code></td>
-<td>Optuna + Optuna-integration</td>
-<td><code>pip install skyulf-core[tuning]</code></td>
-</tr>
-<tr>
-<td><code>modeling-xgboost</code></td>
-<td>XGBoost estimators</td>
-<td><code>pip install skyulf-core[modeling-xgboost]</code></td>
-</tr>
-<tr>
-<td><code>modeling-lightgbm</code></td>
-<td>LightGBM estimators</td>
-<td><code>pip install skyulf-core[modeling-lightgbm]</code></td>
-</tr>
-<tr>
-<td><code>preprocessing-imbalanced</code></td>
-<td>imbalanced-learn (SMOTE, etc.)</td>
-<td><code>pip install skyulf-core[preprocessing-imbalanced]</code></td>
-</tr>
-<tr>
-<td><code>explainability</code></td>
-<td>SHAP explainability</td>
-<td><code>pip install skyulf-core[explainability]</code></td>
-</tr>
-<tr>
-<td><code>dev</code></td>
-<td>pytest, twine, build</td>
-<td><code>pip install skyulf-core[dev]</code></td>
+<td>Multiclass (3+)</td>
+<td><code>nelder-mead</code></td>
+<td>scaled argmax: <code>classes[argmax(y_proba / threshold_per_class)]</code></td>
 </tr>
 </tbody>
 </table>
-<p>Install all non-geospatial optional runtime features:</p>
-<pre><code class="language-bash">pip install skyulf-core[all]
-</code></pre>
-<p>Install geospatial functionality separately because it has native dependencies:</p>
-<pre><code class="language-bash">pip install skyulf-core[geo]
-</code></pre>
-<h2 id="editable-install-contributor-workflow">Editable install (contributor workflow)</h2>
-<p>If you cloned the repository and want live changes reflected:</p>
-<pre><code class="language-bash">git clone https://github.com/flyingriverhorse/Skyulf.git
-cd Skyulf
-pip install -e ./skyulf-core
-</code></pre>
-<h2 id="runtime-dependencies-auto-installed">Runtime dependencies (auto-installed)</h2>
-<p>These are pulled in automatically by <code>pip install skyulf-core</code>:</p>
 <ul>
-<li><strong>pandas</strong> &gt;= 2.0</li>
-<li><strong>numpy</strong> &gt;= 1.24</li>
-<li><strong>scikit-learn</strong> &gt;= 1.4</li>
-<li><strong>polars</strong> &gt;= 1.36</li>
-<li><strong>pyarrow</strong> &gt;= 21.0</li>
-<li><strong>pydantic</strong> &gt;= 2.0</li>
-<li><strong>scipy</strong> &gt;= 1.10</li>
-<li><strong>statsmodels</strong> &gt;= 0.14</li>
+<li><strong>Binary</strong> uses a grid search over <code>(0, 1)</code> (<code>grid_points</code> candidates,
+  exclusive of the endpoints).</li>
+<li><strong>Multiclass</strong> uses Nelder–Mead optimization over a scaled-argmax rule.
+  Equal thresholds across all classes reduce to plain <code>argmax</code>, so the tuned
+  result can only match or beat the default rule on the tuning metric.</li>
 </ul>
-<h2 id="self-hosted-platform">Self-hosted platform</h2>
-<p><a href="../guides/platform_setup.html">Run the separate self-hosted platform</a></p>
-<h2 id="import-check">Import check</h2>
-<p>Verify the installation:</p>
-<pre><code class="language-python">from skyulf import SkyulfPipeline
-from skyulf.data.dataset import SplitDataset
-
-print(&quot;skyulf-core installed successfully&quot;)
-</code></pre>
+<p>Pass <code>strategy="grid"</code> or <code>strategy="nelder-mead"</code> explicitly to override the
+auto-selection.</p>
+<h2 id="notes">Notes</h2>
+<ul>
+<li>The <code>metric</code> is fully caller-supplied — Skyulf ships <strong>no</strong> default metric.
+  Any callable <code>(y_true, y_pred) -&gt; float</code> that returns a value to <em>maximize</em>
+  works (wrap "lower is better" metrics accordingly).</li>
+<li>Always tune on data that is independent of both training and the final test
+  set. See <a href="validation_vs_sklearn.html">Validation vs scikit-learn</a> and
+  <a href="splitdataset_and_leakage.html">SplitDataset &amp; Leakage</a>.</li>
+</ul>
 
 
 
