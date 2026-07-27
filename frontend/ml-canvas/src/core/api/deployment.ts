@@ -11,9 +11,15 @@ export interface DeploymentInfo {
   target_column?: string;
 }
 
+export interface PredictionRequest {
+  data: unknown[];
+  override_thresholds?: Record<string, number> | null;
+}
+
 export interface PredictionResponse {
   predictions: unknown[];
   model_version: string;
+  thresholds_applied?: Record<string, number> | null;
 }
 
 export const deploymentApi = {
@@ -44,8 +50,11 @@ export const deploymentApi = {
     await apiClient.post('/deployment/deactivate');
   },
 
-  predict: async (data: unknown[]): Promise<PredictionResponse> => {
-    const response = await apiClient.post<PredictionResponse>('/deployment/predict', { data });
+  predict: async (data: unknown[], overrideThresholds?: Record<string, number> | null): Promise<PredictionResponse> => {
+    const response = await apiClient.post<PredictionResponse>('/deployment/predict', {
+      data,
+      override_thresholds: overrideThresholds,
+    });
     return response.data;
   }
 };

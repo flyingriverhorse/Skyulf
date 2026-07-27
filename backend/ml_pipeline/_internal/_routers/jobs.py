@@ -1,7 +1,9 @@
 """Job-management endpoints (E9 phase 2).
 
 `/jobs/node-summaries`, `/jobs/{job_id}` (status/cancel/promote/unpromote),
-`/jobs/{job_id}/evaluation`, `/jobs` (list), `/jobs/tuning/...`.
+`/jobs/{job_id}/evaluation`, `/jobs/{job_id}/thresholds/...`
+(preview/save/toggle/clear tuned thresholds), `/jobs` (list),
+`/jobs/tuning/...`.
 
 All handlers delegate to `JobManager` / `EvaluationService`; this module
 is a pure HTTP veneer.
@@ -11,6 +13,7 @@ import logging
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
@@ -18,11 +21,56 @@ from backend.database.engine import get_async_session
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._execution.jobs import JobInfo, JobManager
 from backend.ml_pipeline._services.evaluation_service import EvaluationService
+from backend.ml_pipeline._services.threshold_tuning_service import (
+    ThresholdTuningError,
+    ThresholdTuningService,
+)
 from backend.realtime.events import JobEvent, publish_job_event
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ML Pipeline"])
+
+
+class ThresholdTuningPreviewRequest(BaseModel):
+    """Request body for previewing tuned thresholds."""
+
+    metric: str
+
+
+class ThresholdTuningPreviewResponse(BaseModel):
+    """Response body for a threshold-tuning preview."""
+
+    thresholds: dict[str, float]
+    classes: list
+    metric: str
+    split_used: str
+
+
+class ThresholdTuningSaveRequest(BaseModel):
+    """Request body for saving a previously previewed threshold set."""
+
+    thresholds: dict[str, float]
+    classes: list
+    metric: str
+    split_used: str
+
+
+class ThresholdTuningToggleRequest(BaseModel):
+    """Request body for enabling/disabling a job's saved tuned thresholds."""
+
+    enabled: bool
+
+
+class ThresholdTuningGetResponse(BaseModel):
+    """Response body describing a job's currently saved tuned thresholds, if any."""
+
+    thresholds: dict[str, float] | None = None
+    classes: list | None = None
+    metric: str | None = None
+    split_used: str | None = None
+    computed_at: str | None = None
+    enabled: bool = False
 
 
 @router.get("/jobs/node-summaries", response_model=dict[str, list[dict[str, Any]]])
@@ -106,6 +154,81 @@ async def get_job_evaluation(  # noqa: C901
     except Exception:
         logger.exception("Failed to retrieve evaluation for job %s", job_id)
         raise SkyulfException(message="Failed to retrieve evaluation data") from None
+
+
+@router.get("/jobs/{job_id}/thresholds", response_model=ThresholdTuningGetResponse)
+async def get_thresholds(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Return the job's currently saved tuned thresholds (if any) and whether they're enabled.
+
+    Lets the Evaluation tab restore its "Use tuned thresholds" toggle/preview
+    on load instead of always starting unchecked, and lets the Inference page
+    show what's already active for a deployment before the user runs a
+    prediction.
+    """
+    try:
+        result = await ThresholdTuningService.get_saved(session, job_id)
+    except ThresholdTuningError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ThresholdTuningGetResponse(**result)
+
+
+@router.post("/jobs/{job_id}/thresholds/preview", response_model=ThresholdTuningPreviewResponse)
+async def preview_thresholds(
+    job_id: str,
+    request: ThresholdTuningPreviewRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Compute (without saving) tuned per-class thresholds for a job's evaluation data."""
+    try:
+        result = await ThresholdTuningService.preview(session, job_id, request.metric)
+    except ThresholdTuningError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return ThresholdTuningPreviewResponse(**result)
+
+
+@router.post("/jobs/{job_id}/thresholds/save")
+async def save_thresholds(
+    job_id: str,
+    request: ThresholdTuningSaveRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Persist a previewed threshold set on the job, enabling it by default."""
+    try:
+        await ThresholdTuningService.save(
+            session,
+            job_id,
+            thresholds=request.thresholds,
+            classes=request.classes,
+            metric=request.metric,
+            split_used=request.split_used,
+        )
+    except ThresholdTuningError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"status": "saved"}
+
+
+@router.post("/jobs/{job_id}/thresholds/toggle")
+async def toggle_thresholds(
+    job_id: str,
+    request: ThresholdTuningToggleRequest,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Enable or disable use of the job's saved tuned thresholds at predict time."""
+    try:
+        await ThresholdTuningService.toggle(session, job_id, request.enabled)
+    except ThresholdTuningError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"status": "toggled", "enabled": request.enabled}
+
+
+@router.delete("/jobs/{job_id}/thresholds")
+async def clear_thresholds(job_id: str, session: AsyncSession = Depends(get_async_session)):
+    """Remove any saved tuned thresholds from the job."""
+    try:
+        await ThresholdTuningService.clear(session, job_id)
+    except ThresholdTuningError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return {"status": "cleared"}
 
 
 @router.get("/jobs", response_model=list[JobInfo])

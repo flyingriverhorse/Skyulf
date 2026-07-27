@@ -103,9 +103,7 @@ pipeline = SkyulfPipeline(
 
 pipeline.fit(customers, target_column="purchased")
 pipeline.save("customer_model.pkl")
-predictions = SkyulfPipeline.load("customer_model.pkl").predict(
-    pl.read_csv("new_customers.csv")
-)
+predictions = SkyulfPipeline.load("customer_model.pkl").predict(pl.read_csv("new_customers.csv"))
 ```
 
 See [`examples/00_quickstart.ipynb`](examples/00_quickstart.ipynb) for a
@@ -152,6 +150,34 @@ model.
 `Applier` pairs it wraps (e.g. `SimpleImputerCalculator`/`Applier`) are
 lower-level — only use them directly to embed a single step in a custom
 (e.g. sklearn) pipeline.
+
+**Custom evaluation harnesses:** if you want to compare raw sklearn/XGBoost/
+CatBoost/etc. estimators against the *exact* preprocessed split
+`SkyulfPipeline` would use internally — instead of reimplementing the
+split/target-extraction/Polars-to-pandas conversion yourself and risking a
+different split than `fit()` actually used — call
+`pipeline.get_fitted_split(data, target_column="...")`. It runs the same
+configured preprocessing chain and returns
+`(X_train, y_train, X_test, y_test)` as plain pandas objects, raising a clear
+error if the config doesn't include a `TrainTestSplitter` step:
+
+```python
+X_train, y_train, X_test, y_test = pipeline.get_fitted_split(customers, target_column="purchased")
+```
+
+**Threshold tuning:** the default decision rule (argmax for multiclass, 0.5
+for binary) is rarely optimal for imbalanced classes or a metric you actually
+care about (F1, MCC, balanced accuracy, ...). `pipeline.optimize_thresholds(
+X_val, y_val, metric=...)` searches per-class thresholds against a metric you
+supply — evaluated on validation data you pass in explicitly (never the
+pipeline's internal split; get a clean holdout via `get_fitted_split()` above)
+— and `predict(use_tuned_thresholds=True)` then applies them. The same search
+is available as standalone array-level functions,
+`from skyulf.modeling import optimize_thresholds, apply_thresholds`, for use
+outside a pipeline. See the
+[Threshold Tuning guide](https://flyingriverhorse.github.io/Skyulf/user_guide/threshold_tuning.html)
+for signatures, a full example, and how the binary grid / multiclass
+Nelder-Mead search works.
 
 **Naming:** preprocessing names are `PascalCase` (`SimpleImputer`,
 `TrainTestSplitter`), modeling names are `snake_case` (`logistic_regression`).
@@ -250,14 +276,14 @@ from skyulf import EDAAnalyzer, EDAVisualizer
 
 df = pl.read_csv("data.csv")
 profile = EDAAnalyzer(df).analyze(
-    target_col="target",     # Optional: unlocks target-association analysis
-    date_col="timestamp",    # Optional: unlocks temporal analysis
-    lat_col="latitude",      # Optional: unlocks geospatial analysis
-    lon_col="longitude",     # Optional
+    target_col="target",  # Optional: unlocks target-association analysis
+    date_col="timestamp",  # Optional: unlocks temporal analysis
+    lat_col="latitude",  # Optional: unlocks geospatial analysis
+    lon_col="longitude",  # Optional
 )
 
 EDAVisualizer(profile, df).summary()  # Rich terminal dashboard (skyulf-core[viz])
-EDAVisualizer(profile, df).plot()     # Matplotlib figures (skyulf-core[viz])
+EDAVisualizer(profile, df).plot()  # Matplotlib figures (skyulf-core[viz])
 ```
 
 Everything the visualizer renders is also available as plain data on

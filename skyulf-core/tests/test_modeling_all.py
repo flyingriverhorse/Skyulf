@@ -282,6 +282,35 @@ class TestXGBClassifier:
         )
         assert len(preds["test"]) == 40
 
+    def test_class_weight_balanced_improves_minority_recall(self) -> None:
+        """XGBoost has no native class_weight support; this proves the
+        SklearnCalculator shim actually changes fitted behavior end-to-end,
+        not just that it avoids raising."""
+        pytest.importorskip("xgboost")
+        import numpy as np
+        from sklearn.metrics import recall_score
+
+        from skyulf.modeling.classification import XGBClassifierCalculator
+
+        rng = np.random.RandomState(7)
+        n = 300
+        X = pd.DataFrame({"f1": rng.normal(0, 1, n), "f2": rng.normal(0, 1, n)})
+        # Strongly imbalanced target where the minority class (10%) is still
+        # separably related to f1, so weighting has room to help recall.
+        y = pd.Series(((X["f1"] > 1.2) & (rng.random(n) > 0.1)).astype(int))
+        assert y.sum() < n * 0.2  # sanity check: genuinely imbalanced
+
+        unweighted = XGBClassifierCalculator().fit(
+            X, y, {"params": {"n_estimators": 20, "class_weight": None}}
+        )
+        weighted = XGBClassifierCalculator().fit(
+            X, y, {"params": {"n_estimators": 20, "class_weight": "balanced"}}
+        )
+
+        recall_unweighted = recall_score(y, unweighted.predict(X))
+        recall_weighted = recall_score(y, weighted.predict(X))
+        assert recall_weighted >= recall_unweighted
+
 
 # ===========================================================================
 # REGRESSION MODELS

@@ -19,6 +19,7 @@ from backend.ml_pipeline._services.prediction_utils import (
     extract_target_label_encoder,
 )
 from backend.ml_pipeline.artifacts.factory import ArtifactFactory
+from backend.ml_pipeline.artifacts.store import ArtifactStore
 
 logger = logging.getLogger(__name__)
 
@@ -195,10 +196,16 @@ class EvaluationService:
             logger.debug(f"Reference column decode skipped/failed: {e}")
 
     @staticmethod
-    async def get_job_evaluation(session: AsyncSession, job_id: str) -> dict[str, Any]:
-        """
-        Retrieves the raw evaluation data (y_true, y_pred) for a job.
-        Decodes target labels if a LabelEncoder was used.
+    async def _load_raw_evaluation_data(
+        session: AsyncSession, job_id: str
+    ) -> tuple[dict, ArtifactStore]:
+        """Loads a job's raw evaluation artifact without decoding target labels.
+
+        Returns ``(evaluation_data, artifact_store)`` so callers needing
+        undecoded (raw/encoded) labels — e.g. threshold tuning, which must
+        match the live model's ``estimator.classes_`` values exactly — don't
+        have to reverse the human-readable decoding that
+        ``get_job_evaluation()`` applies for display purposes.
         """
         # 1. Get Job Info
         job = await JobService.get_job_by_id(session, job_id)
@@ -216,13 +223,27 @@ class EvaluationService:
             data = artifact_store.load(key)
             # Verify it belongs to this job (since we share the folder).
             EvaluationService._check_job_id_matches(data, job_id)
+            return data, artifact_store
+        except Exception as e:
+            raise RuntimeError(f"Failed to load evaluation data: {str(e)}") from e
 
+    @staticmethod
+    async def get_job_evaluation(session: AsyncSession, job_id: str) -> dict[str, Any]:
+        """
+        Retrieves the raw evaluation data (y_true, y_pred) for a job.
+        Decodes target labels if a LabelEncoder was used.
+        """
+        evaluation_data, artifact_store = await EvaluationService._load_raw_evaluation_data(
+            session, job_id
+        )
+
+        try:
             # Optional: decode target labels for nicer UI (ROC selector, confusion matrix)
-            EvaluationService._decode_target_labels(data, artifact_store, job_id)
+            EvaluationService._decode_target_labels(evaluation_data, artifact_store, job_id)
 
             # Optional: decode a clustering reference column's crosstab labels
-            EvaluationService._decode_reference_column(data, artifact_store, job_id)
+            EvaluationService._decode_reference_column(evaluation_data, artifact_store, job_id)
 
-            return data
+            return evaluation_data
         except Exception as e:
             raise RuntimeError(f"Failed to load evaluation data: {str(e)}") from e

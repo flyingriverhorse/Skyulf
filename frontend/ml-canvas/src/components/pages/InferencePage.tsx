@@ -24,6 +24,7 @@ import {
 import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
 import { jobsApi } from '../../core/api/jobs';
 import { DatasetService } from '../../core/api/datasets';
+import { thresholdTuningApi, SavedThresholdInfo } from '../../core/api/thresholdTuning';
 import { useConfirm } from '../shared';
 import { toast } from '../../core/toast';
 
@@ -507,6 +508,18 @@ export const InferencePage: React.FC = () => {
     });
     const [error, setError] = useState<string | null>(null);
     const [latencyMs, setLatencyMs] = useState<number | null>(null);
+    const [thresholdsApplied, setThresholdsApplied] = useState<Record<string, number> | null>(null);
+
+    /** Ad-hoc per-class decision threshold overrides for this prediction only. */
+    const [overrideThresholdsEnabled, setOverrideThresholdsEnabled] = useState(false);
+    const [overrideThresholdsValue, setOverrideThresholdsValue] = useState<Record<string, number>>({});
+    const [newOverrideClass, setNewOverrideClass] = useState('');
+    const [newOverrideThreshold, setNewOverrideThreshold] = useState('0.5');
+
+    /** Tuned thresholds already saved for the active deployment's job (from the
+     * Evaluation tab's Threshold Tuning panel) — these are applied automatically
+     * at /predict time whenever `enabled` is true and no ad-hoc override is set. */
+    const [savedThresholds, setSavedThresholds] = useState<SavedThresholdInfo | null>(null);
 
     const [autoFilterInfo, setAutoFilterInfo] = useState<string | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -590,6 +603,7 @@ export const InferencePage: React.FC = () => {
             if (!deployment) {
                 setDatasetId(null);
                 setExcludedColumns(new Set());
+                setSavedThresholds(null);
                 return;
             }
 
@@ -608,6 +622,13 @@ export const InferencePage: React.FC = () => {
             }
 
             if (deployment.job_id) {
+                thresholdTuningApi.get(deployment.job_id)
+                    .then(setSavedThresholds)
+                    .catch(err => {
+                        console.warn('Failed to fetch saved tuned thresholds', err);
+                        setSavedThresholds(null);
+                    });
+
                 try {
                     const job = await jobsApi.getJob(deployment.job_id);
                     const targetColumn = job.target_column;
@@ -646,6 +667,8 @@ export const InferencePage: React.FC = () => {
                 } catch (err) {
                     console.warn('Failed to fetch dataset sample', err);
                 }
+            } else {
+                setSavedThresholds(null);
             }
 
             setExcludedColumns(excluded);
@@ -841,12 +864,17 @@ export const InferencePage: React.FC = () => {
         setError(null);
         setPredictions(null);
         setLatencyMs(null);
+        setThresholdsApplied(null);
         const start = performance.now();
         try {
-            const response = await deploymentApi.predict(data);
+            const response = await deploymentApi.predict(
+                data,
+                overrideThresholdsEnabled ? overrideThresholdsValue : null,
+            );
             const elapsed = Math.round(performance.now() - start);
             setPredictions(response.predictions);
             setLatencyMs(elapsed);
+            setThresholdsApplied(response.thresholds_applied ?? null);
             setRecentRuns(prev =>
                 [
                     {
@@ -864,7 +892,14 @@ export const InferencePage: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [activeDeployment, inputData, isLoading, confirm]);
+    }, [
+        activeDeployment,
+        inputData,
+        isLoading,
+        confirm,
+        overrideThresholdsEnabled,
+        overrideThresholdsValue,
+    ]);
 
     const handleFormatJson = () => {
         try {
@@ -881,6 +916,7 @@ export const InferencePage: React.FC = () => {
         setPredictions(null);
         setError(null);
         setLatencyMs(null);
+        setThresholdsApplied(null);
     };
 
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -888,6 +924,56 @@ export const InferencePage: React.FC = () => {
             e.preventDefault();
             void handlePredict();
         }
+    };
+
+    /** Add (or update) a single class → threshold pair in the override editor. */
+    const handleAddOverrideEntry = () => {
+        const cls = newOverrideClass.trim();
+        const threshold = Number(newOverrideThreshold);
+        if (!cls || !Number.isFinite(threshold)) return;
+        setOverrideThresholdsValue(prev => ({ ...prev, [cls]: threshold }));
+        setNewOverrideClass('');
+        setNewOverrideThreshold('0.5');
+    };
+
+    /** Remove a class → threshold pair from the override editor. */
+    const handleRemoveOverrideEntry = (cls: string) => {
+        setOverrideThresholdsValue(prev => {
+            const next = { ...prev };
+            delete next[cls];
+            return next;
+        });
+    };
+
+    /** Update the threshold value for an existing override entry. */
+    const handleOverrideThresholdChange = (cls: string, value: string) => {
+        const num = Number(value);
+        if (!Number.isFinite(num)) return;
+        setOverrideThresholdsValue(prev => ({ ...prev, [cls]: num }));
+    };
+
+    /** Copy the deployment's already-saved tuned thresholds into the ad-hoc
+     * override editor and enable it — lets the user start from what's
+     * already active server-side and tweak individual classes instead of
+     * typing every value from scratch. */
+    const handlePrefillFromSavedThresholds = () => {
+        if (!savedThresholds?.thresholds) return;
+        setOverrideThresholdsValue({ ...savedThresholds.thresholds });
+        setOverrideThresholdsEnabled(true);
+    };
+
+    /** Pre-fill the override editor with classes seen in the last single-row
+     * prediction's probability map (the only reliable class-list source on
+     * this page, since deployments don't expose `estimator.classes_`). */
+    const handlePrefillFromLastPrediction = () => {
+        if (!singleProbMap) return;
+        setOverrideThresholdsValue(prev => {
+            const next = { ...prev };
+            for (const cls of Object.keys(singleProbMap)) {
+                if (!(cls in next)) next[cls] = 0.5;
+            }
+            return next;
+        });
     };
 
     const handleCopyPredictions = async () => {
@@ -1180,6 +1266,122 @@ export const InferencePage: React.FC = () => {
                             </button>
                         </div>
                     </div>
+
+                    {/* Ad-hoc override thresholds — applied only to this prediction, not persisted server-side. */}
+                    <details className="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 group">
+                        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                            <Sparkles className="w-3.5 h-3.5" /> Advanced: override thresholds
+                        </summary>
+                        <div className="px-3 pb-3 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-700">
+                            {savedThresholds?.enabled && savedThresholds.thresholds && (
+                                <div className="p-2 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 text-[11px] text-blue-700 dark:text-blue-300">
+                                    <p className="mb-1">
+                                        This model already has <strong>tuned thresholds saved and enabled</strong> from
+                                        the Evaluation tab — they&apos;re applied automatically to every real prediction
+                                        unless you turn on an override below:
+                                    </p>
+                                    <div className="flex flex-wrap gap-1 mb-1.5">
+                                        {Object.entries(savedThresholds.thresholds).map(([cls, thr]) => (
+                                            <span
+                                                key={cls}
+                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 font-mono"
+                                            >
+                                                {cls}: {thr}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={handlePrefillFromSavedThresholds}
+                                        className="text-blue-700 dark:text-blue-300 hover:underline font-medium"
+                                    >
+                                        Copy into override editor to tweak
+                                    </button>
+                                </div>
+                            )}
+
+                            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                <input
+                                    type="checkbox"
+                                    checked={overrideThresholdsEnabled}
+                                    onChange={e => setOverrideThresholdsEnabled(e.target.checked)}
+                                />
+                                Apply these thresholds to this prediction
+                            </label>
+
+                            {Object.entries(overrideThresholdsValue).length > 0 && (
+                                <div className="space-y-1">
+                                    {Object.entries(overrideThresholdsValue).map(([cls, thr]) => (
+                                        <div key={cls} className="flex items-center gap-2">
+                                            <span
+                                                className="font-mono text-xs w-28 truncate text-gray-700 dark:text-gray-200"
+                                                title={cls}
+                                            >
+                                                {cls}
+                                            </span>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                max={1}
+                                                step={0.01}
+                                                value={thr}
+                                                onChange={e =>
+                                                    handleOverrideThresholdChange(cls, e.target.value)
+                                                }
+                                                className="w-24 px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100"
+                                            />
+                                            <button
+                                                onClick={() => handleRemoveOverrideEntry(cls)}
+                                                title="Remove"
+                                                className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={newOverrideClass}
+                                    onChange={e => setNewOverrideClass(e.target.value)}
+                                    placeholder="class label"
+                                    className="w-28 px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100"
+                                />
+                                <input
+                                    type="number"
+                                    min={0}
+                                    max={1}
+                                    step={0.01}
+                                    value={newOverrideThreshold}
+                                    onChange={e => setNewOverrideThreshold(e.target.value)}
+                                    className="w-24 px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100"
+                                />
+                                <button
+                                    onClick={handleAddOverrideEntry}
+                                    disabled={!newOverrideClass.trim()}
+                                    className="px-2 py-1 text-xs rounded border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Add
+                                </button>
+                            </div>
+
+                            {singleProbMap && (
+                                <button
+                                    onClick={handlePrefillFromLastPrediction}
+                                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                    Use classes from last prediction
+                                </button>
+                            )}
+
+                            <p className="text-[10px] text-gray-400 italic">
+                                Class labels must exactly match the deployed model&apos;s classes
+                                (e.g. 0, 1, 2), or the prediction will be rejected.
+                            </p>
+                        </div>
+                    </details>
                 </div>
 
                 {/* Right column: deployment status + results */}
@@ -1341,6 +1543,25 @@ export const InferencePage: React.FC = () => {
                                     <BarChart3 className="w-3 h-3" /> Class probabilities
                                 </div>
                                 <ProbabilityBars probs={singleProbMap} />
+                            </div>
+                        )}
+
+                        {/* Which thresholds the backend actually applied for this run (override or deployment default). */}
+                        {thresholdsApplied && Object.keys(thresholdsApplied).length > 0 && (
+                            <div className="mb-3 p-3 rounded bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                                <div className="text-[10px] uppercase tracking-wider text-gray-400 mb-2 flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" /> Thresholds applied
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {Object.entries(thresholdsApplied).map(([cls, thr]) => (
+                                        <span
+                                            key={cls}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700/60 text-gray-700 dark:text-gray-200 text-[11px] font-mono"
+                                        >
+                                            {cls}: {thr}
+                                        </span>
+                                    ))}
+                                </div>
                             </div>
                         )}
 

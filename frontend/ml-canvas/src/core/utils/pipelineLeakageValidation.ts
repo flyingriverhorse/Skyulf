@@ -62,6 +62,54 @@ export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
 // features (X) from the target (y) and creates no train/test boundary.
 export const TRAIN_TEST_SPLIT_STEP_TYPES = new Set<string>(['TrainTestSplitter', 'Split']);
 
+// Encoder step types that can operate purely on the target column (y)
+// instead of feature columns, depending on their config.
+export const TARGET_CAPABLE_ENCODER_STEP_TYPES = new Set<string>(['LabelEncoder', 'OrdinalEncoder']);
+
+// Step types whose params carry the pipeline's target column name.
+const TARGET_COLUMN_SOURCE_STEP_TYPES = new Set<string>([
+  'train_test_split',
+  'TrainTestSplitter',
+  'Split',
+  'feature_target_split',
+  'training',
+]);
+
+/** Finds the pipeline's configured target column name, if any node declares one. */
+function findTargetColumn(nodes: NodeConfigModel[]): string | undefined {
+  for (const n of nodes) {
+    if (TARGET_COLUMN_SOURCE_STEP_TYPES.has(n.step_type)) {
+      const targetColumn = n.params.target_column;
+      if (typeof targetColumn === 'string' && targetColumn) return targetColumn;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * True if a Label/Ordinal encoder node is configured to encode *only* the
+ * target column (y), with no feature columns. Mirrors the backend's
+ * `_is_target_only_encoding` (see
+ * `backend/ml_pipeline/_execution/_leakage_validation.py`) — the node fits
+ * only on `y` (a deterministic category->integer mapping, not a leakage
+ * risk before the train/test split) when its `columns` param is
+ * empty/missing, OR when `columns` names exactly the target column (users
+ * commonly pick the target explicitly from the column picker rather than
+ * leaving it blank). Keep in sync with the backend check.
+ */
+export function isTargetOnlyEncoding(
+  stepType: string,
+  params: Record<string, unknown>,
+  targetColumn: string | undefined,
+): boolean {
+  if (!TARGET_CAPABLE_ENCODER_STEP_TYPES.has(stepType)) return false;
+  const columns = params.columns;
+  if (!columns || (Array.isArray(columns) && columns.length === 0)) return true;
+  return (
+    !!targetColumn && Array.isArray(columns) && columns.length === 1 && columns[0] === targetColumn
+  );
+}
+
 export interface LeakageIssue {
   nodeId: string;
   stepType: string;
@@ -108,8 +156,10 @@ export function findPreprocessingBeforeSplitIssues(nodes: NodeConfigModel[]): Le
   }
 
   const issues: LeakageIssue[] = [];
+  const targetColumn = findTargetColumn(nodes);
   for (const n of nodes) {
     if (!DATA_DEPENDENT_FIT_STEP_TYPES.has(n.step_type)) continue;
+    if (isTargetOnlyEncoding(n.step_type, n.params, targetColumn)) continue;
     const reachable = collect(n.node_id);
     const hitSplitter = [...splitterIds].find((id) => reachable.has(id));
     if (hitSplitter) {

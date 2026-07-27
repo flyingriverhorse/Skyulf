@@ -3,8 +3,8 @@
 // dropdown feature (accuracy/f1/f1_weighted/precision/recall).
 
 import { describe, it, expect } from 'vitest';
-import { findBestThreshold } from './classificationCharts';
-import type { YProba } from '../types';
+import { findBestThreshold, applyMulticlassThresholds } from './classificationCharts';
+import type { YProba, EvaluationSplit } from '../types';
 
 describe('findBestThreshold — binary', () => {
   // 4 samples, P(pos) scores [0.9, 0.4, 0.6, 0.1], true labels [pos, pos, neg, neg].
@@ -134,5 +134,95 @@ describe('findBestThreshold — large multiclass split (sampling cap)', () => {
     expect(result!.threshold).toBeLessThanOrEqual(1);
     expect(result!.value).toBeGreaterThanOrEqual(0);
     expect(result!.value).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('applyMulticlassThresholds', () => {
+  // Fixture computed via the real Python skyulf.modeling._evaluation.thresholds.apply_thresholds():
+  //   apply_thresholds(y_proba, {0: 0.6, 1: 0.5, 2: 0.3}, classes=[0, 1, 2])
+  //   -> array([0, 1, 2, 2, 1])
+  // Confirmed by executing the actual function (not just reading it) against
+  // this fixture, since the scaled-argmax formula's tie-breaking and
+  // division semantics needed to be verified, not assumed.
+  const yProbaValues = [
+    [0.5, 0.3, 0.2],
+    [0.2, 0.6, 0.2],
+    [0.34, 0.33, 0.33],
+    [0.1, 0.1, 0.8],
+    [0.4, 0.4, 0.2],
+  ];
+  const classes = [0, 1, 2];
+  const yTrue = [0, 1, 2, 2, 1];
+  const thresholds = { '0': 0.6, '1': 0.5, '2': 0.3 };
+
+  const splitData: EvaluationSplit = {
+    y_true: yTrue,
+    y_pred: yTrue, // irrelevant: applyMulticlassThresholds recomputes predictions from y_proba
+    y_proba: { values: yProbaValues, classes },
+  };
+
+  it("matches skyulf-core's apply_thresholds output for a known fixture", () => {
+    const result = applyMulticlassThresholds(splitData, thresholds);
+    expect(result.classes).toEqual(classes);
+    // Diagonal-only matrix confirms predictions == expectedPredictions == yTrue for every row.
+    expect(result.matrix).toEqual([
+      [1, 0, 0],
+      [0, 2, 0],
+      [0, 0, 2],
+    ]);
+  });
+
+  it('reduces to plain argmax when all thresholds are equal', () => {
+    const equalThresholds = { '0': 0.5, '1': 0.5, '2': 0.5 };
+    const result = applyMulticlassThresholds(splitData, equalThresholds);
+    // Verified via the real Python apply_thresholds(): plain argmax per row
+    // is [0, 1, 0, 2, 0] (row 4's tie 0.4 vs 0.4 -> first max wins -> idx 0).
+    // yTrue = [0, 1, 2, 2, 1]; grouped by true class into a 3x3 matrix:
+    //   true=0 (sample 0, pred 0)                    -> [1, 0, 0]
+    //   true=1 (samples 1 pred 1, 4 pred 0)           -> [1, 1, 0]
+    //   true=2 (samples 2 pred 0, 3 pred 2)           -> [1, 0, 1]
+    expect(result.matrix).toEqual([
+      [1, 0, 0],
+      [1, 1, 0],
+      [1, 0, 1],
+    ]);
+  });
+
+  it('falls back to the original confusion matrix when y_proba is missing', () => {
+    const noProbaSplit: EvaluationSplit = { y_true: yTrue, y_pred: yTrue };
+    const result = applyMulticlassThresholds(noProbaSplit, thresholds);
+    expect(result.matrix).toEqual([
+      [1, 0, 0],
+      [0, 2, 0],
+      [0, 0, 2],
+    ]);
+  });
+
+  it('remaps y_true from label space to class space when y_proba.labels differs from y_proba.classes', () => {
+    // Label-encoded target: y_true holds human-readable label strings while
+    // y_proba.classes holds the numeric class codes used for prediction.
+    // Verified via the real Python apply_thresholds() that the class-space
+    // predictions for this y_proba/thresholds pair are [0, 1, 2, 2, 1].
+    const labelSplit: EvaluationSplit = {
+      y_true: ['setosa', 'versicolor', 'virginica', 'virginica', 'versicolor'],
+      y_pred: ['setosa', 'versicolor', 'virginica', 'virginica', 'versicolor'],
+      y_proba: {
+        values: yProbaValues,
+        classes,
+        labels: ['setosa', 'versicolor', 'virginica'],
+      },
+    };
+
+    const result = applyMulticlassThresholds(labelSplit, thresholds);
+
+    // Predictions land in class space (0/1/2); y_true is remapped from
+    // label space ('setosa'/'versicolor'/'virginica') into the same class
+    // space, so every sample is a correct prediction -> pure diagonal.
+    expect(result.classes).toEqual(classes);
+    expect(result.matrix).toEqual([
+      [1, 0, 0],
+      [0, 2, 0],
+      [0, 0, 2],
+    ]);
   });
 });

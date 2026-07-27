@@ -1,9 +1,11 @@
 """Modeling module for Skyulf."""
 
 from ._evaluation import (
+    apply_thresholds,
     calculate_classification_metrics,
     calculate_clustering_metrics,
     calculate_regression_metrics,
+    optimize_thresholds,
 )
 from ._explainability import compute_shap_explanation
 from .base import BaseModelApplier, BaseModelCalculator, StatefulEstimator
@@ -87,6 +89,8 @@ __all__ = [
     "calculate_classification_metrics",
     "calculate_regression_metrics",
     "calculate_clustering_metrics",
+    "optimize_thresholds",
+    "apply_thresholds",
     "compute_shap_explanation",
 ]
 

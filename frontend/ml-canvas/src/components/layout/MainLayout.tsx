@@ -22,6 +22,19 @@ import { InferencePage } from '../pages/InferencePage';
 
 export const MainLayout: React.FC = () => {
   const { activeView, isPropertiesPanelExpanded } = useViewStore();
+  // Mount each of the three top-level views lazily, on first visit, then
+  // keep them mounted (hidden via display:none) forever after so their
+  // local state survives subsequent switches. Eagerly mounting all three
+  // up front — rather than only the one the user actually asked for —
+  // forced Experiments/Inference's heavy init effects (job fetches, chart
+  // setup, etc.) to run on every page load even when the user never left
+  // the canvas, which is unnecessary work and was flaky under test.
+  const [visitedViews, setVisitedViews] = React.useState<Set<typeof activeView>>(
+    () => new Set([activeView]),
+  );
+  React.useEffect(() => {
+    setVisitedViews((prev) => (prev.has(activeView) ? prev : new Set(prev).add(activeView)));
+  }, [activeView]);
   // Below the lg breakpoint (or when the user toggles it on), the
   // editor sidebars are hidden and the canvas drops into pan/zoom +
   // inspect-only mode. Sidebars are useless on tablet — drag-and-drop
@@ -59,7 +72,22 @@ export const MainLayout: React.FC = () => {
       <JobsDrawer />
       <Navbar />
 
-      {activeView === 'canvas' ? (
+      {/* Each top-level view, once first visited, stays mounted forever
+       * after (toggled via `display: contents`/`none` instead of
+       * conditional rendering) so that switching Canvas <-> Experiments
+       * <-> Inference never tears down their component trees. Each page
+       * keeps its own local state (selected job, active evaluation tab,
+       * inference form, etc.) exactly as the user left it when they
+       * navigate away and back — previously this ternary unmounted the
+       * inactive views, resetting all of that state on every switch.
+       * `display: contents` makes the wrapper invisible to layout so the
+       * active view's own root element behaves as if it were still a
+       * direct child of this flex column, matching the pre-existing
+       * layout exactly. Canvas is always mounted since it's the default
+       * landing view; Experiments/Inference mount lazily (see
+       * `visitedViews` above) so their init effects don't run until the
+       * user actually opens them. */}
+      <div style={{ display: activeView === 'canvas' ? 'contents' : 'none' }}>
         <div className="flex flex-1 overflow-hidden relative">
           {!readOnly && <Sidebar />}
           <main className="flex-1 h-full relative flex flex-col transition-all duration-300 ease-in-out">
@@ -72,11 +100,13 @@ export const MainLayout: React.FC = () => {
           </main>
           {!readOnly && <PropertiesPanel />}
         </div>
-      ) : activeView === 'experiments' ? (
-        <ExperimentsPage />
-      ) : (
-        <InferencePage />
-      )}
+      </div>
+      <div style={{ display: activeView === 'experiments' ? 'contents' : 'none' }}>
+        {visitedViews.has('experiments') && <ExperimentsPage />}
+      </div>
+      <div style={{ display: activeView === 'inference' ? 'contents' : 'none' }}>
+        {visitedViews.has('inference') && <InferencePage />}
+      </div>
       <ShortcutsOverlay
         open={showShortcuts}
         onClose={() => setShowShortcuts(false)}
