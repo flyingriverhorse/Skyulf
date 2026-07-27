@@ -121,15 +121,6 @@ async def predict(
         # the first compatible except, so ordering here maps it to 422 (not 400).
         raise HTTPException(status_code=422, detail=str(e)) from e
     except ValueError as e:
-        # TEMP DEBUG (to be reverted): capture which ValueError subtype/module
-        # actually reached here, to diagnose a CI-only 400-vs-422 mismatch.
-        logger.error(
-            "TEMP_DEBUG predict ValueError type=%r module=%r mro=%r msg=%r",
-            type(e),
-            type(e).__module__,
-            [c.__module__ + "." + c.__qualname__ for c in type(e).__mro__],
-            str(e),
-        )
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception:
         logger.exception("Prediction failed")

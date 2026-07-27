@@ -67,7 +67,7 @@ class SecurityMixin:
         "http://localhost:3000",
         "http://localhost:8080",
     ]
-    ALLOWED_HOSTS: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1"]
+    ALLOWED_HOSTS: Annotated[list[str], NoDecode] = ["localhost", "127.0.0.1", "testserver"]
 
     # API Docs
     API_DOCS_ENABLED: bool | None = None
