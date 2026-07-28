@@ -20,7 +20,7 @@ slowapi>=0.1.9                       # Imported by backend/main.py + middleware/
 sentry-sdk[fastapi]>=2.0.0           # Optional runtime dep (Sentry init in main.py / celery_worker.py); installed so ty can resolve `sentry_sdk.integrations.*` imports
 
 # ML stack used by tests
-pandas>=2.0.0,<3.0.0
+pandas>=2.0.0,<4.0.0
 numpy>=1.24.0,<2.0.0
 pyarrow>=23.0.1
 polars>=1.36.0
