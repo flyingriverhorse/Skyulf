@@ -43,7 +43,7 @@ Validation:
   - `source .venv/bin/activate && ruff check .` -> `All checks passed!`
   - `source .venv/bin/activate && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py` -> `569 files already formatted`
   - `source .venv/bin/activate && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `All checks passed!`
-- Final follow-up validation on `29c49fa0` (documentation-only final-record repair for the added auto-classification coverage):
+- Follow-up validation on `29c49fa0` (auto-classification regression coverage follow-up plus report/progress update):
   - `source .venv/bin/activate && pytest skyulf-core/tests/test_encoding_target.py::test_feature_engineer_adapts_auto_target_encoder_for_small_classification_training_rows -q` -> `2 passed`
   - `source .venv/bin/activate && pytest skyulf-core/tests/test_encoding_target.py -q` -> `38 passed`
   - `source .venv/bin/activate && ruff check .` -> `All checks passed!`
@@ -67,7 +67,9 @@ Notes:
   - small continuous-target training data still locks the regression auto branch that shrinks
     to `cv=4` on a 4-row split instead of failing with raw sklearn
     `fit_transform(cv=5)` or leaking through `fit(...).transform(...)`.
-- The `29c49fa0` repair is documentation-only bookkeeping: it records the current validated
-  final state after the added auto-classification regression coverage brought the full
+- The `29c49fa0` follow-up adds the focused auto-classification regression coverage plus the
+  paired report/progress bookkeeping updates; it is the commit that brought the full
   `test_encoding_target.py` count to `38 passed`.
+- The `b4c5302` repair is the documentation-only final-record bookkeeping update that
+  corrected the final validation attribution/state without changing code or tests.
 - Task 1 is not marked accepted here; final independent re-review is still pending on this repair chain.
