@@ -219,6 +219,59 @@ def test_feature_engineer_keeps_deterministic_cv5_target_encoder_policy_when_sup
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_feature_engineer_adapts_auto_target_encoder_for_small_classification_training_rows(
+    engine: str,
+) -> None:
+    """Auto target typing should infer classification, shrink CV, and cross-fit train rows."""
+    train_x_pd = pd.DataFrame({"city": ["a", "b", "a", "c"]})
+    train_y_pd = pd.Series(["yes", "no", "yes", "no"], name="target")
+    test_x_pd = pd.DataFrame({"city": ["a", "new", "c"]})
+    test_y_pd = pd.Series(["yes", "no", "no"], name="target")
+
+    with pytest.raises(ValueError, match="n_splits=5.*n_samples=4"):
+        TargetEncoder(
+            smooth="auto", target_type="auto", cv=5, shuffle=True, random_state=42
+        ).fit_transform(train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy())
+
+    expected_encoder = TargetEncoder(
+        smooth="auto", target_type="auto", cv=2, shuffle=True, random_state=42
+    )
+    expected_train = expected_encoder.fit_transform(
+        train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy()
+    )
+    expected_test = expected_encoder.transform(test_x_pd[["city"]].to_numpy())
+    leaky_train = (
+        TargetEncoder(smooth="auto", target_type="auto", cv=5, shuffle=True, random_state=42)
+        .fit(train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy())
+        .transform(train_x_pd[["city"]].to_numpy())
+    )
+
+    engineer, result = _fit_target_encoder_pipeline(
+        engine=engine,
+        train_x_pd=train_x_pd,
+        train_y_pd=train_y_pd,
+        test_x_pd=test_x_pd,
+        test_y_pd=test_y_pd,
+        params={"columns": ["city"]},
+    )
+    train_out, train_y_out = _unpack_split_xy(result.train)
+    test_out, test_y_out = _unpack_split_xy(result.test)
+    train_values = _extract_encoded_column(train_out, "city", engine)
+    test_values = _extract_encoded_column(test_out, "city", engine)
+    fitted_encoder = cast(TargetEncoder, engineer.fitted_steps[0]["artifact"]["encoder_object"])
+
+    np.testing.assert_allclose(train_values, expected_train[:, 0])
+    np.testing.assert_allclose(test_values, expected_test[:, 0])
+    assert not np.allclose(train_values, leaky_train[:, 0])
+    assert fitted_encoder.target_type == "auto"
+    assert fitted_encoder.cv == 2
+    assert fitted_encoder.shuffle is True
+    assert fitted_encoder.random_state == 42
+    assert list(train_y_out) == list(train_y_pd)
+    assert list(test_y_out) == list(test_y_pd)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
 def test_feature_engineer_adapts_auto_target_encoder_for_small_continuous_training_rows(
     engine: str,
 ) -> None:

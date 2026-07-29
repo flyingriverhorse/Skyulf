@@ -52,11 +52,13 @@ Notes:
   - `.superpowers/sdd/core-safety-task-1-report.md`
   - `.superpowers/sdd/progress.md`
 - New coverage locks down the exact eligible pipeline contract (`cv=5`, `shuffle=True`,
-  `random_state=42`, and cross-fitted train rows), plus the distinct `target_type="auto"`
-  continuous-target branch that shrinks to `cv=4` on a 4-row regression split instead of
-  failing with raw sklearn `fit_transform(cv=5)` or leaking through `fit(...).transform(...)`.
-- No separate auto-only classification test was added because the only distinct adaptive
-  `auto` branch in `_resolve_target_encoder_training_cv(...)` is the continuous-target
-  inference path; explicit binary/classification adaptation was already covered by the
-  existing 4-row pipeline test and helper-level class-count assertions.
+  `random_state=42`, and cross-fitted train rows, plus both distinct
+  `target_type="auto"` inference branches used by adaptive fold selection:
+  - small classification training data now has focused pipeline coverage that proves auto
+    inference shrinks to `cv=2`, preserves the deterministic shuffle/seed policy, and keeps
+    train-row encodings on sklearn's cross-fitted path instead of leaky
+    `fit(...).transform(...)` reuse;
+  - small continuous-target training data still locks the regression auto branch that shrinks
+    to `cv=4` on a 4-row split instead of failing with raw sklearn
+    `fit_transform(cv=5)` or leaking through `fit(...).transform(...)`.
 - Task 1 is not marked accepted here; the independent review should be re-run on this repair.
