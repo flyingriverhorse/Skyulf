@@ -168,8 +168,10 @@ class StatefulTransformer:
         if not tracing_was_active:
             tracemalloc.start()
             tracemalloc.reset_peak()
-        baseline_current = tracemalloc.get_traced_memory()[0] if tracing_was_active else 0
+        peak_baseline = tracemalloc.get_traced_memory()[1] if tracemalloc.is_tracing() else 0
+        # With caller-owned tracing we can only report new global peak growth since entry.
         self.peak_memory_bytes = 0
+        self.rows_out = 0
         start = time.time()
 
         try:
@@ -180,7 +182,7 @@ class StatefulTransformer:
             self.fit_time = time.time() - start
             if tracemalloc.is_tracing():
                 _, peak = tracemalloc.get_traced_memory()
-                self.peak_memory_bytes = max(0, peak - baseline_current)
+                self.peak_memory_bytes = max(0, peak - peak_baseline)
             if not tracing_was_active and tracemalloc.is_tracing():
                 tracemalloc.stop()
 

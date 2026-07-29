@@ -67,6 +67,27 @@ class _TrainTransformCalculator(BaseCalculator):
         return {"increment": 10}, out
 
 
+class _ConfigEchoCalculator(BaseCalculator):
+    """Calculator that passes test-only flags through to the applier."""
+
+    def fit(self, df, config):
+        """Return the increment plus any apply-failure flag from config."""
+        return {
+            "increment": config.get("increment", 1),
+            "fail_apply": config.get("fail_apply", False),
+        }
+
+
+class _MaybeFailApplier(BaseApplier):
+    """Applier that can fail on demand for transformer reuse tests."""
+
+    def apply(self, df, params):
+        """Raise when requested; otherwise delegate to the normal add-one applier."""
+        if params.get("fail_apply"):
+            raise RuntimeError("intentional configurable apply failure")
+        return _AddOneApplier().apply(df, params)
+
+
 class _CountingSplitReturningApplier(BaseApplier):
     """Returns the input frame unchanged for the first `trigger_after` calls, then
     illegally returns a SplitDataset — used to selectively trigger the test/validation
@@ -97,6 +118,15 @@ def _fit_failure_transformer() -> StatefulTransformer:
 def _apply_failure_transformer() -> StatefulTransformer:
     """Build a transformer that fails during applier.apply."""
     return StatefulTransformer(_AddOneCalculator(), _FailingApplier(), node_id="apply_failure")
+
+
+def _configurable_apply_failure_transformer() -> StatefulTransformer:
+    """Build a transformer whose applier can fail on a later reuse run."""
+    return StatefulTransformer(
+        _ConfigEchoCalculator(),
+        _MaybeFailApplier(),
+        node_id="configurable_apply_failure",
+    )
 
 
 @pytest.fixture
@@ -192,6 +222,21 @@ def test_fit_transform_records_profiling_metrics():
     assert transformer.rows_out == 4
 
 
+def test_fit_transform_stops_tracing_it_started_after_success(
+    _isolated_tracemalloc_state: None,
+) -> None:
+    """A successful transformer must stop only the tracing session it created."""
+    assert not tracemalloc.is_tracing()
+
+    transformer = _transformer()
+    result = transformer.fit_transform(pd.DataFrame({"a": [1, 2]}), {"increment": 1})
+
+    assert list(result["a"]) == [2, 3]
+    assert transformer.rows_out == 2
+    assert transformer.peak_memory_bytes >= 0
+    assert not tracemalloc.is_tracing()
+
+
 @pytest.mark.parametrize(
     ("build_transformer", "expected_error", "message"),
     _TRACEMALLOC_FAILURE_CASES,
@@ -235,6 +280,42 @@ def test_fit_transform_preserves_caller_owned_tracing_after_failure(
     assert tracemalloc.is_tracing()
     _, after_peak = tracemalloc.get_traced_memory()
     assert after_peak >= before_peak
+
+
+def test_fit_transform_does_not_inherit_caller_peak_history_on_success(
+    _isolated_tracemalloc_state: None,
+) -> None:
+    """Caller-owned tracing should report only new global peak growth since entry."""
+    tracemalloc.start()
+    peak_marker = [bytearray(8192) for _ in range(1024)]
+    del peak_marker
+    before_current, historical_peak = tracemalloc.get_traced_memory()
+    assert historical_peak - before_current > 1_000_000
+
+    transformer = _transformer()
+    result = transformer.fit_transform(pd.DataFrame({"a": [1, 2]}), {"increment": 1})
+
+    assert list(result["a"]) == [2, 3]
+    assert tracemalloc.is_tracing()
+    _, after_peak = tracemalloc.get_traced_memory()
+    assert after_peak == historical_peak
+    assert transformer.peak_memory_bytes == 0
+
+
+def test_fit_transform_clears_rows_out_before_reuse_failure() -> None:
+    """A failed reuse run must not leak rows_out from a prior successful run."""
+    transformer = _configurable_apply_failure_transformer()
+    transformer.fit_transform(pd.DataFrame({"a": [1, 2, 3]}), {"increment": 1})
+    assert transformer.rows_out == 3
+
+    with pytest.raises(RuntimeError, match="intentional configurable apply failure"):
+        transformer.fit_transform(
+            pd.DataFrame({"a": [10, 20]}),
+            {"increment": 1, "fail_apply": True},
+        )
+
+    assert transformer.rows_in == 2
+    assert transformer.rows_out == 0
 
 
 def test_transform_on_plain_dataframe_reuses_stored_params():
