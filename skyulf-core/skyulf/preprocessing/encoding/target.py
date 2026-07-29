@@ -4,8 +4,10 @@ import logging
 from collections.abc import Mapping
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 from sklearn.preprocessing import TargetEncoder
+from sklearn.utils.multiclass import type_of_target
 
 from ...core.meta.decorators import node_meta
 from ...engines import SkyulfDataFrame
@@ -156,7 +158,7 @@ def _translate_target_encoder_error(exc: ValueError) -> None:
 
 
 def _build_target_encoder(
-    X_subset: Any, y: Any, config: dict[str, Any]
+    X_subset: Any, y: Any, config: dict[str, Any], *, cv: int = 5
 ) -> tuple[TargetEncoder, Any]:
     """Build the sklearn encoder and normalize the target array."""
     from sklearn.preprocessing import LabelEncoder
@@ -166,7 +168,7 @@ def _build_target_encoder(
     encoder = TargetEncoder(
         smooth=config.get("smooth", "auto"),
         target_type=target_type,
-        cv=5,
+        cv=cv,
         shuffle=True,
         random_state=42,
     )
@@ -179,6 +181,43 @@ def _build_target_encoder(
         y_np = le.fit_transform(y_np)
 
     return encoder, y_np
+
+
+def _resolve_target_encoder_training_cv(y_np: Any, target_type: str) -> int:
+    """Return the highest deterministic non-leaky fold count for training rows."""
+    y_array = np.asarray(y_np)
+    n_samples = len(y_array)
+    if n_samples < 2:
+        raise ValueError(
+            "TargetEncoder pipeline training requires at least 2 training rows for "
+            f"leakage-safe cross-fitting; got {n_samples}."
+        )
+
+    safe_cv = min(5, n_samples)
+    if y_array.ndim != 1:
+        return safe_cv
+
+    resolved_target_type = target_type
+    if resolved_target_type == "auto":
+        inferred_target_type = type_of_target(y_array)
+        if inferred_target_type == "continuous":
+            resolved_target_type = "regression"
+        elif inferred_target_type in {"binary", "multiclass"}:
+            resolved_target_type = inferred_target_type
+
+    if resolved_target_type in {"binary", "multiclass"}:
+        classes, counts = np.unique(y_array, return_counts=True)
+        min_class_count = int(counts.min())
+        if min_class_count < 2:
+            class_counts = dict(zip(classes.tolist(), counts.tolist(), strict=False))
+            raise ValueError(
+                "TargetEncoder pipeline training requires at least 2 training rows in every "
+                "target class for leakage-safe cross-fitting; "
+                f"got class counts {class_counts}."
+            )
+        safe_cv = min(safe_cv, min_class_count)
+
+    return safe_cv
 
 
 def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> TargetEncoder:
@@ -196,6 +235,9 @@ def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> Target
 def _fit_transform_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> tuple[Any, Any]:
     """Fit sklearn ``TargetEncoder`` and cross-fit the training rows."""
     encoder, y_np = _build_target_encoder(X_subset, y, config)
+    train_cv = _resolve_target_encoder_training_cv(y_np, str(config.get("target_type", "auto")))
+    if train_cv != 5:
+        encoder, y_np = _build_target_encoder(X_subset, y, config, cv=train_cv)
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
 
     try:

@@ -57,10 +57,10 @@ def test_binary_target_encoding_matches_raw_sklearn() -> None:
 
 
 @pytest.mark.parametrize("engine", ["pandas", "polars"])
-def test_feature_engineer_cross_fits_target_encoder_training_rows(engine: str) -> None:
-    """Pipeline TargetEncoder must use sklearn's cross-fitted train representation."""
-    train_x_pd = pd.DataFrame({"city": ["a", "b", "c"] * 10})
-    train_y_pd = pd.Series(([0, 1, 1, 0, 1, 0] * 5), name="target")
+def test_feature_engineer_cross_fits_small_target_encoder_training_rows(engine: str) -> None:
+    """A 4-row pipeline split should shrink CV safely instead of leaking or crashing."""
+    train_x_pd = pd.DataFrame({"city": ["a", "b", "a", "c"]})
+    train_y_pd = pd.Series([0, 1, 0, 1], name="target")
     test_x_pd = pd.DataFrame({"city": ["a", "new", "c"]})
     test_y_pd = pd.Series([0, 1, 0], name="target")
     config: dict[str, Any] = {
@@ -74,7 +74,7 @@ def test_feature_engineer_cross_fits_target_encoder_training_rows(engine: str) -
     }
 
     expected_encoder = TargetEncoder(
-        smooth="auto", target_type="binary", cv=5, shuffle=True, random_state=42
+        smooth="auto", target_type="binary", cv=2, shuffle=True, random_state=42
     )
     expected_train = expected_encoder.fit_transform(
         train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy()
@@ -117,6 +117,29 @@ def test_feature_engineer_cross_fits_target_encoder_training_rows(engine: str) -
     np.testing.assert_allclose(test_values, expected_test[:, 0])
     assert list(train_y_out) == list(train_y_pd)
     assert list(test_y_out) == list(test_y_pd)
+
+
+def test_resolve_target_encoder_training_cv_uses_smallest_class_count() -> None:
+    """Binary pipeline cross-fitting should cap folds to the smallest class size."""
+    from skyulf.preprocessing.encoding.target import _resolve_target_encoder_training_cv
+
+    assert _resolve_target_encoder_training_cv(np.array([0, 1, 0, 1]), "binary") == 2
+
+
+def test_resolve_target_encoder_training_cv_rejects_single_row() -> None:
+    """A one-row training split cannot be encoded without leaking that row's target."""
+    from skyulf.preprocessing.encoding.target import _resolve_target_encoder_training_cv
+
+    with pytest.raises(ValueError, match="at least 2 training rows"):
+        _resolve_target_encoder_training_cv(np.array([1]), "binary")
+
+
+def test_resolve_target_encoder_training_cv_rejects_singleton_class() -> None:
+    """Classification cross-fitting should fail clearly when a class appears only once."""
+    from skyulf.preprocessing.encoding.target import _resolve_target_encoder_training_cv
+
+    with pytest.raises(ValueError, match="at least 2 training rows in every target class"):
+        _resolve_target_encoder_training_cv(np.array([0, 0, 1]), "binary")
 
 
 class TestNoTargetReturnsEmptyAndWarns:

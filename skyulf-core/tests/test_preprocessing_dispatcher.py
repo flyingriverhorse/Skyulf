@@ -1,4 +1,4 @@
-"""Tests for skyulf.preprocessing.dispatcher (apply_dual_engine / fit_dual_engine)."""
+"""Tests for skyulf.preprocessing.dispatcher helpers."""
 
 import logging
 
@@ -6,7 +6,11 @@ import pandas as pd
 import polars as pl
 import pytest
 
-from skyulf.preprocessing.dispatcher import apply_dual_engine, fit_dual_engine
+from skyulf.preprocessing.dispatcher import (
+    apply_dual_engine,
+    fit_dual_engine,
+    fit_transform_train_dual_engine,
+)
 
 
 def _pandas_apply(X, y, params):
@@ -30,6 +34,19 @@ def _pandas_fit(X, y, params):
 def _polars_fit(X, y, params):
     """Polars fit_func stub: returns the mean of column 'a'."""
     return {"mean_a": float(X["a"].mean())}
+
+
+def _pandas_fit_transform_train(X, y, params):
+    """Pandas train-transform stub: returns params plus a special train view."""
+    X = X.copy()
+    X["a"] = X["a"] + 100
+    return {"mean_a": 2.0}, X, y
+
+
+def _polars_fit_transform_train(X, y, params):
+    """Polars train-transform stub: returns params plus a special train view."""
+    X = X.with_columns((pl.col("a") + 100).alias("a"))
+    return {"mean_a": 2.0}, X, y
 
 
 def test_apply_dual_engine_dispatches_to_pandas_path():
@@ -189,3 +206,29 @@ def test_fit_dual_engine_result_is_plain_dict():
     df = pd.DataFrame({"a": [1.0, 2.0]})
     result = fit_dual_engine(df, {}, _polars_fit, _pandas_fit)
     assert type(result) is dict
+
+
+def test_fit_transform_train_dual_engine_dispatches_to_pandas_path():
+    """A pandas DataFrame input should route through the pandas train-transform helper."""
+    df = pd.DataFrame({"a": [1, 2, 3]})
+    params, result = fit_transform_train_dual_engine(
+        df,
+        {},
+        _polars_fit_transform_train,
+        _pandas_fit_transform_train,
+    )
+    assert params == {"mean_a": 2.0}
+    assert list(result["a"]) == [101, 102, 103]
+
+
+def test_fit_transform_train_dual_engine_dispatches_to_polars_path():
+    """A polars DataFrame input should route through the polars train-transform helper."""
+    df = pl.DataFrame({"a": [1, 2, 3]})
+    params, result = fit_transform_train_dual_engine(
+        df,
+        {},
+        _polars_fit_transform_train,
+        _pandas_fit_transform_train,
+    )
+    assert params == {"mean_a": 2.0}
+    assert result["a"].to_list() == [101, 102, 103]
