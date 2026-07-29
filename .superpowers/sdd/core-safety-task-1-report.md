@@ -43,6 +43,12 @@ Validation:
   - `source .venv/bin/activate && ruff check .` -> `All checks passed!`
   - `source .venv/bin/activate && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py` -> `569 files already formatted`
   - `source .venv/bin/activate && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `All checks passed!`
+- Final follow-up validation on `29c49fa0` (documentation-only final-record repair for the added auto-classification coverage):
+  - `source .venv/bin/activate && pytest skyulf-core/tests/test_encoding_target.py::test_feature_engineer_adapts_auto_target_encoder_for_small_classification_training_rows -q` -> `2 passed`
+  - `source .venv/bin/activate && pytest skyulf-core/tests/test_encoding_target.py -q` -> `38 passed`
+  - `source .venv/bin/activate && ruff check .` -> `All checks passed!`
+  - `source .venv/bin/activate && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py` -> `569 files already formatted`
+  - `source .venv/bin/activate && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `All checks passed!`
 
 Notes:
 - This repair is intentionally limited to Task 1's TargetEncoder training-path regression.
@@ -61,4 +67,7 @@ Notes:
   - small continuous-target training data still locks the regression auto branch that shrinks
     to `cv=4` on a 4-row split instead of failing with raw sklearn
     `fit_transform(cv=5)` or leaking through `fit(...).transform(...)`.
-- Task 1 is not marked accepted here; the independent review should be re-run on this repair.
+- The `29c49fa0` repair is documentation-only bookkeeping: it records the current validated
+  final state after the added auto-classification regression coverage brought the full
+  `test_encoding_target.py` count to `38 passed`.
+- Task 1 is not marked accepted here; final independent re-review is still pending on this repair chain.
