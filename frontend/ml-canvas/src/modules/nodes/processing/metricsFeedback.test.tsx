@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NodeSettingsProps } from '../../../core/types/nodes';
+import { FeatureSelectionNode } from './FeatureSelectionNode';
 import { OutlierNode } from './OutlierNode';
 import { ScalingNode } from './ScalingNode';
 
@@ -10,7 +11,7 @@ const mockGraphState = {
   nodes: [],
   edges: [],
   executionResult: {
-    node_results: {} as Record<string, { metrics?: Record<string, unknown> }>,
+    node_results: {} as Record<string, { status?: string; metrics?: Record<string, unknown> }>,
   },
 };
 
@@ -56,6 +57,7 @@ vi.mock('@xyflow/react', async () => {
 
 type ScalingConfig = ReturnType<typeof ScalingNode.getDefaultConfig>;
 type OutlierConfig = ReturnType<typeof OutlierNode.getDefaultConfig>;
+type FeatureSelectionConfig = ReturnType<typeof FeatureSelectionNode.getDefaultConfig>;
 
 function renderScaling(metrics: Record<string, unknown>, config: ScalingConfig) {
   mockGraphState.executionResult.node_results = {
@@ -70,6 +72,14 @@ function renderOutlier(metrics: Record<string, unknown>, config: OutlierConfig) 
     'node-1': { metrics },
   };
   const Settings = OutlierNode.settings as React.JSXElementConstructor<NodeSettingsProps<OutlierConfig>>;
+  render(<Settings config={config} onChange={() => {}} nodeId="node-1" />);
+}
+
+function renderFeatureSelection(metrics: Record<string, unknown>, config: FeatureSelectionConfig) {
+  mockGraphState.executionResult.node_results = {
+    'node-1': { status: 'success', metrics },
+  };
+  const Settings = FeatureSelectionNode.settings as React.JSXElementConstructor<NodeSettingsProps<FeatureSelectionConfig>>;
   render(<Settings config={config} onChange={() => {}} nodeId="node-1" />);
 }
 
@@ -170,5 +180,63 @@ describe('preprocessing node feedback metrics', () => {
     expect(screen.getByText('Values Clipped')).toBeInTheDocument();
     expect(screen.getByText('3')).toBeInTheDocument();
     expect(screen.getByText('Used percentile bounds')).toBeInTheDocument();
+  });
+
+  it('does not claim zero dropped columns for ambiguous wrapped FeatureSelection metrics', () => {
+    renderFeatureSelection(
+      {
+        steps: {
+          '0:before': {
+            details: { dropped_columns: ['age'] },
+          },
+          '1:after': {
+            details: { dropped_columns: ['fare'] },
+          },
+        },
+      },
+      {
+        method: 'variance_threshold',
+        threshold: 0.1,
+        k: 10,
+      },
+    );
+
+    expect(screen.getByText(/could not be resolved to a single step/i)).toBeInTheDocument();
+    expect(screen.queryByText('No columns were dropped.')).not.toBeInTheDocument();
+  });
+
+  it('keeps FeatureSelection empty wrapped single-step feedback as zero drops', () => {
+    renderFeatureSelection(
+      {
+        steps: {
+          '0:feature_selection': {
+            details: {},
+          },
+        },
+      },
+      {
+        method: 'variance_threshold',
+        threshold: 0.1,
+        k: 10,
+      },
+    );
+
+    expect(screen.getByText('No columns were dropped.')).toBeInTheDocument();
+  });
+
+  it('keeps FeatureSelection legacy flat dropped-columns feedback', () => {
+    renderFeatureSelection(
+      {
+        dropped_columns: ['fare'],
+      },
+      {
+        method: 'variance_threshold',
+        threshold: 0.1,
+        k: 10,
+      },
+    );
+
+    expect(screen.getByText('Dropped Columns (1)')).toBeInTheDocument();
+    expect(screen.getByText('fare')).toBeInTheDocument();
   });
 });

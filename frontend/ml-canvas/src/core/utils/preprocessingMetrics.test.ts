@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNodeMetricDetails } from './preprocessingMetrics';
+import { getNodeMetricDetails, hasWrappedNodeMetrics } from './preprocessingMetrics';
 
 describe('getNodeMetricDetails', () => {
   it('returns the single step details for wrapped preprocessing metrics', () => {
@@ -76,5 +76,24 @@ describe('getNodeMetricDetails', () => {
   it('returns null for non-object metrics payloads', () => {
     expect(getNodeMetricDetails(null)).toBeNull();
     expect(getNodeMetricDetails('bad payload')).toBeNull();
+  });
+});
+
+describe('hasWrappedNodeMetrics', () => {
+  it('detects wrapped metrics payloads', () => {
+    expect(
+      hasWrappedNodeMetrics({
+        steps: {
+          '0:step': {
+            details: {},
+          },
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('returns false for legacy flat or invalid payloads', () => {
+    expect(hasWrappedNodeMetrics({ dropped_columns: ['a'] })).toBe(false);
+    expect(hasWrappedNodeMetrics(null)).toBe(false);
   });
 });

@@ -10,11 +10,13 @@ Status: implemented, repaired for follow-up review findings, and **pending indep
 - Namespaced every step as `"{index}:{name}"` with `name`, `transformer`, `fit_time`, `peak_memory_bytes`, `rows_in`, `rows_out`, and `details`.
 - Kept node-specific metrics exclusively inside `steps[*].details`.
 - Repaired the remaining frontend readers so wrapped single-transformer node results resolve `steps[*].details` without falling back to removed flat keys.
+- Applied a focused follow-up repair on top of `0a9c31ec` so `FeatureSelectionNode.tsx` no longer collapses ambiguous wrapped metrics to a false “No columns were dropped” success state.
 
 ## Frontend selection policy
 - `getNodeMetricDetails()` now auto-resolves nested metrics only when the payload has exactly one step with a `details` object.
 - Multi-step payloads are treated as ambiguous and return `null` unless the caller passes an explicit `{ stepKey }` selector.
 - Legacy flat payloads with no `steps` object still return the original flat metrics for historical backend results.
+- `FeatureSelectionNode.tsx` now preserves that ambiguity: wrapped metrics that cannot be resolved to one step show an explicit unavailable/ambiguous message, while valid empty single-step details and legacy flat payloads still render the existing zero-drop or dropped-column feedback.
 
 ## Compatibility inspection
 - Confirmed `backend/ml_pipeline/_execution/engine/_feature_eng.py::_run_feature_engineering()` forwards the preprocessing metrics dict untouched.
@@ -62,6 +64,12 @@ Status: implemented, repaired for follow-up review findings, and **pending indep
 - `cd frontend/ml-canvas && npm run lint` -> clean
 - `cd frontend/ml-canvas && npx tsc --project tsconfig.json --noEmit` -> clean
 - `cd frontend/ml-canvas && npm run build` -> success (pre-existing Vite circular chunk warning only)
+
+## Follow-up validation for the Task 2 minor review repair on top of `0a9c31ec`
+- `cd frontend/ml-canvas && npx vitest run src/core/utils/preprocessingMetrics.test.ts src/modules/nodes/processing/metricsFeedback.test.tsx` -> `14 passed`
+- `cd frontend/ml-canvas && npm run lint` -> clean
+- `cd frontend/ml-canvas && npx tsc --project tsconfig.json --noEmit` -> clean
+- `cd frontend/ml-canvas && npm run build` -> success (pre-existing Vite circular chunk warning and empty `vendor-react` chunk only)
 
 ## Notes
 - Codacy CLI analysis was attempted after each edit, but the repository-local wrapper is malformed (`.codacy/cli.sh` is HTML and exits before analysis).

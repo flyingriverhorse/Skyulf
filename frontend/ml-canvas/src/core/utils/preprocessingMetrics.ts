@@ -9,6 +9,11 @@ function getStepDetails(steps: MetricDict, stepKey: string): MetricDict | null {
   return asMetricDict(step?.details);
 }
 
+export function hasWrappedNodeMetrics(metrics: unknown): boolean {
+  const metricDict = asMetricDict(metrics);
+  return asMetricDict(metricDict?.steps) !== null;
+}
+
 export function getNodeMetricDetails(
   metrics: unknown,
   options?: { stepKey?: string },
