@@ -160,9 +160,10 @@ Same thing via a pipeline config:
   cluster is represented, then fills the remaining slots without replacement
   from the leftover rows. `silhouette_sample_size` reports the actual number
   of rows sent to silhouette scoring. If sampling is required (`rows >
-  silhouette_sample_size`) and a custom silhouette cap is not larger than the
-  number of predicted clusters, Skyulf raises a clear `ValueError` instead of
-  asking sklearn to score an impossible sample. When all rows already fit under
+  silhouette_sample_size`) and the selected silhouette cap is not larger than
+  the number of predicted clusters, Skyulf raises a clear `ValueError`
+  instead of asking sklearn to score an impossible sample. This applies both
+  to the default cap and to any custom cap. When all rows already fit under
   the cap, Skyulf scores the full input even if `silhouette_sample_size <=
   n_clusters`. Calinski-Harabasz and Davies-Bouldin retain their existing
   full-input behavior.
