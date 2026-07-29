@@ -5,6 +5,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
@@ -29,10 +30,7 @@ const DeduplicationSettings: React.FC<{ config: DeduplicationConfig; onChange: (
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics: Record<string, unknown> | null =
-    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
-      ? (nodeResult.metrics as Record<string, unknown>)
-      : null;
+  const metrics = getNodeMetricDetails(nodeResult?.metrics);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();

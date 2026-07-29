@@ -81,12 +81,22 @@ class FeatureEngineer:
         """
         self.fitted_steps = []  # Reset fitted steps
         current_data = data
-        metrics: dict[str, Any] = {}
+        metrics: dict[str, Any] = {
+            "summary": {
+                "fit_time": 0.0,
+                "peak_memory_bytes": 0,
+                "rows_in": 0,
+                "rows_out": 0,
+            },
+            "steps": {},
+        }
 
         for i, step in enumerate(self.steps_config):
             name = step["name"]
             transformer_type = step["transformer"]
             params = step.get("params", {})
+            step_metrics: dict[str, Any] = {}
+            step_key = f"{i}:{name}"
 
             logger.info(f"Running step {i}: {name} ({transformer_type})")
             logger.debug(f"FeatureEngineer running step {i}: {name} ({transformer_type})")
@@ -109,13 +119,6 @@ class FeatureEngineer:
                 params=params,
             )
 
-            if transformer_inst is not None:
-                # Add node-level performance metrics directly into `metrics` dictionary
-                metrics["fit_time"] = getattr(transformer_inst, "fit_time", 0.0)
-                metrics["peak_memory_bytes"] = getattr(transformer_inst, "peak_memory_bytes", 0)
-                metrics["rows_in"] = getattr(transformer_inst, "rows_in", 0)
-                metrics["rows_out"] = getattr(transformer_inst, "rows_out", 0)
-
             logger.debug(f"Step {i} complete. New data type: {type(current_data)}")
 
             rows_after, cols_after = get_data_stats(current_data)
@@ -130,8 +133,49 @@ class FeatureEngineer:
                 rows_after=rows_after,
                 cols_after=cols_after,
                 name=name,
-                metrics=metrics,
+                metrics=step_metrics,
             )
+
+            step_record = {
+                "name": name,
+                "transformer": transformer_type,
+                "fit_time": (
+                    getattr(transformer_inst, "fit_time", 0.0)
+                    if transformer_inst is not None
+                    else 0.0
+                ),
+                "peak_memory_bytes": (
+                    getattr(transformer_inst, "peak_memory_bytes", 0)
+                    if transformer_inst is not None
+                    else 0
+                ),
+                "rows_in": (
+                    getattr(transformer_inst, "rows_in", rows_before)
+                    if transformer_inst is not None
+                    else rows_before
+                ),
+                "rows_out": (
+                    getattr(transformer_inst, "rows_out", rows_after)
+                    if transformer_inst is not None
+                    else rows_after
+                ),
+                "details": step_metrics,
+            }
+            metrics["steps"][step_key] = step_record
+
+            summary = metrics["summary"]
+            summary["fit_time"] += step_record["fit_time"]
+            summary["peak_memory_bytes"] = max(
+                summary["peak_memory_bytes"], step_record["peak_memory_bytes"]
+            )
+            if i == 0:
+                summary["rows_in"] = step_record["rows_in"]
+            summary["rows_out"] = step_record["rows_out"]
+
+        metrics["fit_time"] = metrics["summary"]["fit_time"]
+        metrics["peak_memory_bytes"] = metrics["summary"]["peak_memory_bytes"]
+        metrics["rows_in"] = metrics["summary"]["rows_in"]
+        metrics["rows_out"] = metrics["summary"]["rows_out"]
 
         return current_data, metrics
 
@@ -259,7 +303,7 @@ class FeatureEngineer:
         name: str,
         metrics: dict[str, Any],
     ) -> None:
-        """Aggregate per-step metrics into the running metrics dict."""
+        """Populate one step record's details dict with node-specific metrics."""
         try:
             if fitted_params:
                 self._metrics_from_fitted_params(
@@ -288,7 +332,7 @@ class FeatureEngineer:
     def _copy_present_keys(
         fitted_params: dict[str, Any], metrics: dict[str, Any], keys: tuple[str, ...]
     ) -> None:
-        """Copy each key from fitted_params into metrics, skipping keys that aren't present."""
+        """Copy fitted params into a single step's details dict when present."""
         for key in keys:
             if key in fitted_params:
                 metrics[key] = fitted_params[key]
@@ -305,7 +349,7 @@ class FeatureEngineer:
     def _apply_outlier_metrics(
         self, transformer_type: str, fitted_params: dict[str, Any], metrics: dict[str, Any]
     ) -> None:
-        """Populate outlier-detection related metrics (warnings/bounds/stats/contamination)."""
+        """Populate one step's outlier details (warnings/bounds/stats/contamination)."""
         if transformer_type in self._OUTLIER_TYPES and "warnings" in fitted_params:
             metrics["warnings"] = fitted_params["warnings"]
         for types, key in self._OUTLIER_METRIC_RULES:
@@ -319,7 +363,7 @@ class FeatureEngineer:
         current_data: Any,
         metrics: dict[str, Any],
     ) -> None:
-        """Populate operations count/list and newly generated feature columns metrics."""
+        """Populate one step's generated-feature details and operation metadata."""
         if "operations" in fitted_params:
             metrics["operations_count"] = len(fitted_params["operations"])
             metrics["operations"] = fitted_params["operations"]
@@ -335,6 +379,7 @@ class FeatureEngineer:
         current_data: Any,
         metrics: dict[str, Any],
     ) -> None:
+        """Populate one step's details from fitted parameters and derived artifacts."""
         if transformer_type in self._IMPUTATION_TYPES:
             self._copy_present_keys(
                 fitted_params, metrics, ("missing_counts", "total_missing", "fill_values")
@@ -447,6 +492,7 @@ class FeatureEngineer:
     def _metrics_resampling(
         self, current_data: Any, params: dict[str, Any], metrics: dict[str, Any]
     ) -> None:
+        """Populate one resampling step's class-balance details."""
         try:
             y_res: Any = self._extract_y_for_resampling(current_data, params)
             if y_res is None:
@@ -496,6 +542,7 @@ class FeatureEngineer:
     def _metrics_winsorize_clipped(
         self, data_before: Any, current_data: Any, metrics: dict[str, Any]
     ) -> None:
+        """Populate one Winsorize step's clipped-value count detail."""
         try:
             clipped_count = 0
             if isinstance(data_before, (pd.DataFrame, SkyulfDataFrame)) and isinstance(
@@ -524,6 +571,7 @@ class FeatureEngineer:
         cols_after: Any,
         metrics: dict[str, Any],
     ) -> None:
+        """Populate one step's shape-change details such as dropped rows/columns."""
         if transformer_type in self._ROW_DROP_TYPES:
             dropped = rows_before - rows_after
             metrics[f"{transformer_type}_rows_removed"] = dropped

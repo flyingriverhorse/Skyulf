@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -53,14 +54,33 @@ class JobStrategy(ABC):
         """Collect and de-duplicate dropped columns reported across all nodes' metrics."""
         all_dropped_columns = []
         for node_res in result.node_results.values():
-            if node_res.metrics and "dropped_columns" in node_res.metrics:
-                cols = node_res.metrics["dropped_columns"]
+            for metrics in self._iter_metric_sources(node_res.metrics):
+                cols = metrics.get("dropped_columns")
                 if isinstance(cols, list):
                     all_dropped_columns.extend(cols)
 
         if all_dropped_columns:
             return list(set(all_dropped_columns))
         return all_dropped_columns
+
+    @staticmethod
+    def _iter_metric_sources(metrics: Any) -> list[dict[str, Any]]:
+        """Return legacy top-level metrics plus any nested preprocessing step details."""
+        if not isinstance(metrics, dict):
+            return []
+
+        sources = [metrics]
+        steps = metrics.get("steps")
+        if not isinstance(steps, dict):
+            return sources
+
+        for step in steps.values():
+            if not isinstance(step, dict):
+                continue
+            details = step.get("details")
+            if isinstance(details, dict):
+                sources.append(details)
+        return sources
 
     def _resolve_job_summary(self, job: MLJob, last_result, final_metrics: dict) -> str | None:
         """Resolve the one-line card summary for the trainer/tuner job.

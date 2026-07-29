@@ -8,6 +8,7 @@ import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { parseIntSafe } from '../../../core/utils/numberInput';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
@@ -46,10 +47,7 @@ const ImputationSettings: React.FC<{ config: ImputationConfig; onChange: (c: Imp
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics: Record<string, unknown> | null =
-    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
-      ? (nodeResult.metrics as Record<string, unknown>)
-      : null;
+  const metrics = getNodeMetricDetails(nodeResult?.metrics);
   const fillValues: Record<string, unknown> | null =
     metrics?.fill_values && typeof metrics.fill_values === 'object'
       ? (metrics.fill_values as Record<string, unknown>)

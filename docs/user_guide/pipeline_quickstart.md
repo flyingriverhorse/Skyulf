@@ -81,6 +81,12 @@ pipeline = SkyulfPipeline(config)
 metrics = pipeline.fit(df, target_column="target")
 print("Metrics keys:", list(metrics.keys()))
 
+preprocessing = metrics["preprocessing"]
+print(preprocessing["summary"]["fit_time"])
+print(preprocessing["steps"]["1:impute"]["details"]["fill_values"])
+# preprocessing["fit_time"], ["peak_memory_bytes"], ["rows_in"], and
+# ["rows_out"] remain compatibility aliases for the summary values above.
+
 # 4) Predict (feature-only dataframe)
 incoming = pd.DataFrame({"age": [25, None], "city": ["A", "C"]})
 preds = pipeline.predict(incoming)

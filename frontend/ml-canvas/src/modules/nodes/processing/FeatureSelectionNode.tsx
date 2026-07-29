@@ -7,6 +7,7 @@ import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppe
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
 import { parseIntSafe } from '../../../core/utils/numberInput';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface FeatureSelectionConfig {
@@ -143,7 +144,7 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
     const result = executionResult?.node_results[nodeId || ''];
     if (!result) return null;
 
-    const metrics = result.metrics || {};
+    const metrics = getNodeMetricDetails(result.metrics) || {};
     const dropped = metrics.dropped_columns as string[] | undefined;
     const scores = metrics.feature_scores as Record<string, number> | undefined;
     const pvalues = metrics.p_values as Record<string, number> | undefined;
