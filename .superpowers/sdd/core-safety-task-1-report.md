@@ -1,4 +1,4 @@
-Status: REPAIRED_FOLLOWUP_PENDING_REVIEW
+Status: COMPLETE (final independent review approved)
 Base commit: bb3cfcf2
 
 Repair summary:
@@ -72,4 +72,5 @@ Notes:
   `test_encoding_target.py` count to `38 passed`.
 - The `b4c5302` repair is the documentation-only final-record bookkeeping update that
   corrected the final validation attribution/state without changing code or tests.
-- Task 1 is not marked accepted here; final independent re-review is still pending on this repair chain.
+- Final independent review approved both specification compliance and code quality after the
+  bookkeeping attribution repair in `f0fca11b`. Task 1 is complete.
