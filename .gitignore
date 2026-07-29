@@ -154,7 +154,7 @@ site/
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
-.superpowers/
+
 .worktrees/
 sast/architecture.md
 sast/final-report.md
@@ -168,7 +168,4 @@ sast/sqli-results.md
 sast/ssrf-results.md
 sast/xss-recon.md
 sast/xss-results.md
-.superpowers/sdd/core-safety-task-1-report.md
-.superpowers/sdd/progress.md
-.superpowers/sdd/core-safety-task-1-report.md
-.superpowers/sdd/progress.md
+
