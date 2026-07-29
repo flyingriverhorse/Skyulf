@@ -52,30 +52,37 @@ def _select_silhouette_sample_indices(
     if n_samples <= sample_size:
         return np.arange(n_samples, dtype=int)
 
-    unique_labels = pd.unique(labels)
-    n_clusters = len(unique_labels)
+    representative_by_label: dict[Any, int] = {}
+    for index, label in enumerate(labels):
+        if label not in representative_by_label:
+            representative_by_label[label] = int(index)
+
+    n_clusters = len(representative_by_label)
     if sample_size <= n_clusters:
         raise ValueError(
             f"silhouette_sample_size={sample_size} is too small for {n_clusters} clusters; "
             "increase it above the number of clusters when scoring datasets larger than the cap"
         )
 
-    rng = np.random.RandomState(random_state)
-    permutation = rng.permutation(n_samples)
-    seen_labels: set[Any] = set()
-    required_indices: list[int] = []
-    optional_indices: list[int] = []
-
-    for index in permutation:
-        label = labels[index]
-        if label in seen_labels:
-            optional_indices.append(int(index))
-            continue
-        seen_labels.add(label)
-        required_indices.append(int(index))
-
+    required_indices = list(representative_by_label.values())
+    required_index_set = set(required_indices)
     remaining_slots = sample_size - len(required_indices)
-    selected = required_indices + optional_indices[:remaining_slots]
+    optional_indices: list[int] = []
+    optional_seen = 0
+    rng = np.random.RandomState(random_state)
+
+    for index in range(n_samples):
+        if index in required_index_set:
+            continue
+        optional_seen += 1
+        if len(optional_indices) < remaining_slots:
+            optional_indices.append(index)
+            continue
+        replacement_index = rng.randint(optional_seen)
+        if replacement_index < remaining_slots:
+            optional_indices[replacement_index] = index
+
+    selected = required_indices + optional_indices
     return np.asarray(selected, dtype=int)
 
 
