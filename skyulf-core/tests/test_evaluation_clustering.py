@@ -8,6 +8,7 @@ from sklearn.cluster import KMeans
 from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
 from skyulf.modeling._evaluation.metrics import (
     DEFAULT_SILHOUETTE_SAMPLE_SIZE,
+    _select_silhouette_sample_indices,
     calculate_clustering_metrics,
 )
 from skyulf.modeling._evaluation.schemas import ModelEvaluationReport
@@ -135,6 +136,82 @@ def test_calculate_clustering_metrics_keeps_large_imbalanced_samples_determinist
         == metrics2["silhouette_sample_size"]
         == float(DEFAULT_SILHOUETTE_SAMPLE_SIZE)
     )
+
+
+def test_select_silhouette_sample_indices_handles_sparse_string_labels_deterministically() -> None:
+    """Sampling should keep one row per sparse string label without duplicating rows."""
+    labels = np.array(
+        [
+            "cluster-100",
+            "cluster-500",
+            "cluster-100",
+            "cluster-900",
+            "cluster-500",
+            "cluster-1500",
+            "cluster-900",
+            "cluster-1500",
+            "cluster-500",
+        ],
+        dtype=object,
+    )
+
+    first = _select_silhouette_sample_indices(labels, sample_size=6, random_state=11)
+    second = _select_silhouette_sample_indices(labels, sample_size=6, random_state=11)
+
+    assert len(first) == 6
+    assert np.array_equal(first, second)
+    assert len(set(first.tolist())) == 6
+    assert np.all(first >= 0)
+    assert np.all(first < len(labels))
+    assert set(labels[first]) == set(pd.unique(labels))
+
+
+def test_calculate_clustering_metrics_samples_unique_rows_for_string_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bounded silhouette sampling should stay deterministic and never reuse a row."""
+    captured: list[tuple[np.ndarray, np.ndarray]] = []
+
+    def fake_silhouette(X: np.ndarray, labels: np.ndarray, **_: object) -> float:
+        captured.append((X.copy(), labels.copy()))
+        return 0.42
+
+    monkeypatch.setattr("sklearn.metrics.silhouette_score", fake_silhouette)
+    monkeypatch.setattr("sklearn.metrics.calinski_harabasz_score", lambda X, labels: 1.0)
+    monkeypatch.setattr("sklearn.metrics.davies_bouldin_score", lambda X, labels: 2.0)
+    X = pd.DataFrame(
+        {
+            "row_id": np.arange(8, dtype=float),
+            "feature": np.linspace(0.0, 1.0, 8),
+        }
+    )
+    labels = np.array(
+        [
+            "cluster-100",
+            "cluster-100",
+            "cluster-900",
+            "cluster-5000",
+            "cluster-900",
+            "cluster-100",
+            "cluster-5000",
+            "cluster-900",
+        ],
+        dtype=object,
+    )
+
+    metrics1 = calculate_clustering_metrics(X, labels, silhouette_sample_size=5, random_state=3)
+    metrics2 = calculate_clustering_metrics(X, labels, silhouette_sample_size=5, random_state=3)
+
+    first_X, first_labels = captured[0]
+    second_X, second_labels = captured[1]
+    assert first_X.shape == (5, 2)
+    assert np.array_equal(first_X, second_X)
+    assert np.array_equal(first_labels, second_labels)
+    assert len(np.unique(first_X[:, 0])) == 5
+    assert set(first_X[:, 0]).issubset(set(X["row_id"].to_numpy()))
+    assert set(first_labels) == set(pd.unique(labels))
+    assert metrics1["silhouette_score"] == metrics2["silhouette_score"] == 0.42
+    assert metrics1["silhouette_sample_size"] == metrics2["silhouette_sample_size"] == 5.0
 
 
 def test_calculate_clustering_metrics_scores_all_small_rows(

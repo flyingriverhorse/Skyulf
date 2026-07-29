@@ -1,7 +1,7 @@
 # Task 4 Report: Bound and Report Clustering Silhouette Sampling
 
 Status: reviewer follow-up implemented, pending review.
-Base commit: da98e7a1
+Base commit: 644fe84e
 
 ## Summary
 - Added `DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000` and
@@ -22,6 +22,16 @@ Base commit: da98e7a1
 - Documented the >10k deterministic representative silhouette sampling
   behavior in
   `docs/user_guide/segmentation.md`.
+- Strengthened the regression coverage around
+  `_select_silhouette_sample_indices()` with sparse string/non-contiguous
+  labels so determinism, exact capped length, uniqueness, in-bounds row
+  selection, and per-label feasibility are all asserted directly.
+- Tightened the public `calculate_clustering_metrics()` coverage to prove the
+  bounded sample passed into silhouette scoring does not duplicate rows even
+  when labels are strings and sparse/non-contiguous.
+- Corrected the segmentation docs to say the `cap <= n_clusters` error only
+  applies when sampling is actually required (`rows > cap`); full-input
+  degenerate guards are otherwise unchanged.
 
 ## Explicit cap policy
 - `silhouette_sample_size < 2` raises
@@ -57,13 +67,17 @@ Base commit: da98e7a1
 - `.superpowers/sdd/progress.md`
 
 ## Validation
-- `source .venv/bin/activate && pytest skyulf-core/tests/test_evaluation_clustering.py -q` -> `13 passed`
-- `source .venv/bin/activate && pytest skyulf-core/tests/test_evaluation_clustering.py skyulf-core/tests/test_modeling_clustering.py -q && ruff check . && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `18 passed`, `All checks passed!`, `569 files already formatted`, `All checks passed!`
+- `source .venv/bin/activate && pytest skyulf-core/tests/test_evaluation_clustering.py::test_select_silhouette_sample_indices_handles_sparse_string_labels_deterministically skyulf-core/tests/test_evaluation_clustering.py::test_calculate_clustering_metrics_samples_unique_rows_for_string_labels -q` -> `2 passed`
+- `source .venv/bin/activate && pytest skyulf-core/tests/test_evaluation_clustering.py -q` -> `15 passed`
+- `source .venv/bin/activate && pytest skyulf-core/tests/test_evaluation_clustering.py skyulf-core/tests/test_modeling_clustering.py -q && ruff check . && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `20 passed`, `All checks passed!`, `569 files already formatted`, `All checks passed!`
 
 ## Notes
 - Regression coverage now captures deterministic bounded silhouette inputs, the
   small-input no-sampling path, invalid caps (including the new
   sampled-cardinality guard and the pre-existing `<2` guard), and the existing
   evaluator/raw-metrics path.
+- The new helper/public-call follow-up keeps production behavior unchanged and
+  specifically guards against accidental duplicate row reuse in bounded
+  silhouette sampling.
 - Codacy CLI analysis was attempted after each edit, but the repository-local
   Codacy wrapper is malformed and fails before analysis starts.
