@@ -1,5 +1,5 @@
-Status: REPAIRED_PENDING_REVIEW
-Base commit: 748929e5
+Status: REPAIRED_FOLLOWUP_PENDING_REVIEW
+Base commit: bb3cfcf2
 
 Repair summary:
 - Fixed the Task 1 regression where pipeline TargetEncoder training always called sklearn
@@ -37,7 +37,26 @@ Validation:
 - `source .venv/bin/activate && ruff check .` -> `All checks passed!`
 - `source .venv/bin/activate && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py` -> `569 files already formatted`
 - `source .venv/bin/activate && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `All checks passed!`
+- Follow-up validation on `bb3cfcf2`:
+  - `source .venv/bin/activate && pytest skyulf-core/tests/test_encoding_target.py::test_feature_engineer_cross_fits_small_target_encoder_training_rows skyulf-core/tests/test_encoding_target.py::test_feature_engineer_keeps_deterministic_cv5_target_encoder_policy_when_supported skyulf-core/tests/test_encoding_target.py::test_feature_engineer_adapts_auto_target_encoder_for_small_continuous_training_rows -q` -> `6 passed`
+  - `source .venv/bin/activate && pytest skyulf-core/tests/test_encoding_target.py -q` -> `36 passed`
+  - `source .venv/bin/activate && ruff check .` -> `All checks passed!`
+  - `source .venv/bin/activate && ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py` -> `569 files already formatted`
+  - `source .venv/bin/activate && ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py` -> `All checks passed!`
 
 Notes:
 - This repair is intentionally limited to Task 1's TargetEncoder training-path regression.
+- Follow-up on `bb3cfcf2`: added focused regression coverage for the remaining re-review gap only.
+- Follow-up files changed for this commit:
+  - `skyulf-core/tests/test_encoding_target.py`
+  - `.superpowers/sdd/core-safety-task-1-report.md`
+  - `.superpowers/sdd/progress.md`
+- New coverage locks down the exact eligible pipeline contract (`cv=5`, `shuffle=True`,
+  `random_state=42`, and cross-fitted train rows), plus the distinct `target_type="auto"`
+  continuous-target branch that shrinks to `cv=4` on a 4-row regression split instead of
+  failing with raw sklearn `fit_transform(cv=5)` or leaking through `fit(...).transform(...)`.
+- No separate auto-only classification test was added because the only distinct adaptive
+  `auto` branch in `_resolve_target_encoder_training_cv(...)` is the continuous-target
+  inference path; explicit binary/classification adaptation was already covered by the
+  existing 4-row pipeline test and helper-level class-count assertions.
 - Task 1 is not marked accepted here; the independent review should be re-run on this repair.

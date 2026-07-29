@@ -37,6 +37,70 @@ _no_resolvable_columns_cases = TestCaseLoader(
 ).load_with_ids()
 
 
+def _make_target_encoder_split_dataset(
+    *,
+    engine: str,
+    train_x_pd: pd.DataFrame,
+    train_y_pd: pd.Series,
+    test_x_pd: pd.DataFrame,
+    test_y_pd: pd.Series,
+) -> SplitDataset:
+    """Build a pandas/polars SplitDataset for pipeline target-encoding tests."""
+    if engine == "polars":
+        return SplitDataset(
+            train=cast(Any, (pl.from_pandas(train_x_pd), pl.Series("target", train_y_pd))),
+            test=cast(Any, (pl.from_pandas(test_x_pd), pl.Series("target", test_y_pd))),
+        )
+    return SplitDataset(
+        train=(train_x_pd, train_y_pd),
+        test=(test_x_pd, test_y_pd),
+    )
+
+
+def _extract_encoded_column(frame: Any, column: str, engine: str) -> np.ndarray:
+    """Return one encoded output column as a NumPy array for either engine."""
+    if engine == "polars":
+        return frame.get_column(column).to_numpy()
+    return frame[column].to_numpy()
+
+
+def _fit_target_encoder_pipeline(
+    *,
+    engine: str,
+    train_x_pd: pd.DataFrame,
+    train_y_pd: pd.Series,
+    test_x_pd: pd.DataFrame,
+    test_y_pd: pd.Series,
+    params: dict[str, Any],
+) -> tuple[FeatureEngineer, SplitDataset]:
+    """Fit a one-step TargetEncoder FeatureEngineer pipeline."""
+    engineer = FeatureEngineer(
+        [
+            {
+                "name": "target_encode_city",
+                "transformer": "TargetEncoder",
+                "params": params,
+            }
+        ]
+    )
+    result, _ = engineer.fit_transform(
+        _make_target_encoder_split_dataset(
+            engine=engine,
+            train_x_pd=train_x_pd,
+            train_y_pd=train_y_pd,
+            test_x_pd=test_x_pd,
+            test_y_pd=test_y_pd,
+        )
+    )
+    assert isinstance(result, SplitDataset)
+    return engineer, result
+
+
+def _unpack_split_xy(split: Any) -> tuple[Any, Any]:
+    """Return one pipeline split as an ``(X, y)`` tuple for test assertions."""
+    return cast(tuple[Any, Any], split)
+
+
 def test_binary_target_encoding_matches_raw_sklearn() -> None:
     """The node's binary-target encoding matches a manually-fitted sklearn TargetEncoder."""
     X = pd.DataFrame({"city": ["a", "b", "a", "b", "a", "b"]})
@@ -88,33 +152,120 @@ def test_feature_engineer_cross_fits_small_target_encoder_training_rows(engine: 
     ).transform(train_x_pd[["city"]].to_numpy())
     assert not np.allclose(expected_train, leaky_train)
 
-    if engine == "polars":
-        dataset = SplitDataset(
-            train=cast(Any, (pl.from_pandas(train_x_pd), pl.Series("target", train_y_pd))),
-            test=cast(Any, (pl.from_pandas(test_x_pd), pl.Series("target", test_y_pd))),
-        )
-    else:
-        dataset = SplitDataset(
-            train=(train_x_pd, train_y_pd),
-            test=(test_x_pd, test_y_pd),
-        )
-
-    result, _ = FeatureEngineer(config["preprocessing"]).fit_transform(dataset)
-    train_out, train_y_out = result.train
-    test_out, test_y_out = result.test
-    train_values = (
-        train_out.get_column("city").to_numpy()
-        if engine == "polars"
-        else train_out["city"].to_numpy()
+    _, result = _fit_target_encoder_pipeline(
+        engine=engine,
+        train_x_pd=train_x_pd,
+        train_y_pd=train_y_pd,
+        test_x_pd=test_x_pd,
+        test_y_pd=test_y_pd,
+        params=cast(dict[str, Any], config["preprocessing"][0]["params"]),
     )
-    test_values = (
-        test_out.get_column("city").to_numpy()
-        if engine == "polars"
-        else test_out["city"].to_numpy()
-    )
+    train_out, train_y_out = _unpack_split_xy(result.train)
+    test_out, test_y_out = _unpack_split_xy(result.test)
+    train_values = _extract_encoded_column(train_out, "city", engine)
+    test_values = _extract_encoded_column(test_out, "city", engine)
 
     np.testing.assert_allclose(train_values, expected_train[:, 0])
     np.testing.assert_allclose(test_values, expected_test[:, 0])
+    assert list(train_y_out) == list(train_y_pd)
+    assert list(test_y_out) == list(test_y_pd)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_feature_engineer_keeps_deterministic_cv5_target_encoder_policy_when_supported(
+    engine: str,
+) -> None:
+    """Eligible training data should keep the fixed cv=5/shuffle/seed cross-fit policy."""
+    train_x_pd = pd.DataFrame({"city": ["a", "b", "c"] * 10})
+    train_y_pd = pd.Series(([0, 1, 1, 0, 1, 0] * 5), name="target")
+    test_x_pd = pd.DataFrame({"city": ["a", "new", "c"]})
+    test_y_pd = pd.Series([0, 1, 0], name="target")
+
+    expected_encoder = TargetEncoder(
+        smooth="auto", target_type="binary", cv=5, shuffle=True, random_state=42
+    )
+    expected_train = expected_encoder.fit_transform(
+        train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy()
+    )
+    expected_test = expected_encoder.transform(test_x_pd[["city"]].to_numpy())
+    leaky_train = (
+        TargetEncoder(smooth="auto", target_type="binary", cv=5, shuffle=True, random_state=42)
+        .fit(train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy())
+        .transform(train_x_pd[["city"]].to_numpy())
+    )
+
+    engineer, result = _fit_target_encoder_pipeline(
+        engine=engine,
+        train_x_pd=train_x_pd,
+        train_y_pd=train_y_pd,
+        test_x_pd=test_x_pd,
+        test_y_pd=test_y_pd,
+        params={"columns": ["city"], "target_type": "binary"},
+    )
+    train_out, train_y_out = _unpack_split_xy(result.train)
+    test_out, test_y_out = _unpack_split_xy(result.test)
+    train_values = _extract_encoded_column(train_out, "city", engine)
+    test_values = _extract_encoded_column(test_out, "city", engine)
+    fitted_encoder = cast(TargetEncoder, engineer.fitted_steps[0]["artifact"]["encoder_object"])
+
+    np.testing.assert_allclose(train_values, expected_train[:, 0])
+    np.testing.assert_allclose(test_values, expected_test[:, 0])
+    assert not np.allclose(train_values, leaky_train[:, 0])
+    assert fitted_encoder.cv == 5
+    assert fitted_encoder.shuffle is True
+    assert fitted_encoder.random_state == 42
+    assert list(train_y_out) == list(train_y_pd)
+    assert list(test_y_out) == list(test_y_pd)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_feature_engineer_adapts_auto_target_encoder_for_small_continuous_training_rows(
+    engine: str,
+) -> None:
+    """Auto target typing should shrink CV for small continuous targets instead of failing."""
+    train_x_pd = pd.DataFrame({"city": ["a", "a", "b", "b"]})
+    train_y_pd = pd.Series([1.1, 2.2, 10.3, 12.4], name="target")
+    test_x_pd = pd.DataFrame({"city": ["a", "new", "b"]})
+    test_y_pd = pd.Series([1.6, 6.0, 11.3], name="target")
+
+    with pytest.raises(ValueError, match="n_splits=5.*n_samples=4"):
+        TargetEncoder(
+            smooth="auto", target_type="auto", cv=5, shuffle=True, random_state=42
+        ).fit_transform(train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy())
+
+    expected_encoder = TargetEncoder(
+        smooth="auto", target_type="auto", cv=4, shuffle=True, random_state=42
+    )
+    expected_train = expected_encoder.fit_transform(
+        train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy()
+    )
+    expected_test = expected_encoder.transform(test_x_pd[["city"]].to_numpy())
+    leaky_train = (
+        TargetEncoder(smooth="auto", target_type="auto", cv=5, shuffle=True, random_state=42)
+        .fit(train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy())
+        .transform(train_x_pd[["city"]].to_numpy())
+    )
+
+    engineer, result = _fit_target_encoder_pipeline(
+        engine=engine,
+        train_x_pd=train_x_pd,
+        train_y_pd=train_y_pd,
+        test_x_pd=test_x_pd,
+        test_y_pd=test_y_pd,
+        params={"columns": ["city"]},
+    )
+    train_out, train_y_out = _unpack_split_xy(result.train)
+    test_out, test_y_out = _unpack_split_xy(result.test)
+    train_values = _extract_encoded_column(train_out, "city", engine)
+    test_values = _extract_encoded_column(test_out, "city", engine)
+    fitted_encoder = cast(TargetEncoder, engineer.fitted_steps[0]["artifact"]["encoder_object"])
+
+    np.testing.assert_allclose(train_values, expected_train[:, 0])
+    np.testing.assert_allclose(test_values, expected_test[:, 0])
+    assert not np.allclose(train_values, leaky_train[:, 0])
+    assert fitted_encoder.cv == 4
+    assert fitted_encoder.shuffle is True
+    assert fitted_encoder.random_state == 42
     assert list(train_y_out) == list(train_y_pd)
     assert list(test_y_out) == list(test_y_pd)
 
