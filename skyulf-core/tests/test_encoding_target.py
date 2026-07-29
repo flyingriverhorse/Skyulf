@@ -14,10 +14,12 @@ from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.core.schema import SkyulfSchema
+from skyulf.data.dataset import SplitDataset
 from skyulf.preprocessing.encoding.target import (
     TargetEncoderApplier,
     TargetEncoderCalculator,
 )
+from skyulf.preprocessing.pipeline import FeatureEngineer
 
 settings.register_profile(
     "encoding_target",
@@ -52,6 +54,69 @@ def test_binary_target_encoding_matches_raw_sklearn() -> None:
 
     np.testing.assert_allclose(X_out["city"].to_numpy(), expected[:, 0])
     assert list(y_out) == list(y)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_feature_engineer_cross_fits_target_encoder_training_rows(engine: str) -> None:
+    """Pipeline TargetEncoder must use sklearn's cross-fitted train representation."""
+    train_x_pd = pd.DataFrame({"city": ["a", "b", "c"] * 10})
+    train_y_pd = pd.Series(([0, 1, 1, 0, 1, 0] * 5), name="target")
+    test_x_pd = pd.DataFrame({"city": ["a", "new", "c"]})
+    test_y_pd = pd.Series([0, 1, 0], name="target")
+    config: dict[str, Any] = {
+        "preprocessing": [
+            {
+                "name": "target_encode_city",
+                "transformer": "TargetEncoder",
+                "params": {"columns": ["city"], "target_type": "binary"},
+            }
+        ]
+    }
+
+    expected_encoder = TargetEncoder(
+        smooth="auto", target_type="binary", cv=5, shuffle=True, random_state=42
+    )
+    expected_train = expected_encoder.fit_transform(
+        train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy()
+    )
+    expected_test = expected_encoder.transform(test_x_pd[["city"]].to_numpy())
+    leaky_encoder = TargetEncoder(
+        smooth="auto", target_type="binary", cv=5, shuffle=True, random_state=42
+    )
+    leaky_train = leaky_encoder.fit(
+        train_x_pd[["city"]].to_numpy(), train_y_pd.to_numpy()
+    ).transform(train_x_pd[["city"]].to_numpy())
+    assert not np.allclose(expected_train, leaky_train)
+
+    if engine == "polars":
+        dataset = SplitDataset(
+            train=cast(Any, (pl.from_pandas(train_x_pd), pl.Series("target", train_y_pd))),
+            test=cast(Any, (pl.from_pandas(test_x_pd), pl.Series("target", test_y_pd))),
+        )
+    else:
+        dataset = SplitDataset(
+            train=(train_x_pd, train_y_pd),
+            test=(test_x_pd, test_y_pd),
+        )
+
+    result, _ = FeatureEngineer(config["preprocessing"]).fit_transform(dataset)
+    train_out, train_y_out = result.train
+    test_out, test_y_out = result.test
+    train_values = (
+        train_out.get_column("city").to_numpy()
+        if engine == "polars"
+        else train_out["city"].to_numpy()
+    )
+    test_values = (
+        test_out.get_column("city").to_numpy()
+        if engine == "polars"
+        else test_out["city"].to_numpy()
+    )
+
+    np.testing.assert_allclose(train_values, expected_train[:, 0])
+    np.testing.assert_allclose(test_values, expected_test[:, 0])
+    assert list(train_y_out) == list(train_y_pd)
+    assert list(test_y_out) == list(test_y_pd)
 
 
 class TestNoTargetReturnsEmptyAndWarns:

@@ -303,6 +303,13 @@ Learned params:
 
 Requires a target series (`y`).
 
+In a `FeatureEngineer` or `SkyulfPipeline`, training rows are encoded with
+sklearn's cross-fitted `TargetEncoder.fit_transform` behavior. Test,
+validation, and inference rows use the fitted encoder's `transform`
+behavior. Skyulf uses deterministic five-fold cross-fitting with seed 42.
+Direct Calculator/Applier use remains an advanced API and uses the explicit
+fit/apply calls supplied by the caller.
+
 Config:
 
 - `columns`: list[str]

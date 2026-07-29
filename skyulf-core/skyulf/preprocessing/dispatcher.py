@@ -51,6 +51,10 @@ def _log_dispatch_failure(
 ApplyFunction = Callable[[Any, Any | None, dict[str, Any]], tuple[Any, Any | None]]
 # Fit returns a mapping (TypedDicts are accepted via Mapping invariance).
 FitFunction = Callable[[Any, Any | None, dict[str, Any]], Mapping[str, Any]]
+TrainTransformFunction = Callable[
+    [Any, Any | None, dict[str, Any]],
+    tuple[Mapping[str, Any], Any, Any | None],
+]
 
 
 def apply_dual_engine(
@@ -133,3 +137,30 @@ def fit_dual_engine(
         except Exception as exc:
             _log_dispatch_failure(exc, "Pandas", "fit", pandas_func)
             raise
+
+
+def fit_transform_train_dual_engine(
+    df: pd.DataFrame | SkyulfDataFrame | tuple[Any, ...] | Any,
+    params: dict[str, Any],
+    polars_func: TrainTransformFunction,
+    pandas_func: TrainTransformFunction,
+) -> tuple[dict[str, Any], Any]:
+    """Dispatch an optional fit+train-transform hook across supported engines."""
+    X, y, is_tuple = unpack_pipeline_input(df)
+    engine = get_engine(X)
+
+    if engine.name == EngineName.POLARS:
+        try:
+            artifact, X_out, y_out = polars_func(X, y, params)
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Polars", "fit_transform_train", polars_func)
+            raise
+    else:
+        X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
+        try:
+            artifact, X_out, y_out = pandas_func(X_pd, y, params)
+        except Exception as exc:
+            _log_dispatch_failure(exc, "Pandas", "fit_transform_train", pandas_func)
+            raise
+
+    return dict(artifact), pack_pipeline_output(X_out, y_out, is_tuple)
