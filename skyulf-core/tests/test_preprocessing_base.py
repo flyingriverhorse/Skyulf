@@ -1,5 +1,6 @@
 """Tests for skyulf.preprocessing.base (StatefulTransformer fit_transform/transform paths)."""
 
+import tracemalloc
 import typing
 
 import pandas as pd
@@ -36,6 +37,22 @@ class _AddOneApplier(BaseApplier):
         return df
 
 
+class _FailingCalculator(BaseCalculator):
+    """Calculator used to exercise fit-time cleanup paths."""
+
+    def fit(self, df, config):
+        """Raise a deliberate error before producing fitted params."""
+        raise ValueError("intentional fit failure")
+
+
+class _FailingApplier(BaseApplier):
+    """Applier used to exercise apply-time cleanup paths."""
+
+    def apply(self, df, params):
+        """Raise a deliberate error while applying fitted params."""
+        raise RuntimeError("intentional apply failure")
+
+
 class _TrainTransformCalculator(BaseCalculator):
     """Calculator with an explicit cross-fitted-style training output."""
 
@@ -70,6 +87,32 @@ class _CountingSplitReturningApplier(BaseApplier):
 def _transformer():
     """Build a StatefulTransformer using the AddOne calculator/applier pair."""
     return StatefulTransformer(_AddOneCalculator(), _AddOneApplier(), node_id="add_one")
+
+
+def _fit_failure_transformer() -> StatefulTransformer:
+    """Build a transformer that fails during calculator.fit."""
+    return StatefulTransformer(_FailingCalculator(), _AddOneApplier(), node_id="fit_failure")
+
+
+def _apply_failure_transformer() -> StatefulTransformer:
+    """Build a transformer that fails during applier.apply."""
+    return StatefulTransformer(_AddOneCalculator(), _FailingApplier(), node_id="apply_failure")
+
+
+@pytest.fixture
+def _isolated_tracemalloc_state() -> typing.Iterator[None]:
+    """Keep tracemalloc ownership tests isolated from process-global state."""
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
+    yield
+    if tracemalloc.is_tracing():
+        tracemalloc.stop()
+
+
+_TRACEMALLOC_FAILURE_CASES = [
+    pytest.param(_fit_failure_transformer, ValueError, "intentional fit failure", id="fit"),
+    pytest.param(_apply_failure_transformer, RuntimeError, "intentional apply failure", id="apply"),
+]
 
 
 def test_fit_transform_on_plain_dataframe():
@@ -147,6 +190,51 @@ def test_fit_transform_records_profiling_metrics():
     assert transformer.fit_time >= 0.0
     assert transformer.rows_in == 4
     assert transformer.rows_out == 4
+
+
+@pytest.mark.parametrize(
+    ("build_transformer", "expected_error", "message"),
+    _TRACEMALLOC_FAILURE_CASES,
+)
+def test_fit_transform_stops_tracing_it_started_after_failure(
+    _isolated_tracemalloc_state: None,
+    build_transformer: typing.Callable[[], StatefulTransformer],
+    expected_error: type[Exception],
+    message: str,
+) -> None:
+    """A failing transformer must stop only the tracing session it created."""
+    assert not tracemalloc.is_tracing()
+
+    with pytest.raises(expected_error, match=message):
+        build_transformer().fit_transform(pd.DataFrame({"a": [1, 2]}), {})
+
+    assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.parametrize(
+    ("build_transformer", "expected_error", "message"),
+    _TRACEMALLOC_FAILURE_CASES,
+)
+def test_fit_transform_preserves_caller_owned_tracing_after_failure(
+    _isolated_tracemalloc_state: None,
+    build_transformer: typing.Callable[[], StatefulTransformer],
+    expected_error: type[Exception],
+    message: str,
+) -> None:
+    """A failing transformer must leave caller-owned tracing and peak state intact."""
+    tracemalloc.start()
+    peak_marker = [bytearray(8192) for _ in range(1024)]
+    before_peak = tracemalloc.get_traced_memory()[1]
+    del peak_marker
+    before_current = tracemalloc.get_traced_memory()[0]
+    assert before_peak - before_current > 1_000_000
+
+    with pytest.raises(expected_error, match=message):
+        build_transformer().fit_transform(pd.DataFrame({"a": [1, 2]}), {})
+
+    assert tracemalloc.is_tracing()
+    _, after_peak = tracemalloc.get_traced_memory()
+    assert after_peak >= before_peak
 
 
 def test_transform_on_plain_dataframe_reuses_stored_params():

@@ -164,20 +164,25 @@ class StatefulTransformer:
         config: dict[str, Any],
     ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
         self.rows_in, _ = get_data_stats(dataset)
-        tracemalloc.start()
+        tracing_was_active = tracemalloc.is_tracing()
+        if not tracing_was_active:
+            tracemalloc.start()
+            tracemalloc.reset_peak()
+        baseline_current = tracemalloc.get_traced_memory()[0] if tracing_was_active else 0
+        self.peak_memory_bytes = 0
         start = time.time()
 
-        result = self._fit_transform_inner(dataset, config)
-
-        self.fit_time = time.time() - start
-
-        if tracemalloc.is_tracing():
-            _, peak = tracemalloc.get_traced_memory()
-            self.peak_memory_bytes = peak
-            tracemalloc.stop()
-
-        self.rows_out, _ = get_data_stats(result)
-        return result
+        try:
+            result = self._fit_transform_inner(dataset, config)
+            self.rows_out, _ = get_data_stats(result)
+            return result
+        finally:
+            self.fit_time = time.time() - start
+            if tracemalloc.is_tracing():
+                _, peak = tracemalloc.get_traced_memory()
+                self.peak_memory_bytes = max(0, peak - baseline_current)
+            if not tracing_was_active and tracemalloc.is_tracing():
+                tracemalloc.stop()
 
     def _fit_and_apply_training_data(
         self,
