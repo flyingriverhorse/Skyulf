@@ -36,6 +36,20 @@ class _AddOneApplier(BaseApplier):
         return df
 
 
+class _TrainTransformCalculator(BaseCalculator):
+    """Calculator with an explicit cross-fitted-style training output."""
+
+    def fit(self, df, config):
+        """Fail if the generic fallback path is selected."""
+        raise AssertionError("fit_transform_train should be used")
+
+    def fit_transform_train(self, df, config):
+        """Return fitted parameters and a special training representation."""
+        out = df.copy()
+        out["a"] = out["a"] + 100
+        return {"increment": 10}, out
+
+
 class _CountingSplitReturningApplier(BaseApplier):
     """Returns the input frame unchanged for the first `trigger_after` calls, then
     illegally returns a SplitDataset — used to selectively trigger the test/validation
@@ -75,6 +89,15 @@ def test_fit_transform_on_tuple_input():
     result = transformer.fit_transform((X, y), {"increment": 2})
     assert isinstance(result, tuple)
     assert list(result[0]["a"]) == [3, 4, 5]
+
+
+def test_fit_transform_uses_train_transform_hook_when_available():
+    """fit_transform should prefer fit_transform_train for training rows."""
+    result = StatefulTransformer(
+        _TrainTransformCalculator(), _AddOneApplier(), node_id="train_hook"
+    ).fit_transform(pd.DataFrame({"a": [1, 2]}), {})
+    assert isinstance(result, pd.DataFrame)
+    assert list(result["a"]) == [101, 102]
 
 
 def test_fit_transform_on_split_dataset_applies_to_all_splits():
