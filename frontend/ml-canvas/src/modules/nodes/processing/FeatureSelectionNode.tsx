@@ -7,7 +7,7 @@ import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppe
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { getIncomers } from '@xyflow/react';
 import { parseIntSafe } from '../../../core/utils/numberInput';
-import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
+import { getNodeMetricDetails, hasWrappedNodeMetrics } from '../../../core/utils/preprocessingMetrics';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
 interface FeatureSelectionConfig {
@@ -144,13 +144,21 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
     const result = executionResult?.node_results[nodeId || ''];
     if (!result) return null;
 
-    const metrics = getNodeMetricDetails(result.metrics) || {};
-    const dropped = metrics.dropped_columns as string[] | undefined;
-    const scores = metrics.feature_scores as Record<string, number> | undefined;
-    const pvalues = metrics.p_values as Record<string, number> | undefined;
-    const importances = metrics.feature_importances as Record<string, number> | undefined;
-    const variances = metrics.variances as Record<string, number> | undefined;
-    const ranking = metrics.ranking as Record<string, number> | undefined;
+    const metrics = getNodeMetricDetails(result.metrics);
+    const hasWrappedMetrics = hasWrappedNodeMetrics(result.metrics);
+    const dropped = metrics?.dropped_columns as string[] | undefined;
+    const scores = metrics?.feature_scores as Record<string, number> | undefined;
+    const pvalues = metrics?.p_values as Record<string, number> | undefined;
+    const importances = metrics?.feature_importances as Record<string, number> | undefined;
+    const variances = metrics?.variances as Record<string, number> | undefined;
+    const ranking = metrics?.ranking as Record<string, number> | undefined;
+    const showUnavailableWrappedMetrics = result.status === 'success' && hasWrappedMetrics && !metrics;
+    const showNoDrops = result.status === 'success' && metrics && (!dropped || dropped.length === 0);
+    const hasTopFeatures = Boolean(scores || importances);
+
+    if (!result.error && !showUnavailableWrappedMetrics && !showNoDrops && !dropped?.length && !hasTopFeatures) {
+      return null;
+    }
 
     return (
       <div className="mt-4 p-3 bg-muted/50 rounded border text-xs space-y-3">
@@ -191,27 +199,31 @@ const FeatureSelectionSettings: React.FC<{ config: FeatureSelectionConfig; onCha
               })}
             </div>
           </div>
+        ) : showUnavailableWrappedMetrics ? (
+          <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 rounded border border-yellow-200 dark:border-yellow-800">
+            Feature-selection drop details were unavailable because this wrapped metrics payload could not be resolved to a single step.
+          </div>
         ) : (
-           result.status === 'success' && (
-             <div className="text-green-600 text-[10px] space-y-1">
-               <div>No columns were dropped.</div>
-               {config.method === 'variance_threshold' && (
-                 <div className="text-muted-foreground italic">
-                   All features have variance &gt; {config.threshold ?? 0}. Try increasing the threshold.
-                 </div>
-               )}
-               {config.method === 'select_k_best' && (
-                 <div className="text-muted-foreground italic">
-                   K ({config.k ?? 10}) is likely larger than or equal to the number of features. Try reducing K.
-                 </div>
-               )}
-               {config.method === 'correlation_threshold' && (
-                 <div className="text-muted-foreground italic">
-                   No feature pairs found with correlation &gt; {config.threshold ?? 0.95}.
-                 </div>
-               )}
-             </div>
-           )
+          showNoDrops && (
+            <div className="text-green-600 text-[10px] space-y-1">
+              <div>No columns were dropped.</div>
+              {config.method === 'variance_threshold' && (
+                <div className="text-muted-foreground italic">
+                  All features have variance &gt; {config.threshold ?? 0}. Try increasing the threshold.
+                </div>
+              )}
+              {config.method === 'select_k_best' && (
+                <div className="text-muted-foreground italic">
+                  K ({config.k ?? 10}) is likely larger than or equal to the number of features. Try reducing K.
+                </div>
+              )}
+              {config.method === 'correlation_threshold' && (
+                <div className="text-muted-foreground italic">
+                  No feature pairs found with correlation &gt; {config.threshold ?? 0.95}.
+                </div>
+              )}
+            </div>
+          )
         )}
 
         {/* Top Features Section */}
