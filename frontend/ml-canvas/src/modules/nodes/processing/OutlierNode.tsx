@@ -10,6 +10,7 @@ import { RecommendationsPanel } from '../../../components/panels/Recommendations
 import { Recommendation } from '../../../core/api/client';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 
 interface OutlierConfig {
   method: 'iqr' | 'zscore' | 'winsorize' | 'elliptic_envelope';
@@ -76,6 +77,7 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
+  const metrics = getNodeMetricDetails(nodeResult?.metrics);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
@@ -89,28 +91,27 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     : [];
 
   const renderFeedback = () => {
-    if (!nodeResult || !nodeResult.metrics) return null;
-    const m = nodeResult.metrics;
+    if (!metrics) return null;
 
     // Check for rows removed (common for IQR, ZScore, Elliptic)
-    const rowsRemoved = m.rows_removed as number | undefined;
-    const rowsRemaining = m.rows_remaining as number | undefined;
-    const rowsTotal = m.rows_total as number | undefined ?? ((rowsRemoved ?? 0) + (rowsRemaining ?? 0));
+    const rowsRemoved = metrics.rows_removed as number | undefined;
+    const rowsRemaining = metrics.rows_remaining as number | undefined;
+    const rowsTotal = metrics.rows_total as number | undefined ?? ((rowsRemoved ?? 0) + (rowsRemaining ?? 0));
 
     // Check for bounds (IQR, Winsorize)
-    const bounds = m.bounds as Record<string, { lower: number, upper: number }> | undefined;
+    const bounds = metrics.bounds as Record<string, { lower: number, upper: number }> | undefined;
 
     // Check for stats (ZScore)
-    const stats = m.stats as Record<string, { mean: number, std: number }> | undefined;
+    const stats = metrics.stats as Record<string, { mean: number, std: number }> | undefined;
 
     // Check for contamination (Elliptic Envelope)
-    const contamination = m.contamination as number | undefined;
+    const contamination = metrics.contamination as number | undefined;
 
     // Check for warnings
-    const warnings = m.warnings as string[] | undefined;
+    const warnings = metrics.warnings as string[] | undefined;
 
     // Check for values clipped (Winsorize)
-    const valuesClipped = m.values_clipped as number | undefined;
+    const valuesClipped = metrics.values_clipped as number | undefined;
 
     if (rowsRemoved === undefined && !bounds && !stats && contamination === undefined && !warnings && valuesClipped === undefined) return null;
 
@@ -221,13 +222,12 @@ const OutlierSettings: React.FC<{ config: OutlierConfig; onChange: (c: OutlierCo
     // Combine backend recommendations with runtime feedback
     const runtimeRecommendations: Recommendation[] = [];
 
-    if (nodeResult && nodeResult.metrics) {
-        const m = nodeResult.metrics;
-        const rowsRemoved = m.rows_removed as number | undefined;
-        const rowsTotal = m.rows_total as number | undefined;
+    if (nodeResult && metrics) {
+        const rowsRemoved = metrics.rows_removed as number | undefined;
+        const rowsTotal = metrics.rows_total as number | undefined;
 
         // If rowsTotal is missing but we have rowsRemoved, we can still give some feedback
-        const effectiveRowsTotal = rowsTotal ?? (m[`${config.method === 'elliptic_envelope' ? 'EllipticEnvelope' : config.method === 'zscore' ? 'ZScore' : config.method === 'winsorize' ? 'Winsorize' : 'IQR'}_rows_total`] as number | undefined);
+        const effectiveRowsTotal = rowsTotal ?? (metrics[`${config.method === 'elliptic_envelope' ? 'EllipticEnvelope' : config.method === 'zscore' ? 'ZScore' : config.method === 'winsorize' ? 'Winsorize' : 'IQR'}_rows_total`] as number | undefined);
 
         if (rowsRemoved !== undefined && effectiveRowsTotal !== undefined && effectiveRowsTotal > 0) {
             const lossRatio = rowsRemoved / effectiveRowsTotal;
