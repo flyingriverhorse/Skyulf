@@ -1,7 +1,7 @@
 # Task 4 Report: Bound and Report Clustering Silhouette Sampling
 
-Status: reviewer follow-up implemented, pending review.
-Base commit: 644fe84e
+Status: final review docs-only accuracy repair implemented, pending review.
+Base commit: 2a584cc
 
 ## Summary
 - Added `DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000` and
@@ -29,8 +29,8 @@ Base commit: 644fe84e
 - Tightened the public `calculate_clustering_metrics()` coverage to prove the
   bounded sample passed into silhouette scoring does not duplicate rows even
   when labels are strings and sparse/non-contiguous.
-- Corrected the segmentation docs to say the `cap <= n_clusters` error only
-  applies when sampling is actually required (`rows > cap`); full-input
+- Corrected the segmentation docs to say the `cap <= n_clusters` error applies
+  whenever `rows > selected_cap`, not just for a custom cap; full-input
   degenerate guards are otherwise unchanged.
 
 ## Explicit cap policy
@@ -79,5 +79,7 @@ Base commit: 644fe84e
 - The new helper/public-call follow-up keeps production behavior unchanged and
   specifically guards against accidental duplicate row reuse in bounded
   silhouette sampling.
+- This final review fix is documentation-only; no source, test, or behavior
+  changes were made on top of `2a584cc`.
 - Codacy CLI analysis was attempted after each edit, but the repository-local
   Codacy wrapper is malformed and fails before analysis starts.
