@@ -1,5 +1,6 @@
 """Tests for skyulf.preprocessing.base (StatefulTransformer fit_transform/transform paths)."""
 
+import gc
 import tracemalloc
 import typing
 
@@ -88,6 +89,31 @@ class _MaybeFailApplier(BaseApplier):
         return _AddOneApplier().apply(df, params)
 
 
+class _TracingControlCalculator(BaseCalculator):
+    """Calculator that forwards tracing-control flags to the applier."""
+
+    def fit(self, df, config):
+        """Return the increment plus tracemalloc control flags from config."""
+        return {
+            "increment": config.get("increment", 1),
+            "stop_tracing": config.get("stop_tracing", False),
+            "fail_after_stop": config.get("fail_after_stop", False),
+        }
+
+
+class _TracingControlApplier(BaseApplier):
+    """Applier that can stop tracemalloc before succeeding or failing."""
+
+    def apply(self, df, params):
+        """Apply normally, then optionally stop tracing and raise the original error."""
+        result = _AddOneApplier().apply(df, params)
+        if params.get("stop_tracing"):
+            tracemalloc.stop()
+        if params.get("fail_after_stop"):
+            raise RuntimeError("intentional post-stop apply failure")
+        return result
+
+
 class _CountingSplitReturningApplier(BaseApplier):
     """Returns the input frame unchanged for the first `trigger_after` calls, then
     illegally returns a SplitDataset — used to selectively trigger the test/validation
@@ -127,6 +153,27 @@ def _configurable_apply_failure_transformer() -> StatefulTransformer:
         _MaybeFailApplier(),
         node_id="configurable_apply_failure",
     )
+
+
+def _tracing_control_transformer() -> StatefulTransformer:
+    """Build a transformer whose applier can stop tracemalloc mid-run."""
+    return StatefulTransformer(
+        _TracingControlCalculator(),
+        _TracingControlApplier(),
+        node_id="tracing_control",
+    )
+
+
+def _establish_historical_peak() -> int:
+    """Create a large caller-owned historical peak that later work should not claim."""
+    peak_marker = bytearray(8 * 1024 * 1024)
+    _, peak_with_marker = tracemalloc.get_traced_memory()
+    del peak_marker
+    gc.collect()
+    current, stable_peak = tracemalloc.get_traced_memory()
+    assert stable_peak >= peak_with_marker
+    assert stable_peak - current > 4 * 1024 * 1024
+    return stable_peak
 
 
 @pytest.fixture
@@ -238,6 +285,49 @@ def test_fit_transform_stops_tracing_it_started_after_success(
 
 
 @pytest.mark.parametrize(
+    ("config", "expected_rows_out", "expected_error", "message"),
+    [
+        pytest.param(
+            {"increment": 1, "stop_tracing": True},
+            2,
+            None,
+            None,
+            id="success-after-stop",
+        ),
+        pytest.param(
+            {"increment": 1, "stop_tracing": True, "fail_after_stop": True},
+            0,
+            RuntimeError,
+            "intentional post-stop apply failure",
+            id="failure-after-stop",
+        ),
+    ],
+)
+def test_fit_transform_handles_tracing_becoming_inactive_mid_run(
+    _isolated_tracemalloc_state: None,
+    config: dict[str, typing.Any],
+    expected_rows_out: int,
+    expected_error: type[Exception] | None,
+    message: str | None,
+) -> None:
+    """Stopping tracemalloc mid-run must preserve transform/error semantics and zero fallback."""
+    transformer = _tracing_control_transformer()
+    df = pd.DataFrame({"a": [1, 2]})
+
+    if expected_error is None:
+        result = transformer.fit_transform(df, config)
+        assert isinstance(result, pd.DataFrame)
+        assert list(result["a"]) == [2, 3]
+    else:
+        with pytest.raises(expected_error, match=message):
+            transformer.fit_transform(df, config)
+
+    assert transformer.rows_out == expected_rows_out
+    assert transformer.peak_memory_bytes == 0
+    assert not tracemalloc.is_tracing()
+
+
+@pytest.mark.parametrize(
     ("build_transformer", "expected_error", "message"),
     _TRACEMALLOC_FAILURE_CASES,
 )
@@ -267,33 +357,30 @@ def test_fit_transform_preserves_caller_owned_tracing_after_failure(
     message: str,
 ) -> None:
     """A failing transformer must leave caller-owned tracing and peak state intact."""
+    df = pd.DataFrame({"a": [1, 2]})
+    transformer = build_transformer()
     tracemalloc.start()
-    peak_marker = [bytearray(8192) for _ in range(1024)]
-    before_peak = tracemalloc.get_traced_memory()[1]
-    del peak_marker
-    before_current = tracemalloc.get_traced_memory()[0]
-    assert before_peak - before_current > 1_000_000
+    historical_peak = _establish_historical_peak()
 
     with pytest.raises(expected_error, match=message):
-        build_transformer().fit_transform(pd.DataFrame({"a": [1, 2]}), {})
+        transformer.fit_transform(df, {})
 
     assert tracemalloc.is_tracing()
     _, after_peak = tracemalloc.get_traced_memory()
-    assert after_peak >= before_peak
+    assert after_peak == historical_peak
+    assert transformer.peak_memory_bytes == 0
 
 
 def test_fit_transform_does_not_inherit_caller_peak_history_on_success(
     _isolated_tracemalloc_state: None,
 ) -> None:
     """Caller-owned tracing should report only new global peak growth since entry."""
+    df = pd.DataFrame({"a": [1, 2]})
     tracemalloc.start()
-    peak_marker = [bytearray(8192) for _ in range(1024)]
-    del peak_marker
-    before_current, historical_peak = tracemalloc.get_traced_memory()
-    assert historical_peak - before_current > 1_000_000
+    historical_peak = _establish_historical_peak()
 
     transformer = _transformer()
-    result = transformer.fit_transform(pd.DataFrame({"a": [1, 2]}), {"increment": 1})
+    result = transformer.fit_transform(df, {"increment": 1})
 
     assert list(result["a"]) == [2, 3]
     assert tracemalloc.is_tracing()
