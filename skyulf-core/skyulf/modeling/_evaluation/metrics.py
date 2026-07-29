@@ -37,6 +37,9 @@ geometric_mean_score = None
 if _imblearn_metrics is not None:
     geometric_mean_score = getattr(_imblearn_metrics, "geometric_mean_score", None)
 
+DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000
+DEFAULT_SILHOUETTE_RANDOM_STATE = 42
+
 
 def calculate_classification_metrics(
     model: Any, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
@@ -216,7 +219,11 @@ def calculate_regression_metrics(
 
 
 def calculate_clustering_metrics(
-    X: pd.DataFrame | SkyulfDataFrame, labels: Any
+    X: pd.DataFrame | SkyulfDataFrame,
+    labels: Any,
+    *,
+    silhouette_sample_size: int = DEFAULT_SILHOUETTE_SAMPLE_SIZE,
+    random_state: int = DEFAULT_SILHOUETTE_RANDOM_STATE,
 ) -> dict[str, float]:
     """Compute unsupervised clustering-quality metrics for a fitted model's labels.
 
@@ -232,14 +239,26 @@ def calculate_clustering_metrics(
 
     X_np, _ = SklearnBridge.to_sklearn((X, None))
     labels_np = np.asarray(labels)
+    if silhouette_sample_size < 2:
+        raise ValueError("silhouette_sample_size must be at least 2")
 
+    n_samples = len(labels_np)
     n_unique = len(np.unique(labels_np))
     metrics: dict[str, float] = {"n_clusters": float(n_unique)}
 
     # These metrics are undefined for fewer than 2 clusters, or when the
     # cluster count reaches the sample count — guard rather than let sklearn raise.
-    if 1 < n_unique < len(labels_np):
-        metrics["silhouette_score"] = float(silhouette_score(X_np, labels_np))
+    if 1 < n_unique < n_samples:
+        sampled_rows = min(n_samples, silhouette_sample_size)
+        silhouette_kwargs: dict[str, int] = {}
+        if n_samples > silhouette_sample_size:
+            silhouette_kwargs = {
+                "sample_size": silhouette_sample_size,
+                "random_state": random_state,
+            }
+
+        metrics["silhouette_score"] = float(silhouette_score(X_np, labels_np, **silhouette_kwargs))
+        metrics["silhouette_sample_size"] = float(sampled_rows)
         metrics["calinski_harabasz_score"] = float(calinski_harabasz_score(X_np, labels_np))
         metrics["davies_bouldin_score"] = float(davies_bouldin_score(X_np, labels_np))
 
