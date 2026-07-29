@@ -1,5 +1,8 @@
 """Tests for skyulf.modeling._evaluation.clustering (evaluate_clustering_model)."""
 
+import gc
+import tracemalloc
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -164,6 +167,36 @@ def test_select_silhouette_sample_indices_handles_sparse_string_labels_determini
     assert np.all(first >= 0)
     assert np.all(first < len(labels))
     assert set(labels[first]) == set(pd.unique(labels))
+
+
+def test_select_silhouette_sample_indices_keeps_large_memory_bounded() -> None:
+    """Large label arrays should not require allocations proportional to all rows."""
+    n_samples = 1_000_000
+    sample_size = 10
+    peak_memory_bound = 10 * 1024 * 1024
+    labels = np.empty(n_samples, dtype=np.int8)
+    labels[: n_samples // 2] = 0
+    labels[n_samples // 2 :] = 1
+
+    gc.collect()
+    tracemalloc.start()
+    tracemalloc.reset_peak()
+    try:
+        first = _select_silhouette_sample_indices(
+            labels, sample_size=sample_size, random_state=2718
+        )
+        _, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    second = _select_silhouette_sample_indices(labels, sample_size=sample_size, random_state=2718)
+
+    assert peak_bytes < peak_memory_bound
+    assert len(first) == sample_size
+    assert np.array_equal(first, second)
+    assert len(set(first.tolist())) == sample_size
+    assert np.all(first >= 0)
+    assert np.all(first < len(labels))
+    assert set(labels[first]) == {0, 1}
 
 
 def test_calculate_clustering_metrics_samples_unique_rows_for_string_labels(
