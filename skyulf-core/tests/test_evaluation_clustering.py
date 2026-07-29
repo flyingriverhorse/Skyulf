@@ -6,7 +6,10 @@ import pytest
 from sklearn.cluster import KMeans
 
 from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
-from skyulf.modeling._evaluation.metrics import calculate_clustering_metrics
+from skyulf.modeling._evaluation.metrics import (
+    DEFAULT_SILHOUETTE_SAMPLE_SIZE,
+    calculate_clustering_metrics,
+)
 from skyulf.modeling._evaluation.schemas import ModelEvaluationReport
 
 
@@ -73,19 +76,11 @@ def test_calculate_clustering_metrics_single_cluster_omits_quality_scores():
 def test_calculate_clustering_metrics_caps_silhouette_sample(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Large clustering inputs must use the configured deterministic silhouette cap."""
-    captured: dict[str, object] = {}
+    """Large clustering inputs must pass a bounded preselected sample to silhouette."""
+    captured: list[tuple[np.ndarray, np.ndarray, dict[str, object]]] = []
 
-    def fake_silhouette(
-        X: np.ndarray,
-        labels: np.ndarray,
-        *,
-        sample_size: int | None = None,
-        random_state: int | None = None,
-    ) -> float:
-        captured["shape"] = X.shape
-        captured["sample_size"] = sample_size
-        captured["random_state"] = random_state
+    def fake_silhouette(X: np.ndarray, labels: np.ndarray, **kwargs: object) -> float:
+        captured.append((X.copy(), labels.copy(), dict(kwargs)))
         return 0.5
 
     monkeypatch.setattr("sklearn.metrics.silhouette_score", fake_silhouette)
@@ -94,11 +89,52 @@ def test_calculate_clustering_metrics_caps_silhouette_sample(
 
     metrics = calculate_clustering_metrics(X, labels, silhouette_sample_size=10, random_state=7)
 
-    assert captured["shape"] == (40, 2)
-    assert captured["sample_size"] == 10
-    assert captured["random_state"] == 7
+    sampled_X, sampled_labels, sampled_kwargs = captured[0]
+    assert sampled_X.shape == (10, 2)
+    assert sampled_kwargs == {}
+    assert set(sampled_labels) == {0, 1}
     assert metrics["silhouette_score"] == 0.5
     assert metrics["silhouette_sample_size"] == 10.0
+
+
+def test_calculate_clustering_metrics_keeps_large_imbalanced_samples_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Large imbalanced inputs must keep every cluster represented in a deterministic sample."""
+    captured: list[tuple[np.ndarray, np.ndarray, dict[str, object]]] = []
+
+    def fake_silhouette(X: np.ndarray, labels: np.ndarray, **kwargs: object) -> float:
+        captured.append((X.copy(), labels.copy(), dict(kwargs)))
+        return 0.33
+
+    monkeypatch.setattr("sklearn.metrics.silhouette_score", fake_silhouette)
+    monkeypatch.setattr("sklearn.metrics.calinski_harabasz_score", lambda X, labels: 1.0)
+    monkeypatch.setattr("sklearn.metrics.davies_bouldin_score", lambda X, labels: 2.0)
+    X = pd.DataFrame(
+        {
+            "row_id": np.arange(DEFAULT_SILHOUETTE_SAMPLE_SIZE + 1, dtype=float),
+            "feature": np.linspace(0.0, 1.0, DEFAULT_SILHOUETTE_SAMPLE_SIZE + 1),
+        }
+    )
+    labels = np.array([0] + [1] * DEFAULT_SILHOUETTE_SAMPLE_SIZE)
+
+    metrics1 = calculate_clustering_metrics(X, labels, random_state=474)
+    metrics2 = calculate_clustering_metrics(X, labels, random_state=474)
+
+    first_X, first_labels, first_kwargs = captured[0]
+    second_X, second_labels, second_kwargs = captured[1]
+    assert first_X.shape == (DEFAULT_SILHOUETTE_SAMPLE_SIZE, 2)
+    assert first_kwargs == second_kwargs == {}
+    assert set(first_labels) == {0, 1}
+    assert int((first_labels == 0).sum()) == 1
+    assert np.array_equal(first_X, second_X)
+    assert np.array_equal(first_labels, second_labels)
+    assert metrics1["silhouette_score"] == metrics2["silhouette_score"] == 0.33
+    assert (
+        metrics1["silhouette_sample_size"]
+        == metrics2["silhouette_sample_size"]
+        == float(DEFAULT_SILHOUETTE_SAMPLE_SIZE)
+    )
 
 
 def test_calculate_clustering_metrics_scores_all_small_rows(
@@ -140,3 +176,15 @@ def test_calculate_clustering_metrics_rejects_invalid_cap_before_degenerate_guar
 
     with pytest.raises(ValueError, match="silhouette_sample_size must be at least 2"):
         calculate_clustering_metrics(X, labels, silhouette_sample_size=1)
+
+
+def test_calculate_clustering_metrics_rejects_sampled_cap_without_cluster_headroom() -> None:
+    """Sampled silhouette caps must leave enough rows to represent every cluster."""
+    X = pd.DataFrame({"a": np.arange(40.0), "b": np.arange(40.0)})
+    labels = np.array([0, 1] * 20)
+
+    with pytest.raises(
+        ValueError,
+        match="silhouette_sample_size=2 is too small for 2 clusters",
+    ):
+        calculate_clustering_metrics(X, labels, silhouette_sample_size=2)

@@ -41,6 +41,44 @@ DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000
 DEFAULT_SILHOUETTE_RANDOM_STATE = 42
 
 
+def _select_silhouette_sample_indices(
+    labels: np.ndarray,
+    *,
+    sample_size: int,
+    random_state: int,
+) -> np.ndarray:
+    """Select a deterministic bounded silhouette sample that keeps every cluster represented."""
+    n_samples = len(labels)
+    if n_samples <= sample_size:
+        return np.arange(n_samples, dtype=int)
+
+    unique_labels = pd.unique(labels)
+    n_clusters = len(unique_labels)
+    if sample_size <= n_clusters:
+        raise ValueError(
+            f"silhouette_sample_size={sample_size} is too small for {n_clusters} clusters; "
+            "increase it above the number of clusters when scoring datasets larger than the cap"
+        )
+
+    rng = np.random.RandomState(random_state)
+    permutation = rng.permutation(n_samples)
+    seen_labels: set[Any] = set()
+    required_indices: list[int] = []
+    optional_indices: list[int] = []
+
+    for index in permutation:
+        label = labels[index]
+        if label in seen_labels:
+            optional_indices.append(int(index))
+            continue
+        seen_labels.add(label)
+        required_indices.append(int(index))
+
+    remaining_slots = sample_size - len(required_indices)
+    selected = required_indices + optional_indices[:remaining_slots]
+    return np.asarray(selected, dtype=int)
+
+
 def calculate_classification_metrics(
     model: Any, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
 ) -> dict[str, float]:
@@ -238,27 +276,28 @@ def calculate_clustering_metrics(
     )
 
     X_np, _ = SklearnBridge.to_sklearn((X, None))
-    labels_np = np.asarray(labels)
+    labels_np = np.asarray(labels).ravel()
     if silhouette_sample_size < 2:
         raise ValueError("silhouette_sample_size must be at least 2")
+    if X_np.shape[0] != len(labels_np):
+        raise ValueError("X and labels must have the same number of rows")
 
     n_samples = len(labels_np)
-    n_unique = len(np.unique(labels_np))
+    n_unique = len(pd.unique(labels_np))
     metrics: dict[str, float] = {"n_clusters": float(n_unique)}
 
     # These metrics are undefined for fewer than 2 clusters, or when the
     # cluster count reaches the sample count — guard rather than let sklearn raise.
     if 1 < n_unique < n_samples:
-        sampled_rows = min(n_samples, silhouette_sample_size)
-        silhouette_kwargs: dict[str, int] = {}
-        if n_samples > silhouette_sample_size:
-            silhouette_kwargs = {
-                "sample_size": silhouette_sample_size,
-                "random_state": random_state,
-            }
-
-        metrics["silhouette_score"] = float(silhouette_score(X_np, labels_np, **silhouette_kwargs))
-        metrics["silhouette_sample_size"] = float(sampled_rows)
+        sampled_indices = _select_silhouette_sample_indices(
+            labels_np,
+            sample_size=silhouette_sample_size,
+            random_state=random_state,
+        )
+        sampled_X = X_np[sampled_indices]
+        sampled_labels = labels_np[sampled_indices]
+        metrics["silhouette_score"] = float(silhouette_score(sampled_X, sampled_labels))
+        metrics["silhouette_sample_size"] = float(len(sampled_indices))
         metrics["calinski_harabasz_score"] = float(calinski_harabasz_score(X_np, labels_np))
         metrics["davies_bouldin_score"] = float(davies_bouldin_score(X_np, labels_np))
 
