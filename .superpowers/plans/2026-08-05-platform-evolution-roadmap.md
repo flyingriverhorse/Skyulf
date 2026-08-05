@@ -193,8 +193,10 @@ audit evidence.
 
   ```bash
   git check-ignore -q temp/skyulf-platform-evolution-roadmap-2026-08-05.md
-  rg -n 'TBD|TODO|implement later|fill in details' \
-    temp/skyulf-platform-evolution-roadmap-2026-08-05.md
+  if grep -nE 'TBD|TODO|implement later|fill in details' \
+    temp/skyulf-platform-evolution-roadmap-2026-08-05.md; then
+    exit 1
+  fi
   ```
 
   Expected: the roadmap is ignored and the search returns no placeholder
