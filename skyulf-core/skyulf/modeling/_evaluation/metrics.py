@@ -39,6 +39,35 @@ if _imblearn_metrics is not None:
 
 DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000
 DEFAULT_SILHOUETTE_RANDOM_STATE = 42
+_NAN_CLUSTER_LABEL = object()
+
+
+def _cluster_label_key(label: Any) -> Any:
+    """Return a stable dictionary key for a scalar predicted cluster label."""
+    if isinstance(label, (float, np.floating)) and np.isnan(label):
+        return _NAN_CLUSTER_LABEL
+    return label
+
+
+def _collect_silhouette_representatives(
+    labels: np.ndarray,
+    *,
+    sample_size: int,
+) -> dict[Any, int]:
+    """Retain first cluster occurrences without exceeding the scoring cap."""
+    representatives: dict[Any, int] = {}
+    for index, label in enumerate(labels):
+        key = _cluster_label_key(label)
+        if key in representatives:
+            continue
+        if len(representatives) == sample_size:
+            raise ValueError(
+                f"silhouette_sample_size={sample_size} is too small for more than "
+                f"{sample_size} clusters; increase it above the number of clusters "
+                "when scoring datasets larger than the cap"
+            )
+        representatives[key] = int(index)
+    return representatives
 
 
 def _select_silhouette_sample_indices(
@@ -46,25 +75,26 @@ def _select_silhouette_sample_indices(
     *,
     sample_size: int,
     random_state: int,
+    representative_by_label: dict[Any, int] | None = None,
 ) -> np.ndarray:
     """Select a deterministic bounded silhouette sample that keeps every cluster represented."""
     n_samples = len(labels)
     if n_samples <= sample_size:
         return np.arange(n_samples, dtype=int)
 
-    representative_by_label: dict[Any, int] = {}
-    for index, label in enumerate(labels):
-        if label not in representative_by_label:
-            representative_by_label[label] = int(index)
-
-    n_clusters = len(representative_by_label)
+    representatives = (
+        representative_by_label
+        if representative_by_label is not None
+        else _collect_silhouette_representatives(labels, sample_size=sample_size)
+    )
+    n_clusters = len(representatives)
     if sample_size <= n_clusters:
         raise ValueError(
             f"silhouette_sample_size={sample_size} is too small for {n_clusters} clusters; "
             "increase it above the number of clusters when scoring datasets larger than the cap"
         )
 
-    required_indices = list(representative_by_label.values())
+    required_indices = list(representatives.values())
     required_index_set = set(required_indices)
     remaining_slots = sample_size - len(required_indices)
     optional_indices: list[int] = []
@@ -290,7 +320,11 @@ def calculate_clustering_metrics(
         raise ValueError("X and labels must have the same number of rows")
 
     n_samples = len(labels_np)
-    n_unique = len(pd.unique(labels_np))
+    representative_by_label = _collect_silhouette_representatives(
+        labels_np,
+        sample_size=silhouette_sample_size,
+    )
+    n_unique = len(representative_by_label)
     metrics: dict[str, float] = {"n_clusters": float(n_unique)}
 
     # These metrics are undefined for fewer than 2 clusters, or when the
@@ -300,6 +334,7 @@ def calculate_clustering_metrics(
             labels_np,
             sample_size=silhouette_sample_size,
             random_state=random_state,
+            representative_by_label=representative_by_label,
         )
         sampled_X = X_np[sampled_indices]
         sampled_labels = labels_np[sampled_indices]
