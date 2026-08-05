@@ -199,6 +199,41 @@ def test_select_silhouette_sample_indices_keeps_large_memory_bounded() -> None:
     assert set(labels[first]) == {0, 1}
 
 
+def test_calculate_clustering_metrics_rejects_high_cardinality_before_unbounded_counting() -> None:
+    """Over-cap distinct labels must fail before building a full unique-label result."""
+    sample_size = 10
+    n_samples = 1_000_000
+    X = pd.DataFrame(np.zeros((n_samples, 1), dtype=np.int8))
+    labels = np.arange(n_samples)
+
+    gc.collect()
+    tracemalloc.start()
+    tracemalloc.reset_peak()
+    try:
+        with pytest.raises(
+            ValueError,
+            match="silhouette_sample_size=10 is too small for more than 10 clusters",
+        ):
+            calculate_clustering_metrics(X, labels, silhouette_sample_size=sample_size)
+        _, peak_bytes = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert peak_bytes < 2 * 1024 * 1024
+
+
+def test_calculate_clustering_metrics_rejects_all_unique_labels_above_cap() -> None:
+    """All-unique labels above the cap use the same explicit resource boundary."""
+    X = pd.DataFrame(np.zeros((11, 1), dtype=float))
+    labels = np.arange(11)
+
+    with pytest.raises(
+        ValueError,
+        match="silhouette_sample_size=10 is too small for more than 10 clusters",
+    ):
+        calculate_clustering_metrics(X, labels, silhouette_sample_size=10)
+
+
 def test_calculate_clustering_metrics_samples_unique_rows_for_string_labels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
