@@ -153,6 +153,37 @@ def test_correlation_threshold_native_polars_matches_pandas_without_conversion(
         assert calculator.fit(frame, config) == expected
 
 
+@pytest.mark.parametrize("threshold", [True, False], ids=["true", "false"])
+def test_correlation_threshold_raw_polars_boolean_threshold_uses_pandas_compatibility(
+    monkeypatch: pytest.MonkeyPatch,
+    threshold: bool,
+) -> None:
+    """Raw Polars boolean thresholds must fall back through the Pandas helper once."""
+    pl = pytest.importorskip("polars")
+    values = _correlation_parity_fixture()
+    config = {
+        "columns": ["a", "b", "c", "flag", "constant", "mostly_null"],
+        "threshold": threshold,
+        "correlation_method": "pearson",
+        "drop_columns": True,
+    }
+    raw = pl.DataFrame(values)
+    expected = CorrelationThresholdCalculator().fit(pd.DataFrame(values), config)
+    calls: list[Any] = []
+
+    def fake_to_pandas(frame: Any) -> pd.DataFrame:
+        """Record the raw Polars frame passed into the compatibility path."""
+        calls.append(frame)
+        return frame.to_pandas()
+
+    monkeypatch.setattr(correlation_module, "to_pandas", fake_to_pandas)
+
+    result = CorrelationThresholdCalculator().fit(raw, config)
+    assert result == expected
+    assert calls[0] is raw
+    assert len(calls) == 1
+
+
 @pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
 def test_correlation_threshold_apply_preserves_polars_audit_schema_and_order(
     wrapped: bool,
