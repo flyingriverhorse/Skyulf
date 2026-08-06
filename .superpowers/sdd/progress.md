@@ -603,6 +603,7 @@ Task 4: complete (commits e6e7d7ba..275630c0, review clean).
 
 Targeted warning fix Task 1: complete (commits de66d4aa..102fa738, review clean).
 Targeted warning fix Task 2: complete (commits 102fa738..8a52c6a4, review clean).
+Targeted warning fix Task 3: complete (commits 8a52c6a4..4a5efcd2, review clean).
 
 ## Targeted modeling warning containment
 
