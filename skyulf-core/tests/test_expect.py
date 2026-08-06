@@ -112,6 +112,30 @@ def test_polars_expect_unique_matches_pandas_for_raw_and_wrapped_frames() -> Non
         assert str(polars_error.value) == str(pandas_error.value)
 
 
+def test_polars_expect_unique_treats_nan_and_null_like_pandas() -> None:
+    """Native Polars uniqueness checks must count NaN/null duplicates like Pandas."""
+    pandas_frame = pd.DataFrame({"id": [float("nan"), None, 1.0]})
+    with pytest.raises(ExpectationError) as pandas_error:
+        expect_unique(pandas_frame, ["id"])
+
+    for frame in _polars_variants({"id": [float("nan"), None, 1.0]}):
+        with pytest.raises(ExpectationError) as polars_error:
+            expect_unique(frame, ["id"])
+        assert str(polars_error.value) == str(pandas_error.value)
+
+
+def test_polars_boolean_range_errors_match_pandas_messages() -> None:
+    """Boolean range checks must preserve the established Pandas error contract."""
+    pandas_frame = pd.DataFrame({"flag": [True, False]})
+    with pytest.raises(ExpectationError) as pandas_error:
+        expect_value_range(pandas_frame, "flag", minimum=0.5)
+
+    for frame in _polars_variants({"flag": [True, False]}):
+        with pytest.raises(ExpectationError) as polars_error:
+            expect_value_range(frame, "flag", minimum=0.5)
+        assert str(polars_error.value) == str(pandas_error.value)
+
+
 def test_polars_columns_and_strict_bounds_match_pandas_messages() -> None:
     """Missing-column and exclusive-bound failures stay byte-for-byte compatible."""
     pandas_frame = pd.DataFrame({"value": [1.0, 2.0, 3.0]})

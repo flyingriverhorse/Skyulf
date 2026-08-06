@@ -136,7 +136,7 @@ def _polars_correlation_columns_to_drop(
             left = pl.col(left_column)
             right = pl.col(right_column)
             complete = (
-                left.is_not_null() & right.is_not_null() & left.is_not_nan() & right.is_not_nan()
+                left.is_not_null() & right.is_not_null() & left.is_finite() & right.is_finite()
             )
             expressions.append(
                 pl.corr(

@@ -153,6 +153,37 @@ def test_correlation_threshold_native_polars_matches_pandas_without_conversion(
         assert calculator.fit(frame, config) == expected
 
 
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
+@pytest.mark.parametrize("method", ["pearson", "spearman"])
+def test_correlation_threshold_native_polars_ignores_infinities_like_pandas(
+    monkeypatch: pytest.MonkeyPatch,
+    wrapped: bool,
+    method: str,
+) -> None:
+    """Eligible native Polars fits must exclude infinities from pairwise masks."""
+    pl = pytest.importorskip("polars")
+    calculator = CorrelationThresholdCalculator()
+    config = {
+        "columns": ["a", "b"],
+        "threshold": 0.95,
+        "correlation_method": method,
+        "drop_columns": True,
+    }
+    values = {"a": [1.0, 2.0, float("inf"), 4.0], "b": [2.0, 4.0, 6.0, 8.0]}
+    expected = calculator.fit(pd.DataFrame(values), config)
+    assert expected["columns_to_drop"] == ["b"]
+
+    monkeypatch.setattr(
+        correlation_module,
+        "to_pandas",
+        lambda _frame: pytest.fail("eligible Polars fit called to_pandas"),
+    )
+
+    raw = pl.DataFrame(values)
+    frame = SkyulfPolarsWrapper(raw) if wrapped else raw
+    assert calculator.fit(frame, config) == expected
+
+
 def test_correlation_threshold_raw_polars_numpy_int64_threshold_stays_native(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

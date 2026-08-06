@@ -69,6 +69,17 @@ def _polars_null_count(series: pl.Series) -> int:
     return count
 
 
+def _polars_duplicate_subset(frame: pl.DataFrame, columns: Sequence[str]) -> pl.DataFrame:
+    """Normalize native duplicate inputs to Pandas-equivalent NaN/null semantics."""
+    expressions: list[pl.Expr] = []
+    for column in columns:
+        expression = pl.col(column)
+        if frame.schema[column].is_float():
+            expression = expression.fill_nan(None)
+        expressions.append(expression.alias(column))
+    return frame.select(expressions)
+
+
 def expect_columns_exist(df: Any, columns: Sequence[str]) -> None:
     """Assert that every name in ``columns`` is present in ``df``."""
     frame = _as_polars(df)
@@ -114,10 +125,15 @@ def expect_value_range(
     if frame is not None:
         expect_columns_exist(frame, [column])
         series = frame.get_column(column)
-        observed_as_float = series.dtype.is_integer() and series.null_count() > 0
-        if series.dtype.is_float():
-            series = series.fill_nan(None)
-        series = series.drop_nulls()
+        if series.dtype == pl.Boolean:
+            pandas_frame = _as_pandas(df)
+            series = pandas_frame[column].dropna()
+            observed_as_float = False
+        else:
+            observed_as_float = series.dtype.is_integer() and series.null_count() > 0
+            if series.dtype.is_float():
+                series = series.fill_nan(None)
+            series = series.drop_nulls()
     else:
         pandas_frame = _as_pandas(df)
         expect_columns_exist(pandas_frame, [column])
@@ -181,7 +197,7 @@ def expect_unique(df: Any, columns: Sequence[str]) -> None:
     frame = _as_polars(df)
     if frame is not None:
         expect_columns_exist(frame, columns)
-        dup_count = int(frame.select(list(columns)).is_duplicated().sum())
+        dup_count = int(_polars_duplicate_subset(frame, columns).is_duplicated().sum())
     else:
         pandas_frame = _as_pandas(df)
         expect_columns_exist(pandas_frame, columns)
