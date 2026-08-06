@@ -73,3 +73,56 @@ Task 3: complete (no commit; ignored artifact, task review approved after gate c
 Task 4: complete (no commit; ignored roadmap reconciliation, task review approved) — verified live `metrics.py` has no `pd.unique` and stops at cap-plus-one labels; updated the ignored roadmap’s sampler citation while keeping its claim limited to bounded label-selection state. MkDocs exited 0; existing Material and segmentation-nav notices remain non-fatal; tracked v0.7.4 changelog diff is empty.
 Task 5: complete (no validation commit; task review approved) — combined clustering/expectation coverage passed (`31 passed`), Ruff, formatting, and Ty passed, `git diff --check` was clean, and both ignored `temp/` artifacts were confirmed untracked. A later separate controller progress-ledger commit is outside this task’s validation range.
 Final review: complete — all task reviews approved. The requested whole-range reviewer returned no usable output, so the controller directly reviewed `dfab58f2..538f82db`: no high-confidence defects found in cap-bounded silhouette collection, Polars expectation parity, release-note boundaries, or the ignored evidence artifacts. Existing validation remains `31 passed` plus clean Ruff, format, Ty, MkDocs, and diff checks.
+
+# Progress Ledger: Native Polars Correlation Threshold
+
+Plan: `.superpowers/plans/2026-08-06-polars-native-correlation-threshold.md`
+Task 1: complete (commit `2c724d24`, task review clean) — native Polars
+numeric-column detection now normalizes float NaN to null before its existing
+binary and constant checks, matching the legacy Pandas selection path for raw
+and wrapped frames. Focused utility coverage (`52 passed`) plus Ruff,
+formatting, and Ty were clean.
+Task 2: complete (commits `96bb9bde..e381e344`, generated-report cleanup
+`b5567629`, final task review clean) — raw and wrapped Polars correlation
+fits now execute pairwise-complete native Pearson/Spearman correlation for
+eligible numeric/Boolean columns, preserving exact artifacts and apply output
+schema/order. Kendall, callables, unsupported dtypes, unavailable native
+capability, and boolean thresholds retain the explicit Pandas route; all
+non-boolean `Real` thresholds, including `np.int64`, remain native-eligible.
+Focused correlation coverage (`16 passed`) plus Ruff, formatting, and Ty were
+clean.
+Task 3: complete (commits `73c4a1e9..df712ec8`, task review clean) —
+compatibility regressions now cover raw and wrapped Polars fallback routing
+for Kendall, invalid methods, callables, unsupported selected dtypes, and
+unavailable native capability, along with strict threshold equality. Focused
+correlation coverage (`25 passed`) plus Ruff, formatting, and Ty were clean.
+Task 4: complete (commit `0efdab30`, task review clean) — opt-in
+legacy/native raw/wrapped correlation benchmarks and isolated RSS measurements
+cover 100k x 50, 1M x 20, and 50k x 500. The approved OR gate passed on
+47–56% time reductions for the lower-width raw/wrapped cases; RSS regressed
+in every case and severely at 50k x 500, which is recorded as a material
+caveat in ignored Candidate A evidence. Targeted tests (`98 passed`, one
+pre-existing sklearn warning), Ruff, formatting, and Ty were clean.
+Final-review parity fixes: complete (commit `3228b68d`, final review clean) —
+native correlation now excludes non-finite pairs, native uniqueness normalizes
+selected float NaN values to null, and Boolean Polars range checks use the
+Pandas compatibility path. Six direct regressions and focused correlation/
+expectation coverage passed.
+Final-review cap fix: complete (commit `59c8c469`, final review ready) —
+silhouette caps now reject Boolean, fractional, NaN, and infinite values
+before any collector can grow by cardinality, while accepting NumPy integral
+caps and preserving the below-two error contract. Clustering coverage
+(`31 passed`), Ruff, formatting, and Ty were clean.
+Minor recorded (non-blocking): the RSS benchmark delta is a
+process-lifetime-high-water proxy; Candidate A audit measurements deliberately
+invoke every route in a fresh pytest process, and the final reviewer accepted
+that documented protocol for this merge.
+Final whole-branch review: complete (`5ad70266..59c8c469`) — no Critical or
+Important findings; reviewer verdict is Ready to merge.
+Controller final verification: focused Core regression suite passed (147
+passed, one pre-existing sklearn warning); Ruff, formatting, and Ty passed.
+The representative opt-in 100k x 50 correlation benchmark passed for all
+legacy/native raw/wrapped routes, with native routes faster in this run.
+Controller diff hygiene found one unrelated empty EOF line introduced by
+`206dbb56`; `2d638984` removes only that line. Branch integration remains the
+only pending action.
