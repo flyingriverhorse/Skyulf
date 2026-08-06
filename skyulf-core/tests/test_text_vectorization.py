@@ -1,8 +1,9 @@
 """Tests for text vectorization nodes (CountVectorizer, TfidfVectorizer, HashingVectorizer)."""
 
-import importlib.util
 from typing import Any
+from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pandas as pd
 import polars as pl
 import pytest
@@ -314,16 +315,29 @@ class TestTokenizer:
 
 
 # ── SentenceEmbedder (optional dependency) ────────────────────────────────────
+#
+# This shape test mocks the model loader (like tests/test_sentence_embedder.py)
+# so it runs without network access or the optional 'nlp' extra installed. Any
+# test that needs a real sentence-transformers model download must be opt-in.
 
-_HAS_SENTENCE_TRANSFORMERS = importlib.util.find_spec("sentence_transformers") is not None
+_SENTENCE_EMBEDDER_MODULE_PATH = "skyulf.preprocessing.vectorization.sentence_embedder._load_model"
 
 
-@pytest.mark.skipif(
-    not _HAS_SENTENCE_TRANSFORMERS,
-    reason="sentence-transformers not installed (optional 'nlp' extra)",
-)
+def _make_mock_sentence_embedder_model(dim: int = 16) -> MagicMock:
+    """Return a MagicMock mimicking a SentenceTransformer model with deterministic output."""
+    rng = np.random.default_rng(42)
+    model = MagicMock()
+    model.get_embedding_dimension.return_value = dim
+    model.get_sentence_embedding_dimension.return_value = dim
+    model.encode.side_effect = lambda texts, **kwargs: rng.random((len(texts), dim)).astype(
+        np.float32
+    )
+    return model
+
+
 class TestSentenceEmbedder:
-    def test_embeddings_shape(self, df_pandas: pd.DataFrame) -> None:
+    @patch(_SENTENCE_EMBEDDER_MODULE_PATH, return_value=_make_mock_sentence_embedder_model())
+    def test_embeddings_shape(self, _mock: Any, df_pandas: pd.DataFrame) -> None:
         from skyulf.preprocessing.vectorization import (
             SentenceEmbedderApplier,
             SentenceEmbedderCalculator,
