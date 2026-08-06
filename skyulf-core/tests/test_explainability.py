@@ -1,10 +1,13 @@
 """Unit tests for `skyulf.modeling._explainability.compute_shap_explanation`."""
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
 
 from skyulf.modeling._explainability import compute_shap_explanation
 
@@ -140,6 +143,33 @@ def test_multiclass_waterfall_reconstructs_predicted_class_proba(multiclass_data
         reconstructed = sample["base_value"] + sum(sample["shap_values"].values())
         actual = probas[i][classes.index(preds[i])]
         assert reconstructed == pytest.approx(actual, abs=1e-3)
+
+
+@pytest.mark.parametrize(
+    ("model_class", "model_kwargs"),
+    [
+        (DecisionTreeClassifier, {"random_state": 0}),
+        (RandomForestClassifier, {"n_estimators": 5, "random_state": 0}),
+        (ExtraTreesClassifier, {"n_estimators": 5, "random_state": 0}),
+    ],
+    ids=["decision-tree", "random-forest", "extra-trees"],
+)
+def test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning(
+    multiclass_data,
+    model_class,
+    model_kwargs,
+):
+    """Pipeline-style numpy fitting should not warn during SHAP class lookup."""
+    X, y = multiclass_data
+    model = model_class(**model_kwargs).fit(X.to_numpy(), y.to_numpy())
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = compute_shap_explanation(model, X, max_display_samples=5)
+
+    assert result is not None
+    assert not any("feature names" in str(item.message) for item in caught)
+    assert result["feature_names"] == list(X.columns)
 
 
 def test_returns_none_on_model_failure(classification_data):
