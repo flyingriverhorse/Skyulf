@@ -598,3 +598,5 @@ Validation for the consolidated cleanup docs pass:
   `2918 passed, 69 skipped, 1 xfailed` plus the newly added focused tests; no
   legacy regressions).
 - `git diff --check`: clean.
+
+Task 4: complete (commits e6e7d7ba..275630c0, review clean).
