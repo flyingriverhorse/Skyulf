@@ -7,8 +7,8 @@ evidence. Task 2 adds six normalized shared-foundation findings: one directly
 observed shared-shell issue (`FND-001`), one shared-component risk
 (`FND-003`), and four code-supported risks spanning multiple shell views or
 route journeys (`FND-002`, `FND-004`, `FND-005`, and `FND-006`). Task 3 adds
-four Canvas findings: one directly observed click-to-add placement/configuration
-failure (`CAN-001`) and three code-supported recovery, diagnosis, and node
+five Canvas findings: two directly observed placement/toolbar failures
+(`CAN-001`, `CAN-005`) and three code-supported recovery, diagnosis, and node
 configuration risks (`CAN-002` through `CAN-004`). The Dashboard-only contrast
 result is intentionally deferred to the Dashboard journey rather than
 represented as a shared-foundation finding.
@@ -346,6 +346,82 @@ tasks add live walkthrough evidence.
   and job-failure walkthrough was therefore not claimed. The findings below
   distinguish this limit from source-supported behavior.
 
+- **Observed — responsive and keyboard verification:** A Chrome DOM-geometry
+  walkthrough covered the requested widths. All widths had a document
+  `scrollWidth` equal to the viewport width; “reachable” below means a visible
+  non-disabled control's rectangle stayed within that viewport. The snapshots
+  and measurement are Canvas-specific unless marked `FND-001` or `FND-002`.
+
+  | Width | Toolbar, panels, and canvas result | Keyboard/focus and shortcut result | Limitation owner |
+  |-------|------------------------------------|------------------------------------|------------------|
+  | 1440 px | Components (256 px), Flow canvas (800 px), and Properties (320 px) were present and the document did not overflow. The two absolute toolbar clusters collided: Undo at `528,72 40×40` was covered by Templates at `492,72 118×38`; a real pointer click was intercepted by Templates. | Tab exposed visible focus for normal toolbar controls; `⌘Z` changed the restored graph from two nodes to zero and `⌘⇧Z` restored two. `⌘K` opened the Command palette and focused its search input. | **Skyulf-controlled (`CAN-005`)**: `Toolbar` positioning responds to its Canvas pane, not React Flow. |
+  | 1024 px | Components (256 px) and a 703 px Flow canvas remained reachable; Properties was collapsed. No measured off-screen enabled control or document overflow. | Toolbar and Canvas control-panel buttons remained tabbable with visible focus. | **Skyulf-controlled responsive layout; no observed limitation.** |
+  | 768 px | Both side panels collapsed, leaving a 704 px Flow canvas. Keyboard Shortcuts stayed visible; More canvas tools was in bounds at `710,72 42×34`. No document overflow or measured off-screen enabled control. | The More menu exposed Jobs, performance overlay, and disabled export controls. `⌘K` remains the insertion route after its icon control hides. | **Skyulf-controlled responsive layout; no observed limitation.** |
+  | 390 px | Both panels remained collapsed and the 326 px Flow canvas, shortcut control (`128,72 40×40`), More control (`332,72 42×34`), and Restore/Discard banner were reachable without document overflow. The shell Inference switcher ended at x=399, outside the 390 px viewport. | The shortcut sheet fit at `16,219 359×406` and listed Undo/Redo, Command palette, Run Preview, and Escape. Opening it left focus on its invoker; Tab reached covered More tools, Flow canvas, then Zoom In/Out. | **Skyulf-controlled:** shell clipping remains `FND-001`; overlay focus containment remains `FND-002`. Canvas panel collapse itself had no observed clipping. |
+
+- **Observed — Canvas versus React Flow boundary:** React Flow's focusable
+  `application` canvas and its Zoom In/Out, Fit View, and interactivity
+  controls remained reachable at all four widths; no library-owned viewport
+  clipping was observed. React Flow owns graph panning, node focus/movement,
+  handles, and the control panel. Skyulf owns the Sidebar palette, Toolbar,
+  panel breakpoints, shortcut overlay, and custom node cards. In the 1440 px
+  Tab sequence, Sidebar Search was followed by one focusable palette scroll
+  container rather than an individual Dataset/Encoding card; those cards are
+  pointer click/drag affordances. The Skyulf command-palette alternative is
+  keyboard-operable (`⌘K`, focused search, Arrow navigation, Enter insertion,
+  Escape close), but its discoverability is only the icon's title and the
+  shortcut sheet. This keyboard insertion limitation is retained under
+  `CAN-001`, not attributed to React Flow.
+
+- **Observed/Measured — diagnosis and recovery exercised within mock limits:**
+  an empty Canvas exposed disabled Undo/Redo/Clear and no Run Preview; the
+  palette-added Dataset displayed “Configuration issue: Dataset is required.”
+  The autosave banner showed “Restore previous session?” with Restore, Discard,
+  timestamp, and node count; selecting Restore recreated the two stored cards.
+  Keyboard Undo/Redo changed the graph `2 → 0 → 2`, while the overlapping
+  1440 px toolbar prevented the equivalent Undo pointer click. The Chrome
+  mock in `e2e/preview.spec.ts` seeded Dataset → Drop Columns, intercepted
+  `POST /api/pipeline/preview`, and rendered `setosa`/`virginica` in
+  `ResultsPanel` (1 passing test). The selected local source still returned no
+  schema, so missing-config warning navigation, leakage selection, real
+  backend failure, and server-version loading were not represented as live
+  outcomes.
+
+- **Inferred — unavailable diagnosis/recovery paths, with exact support:**
+  `useRunControls.ts:35-82` enables Preview from a dataset plus outgoing edge,
+  calls the leakage toast guard, and on backend failure only toasts “Check
+  console for details”; it does not call `useGraphStore.ts:454-490`
+  `validateGraph`, which only warns to the console and returns `false`.
+  `RestoreSessionBanner.tsx:26-50` probes one local snapshot once for an empty
+  graph; `canvasPersistence.ts:24-61` silently absorbs storage errors and
+  returns `null` for corrupt/version-mismatched data. The passing targeted
+  tests are `core/hooks/useCanvasAutoSave.test.ts` (four cases: empty,
+  delayed/coalesced, unmount flush) and `core/utils/canvasPersistence.test.ts`
+  (six cases: round-trip, missing, corrupt, mismatched, malformed, clear).
+  They support the persistence mechanics, not an explainable UI for unavailable
+  recovery. Backend-dependent run failure and server-version restore therefore
+  remain **Inferred** only.
+
+#### Representative node-form comparison
+
+All eight required representatives were inspected at their settings render
+paths. The local schema failure prevented a representative live column
+configuration, so this is **Inferred** source evidence, except the Dataset
+form's observed no-schema state above. Their visible `span` labels beside
+unassociated native controls remain the shared `FND-005` issue; no additional
+Canvas finding is warranted solely for this repeated form root.
+
+| Representative | Labels, defaults, help, and validation | Column/advanced behavior | Apply/reset outcome |
+|----------------|-----------------------------------------|--------------------------|---------------------|
+| DatasetNode | Visible Select Dataset text; default `datasetId: ''`; validation says Dataset is required. New Upload and schema/loading/no-schema feedback are present. | Dataset dropdown and schema table; no advanced section. | Selection writes immediately through `onChange`; no Apply or reset. |
+| EncodingNode | Default is one-hot with empty columns; conditional method controls include inline help/default text. Validator requires a column except Label/Ordinal and requires a binary target for WOE. | `ColumnMultiSelect` is labelled Columns to Encode; method-specific options appear conditionally. | Immediate `onChange`; no Apply or reset. |
+| FeatureGenerationNode | Starts with no operations and validates Add at least one operation; operation cards expose contextual help and defaults. | Per-operation compact column selectors, date-feature checkboxes, and output name; recommendations are conditional. | Immediate edits; no reset. Its exposed recommendation Apply handler is empty (`CAN-004`). |
+| FeatureSelectionNode | Defaults to Select K Best, `k: 10`; target-required validation is conditional; explanatory help is present for parameters. | Auto-detected/selectable target and conditional scoring/estimator/threshold controls; responsive two-column parameters are an advanced layout, not a reset path. | Immediate `onChange`; no Apply or reset. |
+| TrainingSettings | Basic/Advanced (Tuning) mode, model/target guidance, scaling notice, dynamic hyperparameter/search-space defaults, and conditional CV help. | Upstream columns/target and registry/API definitions control selectors and advanced sections. | Changes are immediate; Start Training submits; no form Apply/reset. |
+| EnsembleSettings | Classification/Regression, Voting/Stacking, Basic/Advanced mode, estimator count, scaling advice, CV, and tuning help are conditional. | Base estimators, auto-synced upstream model/target/CV state, weights, parallelism, calibration, and advanced tuning are available. | Changes are immediate; Start Ensemble Training/Modeling is the execution action, not Apply/reset. |
+| SegmentationSettings | Model configuration, optional reference column help, scaling notice, model/hyperparameter loading states, and two responsive tabs are present. | Upstream dataset/schema columns and backend clustering/hyperparameter definitions gate selectors and advanced parameters. | Changes are immediate; Start Segmentation is disabled without upstream data; no Apply/reset. |
+| DataPreviewNode | Empty default config and always-valid validator; it is an inspection sink rather than a config form. | Result/branch/tab controls derive from execution output and incoming branches, not editable source columns. | No form Apply/reset; local backend-less walkthrough did not yield preview content. |
+
 - **CAN-001 — Observed: click-to-add places full-size cards on top of each
   other and does not take the user to configuration.**
   - **Evidence:** `Sidebar.tsx` increments click-to-add placement by only
@@ -354,7 +430,8 @@ tasks add live walkthrough evidence.
     Encoding visibly overlapped the two cards; the Dataset card intercepted
     the attempt to select Encoding. The first click-added Dataset was not
     selected, so its required setting was unavailable until a second click on
-    the new card opened Properties.
+    the new card opened Properties. The palette's individual cards were not
+    individual Tab stops; `⌘K` is the keyboard insertion fallback.
   - **User problem:** A user who uses the advertised click alternative to
     drag-and-drop can immediately lose the newly added node under an existing
     card and must discover a second selection step before configuration. This
@@ -379,8 +456,47 @@ tasks add live walkthrough evidence.
     visibility, and keyboard focus at 1440, 1024, 768, and 390 px. Complete
     the same sequence with a mocked usable dataset.
   - **Impact:** High. **Frequency:** Frequent for click-to-add workflows.
-    **Effort:** S. **Risk:** Low. **Dependencies:** React Flow node bounds,
+    **Effort:** S. **Risk:** Low. **Dependencies:** custom-node bounds,
     Sidebar placement, and Properties panel selection. **Milestone:** Now.
+
+- **CAN-005 — Observed: Canvas toolbar clusters overlap and intercept actions
+  when Properties narrows the 1440 px Flow pane.**
+  - **Evidence:** At 1440 px, Components (256 px) + Flow canvas (800 px) +
+    Properties (320 px) fit the viewport without document overflow, but the
+    Toolbar's two absolute clusters do not share their occupied width. The
+    Undo button was measured at `528,72 40×40`; the right-cluster Templates
+    control was measured at `492,72 118×38`. Chrome's real pointer click on
+    Undo timed out because Templates intercepted it. `Toolbar.tsx:202-268`
+    independently positions the left cluster from `left-4` and the right
+    cluster from `right-4`, only constraining the latter to
+    `max-w-[calc(100%-13rem)]`; `xl` retains both clusters. The same restored
+    graph did respond to `⌘Z` and `⌘⇧Z`, proving history exists but the visible
+    pointer control is occluded.
+  - **User problem:** Opening a node's Properties panel can make visible,
+    enabled actions such as Undo appear available while another toolbar action
+    receives the click. Users cannot reliably recover a graph mistake by
+    pointer at a common desktop width.
+  - **Affected surfaces:** Canvas Toolbar, Flow-canvas viewport, Properties
+    panel, Undo/Redo/Clear, and secondary toolbar actions.
+  - **Why Canvas-specific:** This is Skyulf's Canvas toolbar/panel width
+    allocation, not a React Flow viewport/control limitation and not the
+    shared-shell clipping in `FND-001`.
+  - **Proposed behavior:** Reserve non-overlapping space for both toolbar
+    clusters based on the live Canvas pane width; collapse secondary actions
+    before collision and preserve a labelled keyboard-operable overflow menu.
+  - **Acceptance criteria:** At 1440, 1024, 768, and 390 px with each panel
+    state, every visible enabled toolbar target has a non-overlapping hit
+    rectangle; pointer activation calls its own action exactly once; secondary
+    actions remain reachable through an accessible overflow menu; Undo and
+    Redo continue to work by pointer and keyboard.
+  - **Validation method:** Playwright opens/closes Components and Properties,
+    measures toolbar hit-target intersection, clicks Undo/Redo/Load/Save and
+    overflow actions, and checks `⌘Z`/`⌘⇧Z` graph state at all four widths.
+    Include a visual screenshot assertion only for the two-cluster desktop
+    state.
+  - **Impact:** High. **Frequency:** Frequent when configuring an existing
+    graph. **Effort:** S. **Risk:** Low. **Dependencies:** `Toolbar`,
+    responsive panel state, and z-index/positioning rules. **Milestone:** Now.
 
 - **CAN-002 — Inferred: run readiness and diagnosis do not form an actionable
   validation loop.**
@@ -551,12 +667,28 @@ tasks add live walkthrough evidence.
 | FND-004 | Inferred | Route-fetch errors inconsistently offer Retry; Canvas uses a different, toast-scoped pattern. | Dashboard; Data/EDA; Registry; Deployments; Experiments evaluation | Medium | Occasional | S | Low | Page fetch functions | Next |
 | FND-005 | Inferred | Canvas node settings and Inference prediction input lack consistent field semantics. | Canvas node forms; Inference editor; shared controls | High | Frequent | M | Medium | Node metadata/validation | Next |
 | FND-006 | Inferred | Shell view selection is not history-restorable or programmatically selected. | Canvas; Experiments; Inference | High | Frequent | M | Medium | useViewStore; retained views | Now |
-| CAN-001 | Observed | Click-added node cards overlap and do not enter configuration. | Canvas palette, graph, Properties panel | High | Frequent | S | Low | React Flow bounds; Sidebar; selection | Now |
+| CAN-001 | Observed | Click-added node cards overlap and do not enter configuration. | Canvas palette, graph, Properties panel | High | Frequent | S | Low | Custom-node bounds; Sidebar; selection | Now |
+| CAN-005 | Observed | Canvas toolbar clusters overlap and intercept visible actions when Properties narrows the Flow pane. | Canvas Toolbar, Flow viewport, Properties panel | High | Frequent | S | Low | Toolbar responsive layout; panel width | Now |
 | CAN-002 | Inferred | Run readiness and failures lack an actionable node-level diagnostic loop. | Canvas run controls, node warnings, Results | High | Occasional | M | Medium | Validators; converter; FND-003 | Now |
 | CAN-003 | Inferred | Autosave, recent, and version recovery do not explain unavailable local recovery. | Restore banner; Recent; versions; Toolbar | Medium | Occasional | M | Medium | Persistence; versions; FND-003 | Next |
 | CAN-004 | Inferred | Feature Generation exposes a recommendation Apply action that changes nothing. | Feature Generation; Recommendations panel | Medium | Occasional | S | Low | Recommendation schema; FND-005 | Next |
 
 ## Component-Boundary Recommendations
+
+- **Canvas frame and toolbar:** Keep panel-breakpoint ownership in
+  `MainLayout`/Canvas layout, but make `Toolbar` consume the resulting Canvas
+  pane width as one collision contract rather than independently absolutely
+  positioning left and right clusters (`CAN-005`). The shared shell remains
+  responsible for the 390 px view switcher in `FND-001`.
+- **Graph-library boundary:** Leave React Flow responsible for graph viewport,
+  pan/zoom, handles, and node movement. Keep Sidebar insertion placement,
+  selected-node handoff, custom-card semantics, and keyboard insertion
+  discoverability in Skyulf (`CAN-001`); do not classify these custom controls
+  as React Flow defects.
+- **Settings and recovery boundary:** `PropertiesPanel` hosts node-specific
+  forms, which should receive shared label/error primitives from `FND-005`;
+  `useRunControls`, graph validators, `ResultsPanel`, persistence, and restore
+  UI must exchange structured node/recovery state for `CAN-002`/`CAN-003`.
 
 ## Now / Next / Later Roadmap
 
@@ -570,6 +702,8 @@ tasks add live walkthrough evidence.
   restorable and programmatically selected.
 - **CAN-001:** Make click-to-add create a visible, selected, configurable node
   without card collisions.
+- **CAN-005:** Keep Canvas toolbar actions non-overlapping and operable with
+  both panels open at every responsive width.
 - **CAN-002:** Turn Canvas validation and run failures into node-addressable
   diagnosis and recovery.
 
@@ -596,6 +730,7 @@ tasks add live walkthrough evidence.
 | FND-005 Canvas/Inference form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only Canvas configuration and Inference entry | 1440 and 390 px | Accessible-name/error relationship review |
 | FND-006 shell-view history | Back/Forward restores selected Canvas, Experiments, or Inference view | Playwright history tests | Verify retained local state | 1440, 1024, 768, 390 px | Selected-state snapshot |
 | CAN-001 Canvas click-add | New nodes never overlap, are selected, and expose required settings | Playwright palette/drag/palette placement checks | Build a representative pipeline by each insertion method | 1440, 1024, 768, 390 px | Keyboard reachability and focus check |
+| CAN-005 Canvas toolbar collision | Every visible enabled toolbar target has an independent hit area with either panel open | Playwright rectangle-intersection and pointer-action checks | Open/close both panels, then undo/redo/load/save and overflow actions | 1440, 1024, 768, 390 px | Focus, menu role, and keyboard Undo/Redo check |
 | CAN-002 Canvas diagnosis | Invalid/failing nodes identify a next action and open their settings | Validator and mocked-failure tests | Fix every issue from the Canvas summary | 1440 and 390 px | Summary role, focus, and live feedback |
 | CAN-003 Canvas recovery | Local, recent, and server recovery sources and failures are explained | Persistence and version-load tests | Restore/cancel from empty and nonempty canvases | 1440 and 390 px | Keyboard recovery controls and status review |
 | CAN-004 Feature Generation recommendations | Apply changes state once or is absent when unsupported | Component recommendation state/undo tests | Compare representative node configuration behavior | 1440 and 390 px | Accessible feedback after apply |
