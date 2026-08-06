@@ -9,9 +9,12 @@ observed shared-shell issue (`FND-001`), one shared-component risk
 route journeys (`FND-002`, `FND-004`, `FND-005`, and `FND-006`). Task 3 adds
 five Canvas findings: two directly observed placement/toolbar failures
 (`CAN-001`, `CAN-005`) and three code-supported recovery, diagnosis, and node
-configuration risks (`CAN-002` through `CAN-004`). The Dashboard-only contrast
-result is intentionally deferred to the Dashboard journey rather than
-represented as a shared-foundation finding.
+configuration risks (`CAN-002` through `CAN-004`). Task 4 adds seven Data and
+EDA findings: three directly reproduced journey/responsive outcomes
+(`DAT-001`, `DAT-002`, and `DAT-004`) and four code-supported lifecycle,
+configuration, and visualization risks (`DAT-003`, `DAT-005` through
+`DAT-007`). The Dashboard-only contrast result is intentionally deferred to
+the Dashboard journey rather than represented as a shared-foundation finding.
 
 ## Method and Evidence
 
@@ -628,6 +631,282 @@ Canvas finding is warranted solely for this repeated form root.
   coverage for these entry points is `e2e/routes.spec.ts` and
   `e2e/a11y.spec.ts`, both of which exercise `/data` and `/eda`.
 
+#### Data and EDA audit evidence and limits
+
+- **Observed:** A local Chrome walkthrough at `/data` exposed uploaded, S3,
+  pending, preview, Canvas, EDA, CSV, version, and delete controls. The
+  `Data Sources` introduction says datasets are used “in experiments,” but
+  the completed-row actions use the more specific Canvas and EDA destinations.
+  Opening Add Source exposed only the S3 choice and two required inputs. Its
+  visible `Name` and `S3 Path` text is not associated with either input in the
+  rendered accessibility tree. Opening the first preview produced the generic
+  “Failed to load dataset preview.” retry state while its header still
+  announced `0 rows`, `0 columns`, and `0 Bytes`.
+- **Observed:** The local source endpoints returned a populated, synthetic
+  source list, including pending rows. The preview sample/profile requests
+  failed and `/api/eda/3/latest` returned `404`; EDA therefore correctly
+  showed “No analysis found for this dataset.” The walkthrough did not create
+  a source, upload a file, cancel a job, execute an analysis, load a report,
+  or download output, so findings about those outcomes remain **Inferred**.
+  In particular, these mocks cannot prove real source creation/ingestion
+  completion or the depth, correctness, and chart interaction of an EDA
+  result.
+- **Observed:** At 390 px, Data Sources retained the 256 px shell sidebar,
+  leaving a 134 px main pane; its content had a 518 px scroll width, and the
+  table/actions extended from x=289 to x=1449. EDA uses the collapsed 64 px
+  shell sidebar, but its 326 px header had a 962 px scroll width: Dataset,
+  Target Column, Task Type, Analyze, and History ended at x=1026. This is
+  journey-specific evidence of the shared compact-shell root cause
+  **FND-001**, rather than a second shell finding.
+- **Measured:** The ignored audit Chrome configuration
+  (`.superpowers/sdd/playwright.chrome.config.ts`) ran
+  `e2e/routes.spec.ts` and `e2e/a11y.spec.ts`: 9 passed. The tests mock
+  `/api/**` and `/data/api/**`, establish route mounting and no critical axe
+  violations, but do not seed a usable source, report, pending/failed EDA job,
+  or chart payload. Existing non-blocking serious axe output concerned
+  Dashboard color contrast and Canvas scroll-region focusability, not these
+  two mocked routes.
+
+- **DAT-001 — Observed: source onboarding does not establish a consistent,
+  accessible next step from import to analysis.**
+  - **Evidence:** The live introduction promises use “in experiments,” while
+    completed rows offer Canvas and EDA; the `handleUseInCanvas` and EDA
+    actions navigate to `/canvas?source_id=…` and `/eda?dataset_id=…`.
+    Add Source offered only S3 and rendered zero associated `label` elements
+    for the required Name and S3 Path inputs. Source creation itself was not
+    attempted because the local walkthrough uses seeded/mock data rather than
+    a safe real credential/source.
+  - **User problem:** A first-time user cannot tell which source types are
+    supported, what a successful import enables, or reliably identify the
+    required connection fields. “Experiments” also conflicts with the actual
+    Canvas/EDA choices.
+  - **Affected surfaces:** Data Sources introduction, Add Source, file upload,
+    completed dataset row, Canvas handoff, and EDA handoff.
+  - **Proposed behavior:** Make the source-type decision explicit (including
+    unavailable types), associate every field with its label and inline
+    validation, and end successful ingestion with contextual Canvas and EDA
+    next-step cards that name the selected dataset.
+  - **Acceptance criteria:** Every source form control has an accessible name,
+    required/invalid state, and linked error; supported source types and
+    credential expectations are explained before submission; a completed
+    source has unambiguous Canvas and EDA actions whose destination preserves
+    that source; copy does not name a destination that is not offered.
+  - **Validation method:** Component accessibility tests cover required,
+    malformed, API-failure, and successful S3/file source paths. Playwright
+    mocks each outcome, follows Canvas and EDA handoffs, and checks selected
+    source context at 1440 and 390 px; run axe on both modals.
+  - **Impact:** High. **Frequency:** Frequent for new sources. **Effort:** M.
+    **Risk:** Medium. **Dependencies:** source-type capability contract,
+    ingestion API errors, router handoff state, and **FND-005**. **Milestone:**
+    Now.
+
+- **DAT-002 — Observed: failed dataset preview presents fabricated-looking
+  zero metadata and insufficient recovery context.**
+  - **Evidence:** In local Chrome, opening Test Dataset's preview failed both
+    sample/profile calls and displayed “Failed to load dataset preview.” with
+    Retry, while the modal header continued to show `0 rows`, `0 columns`, and
+    `0 Bytes`. `DatasetPreviewModal` falls back to `0` for missing profile and
+    dataset metadata and reduces non-404 errors to that generic text.
+  - **User problem:** Users cannot distinguish an empty dataset from metadata
+    that was never loaded, nor determine whether retrying, waiting for
+    ingestion, returning to the source, or contacting an owner is appropriate.
+  - **Affected surfaces:** Data Sources Preview action; DatasetPreviewModal
+    sample/statistics tabs; profile and sample endpoints.
+  - **Proposed behavior:** Keep metadata unknown until confirmed, state which
+    preview part failed, show the source/job status and last successful
+    metadata where available, and offer the appropriate retry or return-to-job
+    action.
+  - **Acceptance criteria:** A failed preview never labels unavailable counts
+    as zero; empty sample, empty schema, deleted source, and transient
+    sample/profile failures have distinct user-facing explanations; Retry
+    refreshes both resources once and preserves the selected tab; the modal
+    identifies the dataset throughout recovery.
+  - **Validation method:** Mock successful, empty, 404, sample-only failure,
+    profile-only failure, and retry success responses; assert header values,
+    actions, focus, and status/alert semantics at 1440 and 390 px. Exercise
+    horizontal table overflow with a wide schema.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** dataset sample/profile endpoint error shape and
+    **FND-003**. **Milestone:** Now.
+
+- **DAT-003 — Inferred: ingestion states expose activity but not a complete,
+  recoverable lifecycle.**
+  - **Evidence:** `DataSources.tsx` polls pending/processing rows every five
+    seconds and renders only “Pending...” or “Processing...” plus a spinner;
+    the row and Ingestion Jobs modal offer cancellation. `IngestionJobsModal`
+    derives “jobs” from every dataset and only shows its generic completion
+    message for failed/cancelled cards. `DatasetService.uploadWithProgress`
+    can report transfer percentage, but that progress is not represented in
+    this page's ingestion list; failed sources have no retry/reconfigure
+    route.
+  - **User problem:** A user cannot see whether a delay is upload,
+    queueing, parsing, profiling, or a stalled job; after a failure, the
+    available next step is unclear and past job information is indistinguishable
+    from the source inventory.
+  - **Affected surfaces:** file upload, Add Source creation, dataset status
+    badges, Ingestion Jobs modal, cancel confirmation, and failed source rows.
+  - **Proposed behavior:** Use one job model that names lifecycle phase,
+    elapsed/updated time, determinate progress when available, source context,
+    error detail, and safe Retry/Reconfigure actions; retain completed jobs as
+    history rather than presenting all sources as jobs.
+  - **Acceptance criteria:** Every pending, processing, succeeded, failed, and
+    cancelled ingestion has a named state and next action; progress does not
+    imply completion before parsing/profile work finishes; failure explains
+    whether credentials, format, connection, or a transient service caused it;
+    cancel/retry are idempotent and update the originating row and history.
+  - **Validation method:** Mock upload transfer events and each ingestion
+    status/error transition; verify polling start/stop, cancel, retry,
+    reconfiguration, persistence after navigation, duplicate-submit
+    prevention, and live-region announcements at 1440 and 390 px.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** ingestion status/progress/error contract,
+    upload mutation, job-history API, and **FND-003**. **Milestone:** Now.
+
+- **DAT-004 — Observed: Data and EDA controls become off-screen at narrow
+  widths, blocking the journey before a source can be used or analyzed.**
+  - **Evidence:** The 390 px Chrome measurements above placed Data Sources'
+    header actions, filters, status chips, and table actions outside its 134 px
+    main pane. EDA collapsed the global sidebar but retained a 962 px header
+    in a 326 px pane, leaving all analysis controls and History to the right
+    of the viewport. The document itself did not horizontally scroll because
+    the overflow is clipped within route containers.
+  - **User problem:** A narrow-width user can arrive at Data or EDA but cannot
+    discover or activate essential import, selection, configuration, analysis,
+    or history controls without an unavailable horizontal route scroll.
+  - **Affected surfaces:** Data Sources header/filter/table actions; EDA
+    dataset/target/task/analyze/history header; compact shared Layout.
+  - **Proposed behavior:** Consume the compact shell contract in **FND-001**:
+    replace Data's persistent shell/sidebar footprint with a drawer and give
+    Data/EDA page controls an intentional compact hierarchy (stacked primary
+    action, labelled overflow, and responsive table/card alternative).
+  - **Acceptance criteria:** At 390 px, every visible enabled Data/EDA
+    control has an in-viewport hit target; import, source filtering, preview,
+    Canvas/EDA handoff, dataset selection, Analyze, and History remain
+    reachable without clipped content; desktop data density is retained at
+    768 px and above.
+  - **Validation method:** Playwright measures route-container and control
+    rectangles at 1440, 1024, 768, and 390 px with populated Data rows and EDA
+    report/history fixtures; click every compact overflow action and complete
+    keyboard traversal. Include light and dark screenshots.
+  - **Impact:** High. **Frequency:** Frequent on narrow screens. **Effort:**
+    M. **Risk:** Medium. **Dependencies:** **FND-001**, Data table/card
+    presentation, EDA header, and responsive action menu. **Milestone:** Now.
+
+- **DAT-005 — Inferred: EDA analysis selection, job progress, failure, and
+  history do not form a durable, contextual analysis loop.**
+  - **Evidence:** `EDAPage.tsx` auto-selects the first usable dataset, treats
+    `404` latest-report responses as the generic no-analysis state, polls only
+    a `PENDING` report every three seconds, and renders “Analysis in
+    progress...” without phase, job identity, target/task/filter summary, or
+    main-screen cancel action. The `FAILED` state exposes a retry, while
+    cancellation and a fuller target/task record live separately in
+    `JobsHistoryModal`; `analyzeMutation` has no page-level error rendering.
+    The local `404` was reproduced, but a real EDA run/result/failure was not,
+    so this lifecycle finding is Inferred.
+  - **User problem:** Users can lose track of which dataset and analytical
+    choices produced a pending, failed, saved, or loaded report, and cannot
+    confidently compare a rerun with history or recover from a submission
+    failure.
+  - **Affected surfaces:** EDA dataset selector, target/task controls,
+    no-analysis form, Analyze/Re-Run, pending/failed panels, recent targets,
+    Analysis History, and Data Sources → EDA handoff.
+  - **Proposed behavior:** Treat an analysis as a named job with a persistent
+    input summary (dataset, target, task, filters, exclusions), phase/progress,
+    cancel/retry, completed timestamp, and explicit “currently viewing”
+    context that carries through history load and return navigation.
+  - **Acceptance criteria:** EDA never silently changes the selected dataset;
+    every submission either creates a visible job or shows a recoverable
+    request error; pending/failed/cancelled/completed states identify their
+    inputs and next action; loading history visibly changes the current-report
+    context without overwriting draft choices; retry uses the stated inputs.
+  - **Validation method:** Mock no-report, submit rejection, pending,
+    completion, failure, cancellation, stale history, and history-load
+    responses. Test Data Sources handoff, dataset switch, target/task/filter/
+    exclusion changes, Back navigation, polling, cancel/retry, and screen
+    reader status/alert output at desktop and 390 px.
+  - **Impact:** High. **Frequency:** Frequent for analysis work. **Effort:**
+    M. **Risk:** Medium. **Dependencies:** EDA job/report/history API
+    contract, React Query invalidation, `useEDAStore`, and **FND-003**.
+    **Milestone:** Now.
+
+- **DAT-006 — Inferred: EDA filter and exclusion controls hide consequential
+  reanalysis behind unlabelled, immediately applied configuration.**
+  - **Evidence:** `EDASidebar` renders visible `span` labels beside native
+    selects/inputs for column, operator, and value without label association.
+    Adding/removing/clearing a filter immediately calls `runAnalysis`, while
+    exclusions alone use a draft/applied split and an “Apply changes” button.
+    The sidebar shows filters only as compact operator strings and does not
+    state the report's applied filter/exclusion summary beside the visualized
+    result.
+  - **User problem:** Users can make an expensive, result-changing filter edit
+    without a clear accessible input purpose, a consistent apply model, or a
+    durable way to verify which filters/exclusions explain the report and its
+    charts/tables.
+  - **Affected surfaces:** EDA sidebar Active Filters and Excluded controls,
+    Variables/Sample Data exclusion actions, report header, analysis request,
+    and all analysis tabs.
+  - **Proposed behavior:** Use labelled controls and one explicit draft/apply
+    model for filters and exclusions; display a concise applied-context banner
+    with filter count/details, excluded columns, target, task type, and report
+    timestamp above every result and in downloads/history.
+  - **Acceptance criteria:** Every filter/exclusion control has an accessible
+    name and linked validation; no edit silently re-runs analysis; Apply and
+    Reset name the changed context and prevent duplicate requests; each tab,
+    table, chart export, and loaded history report identifies the exact
+    applied analysis context.
+  - **Validation method:** Component tests assert labels, keyboard flow,
+    invalid operators/values, draft/reset/apply, and request payloads.
+    Playwright adds/removes filters and exclusions, switches tabs/datasets,
+    loads history, and downloads a chart/table fixture; inspect the context in
+    light/dark desktop and narrow layouts and run axe.
+  - **Impact:** High. **Frequency:** Frequent when refining analysis. **Effort:**
+    M. **Risk:** Medium. **Dependencies:** `useEDAStore`, EDA request/report
+    schema, download utilities, and **FND-005**. **Milestone:** Next.
+
+- **DAT-007 — Inferred: EDA visualizations do not consistently preserve color
+  meaning, interpretation, and accessible alternatives across result density,
+  dark mode, and narrow widths.**
+  - **Evidence:** `CorrelationHeatmap` encodes negative/positive strength in
+    blue/red with opacity but provides no persistent -1/0/+1 legend; it
+    truncates to 20 columns and depends on hover `title` for full labels.
+    `CanvasScatterPlot` hides its legend at 20 groups, while
+    `ThreeDScatterPlot` always shows a Plotly legend but supplies no theme
+    layout/background. Distribution charts rely on angled abbreviated axes and
+    hover tooltips. Several tabs provide useful nearby interpretation and
+    no-data copy (PCA, time series, correlations, outliers, geospatial), but
+    that coverage is uneven; download functions export images rather than a
+    corresponding data-table alternative. No live report fixture was
+    available, so this is source-supported rather than a claim of a reproduced
+    chart failure.
+  - **User problem:** At high category/column counts or narrow widths, users
+    can lose the mapping from color to group/correlation, cannot reliably read
+    truncated axes or hover-only detail, and may receive an image download
+    without enough context to interpret or reproduce it.
+  - **Affected surfaces:** Dashboard pies/missing-value bars; Variables
+    distributions; Bivariate/PCA 2D and 3D scatter; correlations heatmaps;
+    Target/Time Series/Outliers/Geospatial/Decomposition charts; chart and
+    matrix downloads.
+  - **Proposed behavior:** Define a visualization contract: every color
+    encoding has a persistent legend/scale and text alternative, every
+    truncation names its omitted scope and offers a table/download of values,
+    tooltips augment rather than carry essential meaning, and chart theme,
+    overflow, no-data, and nearby interpretation are tested together.
+  - **Acceptance criteria:** At desktop and 390 px, legends, axes, titles,
+    values, and controls remain readable or intentionally scrollable; color
+    meanings and correlation direction/strength are conveyed without color or
+    hover alone; dark charts meet contrast requirements; empty/unsupported
+    analyses explain why and offer a next step; every visual download includes
+    title, selected variables, applied context, and a CSV/table alternative.
+  - **Validation method:** Render deterministic low/high-cardinality fixtures
+    for each chart family at 1440 and 390 px in light and dark themes. Assert
+    legend/axis visibility, tooltip text, no-data copy, heatmap truncation,
+    table alternatives, download metadata, horizontal/vertical overflow, and
+    contrast with axe plus visual review.
+  - **Impact:** High. **Frequency:** Frequent for EDA result interpretation.
+    **Effort:** L. **Risk:** Medium. **Dependencies:** chart adapters,
+    Plotly/Recharts/Chart.js theme tokens, report payloads, export utilities,
+    and visualization data-table design. **Milestone:** Next.
+
 ### Experiments and Inference
 
 - **Inferred:** `Navbar.tsx` exposes the Experiments and Inference entry
@@ -672,6 +951,13 @@ Canvas finding is warranted solely for this repeated form root.
 | CAN-002 | Inferred | Run readiness and failures lack an actionable node-level diagnostic loop. | Canvas run controls, node warnings, Results | High | Occasional | M | Medium | Validators; converter; FND-003 | Now |
 | CAN-003 | Inferred | Autosave, recent, and version recovery do not explain unavailable local recovery. | Restore banner; Recent; versions; Toolbar | Medium | Occasional | M | Medium | Persistence; versions; FND-003 | Next |
 | CAN-004 | Inferred | Feature Generation exposes a recommendation Apply action that changes nothing. | Feature Generation; Recommendations panel | Medium | Occasional | S | Low | Recommendation schema; FND-005 | Next |
+| DAT-001 | Observed | Source onboarding has conflicting destinations and unassociated required fields. | Data Sources; Add Source; Canvas/EDA handoffs | High | Frequent | M | Medium | Source API; router; FND-005 | Now |
+| DAT-002 | Observed | Failed preview reports zero-like metadata without recovery context. | Dataset Preview; source profile/sample APIs | High | Occasional | M | Medium | Profile/sample errors; FND-003 | Now |
+| DAT-003 | Inferred | Ingestion activity lacks phase/progress/history/retry lifecycle. | Upload; Add Source; jobs; source rows | High | Occasional | M | Medium | Ingestion API; FND-003 | Now |
+| DAT-004 | Observed | Data/EDA route controls are clipped at 390 px. | Data table/actions; EDA header/history; Layout | High | Frequent | M | Medium | FND-001; responsive views | Now |
+| DAT-005 | Inferred | EDA jobs and history lack durable input/status/recovery context. | EDA selection; jobs; failures; History | High | Frequent | M | Medium | EDA job API; useEDAStore; FND-003 | Now |
+| DAT-006 | Inferred | Filters and exclusions apply inconsistently without durable report context. | EDA sidebar; tabs; exports | High | Frequent | M | Medium | EDA schema; FND-005 | Next |
+| DAT-007 | Inferred | Charts lose interpretable color/axis/alternative-data context at density and narrow widths. | EDA charts, tables, exports | High | Frequent | L | Medium | Chart themes; exports; report payloads | Next |
 
 ## Component-Boundary Recommendations
 
@@ -689,6 +975,17 @@ Canvas finding is warranted solely for this repeated form root.
   forms, which should receive shared label/error primitives from `FND-005`;
   `useRunControls`, graph validators, `ResultsPanel`, persistence, and restore
   UI must exchange structured node/recovery state for `CAN-002`/`CAN-003`.
+- **Data journey boundary:** Keep ingestion transport/status truth in the
+  source and ingestion APIs, but make Data Sources own a coherent
+  source-to-Canvas/EDA handoff and preview recovery surface
+  (`DAT-001`–`DAT-003`). Reuse **FND-003** status semantics and **FND-005**
+  field semantics rather than creating route-specific variants.
+- **EDA analysis boundary:** Keep server report/job/history state in React
+  Query and editable analysis context in `useEDAStore`, but expose one
+  user-facing analysis record to the header, sidebar, History, tabs, and
+  export functions (`DAT-005`, `DAT-006`). Chart adapters own rendering and
+  theme mechanics; EDA tabs own explanations, data alternatives, and applied
+  context (`DAT-007`).
 
 ## Now / Next / Later Roadmap
 
@@ -706,6 +1003,14 @@ Canvas finding is warranted solely for this repeated form root.
   both panels open at every responsive width.
 - **CAN-002:** Turn Canvas validation and run failures into node-addressable
   diagnosis and recovery.
+- **DAT-001:** Make source onboarding accessible and make Canvas/EDA handoffs
+  explicit.
+- **DAT-002:** Differentiate unavailable preview metadata from an empty
+  dataset and give recovery context.
+- **DAT-003:** Make ingestion phase, progress, failure, and recovery coherent.
+- **DAT-004:** Make Data and EDA controls reachable at 390 px through
+  **FND-001**'s compact-shell work.
+- **DAT-005:** Preserve dataset/input/job/history context across EDA outcomes.
 
 ### Next
 
@@ -716,6 +1021,10 @@ Canvas finding is warranted solely for this repeated form root.
   understandable before replacing work.
 - **CAN-004:** Make Feature Generation recommendations apply or stop presenting
   an Apply action.
+- **DAT-006:** Make filter and exclusion application accessible, explicit, and
+  visible in every result/export.
+- **DAT-007:** Establish interpretable, responsive, theme-safe chart and
+  alternative-data behavior.
 
 ### Later
 
@@ -734,3 +1043,10 @@ Canvas finding is warranted solely for this repeated form root.
 | CAN-002 Canvas diagnosis | Invalid/failing nodes identify a next action and open their settings | Validator and mocked-failure tests | Fix every issue from the Canvas summary | 1440 and 390 px | Summary role, focus, and live feedback |
 | CAN-003 Canvas recovery | Local, recent, and server recovery sources and failures are explained | Persistence and version-load tests | Restore/cancel from empty and nonempty canvases | 1440 and 390 px | Keyboard recovery controls and status review |
 | CAN-004 Feature Generation recommendations | Apply changes state once or is absent when unsupported | Component recommendation state/undo tests | Compare representative node configuration behavior | 1440 and 390 px | Accessible feedback after apply |
+| DAT-001 source onboarding | Every source field is labelled and success names the selected source's Canvas/EDA next step | Form/API outcome and router-handoff Playwright tests | Create file/S3 source; follow both handoffs | 1440 and 390 px | Labels, errors, modal focus, axe |
+| DAT-002 preview recovery | Unavailable metadata is never presented as zero; retry has scoped context | Mock sample/profile partial/full failure tests | Empty, deleted, and transient source preview | 1440 and 390 px | Status/alert, retry focus, table scrolling |
+| DAT-003 ingestion lifecycle | Each job exposes phase/progress/error/cancel/retry and source context | Upload-progress and status-transition tests | Successful, stalled, failed, cancelled ingestion | 1440 and 390 px | Live updates and duplicate-submit checks |
+| DAT-004 Data/EDA compact journey | All source and analysis controls remain in viewport | Geometry, overflow, and compact-menu Playwright tests | Complete filter/handoff/analyze/history tasks | 1440, 1024, 768, 390 px | Keyboard order and 44 px targets |
+| DAT-005 EDA job context | Dataset plus target/task/filter/exclusion inputs persist through pending/fail/history outcomes | Mock job/report/history and polling tests | Submit, cancel, retry, load history, switch dataset | 1440 and 390 px | Status/alert and current-report context |
+| DAT-006 EDA applied context | Filters/exclusions use labelled draft/apply/reset and annotate all outputs | Component payload/context/export tests | Refine analysis and inspect every tab/export | 1440 and 390 px | Labels, errors, keyboard, axe |
+| DAT-007 visualization contract | Legends/axes/tooltips/context/alternatives work in themes and at density | Deterministic chart fixture and visual/axe tests | Interpret, scroll, tabulate, and download each chart family | 1440 and 390 px, light/dark | Non-color meaning and data-table alternatives |
