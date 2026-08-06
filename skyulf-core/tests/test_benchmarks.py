@@ -25,9 +25,12 @@ from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.modeling._evaluation import clustering as clustering_module
 from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
 from skyulf.pipeline import SkyulfPipeline
+from skyulf.preprocessing.bucketing import GeneralBinningCalculator
+from skyulf.preprocessing.bucketing import _to_pandas_for_fit as _bucketing_to_pandas_for_fit
 from skyulf.preprocessing.feature_selection import correlation as correlation_module
 from skyulf.preprocessing.feature_selection.correlation import CorrelationThresholdCalculator
 from skyulf.profiling._analyzer.multivariate import MultivariateMixin
+from skyulf.utils import detect_numeric_columns, resolve_columns
 
 try:
     import polars as pl
@@ -349,3 +352,91 @@ def test_outlier_impute_matrix_peak_rss(benchmark, rows, cols, all_null_cols, ro
         f"peak_rss_delta={delta}"
     )
     assert result.shape[0] == rows
+
+
+def _bucketing_benchmark_frame(rows: int, cols: int, null_frac: float = 0.0) -> pl.DataFrame:
+    """Build a deterministic wide/tall numeric Polars frame for bucketing-fit benchmarks."""
+    rng = np.random.default_rng(20260806)
+    data: dict[str, object] = {}
+    for i in range(cols):
+        col = rng.standard_normal(rows)
+        if null_frac:
+            null_mask = rng.random(rows) < null_frac
+            col = np.where(null_mask, np.nan, col)
+        data[f"num_{i}"] = col
+    return pl.DataFrame(data)
+
+
+def _legacy_general_binning_fit(df: pl.DataFrame, config: dict[str, object]) -> object:
+    """Force the pre-native full-frame ``to_pandas()`` bucketing-fit route.
+
+    Mirrors ``GeneralBinningCalculator.fit`` before the column-subset
+    conversion was added: convert the entire input frame, then resolve
+    columns and fit, so the benchmark measures the conversion cost the
+    legacy implementation always paid regardless of how many columns were
+    actually selected for binning.
+    """
+    calc = GeneralBinningCalculator()
+    pdf = _bucketing_to_pandas_for_fit(df)
+    columns = resolve_columns(pdf, config, detect_numeric_columns)
+    narrowed_config = dict(config)
+    narrowed_config["columns"] = columns
+    return calc.fit(pdf, narrowed_config)
+
+
+_RUN_LARGE_BUCKETING_BENCHMARKS = os.environ.get("SKYULF_RUN_LARGE_BENCHMARKS") == "1"
+_LARGE_BUCKETING_CASE = pytest.mark.skipif(
+    not _RUN_LARGE_BUCKETING_BENCHMARKS,
+    reason="set SKYULF_RUN_LARGE_BENCHMARKS=1 to run large bucketing benchmarks",
+)
+_BUCKETING_BENCHMARK_CASES = [
+    pytest.param(1_000_000, 1, 0.0, id="1m-x-1"),
+    pytest.param(250_000, 25, 0.0, marks=_LARGE_BUCKETING_CASE, id="250k-x-25"),
+    pytest.param(250_000, 25, 0.3, marks=_LARGE_BUCKETING_CASE, id="250k-x-25-high-null"),
+]
+
+
+@pytest.mark.parametrize(("rows", "cols", "null_frac"), _BUCKETING_BENCHMARK_CASES)
+@pytest.mark.parametrize("route", ["legacy", "native"])
+def test_bucketing_fit_benchmark(benchmark, rows, cols, null_frac, route):
+    """Benchmark equivalent legacy (full-frame conversion) and native
+    (column-subset conversion) ``GeneralBinning`` fit routes; only the first
+    column is selected for binning to isolate the conversion-scope benefit.
+    """
+    pytest.importorskip("polars")
+    df = _bucketing_benchmark_frame(rows, cols, null_frac)
+    config = {"columns": ["num_0"], "strategy": "equal_width", "n_bins": 5}
+
+    if route == "legacy":
+        artifact = benchmark(_legacy_general_binning_fit, df, config)
+    else:
+        calc = GeneralBinningCalculator()
+        artifact = benchmark(calc.fit, df, config)
+
+    assert "num_0" in artifact["bin_edges"]
+    assert len(artifact["bin_edges"]["num_0"]) == 6
+
+
+@pytest.mark.skipif(
+    os.environ.get("SKYULF_MEASURE_BUCKETING_RSS") != "1",
+    reason="set SKYULF_MEASURE_BUCKETING_RSS=1 for isolated RSS output",
+)
+@pytest.mark.parametrize(("rows", "cols", "null_frac"), _BUCKETING_BENCHMARK_CASES)
+@pytest.mark.parametrize("route", ["legacy", "native"])
+def test_bucketing_fit_peak_rss(benchmark, rows, cols, null_frac, route):
+    """Print incremental process RSS for one separately invoked bucketing-fit route."""
+    pytest.importorskip("polars")
+    df = _bucketing_benchmark_frame(rows, cols, null_frac)
+    config = {"columns": ["num_0"], "strategy": "equal_width", "n_bins": 5}
+    baseline = _peak_rss_bytes()
+
+    def _fit():
+        if route == "legacy":
+            return _legacy_general_binning_fit(df, config)
+        return GeneralBinningCalculator().fit(df, config)
+
+    result = benchmark.pedantic(_fit, rounds=1, iterations=1, warmup_rounds=0)
+
+    delta = max(0, _peak_rss_bytes() - baseline)
+    print(f"route={route} rows={rows} cols={cols} null_frac={null_frac} peak_rss_delta={delta}")
+    assert "num_0" in result["bin_edges"]
