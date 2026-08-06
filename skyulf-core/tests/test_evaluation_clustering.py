@@ -2,6 +2,7 @@
 
 import gc
 import tracemalloc
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ from sklearn.cluster import KMeans
 from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
 from skyulf.modeling._evaluation.metrics import (
     DEFAULT_SILHOUETTE_SAMPLE_SIZE,
+    _collect_silhouette_representatives,
     _select_silhouette_sample_indices,
     calculate_clustering_metrics,
 )
@@ -199,6 +201,20 @@ def test_select_silhouette_sample_indices_keeps_large_memory_bounded() -> None:
     assert set(labels[first]) == {0, 1}
 
 
+@pytest.mark.parametrize(
+    ("sample_size"),
+    [False, np.bool_(True), 10.5, np.float64(10.5), np.nan, np.inf],
+)
+def test_collect_silhouette_representatives_rejects_non_integral_sample_size(
+    sample_size: object,
+) -> None:
+    """Representative collection must reject non-integral caps before tracking labels."""
+    labels = np.arange(100)
+
+    with pytest.raises(ValueError, match="silhouette_sample_size must be an integer"):
+        _collect_silhouette_representatives(labels, sample_size=cast(Any, sample_size))
+
+
 def test_calculate_clustering_metrics_rejects_high_cardinality_before_unbounded_counting() -> None:
     """Over-cap distinct labels must fail before building a full unique-label result."""
     sample_size = 10
@@ -321,6 +337,50 @@ def test_calculate_clustering_metrics_rejects_invalid_cap_before_degenerate_guar
 
     with pytest.raises(ValueError, match="silhouette_sample_size must be at least 2"):
         calculate_clustering_metrics(X, labels, silhouette_sample_size=1)
+
+
+@pytest.mark.parametrize(
+    "sample_size",
+    [True, np.bool_(False), 10.5, np.float64(10.5), np.nan, np.inf],
+)
+def test_calculate_clustering_metrics_rejects_non_integral_silhouette_sample_size(
+    sample_size: object,
+) -> None:
+    """Public clustering metrics must reject non-integral silhouette caps."""
+    X = pd.DataFrame({"a": np.arange(40.0), "b": np.arange(40.0)})
+    labels = np.array([0, 1] * 20)
+
+    with pytest.raises(ValueError, match="silhouette_sample_size must be an integer"):
+        calculate_clustering_metrics(X, labels, silhouette_sample_size=cast(Any, sample_size))
+
+
+def test_calculate_clustering_metrics_accepts_numpy_integral_silhouette_sample_size(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """NumPy integer caps should still drive bounded silhouette sampling."""
+    captured: list[tuple[np.ndarray, np.ndarray, dict[str, object]]] = []
+
+    def fake_silhouette(X: np.ndarray, labels: np.ndarray, **kwargs: object) -> float:
+        captured.append((X.copy(), labels.copy(), dict(kwargs)))
+        return 0.5
+
+    monkeypatch.setattr("sklearn.metrics.silhouette_score", fake_silhouette)
+    X = pd.DataFrame({"a": np.arange(40.0), "b": np.arange(40.0) * 2})
+    labels = np.array([0, 1] * 20)
+
+    metrics = calculate_clustering_metrics(
+        X,
+        labels,
+        silhouette_sample_size=np.int64(10),
+        random_state=7,
+    )
+
+    sampled_X, sampled_labels, sampled_kwargs = captured[0]
+    assert sampled_X.shape == (10, 2)
+    assert sampled_kwargs == {}
+    assert set(sampled_labels) == {0, 1}
+    assert metrics["silhouette_score"] == 0.5
+    assert metrics["silhouette_sample_size"] == 10.0
 
 
 def test_calculate_clustering_metrics_rejects_sampled_cap_without_cluster_headroom() -> None:

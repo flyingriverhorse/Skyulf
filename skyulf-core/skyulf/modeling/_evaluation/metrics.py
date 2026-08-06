@@ -3,6 +3,7 @@
 import contextlib
 import importlib
 import math
+import numbers
 import warnings
 from typing import Any
 
@@ -40,6 +41,19 @@ if _imblearn_metrics is not None:
 DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000
 DEFAULT_SILHOUETTE_RANDOM_STATE = 42
 _NAN_CLUSTER_LABEL = object()
+SilhouetteSampleSize = int | np.integer[Any]
+
+
+def _validate_silhouette_sample_size(sample_size: Any) -> int:
+    """Validate silhouette sample caps and return a plain Python integer."""
+    if isinstance(sample_size, (bool, np.bool_)) or not isinstance(
+        sample_size, (numbers.Integral, np.integer)
+    ):
+        raise ValueError("silhouette_sample_size must be an integer")
+    validated_sample_size = int(sample_size)
+    if validated_sample_size < 2:
+        raise ValueError("silhouette_sample_size must be at least 2")
+    return validated_sample_size
 
 
 def _cluster_label_key(label: Any) -> Any:
@@ -52,9 +66,10 @@ def _cluster_label_key(label: Any) -> Any:
 def _collect_silhouette_representatives(
     labels: np.ndarray,
     *,
-    sample_size: int,
+    sample_size: SilhouetteSampleSize,
 ) -> dict[Any, int]:
     """Retain first cluster occurrences without exceeding the scoring cap."""
+    sample_size = _validate_silhouette_sample_size(sample_size)
     representatives: dict[Any, int] = {}
     for index, label in enumerate(labels):
         key = _cluster_label_key(label)
@@ -73,11 +88,12 @@ def _collect_silhouette_representatives(
 def _select_silhouette_sample_indices(
     labels: np.ndarray,
     *,
-    sample_size: int,
+    sample_size: SilhouetteSampleSize,
     random_state: int,
     representative_by_label: dict[Any, int] | None = None,
 ) -> np.ndarray:
     """Select a deterministic bounded silhouette sample that keeps every cluster represented."""
+    sample_size = _validate_silhouette_sample_size(sample_size)
     n_samples = len(labels)
     if n_samples <= sample_size:
         return np.arange(n_samples, dtype=int)
@@ -297,7 +313,7 @@ def calculate_clustering_metrics(
     X: pd.DataFrame | SkyulfDataFrame,
     labels: Any,
     *,
-    silhouette_sample_size: int = DEFAULT_SILHOUETTE_SAMPLE_SIZE,
+    silhouette_sample_size: SilhouetteSampleSize = DEFAULT_SILHOUETTE_SAMPLE_SIZE,
     random_state: int = DEFAULT_SILHOUETTE_RANDOM_STATE,
 ) -> dict[str, float]:
     """Compute unsupervised clustering-quality metrics for a fitted model's labels.
@@ -314,8 +330,7 @@ def calculate_clustering_metrics(
 
     X_np, _ = SklearnBridge.to_sklearn((X, None))
     labels_np = np.asarray(labels).ravel()
-    if silhouette_sample_size < 2:
-        raise ValueError("silhouette_sample_size must be at least 2")
+    silhouette_sample_size = _validate_silhouette_sample_size(silhouette_sample_size)
     if X_np.shape[0] != len(labels_np):
         raise ValueError("X and labels must have the same number of rows")
 
