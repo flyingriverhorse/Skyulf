@@ -34,6 +34,7 @@ yarn-error.log*
 frontend/ml-canvas/playwright-report/
 frontend/ml-canvas/test-results/
 frontend/ml-canvas/.playwright/
+.playwright-mcp/
 
 # === Database ===
 .mlops_database.db/
@@ -67,6 +68,8 @@ mlops_database.db
 *.pkl
 *.cache/
 .pytest_cache/
+.hypothesis/
+.benchmarks/
 .ruff_cache/
 .mypy_cache/
 .coverage
