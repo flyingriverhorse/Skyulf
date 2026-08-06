@@ -10,11 +10,6 @@ from .._validation import raise_invalid_choice
 from ..data.dataset import SplitDataset
 from ..engines import EngineName, SkyulfDataFrame, get_engine
 
-# Evaluation imports - we will migrate these next
-# from ._evaluation.schemas import ModelEvaluationReport, ModelEvaluationSplitPayload
-# from ._evaluation.classification import build_classification_split_report
-# from ._evaluation.regression import build_regression_split_report
-
 logger = logging.getLogger(__name__)
 
 

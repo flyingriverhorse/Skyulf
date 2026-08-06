@@ -144,14 +144,12 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
 
         # 2. Hybrid Verification: If input is Polars, ensure it ALSO works on Pandas
         if isinstance(df, pl.DataFrame):
-            # print(f"    --> Verifying Pandas compatibility for {calc_cls.__name__}...", end="")
             try:
                 df_pd = df.to_pandas()
                 calc_pd = calc_cls()
                 applier_pd = applier_cls()
                 fit_res_pd = calc_pd.fit(df_pd, params)
                 applier_pd.apply(df_pd, fit_res_pd)
-                # print(" OK")
             except Exception as e:
                 print(f"\n    [!] PANDAS FAILURE for {calc_cls.__name__}: {e}")
                 raise e
@@ -507,8 +505,8 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         res, _ = self._apply_calc_applier(
             EllipticEnvelopeCalculator, EllipticEnvelopeApplier, df_clean, {"contamination": 0.1}
         )
-        # Should drop finding outliers
-        # self.assertTrue(len(res) < len(df_clean)) # Depends on random state and data
+        # Outlier count is non-deterministic (depends on random_state and data), so we
+        # only verify the calculator/applier run without error above.
 
     def test_scaling_nodes(self):
         print("\n--- Scaling Nodes ---")

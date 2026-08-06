@@ -79,9 +79,6 @@ def fit_method[T: Mapping[str, Any]](fn: Callable[..., T]) -> Callable[..., T]:
     return wrapper  # type: ignore[return-value]
 
 
-# from ..artifacts.store import ArtifactStore # Removed dependency on ArtifactStore for now
-
-
 class BaseCalculator(ABC):
     @abstractmethod
     def fit(

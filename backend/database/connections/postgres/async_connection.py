@@ -23,12 +23,6 @@ except ImportError:
     # dotenv is optional; environment variables may already be set in production
     pass
 
-# Provider helpers can be added later for AWS/Azure/GCP
-# try:
-#     from .providers import aws, azure, gcp
-# except ImportError:
-#     aws = azure = gcp = None
-
 
 def _normalize_raw_database_url(raw: str) -> str:
     """Convert a sync-style DATABASE_URL to its async-driver equivalent."""
