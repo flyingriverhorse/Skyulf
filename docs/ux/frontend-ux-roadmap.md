@@ -3,8 +3,12 @@
 ## Executive Summary
 
 Task 1 establishes the roadmap scaffold and records objective frontend baseline
-evidence. Later audit tasks will add findings, prioritization, and delivery
-milestones using the evidence labels below.
+evidence. Task 2 adds six normalized shared-foundation findings: one directly
+observed shared-shell issue (`FND-001`), one shared-component risk
+(`FND-003`), and four code-supported risks spanning multiple shell views or
+route journeys (`FND-002`, `FND-004`, `FND-005`, and `FND-006`). The
+Dashboard-only contrast result is intentionally deferred to the Dashboard
+journey rather than represented as a shared-foundation finding.
 
 ## Method and Evidence
 
@@ -120,26 +124,33 @@ tasks add live walkthrough evidence.
 
 ### Navigation and Orientation
 
-- **FND-006 — Observed: Canvas subviews do not create navigation history or
-  announce their selected state.**
-  - **User problem:** After opening Experiments, the address remains
-    `/canvas`; browser Back leaves Canvas for the prior route rather than
-    returning to the Canvas view. The Canvas/Experiments/Inference controls
-    also expose three unselected buttons to assistive technology, so the
-    current subview is communicated by color only.
-  - **Affected surfaces:** Canvas, Experiments, Inference; `Navbar.tsx`,
-    `MainLayout.tsx`, and `Breadcrumb.tsx`.
-  - **Proposed behavior:** Represent the selected Canvas subview in
+- **FND-006 — Inferred: shared shell view selection is neither history-backed
+  nor programmatically selected.**
+  - **Evidence:** **Observed** once while switching from Canvas to
+    Experiments: the URL remained `/canvas`, and Back left Canvas for the
+    prior route. **Inferred** across the three shell-view journeys:
+    `Navbar.tsx` sends Canvas, Experiments, and Inference through the same
+    `setView` calls; `useViewStore.ts` stores only `activeView` in memory; and
+    `MainLayout.tsx` displays the same retained views from that state. The
+    three buttons have no selected/current ARIA state. Inference was not
+    separately reproduced, so this inventory row is Inferred.
+  - **User problem:** A user moving among Canvas, Experiments, and Inference
+    cannot restore the selected shell view with Back/Forward, and assistive
+    technology receives three ordinary, unselected buttons instead of the
+    current view.
+  - **Affected surfaces:** Canvas, Experiments, and Inference; `Navbar.tsx`,
+    `MainLayout.tsx`, `useViewStore.ts`, and `Breadcrumb.tsx`.
+  - **Proposed behavior:** Represent the selected shell view in
     navigation state that participates in Back/Forward (for example, a
     query parameter), and expose the control group with the appropriate
     selected state and accessible name.
   - **Acceptance criteria:** Switching views updates a restorable URL/state;
-    Back/Forward returns to the prior Canvas subview without resetting its
+    Back/Forward returns to the prior shell view without resetting its
     retained local state; the active control is programmatically identified
     without depending on its color.
   - **Validation method:** Playwright navigates Canvas → Experiments →
     Inference → Back/Forward at 1440, 1024, 768, and 390 px; an accessibility
-    snapshot asserts one selected/current subview.
+    snapshot asserts one selected/current subview for each shell view.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     Medium. **Dependencies:** `useViewStore` and retained-view behavior.
     **Milestone:** Now.
@@ -172,11 +183,20 @@ tasks add live walkthrough evidence.
 
 - **FND-004 — Inferred: Retry affordances are inconsistent for equivalent
   request failures.**
+  - **Evidence:** `Dashboard.tsx`, `EDAPage.tsx`, and
+    `DeploymentsPage.tsx` pass `onRetry` to the shared `ErrorState`, while
+    `ModelRegistry.tsx` and the Experiments Evaluation/Segmentation views
+    render it without one. This is concrete code evidence across the
+    Dashboard, Data/EDA, Operations, and Experiments journeys. Canvas is
+    intentionally not included: `CanvasPage.tsx` performs URL/restore
+    handling and reports its scoped failures with `toast`, rather than
+    rendering this page-fetch `ErrorState` pattern.
   - **User problem:** Users can retry failed dashboard, EDA, and deployment
     loads in place, but Model Registry and evaluation error uses can render
     `ErrorState` without a retry, forcing a reload or a route change.
-  - **Affected surfaces:** Dashboard, EDA, Model Registry, Deployments,
-    Experiments evaluation/segmentation, and their shared `ErrorState`.
+  - **Affected surfaces:** Dashboard, EDA, Model Registry, Deployments, and
+    Experiments evaluation/segmentation; shared `ErrorState`. Canvas is out
+    of scope for this route-fetch finding.
   - **Proposed behavior:** Pass a safe, idempotent retry action to every
     recoverable request error, retain the prior selection/filter context, and
     distinguish unavailable actions from a failed request.
@@ -186,50 +206,66 @@ tasks add live walkthrough evidence.
     context on success or a useful error on failure.
   - **Validation method:** Add focused page tests for each current
     `ErrorState` use and Playwright request-failure/retry checks for the four
-    journeys.
+    affected journeys.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** S. **Risk:**
     Low. **Dependencies:** Existing page fetch functions. **Milestone:** Next.
 
 ### Forms and Validation
 
-- **FND-005 — Inferred: Representative node forms do not consistently
-  programmatically label controls or communicate required validation.**
-  - **User problem:** Visual `span` labels such as “Model Type”, “Encoding
-    Method”, and “Selection Method” are not associated with their adjacent
-    selects/inputs; required fields are often explanatory text instead of
-    required/error semantics. Keyboard and assistive-technology users can
-    reach a control without its purpose or invalid state.
-  - **Affected surfaces:** Canvas Training, Ensemble, Encoding, Feature
-    Generation, and Feature Selection node settings; shared `Input` and
-    `Button` primitives. The same convention is available to Data/EDA,
-    Experiments/Inference, and Operations forms.
+- **FND-005 — Inferred: Canvas node settings and the Inference prediction
+  editor lack consistent programmatic field semantics.**
+  - **Evidence:** In Canvas, `EncodingNode.tsx` places the visible “Encoding
+    Method” `span` beside a `select` without `htmlFor`, `id`, or ARIA
+    association; the representative node settings use the same visual-label
+    convention. In Inference, `InferencePage.tsx` renders the JSON
+    `textarea` without a `label`, `aria-label`, or `aria-labelledby`, and
+    displays parse status without associating it to the editor or setting its
+    invalid state. This is source evidence across two journeys, not a claim
+    about uninspected Data/EDA, Experiments, or Operations forms.
+  - **User problem:** Keyboard and assistive-technology users can reach the
+    Canvas encoding control or Inference prediction editor without a
+    programmatically conveyed purpose or invalid/error relationship.
+  - **Affected surfaces:** Canvas node settings, including Encoding; Inference
+    prediction input; shared `Input` and `Button` primitives where adopted.
   - **Proposed behavior:** Require an explicit label association (or
-    `aria-labelledby`) for shared and node-form controls, expose required and
-    invalid states programmatically, and place a persistent error beside the
-    field while preserving helpful defaults.
-  - **Acceptance criteria:** Every interactive form control has a unique
-    accessible name; required fields announce as required before submission;
-    invalid fields expose `aria-invalid` and an associated error; Enter
-    submits only forms with a defined submit action.
+    `aria-labelledby`) for the affected Canvas node and Inference controls,
+    expose required and invalid states programmatically, and place a
+    persistent error beside the field while preserving helpful defaults.
+  - **Acceptance criteria:** Every interactive control in the affected Canvas
+    node panels and Inference prediction editor has a unique accessible name;
+    required fields announce as required before submission; invalid fields
+    expose `aria-invalid` and an associated error; Enter submits only forms
+    with a defined submit action.
   - **Validation method:** Render representative forms in component tests,
     assert accessible names/required/error relationships, and complete
     keyboard-only configuration at desktop and 390 px; run axe on rendered
-    form panels.
+    Canvas node panels and the Inference editor.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     Medium. **Dependencies:** Node configuration metadata and existing
     validation rules. **Milestone:** Next.
 
 ### Accessibility and Keyboard UX
 
-- **FND-002 — Observed: the Keyboard Shortcuts overlay lets Tab escape to
-  covered Canvas controls.**
+- **FND-002 — Inferred: shell overlays lack a shared focus-containment and
+  focus-return contract.**
+  - **Evidence:** **Observed** only in Canvas `ShortcutsOverlay`: Tab reached
+    the covered “More canvas tools” control instead of a dialog control.
+    **Inferred** for the other shell overlays: `ShortcutsOverlay.tsx`,
+    `CommandPalette.tsx`, and the notification detail modal in
+    `NotificationCenter.tsx` each render custom dialogs without
+    `ModalShell.tsx`'s containment/return helpers. `MainLayout.tsx` mounts
+    Shortcuts and Command Palette alongside Canvas, Experiments, and
+    Inference, and `Navbar.tsx` renders NotificationCenter for the same three
+    views. Command Palette and notification detail were not separately
+    reproduced, so the inventory label is Inferred.
   - **User problem:** With the shortcuts overlay open, the next Tab focused
     the covered “More canvas tools” button instead of an element in the
-    dialog. Keyboard users can operate hidden controls and lose their
-    expected modal focus flow.
-  - **Affected surfaces:** Canvas `ShortcutsOverlay`; the same custom-overlay
-    pattern is used by Command Palette and Notification detail in Canvas,
-    Experiments, and Inference.
+    dialog. Other shell overlays have the same missing shared focus-management
+    contract, creating a cross-view regression risk rather than an observed
+    duplicate failure.
+  - **Affected surfaces:** Shortcuts and Command Palette in Canvas,
+    Experiments, and Inference; Notification detail from the shared Navbar;
+    `ModalShell.tsx`.
   - **Proposed behavior:** Apply the existing modal focus containment and
     focus-return behavior to these custom overlays, with an initial focus on
     the first useful dialog control and Escape/backdrop close where allowed.
@@ -238,28 +274,11 @@ tasks add live walkthrough evidence.
     element remains reachable behind a modal. Command Palette retains arrow
     navigation and search focus.
   - **Validation method:** Playwright keyboard tests open/close Shortcuts,
-    Command Palette, and Notification detail and assert the active element
-    throughout; run existing overlay/component tests.
+    Command Palette, and Notification detail from Canvas, Experiments, and
+    Inference and assert the active element throughout; run existing
+    overlay/component tests.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** S. **Risk:**
     Low. **Dependencies:** `ModalShell` focus helpers. **Milestone:** Now.
-
-- **FND-007 — Observed: Dashboard card metadata fails the minimum text
-  contrast ratio.**
-  - **User problem:** The small dashboard metadata text uses
-    `text-slate-400` on white (2.56:1), so activity context is difficult to
-    read for low-vision users and fails WCAG AA.
-  - **Affected surfaces:** Dashboard status cards; the repeated muted-text
-    visual hierarchy used by summary cards.
-  - **Proposed behavior:** Use a muted foreground token/value that reaches
-    at least 4.5:1 on the card background without changing the information
-    hierarchy.
-  - **Acceptance criteria:** Every normal-size status-card metadata label
-    reaches 4.5:1 in light and dark themes, and color is not its only status
-    cue.
-  - **Validation method:** Run axe on Dashboard in both themes and manually
-    inspect the cards at 1440, 1024, 768, and 390 px.
-  - **Impact:** Medium. **Frequency:** Frequent. **Effort:** S. **Risk:**
-    Low. **Dependencies:** Dashboard color tokens. **Milestone:** Now.
 
 ### Responsive Behavior
 
@@ -347,12 +366,11 @@ tasks add live walkthrough evidence.
 | ID | Evidence | User problem | Surfaces | Impact | Frequency | Effort | Risk | Dependencies | Milestone |
 |----|----------|--------------|----------|--------|-----------|--------|------|--------------|-----------|
 | FND-001 | Observed | Global navigation and Canvas view controls clip/overlap at 390 px. | Layout; Canvas, Experiments, Inference; Data/EDA; Operations | High | Frequent | M | Medium | Layout; read-only breakpoint | Now |
-| FND-002 | Observed | Tab escapes the keyboard-shortcuts dialog to covered controls. | Canvas overlays; Command Palette; notifications | High | Occasional | S | Low | ModalShell focus helpers | Now |
+| FND-002 | Inferred | Shell overlays lack a shared focus-containment and focus-return contract. | Canvas, Experiments, Inference overlays; shared Navbar | High | Occasional | S | Low | ModalShell focus helpers | Now |
 | FND-003 | Inferred | Async state changes lack shared live-region semantics. | Canvas; Data/EDA; Experiments/Inference; Operations | High | Occasional | S | Low | None | Now |
-| FND-004 | Inferred | Equivalent request failures do not consistently offer Retry. | Dashboard; EDA; Registry; Deployments; evaluation views | Medium | Occasional | S | Low | Page fetch functions | Next |
-| FND-005 | Inferred | Form labels, required states, and errors are not consistently programmatic. | Canvas node forms; shared controls | High | Frequent | M | Medium | Node metadata/validation | Next |
-| FND-006 | Observed | Canvas subview selection is not restorable with Back/Forward or exposed as selected. | Canvas; Experiments; Inference | High | Frequent | M | Medium | useViewStore; retained views | Now |
-| FND-007 | Observed | Dashboard card metadata has 2.56:1 contrast. | Dashboard status cards | Medium | Frequent | S | Low | Dashboard color tokens | Now |
+| FND-004 | Inferred | Route-fetch errors inconsistently offer Retry; Canvas uses a different, toast-scoped pattern. | Dashboard; Data/EDA; Registry; Deployments; Experiments evaluation | Medium | Occasional | S | Low | Page fetch functions | Next |
+| FND-005 | Inferred | Canvas node settings and Inference prediction input lack consistent field semantics. | Canvas node forms; Inference editor; shared controls | High | Frequent | M | Medium | Node metadata/validation | Next |
+| FND-006 | Inferred | Shell view selection is not history-restorable or programmatically selected. | Canvas; Experiments; Inference | High | Frequent | M | Medium | useViewStore; retained views | Now |
 
 ## Component-Boundary Recommendations
 
@@ -362,17 +380,16 @@ tasks add live walkthrough evidence.
 
 - **FND-001:** Make the shared shell and Canvas subview navigation usable at
   390 px without degrading 768 px and desktop workflows.
-- **FND-002:** Contain and return keyboard focus for custom overlays.
+- **FND-002:** Give shared shell overlays contained, returnable keyboard focus.
 - **FND-003:** Add semantic async status/error feedback across shared states.
-- **FND-006:** Make Canvas subview navigation restorable and programmatically
-  selected.
-- **FND-007:** Correct the documented Dashboard metadata contrast failure.
+- **FND-006:** Make shared Canvas, Experiments, and Inference view navigation
+  restorable and programmatically selected.
 
 ### Next
 
 - **FND-004:** Normalize recoverable request retries.
 - **FND-005:** Normalize labels, required-state messaging, and field-error
-  relationships in shared and node forms.
+  relationships in Canvas node and Inference prediction forms.
 
 ### Later
 
@@ -381,9 +398,8 @@ tasks add live walkthrough evidence.
 | Roadmap item | Acceptance criteria | Automated validation | Manual validation | Responsive coverage | Accessibility coverage |
 |--------------|---------------------|----------------------|-------------------|---------------------|------------------------|
 | FND-001 shared compact shell | No clipped/overlapping global controls; navigation remains available | Playwright viewport geometry and screenshot checks | Navigate every route and Canvas subview | 1440, 1024, 768, 390 px | Keyboard drawer and target-size check |
-| FND-002 overlay focus | Focus remains in overlay and returns to invoker | Playwright Tab/Shift+Tab/Escape tests | Command Palette, Shortcuts, notification detail | 1440 and 390 px | Focus-order assertions |
+| FND-002 shell-overlay focus | Focus remains in overlay and returns to invoker | Playwright Tab/Shift+Tab/Escape tests | Shortcuts, Command Palette, notification detail from all shell views | 1440 and 390 px | Focus-order assertions |
 | FND-003 async semantics | Status/alert messages announce transitions | Component role tests and axe | Success, empty, error, retry, unavailable action | 1440 and 390 px | Live-region review |
-| FND-004 retry consistency | Every recoverable fetch error retries in place | Page request-failure tests | Preserve filters and selection after retry | 1440 and 390 px | Retry button keyboard operation |
-| FND-005 form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only node configuration | 1440 and 390 px | Accessible-name/error relationship review |
-| FND-006 Canvas view history | Back/Forward restores selected Canvas subview | Playwright history tests | Verify retained local state | 1440, 1024, 768, 390 px | Selected-state snapshot |
-| FND-007 contrast | Status-card metadata is at least 4.5:1 | Axe in light/dark modes | Inspect hierarchy without color-only cues | 1440, 1024, 768, 390 px | WCAG AA contrast check |
+| FND-004 retry consistency | Every recoverable route fetch error retries in place | Page request-failure tests | Preserve filters and selection after retry | 1440 and 390 px | Retry button keyboard operation |
+| FND-005 Canvas/Inference form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only Canvas configuration and Inference entry | 1440 and 390 px | Accessible-name/error relationship review |
+| FND-006 shell-view history | Back/Forward restores selected Canvas, Experiments, or Inference view | Playwright history tests | Verify retained local state | 1440, 1024, 768, 390 px | Selected-state snapshot |
