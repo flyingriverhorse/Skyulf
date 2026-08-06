@@ -114,6 +114,7 @@ def expect_value_range(
     if frame is not None:
         expect_columns_exist(frame, [column])
         series = frame.get_column(column)
+        observed_as_float = series.dtype.is_integer() and series.null_count() > 0
         if series.dtype.is_float():
             series = series.fill_nan(None)
         series = series.drop_nulls()
@@ -121,33 +122,57 @@ def expect_value_range(
         pandas_frame = _as_pandas(df)
         expect_columns_exist(pandas_frame, [column])
         series = pandas_frame[column].dropna()
-    _check_lower_bound(series, column, minimum, inclusive)
-    _check_upper_bound(series, column, maximum, inclusive)
+        observed_as_float = False
+    _check_lower_bound(series, column, minimum, inclusive, observed_as_float=observed_as_float)
+    _check_upper_bound(series, column, maximum, inclusive, observed_as_float=observed_as_float)
 
 
-def _check_lower_bound(series: Any, column: str, minimum: float | None, inclusive: bool) -> None:
+def _format_observed_value(value: Any, observed_as_float: bool) -> Any:
+    """Normalize observed values for nullable integer Polars series."""
+    if observed_as_float and value is not None:
+        return float(value)
+    return value
+
+
+def _check_lower_bound(
+    series: Any,
+    column: str,
+    minimum: float | None,
+    inclusive: bool,
+    *,
+    observed_as_float: bool = False,
+) -> None:
     """Raise when ``series`` contains a value below the allowed minimum."""
     if minimum is None:
         return
     violates = series < minimum if inclusive else series <= minimum
     if bool(violates.any()):
         bound = ">=" if inclusive else ">"
+        observed = _format_observed_value(series.min(), observed_as_float)
         raise ExpectationError(
             f"Column '{column}' has values that are not {bound} {minimum} "
-            f"(min observed: {series.min()})"
+            f"(min observed: {observed})"
         )
 
 
-def _check_upper_bound(series: Any, column: str, maximum: float | None, inclusive: bool) -> None:
+def _check_upper_bound(
+    series: Any,
+    column: str,
+    maximum: float | None,
+    inclusive: bool,
+    *,
+    observed_as_float: bool = False,
+) -> None:
     """Raise when ``series`` contains a value above the allowed maximum."""
     if maximum is None:
         return
     violates = series > maximum if inclusive else series >= maximum
     if bool(violates.any()):
         bound = "<=" if inclusive else "<"
+        observed = _format_observed_value(series.max(), observed_as_float)
         raise ExpectationError(
             f"Column '{column}' has values that are not {bound} {maximum} "
-            f"(max observed: {series.max()})"
+            f"(max observed: {observed})"
         )
 
 
