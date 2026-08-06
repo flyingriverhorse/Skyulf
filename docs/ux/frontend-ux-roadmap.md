@@ -6,9 +6,12 @@ Task 1 establishes the roadmap scaffold and records objective frontend baseline
 evidence. Task 2 adds six normalized shared-foundation findings: one directly
 observed shared-shell issue (`FND-001`), one shared-component risk
 (`FND-003`), and four code-supported risks spanning multiple shell views or
-route journeys (`FND-002`, `FND-004`, `FND-005`, and `FND-006`). The
-Dashboard-only contrast result is intentionally deferred to the Dashboard
-journey rather than represented as a shared-foundation finding.
+route journeys (`FND-002`, `FND-004`, `FND-005`, and `FND-006`). Task 3 adds
+four Canvas findings: one directly observed click-to-add placement/configuration
+failure (`CAN-001`) and three code-supported recovery, diagnosis, and node
+configuration risks (`CAN-002` through `CAN-004`). The Dashboard-only contrast
+result is intentionally deferred to the Dashboard journey rather than
+represented as a shared-foundation finding.
 
 ## Method and Evidence
 
@@ -321,6 +324,183 @@ tasks add live walkthrough evidence.
   canvas view is active, and the canvas branch is hidden with `display:
   contents` rather than unmounted.
 
+#### Canvas audit evidence and limits
+
+- **Observed:** In the local Chrome walkthrough, the empty canvas offered a
+  sidebar palette, an empty-state template CTA, a command-palette control,
+  disabled undo/redo/clear controls, and no Run Preview action. Clicking the
+  Dataset palette card inserted an invalid Dataset node but did not select it;
+  selecting the card a second time opened its Properties panel. After choosing
+  a local `test source`, the panel reported “No schema available.” Clicking
+  Encoding then placed its card only 30 px from the Dataset card, underneath
+  it; the Dataset card intercepted the attempted pointer click on Encoding.
+- **Measured:** The Chrome fallback command ran
+  `e2e/preview.spec.ts` successfully (1 passed). It seeds a Dataset → Drop
+  Columns graph and mocks `/api/pipeline/preview`, so it verifies the real
+  toolbar gate, converter, request, and Results panel rendering, but not
+  palette creation, real source schema, connection gestures, or a backend
+  completion.
+- **Evidence limit:** The local source list was available, but its selected
+  `test source` did not return a schema and logged four browser console errors.
+  A complete real-data pipeline, connection, training, server-version restore,
+  and job-failure walkthrough was therefore not claimed. The findings below
+  distinguish this limit from source-supported behavior.
+
+- **CAN-001 — Observed: click-to-add places full-size cards on top of each
+  other and does not take the user to configuration.**
+  - **Evidence:** `Sidebar.tsx` increments click-to-add placement by only
+    30 px from `(100, 100)` while `CustomNodeWrapper.tsx` renders a
+    `min-w-[200px]` card. In the running Canvas, click-adding Dataset then
+    Encoding visibly overlapped the two cards; the Dataset card intercepted
+    the attempt to select Encoding. The first click-added Dataset was not
+    selected, so its required setting was unavailable until a second click on
+    the new card opened Properties.
+  - **User problem:** A user who uses the advertised click alternative to
+    drag-and-drop can immediately lose the newly added node under an existing
+    card and must discover a second selection step before configuration. This
+    turns the first pipeline into canvas rearrangement rather than a
+    Dataset → transform workflow.
+  - **Affected surfaces:** Canvas Components sidebar; `useGraphStore.addNode`;
+    `FlowCanvas`; `CustomNodeWrapper`; Properties panel.
+  - **Why Canvas-specific:** This is the Canvas graph placement and selection
+    contract, not a shared-shell issue.
+  - **Proposed behavior:** Place click-added nodes at a visible non-overlapping
+    position (or intelligently cascade from existing bounds), select and bring
+    the new node into view, and open its configuration when required fields
+    are incomplete.
+  - **Acceptance criteria:** Two consecutive click-added cards have
+    non-overlapping hit targets; each new node is visible, selected, and
+    keyboard-reachable; an invalid new node exposes its required setting
+    without a second pointer action; drag-and-drop and command-palette
+    insertion retain predictable placement.
+  - **Validation method:** Playwright adds Dataset, Encoding,
+    Feature Selection, Split, Training, and Data Preview by palette click,
+    drag/drop, and command palette; assert non-overlap, selection, Properties
+    visibility, and keyboard focus at 1440, 1024, 768, and 390 px. Complete
+    the same sequence with a mocked usable dataset.
+  - **Impact:** High. **Frequency:** Frequent for click-to-add workflows.
+    **Effort:** S. **Risk:** Low. **Dependencies:** React Flow node bounds,
+    Sidebar placement, and Properties panel selection. **Milestone:** Now.
+
+- **CAN-002 — Inferred: run readiness and diagnosis do not form an actionable
+  validation loop.**
+  - **Evidence:** `useRunControls.ts` enables Run Preview when one Dataset has
+    an ID and an outgoing edge; it does not call the store's
+    `validateGraph`. `useGraphStore.ts` returns only `false` and logs missing
+    configuration or disconnected-node messages to the console. The node
+    wrapper renders validation and failed-run chips as non-actionable status
+    spans, while preview failures toast only “Check console for details.”
+    Leakage is more specific—it blocks before submission with a toast—but does
+    not select or navigate to the cited nodes. This is code evidence; the
+    unavailable local schema prevented a real end-to-end invalid run.
+  - **User problem:** A user can see a disabled or failed outcome without a
+    reliable path from Run Preview to every affected node and setting. Console
+    text and tooltip-only chips are especially poor recovery paths in a
+    crowded graph.
+  - **Affected surfaces:** Run Preview and Run All controls; node validation
+    chips; leakage guard; `ResultsPanel`; graph store; Properties panel.
+  - **Why Canvas-specific:** The missing handoff is between graph validation,
+    node location, and Canvas execution controls. It should consume
+    **FND-003** for any shared toast/status announcement semantics rather than
+    duplicate that finding.
+  - **Proposed behavior:** Before a run, produce one structured Canvas
+    validation summary that names each node by label, classifies
+    configuration/connection/leakage errors, focuses the first issue, and
+    lets the user step through all issues. Preserve a failed run's node-level
+    error and link it to the same recovery surface.
+  - **Acceptance criteria:** Run Preview never submits an invalid graph;
+    every detected issue names a node and a next action; selecting an issue
+    selects, pans to, and opens the node's Properties panel; leakage messages
+    identify both the preprocessing and splitter nodes; a backend failure
+    remains inspectable after its toast disappears.
+  - **Validation method:** Component tests cover missing Dataset settings,
+    disconnected transform/training nodes, invalid column settings, and
+    leakage. Playwright creates each invalid graph, invokes run by button and
+    Ctrl/Cmd+Enter, verifies no request is sent, then fixes it through the
+    issue list. Mock a node-specific backend failure and assert durable
+    Results/Canvas recovery navigation; run axe on the summary.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** Node registry validators, pipeline converter,
+    leakage validator, Results panel, and **FND-003**. **Milestone:** Now.
+
+- **CAN-003 — Inferred: recovery sources are not explainable when Canvas
+  autosave cannot be restored.**
+  - **Evidence:** `useCanvasAutoSave.ts` writes a single local snapshot every
+    second, and `canvasPersistence.ts` silently swallows storage/quota errors
+    and returns `null` for corrupt or version-mismatched payloads.
+    `RestoreSessionBanner.tsx` probes only once and only with an empty graph.
+    Separately, the Toolbar offers server versions, a per-browser Recent
+    fallback, and the route accepts a Data Sources version payload; their
+    overwrite confirmations are source-specific. There is no Canvas state
+    explaining why an expected autosave is unavailable or which recovery
+    source is current.
+  - **User problem:** After a refresh, storage failure, or incompatible saved
+    shape, a user cannot distinguish “nothing was saved,” “the current graph
+    suppressed restore,” and “the snapshot cannot be used.” They may start
+    over or load the wrong source without understanding whether it is local or
+    server-backed.
+  - **Affected surfaces:** Autosave/Restore banner; Recent pipelines; server
+    version load and Data Sources restore; Canvas toolbar.
+  - **Why Canvas-specific:** This is the Canvas graph's local/server recovery
+    model. It depends on **FND-003** only for shared status/error announcement
+    behavior.
+  - **Proposed behavior:** Present one recovery entry point that labels each
+    candidate as autosave, local recent, or server version; explains
+    availability/expiry/compatibility; and reports recoverable local-storage
+    failure without exposing implementation details. Keep the existing
+    overwrite protection and never replace a nonempty graph silently.
+  - **Acceptance criteria:** A fresh Canvas can identify all available
+    recovery sources and their timestamps; a corrupt, stale-schema, disabled,
+    or quota-limited autosave yields an understandable non-blocking message;
+    loading any source names what will be replaced and leaves the prior graph
+    recoverable until confirmation; restore success focuses the restored
+    graph.
+  - **Validation method:** Unit-test valid, corrupt, mismatched-version, and
+    storage-throwing snapshot cases. Playwright seeds local storage and mocked
+    server versions, verifies source labels and overwrite/cancel behavior,
+    reloads empty and nonempty canvases, and checks keyboard and live-region
+    behavior.
+  - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** canvas persistence, recent-pipeline utilities,
+    pipeline versions API, and **FND-003**. **Milestone:** Next.
+
+- **CAN-004 — Inferred: Feature Generation presents an Apply action that
+  silently does nothing.**
+  - **Evidence:** `FeatureGenerationNode.tsx` passes
+    `handleApplyRecommendation` to `RecommendationsPanel`, but that handler
+    is an empty function. `RecommendationsPanel.tsx` consequently renders an
+    “Apply Recommendation” button whenever recommendations exist. By
+    comparison, the inspected Imputation, Resampling, and Drop Columns nodes
+    implement nonempty recommendation-apply handlers. Recommendation data was
+    not available from the local source, so this is source evidence rather
+    than a claimed live click.
+  - **User problem:** A user can choose an explicitly offered action in
+    Feature Generation and receive no configuration change, confirmation, or
+    explanation. This breaks the otherwise immediate configuration model and
+    makes it unsafe to trust recommendations.
+  - **Affected surfaces:** Feature Generation settings; Recommendations panel;
+    preprocessing recommendation API.
+  - **Why Canvas-specific:** This is a node-configuration behavior mismatch.
+    It should use **FND-005** for the shared field semantic contract, not
+    restate FND-005 as a duplicate finding.
+  - **Proposed behavior:** Either apply a recommendation deterministically to
+    the appropriate operation/configuration and confirm the change, or mark
+    the recommendation informational and omit the Apply action until it is
+    supported.
+  - **Acceptance criteria:** Every visible Apply action changes the documented
+    configuration once, makes the change inspectable and undoable, and
+    announces success; unsupported recommendations expose no actionable Apply
+    control; applying preserves valid user-entered operation data.
+  - **Validation method:** Render Feature Generation with representative
+    column recommendations and assert state changes, undo, and accessible
+    feedback. Compare the same contract with Encoding, Feature Selection,
+    Training, Ensemble, Segmentation, Dataset, and Data Preview configuration
+    panels; run keyboard-only and axe checks.
+  - **Impact:** Medium. **Frequency:** Occasional when recommendations are
+    available. **Effort:** S. **Risk:** Low. **Dependencies:** recommendation
+    payload schema, Feature Generation config shape, and **FND-005**.
+    **Milestone:** Next.
+
 ### Data and EDA
 
 - **Baseline entry-point mapping:** `/data` mounts the eager `DataSources`
@@ -371,6 +551,10 @@ tasks add live walkthrough evidence.
 | FND-004 | Inferred | Route-fetch errors inconsistently offer Retry; Canvas uses a different, toast-scoped pattern. | Dashboard; Data/EDA; Registry; Deployments; Experiments evaluation | Medium | Occasional | S | Low | Page fetch functions | Next |
 | FND-005 | Inferred | Canvas node settings and Inference prediction input lack consistent field semantics. | Canvas node forms; Inference editor; shared controls | High | Frequent | M | Medium | Node metadata/validation | Next |
 | FND-006 | Inferred | Shell view selection is not history-restorable or programmatically selected. | Canvas; Experiments; Inference | High | Frequent | M | Medium | useViewStore; retained views | Now |
+| CAN-001 | Observed | Click-added node cards overlap and do not enter configuration. | Canvas palette, graph, Properties panel | High | Frequent | S | Low | React Flow bounds; Sidebar; selection | Now |
+| CAN-002 | Inferred | Run readiness and failures lack an actionable node-level diagnostic loop. | Canvas run controls, node warnings, Results | High | Occasional | M | Medium | Validators; converter; FND-003 | Now |
+| CAN-003 | Inferred | Autosave, recent, and version recovery do not explain unavailable local recovery. | Restore banner; Recent; versions; Toolbar | Medium | Occasional | M | Medium | Persistence; versions; FND-003 | Next |
+| CAN-004 | Inferred | Feature Generation exposes a recommendation Apply action that changes nothing. | Feature Generation; Recommendations panel | Medium | Occasional | S | Low | Recommendation schema; FND-005 | Next |
 
 ## Component-Boundary Recommendations
 
@@ -384,12 +568,20 @@ tasks add live walkthrough evidence.
 - **FND-003:** Add semantic async status/error feedback across shared states.
 - **FND-006:** Make shared Canvas, Experiments, and Inference view navigation
   restorable and programmatically selected.
+- **CAN-001:** Make click-to-add create a visible, selected, configurable node
+  without card collisions.
+- **CAN-002:** Turn Canvas validation and run failures into node-addressable
+  diagnosis and recovery.
 
 ### Next
 
 - **FND-004:** Normalize recoverable request retries.
 - **FND-005:** Normalize labels, required-state messaging, and field-error
   relationships in Canvas node and Inference prediction forms.
+- **CAN-003:** Make Canvas recovery sources and unavailable autosaves
+  understandable before replacing work.
+- **CAN-004:** Make Feature Generation recommendations apply or stop presenting
+  an Apply action.
 
 ### Later
 
@@ -403,3 +595,7 @@ tasks add live walkthrough evidence.
 | FND-004 retry consistency | Every recoverable route fetch error retries in place | Page request-failure tests | Preserve filters and selection after retry | 1440 and 390 px | Retry button keyboard operation |
 | FND-005 Canvas/Inference form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only Canvas configuration and Inference entry | 1440 and 390 px | Accessible-name/error relationship review |
 | FND-006 shell-view history | Back/Forward restores selected Canvas, Experiments, or Inference view | Playwright history tests | Verify retained local state | 1440, 1024, 768, 390 px | Selected-state snapshot |
+| CAN-001 Canvas click-add | New nodes never overlap, are selected, and expose required settings | Playwright palette/drag/palette placement checks | Build a representative pipeline by each insertion method | 1440, 1024, 768, 390 px | Keyboard reachability and focus check |
+| CAN-002 Canvas diagnosis | Invalid/failing nodes identify a next action and open their settings | Validator and mocked-failure tests | Fix every issue from the Canvas summary | 1440 and 390 px | Summary role, focus, and live feedback |
+| CAN-003 Canvas recovery | Local, recent, and server recovery sources and failures are explained | Persistence and version-load tests | Restore/cancel from empty and nonempty canvases | 1440 and 390 px | Keyboard recovery controls and status review |
+| CAN-004 Feature Generation recommendations | Apply changes state once or is absent when unsupported | Component recommendation state/undo tests | Compare representative node configuration behavior | 1440 and 390 px | Accessible feedback after apply |
