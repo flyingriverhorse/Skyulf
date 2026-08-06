@@ -556,3 +556,45 @@ three touched files.
 
 Task 1: complete (commits 757f54bd..87dda687, review clean).
 Task 2: complete (commits 87dda687..b6d62bb9, review clean after fix).
+Task 3: complete (commits b6d62bb9..e6e7d7ba, review clean).
+
+## Final Polars-first cleanup consolidation
+
+This documentation/verification pass preserved the existing Task 1-3 ledger
+lines above and recorded the durable cleanup details across the full
+follow-up:
+
+1. `skyulf-core/skyulf/preprocessing/feature_generation/polynomial.py`
+   plus `skyulf-core/tests/test_feature_generation_gaps.py`: polynomial apply
+   now narrows the explicit feature list and passes the resulting numpy array
+   straight into sklearn, removing the unnecessary Pandas hop without changing
+   the fitted transformer contract or output column naming.
+2. `skyulf-core/skyulf/preprocessing/transformations/general.py`
+   plus `skyulf-core/tests/test_transformations_general.py`: PowerTransformer
+   fit now resolves candidate columns natively and hands sklearn a narrowed
+   numpy array directly; the apply/rebuild path remains behavior-identical.
+3. `skyulf-core/skyulf/preprocessing/vectorization/_common.py`
+   plus `skyulf-core/tests/test_vectorization_gaps.py`: Count/TF-IDF fit now
+   resolves valid text columns first and only then converts the narrowed text
+   subset to Pandas. The Pandas boundary intentionally remains because these
+   fit paths still assemble row-wise text with Pandas string/object semantics
+   before passing a 1-D corpus into sklearn's vectorizers; removing that would
+   be a separate behavior-sensitive change, not a safe cleanup.
+4. `skyulf-core/skyulf/preprocessing/encoding/_common.py`,
+   `skyulf-core/skyulf/preprocessing/encoding/woe.py`,
+   `skyulf-core/skyulf/preprocessing/encoding/target.py`,
+   `skyulf-core/tests/test_encoding_woe.py`, and
+   `skyulf-core/tests/test_encoding_target.py`: WOE and TargetEncoder now
+   share one engine-agnostic target extractor, and WOE reuses the shared
+   narrow-then-Pandas helper instead of maintaining its own duplicate target
+   extraction/conversion path.
+
+Validation for the consolidated cleanup docs pass:
+- `ruff check` on the six touched Core source files plus five focused tests:
+  passed.
+- `ruff format --check` on the same file set: passed.
+- `ty check` on the six touched Core source files: passed.
+- Full Core suite: `2923 passed, 69 skipped, 1 xfailed` (baseline
+  `2918 passed, 69 skipped, 1 xfailed` plus the newly added focused tests; no
+  legacy regressions).
+- `git diff --check`: clean.
