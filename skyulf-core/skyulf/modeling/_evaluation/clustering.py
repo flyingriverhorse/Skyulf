@@ -7,29 +7,11 @@ import pandas as pd
 import polars as pl
 
 from ...engines import SkyulfDataFrame
-from ...engines.polars_engine import SkyulfPolarsWrapper
+from ...engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
 from ...modeling.sklearn_wrapper import SklearnBridge
 from .common import sanitize_metrics
 from .metrics import calculate_clustering_metrics
 from .schemas import ClusterCentroid, ClusteringEvaluation, ModelEvaluationReport
-
-# Mirrors pandas' `select_dtypes(include=["number", "bool"])` for Polars dtypes,
-# used by the native Polars evaluation path below.
-_POLARS_NUMERIC_BOOL_DTYPES = frozenset(
-    (
-        pl.Boolean,
-        pl.Float32,
-        pl.Float64,
-        pl.Int8,
-        pl.Int16,
-        pl.Int32,
-        pl.Int64,
-        pl.UInt8,
-        pl.UInt16,
-        pl.UInt32,
-        pl.UInt64,
-    )
-)
 
 
 def _feature_frame(X: pd.DataFrame | SkyulfDataFrame | Any) -> pd.DataFrame:
@@ -233,7 +215,7 @@ def evaluate_clustering_model(
         numeric_cols = [
             c
             for c, t in zip(pl_frame.columns, pl_frame.dtypes, strict=True)
-            if t in _POLARS_NUMERIC_BOOL_DTYPES
+            if t in POLARS_NUMERIC_BOOL_DTYPES
         ]
         if numeric_cols:
             X_numeric_pl = pl_frame.select(numeric_cols)

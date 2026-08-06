@@ -8,7 +8,7 @@ import numpy as np
 import polars as pl
 
 from ...core.meta.decorators import node_meta
-from ...engines.polars_engine import SkyulfPolarsWrapper
+from ...engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns, resolve_columns
 from .._artifacts import CorrelationThresholdArtifact
@@ -18,21 +18,6 @@ from ..dispatcher import apply_dual_engine
 
 _NATIVE_POLARS_METHODS = frozenset(("pearson", "spearman"))
 NativePolarsCorrelationMethod = Literal["pearson", "spearman"]
-_POLARS_CORRELATION_DTYPES = frozenset(
-    (
-        pl.Boolean,
-        pl.Float32,
-        pl.Float64,
-        pl.Int8,
-        pl.Int16,
-        pl.Int32,
-        pl.Int64,
-        pl.UInt8,
-        pl.UInt16,
-        pl.UInt32,
-        pl.UInt64,
-    )
-)
 
 
 def _corr_drop_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -118,7 +103,7 @@ def _native_polars_correlation_eligible(
         and isinstance(threshold, Real)
         and not isinstance(threshold, bool)
         and _polars_corr_accepts_method()
-        and all(frame.get_column(column).dtype in _POLARS_CORRELATION_DTYPES for column in columns)
+        and all(frame.get_column(column).dtype in POLARS_NUMERIC_BOOL_DTYPES for column in columns)
     )
 
 
