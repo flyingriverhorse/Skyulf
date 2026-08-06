@@ -76,6 +76,35 @@ def resolve_columns_then_to_pandas(
     return X, columns
 
 
+def resolve_columns_then_to_numpy(
+    X: Any,
+    config: dict[str, Any],
+    default_selection_func: Callable[[Any], list[str]] | None = None,
+    target_column_key: str = "target_column",
+) -> tuple[np.ndarray, list[str]]:
+    """Resolve columns natively, then convert only that subset straight to numpy.
+
+    Prefer this over ``resolve_columns_then_to_pandas`` whenever the caller's
+    only use for the converted frame is immediately handing it to sklearn (or
+    another numpy-based consumer) with no Pandas-only step (no ``errors="coerce"``
+    NaN handling, no ``.quantile()``/interpolation semantics, no indexed
+    ``pd.Series`` masking) in between. sklearn estimators accept numpy arrays
+    directly, so Polars frames can skip the Pandas hop entirely: Polars
+    ``.select(cols).to_numpy()`` is native, no Pandas involved. Pandas inputs
+    still go through ``DataFrame.to_numpy()`` (also native, no extra copy vs.
+    the old ``pandas -> pandas -> numpy`` path).
+    """
+    columns = resolve_columns(X, config, default_selection_func, target_column_key)
+    if not columns:
+        return np.empty((0, 0)), columns
+    if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
+        select_cols = [c for c in columns if c in X.columns]
+        X_np = X.select(select_cols).to_numpy() if select_cols else np.empty((0, 0))
+    else:
+        X_np = X[columns].to_numpy()
+    return X_np, columns
+
+
 def select_then_to_pandas(X: Any, requested: Iterable[str]) -> pd.DataFrame:
     """Narrow to ``requested`` columns natively (if Polars), then convert to pandas.
 
@@ -89,6 +118,24 @@ def select_then_to_pandas(X: Any, requested: Iterable[str]) -> pd.DataFrame:
         select_cols = resolve_valid_columns(X, requested)
         return (X.select(select_cols) if select_cols else X).to_pandas()
     return to_pandas(X)
+
+
+def select_then_to_numpy(X: Any, requested: Iterable[str]) -> tuple[np.ndarray, list[str]]:
+    """Narrow to ``requested`` columns (filtering out missing ones), then go straight to numpy.
+
+    Same "small explicitly-named column list" case as ``select_then_to_pandas``,
+    but for callers whose only downstream use is a numpy-based consumer (e.g.
+    sklearn ``PolynomialFeatures``/``PolynomialFeatures.fit``) with no
+    Pandas-only step in between — skips the Pandas hop entirely for Polars
+    inputs. Returns the actually-present column list alongside the array so
+    callers can keep it in sync with the array's column order.
+    """
+    valid_cols = resolve_valid_columns(X, requested)
+    if not valid_cols:
+        return np.empty((0, 0)), []
+    if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
+        return X.select(valid_cols).to_numpy(), valid_cols
+    return X[valid_cols].to_numpy(), valid_cols
 
 
 def is_polars(X: Any) -> bool:

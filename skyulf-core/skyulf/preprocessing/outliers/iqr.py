@@ -81,6 +81,13 @@ class IQRCalculator(BaseCalculator):
             return {}
 
         multiplier = config.get("multiplier", 1.5)
+        # TODO(pandas-removal): stays on resolve_columns_then_to_pandas (not
+        # ..._to_numpy) because `.quantile()` needs Pandas' linear
+        # interpolation semantics, which differ from Polars' default
+        # "nearest" interpolation (see _helpers.py note). Switching to numpy
+        # would require doing the quantile math with
+        # np.percentile(..., method="linear") plus matching Pandas'
+        # errors="coerce" NaN-drop behavior before benchmarking equivalence.
         X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}

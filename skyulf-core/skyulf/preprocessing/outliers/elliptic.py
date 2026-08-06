@@ -103,6 +103,10 @@ class EllipticEnvelopeCalculator(BaseCalculator):
 
         contamination = config.get("contamination", 0.01)
         random_state = config.get("random_state", 42)
+        # TODO(pandas-removal): same per-column coercion/dropna caveat as
+        # zscore.py — EllipticEnvelope.fit itself takes numpy fine, but the
+        # per-column pd.to_numeric(errors="coerce").dropna() skip-logic for
+        # non-numeric/short columns needs a native-Polars equivalent first.
         X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}
