@@ -56,5 +56,10 @@ avoids both directions of sklearn's feature-name warning.
   valid explanation.
 - Keep existing DataFrame-fitted explainability tests to cover the
   `feature_names_in_` branch.
+- Update the random-search classification integration test to predict through
+  `TuningApplier(RandomForestClassifierApplier())` with the `(model, result)`
+  artifact instead of calling the numpy-fitted raw estimator with a Pandas
+  frame. This tests the supported Skyulf prediction boundary and removes the
+  pre-existing feature-name warning without changing final-model fit behavior.
 - Run focused tuning/explainability tests, Ruff, type checking, and the full
   Core suite.
