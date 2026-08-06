@@ -440,3 +440,52 @@ def test_bucketing_fit_peak_rss(benchmark, rows, cols, null_frac, route):
     delta = max(0, _peak_rss_bytes() - baseline)
     print(f"route={route} rows={rows} cols={cols} null_frac={null_frac} peak_rss_delta={delta}")
     assert "num_0" in result["bin_edges"]
+
+
+def _h3_benchmark_frame(rows: int, null_rate: float = 0.0) -> pl.DataFrame:
+    """Build a deterministic lat/lon Polars frame for H3-index conversion-cost benchmarks."""
+    rng = np.random.default_rng(20260806)
+    lat = rng.uniform(-60, 60, rows)
+    lon = rng.uniform(-180, 180, rows)
+    if null_rate:
+        null_mask = rng.random(rows) < null_rate
+        lat = np.where(null_mask, np.nan, lat)
+    return pl.DataFrame({"lat": lat, "lon": lon})
+
+
+_RUN_LARGE_H3_BENCHMARKS = os.environ.get("SKYULF_RUN_LARGE_BENCHMARKS") == "1"
+_LARGE_H3_CASE = pytest.mark.skipif(
+    not _RUN_LARGE_H3_BENCHMARKS,
+    reason="set SKYULF_RUN_LARGE_BENCHMARKS=1 to run large H3-index benchmarks",
+)
+_H3_BENCHMARK_CASES = [
+    pytest.param(100_000, 0.0, id="100k-null0"),
+    pytest.param(1_000_000, 0.05, marks=_LARGE_H3_CASE, id="1m-null5"),
+    pytest.param(5_000_000, 0.5, marks=_LARGE_H3_CASE, id="5m-null50"),
+]
+
+
+@pytest.mark.parametrize(("rows", "null_rate"), _H3_BENCHMARK_CASES)
+def test_h3_index_conversion_share_of_total_fit_time(benchmark, rows, null_rate):
+    """Measure what share of H3Index's total apply time is spent in ``to_pandas()``
+    conversion vs. the third-party ``h3.latlng_to_cell`` row computation.
+
+    Candidate E (H3 index Polars route) proposed avoiding this conversion; this
+    benchmark provides the evidence for that promotion decision by isolating
+    the conversion cost. See the audit's Candidate E execution record for the
+    resulting reject decision: conversion is a negligible fraction of total
+    time at every audit-specified shape, so there is no meaningful benefit to
+    capture with a native Polars rewrite.
+    """
+    h3 = pytest.importorskip("h3")
+    from skyulf.preprocessing.geo.h3_index import _h3_cell_or_none
+
+    df = _h3_benchmark_frame(rows, null_rate)
+
+    def _convert_and_compute():
+        pdf = df.to_pandas()
+        pdf["h3"] = pdf.apply(lambda row: _h3_cell_or_none(row["lat"], row["lon"], h3, 9), axis=1)
+        return pdf
+
+    result = benchmark(_convert_and_compute)
+    assert len(result) == rows

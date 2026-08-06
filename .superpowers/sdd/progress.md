@@ -270,3 +270,41 @@ values). Full Core suite `2918 passed, 66 skipped, 1 xfailed` (unchanged
 skip/xfail set plus the 7 new tests); `ruff check`/`ruff format --check` and
 `ty check` on touched files clean; `git diff --check` clean. Added a concise
 v0.7.4 changelog entry.
+
+Selection: continued to the final Wave 2 candidate, E (H3 index Polars
+route, `skyulf-core/skyulf/preprocessing/geo/h3_index.py`).
+Task: complete, rejected — reproduced the audit's pinned golden fixture
+exactly (h3 4.5.0, same third-party output strings) with no code changes
+needed. Isolated `to_pandas()` conversion time from the third-party
+`h3.latlng_to_cell()` per-row computation time at all three audit-specified
+shapes/null-rates (100k/0%, 1M/5%, 5M/50%) in the same warmed-up process:
+conversion consistently accounted for 0.08-0.13% of total apply time —
+three orders of magnitude smaller than the row computation itself. This
+directly matches the audit's own explicit rollback condition ("retain the
+current Pandas route if H3 computation dominates runtime"), so no native
+Polars rewrite was implemented; `h3_index.py` is unmodified. Added a
+permanent `test_h3_index_conversion_share_of_total_fit_time` benchmark to
+`test_benchmarks.py` as a standing re-evaluation check (e.g. if a vectorized
+H3 API appears upstream in the future). Existing `test_geo_nodes.py` h3
+tests (8) still pass unchanged. Documented the full evidence table and
+reject decision in the audit's new "Candidate E execution record" section,
+plus a "Wave 2 summary" table consolidating all five candidates' decisions.
+Full Core suite `2918 passed, 69 skipped, 1 xfailed` (unchanged skip/xfail
+count plus 3 new opt-in benchmark tests, 2 of which are large-shape and
+skip by default); `ruff check`/`ruff format --check` and `ty check` on
+touched files clean; `git diff --check` clean. Added a concise v0.7.4
+changelog note.
+
+Wave 2 status: all five candidates (A/B/C/D accepted, E rejected with
+evidence) from `temp/skyulf-core-pandas-polars-audit-2026-08-05.md` are now
+resolved. A quick `grep -rl "to_pandas()" skyulf/` sweep after this session
+shows the remaining call sites are narrow (already column-subset, e.g.
+`woe.py`/`polynomial.py`'s `.select(cols).to_pandas()`) or fall under the
+audit's own documented "Retained Compatibility Boundaries" (sklearn/NumPy
+model-fit surfaces in `elliptic.py`/`resampling.py`/`split.py`/
+`vectorization/_common.py`, SHAP, Pandas plotting, generic dispatcher
+fallbacks) — no further in-scope candidates were identified from this
+audit's original inventory. A fresh full-codebase inventory sweep (repeating
+the audit's "Scope and Method" pass) would be needed before claiming there
+is nothing left anywhere in the codebase; this only confirms nothing further
+is owed from this specific audit document.
