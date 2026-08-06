@@ -60,6 +60,44 @@ class MultivariateMixin(_AnalyzerState):
             X = np.nan_to_num(X, nan=0.0)
         return X
 
+    @staticmethod
+    def _impute_matrix_drop_empty(X_df: pl.DataFrame) -> np.ndarray:
+        """Mean-impute (Polars fast path, sklearn fallback), dropping columns with no
+        observed values, matching ``SimpleImputer(strategy="mean")``'s default
+        ``keep_empty_features=False`` behavior used by outlier detection.
+
+        Unlike :meth:`_impute_matrix` (used for PCA/clustering, which must keep a
+        stable column count and zero-fills all-null columns instead), outlier
+        detection's `IsolationForest` doesn't need column alignment across calls,
+        so all-null/all-NaN columns are dropped exactly like sklearn would.
+        """
+        from sklearn.impute import SimpleImputer
+
+        try:
+            # NaN-as-value and Polars null are both "missing" for SimpleImputer, so
+            # normalize NaN to null before checking for all-missing columns.
+            working = X_df.with_columns(
+                [pl.col(c).cast(pl.Float64).fill_nan(None) for c in X_df.columns]
+            )
+            non_empty = [c for c in working.columns if working[c].null_count() < working.height]
+            if non_empty:
+                working = working.select(non_empty)
+                working = working.with_columns(
+                    [pl.col(c).fill_null(pl.col(c).mean()) for c in working.columns]
+                )
+                X = working.to_numpy()
+            else:
+                # `working.select([])` collapses to 0 rows, unlike sklearn's
+                # `(n_rows, 0)` output — keep the height explicitly.
+                X = np.empty((working.height, 0))
+            if not np.isfinite(X).all():
+                raise ValueError("non-finite value present after imputation")
+        except Exception:
+            X = X_df.to_pandas().values
+            imputer = SimpleImputer(strategy="mean")
+            X = imputer.fit_transform(X)
+        return X
+
     def _prepare_matrix_sample(
         self,
         numeric_cols: list[str],
@@ -325,14 +363,11 @@ class MultivariateMixin(_AnalyzerState):
         """Isolation-Forest outlier detection with per-feature deviation explanations."""
         try:
             from sklearn.ensemble import IsolationForest
-            from sklearn.impute import SimpleImputer
 
             limit = 50000
             df_numeric = self._sample_numeric_for_outliers(numeric_cols, limit)
 
-            X = df_numeric.to_pandas().values
-            imputer = SimpleImputer(strategy="mean")
-            X = imputer.fit_transform(X)
+            X = self._impute_matrix_drop_empty(df_numeric)
 
             clf = IsolationForest(random_state=42, contamination=0.05, n_jobs=-1)
             clf.fit(X)

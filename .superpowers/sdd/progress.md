@@ -194,3 +194,48 @@ A, accepted since 1M x 15 clears both the 20% time floor and the candidate's
 stated 20% memory floor. Full Core suite `2907 passed, 42 skipped, 1 xfailed`
 (unchanged skip/xfail set); `ruff check`/`ruff format --check` and `ty check`
 clean; `git diff --check` clean. Added a concise v0.7.4 changelog entry.
+
+Follow-up: deduped the byte-identical `_POLARS_NUMERIC_BOOL_DTYPES`/
+`_POLARS_CORRELATION_DTYPES` frozensets (copy-pasted between `clustering.py`
+and `correlation.py`) into a single shared, `HAS_POLARS`-guarded
+`POLARS_NUMERIC_BOOL_DTYPES` constant in `skyulf/engines/polars_engine.py`,
+re-exported from `skyulf/engines/__init__.py`; both call sites now import it.
+Committed as `9b4155ae` (full Core suite/`ruff`/`ty`/`git diff --check` all
+clean, unchanged baseline).
+
+Selection: continued to Wave 2 Candidate C (profiling multivariate fallback,
+`skyulf-core/skyulf/profiling/_analyzer/multivariate.py`), chosen via
+`ask_user` from the remaining C/D/E candidates.
+Scope narrowing: `_prepare_matrix_sample`'s `_impute_matrix()` (used by
+PCA/clustering) already had a native-first Polars path with sklearn fallback
+and needs a stable column count (zero-fills all-null columns) — left
+unmodified. The genuine unconditional-Pandas-conversion fallback was
+`_detect_outliers()`, which always called `df_numeric.to_pandas().values`
+then `SimpleImputer(strategy="mean")`.
+Task: complete, accepted — added `_impute_matrix_drop_empty()` (native Polars
+fast path: cast to `Float64`, `fill_nan(None)` to normalize NaN-as-value into
+null, drop all-null columns matching sklearn's `keep_empty_features=False`
+default, `fill_null(mean)`, raise on remaining non-finite values; sklearn
+`SimpleImputer` fallback on any exception) and wired it into
+`_detect_outliers()` in place of the old inline conversion+impute. Verified
+the audit's exact golden fixture (`total_outliers=1`, `outlier_percentage=20.0`,
+`index=0`, `score=-0.01172203142549666`) reproduces identically before and
+after the change.
+Validation: extended `test_profiling_multivariate.py` from 24 to 28 tests
+(golden-fixture reproduction, direct `_impute_matrix_drop_empty` vs
+`SimpleImputer` parity across mixed-null/Int64-null/NaN-as-value/no-null
+cases, all-null column dropping, infinite-value fallback-and-`None`
+handling), all passing. New benchmark harness in `test_benchmarks.py`
+(`test_outlier_impute_matrix_fit_benchmark`/`_peak_rss`, opt-in large cases
+via `SKYULF_RUN_LARGE_BENCHMARKS`) at the audit's exact shapes (50k x 20
+null-heavy, 500k x 30 mixed null/all-null, 1M x 10 numeric): fit-preparation
+time improved 87-97% across all three shapes (far exceeding the 20% floor);
+peak RSS was roughly neutral at the one measured shape (50k x 20, -1.85%).
+Accepted on the time criterion alone per the time-OR-memory gate (see the
+audit's new "Candidate C execution record" section for exact commands/
+values). Full Core suite `2911 passed, 54 skipped, 1 xfailed` (unchanged
+skip/xfail set plus the 4 new tests); `ruff check`/`ruff format --check` and
+`ty check` on touched files clean (pre-existing unrelated `ty` diagnostics in
+`test_evaluation_clustering_polars.py`/`test_benchmarks.py`'s Candidate B
+legacy helper, untouched by this change); `git diff --check` clean. Added a
+concise v0.7.4 changelog entry.

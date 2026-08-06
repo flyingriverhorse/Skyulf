@@ -27,6 +27,7 @@ from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.preprocessing.feature_selection import correlation as correlation_module
 from skyulf.preprocessing.feature_selection.correlation import CorrelationThresholdCalculator
+from skyulf.profiling._analyzer.multivariate import MultivariateMixin
 
 try:
     import polars as pl
@@ -265,3 +266,86 @@ def test_evaluate_clustering_model_fit_peak_rss(benchmark, rows, numeric_cols, w
         f"peak_rss_delta={delta}"
     )
     assert result[0]["n_clusters"] == 4.0
+
+
+def _outlier_impute_benchmark_frame(rows: int, cols: int, all_null_cols: int = 0) -> pl.DataFrame:
+    """Build a deterministic mostly-numeric Polars frame with null-heavy columns,
+    matching the audit's Candidate C benchmark shapes (null-heavy / mixed null and
+    all-null columns / large numeric-only).
+    """
+    rng = np.random.default_rng(20260806)
+    data: dict[str, object] = {}
+    for i in range(cols):
+        col = rng.standard_normal(rows)
+        null_mask = rng.random(rows) < 0.3
+        col = np.where(null_mask, np.nan, col)
+        data[f"num_{i}"] = col
+    for i in range(all_null_cols):
+        data[f"all_null_{i}"] = [None] * rows
+    return pl.DataFrame(data)
+
+
+def _legacy_impute_matrix_drop_empty(X_df: pl.DataFrame) -> np.ndarray:
+    """Force the pre-native ``to_pandas().values`` + ``SimpleImputer`` fallback route
+    that ``_detect_outliers`` used before the native Polars fast path was added.
+    """
+    from sklearn.impute import SimpleImputer
+
+    X = X_df.to_pandas().values
+    imputer = SimpleImputer(strategy="mean")
+    return imputer.fit_transform(X)
+
+
+_RUN_LARGE_OUTLIER_IMPUTE_BENCHMARKS = os.environ.get("SKYULF_RUN_LARGE_BENCHMARKS") == "1"
+_LARGE_OUTLIER_IMPUTE_CASE = pytest.mark.skipif(
+    not _RUN_LARGE_OUTLIER_IMPUTE_BENCHMARKS,
+    reason="set SKYULF_RUN_LARGE_BENCHMARKS=1 to run large outlier-imputation benchmarks",
+)
+_OUTLIER_IMPUTE_BENCHMARK_CASES = [
+    pytest.param(50_000, 20, 0, id="50k-x-20-null-heavy"),
+    pytest.param(500_000, 30, 3, marks=_LARGE_OUTLIER_IMPUTE_CASE, id="500k-x-30-mixed-null"),
+    pytest.param(1_000_000, 10, 0, marks=_LARGE_OUTLIER_IMPUTE_CASE, id="1m-x-10-numeric"),
+]
+
+
+@pytest.mark.parametrize(("rows", "cols", "all_null_cols"), _OUTLIER_IMPUTE_BENCHMARK_CASES)
+@pytest.mark.parametrize("route", ["legacy", "native"])
+def test_outlier_impute_matrix_fit_benchmark(benchmark, rows, cols, all_null_cols, route):
+    """Benchmark equivalent legacy and native outlier-detection imputation routes."""
+    pytest.importorskip("polars")
+    df = _outlier_impute_benchmark_frame(rows, cols, all_null_cols)
+
+    if route == "legacy":
+        result = benchmark(_legacy_impute_matrix_drop_empty, df)
+    else:
+        result = benchmark(MultivariateMixin._impute_matrix_drop_empty, df)
+
+    assert result.shape[0] == rows
+    assert result.shape[1] == cols  # all-null columns dropped in both routes
+
+
+@pytest.mark.skipif(
+    os.environ.get("SKYULF_MEASURE_OUTLIER_IMPUTE_RSS") != "1",
+    reason="set SKYULF_MEASURE_OUTLIER_IMPUTE_RSS=1 for isolated RSS output",
+)
+@pytest.mark.parametrize(("rows", "cols", "all_null_cols"), _OUTLIER_IMPUTE_BENCHMARK_CASES)
+@pytest.mark.parametrize("route", ["legacy", "native"])
+def test_outlier_impute_matrix_peak_rss(benchmark, rows, cols, all_null_cols, route):
+    """Print incremental process RSS for one separately invoked imputation route."""
+    pytest.importorskip("polars")
+    df = _outlier_impute_benchmark_frame(rows, cols, all_null_cols)
+    baseline = _peak_rss_bytes()
+
+    def _fit():
+        if route == "legacy":
+            return _legacy_impute_matrix_drop_empty(df)
+        return MultivariateMixin._impute_matrix_drop_empty(df)
+
+    result = benchmark.pedantic(_fit, rounds=1, iterations=1, warmup_rounds=0)
+
+    delta = max(0, _peak_rss_bytes() - baseline)
+    print(
+        f"route={route} rows={rows} cols={cols} all_null_cols={all_null_cols} "
+        f"peak_rss_delta={delta}"
+    )
+    assert result.shape[0] == rows
