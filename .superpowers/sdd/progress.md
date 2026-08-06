@@ -126,3 +126,40 @@ legacy/native raw/wrapped routes, with native routes faster in this run.
 Controller diff hygiene found one unrelated empty EOF line introduced by
 `206dbb56`; `2d638984` removes only that line. Branch integration remains the
 only pending action.
+
+# Progress Ledger: Platform Roadmap Consolidation and Phase 0 Documentation/Test Fix
+
+Plan: `temp/skyulf-platform-evolution-roadmap-2026-08-05.md` (ignored decision
+roadmap, already consolidated across Core, backend/operations, frontend UX,
+release engineering, and adoption/enterprise sections in prior commits
+`60a48fee`/`538f82db`).
+Consolidation check: complete (no commit; ignored artifact) — confirmed the
+roadmap's backend/operations, frontend product experience, and
+community/adoption sections were already merged into the single document;
+no separate stray audit files existed elsewhere. Added the missing "Native
+Polars correlation fitting" line to `## Completed in v0.7.4`, citing
+`skyulf-core/skyulf/preprocessing/feature_selection/correlation.py:108-209`
+and its real test/benchmark files, since that work landed (`e3a5fa3e`) after
+the roadmap's last edit and was previously unlisted there.
+Selection: chose Phase 0's "Correct quickstart, documentation, and test
+reliability" initiative's two most concrete, low-risk findings — stale
+`skyulf[nlp]` install guidance and the network-dependent legacy
+SentenceEmbedder test — as the next evidence-backed implementation (commit
+`80cebbff`).
+Task: complete (commit `80cebbff`, self-reviewed) — `README.md`,
+`docs/user_guide/text_nlp.md`, and `requirements-nlp.txt` now consistently
+reference `skyulf-core[nlp]` (the actual published package name), matching
+every other extras reference already used across the docs. The legacy
+`TestSentenceEmbedder.test_embeddings_shape` in
+`skyulf-core/tests/test_text_vectorization.py` now mocks
+`sentence_embedder._load_model` the same way
+`skyulf-core/tests/test_sentence_embedder.py` does, so it runs deterministically
+without the optional `sentence-transformers` package or any network access.
+Validation: full Core suite `2888 passed, 26 skipped, 1 xfailed` (unchanged
+skip/xfail set), plus the 90 targeted vectorization tests; `ruff check`/`ruff
+format --check` and `ty check skyulf` clean; `mkdocs build` exited 0 with only
+the pre-existing Material 2.0 notice; `git diff --check` clean.
+Remaining Phase 0 doc/test-reliability items not yet done (left for a future
+task): the docs CI link checker / notebook execution gate, and the broader
+engine-contributor-guide/registry-API drift noted in the roadmap's release
+engineering section.
