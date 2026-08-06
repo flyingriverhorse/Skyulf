@@ -85,11 +85,12 @@ def resolve_fit_text_valid_columns(X: Any, config: dict[str, Any]) -> list[str] 
 def resolve_fit_text_columns(
     X: Any, config: dict[str, Any]
 ) -> tuple[pd.DataFrame, list[str]] | None:
-    """Resolve the pandas frame and valid text columns for a vectorizer ``fit``.
+    """Resolve the narrowed pandas frame and valid text columns for a fit.
 
-    Converts *X* to pandas if needed and filters ``config["columns"]`` down to
-    columns actually present. Returns ``None`` when there are no configured or
-    matching columns, signalling the caller should return an empty artifact.
+    Filters ``config["columns"]`` down to columns actually present, narrows the
+    input to just those columns, then converts to pandas if needed. Returns
+    ``None`` when there are no configured or matching columns, signalling the
+    caller should return an empty artifact.
 
     Use this when the caller needs the actual text data (e.g. Count/TF-IDF
     vectorizers fitting a vocabulary). If only the resolved column names are
@@ -100,12 +101,14 @@ def resolve_fit_text_columns(
     if not cols:
         return None
 
-    if hasattr(X, "to_pandas"):
-        X = X.to_pandas()
-
     valid_cols = [c for c in cols if c in X.columns]
     if not valid_cols:
         return None
+
+    if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
+        X = X.select(valid_cols).to_pandas()
+    else:
+        X = X[valid_cols]
 
     return X, valid_cols
 
