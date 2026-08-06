@@ -142,10 +142,18 @@ tasks add live walkthrough evidence.
   the installed Google Chrome binary. `11` tests passed and
   `e2e/preview.spec.ts:24` failed after `30s` because the Run Preview button
   repeatedly became unstable/detached from the DOM while Playwright tried to
-  click it (`preview.spec.ts:113`). The accessibility suite passed its
-  critical-only gate while logging two non-blocking serious findings:
-  dashboard `color-contrast` and canvas `scrollable-region-focusable`. These
-  remain pre-existing UX/test evidence, not fixes.
+  click it (`preview.spec.ts:113`). Keep this as historical measured evidence
+  of a one-off preview-button instability. The later targeted preview reruns
+  and the final system-Chrome validation superseded it: Task 8 ended with
+  `12/12` system-Chrome E2E tests passing, so the authoritative baseline
+  status is full pass.
+- **Measured:** The later targeted preview reruns and the final Task 8
+  system-Chrome validation passed `12/12` E2E tests. That final run is the
+  baseline status to trust; the earlier `11/12` measurement above remains only
+  as historical evidence. The accessibility suite passed its critical-only gate
+  while logging two non-blocking serious findings: dashboard `color-contrast`
+  and canvas `scrollable-region-focusable`. These remain pre-existing UX/test
+  evidence, not fixes.
 - **Measured:** `npm run size-check` exited `0`; all checked chunks were within
   budget.
 
@@ -475,7 +483,10 @@ tasks add live walkthrough evidence.
   `ResultsPanel` (1 passing test). The selected local source still returned no
   schema, so missing-config warning navigation, leakage selection, real
   backend failure, and server-version loading were not represented as live
-  outcomes.
+  outcomes. The earlier Baseline note about a one-off preview-button
+  instability is superseded by the later targeted preview reruns and the final
+  Task 8 system-Chrome `12/12` pass, so it stays historical rather than
+  becoming a Canvas finding.
 
 - **Inferred — unavailable diagnosis/recovery paths, with exact support:**
   `useRunControls.ts:35-82` enables Preview from a dataset plus outgoing edge,
