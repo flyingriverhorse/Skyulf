@@ -1212,6 +1212,303 @@ Canvas finding is warranted solely for this repeated form root.
   smoke coverage only includes `/jobs`; the remaining Operations routes are
   not listed in the route or a11y specs.
 
+#### Operations audit evidence and limits
+
+- **Observed:** Local system Chrome at 1440 px rendered historical completed
+  and failed rows on Jobs; model rows, version history, a deployment
+  confirmation entry point, and one active deployment; Drift's no-report
+  state and editable thresholds; 12 Error Log HTTP events with time and
+  resolution controls; Slow Nodes aggregates; and Audit Log's
+  dataset-and-limit controls with no saves for its selected dataset. The
+  reproduced Error Log row expanded to a traceback. No destructive resolve,
+  clear, deactivate, deploy, or redeploy request was submitted during this
+  documentation-only audit.
+- **Observed:** The reproduced registry version dialog named version, date,
+  `best_score`, status, and Deploy. The deployment screen named its active
+  model, full job ID, date, artifact URI, and Deactivate. These are separate
+  route-local displays: the records and identifiers were not interactive links
+  to each other or to Jobs in the reproduced UI.
+- **Inferred:** `JobsPage.tsx` renders table rows but no row/detail action;
+  `JobsDrawer`/`JobDetailsView` separately provide overview, logs, and
+  non-terminal cancellation. There is no retry action in either path.
+  `DeploymentsPage.tsx`, `DataDriftPage.tsx`, `ErrorLogPage.tsx`,
+  `SlowNodesPage.tsx`, and `AuditLogPage.tsx` contain no router navigation
+  from operational identifiers. The monitoring contracts carry `job_id`,
+  `pipeline_id`, `node_id`, and `sample_node_id`, but the route pages expose
+  them as text rather than a common investigation context.
+- **Inferred:** Existing Playwright route and axe suites cover `/jobs` but not
+  Registry, Deployments, Drift, Errors, Slow Nodes, or Audit Log; unit tests
+  do not supply operational history, alert, resolve/reopen, cancellation,
+  retry, deployment mutation, or audit-version fixtures. Therefore the audit
+  cannot claim reproduced lifecycle transitions, mutation success/failure, or
+  populated drift/audit histories. The findings below distinguish that missing
+  evidence from the observed static states and code-supported behavior.
+
+- **OPS-001 — Observed: the Jobs route presents status history but does not
+  enter an actionable job investigation.**
+  - **Evidence:** Chrome showed completed and failed job rows with status,
+    truncated ID, type, one detail value, duration, and created time. The rows
+    have no visible action or detail entry point. In code, `JobsPage.tsx`
+    filters and paginates a task pool, while `JobDetailsView.tsx` has a
+    different drawer-only overview/logs/cancel experience; it supports
+    cancellation for non-terminal jobs, but no retry.
+  - **Problem:** A failed or long-running job discovered in the operational
+    history cannot be opened into its error, logs, source pipeline, dataset,
+    model/version, or a recovery action. Users must locate the same opaque ID
+    manually, while terminal and active states provide inconsistent next steps.
+  - **Surfaces:** Jobs route; Canvas Job History drawer; job overview/logs;
+    completed, failed, queued, running, cancelled, and paginated histories.
+  - **Proposed behavior:** Make each job record a single durable investigation
+    target, with status phase/progress/timing, task/model/dataset/pipeline
+    context, logs/error, and only supported actions (cancel while active;
+    retry/clone when the backend can safely supply one). Preserve the current
+    Jobs filters and scroll position when closing or following a related
+    record.
+  - **Acceptance criteria:** Every displayed job has an accessible Details
+    action; its detail view names full ID, status transition timestamps,
+    progress or an honest “not reported,” inputs, result/model version, and
+    error/log state. Active and terminal actions state availability and
+    outcome; unavailable retry is not implied. Back returns to the same
+    tab/search/status/page. Related model, deployment, dataset, pipeline, and
+    error links carry the exact job context.
+  - **Validation method:** Seed queued/running/progress/completed/failed/
+    cancelled training, tuning, EDA, and ingestion fixtures plus multiple
+    pages. Exercise search/status/task filters, Load More, details, logs,
+    cancel confirmation/success/failure, retry-supported and retry-unavailable
+    outcomes, and Back at 1440 and 390 px with keyboard and live-status checks.
+  - **Impact:** High. **Frequency:** Frequent. **Effort:** L. **Risk:**
+    Medium. **Dependencies:** jobs/status/log APIs, `useJobStore`,
+    `JobsPage`, `JobsDrawer`, job-detail contract, and **FND-003**. Do not
+    duplicate ingestion/EDA lifecycle work in **DAT-003**/**DAT-005**; consume
+    its source-specific provenance.
+    **Milestone:** Now.
+
+- **OPS-002 — Observed: model registration and deployment history do not form
+  a traceable model-to-deployment decision chain.**
+  - **Evidence:** Chrome showed a model's version dialog with its score and a
+    Deploy button, then a separate active-deployment record with the same kind
+    of job ID and artifact URI. The IDs were text, not links. In code,
+    Registry deploys by `version.job_id`; Deployments fetches active/history
+    independently and only redeploys an inactive historical job.
+  - **Problem:** An operator cannot reliably answer which training job,
+    dataset/split/metric, registered version, artifact, deployment event, and
+    current inference target belong together—or return to that evidence after
+    a deploy/redeploy/deactivate decision.
+  - **Surfaces:** Model Registry filters/list/version dialog/artifacts;
+    Deployments active card/history/redeploy; Jobs; Experiments/Evaluation;
+    Inference deployment picker.
+  - **Proposed behavior:** Give the model version a stable lineage record and
+    make Registry, Deployments, Jobs, and Inference render the same
+    model-version/deployment identity with bidirectional deep links. Retain
+    confirmation, pending, success, failure, and inactive/replaced history on
+    the initiating surface and on the resulting deployment record.
+  - **Acceptance criteria:** A version identifies source job, dataset,
+    evaluation provenance, artifact/version, deployment state, actor/time, and
+    replacement relationship; the active deployment identifies the same
+    version rather than just a job ID. Deploy/redeploy/deactivate confirmations
+    name the exact before/after model; success and failure leave a durable,
+    refresh-safe record; every related link opens the exact record and offers a
+    return path.
+  - **Validation method:** Mock two model families, multiple versions, an
+    active replacement, inactive history, no deployment, successful and failed
+    deploy/redeploy/deactivate mutations, and stale refresh. Assert
+    confirmation copy, disabled duplicate actions, route/query context,
+    Back/Forward, refresh persistence, and keyboard/modal feedback at desktop
+    and 390 px.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** L. **Risk:**
+    High. **Dependencies:** registry/deployment version schema, job/evaluation
+    provenance, artifact metadata, router context, and **EXP-005** threshold
+    provenance. Reuse **FND-003** for shared async announcements and
+    **FND-004** for route-fetch retry rather than creating parallel mechanisms.
+    **Milestone:** Now.
+
+- **OPS-003 — Inferred: drift detection has no durable alert-to-investigation
+  and remediation lifecycle.**
+  - **Evidence:** Chrome reproduced only the no-report state and locally
+    editable PSI, KS p-value, Wasserstein, and KL-divergence thresholds.
+    `DataDriftPage.tsx` retains selected job, file, thresholds, and report in
+    page state, refreshes per-job history after a calculation, and displays a
+    report/filter/export when present. Its API returns history metadata but no
+    alert ownership, acknowledgement, severity, deployment, or resolution
+    context; no populated drift fixture exists.
+  - **Problem:** A drift signal cannot be reliably triaged: the user cannot
+    see which deployed model/version and reference/current data it affects,
+    why it crossed the threshold, whether thresholds changed since the prior
+    check, who investigated it, or the next safe action.
+  - **Surfaces:** Data Drift reference-job selector, thresholds, report,
+    history, sidebar drift badge, Registry/Deployments, Jobs, Errors, and
+    Audit Log.
+  - **Proposed behavior:** Persist each drift check as an investigation record
+    with reference job/model/deployment, current-data identity, evaluated
+    threshold set/version, feature evidence, severity, status, owner, linked
+    response actions, and links back to the originating alert. Acknowledge or
+    resolve only when an explicit disposition is recorded.
+  - **Acceptance criteria:** Every drift alert states affected resource,
+    detection time, severity/reason, threshold values, and report/history
+    identity; it deep-links to filtered feature evidence and related
+    model/deployment/job. Threshold changes are versioned, not silently
+    attributed to old reports. Empty, request-failed, partial, acknowledged,
+    resolved, and re-opened histories name the next action without treating
+    “no report” as “no drift.”
+  - **Validation method:** Mock no reference, upload/error, no-drift,
+    warning/critical feature drift, schema drift, repeated checks under changed
+    thresholds, alert acknowledgement/resolution, and deployment replacement.
+    Verify badge→report→deployment/job navigation, history filters, CSV
+    provenance, retry behavior, screen-reader status, and narrow/desktop
+    layouts.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** L. **Risk:**
+    High. **Dependencies:** persisted drift/alert schema, threshold versioning,
+    deployment lineage, notification routing, and **FND-003**. This extends
+    operational investigation; it does not duplicate **DAT-007**'s chart
+    interpretation contract.
+    **Milestone:** Next.
+
+- **OPS-004 — Observed: Error Log time filtering and resolution do not provide
+  a severity- and resource-scoped incident workflow.**
+  - **Evidence:** Chrome reproduced Events and Issues, search, 1h/6h/24h/7d/
+    All controls, Show resolved, Resolve, and a route-specific 500 event.
+    Expanding that event revealed a traceback but no resource deep link or
+    severity filter. `ErrorLogPage.tsx` only passes time and resolved state to
+    `getErrors`; the contract has `job_id`, route, and status code but no
+    severity or investigation state. Mutation outcomes are untested and were
+    not submitted in this audit.
+  - **Problem:** A route string, HTTP code, and raw traceback are insufficient
+    to prioritize, deduplicate, assign, diagnose, or safely resolve an
+    operational incident. The user cannot filter affected job/pipeline/node/
+    deployment or move from the incident to that resource with context.
+  - **Surfaces:** Error Log Events/Issues/timeline/search/time/resolved
+    controls; traceback dialog; pipeline logs; Jobs; Canvas; Data Sources;
+    Registry/Deployments.
+  - **Proposed behavior:** Establish incident records with normalized severity,
+    resource links, correlation/group identity, count/first/last seen,
+    owner/status/resolution note, and a safe diagnostic excerpt. Keep raw
+    technical detail available on demand but do not make it the sole next
+    action; preserve current filters in shared links and export.
+  - **Acceptance criteria:** Filters cover severity, time, status, error type,
+    and affected resource; every event/issue identifies its correlation,
+    recurrence, related job/pipeline/node/model/deployment, and a contextual
+    View action. Resolve/reopen requires and records a disposition, updates
+    grouped/timeline counts consistently, and exposes mutation pending/error/
+    retry without losing filters. Detail redacts unsafe host/path material
+    according to product policy while retaining a copyable diagnostic ID.
+  - **Validation method:** Mock client/4xx/5xx/pipeline errors, warning/error/
+    critical severities, repeated groups, linked and unlinked resources,
+    resolved/reopened rows, fetch and mutation failure, and export. Exercise
+    each filter combination, resolve/reopen, issue/event detail, and all deep
+    links at 1440 and 390 px with keyboard, dialog-focus, and live-feedback
+    assertions.
+  - **Impact:** High. **Frequency:** Frequent. **Effort:** L. **Risk:**
+    Medium. **Dependencies:** monitoring incident schema, correlation/resource
+    mapping, route context, redaction policy, and **FND-003**/**FND-004**.
+    **Milestone:** Now.
+
+- **OPS-005 — Observed: Slow Nodes identifies aggregate cost but cannot lead
+  an operator to the slow run, node configuration, or remediation.**
+  - **Evidence:** Chrome showed lookback/top-N controls, aggregate metrics,
+    sortable columns, and sample node IDs rendered as “e.g.” text. The
+    `SlowNodesResponse` only supplies aggregate step statistics and optional
+    `sample_node_id`; `SlowNodesPage.tsx` renders no row action or navigation.
+  - **Problem:** Aggregate p95/total cost can suggest a candidate, but it
+    cannot establish whether a particular pipeline, dataset, run, configuration,
+    or deployment caused the cost. “Use it to spot” does not provide an
+    investigation or remediation path.
+  - **Surfaces:** Slow Nodes lookback/top-N controls, chart/table, Jobs,
+    Canvas node properties, Audit Log, Error Log, and affected deployments.
+  - **Proposed behavior:** Allow an aggregate to open a time-bound performance
+    investigation with contributing run IDs, sample/representative node
+    identity, dataset/pipeline/version context, distribution/outlier evidence,
+    and context-preserving links to the job and Canvas configuration. Clearly
+    distinguish aggregate estimates from one run's measurement.
+  - **Acceptance criteria:** Every aggregate states window, run count, unit,
+    sort direction, and whether its sample is representative; an accessible
+    Investigate action lists contributing runs or honestly says unavailable.
+    Links carry step/node/run/time context; returning restores lookback, top-N,
+    sort, and row. Empty/error/stale data names its refresh/recovery state.
+  - **Validation method:** Mock no runs, one run, many runs, missing sample
+    node, outlier p95/max, fetch failure, and a representative run with saved
+    pipeline context. Assert sorting, labels, investigation drill-down,
+    context-return, keyboard control, chart/table equivalence, and responsive
+    geometry.
+  - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** slow-node drill-down API, run/pipeline snapshot
+    retention, router context, and **CAN-002** node-addressable diagnosis.
+    **Milestone:** Next.
+
+- **OPS-006 — Inferred: Audit Log is a dataset-scoped save list, not a
+  filterable, attributable operational history.**
+  - **Evidence:** Chrome rendered Dataset and limit controls and the explicit
+    empty state “No saves recorded”; no history fixture was available.
+    `AuditLogPage.tsx` calls `pipelineVersionsApi.audit(datasetId, limit)` and
+    exposes no time, actor, resource, action, version-status, or related-run
+    filter. The page describes an append-only Canvas save history, but no
+    populated detail/action state is tested.
+  - **Problem:** Operators cannot isolate a change around an incident, learn
+    who changed which pipeline/version and why, compare it with a deployment or
+    job, or share a reproducible filtered audit view. An empty history gives no
+    scope/retention explanation.
+  - **Surfaces:** Audit Log dataset picker/limit/entries/details; Canvas save
+    and Save as version; Jobs; Registry/Deployments; Drift; Errors.
+  - **Proposed behavior:** Make each audit entry a stable, read-only change
+    event with actor/time/action/resource/version, concise changed-node summary,
+    selected pipeline/dataset context, and deep links to the relevant version,
+    run, model, and deployment. Add server-supported time/resource/action/
+    actor filters and describe scope, ordering, retention, and unavailable
+    history explicitly.
+  - **Acceptance criteria:** Dataset, time range, resource/pipeline, action,
+    actor, and version-status filters are visible, composable, URL-restorable,
+    and retained through detail/Back. Each event identifies before/after
+    version, changed nodes/config summary, actor/time, source action, and
+    related record links. Empty, filtered-empty, access-denied, expired, and
+    request-failed states state what was searched and the next action.
+  - **Validation method:** Mock multiple datasets/pipelines, save/version/
+    restore/delete-like actions, actors, timestamps, changed/unchanged node
+    diffs, linked/unlinked jobs and deployments, retention/permission/fetch
+    failures, and pagination. Test filter chips/query restoration, detail,
+    copy/share link, Back, keyboard expansion, and desktop/mobile tables.
+  - **Impact:** Medium. **Frequency:** Occasional. **Effort:** L. **Risk:**
+    Medium. **Dependencies:** pipeline-version audit API, identity/retention
+    policy, version graph snapshots, router query state, and **EXP-004**'s
+    baseline/candidate snapshot contract.
+    **Milestone:** Next.
+
+- **OPS-007 — Inferred: Operations records do not share a cross-page,
+  deep-linkable investigation context.**
+  - **Evidence:** The operations route sources do not call router navigation;
+    identifiers in Jobs, Deployments, Drift, Errors, Slow Nodes, and Audit Log
+    are local display/filter state. The live audit reproduced the consequence:
+    Registry and Deployments show related job-like identifiers without a
+    navigable relationship, and Error/Slow Nodes show route/node references as
+    text. Tests do not exercise operational handoffs.
+  - **Problem:** An alert, failed job, slow node, version change, or deployment
+    investigation becomes a sequence of manual copying and rediscovery. Context
+    (filters, time, resource identity, selected record) is lost between pages,
+    risking investigation of the wrong artifact or historical record.
+  - **Surfaces:** All Operations routes; Canvas; Data Sources/EDA;
+    Experiments/Inference; global alert badges and notifications.
+  - **Proposed behavior:** Define a route/query-backed operational context
+    contract for job, pipeline/version, dataset, model version, deployment,
+    drift check, incident, node, time range, and origin. Each page consumes
+    only the fields it understands, visibly preserves the origin, and offers a
+    contextual return without changing the underlying record identity.
+  - **Acceptance criteria:** Every operational alert/row/detail provides
+    resource-appropriate deep links; destinations show a breadcrumb/context
+    chip and can return to the filtered origin. Invalid/deleted/unauthorized
+    targets retain the safe identifier and provide recovery, rather than a
+    blank page. Links are copyable and URL-restorable; no route uses a
+    truncated ID as its sole identity.
+  - **Validation method:** Seed a connected job→model version→deployment,
+    drift→deployment, error→pipeline/node, slow-node→run, and
+    audit-version→Canvas graph. Follow every link and Back/Forward/reload;
+    assert exact identity, filters/time context, missing-target behavior,
+    desktop/mobile geometry, and keyboard focus on arrival.
+  - **Impact:** High. **Frequency:** Frequent. **Effort:** L. **Risk:**
+    High. **Dependencies:** shared operational context schema, router/query
+    serialization, all Operations API identities, and navigation ownership.
+    This is Operations-specific continuity; it reuses rather than duplicates
+    **FND-001** compact layout, **FND-003** status semantics, and
+    **FND-004** retry behavior.
+    **Milestone:** Now.
+
 ## Prioritized Findings Inventory
 
 | ID | Evidence | User problem | Surfaces | Impact | Frequency | Effort | Risk | Dependencies | Milestone |
@@ -1241,6 +1538,13 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-005 | Inferred | Threshold exploration/tuning/activation lacks a durable decision record. | Evaluation, threshold API, Inference overrides/results | High | Occasional | M | High | Threshold API/version semantics; FND-003 | Now |
 | EXP-006 | Observed | Inference permits visibly incomplete/type-incompatible input. | Editor, schema badges/Fix, prediction request | High | Frequent | M | High | Typed artifact schema | Now |
 | EXP-007 | Inferred | Inference execution/recovery is not a complete durable run lifecycle. | Run, pending/error/results, history, exports | High | Occasional | L | Medium | Prediction/status API; storage; FND-003 | Now |
+| OPS-001 | Observed | Jobs history cannot open a unified details/recovery investigation. | Jobs; Job History drawer; logs; related resources | High | Frequent | L | Medium | Job/status/log APIs; useJobStore; DAT-003/DAT-005; FND-003 | Now |
+| OPS-002 | Observed | Registered versions and deployments do not form a traceable decision chain. | Registry; Deployments; Jobs; Experiments; Inference | High | Occasional | L | High | Registry/deployment lineage; job/evaluation provenance; FND-003/FND-004 | Now |
+| OPS-003 | Inferred | Drift reports lack a durable alert, investigation, and remediation lifecycle. | Drift; alert badge; Registry/Deployments; Jobs; Errors | High | Occasional | L | High | Drift/alert schema; threshold versioning; deployment lineage; FND-003 | Next |
+| OPS-004 | Observed | Error investigation lacks severity/resource-scoped workflow and deep links. | Error Log; incidents; Jobs; Canvas; Data; Registry/Deployments | High | Frequent | L | Medium | Incident/correlation schema; resource mapping; redaction; FND-003/FND-004 | Now |
+| OPS-005 | Observed | Slow-node aggregates cannot lead to the measured run/node or remediation. | Slow Nodes; Jobs; Canvas; Audit Log | Medium | Occasional | M | Medium | Slow-node drill-down API; run snapshots; CAN-002 | Next |
+| OPS-006 | Inferred | Audit history cannot be filtered, attributed, or correlated operationally. | Audit Log; Canvas versions; Jobs; Deployments; Drift; Errors | Medium | Occasional | L | Medium | Audit API; identity/retention policy; graph snapshots; EXP-004 | Next |
+| OPS-007 | Inferred | Operations records lack context-preserving, deep-linkable continuity. | All Operations; Canvas; Data/EDA; Experiments/Inference; alerts | High | Frequent | L | High | Operational context schema; router/query state; API identities; FND-001/FND-003/FND-004 | Now |
 
 ## Component-Boundary Recommendations
 
@@ -1280,6 +1584,15 @@ Canvas finding is warranted solely for this repeated form root.
   treat shared retry and field-semantics cleanup in `FND-004`/`FND-005` as
   later normalization, and do not split presentational helpers merely for file
   size.
+- **Operations record boundary:** Keep authoritative job, registry/deployment,
+  drift, incident, performance, and version-audit data in their existing APIs,
+  but introduce a small shared operational-context serializer and record-link
+  primitive before composing route-specific detail views. Jobs owns job
+  lifecycle (`OPS-001`); Registry/Deployments owns model lineage (`OPS-002`);
+  Drift, Errors, Slow Nodes, and Audit Log own their investigation views
+  (`OPS-003`–`OPS-006`). Those views must consume one identity/origin contract
+  for `OPS-007`, while **FND-003** and **FND-004** remain the shared status and
+  retry mechanisms rather than parallel Operations implementations.
 
 ## Now / Next / Later Roadmap
 
@@ -1315,6 +1628,15 @@ Canvas finding is warranted solely for this repeated form root.
   route-local issue reporting and reviewable repairs.
 - **EXP-007:** Give prediction runs durable pending/failure/retry/result/export
   context within the Inference journey.
+- **OPS-001:** Make every Jobs history record open a context-rich details and
+  supported-recovery view, retaining the originating list state.
+- **OPS-002:** Trace every registered model version through source job,
+  evaluation/artifact, deployment event, active state, and inference target.
+- **OPS-004:** Turn Error Log events/issues into severity- and resource-scoped
+  incidents with safe diagnostic detail, disposition, and contextual links.
+- **OPS-007:** Add URL-restorable operational context and contextual return
+  across alerts, Jobs, Registry, Deployments, monitoring, Canvas, and
+  inference.
 
 ### Next
 
@@ -1335,6 +1657,12 @@ Canvas finding is warranted solely for this repeated form root.
   zero values, and segmentation metric direction.
 - **EXP-004:** Make baseline/candidate roles, snapshot availability, and
   structural-versus-outcome differences explicit in Pipeline Diff.
+- **OPS-003:** Persist drift alerts, threshold versions, severity, ownership,
+  disposition, and links to the affected model/deployment/job.
+- **OPS-005:** Let Slow Nodes open time-bound contributing-run and Canvas-node
+  investigation rather than presenting aggregates alone.
+- **OPS-006:** Add attributed, filterable, URL-restorable version audit
+  history with related-record links and clear retention states.
 
 ### Later
 
@@ -1367,3 +1695,10 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-005 threshold decision lifecycle | Preview/save/enable/clear/provenance cannot be misattributed and failed mutations retry in place on the current surface | Two-job threshold API state-transition tests | Tune, enable, infer, override, clear, retry | 1440 and 390 px | Status/error announcements and control labels |
 | EXP-006 typed inference input | Invalid field/value/row shapes and editor-local issue state are actionable before submit | Typed-schema JSON/CSV request-gating tests | Review repair/default/unknown-type input | 1440 and 390 px | Field/error relationships and keyboard repair |
 | EXP-007 inference run lifecycle | Pending/failure/retry/results/export/history retain clear provenance on the Inference surface | Delayed/success/failure/cancel/reload/export tests | Execute, reset, retry, reload, restore, export | 1440 and 390 px | Live status, error recovery, and focus review |
+| OPS-001 job investigation lifecycle | Job details name lifecycle/input/error/log/result context; supported actions recover in place and Back restores list state | Paginated multi-type job, cancel/retry/unavailable-action component and Playwright fixtures | Search/filter/load/details/log/cancel/retry/return | 1440 and 390 px | Detail/action names, live status, keyboard return |
+| OPS-002 model deployment lineage | Model/job/version/artifact/deployment/inference identities remain traceable across action outcomes | Multi-version/deployment mutation and deep-link Playwright tests | Deploy, replace, deactivate, redeploy, refresh, follow links | 1440 and 390 px | Confirmation/modal focus and action status |
+| OPS-003 drift investigation lifecycle | Alert, severity, threshold version, evidence, owner/disposition, and related resources persist per check | Drift/alert history and transition fixtures | Alert→report→job/deployment, threshold change, acknowledge/reopen | 1440 and 390 px | Alert/status semantics and feature-table navigation |
+| OPS-004 incident investigation | Severity/time/resource/status filters, safe detail, dispositions, and related links explain every incident | Event/group/resource/mutation/export Playwright tests | Filter, expand, resolve/reopen, retry, export, follow context | 1440 and 390 px | Dialog focus, live mutation outcomes, readable detail |
+| OPS-005 slow-node diagnosis | Aggregate source, unit/window, contributing run context, and returnable remediation links are explicit | Aggregate/outlier/no-data/drill-down tests | Sort, investigate, open job/Canvas, return with controls retained | 1440 and 390 px | Sort/button names and chart/table alternatives |
+| OPS-006 version audit trail | Action/resource/time/actor/version filters and linked details explain scope, change, and retention | Multi-dataset/version/actor/filter/query-state tests | Filter, inspect, copy/reload link, follow and return | 1440 and 390 px | Expandable audit detail and filter semantics |
+| OPS-007 cross-page continuity | Every related Operations record arrives with exact identity, origin, and recoverable context | Connected-record deep-link/Back/Forward/reload tests | Follow alert/job/error/drift/slow/audit links including deleted target | 1440 and 390 px | Arrival focus, breadcrumb/context chip, copyable links |
