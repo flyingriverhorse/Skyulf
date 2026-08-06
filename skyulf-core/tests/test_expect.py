@@ -88,6 +88,18 @@ def test_polars_expectations_match_pandas_null_nan_and_range_messages() -> None:
         assert str(polars_range_error.value) == str(pandas_range_error.value)
 
 
+def test_polars_nullable_integer_range_message_matches_pandas() -> None:
+    """Nullable integer range failures keep Pandas max-observed formatting."""
+    pandas_frame = pd.DataFrame({"value": [1, None, 3]})
+    with pytest.raises(ExpectationError) as pandas_error:
+        expect_value_range(pandas_frame, "value", maximum=2)
+
+    for frame in _polars_variants({"value": [1, None, 3]}):
+        with pytest.raises(ExpectationError) as polars_error:
+            expect_value_range(frame, "value", maximum=2)
+        assert str(polars_error.value) == str(pandas_error.value)
+
+
 def test_polars_expect_unique_matches_pandas_for_raw_and_wrapped_frames() -> None:
     """Duplicate-row counts and messages match the Pandas path."""
     pandas_frame = pd.DataFrame({"left": [1, 1, 2], "right": ["a", "a", "b"]})
