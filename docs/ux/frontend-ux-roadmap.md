@@ -22,14 +22,15 @@ shared field-semantic (`FND-005`) normalization remain Next follow-ons. The
 Dashboard-only contrast result is intentionally deferred to the Dashboard
 journey rather than represented as a shared-foundation finding.
 
-Task 6 adds seven Operations findings. `OPS-007` establishes the shared
-URL-restorable operational-context serializer in Now; the Jobs, model-lineage,
-and Error Log investigation work (`OPS-001`, `OPS-002`, and `OPS-004`) follows
-in Next because its contextual record links depend on that boundary. `OPS-006`
-does not claim Audit Log lacks attribution or change detail: its existing
-entries render actor, timestamp, action kind, version, and node diffs. It
-instead targets missing filters, time-range/retention clarity, and
-cross-record correlation.
+Task 6 adds seven Operations findings. `OPS-007` now limits the Now slice
+to a shared typed operational-context schema, serializer/parser round-trip
+contract, and contextual record-link primitive. The consumer integrations for
+Jobs, Registry/Deployments, Drift, Error Log, Slow Nodes, and Audit Log
+(`OPS-001`–`OPS-006`) remain Next so each view can adopt that boundary in its
+own rows/details. `OPS-006` does not claim Audit Log lacks attribution or
+change detail: its existing entries render actor, timestamp, action kind,
+version, and node diffs. It instead targets missing filters,
+time-range/retention clarity, and cross-record correlation.
 
 ## Method and Evidence
 
@@ -975,7 +976,8 @@ Canvas finding is warranted solely for this repeated form root.
   only the rendered client-side name check, not backend acceptance or a real
   prediction result.
 - **Inferred:** The shared Playwright API stub returns `{}` for `/api/**`;
-  route/a11y coverage lists only `/`, `/canvas`, `/jobs`, `/data`, and `/eda`.
+  `routes.spec.ts` covers only `/`, `/canvas`, `/jobs`, `/data`, and `/eda`,
+  while `a11y.spec.ts` covers only `/`, `/canvas`, `/data`, and `/eda`.
   The focused unit tests cover threshold-tab visibility, threshold math, and
   per-class matrix calculation, not an Experiments or Inference journey.
   Consequently, mocks do **not** expose realistic multi-run classification,
@@ -1218,8 +1220,9 @@ Canvas finding is warranted solely for this repeated form root.
   route pages; `/errors` is the eager `ErrorLogPage`.
 - **Baseline entry-point mapping:** `Layout.tsx` shows alert badges only on
   `/drift` (`driftAlert`) and `/errors` (`errorAlert`). Current E2E route
-  smoke coverage only includes `/jobs`; the remaining Operations routes are
-  not listed in the route or a11y specs.
+  smoke coverage includes `/jobs`; the remaining Operations routes are not
+  listed in `routes.spec.ts`, and `a11y.spec.ts` does not cover any
+  Operations route.
 
 #### Operations audit evidence and limits
 
@@ -1245,11 +1248,13 @@ Canvas finding is warranted solely for this repeated form root.
   from operational identifiers. The monitoring contracts carry `job_id`,
   `pipeline_id`, `node_id`, and `sample_node_id`, but the route pages expose
   them as text rather than a common investigation context.
-- **Inferred:** Existing Playwright route and axe suites cover `/jobs` but not
-  Registry, Deployments, Drift, Errors, Slow Nodes, or Audit Log; unit tests
-  do not supply operational history, alert, resolve/reopen, cancellation,
-  retry, deployment mutation, or audit-version fixtures. Therefore the audit
-  cannot claim reproduced lifecycle transitions, mutation success/failure, or
+- **Inferred:** Existing Playwright route coverage includes `/jobs`, while
+  `a11y.spec.ts` covers only `/`, `/canvas`, `/data`, and `/eda` and does not
+  include `/jobs`. Registry, Deployments, Drift, Errors, Slow Nodes, and Audit
+  Log are absent from both route-smoke and axe coverage. Unit tests do not
+  supply operational history, alert, resolve/reopen, cancellation, retry,
+  deployment mutation, or audit-version fixtures. Therefore the audit cannot
+  claim reproduced lifecycle transitions, mutation success/failure, or
   populated drift/audit histories. The findings below distinguish that missing
   evidence from the observed static states and code-supported behavior.
 - **Inferred:** Although no populated Audit Log fixture was available,
@@ -1379,9 +1384,10 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** L. **Risk:**
     High. **Dependencies:** persisted drift/alert schema, threshold versioning,
     deployment lineage, notification routing, **OPS-007** operational context,
-    and **FND-003**. This extends
-    operational investigation; it does not duplicate **DAT-007**'s chart
-    interpretation contract.
+    and **FND-003**. This extends operational investigation; it does not
+    duplicate **DAT-007**'s chart interpretation contract. This follows
+    **OPS-007** because its alert, report, and related-record links consume the
+    shared serializer/boundary; no independent slice is claimed here.
     **Milestone:** Next.
 
 - **OPS-004 — Observed: Error Log generic identifier search lacks typed
@@ -1461,7 +1467,9 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** slow-node drill-down API, run/pipeline snapshot
     retention, **OPS-007** operational context, and **CAN-002**
-    node-addressable diagnosis.
+    node-addressable diagnosis. This follows **OPS-007** because its
+    investigation links and return state consume the shared
+    serializer/boundary; no independent slice is claimed here.
     **Milestone:** Next.
 
 - **OPS-006 — Inferred: Audit Log has attributed version/diff entries but lacks
@@ -1504,44 +1512,51 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** L. **Risk:**
     Medium. **Dependencies:** pipeline-version audit filtering/correlation API,
     identity/retention policy, version graph snapshots, **OPS-007** operational
-    context, and **EXP-004**'s baseline/candidate snapshot contract.
+    context, and **EXP-004**'s baseline/candidate snapshot contract. This
+    follows **OPS-007** because its contextual filters/links and return state
+    consume the shared serializer/boundary; no independent slice is claimed
+    here.
     **Milestone:** Next.
 
-- **OPS-007 — Inferred: Operations records do not share a cross-page,
-  deep-linkable investigation context.**
+- **OPS-007 — Inferred: Operations lacks a shared typed context-serialization
+  and record-link primitive.**
   - **Evidence:** The operations route sources do not call router navigation;
     identifiers in Jobs, Deployments, Drift, Errors, Slow Nodes, and Audit Log
-    are local display/filter state. The live audit reproduced the consequence:
-    Registry and Deployments show related job-like identifiers without a
-    navigable relationship, and Error/Slow Nodes show route/node references as
-    text. Tests do not exercise operational handoffs.
-  - **Problem:** An alert, failed job, slow node, version change, or deployment
-    investigation becomes a sequence of manual copying and rediscovery. Context
-    (filters, time, resource identity, selected record) is lost between pages,
-    risking investigation of the wrong artifact or historical record.
-  - **Surfaces:** All Operations routes; Canvas; Data Sources/EDA;
-    Experiments/Inference; global alert badges and notifications.
-  - **Proposed behavior:** Define a route/query-backed operational context
-    contract for job, pipeline/version, dataset, model version, deployment,
-    drift check, incident, node, time range, and origin. Each page consumes
-    only the fields it understands, visibly preserves the origin, and offers a
-    contextual return without changing the underlying record identity.
-  - **Acceptance criteria:** Every operational alert/row/detail provides
-    resource-appropriate deep links; destinations show a breadcrumb/context
-    chip and can return to the filtered origin. Invalid/deleted/unauthorized
-    targets retain the safe identifier and provide recovery, rather than a
-    blank page. Links are copyable and URL-restorable; no route uses a
-    truncated ID as its sole identity.
-  - **Validation method:** Seed a connected job→model version→deployment,
-    drift→deployment, error→pipeline/node, slow-node→run, and
-    audit-version→Canvas graph. Follow every link and Back/Forward/reload;
-    assert exact identity, filters/time context, missing-target behavior,
-    desktop/mobile geometry, and keyboard focus on arrival.
-  - **Impact:** High. **Frequency:** Frequent. **Effort:** L. **Risk:**
-    High. **Dependencies:** shared operational context schema, router/query
-    serialization, all Operations API identities, and navigation ownership.
-    This is Operations-specific continuity; it reuses rather than duplicates
-    **FND-001** compact layout, **FND-003** status semantics, and
+    remain local display/filter state. No shared parser/serializer or link
+    helper owns operational identities, origin, or time/filter context. Tests do
+    not exercise query parsing, round-tripping, or operational handoffs.
+  - **Problem:** If each Operations view adds deep links independently, it will
+    hand-roll route keys, parsing, invalid-value handling, and return-state
+    semantics. That makes cross-page investigations brittle and raises the risk
+    of copying the wrong record, losing origin/time scope, or treating a
+    truncated label as identity.
+  - **Surfaces:** Shared Operations link/query-state utilities and the future
+    Jobs, Registry, Deployments, Drift, Errors, Slow Nodes, and Audit Log
+    consumers that adopt them.
+  - **Proposed behavior:** Define one typed operational-context contract plus a
+    shared serializer/parser and contextual record-link primitive for job,
+    pipeline/version, dataset, model version, deployment, drift check,
+    incident, node, time range, and origin. Consumer rows/details adopt that
+    primitive later rather than inventing their own query keys or return-state
+    handling.
+  - **Acceptance criteria:** A typed schema exists for supported operational
+    identities, origin, and time/filter fields. Valid contexts serialize to a
+    copyable URL shape and parse back without losing meaning; partial, unknown,
+    invalid, deleted, or unauthorized values degrade safely without inventing a
+    target. The shared record-link primitive builds href/return payloads from
+    typed input and exposes accessible link text without requiring consumer-
+    specific routing logic.
+  - **Validation method:** Add focused unit/component tests for schema typing,
+    serializer→parser round trips, invalid/partial query inputs, backward-
+    compatible parsing, and shared record-link href generation/copy behavior.
+    Manual verification uses representative job/model/deployment/error/drift/
+    slow-node/audit contexts in a harness or Storybook-style fixture, then
+    reloads the generated URL to confirm the same parsed payload.
+  - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** shared operational context schema,
+    router/query-state serialization, and stable Operations API identities. This
+    is the Operations-specific continuity foundation; later views reuse it
+    rather than duplicating it beside **FND-003** status semantics or
     **FND-004** retry behavior.
     **Milestone:** Now.
 
@@ -1580,7 +1595,7 @@ Canvas finding is warranted solely for this repeated form root.
 | OPS-004 | Observed | Generic identifier search lacks typed resource facets and contextual deep links. | Error Log; incidents; Jobs; Canvas; Data; Registry/Deployments | High | Frequent | L | Medium | Resource-facet/correlation schema; OPS-007; redaction; FND-003/FND-004 | Next |
 | OPS-005 | Observed | Slow-node aggregates cannot lead to the measured run/node or remediation. | Slow Nodes; Jobs; Canvas; Audit Log | Medium | Occasional | M | Medium | Slow-node drill-down API; run snapshots; OPS-007; CAN-002 | Next |
 | OPS-006 | Inferred | Attributed version/diff history lacks filters, retention/time clarity, and related-record correlation. | Audit Log; Canvas versions; Jobs; Deployments; Drift; Errors | Medium | Occasional | L | Medium | Audit filtering/correlation API; identity/retention policy; graph snapshots; OPS-007; EXP-004 | Next |
-| OPS-007 | Inferred | Operations records lack context-preserving, deep-linkable continuity. | All Operations; Canvas; Data/EDA; Experiments/Inference; alerts | High | Frequent | L | High | Operational context schema; router/query state; API identities; FND-001/FND-003/FND-004 | Now |
+| OPS-007 | Inferred | Operations lacks a shared typed context serializer and record-link primitive. | Shared Operations link/query-state utilities; future rows/details across Operations | High | Frequent | M | Medium | Operational context schema; router/query state; API identities | Now |
 
 ## Component-Boundary Recommendations
 
@@ -1622,13 +1637,14 @@ Canvas finding is warranted solely for this repeated form root.
   size.
 - **Operations record boundary:** Keep authoritative job, registry/deployment,
   drift, incident, performance, and version-audit data in their existing APIs,
-  but deliver `OPS-007`'s small shared operational-context serializer and
-  record-link primitive first. Jobs (`OPS-001`), Registry/Deployments
-  (`OPS-002`), Error Log (`OPS-004`), and the remaining investigation views
-  (`OPS-003`, `OPS-005`, `OPS-006`) consume that identity/origin contract
-  afterward; they do not independently serialize deep-link or return state.
-  **FND-003** and **FND-004** remain the shared status and retry mechanisms
-  rather than parallel Operations implementations.
+  but deliver `OPS-007`'s small typed operational-context schema,
+  serializer/parser, and record-link primitive first. Jobs (`OPS-001`),
+  Registry/Deployments (`OPS-002`), Drift (`OPS-003`), Error Log (`OPS-004`),
+  Slow Nodes (`OPS-005`), and Audit Log (`OPS-006`) consume that
+  identity/origin contract afterward; they do not independently invent query
+  keys, parse deep-link state, or serialize return context. **FND-003** and
+  **FND-004** remain the shared status and retry mechanisms rather than
+  parallel Operations implementations.
 
 ## Now / Next / Later Roadmap
 
@@ -1664,9 +1680,9 @@ Canvas finding is warranted solely for this repeated form root.
   route-local issue reporting and reviewable repairs.
 - **EXP-007:** Give prediction runs durable pending/failure/retry/result/export
   context within the Inference journey.
-- **OPS-007:** Add URL-restorable operational context and contextual return
-  across alerts, Jobs, Registry, Deployments, monitoring, Canvas, and
-  inference.
+- **OPS-007:** Define a typed, URL-restorable operational-context schema plus
+  serializer/parser round-trip behavior and a shared contextual record-link
+  primitive; leave view-specific row/detail adoption to `OPS-001`–`OPS-006`.
 
 ### Next
 
@@ -1692,14 +1708,16 @@ Canvas finding is warranted solely for this repeated form root.
 - **OPS-002:** After `OPS-007`, trace every registered model version through
   source job, evaluation/artifact, deployment event, active state, and
   inference target.
-- **OPS-003:** Persist drift alerts, threshold versions, severity, ownership,
-  disposition, and links to the affected model/deployment/job.
+- **OPS-003:** After `OPS-007`, persist drift alerts, threshold versions,
+  severity, ownership, disposition, and links to the affected
+  model/deployment/job.
 - **OPS-004:** After `OPS-007`, retain generic identifier search and add typed
   Error Log resource/severity facets with contextual links.
-- **OPS-005:** Let Slow Nodes open time-bound contributing-run and Canvas-node
-  investigation rather than presenting aggregates alone.
-- **OPS-006:** Preserve attributed version/diff history while adding filters,
-  retention/time-scope clarity, and related-record correlation.
+- **OPS-005:** After `OPS-007`, let Slow Nodes open time-bound contributing-run
+  and Canvas-node investigation rather than presenting aggregates alone.
+- **OPS-006:** After `OPS-007`, preserve attributed version/diff history while
+  adding filters, retention/time-scope clarity, and related-record
+  correlation.
 
 ### Later
 
@@ -1734,8 +1752,8 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-007 inference run lifecycle | Pending/failure/retry/results/export/history retain clear provenance on the Inference surface | Delayed/success/failure/cancel/reload/export tests | Execute, reset, retry, reload, restore, export | 1440 and 390 px | Live status, error recovery, and focus review |
 | OPS-001 job investigation lifecycle | Job details name lifecycle/input/error/log/result context; supported actions recover in place and Back restores list state | After OPS-007, paginated multi-type job, cancel/retry/unavailable-action component and Playwright fixtures | Search/filter/load/details/log/cancel/retry/return | 1440 and 390 px | Detail/action names, live status, keyboard return |
 | OPS-002 model deployment lineage | Model/job/version/artifact/deployment/inference identities remain traceable across action outcomes | After OPS-007, multi-version/deployment mutation and deep-link Playwright tests | Deploy, replace, deactivate, redeploy, refresh, follow links | 1440 and 390 px | Confirmation/modal focus and action status |
-| OPS-003 drift investigation lifecycle | Alert, severity, threshold version, evidence, owner/disposition, and related resources persist per check | Drift/alert history and transition fixtures | Alert→report→job/deployment, threshold change, acknowledge/reopen | 1440 and 390 px | Alert/status semantics and feature-table navigation |
+| OPS-003 drift investigation lifecycle | Alert, severity, threshold version, evidence, owner/disposition, and related resources persist per check | After OPS-007, drift/alert history and transition fixtures | Alert→report→job/deployment, threshold change, acknowledge/reopen | 1440 and 390 px | Alert/status semantics and feature-table navigation |
 | OPS-004 Error Log investigation facets | Generic search retains exact HTTP job/pipeline node IDs; typed severity/resource facets and contextual links remain unambiguous | After OPS-007, HTTP `job_id`/pipeline `node_id` search plus facet/link/export Playwright tests | Search, facet, expand, export, follow and return | 1440 and 390 px | Facet names, arrival focus, readable detail |
-| OPS-005 slow-node diagnosis | Aggregate source, unit/window, contributing run context, and returnable remediation links are explicit | Aggregate/outlier/no-data/drill-down tests | Sort, investigate, open job/Canvas, return with controls retained | 1440 and 390 px | Sort/button names and chart/table alternatives |
-| OPS-006 version audit trail | Existing actor/timestamp/action/version/diff detail remains visible; filters, time/retention scope, and supplied correlations are clear | Multi-dataset/version/actor/time/filter/query-state and linked/unlinked-record tests | Filter, inspect scope copy, reload link, follow and return | 1440 and 390 px | Expandable audit detail and filter semantics |
-| OPS-007 cross-page continuity | Every related Operations record arrives with exact identity, origin, and recoverable context | Connected-record deep-link/Back/Forward/reload tests | Follow alert/job/error/drift/slow/audit links including deleted target | 1440 and 390 px | Arrival focus, breadcrumb/context chip, copyable links |
+| OPS-005 slow-node diagnosis | Aggregate source, unit/window, contributing run context, and returnable remediation links are explicit | After OPS-007, aggregate/outlier/no-data/drill-down tests | Sort, investigate, open job/Canvas, return with controls retained | 1440 and 390 px | Sort/button names and chart/table alternatives |
+| OPS-006 version audit trail | Existing actor/timestamp/action/version/diff detail remains visible; filters, time/retention scope, and supplied correlations are clear | After OPS-007, multi-dataset/version/actor/time/filter/query-state and linked/unlinked-record tests | Filter, inspect scope copy, reload link, follow and return | 1440 and 390 px | Expandable audit detail and filter semantics |
+| OPS-007 operational context primitive | Typed operational identities, origin, and time/filter context round-trip without loss and build shared href/return payloads | Schema/serializer/parser round-trip and shared record-link component tests | Generate representative job/model/deployment/error/drift/slow/audit contexts, copy the link, reload, and confirm the same parsed payload | 1440 and 390 px for primitive rendering | Accessible link names and copyable target semantics |
