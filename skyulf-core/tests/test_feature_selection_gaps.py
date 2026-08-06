@@ -14,6 +14,8 @@ import pytest
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+import skyulf.preprocessing.feature_selection.correlation as correlation_module
+from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.preprocessing.feature_selection.correlation import (
     CorrelationThresholdApplier,
     CorrelationThresholdCalculator,
@@ -101,6 +103,88 @@ def test_correlation_threshold_polars_engine_parity() -> None:
     pd_art = CorrelationThresholdCalculator().fit(df, {"threshold": 0.9})
     pl_art = CorrelationThresholdCalculator().fit(pl.from_pandas(df), {"threshold": 0.9})
     assert set(pd_art["columns_to_drop"]) == set(pl_art["columns_to_drop"])
+
+
+def _correlation_parity_fixture() -> dict[str, list[object]]:
+    """Return ordered values covering boolean, constant, null, and correlation cases."""
+    return {
+        "a": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        "b": [2.0, 4.0, 6.0, 8.0, 10.0, 12.0],
+        "c": [6.0, 5.0, 4.0, 3.0, 2.0, 1.0],
+        "flag": [True, False, True, False, True, False],
+        "constant": [7, 7, 7, 7, 7, 7],
+        "mostly_null": [1.0, None, None, None, None, 6.0],
+        "target": ["x", "x", "y", "y", "z", "z"],
+    }
+
+
+@pytest.mark.parametrize("method", ["pearson", "spearman"])
+def test_correlation_threshold_native_polars_matches_pandas_without_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+) -> None:
+    """Eligible raw and wrapped Polars fits must stay native and match Pandas."""
+    pl = pytest.importorskip("polars")
+    values = _correlation_parity_fixture()
+    config = {
+        "columns": ["a", "b", "c", "flag", "constant", "mostly_null"],
+        "threshold": 0.95,
+        "correlation_method": method,
+        "drop_columns": True,
+    }
+    calculator = CorrelationThresholdCalculator()
+    expected = calculator.fit(pd.DataFrame(values), config)
+    if method == "pearson":
+        assert expected == {
+            "type": "correlation_threshold",
+            "columns_to_drop": ["b", "c", "mostly_null"],
+            "threshold": 0.95,
+            "method": "pearson",
+            "drop_columns": True,
+        }
+
+    monkeypatch.setattr(
+        correlation_module,
+        "to_pandas",
+        lambda _frame: pytest.fail("eligible Polars fit called to_pandas"),
+    )
+    raw = pl.DataFrame(values)
+    for frame in (raw, SkyulfPolarsWrapper(raw)):
+        assert calculator.fit(frame, config) == expected
+
+
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
+def test_correlation_threshold_apply_preserves_polars_audit_schema_and_order(
+    wrapped: bool,
+) -> None:
+    """Applying the audit artifact keeps raw/wrapped Polars output contracts."""
+    pl = pytest.importorskip("polars")
+    values = _correlation_parity_fixture()
+    config = {
+        "columns": ["a", "b", "c", "flag", "constant", "mostly_null"],
+        "threshold": 0.95,
+        "correlation_method": "pearson",
+        "drop_columns": True,
+    }
+    raw = pl.DataFrame(values)
+    frame = SkyulfPolarsWrapper(raw) if wrapped else raw
+    artifact = CorrelationThresholdCalculator().fit(frame, config)
+    output = CorrelationThresholdApplier().apply(frame, artifact)
+
+    if wrapped:
+        assert isinstance(output, SkyulfPolarsWrapper)
+        native = output._df
+    else:
+        assert isinstance(output, pl.DataFrame)
+        native = output
+
+    assert native.columns == ["a", "flag", "constant", "target"]
+    assert native.schema == {
+        "a": pl.Float64,
+        "flag": pl.Boolean,
+        "constant": pl.Int64,
+        "target": pl.String,
+    }
 
 
 def test_correlation_threshold_apply_polars_drops_column() -> None:
