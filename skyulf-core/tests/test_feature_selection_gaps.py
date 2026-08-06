@@ -209,6 +209,112 @@ def test_correlation_threshold_raw_polars_boolean_threshold_uses_pandas_compatib
     assert len(calls) == 1
 
 
+def test_correlation_threshold_threshold_equality_does_not_drop_polars_columns() -> None:
+    """A correlation exactly equal to the threshold remains selected."""
+    pl = pytest.importorskip("polars")
+    config = {
+        "columns": ["a", "b", "c"],
+        "threshold": 1.0,
+        "correlation_method": "pearson",
+    }
+    values = _correlation_parity_fixture()
+    artifact = CorrelationThresholdCalculator().fit(pl.DataFrame(values), config)
+    assert artifact["columns_to_drop"] == []
+
+
+@pytest.mark.parametrize("method", ["kendall", "not_a_method"])
+def test_correlation_threshold_native_ineligible_methods_use_pandas_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+) -> None:
+    """Kendall and invalid methods must retain the established Pandas route."""
+    pl = pytest.importorskip("polars")
+    frame = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+    calculator = CorrelationThresholdCalculator()
+    config = {"correlation_method": method}
+    expected = calculator.fit(frame.to_pandas(), config) if method == "kendall" else None
+    original_to_pandas = correlation_module.to_pandas
+    calls: list[object] = []
+
+    def recording_to_pandas(frame: object) -> pd.DataFrame:
+        calls.append(frame)
+        return original_to_pandas(frame)
+
+    monkeypatch.setattr(correlation_module, "to_pandas", recording_to_pandas)
+
+    if method == "kendall":
+        assert calculator.fit(frame, config) == expected
+    else:
+        with pytest.raises(
+            ValueError,
+            match="method must be either 'pearson', 'spearman', 'kendall', or a callable",
+        ):
+            calculator.fit(frame, config)
+
+    assert len(calls) == 1
+    assert calls[0] is frame
+
+
+def test_correlation_threshold_callable_and_unsupported_dtype_use_pandas_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Callable methods and selected strings keep the legacy compatibility behavior."""
+    pl = pytest.importorskip("polars")
+    original_to_pandas = correlation_module.to_pandas
+    calls: list[object] = []
+
+    def recording_to_pandas(frame: object) -> pd.DataFrame:
+        calls.append(frame)
+        return original_to_pandas(frame)
+
+    def force_correlation(_left: np.ndarray, _right: np.ndarray) -> float:
+        return 1.0
+
+    monkeypatch.setattr(correlation_module, "to_pandas", recording_to_pandas)
+    calculator = CorrelationThresholdCalculator()
+    callable_frame = pl.DataFrame(
+        {"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0], "c": [2.0, 3.0, 4.0]}
+    )
+    callable_config = {
+        "columns": ["a", "b", "c"],
+        "correlation_method": force_correlation,
+        "threshold": 0.95,
+    }
+    assert calculator.fit(callable_frame, callable_config)["columns_to_drop"] == ["b", "c"]
+
+    unsupported_frame = pl.DataFrame({"a": [1.0, 2.0, 3.0], "text": ["a", "b", "c"]})
+    with pytest.raises(ValueError, match="could not convert string to float"):
+        calculator.fit(unsupported_frame, {"columns": ["a", "text"]})
+
+    assert len(calls) == 2
+    assert calls[0] is callable_frame
+    assert calls[1] is unsupported_frame
+
+
+def test_correlation_threshold_unavailable_native_capability_uses_pandas_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A missing native capability delegates before any Polars calculation."""
+    pl = pytest.importorskip("polars")
+    frame = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+    config = {"correlation_method": "pearson"}
+    calculator = CorrelationThresholdCalculator()
+    expected = calculator.fit(frame.to_pandas(), config)
+    original_to_pandas = correlation_module.to_pandas
+    calls: list[object] = []
+
+    def recording_to_pandas(value: object) -> pd.DataFrame:
+        calls.append(value)
+        return original_to_pandas(value)
+
+    monkeypatch.setattr(correlation_module, "_polars_corr_accepts_method", lambda: False)
+    monkeypatch.setattr(correlation_module, "to_pandas", recording_to_pandas)
+
+    assert calculator.fit(frame, config) == expected
+    assert len(calls) == 1
+    assert calls[0] is frame
+
+
 @pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
 def test_correlation_threshold_apply_preserves_polars_audit_schema_and_order(
     wrapped: bool,
