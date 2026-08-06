@@ -348,3 +348,115 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 Review the complete Task 1-3 commit range against the approved design. Fix all
 Critical and Important findings, rerun their covering tests, and re-review
 before completion.
+
+---
+
+### Task 4: Exercise the Supported Tuning Prediction Boundary
+
+**Files:**
+- Modify: `skyulf-core/tests/test_pipeline_integration_tuning.py:21-24,93-132`
+- Modify: `.superpowers/sdd/progress.md`
+
+**Interfaces:**
+- Consumes: `TuningApplier(base_applier)` and its expected
+  `(fitted_model, tuning_result)` artifact.
+- Produces: unchanged production behavior; the integration test predicts
+  through Skyulf's supported numpy-normalizing applier boundary.
+
+- [ ] **Step 1: Make the existing warning fail the integration test**
+
+Add `import warnings`, `TuningApplier`, and
+`RandomForestClassifierApplier` to the test imports. Wrap the prediction
+section:
+
+```python
+        tuned_applier = TuningApplier(RandomForestClassifierApplier())
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error",
+                message=r"X has feature names, but RandomForestClassifier was fitted without feature names",
+            )
+            preds = tuned_applier.predict(X_test, (model, result))
+```
+
+Before switching to `tuned_applier.predict`, temporarily keep
+`preds = model.predict(X_test)` inside the warning context.
+
+- [ ] **Step 2: Verify the raw-estimator prediction fails**
+
+Run:
+
+```bash
+cd /Users/BH7043/Skyulf/skyulf-core
+source /Users/BH7043/Skyulf/.venv/bin/activate
+python -m pytest \
+  tests/test_pipeline_integration_tuning.py::TestRandomSearchClassification::test_random_search_returns_valid_best_params_and_finite_test_score \
+  -q
+```
+
+Expected: FAIL because the sklearn feature-name warning is promoted to an
+exception.
+
+- [ ] **Step 3: Predict through `TuningApplier`**
+
+Replace the raw prediction with:
+
+```python
+        tuned_applier = TuningApplier(RandomForestClassifierApplier())
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error",
+                message=r"X has feature names, but RandomForestClassifier was fitted without feature names",
+            )
+            preds = tuned_applier.predict(X_test, (model, result))
+```
+
+Keep all best-parameter and finite-accuracy assertions unchanged.
+
+- [ ] **Step 4: Run focused integration and warning tests**
+
+Run:
+
+```bash
+python -m pytest \
+  tests/test_pipeline_integration_tuning.py::TestRandomSearchClassification::test_random_search_returns_valid_best_params_and_finite_test_score \
+  tests/test_tuning_engine.py::test_fit_optuna_strategy_basic \
+  tests/test_explainability.py::test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning \
+  -q
+```
+
+Expected: five selected cases pass with no target warning.
+
+- [ ] **Step 5: Run lint and the full Core suite**
+
+Run:
+
+```bash
+ruff check tests/test_pipeline_integration_tuning.py
+ruff format --check tests/test_pipeline_integration_tuning.py
+python -m pytest -q
+```
+
+Expected: Ruff passes; full suite remains `2926 passed, 69 skipped, 1
+xfailed`, and the RandomForest integration-test warning is absent from the
+warning summary.
+
+- [ ] **Step 6: Record and commit the follow-up**
+
+Append the integration-test root cause, supported-boundary decision, and
+verification result to `.superpowers/sdd/progress.md`, then commit:
+
+```bash
+git add \
+  skyulf-core/tests/test_pipeline_integration_tuning.py \
+  .superpowers/sdd/progress.md
+git commit -m "test(modeling): use tuning applier for integration prediction
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+- [ ] **Step 7: Request final review**
+
+Review Task 4 for spec compliance and code quality, then review the complete
+warning-fix implementation range. Fix every Critical or Important finding
+before completion.
