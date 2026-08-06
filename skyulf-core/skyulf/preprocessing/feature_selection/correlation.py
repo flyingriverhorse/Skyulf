@@ -1,7 +1,6 @@
 """Correlation-threshold feature selector."""
 
 import inspect
-from numbers import Real
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -115,7 +114,8 @@ def _native_polars_correlation_eligible(
     return (
         isinstance(method, str)
         and method in _NATIVE_POLARS_METHODS
-        and isinstance(threshold, Real)
+        and isinstance(threshold, (int, float))
+        and not isinstance(threshold, bool)
         and _polars_corr_accepts_method()
         and all(frame.get_column(column).dtype in _POLARS_CORRELATION_DTYPES for column in columns)
     )
@@ -125,7 +125,7 @@ def _polars_correlation_columns_to_drop(
     frame: pl.DataFrame,
     columns: list[str],
     method: NativePolarsCorrelationMethod,
-    threshold: Real,
+    threshold: int | float,
 ) -> list[str]:
     """Return upper-triangle columns whose pairwise-complete correlation exceeds threshold."""
     normalized = frame.select([pl.col(column).cast(pl.Float64).alias(column) for column in columns])
