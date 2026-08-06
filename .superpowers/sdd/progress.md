@@ -163,3 +163,34 @@ Remaining Phase 0 doc/test-reliability items not yet done (left for a future
 task): the docs CI link checker / notebook execution gate, and the broader
 engine-contributor-guide/registry-API drift noted in the roadmap's release
 engineering section.
+
+Selection: continued the Polars-first Core migration thread — reviewed
+`temp/skyulf-core-pandas-polars-audit-2026-08-05.md`'s Wave 2 candidate list
+(B: clustering, C: multivariate fallback, D: bucketing, E: H3 index) via
+`ask_user` and the user chose Candidate B (clustering numeric filtering,
+`skyulf-core/skyulf/modeling/_evaluation/clustering.py`).
+Task: complete, accepted — added a native Polars path to
+`evaluate_clustering_model()` (`_as_polars_frame`, `_compute_centroids_polars`,
+`_compute_reference_crosstab_polars`, `_POLARS_NUMERIC_BOOL_DTYPES`) that
+avoids the full-frame `_feature_frame()` Pandas conversion for raw/wrapped
+Polars input while reproducing the audit's pinned golden fixture exactly
+(metrics, centroids, profiles, crosstab), including a genuine parity fix for
+Polars' `select([])` collapsing row count to 0 unlike pandas'
+`select_dtypes(...)`. The untouched legacy Pandas path remains the fallback
+for everything else. Widened `calculate_clustering_metrics`'s type
+annotation in `metrics.py` to include raw `pl.DataFrame` (it already worked
+at runtime via `SklearnBridge`/engine dispatch; only the type annotation was
+stale) to keep `ty check` clean for the new call site.
+Validation: new `skyulf-core/tests/test_evaluation_clustering_polars.py`
+(19 tests: golden-fixture parity across Pandas/raw/wrapped Polars, missing
+reference column, NaN labels, zero-numeric-columns error parity, dtype
+preservation, no-full-conversion guard, relative peak-memory). Benchmark gate
+(mirroring Candidate A's harness in `test_benchmarks.py`): 100k x 30 fit time
+improved 19.3-19.8% (just under the 20% floor) with mixed RSS (-16.75% raw,
++11.59% wrapped); 1M x 15 fit time improved 30.1-33.8% and peak RSS improved
+30.4-37.9% (see the audit's new "Candidate B execution record" section for
+exact commands/values). Per the same time-OR-memory gate used for Candidate
+A, accepted since 1M x 15 clears both the 20% time floor and the candidate's
+stated 20% memory floor. Full Core suite `2907 passed, 42 skipped, 1 xfailed`
+(unchanged skip/xfail set); `ruff check`/`ruff format --check` and `ty check`
+clean; `git diff --check` clean. Added a concise v0.7.4 changelog entry.
