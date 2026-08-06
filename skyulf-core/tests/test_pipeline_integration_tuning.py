@@ -9,6 +9,7 @@ split -> tuned model fit -> best-params retrieval -> predict on held-out data
 Optuna-backed ("bayes") search strategies.
 """
 
+import warnings
 from typing import Any
 
 import numpy as np
@@ -18,9 +19,12 @@ from sklearn.metrics import get_scorer
 from sklearn.model_selection import KFold, train_test_split
 from tests.utils.dataset_loader import load_sample_dataset
 
-from skyulf.modeling._tuning.engine import TuningCalculator
+from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling._tuning.schemas import TuningConfig
-from skyulf.modeling.classification import RandomForestClassifierCalculator
+from skyulf.modeling.classification import (
+    RandomForestClassifierApplier,
+    RandomForestClassifierCalculator,
+)
 from skyulf.modeling.regression import RidgeRegressionCalculator
 from skyulf.preprocessing.encoding.one_hot import (
     OneHotEncoderApplier,
@@ -124,7 +128,13 @@ class TestRandomSearchClassification:
 
         # Refit-on-full-train-data model must be immediately usable for prediction.
         assert hasattr(model, "predict")
-        preds = model.predict(X_test)
+        tuned_applier = TuningApplier(RandomForestClassifierApplier())
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "error",
+                message=r"X has feature names, but RandomForestClassifier was fitted without feature names",
+            )
+            preds = tuned_applier.predict(X_test, (model, result))
         assert len(preds) == len(X_test)
 
         test_accuracy = (preds == y_test.to_numpy()).mean()

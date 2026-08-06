@@ -647,3 +647,17 @@ Validation for the targeted warning containment docs pass:
 - Full Core suite: `2926 passed, 69 skipped, 1 xfailed, 49 warnings in 37.85s`
   (historical baseline `2923 passed, 69 skipped, 1 xfailed` plus the 3 new
   parameterized explainability cases; no regressions).
+
+# Progress Ledger: Tuning Boundary Integration Follow-up
+
+Task 4: complete — the integration test now exercises the supported
+`TuningApplier(RandomForestClassifierApplier())` boundary instead of calling the
+raw refit estimator directly. Root cause: the tuned RandomForest refit is
+trained without feature names, so a direct pandas prediction emits sklearn's
+`X has feature names, but RandomForestClassifier was fitted without feature names`
+warning. Decision: keep production behavior unchanged and make the integration
+test predict through the supported tuning applier wrapper. Verification:
+targeted RED failed with the promoted warning; GREEN passed; focused
+integration/warning set passed (`5 passed`); Ruff clean; full Core suite passed
+(`2926 passed, 69 skipped, 1 xfailed`), with no target warning in the warning
+summary.
