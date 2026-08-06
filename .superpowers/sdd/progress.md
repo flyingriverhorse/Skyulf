@@ -239,3 +239,34 @@ skip/xfail set plus the 4 new tests); `ruff check`/`ruff format --check` and
 `test_evaluation_clustering_polars.py`/`test_benchmarks.py`'s Candidate B
 legacy helper, untouched by this change); `git diff --check` clean. Added a
 concise v0.7.4 changelog entry.
+
+Selection: continued to Wave 2 Candidate D (bucketing fit routes,
+`skyulf-core/skyulf/preprocessing/bucketing.py`).
+Scope narrowing: fitting itself is inherently sklearn/pandas-bound for every
+strategy (`pd.cut`, `pd.qcut`, `KBinsDiscretizer`), so a full native-Polars
+rewrite of the bin-edge math was rejected as unnecessary — the real,
+evidence-backed cost was `_to_pandas_for_fit()` always converting the
+**entire input frame**, even when only one or a few columns out of a wide
+frame are actually being binned.
+Task: complete, accepted — added `_resolve_columns_then_to_pandas()`, which
+resolves the columns to bin directly on the raw Polars frame first
+(`resolve_columns`/`detect_numeric_columns` already dispatch natively
+per-engine), then converts only that column subset to pandas. Wired into
+`GeneralBinningCalculator.fit()` and `CustomBinningCalculator.fit()`
+(`KBinsDiscretizerCalculator` inherits the benefit via `super().fit()`).
+Pandas-input calls are unaffected by construction.
+Validation: extended `test_bucketing.py` from 47 to 54 tests (bin-edge
+parity between raw-Polars-input and pandas-input fits across all 5
+strategies, a no-full-conversion guard test tracking `to_pandas()` call
+shapes, and the `columns: []` short-circuit on Polars input), all passing.
+New benchmark harness in `test_benchmarks.py` at the audit's shapes (1M x 1
+single-column control, 250k x 25, 250k x 25 high-null): wide-frame cases
+improved fit time 31.7-34.0% and peak RSS 96.6% (only 1/25th of columns
+materialized in pandas); the single-column control was correctly neutral
+(~2%, noise-level), confirming the benefit is specifically from avoiding
+unrelated-column conversion. Accepted per the time-OR-memory gate (see the
+audit's new "Candidate D execution record" section for exact commands/
+values). Full Core suite `2918 passed, 66 skipped, 1 xfailed` (unchanged
+skip/xfail set plus the 7 new tests); `ruff check`/`ruff format --check` and
+`ty check` on touched files clean; `git diff --check` clean. Added a concise
+v0.7.4 changelog entry.
