@@ -2,35 +2,86 @@
 
 ## Executive Summary
 
-Task 1 establishes the roadmap scaffold and records objective frontend baseline
-evidence. Task 2 adds six normalized shared-foundation findings: one directly
-observed shared-shell issue (`FND-001`), one shared-component risk
-(`FND-003`), and four code-supported risks spanning multiple shell views or
-route journeys (`FND-002`, `FND-004`, `FND-005`, and `FND-006`). Task 3 adds
-five Canvas findings: two directly observed placement/toolbar failures
-(`CAN-001`, `CAN-005`) and three code-supported recovery, diagnosis, and node
-configuration risks (`CAN-002` through `CAN-004`). Task 4 adds seven Data and
-EDA findings: three directly reproduced journey/responsive outcomes
-(`DAT-001`, `DAT-002`, and `DAT-004`) and four code-supported lifecycle,
-configuration, and visualization risks (`DAT-003`, `DAT-005` through
-`DAT-007`). Task 5 adds seven Experiments and Inference findings: two
-comparison-context issues kept in Now (`EXP-001`, `EXP-002`), two artifact/diff
-clarity items sequenced to Next (`EXP-003`, `EXP-004`), and three high-impact
-threshold/inference items (`EXP-005` through `EXP-007`) explicitly scoped so
-their Now slice is independently complete while shared retry (`FND-004`) and
-shared field-semantic (`FND-005`) normalization remain Next follow-ons. The
-Dashboard-only contrast result is intentionally deferred to the Dashboard
-journey rather than represented as a shared-foundation finding.
+This synthesis groups the reviewed Foundations, Canvas, Data/EDA,
+Experiments/Inference, and Operations evidence by the user outcome it changes.
+It does not treat an inferred risk as a reproduced defect, and it does not let
+one well-instrumented journey stand in for another. The highest-value
+opportunities are:
 
-Task 6 adds seven Operations findings. `OPS-007` now limits the Now slice
-to a shared typed operational-context schema, serializer/parser round-trip
-contract, and contextual record-link primitive. The consumer integrations for
-Jobs, Registry/Deployments, Drift, Error Log, Slow Nodes, and Audit Log
-(`OPS-001`–`OPS-006`) remain Next so each view can adopt that boundary in its
-own rows/details. `OPS-006` does not claim Audit Log lacks attribution or
-change detail: its existing entries render actor, timestamp, action kind,
-version, and node diffs. It instead targets missing filters,
-time-range/retention clarity, and cross-record correlation.
+1. **Let people complete core work on every supported screen size.**
+   Eliminate clipped global, Data/EDA, and Canvas controls rather than asking
+   users to discover hidden actions (`FND-001`, `DAT-004`, `CAN-005`).
+2. **Keep the current task and its context visible across navigation.**
+   Restore shell-view history, make retained experiment selections explicit,
+   and establish the Operations context/link primitive before consumer pages
+   adopt it (`FND-006`, `EXP-001`, `OPS-007`).
+3. **Make failure, waiting, and recovery understandable at the point of work.**
+   Give async changes usable semantics and turn Canvas, dataset-preview,
+   ingestion, EDA, and inference failures into recoverable states
+   (`FND-003`, `CAN-002`, `DAT-002`, `DAT-003`, `DAT-005`, `EXP-007`).
+4. **Prevent invalid ML decisions before they are submitted.** Make source,
+   Canvas, EDA, and inference inputs identify their purpose and make typed
+   inference validation and repairs reviewable (`DAT-001`, `FND-005`,
+   `DAT-006`, `EXP-006`).
+5. **Make the Canvas reliably operable while building a pipeline.** A newly
+   added node should be selectable and configurable, and every visible toolbar
+   action should receive its own click (`CAN-001`, `CAN-005`).
+6. **Make analysis results attributable and interpretable.** Preserve analysis
+   inputs through history and then add explicit applied context and accessible
+   chart interpretation (`DAT-005`, `DAT-006`, `DAT-007`).
+7. **Make model comparison and threshold choices defensible.** Expose selected
+   runs, metric direction and missingness, then carry threshold provenance to
+   prediction (`EXP-001`, `EXP-002`, `EXP-005`).
+8. **Let operators investigate a record instead of copying an identifier.**
+   Build the shared context contract first, then connect jobs, model lineage,
+   drift, errors, performance, and audit history using only API-supported
+   correlations (`OPS-007`, `OPS-001`–`OPS-006`).
+
+## Synthesis, Deduplication, and Ranking
+
+### Root-cause decisions
+
+- **Shared responsive geometry:** `FND-001` is the one cross-journey root
+  cause. `DAT-004` remains a Data/EDA consumer slice because its responsive
+  header/table hierarchy needs route-specific behavior; `CAN-005` remains a
+  separate measured Canvas-pane collision. Neither claims a second shell root.
+- **Shared semantics, not duplicate lifecycle findings:** `FND-003` owns
+  live-region semantics and `FND-005` owns reusable field naming/error
+  semantics. `CAN-002`, `DAT-001`–`DAT-006`, and `EXP-005`–`EXP-007` remain
+  distinct where their evidence concerns domain state, validation, provenance,
+  or recovery beyond those primitives. Their scoped Now work may use local
+  semantics without waiting for the broader `FND-005` normalization.
+- **Shared shell interaction:** `FND-002` owns the common overlay contract and
+  `FND-006` owns shell-view history/selected state. Canvas evidence is retained
+  under those shared IDs; no duplicate CAN item is created.
+- **Operational continuity boundary:** `OPS-007` owns only typed
+  serialization/parsing and record-link construction. `OPS-001`–`OPS-006`
+  remain separate consumers because jobs, lineage, drift, errors, performance,
+  and audit records require different server evidence and acceptance criteria.
+- **No false merge:** ingestion (`DAT-003`), EDA analysis (`DAT-005`), and
+  inference (`EXP-007`) are all async lifecycles, but have different resource
+  contracts and recovery actions. Experiment comparison, Canvas diagnosis, and
+  Operations investigation likewise remain journey-specific. This preserves
+  equal representation instead of collapsing evidence from less-observed
+  journeys into a generic finding.
+
+### Normalized ranking
+
+Ranks use the required order: impact/severity, frequency, journeys improved,
+accessibility or data-loss risk, effort, then regression risk/dependencies.
+The inventory retains only the normalized values `High`/`Medium`/`Low`,
+`Frequent`/`Occasional`/`Rare`, `S`/`M`/`L`, `Low`/`Medium`/`High`, and
+`Now`/`Next`/`Later`. A later milestone can still rank highly when its
+dependency-complete slice is intentionally broader than the smallest Now
+change.
+
+| Rank | Finding IDs in priority order | Sequencing rationale |
+|------|-------------------------------|----------------------|
+| 1–6 | FND-001, FND-005, FND-006, EXP-006, CAN-001, CAN-005 | Frequent high-impact access, task-completion, or data-validity risks; observed evidence leads where available. |
+| 7–12 | DAT-001, DAT-004, DAT-005, EXP-001, EXP-002, OPS-007 | Frequent journey blockers or cross-page foundations spanning Data/EDA, Experiments, and Operations. |
+| 13–19 | FND-003, CAN-002, DAT-002, DAT-003, EXP-005, EXP-007, FND-002 | High-impact recovery, decision, or overlay-accessibility work; dependencies fit within Now. |
+| 20–26 | OPS-001, OPS-004, OPS-002, OPS-003, DAT-006, DAT-007, EXP-003 | Important journey redesigns or broad interpretation work, sequenced after their foundations and API contracts. |
+| 27–32 | FND-004, EXP-004, CAN-003, OPS-005, OPS-006, CAN-004 | Lower-frequency normalization, larger historical-context work, or optional polish after the preceding outcomes. |
 
 ## Method and Evidence
 
@@ -610,7 +661,7 @@ Canvas finding is warranted solely for this repeated form root.
     behavior.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** canvas persistence, recent-pipeline utilities,
-    pipeline versions API, and **FND-003**. **Milestone:** Next.
+    pipeline versions API, and **FND-003**. **Milestone:** Later.
 
 - **CAN-004 — Inferred: Feature Generation presents an Apply action that
   silently does nothing.**
@@ -647,7 +698,7 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** Medium. **Frequency:** Occasional when recommendations are
     available. **Effort:** S. **Risk:** Low. **Dependencies:** recommendation
     payload schema, Feature Generation config shape, and **FND-005**.
-    **Milestone:** Next.
+    **Milestone:** Later.
 
 ### Data and EDA
 
@@ -1470,7 +1521,7 @@ Canvas finding is warranted solely for this repeated form root.
     node-addressable diagnosis. This follows **OPS-007** because its
     investigation links and return state consume the shared
     serializer/boundary; no independent slice is claimed here.
-    **Milestone:** Next.
+    **Milestone:** Later.
 
 - **OPS-006 — Inferred: Audit Log has attributed version/diff entries but lacks
   filter, retention, and cross-record investigation context.**
@@ -1516,7 +1567,7 @@ Canvas finding is warranted solely for this repeated form root.
     follows **OPS-007** because its contextual filters/links and return state
     consume the shared serializer/boundary; no independent slice is claimed
     here.
-    **Milestone:** Next.
+    **Milestone:** Later.
 
 - **OPS-007 — Inferred: Operations lacks a shared typed context-serialization
   and record-link primitive.**
@@ -1573,8 +1624,8 @@ Canvas finding is warranted solely for this repeated form root.
 | CAN-001 | Observed | Click-added node cards overlap and do not enter configuration. | Canvas palette, graph, Properties panel | High | Frequent | S | Low | Custom-node bounds; Sidebar; selection | Now |
 | CAN-005 | Observed | Canvas toolbar clusters overlap and intercept visible actions when Properties narrows the Flow pane. | Canvas Toolbar, Flow viewport, Properties panel | High | Frequent | S | Low | Toolbar responsive layout; panel width | Now |
 | CAN-002 | Inferred | Run readiness and failures lack an actionable node-level diagnostic loop. | Canvas run controls, node warnings, Results | High | Occasional | M | Medium | Validators; converter; FND-003 | Now |
-| CAN-003 | Inferred | Autosave, recent, and version recovery do not explain unavailable local recovery. | Restore banner; Recent; versions; Toolbar | Medium | Occasional | M | Medium | Persistence; versions; FND-003 | Next |
-| CAN-004 | Inferred | Feature Generation exposes a recommendation Apply action that changes nothing. | Feature Generation; Recommendations panel | Medium | Occasional | S | Low | Recommendation schema; FND-005 | Next |
+| CAN-003 | Inferred | Autosave, recent, and version recovery do not explain unavailable local recovery. | Restore banner; Recent; versions; Toolbar | Medium | Occasional | M | Medium | Persistence; versions; FND-003 | Later |
+| CAN-004 | Inferred | Feature Generation exposes a recommendation Apply action that changes nothing. | Feature Generation; Recommendations panel | Medium | Occasional | S | Low | Recommendation schema; FND-005 | Later |
 | DAT-001 | Observed | Source onboarding has conflicting destinations and unassociated required fields. | Data Sources; Add Source; Canvas/EDA handoffs | High | Frequent | M | Medium | Source API; router | Now |
 | DAT-002 | Observed | Failed preview reports zero-like metadata without recovery context. | Dataset Preview; source profile/sample APIs | High | Occasional | M | Medium | Profile/sample errors; FND-003 | Now |
 | DAT-003 | Inferred | Ingestion activity lacks phase/progress/history/retry lifecycle. | Upload; Add Source; jobs; source rows | High | Occasional | M | Medium | Ingestion API; FND-003 | Now |
@@ -1593,62 +1644,108 @@ Canvas finding is warranted solely for this repeated form root.
 | OPS-002 | Observed | Registered versions and deployments do not form a traceable decision chain. | Registry; Deployments; Jobs; Experiments; Inference | High | Occasional | L | High | Registry/deployment lineage; job/evaluation provenance; OPS-007; FND-003/FND-004 | Next |
 | OPS-003 | Inferred | Drift reports lack a durable alert, investigation, and remediation lifecycle. | Drift; alert badge; Registry/Deployments; Jobs; Errors | High | Occasional | L | High | Drift/alert schema; threshold versioning; deployment lineage; OPS-007; FND-003 | Next |
 | OPS-004 | Observed | Generic identifier search lacks typed resource facets and contextual deep links. | Error Log; incidents; Jobs; Canvas; Data; Registry/Deployments | High | Frequent | L | Medium | Resource-facet/correlation schema; OPS-007; redaction; FND-003/FND-004 | Next |
-| OPS-005 | Observed | Slow-node aggregates cannot lead to the measured run/node or remediation. | Slow Nodes; Jobs; Canvas; Audit Log | Medium | Occasional | M | Medium | Slow-node drill-down API; run snapshots; OPS-007; CAN-002 | Next |
-| OPS-006 | Inferred | Attributed version/diff history lacks filters, retention/time clarity, and related-record correlation. | Audit Log; Canvas versions; Jobs; Deployments; Drift; Errors | Medium | Occasional | L | Medium | Audit filtering/correlation API; identity/retention policy; graph snapshots; OPS-007; EXP-004 | Next |
+| OPS-005 | Observed | Slow-node aggregates cannot lead to the measured run/node or remediation. | Slow Nodes; Jobs; Canvas; Audit Log | Medium | Occasional | M | Medium | Slow-node drill-down API; run snapshots; OPS-007; CAN-002 | Later |
+| OPS-006 | Inferred | Attributed version/diff history lacks filters, retention/time clarity, and related-record correlation. | Audit Log; Canvas versions; Jobs; Deployments; Drift; Errors | Medium | Occasional | L | Medium | Audit filtering/correlation API; identity/retention policy; graph snapshots; OPS-007; EXP-004 | Later |
 | OPS-007 | Inferred | Operations lacks a shared typed context serializer and record-link primitive. | Shared Operations link/query-state utilities; future rows/details across Operations | High | Frequent | M | Medium | Operational context schema; router/query state; API identities | Now |
 
 ## Component-Boundary Recommendations
 
-- **Canvas frame and toolbar:** Keep panel-breakpoint ownership in
-  `MainLayout`/Canvas layout, but make `Toolbar` consume the resulting Canvas
-  pane width as one collision contract rather than independently absolutely
-  positioning left and right clusters (`CAN-005`). The shared shell remains
-  responsible for the 390 px view switcher in `FND-001`.
-- **Graph-library boundary:** Leave React Flow responsible for graph viewport,
-  pan/zoom, handles, and node movement. Keep Sidebar insertion placement,
-  selected-node handoff, custom-card semantics, and keyboard insertion
-  discoverability in Skyulf (`CAN-001`); do not classify these custom controls
-  as React Flow defects.
-- **Settings and recovery boundary:** `PropertiesPanel` hosts node-specific
-  forms, which should receive shared label/error primitives from `FND-005`;
-  `useRunControls`, graph validators, `ResultsPanel`, persistence, and restore
-  UI must exchange structured node/recovery state for `CAN-002`/`CAN-003`.
-- **Data journey boundary:** Keep ingestion transport/status truth in the
-  source and ingestion APIs, but make Data Sources own a coherent
-  source-to-Canvas/EDA handoff and preview recovery surface
-  (`DAT-001`–`DAT-003`). Reuse **FND-003** status semantics now and treat
-  **FND-005** as later shared-primitive normalization rather than a blocker for
-  the route-specific source journey.
-- **EDA analysis boundary:** Keep server report/job/history state in React
-  Query and editable analysis context in `useEDAStore`, but expose one
-  user-facing analysis record to the header, sidebar, History, tabs, and
-  export functions (`DAT-005`, `DAT-006`). Chart adapters own rendering and
-  theme mechanics; EDA tabs own explanations, data alternatives, and applied
-  context (`DAT-007`).
-- **Inference run boundary:** `InferencePage.tsx` currently combines
-  deployment/schema loading, input import/repair, per-request threshold
-  overrides, prediction transport, result/export rendering, and transient
-  history. Split a testable inference-run controller from input and
-  results/history views only to prevent those independently changing states
-  from attributing a result, error, or threshold to the wrong deployment
-  (`EXP-006`, `EXP-007`). Keep API truth in the deployment/threshold clients;
-  treat shared retry and field-semantics cleanup in `FND-004`/`FND-005` as
-  later normalization, and do not split presentational helpers merely for file
-  size.
-- **Operations record boundary:** Keep authoritative job, registry/deployment,
-  drift, incident, performance, and version-audit data in their existing APIs,
-  but deliver `OPS-007`'s small typed operational-context schema,
-  serializer/parser, and record-link primitive first. Jobs (`OPS-001`),
-  Registry/Deployments (`OPS-002`), Drift (`OPS-003`), Error Log (`OPS-004`),
-  Slow Nodes (`OPS-005`), and Audit Log (`OPS-006`) consume that
-  identity/origin contract afterward; they do not independently invent query
-  keys, parse deep-link state, or serialize return context. **FND-003** and
-  **FND-004** remain the shared status and retry mechanisms rather than
-  parallel Operations implementations.
+Only the following boundaries are recommended. They address a measured
+reliability failure or independently testable user-state risk; no split is
+recommended merely because a file is large. React Flow continues to own graph
+viewport, pan/zoom, handles, and node movement. APIs remain the authoritative
+source for ingestion, analysis, deployment, and Operations records.
+
+### `Toolbar.tsx`
+
+- **User-facing risk:** The independently positioned action groups overlap and
+  intercept Undo at a measured desktop pane width (`CAN-005`).
+- **Current responsibilities:** It calculates two absolute action clusters,
+  chooses responsive visibility, and wires graph actions.
+- **Proposed boundaries:** `CanvasToolbarLayout` owns one measured pane-width
+  allocation and overflow decision; `PrimaryToolbarActions` and
+  `SecondaryToolbarActions` render only their supplied actions.
+- **Required behavior preservation:** Undo/Redo shortcuts, current action
+  labels, disabled states, panel breakpoints, and every existing action remain
+  available; React Flow controls do not move into this boundary.
+- **Validation:** Unit-test allocation/overflow thresholds; Playwright measures
+  non-intersecting rectangles and activates every visible/overflow action with
+  both panels at 1440, 768, and 390 px, by pointer and keyboard.
+
+### `EDAPage.tsx`
+
+- **User-facing risk:** Selection, draft inputs, polling, loaded history, and
+  exports can describe different analyses (`DAT-005`, `DAT-006`).
+- **Current responsibilities:** It coordinates report/job queries, editable
+  analysis context, lifecycle actions, header/sidebar state, history, tabs,
+  and export context.
+- **Proposed boundaries:** `useAnalysisRecord` derives one immutable
+  current-report/input/lifecycle record from React Query and `useEDAStore`;
+  `AnalysisContextSummary`, `AnalysisLifecycleActions`, and
+  `AnalysisHistoryPanel` consume it. Tabs keep chart-specific rendering and
+  explanation.
+- **Required behavior preservation:** Existing dataset handoff, drafts,
+  polling cadence, cancellation/retry permissions, history loading, and
+  tab-specific content remain unchanged; server report truth stays in React
+  Query.
+- **Validation:** Unit-test record derivation for no-report, pending, failed,
+  completed, stale-history, and dataset-switch fixtures; Playwright validates
+  submit/cancel/retry/history/export context, keyboard flow, and VoiceOver
+  announcements at 1440, 768, and 390 px.
+
+### `InferencePage.tsx`
+
+- **User-facing risk:** Schema/import/repair, thresholds, transport, results,
+  and transient history can attribute an error or result to the wrong
+  deployment (`EXP-005`–`EXP-007`).
+- **Current responsibilities:** It loads deployment/schema data, imports and
+  repairs input, manages overrides, submits predictions, renders results and
+  exports, and retains recent-run state.
+- **Proposed boundaries:** `useInferenceRunController` owns the immutable
+  request snapshot and mutation lifecycle; `InferenceInputPanel` owns
+  editing/repair; `InferenceRunResult` and `InferenceRunHistory` render only
+  controller snapshots. API clients remain authoritative.
+- **Required behavior preservation:** JSON/CSV/sample entry, current
+  thresholds, reset, export formats, privacy/retention choices, and existing
+  keyboard actions remain available; the split must not persist results that
+  are currently deliberately transient.
+- **Validation:** Unit-test deployment switches, typed validation, repairs,
+  delayed success, failure, cancellation, retry, and export snapshots;
+  Playwright completes the inference journey with keyboard and screen-reader
+  checks at 1440, 768, and 390 px.
+
+### Operations context utility boundary
+
+- **User-facing risk:** Separate route pages would otherwise invent incompatible
+  query keys and return context, risking an investigation of the wrong record
+  (`OPS-007`).
+- **Current responsibilities:** Identity, origin, time/filter, href, and
+  return-state handling are absent or route-local rather than owned by a
+  common boundary.
+- **Proposed boundaries:** `OperationalContextSchema` owns typed identities and
+  safe parse/serialize behavior; `createOperationalRecordLink` owns href and
+  accessible link payload generation. Future page rows/details consume them;
+  they do not parse query state themselves.
+- **Required behavior preservation:** Existing route-local filters and record
+  displays remain unchanged until their respective `OPS-001`–`OPS-006`
+  consumer work; partial, deleted, and unauthorized values never invent a
+  target.
+- **Validation:** Unit-test valid, partial, invalid, and backward-compatible
+  round trips plus href/copy output; manually reload representative contexts
+  with keyboard and screen-reader link names in a desktop, tablet, and mobile
+  harness before any consumer integration.
 
 ## Now / Next / Later Roadmap
 
 ### Now
+
+This is the smallest dependency-complete high-impact set: four shared
+foundations, the Operations primitive, and independently complete journey
+slices. Re-evaluation finds **18** Now items; every finding-ID dependency named
+by one is also in Now (or is an external API/product contract rather than a
+later roadmap item). Work foundations first: `FND-001`/`FND-002`/`FND-003`/
+`FND-006` and `OPS-007`; then land the dependent Canvas, Data/EDA, and
+Experiments/Inference slices.
 
 - **FND-001:** Make the shared shell and Canvas subview navigation usable at
   390 px without degrading 768 px and desktop workflows.
@@ -1691,10 +1788,6 @@ Canvas finding is warranted solely for this repeated form root.
 - **FND-005:** Normalize labels, required-state messaging, and field-error
   relationships in Canvas, Data/EDA, and Inference after route-specific source
   and inference validation fixes land.
-- **CAN-003:** Make Canvas recovery sources and unavailable autosaves
-  understandable before replacing work.
-- **CAN-004:** Make Feature Generation recommendations apply or stop presenting
-  an Apply action.
 - **DAT-006:** Make filter and exclusion application accessible, explicit, and
   visible in every result/export.
 - **DAT-007:** Establish interpretable, responsive, theme-safe chart and
@@ -1713,15 +1806,27 @@ Canvas finding is warranted solely for this repeated form root.
   model/deployment/job.
 - **OPS-004:** After `OPS-007`, retain generic identifier search and add typed
   Error Log resource/severity facets with contextual links.
-- **OPS-005:** After `OPS-007`, let Slow Nodes open time-bound contributing-run
-  and Canvas-node investigation rather than presenting aggregates alone.
-- **OPS-006:** After `OPS-007`, preserve attributed version/diff history while
-  adding filters, retention/time-scope clarity, and related-record
-  correlation.
 
 ### Later
 
+- **CAN-003:** Make Canvas recovery sources and unavailable autosaves
+  understandable before replacing work.
+- **CAN-004:** Make Feature Generation recommendations apply once, or remove
+  the unsupported Apply action.
+- **OPS-005:** After `OPS-007` and `CAN-002`, let Slow Nodes open a
+  time-bound contributing-run and Canvas-node investigation.
+- **OPS-006:** After `OPS-007` and `EXP-004`, preserve attributed version/diff
+  history while adding filters, retention/time-scope clarity, and
+  API-supplied related-record correlation.
+
 ## Validation Matrix
+
+All user-interface rows require desktop (**D**, 1440 px), tablet (**T**, 768
+px), and mobile (**M**, 390 px) checks unless the row is a shared utility with
+no standalone layout. Each row's accessibility coverage includes keyboard-only
+operation (Tab/Shift+Tab plus relevant Enter, Space, and Escape) and a
+screen-reader pass with the supported local screen reader; axe is an automated
+supplement, not a substitute. The table states any additional coverage.
 
 | Roadmap item | Acceptance criteria | Automated validation | Manual validation | Responsive coverage | Accessibility coverage |
 |--------------|---------------------|----------------------|-------------------|---------------------|------------------------|
