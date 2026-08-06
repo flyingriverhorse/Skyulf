@@ -218,37 +218,50 @@ tasks add live walkthrough evidence.
 
 ### Forms and Validation
 
-- **FND-005 — Inferred: Canvas node settings and the Inference prediction
-  editor lack consistent programmatic field semantics.**
+- **FND-005 — Inferred: Canvas, Data/EDA, and Inference forms lack consistent
+  programmatic field semantics.**
   - **Evidence:** In Canvas, `EncodingNode.tsx` places the visible “Encoding
     Method” `span` beside a `select` without `htmlFor`, `id`, or ARIA
     association; the representative node settings use the same visual-label
-    convention. In Inference, `InferencePage.tsx` renders the JSON
-    `textarea` without a `label`, `aria-label`, or `aria-labelledby`, and
-    displays parse status without associating it to the editor or setting its
-    invalid state. This is source evidence across two journeys, not a claim
-    about uninspected Data/EDA, Experiments, or Operations forms.
-  - **User problem:** Keyboard and assistive-technology users can reach the
-    Canvas encoding control or Inference prediction editor without a
-    programmatically conveyed purpose or invalid/error relationship.
-  - **Affected surfaces:** Canvas node settings, including Encoding; Inference
-    prediction input; shared `Input` and `Button` primitives where adopted.
+    convention. In Data Sources, the observed Add Source modal rendered zero
+    associated `label` elements for the required Name and S3 Path inputs, and
+    `AddSourceModal.tsx` uses visible `span` labels for those fields and the
+    optional credential inputs without `id`/`htmlFor` or ARIA association. In
+    EDA, `EDASidebar.tsx` renders filter/exclusion column/operator/value
+    controls with placeholder-only prompts and no programmatic label
+    association, and `EDAPage.tsx` renders the no-analysis Target Column input
+    and Task Type `select` without a label. In Inference, `InferencePage.tsx`
+    renders the JSON `textarea` without a `label`, `aria-label`, or
+    `aria-labelledby`, and displays parse status without associating it to the
+    editor or setting its invalid state. This is concrete evidence across four
+    journeys, not a claim about uninspected Experiments or Operations forms.
+  - **User problem:** Keyboard and assistive-technology users can reach Canvas
+    node controls, Data source fields, EDA analysis/filter inputs, or the
+    Inference prediction editor without a programmatically conveyed purpose or
+    invalid/error relationship.
+  - **Affected surfaces:** Canvas node settings, including Encoding; Data
+    Sources Add Source; EDA analysis setup plus filter/exclusion controls;
+    Inference prediction input; shared `Input` and `Button` primitives where
+    adopted.
   - **Proposed behavior:** Require an explicit label association (or
-    `aria-labelledby`) for the affected Canvas node and Inference controls,
-    expose required and invalid states programmatically, and place a
+    `aria-labelledby`) for the affected Canvas, Data, EDA, and Inference
+    controls, expose required and invalid states programmatically, and place a
     persistent error beside the field while preserving helpful defaults.
   - **Acceptance criteria:** Every interactive control in the affected Canvas
-    node panels and Inference prediction editor has a unique accessible name;
-    required fields announce as required before submission; invalid fields
-    expose `aria-invalid` and an associated error; Enter submits only forms
-    with a defined submit action.
+    node panels, Add Source modal, EDA setup/sidebar controls, and Inference
+    prediction editor has a unique accessible name; required fields announce as
+    required before submission; invalid fields expose `aria-invalid` and an
+    associated error; Enter submits only forms or actions with a defined,
+    announced submit action.
   - **Validation method:** Render representative forms in component tests,
     assert accessible names/required/error relationships, and complete
-    keyboard-only configuration at desktop and 390 px; run axe on rendered
-    Canvas node panels and the Inference editor.
+    keyboard-only configuration for Canvas node panels, Add Source, EDA
+    setup/filter flows, and the Inference editor at desktop and 390 px; run
+    axe on each representative surface.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
-    Medium. **Dependencies:** Node configuration metadata and existing
-    validation rules. **Milestone:** Next.
+    Medium. **Dependencies:** shared form primitives, node configuration
+    metadata, and existing source/EDA/inference validation rules.
+    **Milestone:** Next.
 
 ### Accessibility and Keyboard UX
 
@@ -944,7 +957,7 @@ Canvas finding is warranted solely for this repeated form root.
 | FND-002 | Inferred | Shell overlays lack a shared focus-containment and focus-return contract. | Canvas, Experiments, Inference overlays; shared Navbar | High | Occasional | S | Low | ModalShell focus helpers | Now |
 | FND-003 | Inferred | Async state changes lack shared live-region semantics. | Canvas; Data/EDA; Experiments/Inference; Operations | High | Occasional | S | Low | None | Now |
 | FND-004 | Inferred | Route-fetch errors inconsistently offer Retry; Canvas uses a different, toast-scoped pattern. | Dashboard; Data/EDA; Registry; Deployments; Experiments evaluation | Medium | Occasional | S | Low | Page fetch functions | Next |
-| FND-005 | Inferred | Canvas node settings and Inference prediction input lack consistent field semantics. | Canvas node forms; Inference editor; shared controls | High | Frequent | M | Medium | Node metadata/validation | Next |
+| FND-005 | Inferred | Canvas, Data/EDA, and Inference forms lack consistent field semantics. | Canvas node forms; Data Sources Add Source; EDA analysis/filter controls; Inference editor; shared controls | High | Frequent | M | Medium | Shared form primitives; node metadata/validation; source/EDA/inference validation | Next |
 | FND-006 | Inferred | Shell view selection is not history-restorable or programmatically selected. | Canvas; Experiments; Inference | High | Frequent | M | Medium | useViewStore; retained views | Now |
 | CAN-001 | Observed | Click-added node cards overlap and do not enter configuration. | Canvas palette, graph, Properties panel | High | Frequent | S | Low | Custom-node bounds; Sidebar; selection | Now |
 | CAN-005 | Observed | Canvas toolbar clusters overlap and intercept visible actions when Properties narrows the Flow pane. | Canvas Toolbar, Flow viewport, Properties panel | High | Frequent | S | Low | Toolbar responsive layout; panel width | Now |
@@ -1016,7 +1029,7 @@ Canvas finding is warranted solely for this repeated form root.
 
 - **FND-004:** Normalize recoverable request retries.
 - **FND-005:** Normalize labels, required-state messaging, and field-error
-  relationships in Canvas node and Inference prediction forms.
+  relationships in Canvas, Data/EDA, and Inference forms.
 - **CAN-003:** Make Canvas recovery sources and unavailable autosaves
   understandable before replacing work.
 - **CAN-004:** Make Feature Generation recommendations apply or stop presenting
@@ -1036,7 +1049,7 @@ Canvas finding is warranted solely for this repeated form root.
 | FND-002 shell-overlay focus | Focus remains in overlay and returns to invoker | Playwright Tab/Shift+Tab/Escape tests | Shortcuts, Command Palette, notification detail from all shell views | 1440 and 390 px | Focus-order assertions |
 | FND-003 async semantics | Status/alert messages announce transitions | Component role tests and axe | Success, empty, error, retry, unavailable action | 1440 and 390 px | Live-region review |
 | FND-004 retry consistency | Every recoverable route fetch error retries in place | Page request-failure tests | Preserve filters and selection after retry | 1440 and 390 px | Retry button keyboard operation |
-| FND-005 Canvas/Inference form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only Canvas configuration and Inference entry | 1440 and 390 px | Accessible-name/error relationship review |
+| FND-005 shared form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only Canvas configuration, Add Source, EDA filter/setup, and Inference entry | 1440 and 390 px | Accessible-name/error relationship review |
 | FND-006 shell-view history | Back/Forward restores selected Canvas, Experiments, or Inference view | Playwright history tests | Verify retained local state | 1440, 1024, 768, 390 px | Selected-state snapshot |
 | CAN-001 Canvas click-add | New nodes never overlap, are selected, and expose required settings | Playwright palette/drag/palette placement checks | Build a representative pipeline by each insertion method | 1440, 1024, 768, 390 px | Keyboard reachability and focus check |
 | CAN-005 Canvas toolbar collision | Every visible enabled toolbar target has an independent hit area with either panel open | Playwright rectangle-intersection and pointer-action checks | Open/close both panels, then undo/redo/load/save and overflow actions | 1440, 1024, 768, 390 px | Focus, menu role, and keyboard Undo/Redo check |
