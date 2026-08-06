@@ -244,7 +244,7 @@ def _polars_column_excluded(series: Any, exclude_binary: bool, exclude_constant:
     if series.dtype == pl.Boolean:
         return True
 
-    valid = series.drop_nulls()
+    valid = series.fill_nan(None).drop_nulls() if series.dtype.is_float() else series.drop_nulls()
     if valid.is_empty():
         return True
     if exclude_binary and _is_binary_numeric(valid):

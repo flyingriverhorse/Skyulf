@@ -12,6 +12,7 @@ import pandas as pd
 import pytest
 
 from skyulf.data.dataset import SplitDataset
+from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.utils import (
     _is_binary_numeric,
     detect_numeric_columns,
@@ -482,6 +483,26 @@ def test_detect_numeric_columns_polars_constant_excluded() -> None:
     result = detect_numeric_columns(typing.cast(pd.DataFrame, df_pl))
     assert "const" not in result
     assert "varied" in result
+
+
+@pytest.mark.skipif(not _POLARS_AVAILABLE, reason="polars not installed")
+def test_detect_numeric_columns_polars_treats_nan_as_missing_like_pandas() -> None:
+    """Native Polars selection must ignore float NaN before exclusion checks."""
+    import polars as pl
+
+    raw = pl.DataFrame(
+        {
+            "one_finite": [1.0, float("nan"), None],
+            "binary": [0.0, 1.0, float("nan")],
+            "constant": [7.0, 7.0, float("nan")],
+            "varied": [1.0, 2.0, float("nan")],
+        }
+    )
+    expected = detect_numeric_columns(raw.to_pandas())
+
+    for frame in (raw, SkyulfPolarsWrapper(raw)):
+        result = detect_numeric_columns(typing.cast(pd.DataFrame, frame))
+        assert result == expected == ["varied"]
 
 
 @pytest.mark.skipif(not _POLARS_AVAILABLE, reason="polars not installed")
