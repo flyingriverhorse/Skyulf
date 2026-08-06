@@ -85,6 +85,14 @@ class ZScoreCalculator(BaseCalculator):
             return {}
 
         threshold = config.get("threshold", 3.0)
+        # TODO(pandas-removal): mean/std alone would be numpy-safe (Polars std
+        # ddof=0 already matches Pandas — verified), but this loop relies on
+        # per-column pd.to_numeric(errors="coerce") to gracefully skip
+        # non-numeric/mixed-dtype columns and .dropna() per column before
+        # computing stats. Revisit once there's a native Polars equivalent
+        # (pl.col(col).cast(pl.Float64, strict=False).drop_nulls()) wired in
+        # to replace the coercion step without changing which columns get a
+        # "non-numeric" warning.
         X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}

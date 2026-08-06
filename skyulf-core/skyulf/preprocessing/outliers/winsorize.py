@@ -80,6 +80,9 @@ class WinsorizeCalculator(BaseCalculator):
 
         lower_p = config.get("lower_percentile", 5.0)
         upper_p = config.get("upper_percentile", 95.0)
+        # TODO(pandas-removal): same quantile-interpolation caveat as iqr.py —
+        # keep on resolve_columns_then_to_pandas until Polars' quantile
+        # interpolation mode is matched to Pandas' "linear" default.
         X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}

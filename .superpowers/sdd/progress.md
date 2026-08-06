@@ -376,3 +376,27 @@ legitimate sklearn/NumPy/SHAP/plotting/imbalanced-learn boundaries. A fresh
 whole-codebase inventory (beyond this specific audit's original scope, and
 beyond `skyulf-core` into `backend`/`frontend`) would still be the rigorous
 way to rule out anything entirely outside what's been looked at so far.
+
+## Follow-up 2: direct Polars→numpy for sklearn fits where safe
+
+Answered "are we good for Polars everywhere, will removing Pandas later be
+OK, is Polars→numpy clean": audited every sklearn-bound fit routine's actual
+conversion path. Two nodes (`VarianceThreshold`, `PolynomialFeatures`) had no
+Pandas-only step between column resolution and `.fit()` — sklearn accepts
+numpy directly — so added `resolve_columns_then_to_numpy()` and
+`select_then_to_numpy()` to `_helpers.py` and rewired both nodes to skip the
+Pandas hop entirely (Polars `.select(cols).to_numpy()` is native).
+
+The other five narrowed nodes (IQR, Winsorize, Z-Score, Elliptic Envelope,
+Power Transformer) genuinely still need Pandas: confirmed via a live
+comparison that Polars' `.quantile()` defaults to "nearest" interpolation
+vs. Pandas' "linear" (3.25 vs 3.0 on a simple 1..10 series) — a real
+behavior mismatch for IQR/Winsorize if swapped carelessly. Z-Score/Elliptic
+rely on per-column `pd.to_numeric(errors="coerce").dropna()` semantics with
+no native-Polars replacement wired in yet. Power Transformer's box-cox
+filter uses Pandas boolean column indexing. Left `TODO(pandas-removal)`
+comments at each call site documenting exactly what's blocking the change,
+so this isn't silently forgotten.
+
+Validation: full Core suite 2918 passed / 69 skipped / 1 xfailed (unchanged
+baseline), ruff check/format and ty check clean on all touched files.

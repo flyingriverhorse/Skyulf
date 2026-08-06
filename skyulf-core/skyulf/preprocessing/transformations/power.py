@@ -154,6 +154,12 @@ class PowerTransformerCalculator(BaseCalculator):
 
         method = config.get("method", "yeo-johnson")
         standardize = config.get("standardize", True)
+        # TODO(pandas-removal): PowerTransformer.fit accepts numpy directly,
+        # but _filter_power_columns() uses Pandas column-wise boolean
+        # indexing (`X_pd[c] <= 0`) to drop non-positive columns for box-cox.
+        # That check is easy to port to numpy (X_np[:, i] <= 0), but do it
+        # together with a matching rewrite of _filter_power_columns to take
+        # an ndarray, so both stay in sync.
         X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         valid_cols = _filter_power_columns(X_pd, cols, method)
         if not valid_cols:
