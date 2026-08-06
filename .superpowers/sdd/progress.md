@@ -400,3 +400,38 @@ so this isn't silently forgotten.
 
 Validation: full Core suite 2918 passed / 69 skipped / 1 xfailed (unchanged
 baseline), ruff check/format and ty check clean on all touched files.
+
+## Follow-up 3: found and fixed a missed narrowing case + a real duplication
+
+Rechecked "is there any code improvement related to this" by grepping every
+`to_pandas`/`resolve_columns_then_to_pandas`/`select_then_to_pandas` call
+site across `preprocessing/` again with fresh eyes, rather than trusting
+the earlier sweep was exhaustive.
+
+Found two real gaps:
+1. `feature_selection/model_based.py` and `feature_selection/univariate.py`
+   both called `to_pandas(X)` on the *entire* input frame before calling
+   `_resolve_candidate_columns()` -- the exact wasteful pattern already
+   fixed in 8+ other nodes, missed originally because it's routed through
+   a shared `_common.py` helper rather than the node's own inline
+   `resolve_columns()` call. Fixed by resolving candidates natively first,
+   then narrow-converting via `select_then_to_pandas()` (candidate columns,
+   plus the target column when it must be pulled from X itself).
+2. `transformations/power.py` and `transformations/general.py` each had
+   their own near-identical ~25-line routine to reconstruct a fitted
+   `PowerTransformer` + its internal `StandardScaler` from stored
+   lambdas/scaler-params (one for a resolved multi-column subset, one for
+   a single column at apply time). Extracted into one shared
+   `transformations/_power_common.py::build_pretrained_power_transformer()`,
+   parameterized by optional `col_indices`/`n_total_cols` for the
+   multi-column narrowing case.
+
+Verified: scaling nodes (standard.py, maxabs.py) were already numpy-direct
+-- no gap there. woe.py and general.py's per-column power apply were
+already narrow -- no gap there either. resampling.py/split.py genuinely
+need the full feature matrix (imbalanced-learn/sklearn splitters use all
+columns), so their full-frame conversion isn't waste.
+
+Validation: full Core suite 2918 passed / 69 skipped / 1 xfailed (twice,
+identical to baseline), ruff check/format and ty check clean on all touched
+files, targeted tests for both changes green.
