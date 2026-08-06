@@ -458,6 +458,20 @@ class TestInternalHelpers:
         if not is_polars:
             assert len(result["lambdas"]) == 1
 
+    def test_fit_power_for_polars_column_skips_pandas(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Polars PowerTransformer fit should consume a numpy column directly."""
+        frame = pl.DataFrame({"a": [1.0, 2.0, 4.0, 8.0, 16.0]})
+
+        def fail_to_pandas(*_args: Any, **_kwargs: Any) -> Any:
+            raise AssertionError("power fit converted a Polars Series to Pandas")
+
+        monkeypatch.setattr(pl.Series, "to_pandas", fail_to_pandas)
+        artifact = _fit_power_for_column(frame, "a", "yeo-johnson", is_polars=True)
+
+        assert len(artifact["lambdas"]) == 1
+
     def test_apply_power_pandas_missing_lambdas_is_noop(self, pos_df: pd.DataFrame) -> None:
         """_apply_power_to_pandas_col with lambdas=None returns the frame unchanged."""
         item: dict = {"column": "a", "method": "yeo-johnson"}

@@ -124,13 +124,13 @@ class GeneralTransformationApplier(BaseApplier):
 def _fit_power_for_column(X: Any, col: str, method: str, is_polars: bool) -> dict[str, Any]:
     """Fit a PowerTransformer for one column; return the per-column artifact dict."""
     if is_polars:
-        col_series = X[col].to_pandas()
-        col_df = col_series.to_frame()
+        col_values = X[col].to_numpy()
+        col_df = col_values.reshape(-1, 1)
     else:
-        col_series = X[col]
+        col_values = X[col]
         col_df = X[[col]]
 
-    if method == "box-cox" and (col_series <= 0).any():
+    if method == "box-cox" and (col_values <= 0).any():
         logger.warning(
             f"Skipping Box-Cox for column {col} because it contains non-positive values."
         )
