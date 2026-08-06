@@ -600,3 +600,49 @@ Validation for the consolidated cleanup docs pass:
 - `git diff --check`: clean.
 
 Task 4: complete (commits e6e7d7ba..275630c0, review clean).
+
+Targeted warning fix Task 1: complete (commits de66d4aa..102fa738, review clean).
+Targeted warning fix Task 2: complete (commits 102fa738..8a52c6a4, review clean).
+
+## Targeted modeling warning containment
+
+This documentation/verification pass preserves the existing Task 1-2 ledger
+lines above and records the durable details across the warning-fix follow-up:
+
+1. `skyulf-core/skyulf/modeling/_tuning/engine.py` plus
+   `skyulf-core/tests/test_tuning_engine.py`: `TuningCalculator.fit()` already
+   captures and re-emits warnings, so constructing the supported
+   `OptunaSearchCV` path leaked Optuna's known experimental notice back to
+   callers. `_build_optuna_searcher()` now applies an exact local filter only
+   around the `OptunaSearchCV(...)` constructor, and the regression test proves
+   tuning still succeeds while unrelated warning categories remain visible.
+2. `skyulf-core/skyulf/modeling/_explainability/shap_explanation.py` plus
+   `skyulf-core/tests/test_explainability.py`: Task 2 confirmed that Skyulf's
+   pipeline-style numpy fitting left tree estimators without
+   `feature_names_in_`, but multiclass SHAP class selection still called
+   `model.predict()` with a named Pandas row. `_predicted_class_index()` now
+   matches the prediction input to the estimator's fit-time metadata: Pandas
+   when `feature_names_in_` exists, otherwise `sample.to_numpy()`. SHAP
+   feature names and sample payloads stay Pandas-backed.
+3. `skyulf-core/tests/test_tuning_engine.py`: the new stdlib `warnings` import
+   from Task 1 needed one Ruff import-order cleanup during Task 3 verification;
+   the change is formatting-only and does not alter test behavior.
+
+Regression tests locked in by the warning plan:
+- `tests/test_tuning_engine.py::test_fit_optuna_strategy_basic`
+- `tests/test_explainability.py::test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning[decision-tree]`
+- `tests/test_explainability.py::test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning[random-forest]`
+- `tests/test_explainability.py::test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning[extra-trees]`
+
+Validation for the targeted warning containment docs pass:
+- `ruff check skyulf/modeling/_tuning/engine.py skyulf/modeling/_explainability/shap_explanation.py tests/test_tuning_engine.py tests/test_explainability.py`:
+  passed after the import-order cleanup above.
+- `ruff format --check skyulf/modeling/_tuning/engine.py skyulf/modeling/_explainability/shap_explanation.py tests/test_tuning_engine.py tests/test_explainability.py`:
+  `4 files already formatted`.
+- `ty check skyulf/modeling/_tuning/engine.py skyulf/modeling/_explainability/shap_explanation.py`:
+  `All checks passed!`
+- `python -m pytest tests/test_tuning_engine.py::test_fit_optuna_strategy_basic tests/test_explainability.py::test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning -q`:
+  `4 passed in 2.17s`, with neither target warning captured.
+- Full Core suite: `2926 passed, 69 skipped, 1 xfailed, 49 warnings in 37.85s`
+  (historical baseline `2923 passed, 69 skipped, 1 xfailed` plus the 3 new
+  parameterized explainability cases; no regressions).
