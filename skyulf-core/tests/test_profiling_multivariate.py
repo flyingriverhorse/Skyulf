@@ -299,6 +299,80 @@ def test_detect_outliers_outer_exception(monkeypatch) -> None:
     assert result is None
 
 
+def _candidate_c_fixture() -> pl.DataFrame:
+    """Audit-pinned golden fixture for the native outlier-imputation path."""
+    return pl.DataFrame(
+        {
+            "x": [0.0, 1.0, None, 3.0, 4.0],
+            "y": [10.0, None, 12.0, 13.0, 14.0],
+            "all_null": [None, None, None, None, None],
+            "target": ["a", "b", "a", "b", "a"],
+        }
+    )
+
+
+def test_detect_outliers_matches_golden_fixture() -> None:
+    """Native Polars imputation path must reproduce the audit's pinned golden values
+    exactly: total_outliers=1, outlier_percentage=20.0, index=0, values, and score.
+    """
+    analyzer = EDAAnalyzer(_candidate_c_fixture())
+    result = analyzer._detect_outliers(["x", "y", "all_null"])
+
+    assert result is not None
+    assert result.total_outliers == 1
+    assert result.outlier_percentage == 20.0
+    assert len(result.top_outliers) == 1
+    top = result.top_outliers[0]
+    assert top.index == 0
+    assert top.values == {"x": 0.0, "y": 10.0, "all_null": None}
+    assert abs(top.score - (-0.01172203142549666)) < 1e-9
+    assert top.explanation == [{"feature": "x", "value": 0.0, "median": 2.0, "diff_pct": 100.0}]
+
+
+def test_impute_matrix_drop_empty_matches_sklearn_simple_imputer() -> None:
+    """Native Polars fast path must match ``SimpleImputer(strategy="mean")`` exactly,
+    including dropping all-null/all-NaN columns (``keep_empty_features=False``).
+    """
+    from sklearn.impute import SimpleImputer
+
+    from skyulf.profiling._analyzer.multivariate import MultivariateMixin
+
+    cases = [
+        pl.DataFrame({"x": [0.0, 1.0, None, 3.0, 4.0], "y": [10.0, None, 12.0, 13.0, 14.0]}),
+        pl.DataFrame({"a": pl.Series([1, 2, None, 4], dtype=pl.Int64), "b": [1.0, 2.0, 3.0, 4.0]}),
+        pl.DataFrame({"x": [1.0, float("nan"), 3.0, 4.0]}),
+        pl.DataFrame({"x": [1.0, 2.0, 3.0, 4.0, 5.0]}),
+    ]
+    for df in cases:
+        native = MultivariateMixin._impute_matrix_drop_empty(df)
+        legacy = SimpleImputer(strategy="mean").fit_transform(df.to_pandas().values)
+        assert native.shape == legacy.shape
+        np.testing.assert_allclose(native, legacy)
+
+
+def test_impute_matrix_drop_empty_drops_all_null_columns() -> None:
+    """An all-null column must be dropped from the output entirely, matching sklearn's
+    default `keep_empty_features=False`, rather than zero-filled (unlike `_impute_matrix`).
+    """
+    from skyulf.profiling._analyzer.multivariate import MultivariateMixin
+
+    df = pl.DataFrame({"x": [1.0, 2.0, 3.0], "all_null": [None, None, None]})
+    result = MultivariateMixin._impute_matrix_drop_empty(df)
+    assert result.shape == (3, 1)
+    np.testing.assert_allclose(result[:, 0], [1.0, 2.0, 3.0])
+
+
+def test_detect_outliers_infinite_value_returns_none() -> None:
+    """Infinite values are not finite-safe under either the fast or fallback path,
+    so `_detect_outliers` must catch the error and return `None` rather than crash.
+    """
+    analyzer = EDAAnalyzer(
+        pl.DataFrame({"x": [1.0, float("inf"), 3.0, 4.0], "y": [1.0, 2.0, 3.0, 4.0]})
+    )
+    result = analyzer._detect_outliers(["x", "y"])
+    assert result is None
+
+
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample,
     which has missing ``age``/``income``/``lat``/``lon`` values — closer to
