@@ -10,6 +10,46 @@ def _collect(lf: pl.LazyFrame) -> pl.DataFrame:
     return cast(pl.DataFrame, lf.collect())
 
 
+_INT_DTYPES = (
+    pl.Int8,
+    pl.Int16,
+    pl.Int32,
+    pl.Int64,
+    pl.UInt8,
+    pl.UInt16,
+    pl.UInt32,
+    pl.UInt64,
+)
+
+
+def _dtype_to_semantic_bucket(dtype: Any, ratio: float, n_unique: int) -> str:
+    """Map a Polars dtype + cardinality ratio/count to a semantic bucket.
+
+    Shared by ``ColumnMixin._get_semantic_type`` (per-series, used during the
+    main per-column analysis pass) and ``EDAAnalyzer._semantic_type_for_column``
+    (dtype-only, used by the inline/vectorized inference pass that reuses
+    already-computed ``n_unique`` counts) so the Numeric/Categorical/Boolean/
+    DateTime/Text buckets never drift apart between the two call sites.
+
+    ``ratio`` is ``n_unique / row_count`` (0 when there are no rows).
+    Low-cardinality ints (``ratio < 0.05`` and ``n_unique < 20``) and
+    low-cardinality strings (``ratio < 0.05``) are treated as Categorical.
+    """
+    if dtype in (pl.Float32, pl.Float64):
+        return "Numeric"
+    if dtype in _INT_DTYPES:
+        return "Categorical" if (ratio < 0.05 and n_unique < 20) else "Numeric"
+    if dtype == pl.Boolean:
+        return "Boolean"
+    if dtype in (pl.Date, pl.Datetime, pl.Duration):
+        return "DateTime"
+    if dtype in (pl.Utf8, pl.String):
+        return "Categorical" if ratio < 0.05 else "Text"
+    if str(dtype) == "Categorical":
+        return "Categorical"
+    return "Text"
+
+
 @runtime_checkable
 class _AnalyzerState(Protocol):
     """Structural type for the shared :class:`EDAAnalyzer` state.

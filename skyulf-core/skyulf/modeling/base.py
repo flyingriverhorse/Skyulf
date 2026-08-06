@@ -540,7 +540,7 @@ class StatefulEstimator:
             return None
         return {
             "classes": y_proba_df.columns.tolist(),
-            "values": y_proba_df.values.tolist(),
+            "values": y_proba_df.to_numpy().tolist(),
         }
 
     @staticmethod
