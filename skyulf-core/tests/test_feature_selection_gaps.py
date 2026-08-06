@@ -222,17 +222,20 @@ def test_correlation_threshold_threshold_equality_does_not_drop_polars_columns()
     assert artifact["columns_to_drop"] == []
 
 
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
 @pytest.mark.parametrize("method", ["kendall", "not_a_method"])
 def test_correlation_threshold_native_ineligible_methods_use_pandas_errors(
     monkeypatch: pytest.MonkeyPatch,
+    wrapped: bool,
     method: str,
 ) -> None:
     """Kendall and invalid methods must retain the established Pandas route."""
     pl = pytest.importorskip("polars")
-    frame = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+    raw = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+    frame = SkyulfPolarsWrapper(raw) if wrapped else raw
     calculator = CorrelationThresholdCalculator()
     config = {"correlation_method": method}
-    expected = calculator.fit(frame.to_pandas(), config) if method == "kendall" else None
+    expected = calculator.fit(raw.to_pandas(), config) if method == "kendall" else None
     original_to_pandas = correlation_module.to_pandas
     calls: list[object] = []
 
@@ -255,11 +258,14 @@ def test_correlation_threshold_native_ineligible_methods_use_pandas_errors(
     assert calls[0] is frame
 
 
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
 def test_correlation_threshold_callable_and_unsupported_dtype_use_pandas_fallback(
     monkeypatch: pytest.MonkeyPatch,
+    wrapped: bool,
 ) -> None:
     """Callable methods and selected strings keep the legacy compatibility behavior."""
     pl = pytest.importorskip("polars")
+    calculator = CorrelationThresholdCalculator()
     original_to_pandas = correlation_module.to_pandas
     calls: list[object] = []
 
@@ -270,19 +276,21 @@ def test_correlation_threshold_callable_and_unsupported_dtype_use_pandas_fallbac
     def force_correlation(_left: np.ndarray, _right: np.ndarray) -> float:
         return 1.0
 
-    monkeypatch.setattr(correlation_module, "to_pandas", recording_to_pandas)
-    calculator = CorrelationThresholdCalculator()
-    callable_frame = pl.DataFrame(
-        {"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0], "c": [2.0, 3.0, 4.0]}
-    )
+    callable_raw = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [3.0, 2.0, 1.0], "c": [2.0, 3.0, 4.0]})
+    callable_frame = SkyulfPolarsWrapper(callable_raw) if wrapped else callable_raw
     callable_config = {
         "columns": ["a", "b", "c"],
         "correlation_method": force_correlation,
         "threshold": 0.95,
     }
-    assert calculator.fit(callable_frame, callable_config)["columns_to_drop"] == ["b", "c"]
+    callable_expected = calculator.fit(callable_raw.to_pandas(), callable_config)
 
-    unsupported_frame = pl.DataFrame({"a": [1.0, 2.0, 3.0], "text": ["a", "b", "c"]})
+    monkeypatch.setattr(correlation_module, "to_pandas", recording_to_pandas)
+
+    assert calculator.fit(callable_frame, callable_config) == callable_expected
+
+    unsupported_raw = pl.DataFrame({"a": [1.0, 2.0, 3.0], "text": ["a", "b", "c"]})
+    unsupported_frame = SkyulfPolarsWrapper(unsupported_raw) if wrapped else unsupported_raw
     with pytest.raises(ValueError, match="could not convert string to float"):
         calculator.fit(unsupported_frame, {"columns": ["a", "text"]})
 
@@ -291,15 +299,18 @@ def test_correlation_threshold_callable_and_unsupported_dtype_use_pandas_fallbac
     assert calls[1] is unsupported_frame
 
 
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
 def test_correlation_threshold_unavailable_native_capability_uses_pandas_fallback(
     monkeypatch: pytest.MonkeyPatch,
+    wrapped: bool,
 ) -> None:
     """A missing native capability delegates before any Polars calculation."""
     pl = pytest.importorskip("polars")
-    frame = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+    raw = pl.DataFrame({"a": [1.0, 2.0, 3.0], "b": [2.0, 4.0, 6.0]})
+    frame = SkyulfPolarsWrapper(raw) if wrapped else raw
     config = {"correlation_method": "pearson"}
     calculator = CorrelationThresholdCalculator()
-    expected = calculator.fit(frame.to_pandas(), config)
+    expected = calculator.fit(raw.to_pandas(), config)
     original_to_pandas = correlation_module.to_pandas
     calls: list[object] = []
 
