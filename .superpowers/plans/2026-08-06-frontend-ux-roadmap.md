@@ -58,7 +58,7 @@
 - Read: `frontend/ml-canvas/e2e/routes.spec.ts`
 
 **Interfaces:**
-- Consumes: approved design at `docs/superpowers/specs/2026-08-06-frontend-ux-roadmap-design.md`.
+- Consumes: approved design at `.superpowers/specs/2026-08-06-frontend-ux-roadmap-design.md`.
 - Produces: a stable report structure and baseline evidence used by every later task.
 
 - [ ] **Step 1: Create the report with the final section structure**
@@ -555,7 +555,7 @@ git commit -m "docs: prioritize frontend UX roadmap"
 
 **Files:**
 - Modify: `docs/ux/frontend-ux-roadmap.md`
-- Read: `docs/superpowers/specs/2026-08-06-frontend-ux-roadmap-design.md`
+- Read: `.superpowers/specs/2026-08-06-frontend-ux-roadmap-design.md`
 
 **Interfaces:**
 - Consumes: completed roadmap from Tasks 1-7.
