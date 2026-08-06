@@ -13,8 +13,14 @@ configuration risks (`CAN-002` through `CAN-004`). Task 4 adds seven Data and
 EDA findings: three directly reproduced journey/responsive outcomes
 (`DAT-001`, `DAT-002`, and `DAT-004`) and four code-supported lifecycle,
 configuration, and visualization risks (`DAT-003`, `DAT-005` through
-`DAT-007`). The Dashboard-only contrast result is intentionally deferred to
-the Dashboard journey rather than represented as a shared-foundation finding.
+`DAT-007`). Task 5 adds seven Experiments and Inference findings: two
+comparison-context issues kept in Now (`EXP-001`, `EXP-002`), two artifact/diff
+clarity items sequenced to Next (`EXP-003`, `EXP-004`), and three high-impact
+threshold/inference items (`EXP-005` through `EXP-007`) explicitly scoped so
+their Now slice is independently complete while shared retry (`FND-004`) and
+shared field-semantic (`FND-005`) normalization remain Next follow-ons. The
+Dashboard-only contrast result is intentionally deferred to the Dashboard
+journey rather than represented as a shared-foundation finding.
 
 ## Method and Evidence
 
@@ -696,9 +702,11 @@ Canvas finding is warranted solely for this repeated form root.
   - **Affected surfaces:** Data Sources introduction, Add Source, file upload,
     completed dataset row, Canvas handoff, and EDA handoff.
   - **Proposed behavior:** Make the source-type decision explicit (including
-    unavailable types), associate every field with its label and inline
-    validation, and end successful ingestion with contextual Canvas and EDA
-    next-step cards that name the selected dataset.
+    unavailable types), associate every Add Source field with a route-specific
+    label and inline validation now, and end successful ingestion with
+    contextual Canvas and EDA next-step cards that name the selected dataset.
+    `FND-005` can later normalize the shared primitive layer without blocking
+    this Data Sources slice.
   - **Acceptance criteria:** Every source form control has an accessible name,
     required/invalid state, and linked error; supported source types and
     credential expectations are explained before submission; a completed
@@ -710,8 +718,7 @@ Canvas finding is warranted solely for this repeated form root.
     source context at 1440 and 390 px; run axe on both modals.
   - **Impact:** High. **Frequency:** Frequent for new sources. **Effort:** M.
     **Risk:** Medium. **Dependencies:** source-type capability contract,
-    ingestion API errors, router handoff state, and **FND-005**. **Milestone:**
-    Now.
+    ingestion API errors, and router handoff state. **Milestone:** Now.
 
 - **DAT-002 — Observed: failed dataset preview presents fabricated-looking
   zero metadata and insufficient recovery context.**
@@ -1103,14 +1110,17 @@ Canvas finding is warranted solely for this repeated form root.
     and a recoverable state if a mutation fails or the selected run changes.
   - **Surfaces:** Evaluation Threshold Slider/Tuning; confusion matrices;
     saved-threshold API; Inference advanced overrides and results.
-  - **Proposed behavior:** Treat tuning as a versioned decision: preview
-    context, confirm/save/enable lifecycle, pending/error/retry feedback, and
-    an immutable applied-threshold summary carried into prediction results.
-    Preserve the existing distinction between exploratory slider and deployed
-    behavior.
-  - **Acceptance criteria:** Preview, save, enable, disable, clear, and
-    failed states name job/model version, metric, data split, threshold values,
-    and whether real prediction is affected; controls prevent duplicate
+  - **Proposed behavior:** Treat tuning as a versioned decision on the current
+    Evaluation and Inference surfaces: preview context, confirm/save/enable
+    lifecycle, mutation-scoped pending/error/retry feedback, and an immutable
+    applied-threshold summary carried into prediction results. Preserve the
+    existing distinction between exploratory slider and deployed behavior.
+    `FND-004` can later align cross-route fetch retries without blocking this
+    threshold lifecycle slice.
+  - **Acceptance criteria:** Preview, save, enable, disable, clear, and failed
+    states name job/model version, metric, data split, threshold values, and
+    whether real prediction is affected; each failed mutation offers one scoped
+    retry or dismissal path on the same surface; controls prevent duplicate
     mutations; every result identifies default/saved/override thresholds;
     switching jobs never attributes thresholds to the wrong job.
   - **Validation method:** Mock validation/test fallback, saved-enabled,
@@ -1119,8 +1129,8 @@ Canvas finding is warranted solely for this repeated form root.
     Playwright tests, including tab/run switches and live/status assertions.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
     High. **Dependencies:** threshold-tuning API/version semantics,
-    evaluation artifacts, deployment prediction response, and **FND-003** and
-    **FND-004** for shared async/retry behavior. **Milestone:** Now.
+    evaluation artifacts, deployment prediction response, and **FND-003**.
+    **Milestone:** Now.
 
 - **EXP-006 — Observed: inference schema feedback permits a structurally
   incomplete, type-incompatible request.**
@@ -1138,20 +1148,22 @@ Canvas finding is warranted solely for this repeated form root.
   - **Proposed behavior:** Obtain a typed, required/nullable input contract
     from the deployed artifact; validate each row before submission; make
     repair an explicit, reviewable transform with per-field defaults/reasons,
-    never an unqualified zero-fill.
-  - **Acceptance criteria:** Run Prediction is blocked or requires an
-    explicit reviewed override for missing, extra, wrong-type, nullability,
-    range, categorical, and row-shape violations; each issue names
-    row/field/expected/received value; repair previews changed values and
-    preserves the original input; unknown schema types are honestly marked
-    unvalidated.
+    never an unqualified zero-fill; and make the inference editor's own
+    invalid/error state explicit even before `FND-005` later normalizes shared
+    form primitives.
+  - **Acceptance criteria:** Run Prediction is blocked or requires an explicit
+    reviewed override for missing, extra, wrong-type, nullability, range,
+    categorical, and row-shape violations; each issue names
+    row/field/expected/received value and is tied to the current editor state;
+    repair previews changed values and preserves the original input; unknown
+    schema types are honestly marked unvalidated.
   - **Validation method:** Render deployed-artifact fixtures for numeric,
     string, categorical, nullable, defaultable, and unknown fields; enter
     JSON, CSV, sample, and drag/drop variants; assert request gating/payload,
     repair preview, keyboard feedback, and server-validation reconciliation.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     High. **Dependencies:** deployment artifact schema, prediction validation
-    response, CSV parser, and **FND-005** field semantics. **Milestone:** Now.
+    response, and CSV parser. **Milestone:** Now.
 
 - **EXP-007 — Inferred: inference execution and recovery are not a complete
   durable run lifecycle.**
@@ -1169,15 +1181,17 @@ Canvas finding is warranted solely for this repeated form root.
     recent runs; JSON/CSV export; deployment card; threshold display.
   - **Proposed behavior:** Model each request as a named inference run with
     submit/pending/success/failure/cancelled status, model/version/schema/
-    threshold/input summary, scoped retry/cancel where supported, and a
-    privacy-conscious local/session history that distinguishes retained input
-    from retained result.
+    threshold/input summary, scoped retry/cancel on the same inference surface
+    where supported, and a privacy-conscious local/session history that
+    distinguishes retained input from retained result. `FND-004` can later
+    align broader route-fetch retry affordances without blocking this run
+    lifecycle slice.
   - **Acceptance criteria:** Pending work names its run and prevents duplicate
-    submission; failure exposes safe cause, unchanged input, retry and next
-    action; success/export names model version, schema/threshold context,
-    row count, client/server latency, and result format; reload/history makes
-    retention/expiry explicit; no raw transport object is the only recovery
-    copy.
+    submission; failure exposes safe cause, unchanged input, one scoped retry,
+    and next action; success/export names model version, schema/threshold
+    context, row count, client/server latency, and result format;
+    reload/history makes retention/expiry explicit; no raw transport object is
+    the only recovery copy.
   - **Validation method:** Mock active/no deployment, malformed/server schema
     errors, delayed success, timeout, cancellation, retry, classification and
     regression results, export, reset, and reload. Assert requests, retained
@@ -1185,8 +1199,8 @@ Canvas finding is warranted solely for this repeated form root.
     narrow/desktop layouts.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** L. **Risk:**
     Medium. **Dependencies:** deployment/prediction APIs, job/status contract,
-    browser storage/privacy policy, exports, and **FND-003** and **FND-004**.
-    **Milestone:** Now.
+    browser storage/privacy policy, exports, and **FND-003**. **Milestone:**
+    Now.
 
 ### Operations
 
@@ -1213,7 +1227,7 @@ Canvas finding is warranted solely for this repeated form root.
 | CAN-002 | Inferred | Run readiness and failures lack an actionable node-level diagnostic loop. | Canvas run controls, node warnings, Results | High | Occasional | M | Medium | Validators; converter; FND-003 | Now |
 | CAN-003 | Inferred | Autosave, recent, and version recovery do not explain unavailable local recovery. | Restore banner; Recent; versions; Toolbar | Medium | Occasional | M | Medium | Persistence; versions; FND-003 | Next |
 | CAN-004 | Inferred | Feature Generation exposes a recommendation Apply action that changes nothing. | Feature Generation; Recommendations panel | Medium | Occasional | S | Low | Recommendation schema; FND-005 | Next |
-| DAT-001 | Observed | Source onboarding has conflicting destinations and unassociated required fields. | Data Sources; Add Source; Canvas/EDA handoffs | High | Frequent | M | Medium | Source API; router; FND-005 | Now |
+| DAT-001 | Observed | Source onboarding has conflicting destinations and unassociated required fields. | Data Sources; Add Source; Canvas/EDA handoffs | High | Frequent | M | Medium | Source API; router | Now |
 | DAT-002 | Observed | Failed preview reports zero-like metadata without recovery context. | Dataset Preview; source profile/sample APIs | High | Occasional | M | Medium | Profile/sample errors; FND-003 | Now |
 | DAT-003 | Inferred | Ingestion activity lacks phase/progress/history/retry lifecycle. | Upload; Add Source; jobs; source rows | High | Occasional | M | Medium | Ingestion API; FND-003 | Now |
 | DAT-004 | Observed | Data/EDA route controls are clipped at 390 px. | Data table/actions; EDA header/history; Layout | High | Frequent | M | Medium | FND-001; responsive views | Now |
@@ -1224,9 +1238,9 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-002 | Inferred | Metric comparison does not make direction, comparability, or missingness durable. | Visual/table/branch metric comparison | High | Frequent | M | Medium | Metric metadata; chart/table adapters | Now |
 | EXP-003 | Inferred | Conditional explainability/segmentation views conceal availability and comparability. | Feature Importance, SHAP, Segmentation, exports | High | Occasional | M | Medium | Artifact schema; explanation services | Next |
 | EXP-004 | Inferred | Pipeline Diff lacks an explicit baseline/candidate decision contract. | Run sidebar, Pipeline Diff, saved graphs | Medium | Occasional | M | Medium | Graph snapshots; graphDiff; job metadata | Next |
-| EXP-005 | Inferred | Threshold exploration/tuning/activation lacks a durable decision record. | Evaluation, threshold API, Inference overrides/results | High | Occasional | M | High | Threshold API/version semantics; FND-003/FND-004 | Now |
-| EXP-006 | Observed | Inference permits visibly incomplete/type-incompatible input. | Editor, schema badges/Fix, prediction request | High | Frequent | M | High | Typed artifact schema; FND-005 | Now |
-| EXP-007 | Inferred | Inference execution/recovery is not a complete durable run lifecycle. | Run, pending/error/results, history, exports | High | Occasional | L | Medium | Prediction/status API; storage; FND-003/FND-004 | Now |
+| EXP-005 | Inferred | Threshold exploration/tuning/activation lacks a durable decision record. | Evaluation, threshold API, Inference overrides/results | High | Occasional | M | High | Threshold API/version semantics; FND-003 | Now |
+| EXP-006 | Observed | Inference permits visibly incomplete/type-incompatible input. | Editor, schema badges/Fix, prediction request | High | Frequent | M | High | Typed artifact schema | Now |
+| EXP-007 | Inferred | Inference execution/recovery is not a complete durable run lifecycle. | Run, pending/error/results, history, exports | High | Occasional | L | Medium | Prediction/status API; storage; FND-003 | Now |
 
 ## Component-Boundary Recommendations
 
@@ -1247,8 +1261,9 @@ Canvas finding is warranted solely for this repeated form root.
 - **Data journey boundary:** Keep ingestion transport/status truth in the
   source and ingestion APIs, but make Data Sources own a coherent
   source-to-Canvas/EDA handoff and preview recovery surface
-  (`DAT-001`–`DAT-003`). Reuse **FND-003** status semantics and **FND-005**
-  field semantics rather than creating route-specific variants.
+  (`DAT-001`–`DAT-003`). Reuse **FND-003** status semantics now and treat
+  **FND-005** as later shared-primitive normalization rather than a blocker for
+  the route-specific source journey.
 - **EDA analysis boundary:** Keep server report/job/history state in React
   Query and editable analysis context in `useEDAStore`, but expose one
   user-facing analysis record to the header, sidebar, History, tabs, and
@@ -1262,7 +1277,9 @@ Canvas finding is warranted solely for this repeated form root.
   results/history views only to prevent those independently changing states
   from attributing a result, error, or threshold to the wrong deployment
   (`EXP-006`, `EXP-007`). Keep API truth in the deployment/threshold clients;
-  do not split presentational helpers merely for file size.
+  treat shared retry and field-semantics cleanup in `FND-004`/`FND-005` as
+  later normalization, and do not split presentational helpers merely for file
+  size.
 
 ## Now / Next / Later Roadmap
 
@@ -1281,7 +1298,7 @@ Canvas finding is warranted solely for this repeated form root.
 - **CAN-002:** Turn Canvas validation and run failures into node-addressable
   diagnosis and recovery.
 - **DAT-001:** Make source onboarding accessible and make Canvas/EDA handoffs
-  explicit.
+  explicit without waiting on shared form-primitives cleanup.
 - **DAT-002:** Differentiate unavailable preview metadata from an empty
   dataset and give recovery context.
 - **DAT-003:** Make ingestion phase, progress, failure, and recovery coherent.
@@ -1292,17 +1309,20 @@ Canvas finding is warranted solely for this repeated form root.
 - **EXP-002:** Make metric direction, split/population, availability, and
   winner logic explicit in every comparison.
 - **EXP-005:** Make threshold preview/save/enable state versioned, attributable,
-  recoverable, and visible at prediction time.
-- **EXP-006:** Validate typed deployed-schema input before inference and make
-  repairs reviewable.
+  recoverable, and visible at prediction time on the existing
+  Experiments/Inference surfaces.
+- **EXP-006:** Validate typed deployed-schema input before inference, with
+  route-local issue reporting and reviewable repairs.
 - **EXP-007:** Give prediction runs durable pending/failure/retry/result/export
-  context.
+  context within the Inference journey.
 
 ### Next
 
-- **FND-004:** Normalize recoverable request retries.
+- **FND-004:** Normalize recoverable route-fetch retries after route-specific
+  threshold and inference recovery flows are complete.
 - **FND-005:** Normalize labels, required-state messaging, and field-error
-  relationships in Canvas, Data/EDA, and Inference forms.
+  relationships in Canvas, Data/EDA, and Inference after route-specific source
+  and inference validation fixes land.
 - **CAN-003:** Make Canvas recovery sources and unavailable autosaves
   understandable before replacing work.
 - **CAN-004:** Make Feature Generation recommendations apply or stop presenting
@@ -1333,7 +1353,7 @@ Canvas finding is warranted solely for this repeated form root.
 | CAN-002 Canvas diagnosis | Invalid/failing nodes identify a next action and open their settings | Validator and mocked-failure tests | Fix every issue from the Canvas summary | 1440 and 390 px | Summary role, focus, and live feedback |
 | CAN-003 Canvas recovery | Local, recent, and server recovery sources and failures are explained | Persistence and version-load tests | Restore/cancel from empty and nonempty canvases | 1440 and 390 px | Keyboard recovery controls and status review |
 | CAN-004 Feature Generation recommendations | Apply changes state once or is absent when unsupported | Component recommendation state/undo tests | Compare representative node configuration behavior | 1440 and 390 px | Accessible feedback after apply |
-| DAT-001 source onboarding | Every source field is labelled and success names the selected source's Canvas/EDA next step | Form/API outcome and router-handoff Playwright tests | Create file/S3 source; follow both handoffs | 1440 and 390 px | Labels, errors, modal focus, axe |
+| DAT-001 source onboarding | Every source field is labelled in the Data Sources journey and success names the selected source's Canvas/EDA next step | Form/API outcome and router-handoff Playwright tests | Create file/S3 source; follow both handoffs | 1440 and 390 px | Labels, errors, modal focus, axe |
 | DAT-002 preview recovery | Unavailable metadata is never presented as zero; retry has scoped context | Mock sample/profile partial/full failure tests | Empty, deleted, and transient source preview | 1440 and 390 px | Status/alert, retry focus, table scrolling |
 | DAT-003 ingestion lifecycle | Each job exposes phase/progress/error/cancel/retry and source context | Upload-progress and status-transition tests | Successful, stalled, failed, cancelled ingestion | 1440 and 390 px | Live updates and duplicate-submit checks |
 | DAT-004 Data/EDA compact journey | All source and analysis controls remain in viewport | Geometry, overflow, and compact-menu Playwright tests | Complete filter/handoff/analyze/history tasks | 1440, 1024, 768, 390 px | Keyboard order and 44 px targets |
@@ -1344,6 +1364,6 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-002 metric decision contract | Metric direction/split/units/missingness/winner are explicit | Deterministic metric/branch fixture tests | Compare classification, regression, CV, and partial jobs | 1440 and 390 px, light/dark | Tooltip-independent labels and table semantics |
 | EXP-003 explanation/segmentation availability | Artifact coverage, missingness, normalization, and cluster metric direction are explicit | Artifact-state component/visual tests | Compare supported/unsupported/partial SHAP and clustering jobs | 1440 and 390 px, light/dark | Non-color and data/export alternatives |
 | EXP-004 Pipeline Diff roles | Baseline/candidate, graph status, and difference direction are unambiguous | Ordered graph-pair, missing/error snapshot tests | Swap roles and inspect equal/changed/failed pairs | 1440 and 390 px | Keyboard role controls and change-list semantics |
-| EXP-005 threshold decision lifecycle | Preview/save/enable/clear/provenance cannot be misattributed | Two-job threshold API state-transition tests | Tune, enable, infer, override, clear, retry | 1440 and 390 px | Status/error announcements and control labels |
-| EXP-006 typed inference input | Invalid field/value/row shapes are actionable before submit | Typed-schema JSON/CSV request-gating tests | Review repair/default/unknown-type input | 1440 and 390 px | Field/error relationships and keyboard repair |
-| EXP-007 inference run lifecycle | Pending/failure/retry/results/export/history retain clear provenance | Delayed/success/failure/cancel/reload/export tests | Execute, reset, retry, reload, restore, export | 1440 and 390 px | Live status, error recovery, and focus review |
+| EXP-005 threshold decision lifecycle | Preview/save/enable/clear/provenance cannot be misattributed and failed mutations retry in place on the current surface | Two-job threshold API state-transition tests | Tune, enable, infer, override, clear, retry | 1440 and 390 px | Status/error announcements and control labels |
+| EXP-006 typed inference input | Invalid field/value/row shapes and editor-local issue state are actionable before submit | Typed-schema JSON/CSV request-gating tests | Review repair/default/unknown-type input | 1440 and 390 px | Field/error relationships and keyboard repair |
+| EXP-007 inference run lifecycle | Pending/failure/retry/results/export/history retain clear provenance on the Inference surface | Delayed/success/failure/cancel/reload/export tests | Execute, reset, retry, reload, restore, export | 1440 and 390 px | Live status, error recovery, and focus review |
