@@ -33,10 +33,9 @@ def evaluate_classification_model(
     # Convert to Numpy for compatibility
     X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
 
-    # Calculate scalar metrics
-    metrics = calculate_classification_metrics(model, X_test, y_test)
-
-    # Generate predictions and probabilities
+    # Generate predictions and probabilities once, then reuse them below both
+    # for the curve data and for metrics (previously each was redundantly
+    # recomputed inside calculate_classification_metrics too).
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=".*valid feature names.*")
         y_pred = model.predict(X_test_np)
@@ -48,6 +47,17 @@ def evaluate_classification_model(
                 y_prob = model.predict_proba(X_test_np)
         except Exception:
             pass  # nosec B110 - predict_proba is optional; classes/labels still work without it
+
+    # Calculate scalar metrics, reusing the already-computed conversion/predictions
+    metrics = calculate_classification_metrics(
+        model,
+        X_test,
+        y_test,
+        X_np=X_test_np,
+        y_np=y_test_np,
+        predictions=y_pred,
+        proba=y_prob,
+    )
 
     # Determine classes
     classes = getattr(model, "classes_", None)

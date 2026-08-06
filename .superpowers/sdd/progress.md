@@ -516,3 +516,40 @@ after every change (before and after the vectorization fix, before and
 after the profiling dedup, before and after the imputation fix, and once
 more after the semantic-type extraction regression fix); ruff check/format
 and ty check clean on all touched files.
+
+## Modeling evaluation redundancy fix (follow-up, previously deferred)
+
+Implemented the deferred highest-value modeling finding: removed the
+redundant `predict()`/`predict_proba()`/`to_sklearn()` calls inside
+`evaluate_classification_model()`/`evaluate_regression_model()`.
+
+- `_evaluation/metrics.py`: `calculate_classification_metrics()` and
+  `calculate_regression_metrics()` now accept optional keyword-only
+  `X_np`/`y_np`/`predictions` (classification also `proba`), all defaulting
+  to `None`. When omitted, behavior is byte-identical to before (internal
+  `SklearnBridge.to_sklearn()` + `model.predict()`/`predict_proba()`
+  computed as always). This keeps the existing 3-positional-arg public
+  signature and all `cross_validation.py`/test call sites fully unaffected.
+  `_add_probability_based_metrics()` similarly gained an optional `proba`
+  kwarg to skip its own `predict_proba()` call when the caller already has it.
+- `_evaluation/classification.py::evaluate_classification_model()` and
+  `_evaluation/regression.py::evaluate_regression_model()`: now compute
+  `X_test_np`/`y_test_np`/`y_pred`/`y_prob` once at the top and pass them
+  into `calculate_classification_metrics()`/`calculate_regression_metrics()`
+  via the new kwargs, then reuse the same values for ROC/PR curve
+  construction (classification) and residuals (regression) -- eliminating
+  the previous 2-3x redundant `to_sklearn`/`predict`/`predict_proba` calls
+  per evaluated split.
+- Not touched: `base.py::_evaluate_split()`'s own `self.applier.predict`/
+  `predict_proba` calls (via `SklearnApplier`) remain separate, since they
+  return Pandas-wrapped, index-preserving, display-oriented values (used for
+  raw prediction payloads) rather than the raw numpy arrays needed inside
+  `_evaluation/*`; unifying those two layers would require reshaping
+  `SklearnApplier`'s return contract and was judged higher-risk than
+  warranted for this pass. This remaining layer is a smaller,
+  lower-multiplier redundancy (1 extra call each) vs. the 2-3x one fixed here.
+
+Validation: `tests/test_evaluation_metrics.py` + `tests/test_public_api_exports.py`
+(25 passed); full Core suite 2918 passed / 69 skipped / 1 xfailed (unchanged
+baseline); `ruff check`/`ruff format --check` and `ty check` clean on all
+three touched files.
