@@ -54,7 +54,7 @@ class MultivariateMixin(_AnalyzerState):
             if not np.isfinite(X).all():
                 X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
         except Exception:
-            X = X_df.to_pandas().values
+            X = X_df.to_numpy()
             imputer = SimpleImputer(strategy="mean")
             X = imputer.fit_transform(X)
             X = np.nan_to_num(X, nan=0.0)
@@ -93,7 +93,7 @@ class MultivariateMixin(_AnalyzerState):
             if not np.isfinite(X).all():
                 raise ValueError("non-finite value present after imputation")
         except Exception:
-            X = X_df.to_pandas().values
+            X = X_df.to_numpy()
             imputer = SimpleImputer(strategy="mean")
             X = imputer.fit_transform(X)
         return X

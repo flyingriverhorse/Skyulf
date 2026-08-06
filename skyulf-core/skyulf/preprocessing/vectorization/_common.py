@@ -17,6 +17,7 @@ from typing import Any
 import pandas as pd
 
 from ...utils import pack_pipeline_output, unpack_pipeline_input
+from .._helpers import resolve_valid_columns
 
 # Signature: (X_pandas, y, params) -> (X_out_pandas, y_out)
 TextApplyFn = Callable[[pd.DataFrame, Any, dict[str, Any]], tuple[pd.DataFrame, Any]]
@@ -58,6 +59,29 @@ def apply_text_pandas_only(
     return pack_pipeline_output(X_out, y_out, is_tuple)
 
 
+def resolve_fit_text_valid_columns(X: Any, config: dict[str, Any]) -> list[str] | None:
+    """Resolve valid text columns for a vectorizer ``fit`` without converting *X*.
+
+    Filters ``config["columns"]`` down to columns actually present on *X*
+    (any engine — Polars/Pandas both expose ``.columns``). Returns ``None``
+    when there are no configured or matching columns, signalling the caller
+    should return an empty artifact.
+
+    Use this instead of :func:`resolve_fit_text_columns` when the caller only
+    needs the resolved column names (no text data), e.g. hashing vectorizers
+    or tokenizers that fit stateless/vocabulary-free artifacts.
+    """
+    cols: list[str] = config.get("columns", [])
+    if not cols:
+        return None
+
+    valid_cols = resolve_valid_columns(X, cols)
+    if not valid_cols:
+        return None
+
+    return valid_cols
+
+
 def resolve_fit_text_columns(
     X: Any, config: dict[str, Any]
 ) -> tuple[pd.DataFrame, list[str]] | None:
@@ -66,6 +90,11 @@ def resolve_fit_text_columns(
     Converts *X* to pandas if needed and filters ``config["columns"]`` down to
     columns actually present. Returns ``None`` when there are no configured or
     matching columns, signalling the caller should return an empty artifact.
+
+    Use this when the caller needs the actual text data (e.g. Count/TF-IDF
+    vectorizers fitting a vocabulary). If only the resolved column names are
+    needed, use :func:`resolve_fit_text_valid_columns` instead to avoid a
+    wasted full-frame Pandas conversion.
     """
     cols: list[str] = config.get("columns", [])
     if not cols:

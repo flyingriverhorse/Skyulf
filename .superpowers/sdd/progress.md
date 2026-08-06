@@ -435,3 +435,84 @@ columns), so their full-frame conversion isn't waste.
 Validation: full Core suite 2918 passed / 69 skipped / 1 xfailed (twice,
 identical to baseline), ruff check/format and ty check clean on all touched
 files, targeted tests for both changes green.
+
+## Subagent-audited pass across remaining skyulf-core (preprocessing,
+## modeling, profiling/engines)
+
+Dispatched 3 parallel background `explore` agents (read-only) to cover the
+rest of the codebase before preparing a PR: `audit-preprocessing-remaining`
+(cleaning, drop_and_missing, encoding, imputation, scaling, time_series,
+vectorization + re-check of feature_generation/feature_selection/geo edge
+cases), `audit-modeling` (modeling/, data/, core/), and
+`audit-profiling-engines` (profiling/, engines/, utils.py). All three
+completed; findings triaged and the following fixed in this pass:
+
+1. **Vectorization full-frame waste (highest-impact preprocessing finding).**
+   `vectorization/_common.py::resolve_fit_text_columns()` converted the
+   entire input frame to Pandas for every text-vectorizer `fit()`, even
+   though 3 of its 5 callers (`hashing_vectorizer.py`, `tokenizer.py`,
+   `sentence_embedder.py`) discard the returned frame entirely (`_, cols =
+   resolved`) -- only the resolved column list is used, no vocab/stats
+   fitting happens. Added a zero-conversion `resolve_fit_text_valid_columns()`
+   (reuses existing `resolve_valid_columns()`) for those three callers;
+   `count_vectorizer.py`/`tfidf_vectorizer.py` (which do need the text data)
+   keep the original Pandas-converting `resolve_fit_text_columns()`.
+2. **Imputation duplication + unneeded Pandas hop.** `imputation/knn.py`
+   and `iterative.py` each had an identical inline
+   `X.select(cols) if hasattr(X, "select") and not hasattr(X, "loc") else
+   X[cols]` selection line, then routed through `SklearnBridge.to_sklearn()`
+   just to reach numpy for `KNNImputer`/`IterativeImputer.fit()`. Both now
+   use `resolve_columns_then_to_numpy()` (already existed, underused),
+   removing the duplication and the Pandas hop in one move.
+3. **Profiling `_NUMERIC_DTYPES` duplication (round 2).** Same 10-item
+   Polars dtype tuple had drifted into two more near-identical copies
+   (`profiling/analyzer.py`, `profiling/_analyzer/decomposition.py`) beyond
+   the ones already deduplicated earlier in `utils.py`/
+   `preprocessing/_helpers.py`. Both now import the shared
+   `POLARS_NUMERIC_DTYPES` frozenset from `engines/polars_engine.py`
+   (verified `EDAAnalyzer._NUMERIC_DTYPES is DecompositionMixin._NUMERIC_DTYPES`
+   -- exact same object).
+4. **Semantic-type dispatch duplication.** `ColumnMixin._get_semantic_type`
+   (per-series) and `EDAAnalyzer`'s inline `_semantic_type_for_column`
+   (dtype+ratio, reusing precomputed `n_unique`) implemented the same
+   Numeric/Categorical/Boolean/DateTime/Text bucketing logic twice, with
+   subtly diverging code (drift risk). Extracted into one shared
+   `_dtype_to_semantic_bucket(dtype, ratio, n_unique)` in
+   `profiling/_analyzer/_utils.py`; both call sites now delegate to it.
+   Caught and fixed a real regression during this: `ColumnMixin` originally
+   called `series.n_unique()` unconditionally before dispatching, but
+   `_dtype_to_semantic_bucket` only needs ratio/n_unique for Int/String
+   dtypes -- Polars' `n_unique()` raises `InvalidOperationError` for
+   `pl.Object` columns (caught by
+   `test_get_semantic_type_unhandled_dtype_falls_back_to_text`). Fixed by
+   only computing n_unique/ratio when dtype is Int or String, matching the
+   original per-branch laziness.
+5. **Two low-risk `.to_pandas().values`/`.values.tolist()` -> `.to_numpy()`
+   one-liners**: `profiling/_analyzer/multivariate.py`'s sklearn-fallback
+   imputation path (both `_impute_matrix` and `_impute_matrix_drop_empty`),
+   and `modeling/base.py`'s `predict_proba` payload construction -- both feed
+   a pure-numpy consumer with no Pandas-only semantics needed.
+
+**Deliberately deferred**: the modeling audit's highest-value finding --
+redundant `SklearnBridge.to_sklearn()` (3-4x) and `predict()`/
+`predict_proba()` (2-3x) calls on the same `X_test`/`y_test` across
+`base.py` -> `sklearn_wrapper.py` -> `_evaluation/{classification,
+regression,metrics}.py` -- is real, measurable wasted inference compute,
+but spans multiple call layers and touches the public API surface of
+`evaluate_classification_model`/`evaluate_regression_model`/
+`calculate_classification_metrics`/`calculate_regression_metrics`. Given the
+risk/complexity, it needs its own carefully-scoped follow-up rather than
+being bundled into this audit-fix pass. Also deferred as lower-value/
+non-bugs: the ROC/PR-AUC class-resolution logic split between
+`_evaluation/metrics.py` and `_evaluation/classification.py` (already
+comment-cross-referenced, differs in binary/multiclass/curve-plotting
+purpose -- not a pure duplicate); `scaling/_common.py`'s near-miss vs.
+shared helpers (correct as-is, needs native frame not numpy);
+`profiling/expect.py`'s ad-hoc `hasattr` check (intentionally
+engine-agnostic per its own docstring).
+
+Validation: full Core suite 2918 passed / 69 skipped / 1 xfailed reproduced
+after every change (before and after the vectorization fix, before and
+after the profiling dedup, before and after the imputation fix, and once
+more after the semantic-type extraction regression fix); ruff check/format
+and ty check clean on all touched files.

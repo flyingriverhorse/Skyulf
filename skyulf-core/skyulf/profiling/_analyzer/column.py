@@ -14,7 +14,7 @@ from ..schemas import (
     NormalityTestResult,
     NumericStats,
 )
-from ._utils import SCIPY_AVAILABLE, _AnalyzerState
+from ._utils import _INT_DTYPES, SCIPY_AVAILABLE, _AnalyzerState, _dtype_to_semantic_bucket
 
 logger = logging.getLogger(__name__)
 
@@ -22,55 +22,22 @@ logger = logging.getLogger(__name__)
 class ColumnMixin(_AnalyzerState):
     """Single-column analysis dispatch."""
 
-    @staticmethod
-    def _cardinality_ratio(series: pl.Series) -> float:
-        """Compute the ratio of unique values to total values in a series."""
-        n_unique = series.n_unique()
-        count = len(series)
-        return n_unique / count if count > 0 else 0
-
-    def _int_semantic_type(self, series: pl.Series) -> str:
-        """Classify an integer series as Categorical (low-cardinality) or Numeric."""
-        # Low-cardinality ints behave more like categories (better for plotting).
-        ratio = self._cardinality_ratio(series)
-        if ratio < 0.05 and series.n_unique() < 20:
-            return "Categorical"
-        return "Numeric"
-
-    def _string_semantic_type(self, series: pl.Series) -> str:
-        """Classify a string series as Categorical (low-cardinality) or Text."""
-        ratio = self._cardinality_ratio(series)
-        if ratio < 0.05:
-            return "Categorical"
-        return "Text"
-
     def _get_semantic_type(self, series: pl.Series) -> str:
         """Map polars dtype + cardinality heuristics to a semantic bucket."""
         dtype = series.dtype
-
-        if dtype in [pl.Float32, pl.Float64]:
-            return "Numeric"
-        if dtype in [
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        ]:
-            return self._int_semantic_type(series)
-        if dtype == pl.Boolean:
-            return "Boolean"
-        if dtype in [pl.Date, pl.Datetime, pl.Duration]:
-            return "DateTime"
-        if dtype == pl.Utf8 or dtype == pl.String:
-            return self._string_semantic_type(series)
-        if dtype == pl.Categorical:
-            return "Categorical"
-
-        return "Text"
+        if dtype in _INT_DTYPES or dtype in (pl.Utf8, pl.String):
+            n_unique = series.n_unique()
+            count = len(series)
+            ratio = n_unique / count if count > 0 else 0
+        else:
+            # Non-int/string dtypes (Float, Boolean, Date/Datetime/Duration,
+            # Categorical, Object, ...) never consult ratio/n_unique in
+            # _dtype_to_semantic_bucket, so skip n_unique() — it can be
+            # unsupported for some dtypes (e.g. Object) and is otherwise
+            # wasted work.
+            n_unique = 0
+            ratio = 0.0
+        return _dtype_to_semantic_bucket(dtype, ratio, n_unique)
 
     def _add_high_null_alert(self, col: str, null_pct: float, alerts: list[Alert]) -> None:
         """Flag columns with more than 5% missing values."""
