@@ -114,9 +114,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
     scope: 'column'
   });
 
-  const handleApplyRecommendation = (_rec: Recommendation) => {
-    // console.log("Applying recommendation:", _rec);
-  };
+  const handleApplyRecommendation = (_rec: Recommendation) => {};
 
   const addOperation = (type: MathOperation['operation_type']) => {
     const newOp: MathOperation = {

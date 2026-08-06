@@ -304,20 +304,8 @@ class TestPreprocessingNodes(unittest.TestCase):
         train_df, train_y = res.train
         test_df, test_y = res.test
 
-        # train_y/test_y might be None if input was just DF and no target split logic inside split itself
-        # Actually SplitApplier splits rows. It returns (X_train, y_train) IF input was (X, y).
-        # If input was DF, it returns (train_df, None) usually?
-        # Let's check Splitter logic.
-        # It calls train_test_split(df_pd). Returns train, test DFs.
-        # So res.train is (train_df, None) or just train_df?
-        # SplitDataset definition: train: Tuple[Any, Any]
-
-        # Logic in split.py:
-        # return SplitDataset(train=(X_train, y_train), ...)
-        # If input was DF, X_train is the train DF, y_train is None?
-        # Ah, in split.py:
-        # X_train, y_train = X_train_val, y_train_val (where y_train_val is None if y_pd was None)
-        # So yes, (df, None).
+        # Input was a plain DataFrame (no separate target), so SplitApplier
+        # returns (train_df, None) / (test_df, None) rather than (X, y) tuples.
 
         self.assertEqual(train_df.height, 8)
         self.assertEqual(test_df.height, 2)
