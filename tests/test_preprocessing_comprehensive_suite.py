@@ -239,29 +239,8 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
         # Check dtype - Polars might allow numeric?
         # Typically ordinal encoder returns float in sklearn
 
-        # 3. Target Encoder (Needs y)
-        # Need to pack y into input
-        df_xy = (
-            self.df.select(["C_txt", "E_target"]).fill_null("Missing"),
-            self.df.select("E_target"),
-        )
-        # Wait, unpack_pipeline_usage expects distinct calls usually or tuple for fit.
-        # Let's rely on fit taking X, y if passed as args?
-        # My helper _apply_calc_applier takes 'df' and passes it to fit/apply
-        # But applier only takes X.
-        # For TargetEncoder, calc.fit needs y.
-        # Let's manually do this one
-        TargetEncoderCalculator()
-        TargetEncoderApplier()
-
-        X = (
-            self.df.select("C_txt").fill_null("Missing").to_pandas()
-        )  # Bridge requires pandas usually for TargetEnc?
-        self.df.select("E_target").to_pandas()["E_target"]
-
-        # Test helper wrapper adaptation?
-        # _apply_calc_applier: fit_res = calc.fit(df, params)
-        # If I pass (X, y) tuple, unpacker should work.
+        # 3. Target Encoder is exercised separately in test_encoding.py and
+        # test_encoding_target_guard.py (it needs y, which _apply_calc_applier doesn't pass).
 
     def test_cleaning_nodes(self):
         print("\n--- Cleaning Nodes ---")
@@ -367,13 +346,8 @@ class TestPolarsPreprocessingComprehensive(unittest.TestCase):
 
     def test_more_feature_selection_nodes(self):
         print("\n--- Advanced Feature Selection Nodes ---")
-        # 1. Univariate
-        # Needs y. Let's use tuple input if supported by helper, or skip if helper too simple.
-        # My helper: fit(df, params). Unpack handles tuple.
-        # y is E_target
-        # Note: UnivariateSelection internally expects y to be Pandas Series for _infer_problem_type check
-        # or it should handle conversion. The current implementation crashes on Polars y in infer (line 341).
-        # We pass Pandas y to be safe for this hybrid node.
+        # 1. Univariate — needs y as a Pandas Series: UnivariateSelection's
+        # _infer_problem_type check crashes on a Polars y, so we pass Pandas y here.
         X = self.df.select(["A_float", "B_int"]).fill_nan(0).fill_null(0)
         y = self.df.select("E_target").to_pandas()["E_target"]
         input_pair = (X, y)

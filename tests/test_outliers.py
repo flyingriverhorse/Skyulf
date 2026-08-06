@@ -17,12 +17,8 @@ def outlier_df():
 
 
 def test_iqr_clip(outlier_df):
-    # Note: Current IQRCalculator implementation in outliers.py only calculates bounds.
-    # It does NOT support 'action': 'clip' or 'drop' directly in the calculator config.
-    # The Applier uses the bounds to filter (drop) or mask.
-    # Looking at outliers.py: IQRApplier filters (drops) rows outside bounds.
-    # It does NOT seem to support clipping in the current implementation shown in context.
-    # It returns X_filtered = X[mask].
+    # Despite the name, IQRApplier only supports dropping rows outside bounds
+    # (no clip/mask mode), so this test verifies the drop behavior.
 
     calc = IQRCalculator()
     params = calc.fit(outlier_df, {"multiplier": 1.5, "columns": ["A"]})
