@@ -2,6 +2,7 @@
 
 from typing import Any, cast
 
+import numpy as np
 import pandas as pd
 from sklearn.preprocessing import PolynomialFeatures
 
@@ -15,7 +16,7 @@ from ..dispatcher import apply_dual_engine
 
 
 def _polynomial_compute(
-    X_subset: pd.DataFrame, valid_cols: list[str], params: dict[str, Any]
+    X_subset: Any, valid_cols: list[str], params: dict[str, Any]
 ) -> tuple[Any, list[str]] | None:
     """Run sklearn PolynomialFeatures + name normalisation; ``None`` ⇒ skip."""
     poly = PolynomialFeatures(
@@ -34,7 +35,7 @@ def _polynomial_compute(
     if not keep:
         return None
 
-    transformed = transformed[:, keep]
+    transformed = np.ascontiguousarray(transformed[:, keep])
     feature_names = feature_names[keep]
     output_prefix = params.get("output_prefix", "poly")
     new_names = [
@@ -50,7 +51,11 @@ def _polynomial_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
     if not valid_cols:
         return X, _y
 
-    result = _polynomial_compute(X.select(valid_cols).to_pandas(), valid_cols, params)
+    X_np, valid_cols = select_then_to_numpy(X, valid_cols)
+    if not valid_cols:
+        return X, _y
+
+    result = _polynomial_compute(X_np, valid_cols, params)
     if result is None:
         return X, _y
     transformed, new_names = result
@@ -63,7 +68,11 @@ def _polynomial_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[A
     if not valid_cols:
         return X, _y
 
-    result = _polynomial_compute(X[valid_cols], valid_cols, params)
+    X_np, valid_cols = select_then_to_numpy(X, valid_cols)
+    if not valid_cols:
+        return X, _y
+
+    result = _polynomial_compute(X_np, valid_cols, params)
     if result is None:
         return X, _y
     transformed, new_names = result

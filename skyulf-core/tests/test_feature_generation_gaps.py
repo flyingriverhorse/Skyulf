@@ -386,6 +386,25 @@ def test_polynomial_features_apply_with_sklearn_pandas_output_config() -> None:
     assert "poly_a_b" in out.columns
 
 
+def test_polynomial_features_apply_polars_skips_pandas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Polars polynomial apply should feed numpy directly to sklearn."""
+    import polars as pl
+
+    train = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
+    artifact = PolynomialFeaturesCalculator().fit(train, {"columns": ["a", "b"], "degree": 2})
+    frame = pl.from_pandas(train)
+
+    def fail_to_pandas(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("polynomial apply converted Polars input to Pandas")
+
+    monkeypatch.setattr(pl.DataFrame, "to_pandas", fail_to_pandas)
+    output = PolynomialFeaturesApplier().apply(frame, artifact)
+
+    assert output.get_column("poly_a_b").to_list() == [4.0, 10.0, 18.0]
+
+
 # ---------------------------------------------------------------------------
 # _common.py: rapidfuzz-absent fallback + ImportError branch
 # ---------------------------------------------------------------------------
