@@ -58,6 +58,15 @@ tasks add live walkthrough evidence.
   `/Users/BH7043/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell`.
   The runner advised `npx playwright install`. Per audit scope, this is
   recorded as pre-existing baseline evidence and was not fixed.
+- **Observed:** The controller re-ran the same `12` E2E tests using installed
+  Google Chrome through the ignored fallback config
+  `.superpowers/sdd/playwright.chrome.config.ts`. `11` passed and
+  `e2e/preview.spec.ts:24` failed after `30s` because the Run Preview button
+  repeatedly became unstable/detached from the DOM while Playwright tried to
+  click it (`preview.spec.ts:113`). The accessibility suite passed its
+  critical-only gate while logging two non-blocking serious findings:
+  dashboard `color-contrast` and canvas `scrollable-region-focusable`. These
+  remain pre-existing UX/test evidence, not fixes.
 - **Observed:** `npm run size-check` exited `0`; all checked chunks were within
   budget.
 
