@@ -194,14 +194,8 @@ def test_run_pipeline_task_resolves_dataset_id(mock_get_db_session, mock_engine_
         node_results={},
     )
 
-    # Patch extract_file_path_from_source to avoid file existence check
-    # Note: With SmartCatalog, this patch might be needed inside the catalog's method if we were testing catalog execution,
-    # but here we are just testing tasks.py flow.
-    # However, SmartCatalog imports it locally, so we might need to patch it where it's used.
-    # But wait, tasks.py doesn't call it anymore! SmartCatalog calls it.
-    # And we are mocking PipelineEngine, so engine.run() is a mock.
-    # So SmartCatalog.load() is NEVER CALLED in this test!
-    # So we don't need to patch extract_file_path_from_source for this test anymore.
+    # extract_file_path_from_source isn't patched here: PipelineEngine.run is
+    # mocked, so SmartCatalog.load() (the only caller) is never invoked.
 
     # Run Task
     run_pipeline_task(MOCK_JOB_ID, config_with_numeric_id)

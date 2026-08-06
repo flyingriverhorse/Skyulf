@@ -263,12 +263,8 @@ class FeatureEngMixin:
         # SDK FeatureEngineer.fit_transform(data) -> (transformed_data, metrics)
         processed_df, metrics = engineer.fit_transform(df)
 
-        # Manually save state if needed.
-        # The SDK keeps state in engineer.fitted_steps.
-        # For now, we save the whole engineer object as the artifact for this node?
-        # Or we iterate and save individual steps if the artifact store expects that.
-        # The original code passed artifact_store to fit_transform, implying internal saving.
-        # We will save the engineer object itself to preserve the pipeline state.
+        # Save the fitted FeatureEngineer itself (holds engineer.fitted_steps state)
+        # as this node's artifact, so downstream inference can reload the pipeline.
         self.artifact_store.save(f"{node.node_id}_pipeline", engineer)
 
         if hasattr(processed_df, "shape"):
