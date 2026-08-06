@@ -101,7 +101,7 @@ def resolve_fit_text_columns(
     if not cols:
         return None
 
-    valid_cols = [c for c in cols if c in X.columns]
+    valid_cols = resolve_valid_columns(X, cols)
     if not valid_cols:
         return None
 
