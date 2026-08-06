@@ -3,8 +3,8 @@
 import importlib.util
 import sys
 import typing
-from typing import Any
 import warnings
+from typing import Any
 
 import pandas as pd
 import polars as pl
