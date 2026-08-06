@@ -7,7 +7,7 @@ from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from .._artifacts import ModelBasedSelectionArtifact
-from .._helpers import to_pandas
+from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import (
@@ -44,7 +44,16 @@ class ModelBasedSelectionCalculator(BaseCalculator):
     @fit_method
     def fit(self, X: Any, y: Any, config: dict[str, Any]) -> ModelBasedSelectionArtifact:  # pylint: disable=arguments-differ
         target_col = config.get("target_column")
-        X_pd = to_pandas(X)
+        # Resolve candidate columns natively on the raw frame first (works on
+        # Polars without conversion), then convert only the columns actually
+        # needed -- candidates plus the target column when it must be pulled
+        # out of X itself (y is None) -- instead of the whole input frame.
+        cols = _resolve_candidate_columns(X, config, target_col)
+        if not cols:
+            return cast(ModelBasedSelectionArtifact, {})
+
+        needed_cols = cols if y is not None or not target_col else [*cols, target_col]
+        X_pd = select_then_to_pandas(X, needed_cols)
 
         y = _extract_target(X_pd, y, target_col)
         if y is None:
@@ -52,10 +61,6 @@ class ModelBasedSelectionCalculator(BaseCalculator):
                 f"ModelBasedSelection requires target column '{target_col}' "
                 "to be present in training data."
             )
-            return cast(ModelBasedSelectionArtifact, {})
-
-        cols = _resolve_candidate_columns(X_pd, config, target_col)
-        if not cols:
             return cast(ModelBasedSelectionArtifact, {})
 
         method = config.get("method", "select_from_model")

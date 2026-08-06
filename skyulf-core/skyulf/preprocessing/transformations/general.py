@@ -15,6 +15,7 @@ from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._ops import _PANDAS_OPS, _POLARS_OPS
+from ._power_common import build_pretrained_power_transformer
 
 logger = logging.getLogger(__name__)
 
@@ -32,20 +33,12 @@ def _apply_power_to_polars_col(X_out: Any, item: dict[str, Any]) -> Any:
         return X_out
 
     try:
-        pt = PowerTransformer(method=method, standardize=True)
-        pt.lambdas_ = np.array(lambdas)
-        scaler_params = item.get("scaler_params")
-        if scaler_params:
-            scaler = StandardScaler()
-            m = scaler_params.get("mean")
-            s = scaler_params.get("scale")
-            if m is not None:
-                scaler.mean_ = np.array(m)
-            if s is not None:
-                scaler.scale_ = np.array(s)
-                scaler.var_ = np.square(scaler.scale_)
-            pt._scaler = scaler
-
+        pt = build_pretrained_power_transformer(
+            method=method,
+            standardize=True,
+            lambdas_arr=np.array(lambdas),
+            scaler_params=item.get("scaler_params"),
+        )
         vals = X_out[col].to_numpy().reshape(-1, 1)
         flat = pt.transform(vals).ravel()
         return X_out.with_columns(pl.Series(flat).alias(col))
@@ -63,16 +56,12 @@ def _apply_power_to_pandas_col(df_out: Any, item: dict[str, Any]) -> Any:
         return df_out
 
     try:
-        pt = PowerTransformer(method=method, standardize=True)
-        pt.lambdas_ = np.array(lambdas)
-        scaler_params = item.get("scaler_params")
-        if scaler_params:
-            scaler = StandardScaler()
-            scaler.mean_ = np.array(scaler_params.get("mean"))
-            scaler.scale_ = np.array(scaler_params.get("scale"))
-            scaler.var_ = np.square(scaler.scale_)
-            pt._scaler = scaler
-
+        pt = build_pretrained_power_transformer(
+            method=method,
+            standardize=True,
+            lambdas_arr=np.array(lambdas),
+            scaler_params=item.get("scaler_params"),
+        )
         series = pd.to_numeric(df_out[col], errors="coerce")
         vals = series.values.reshape(-1, 1)
         trans_vals = pt.transform(vals)
