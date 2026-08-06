@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -310,7 +311,7 @@ def calculate_regression_metrics(
 
 
 def calculate_clustering_metrics(
-    X: pd.DataFrame | SkyulfDataFrame,
+    X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
     labels: Any,
     *,
     silhouette_sample_size: SilhouetteSampleSize = DEFAULT_SILHOUETTE_SAMPLE_SIZE,
