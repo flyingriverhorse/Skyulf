@@ -231,6 +231,14 @@ pytest/pytest-benchmark, Ruff, and Ty.
       }
       calculator = CorrelationThresholdCalculator()
       expected = calculator.fit(pd.DataFrame(values), config)
+      if method == "pearson":
+          assert expected == {
+              "type": "correlation_threshold",
+              "columns_to_drop": ["b", "c", "mostly_null"],
+              "threshold": 0.95,
+              "method": "pearson",
+              "drop_columns": True,
+          }
 
       monkeypatch.setattr(
           correlation_module,
@@ -240,11 +248,47 @@ pytest/pytest-benchmark, Ruff, and Ty.
       raw = pl.DataFrame(values)
       for frame in (raw, SkyulfPolarsWrapper(raw)):
           assert calculator.fit(frame, config) == expected
+
+
+  @pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
+  def test_correlation_threshold_apply_preserves_polars_audit_schema_and_order(
+      wrapped: bool,
+  ) -> None:
+      """Applying the audit artifact keeps raw/wrapped Polars output contracts."""
+      pl = pytest.importorskip("polars")
+      values = _correlation_parity_fixture()
+      config = {
+          "columns": ["a", "b", "c", "flag", "constant", "mostly_null"],
+          "threshold": 0.95,
+          "correlation_method": "pearson",
+          "drop_columns": True,
+      }
+      raw = pl.DataFrame(values)
+      frame = SkyulfPolarsWrapper(raw) if wrapped else raw
+      artifact = CorrelationThresholdCalculator().fit(frame, config)
+      output = CorrelationThresholdApplier().apply(frame, artifact)
+
+      if wrapped:
+          assert isinstance(output, SkyulfPolarsWrapper)
+          native = output._df
+      else:
+          assert isinstance(output, pl.DataFrame)
+          native = output
+
+      assert native.columns == ["a", "flag", "constant", "target"]
+      assert native.schema == {
+          "a": pl.Float64,
+          "flag": pl.Boolean,
+          "constant": pl.Int64,
+          "target": pl.String,
+      }
   ```
 
   The expected Pearson artifact is the audit golden artifact with
-  `columns_to_drop == ["b", "c", "mostly_null"]`; the Spearman route must
-  match the current Pandas artifact as well.
+  `columns_to_drop == ["b", "c", "mostly_null"]`. The apply route must retain
+  raw/wrapped Polars output columns exactly
+  `["a", "flag", "constant", "target"]` with its audited schema. The
+  Spearman route must match the current Pandas artifact as well.
 
 - [ ] **Step 2: Run the new contract test and confirm the current route fails**
 
