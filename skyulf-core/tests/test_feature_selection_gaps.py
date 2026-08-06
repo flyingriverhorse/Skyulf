@@ -153,6 +153,31 @@ def test_correlation_threshold_native_polars_matches_pandas_without_conversion(
         assert calculator.fit(frame, config) == expected
 
 
+def test_correlation_threshold_raw_polars_numpy_int64_threshold_stays_native(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Eligible raw Polars fits must keep NumPy integer thresholds on the native path."""
+    pl = pytest.importorskip("polars")
+    values = _correlation_parity_fixture()
+    config = {
+        "columns": ["a", "b", "c", "flag", "constant", "mostly_null"],
+        "threshold": np.int64(0),
+        "correlation_method": "pearson",
+        "drop_columns": True,
+    }
+    calculator = CorrelationThresholdCalculator()
+    expected = calculator.fit(pd.DataFrame(values), config)
+
+    monkeypatch.setattr(
+        correlation_module,
+        "to_pandas",
+        lambda _frame: pytest.fail("eligible raw Polars fit called to_pandas"),
+    )
+
+    raw = pl.DataFrame(values)
+    assert calculator.fit(raw, config) == expected
+
+
 @pytest.mark.parametrize("threshold", [True, False], ids=["true", "false"])
 def test_correlation_threshold_raw_polars_boolean_threshold_uses_pandas_compatibility(
     monkeypatch: pytest.MonkeyPatch,
