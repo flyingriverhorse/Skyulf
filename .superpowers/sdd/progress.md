@@ -553,3 +553,6 @@ Validation: `tests/test_evaluation_metrics.py` + `tests/test_public_api_exports.
 (25 passed); full Core suite 2918 passed / 69 skipped / 1 xfailed (unchanged
 baseline); `ruff check`/`ruff format --check` and `ty check` clean on all
 three touched files.
+
+Task 1: complete (commits 757f54bd..87dda687, review clean).
+Task 2: complete (commits 87dda687..b6d62bb9, review clean after fix).
