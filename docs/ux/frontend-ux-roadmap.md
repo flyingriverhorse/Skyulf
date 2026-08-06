@@ -145,6 +145,15 @@ tasks add live walkthrough evidence.
 
 ### Data and EDA
 
+- **Baseline entry-point mapping:** `/data` mounts the eager `DataSources`
+  page, while `/eda` mounts `EDAPage` through `LazyRoute` / `React.lazy`.
+  `EDAPage` owns the `EDASidebar` and analysis tabs, and the shared
+  `Layout.tsx` also collapses the shell sidebar on `/eda` (same compact shell
+  treatment used for `/canvas`).
+- **Baseline entry-point mapping:** The only current route/a11y smoke
+  coverage for these entry points is `e2e/routes.spec.ts` and
+  `e2e/a11y.spec.ts`, both of which exercise `/data` and `/eda`.
+
 ### Experiments and Inference
 
 - **Inferred:** `Navbar.tsx` exposes the Experiments and Inference entry
@@ -165,6 +174,14 @@ tasks add live walkthrough evidence.
   the shell view is revisited.
 
 ### Operations
+
+- **Baseline entry-point mapping:** `/jobs` is the eager `JobsPage`; `/drift`,
+  `/registry`, `/deployments`, `/slow-nodes`, and `/audit` are lazy-loaded
+  route pages; `/errors` is the eager `ErrorLogPage`.
+- **Baseline entry-point mapping:** `Layout.tsx` shows alert badges only on
+  `/drift` (`driftAlert`) and `/errors` (`errorAlert`). Current E2E route
+  smoke coverage only includes `/jobs`; the remaining Operations routes are
+  not listed in the route or a11y specs.
 
 ## Prioritized Findings Inventory
 
