@@ -148,4 +148,3 @@ A roadmap item is implementation-ready only when it defines:
 The future implementation plan should prefer targeted component and journey
 tests, then run the existing frontend lint, TypeScript, build, unit, end-to-end,
 accessibility, and bundle-size checks appropriate to each change.
-
