@@ -6,9 +6,9 @@ import pandas as pd
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import IQRArtifact
-from .._helpers import to_pandas
+from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -80,9 +80,8 @@ class IQRCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
 
-        X_pd = to_pandas(X)
         multiplier = config.get("multiplier", 1.5)
-        cols = resolve_columns(X_pd, config, detect_numeric_columns)
+        X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}
 

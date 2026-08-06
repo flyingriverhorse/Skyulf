@@ -14,13 +14,14 @@ Boundary with ``dispatcher.py``:
       dispatcher never implements column-level logic.
 """
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..utils import resolve_columns
 
 
 def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
@@ -51,6 +52,45 @@ def to_pandas(X: Any) -> pd.DataFrame:
     return X.to_pandas() if hasattr(X, "to_pandas") else X
 
 
+def resolve_columns_then_to_pandas(
+    X: Any,
+    config: dict[str, Any],
+    default_selection_func: Callable[[Any], list[str]] | None = None,
+    target_column_key: str = "target_column",
+) -> tuple[pd.DataFrame, list[str]]:
+    """Resolve the columns to process natively, then convert only that subset to pandas.
+
+    ``resolve_columns``/``detect_numeric_columns`` already work directly on raw
+    Polars frames, so column resolution doesn't require a conversion. Many fit
+    routines are sklearn/pandas-bound for the actual math, but converting only
+    the selected columns instead of the full input frame avoids paying for
+    unrelated columns on wide frames (large win when few columns of many are
+    selected, neutral when most/all columns are selected).
+    """
+    columns = resolve_columns(X, config, default_selection_func, target_column_key)
+    if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
+        select_cols = [c for c in columns if c in X.columns]
+        X = (X.select(select_cols) if select_cols else X).to_pandas()
+    else:
+        X = to_pandas(X)
+    return X, columns
+
+
+def select_then_to_pandas(X: Any, requested: Iterable[str]) -> pd.DataFrame:
+    """Narrow to ``requested`` columns natively (if Polars), then convert to pandas.
+
+    For fit routines that validate/consume a small, explicitly-named set of
+    columns (e.g. lat/lon pairs, an explicit interaction/polynomial column
+    list) rather than an auto-detected set. Column existence isn't
+    required here — validation of missing columns happens after conversion,
+    so error messages stay identical to full-frame-conversion behavior.
+    """
+    if hasattr(X, "to_pandas") and not isinstance(X, pd.DataFrame):
+        select_cols = resolve_valid_columns(X, requested)
+        return (X.select(select_cols) if select_cols else X).to_pandas()
+    return to_pandas(X)
+
+
 def is_polars(X: Any) -> bool:
     """Return ``True`` when ``X`` is backed by the Polars engine.
 
@@ -79,21 +119,9 @@ def auto_detect_numeric_columns(df: pd.DataFrame | SkyulfDataFrame) -> list[str]
     """Return numeric columns from either a Pandas or Polars frame."""
     engine = get_engine(df)
     if engine.name == EngineName.POLARS:
-        import polars as pl
+        from ..engines import POLARS_NUMERIC_DTYPES
 
-        numeric_dtypes = [
-            pl.Float32,
-            pl.Float64,
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        ]
-        return [c for c, t in zip(df.columns, df.dtypes, strict=True) if t in numeric_dtypes]
+        return [c for c, t in zip(df.columns, df.dtypes, strict=True) if t in POLARS_NUMERIC_DTYPES]
     return list(df.select_dtypes(include=["number"]).columns)
 
 

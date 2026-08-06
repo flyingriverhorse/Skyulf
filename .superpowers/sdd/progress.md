@@ -308,3 +308,71 @@ audit's original inventory. A fresh full-codebase inventory sweep (repeating
 the audit's "Scope and Method" pass) would be needed before claiming there
 is nothing left anywhere in the codebase; this only confirms nothing further
 is owed from this specific audit document.
+
+## Follow-up: generalized narrow-conversion pattern + dtype dedupe (post-Wave-2)
+
+Following the "are we good everywhere for Polars" question, revisited the
+grep sweep's "already narrow" and "retained boundary" claims with fresh
+eyes and found six more fit routines doing the exact wasteful
+full-frame-`to_pandas()`-then-`resolve_columns()` pattern that Candidate D
+fixed in `bucketing.py`, previously miscategorized as compatibility
+boundaries because the *estimator* itself is sklearn-bound even though the
+*column-resolution step* before it wasn't: `outliers/iqr.py`,
+`outliers/winsorize.py`, `outliers/zscore.py`, `outliers/elliptic.py`,
+`transformations/power.py`, and `feature_selection/variance.py`. Extracted
+Candidate D's inline helper into a shared, reusable
+`resolve_columns_then_to_pandas()` in `preprocessing/_helpers.py` and wired
+all six nodes through it, removing the duplicated inline pattern.
+
+Also found four nodes that take an explicit, small, named column list
+(not auto-detected) and still converted the whole frame before validating
+those columns: `geo/distance.py` (lat/lon pairs), `geo/h3_index.py`
+(lat/lon pair — Candidate E's evaluated file, still correctly left with a
+Pandas apply/compute path, but its *fit-time column validation* narrowing
+is a separate, safe, always-a-win change since it doesn't touch the h3
+computation itself), `feature_generation/interaction.py`, and
+`feature_generation/polynomial.py`. Added a second shared helper,
+`select_then_to_pandas()`, for this narrower "select an explicit column
+list" case, and wired all four through it.
+
+Deliberately left `feature_selection/model_based.py` and
+`feature_selection/univariate.py` unchanged: their candidate-column set is
+"all eligible minus target", so narrowing rarely excludes more than one
+column — not worth the churn for negligible benefit.
+
+Initially over-reached and also tried to narrow
+`feature_selection/correlation.py`'s retained Pandas-fallback path (the
+non-`pearson`/`spearman` compatibility branch from Candidate A), which
+broke 10 existing tests in `test_feature_selection_gaps.py` that assert
+`to_pandas` is called exactly once with a specific input via
+`monkeypatch.setattr(correlation_module, "to_pandas", ...)` spies — that
+file's fallback contract is intentionally locked from Candidate A's review,
+so this was reverted back to its original form; `correlation.py` has zero
+diff in this follow-up.
+
+Separately, deduplicated a numeric-Polars-dtype list that had drifted into
+two independent, near-identical copies (`utils.py::_polars_numeric_dtype_cols`,
+`preprocessing/_helpers.py::auto_detect_numeric_columns`) missing the
+`Boolean` entry present in the already-shared `POLARS_NUMERIC_BOOL_DTYPES`
+(from the earlier `9b4155ae` dedup commit) into one new
+`POLARS_NUMERIC_DTYPES` constant in `engines/polars_engine.py`
+(`POLARS_NUMERIC_BOOL_DTYPES` minus `Boolean`), exported from
+`engines/__init__.py`, and consumed by both call sites.
+
+Validation: full Core suite `2918 passed, 69 skipped, 1 xfailed` (identical
+to the Wave 2 baseline — no regressions), `ruff check`/`ruff format --check`
+clean on all touched files, `ty check` clean on all touched files (the two
+pre-existing `test_benchmarks.py` diagnostics were confirmed unrelated via
+`git stash`/re-check). Ad-hoc benchmark on `IQRCalculator.fit` (250k x 25,
+1 of 25 columns selected) confirms the narrowed path runs in ~4.3ms,
+consistent with Candidate D's measured gains at the same shape.
+
+Answer to "is there anything left for Polars conversion, are we good to go
+everywhere": yes for this repo's `skyulf-core` fit/apply surface as of this
+follow-up — the column-resolution-narrowing opportunity is now applied
+everywhere it exists (10 nodes total across Wave 2 + this follow-up), and
+the remaining `to_pandas()` sites are genuinely either narrow already or are
+legitimate sklearn/NumPy/SHAP/plotting/imbalanced-learn boundaries. A fresh
+whole-codebase inventory (beyond this specific audit's original scope, and
+beyond `skyulf-core` into `backend`/`frontend`) would still be the rigorous
+way to rule out anything entirely outside what's been looked at so far.

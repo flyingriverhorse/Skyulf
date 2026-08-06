@@ -9,7 +9,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import detect_numeric_columns
 from .._artifacts import PolynomialFeaturesArtifact
-from .._helpers import to_pandas
+from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 
@@ -89,10 +89,12 @@ class PolynomialFeaturesApplier(BaseApplier):
 class PolynomialFeaturesCalculator(BaseCalculator):
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> PolynomialFeaturesArtifact:  # pylint: disable=arguments-differ
-        X_pd = to_pandas(X)
         cols = list(config.get("columns", []))
         if not cols and config.get("auto_detect", False):
-            cols = detect_numeric_columns(X_pd)
+            # detect_numeric_columns dispatches natively on Polars frames too,
+            # so this doesn't require converting the full frame first.
+            cols = detect_numeric_columns(X)
+        X_pd = select_then_to_pandas(X, cols)
         cols = [c for c in cols if c in X_pd.columns]
         if not cols:
             return cast(PolynomialFeaturesArtifact, {})
