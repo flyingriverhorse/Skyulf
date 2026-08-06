@@ -14,15 +14,16 @@ tasks add live walkthrough evidence.
 
 ### Evidence Labels
 - **Observed:** Reproduced in the running interface.
+- **Measured:** Verified through CLI, build, or automated test output.
 - **Inferred:** Identified from code or test structure as a UX regression risk.
 
 ### Baseline
 
 #### Engineering baseline
 
-- **Observed:** `npm run lint` exited `0`.
-- **Observed:** `npx tsc --project tsconfig.json --noEmit` exited `0`.
-- **Observed:** `npm run build` exited `0` after Vite transformed `2939`
+- **Measured:** `npm run lint` exited `0`.
+- **Measured:** `npx tsc --project tsconfig.json --noEmit` exited `0`.
+- **Measured:** `npm run build` exited `0` after Vite transformed `2939`
   modules and completed in `9.48s`. The output also reported
   `Circular chunk: vendor-flow -> vendor-charts -> vendor-flow` and
   `Generated an empty chunk: "vendor-react"`.
@@ -45,29 +46,30 @@ tasks add live walkthrough evidence.
 | `index-Bfinbtv3.js` | `1,015.86 kB` | `258.24 kB` |
 | `vendor-plotly-J_-jSK3N.js` | `1,704.42 kB` | `541.11 kB` |
 
-- **Observed:** `npm run test -- --reporter=dot` exited `0` with
+- **Measured:** `npm run test -- --reporter=dot` exited `0` with
   `Test Files 40 passed (40)` and `Tests 335 passed (335)` in `4.89s`.
   The output also included existing test-run console noise from jsdom
   `localStorage` warnings, `useConfirm must be used inside <ConfirmProvider>`
   coverage in `ConfirmDialog.test.tsx`, repeated `404 not found` polling logs
   in `useJobPolling.test.ts`, and Recharts zero-size warnings in
   `EvaluationView.test.tsx`.
-- **Observed:** `npm run test:e2e -- --project=chromium` exited `1`.
+- **Measured:** `npm run test:e2e -- --project=chromium` exited `1`.
   Playwright attempted `12` Chromium tests and all `12` failed before route
   interaction because the Chromium executable was missing at
   `/Users/BH7043/Library/Caches/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-mac-arm64/chrome-headless-shell`.
   The runner advised `npx playwright install`. Per audit scope, this is
   recorded as pre-existing baseline evidence and was not fixed.
-- **Observed:** The controller re-ran the same `12` E2E tests using installed
-  Google Chrome through the ignored fallback config
-  `.superpowers/sdd/playwright.chrome.config.ts`. `11` passed and
+- **Measured:** Fallback E2E invocation:
+  `cd frontend/ml-canvas && NODE_PATH="$PWD/node_modules" npx playwright test --config=/Users/BH7043/Skyulf/.worktrees/frontend-ux-audit/.superpowers/sdd/playwright.chrome.config.ts`.
+  The audit config is ignored by the normal Chromium runner and instead uses
+  the installed Google Chrome binary. `11` tests passed and
   `e2e/preview.spec.ts:24` failed after `30s` because the Run Preview button
   repeatedly became unstable/detached from the DOM while Playwright tried to
   click it (`preview.spec.ts:113`). The accessibility suite passed its
   critical-only gate while logging two non-blocking serious findings:
   dashboard `color-contrast` and canvas `scrollable-region-focusable`. These
   remain pre-existing UX/test evidence, not fixes.
-- **Observed:** `npm run size-check` exited `0`; all checked chunks were within
+- **Measured:** `npm run size-check` exited `0`; all checked chunks were within
   budget.
 
 | Size-check target | Raw size | Gzip size | Budget | Result |
@@ -109,8 +111,10 @@ tasks add live walkthrough evidence.
   `/jobs`, `/data`, and `/eda`; the remaining top-level operations routes are
   not included in that smoke coverage file.
 - **Inferred:** The shared shell exposes Canvas, Data/EDA, and Operations at
-  the top level; Experiments/Inference will need equal audit coverage later via
-  page-level components and flows rather than a dedicated app-shell route.
+  the top level; Experiments and Inference are shell views, not App routes.
+  They are opened from the `Navbar` buttons and lazily mounted by
+  `MainLayout`, which keeps each page alive in `visitedViews` so its local
+  state survives switches.
 
 ## Shared Foundations
 
@@ -132,9 +136,33 @@ tasks add live walkthrough evidence.
 
 ### Canvas
 
+- **Inferred:** `Navbar.tsx` and `MainLayout.tsx` keep Canvas as the default
+  shell view (`activeView === 'canvas'`), with Sidebar, Toolbar,
+  `FlowCanvas`, `RestoreSessionBanner`, `ResultsPanel`, and `PropertiesPanel`
+  rendered inside the canvas branch. The read-only chip only appears while the
+  canvas view is active, and the canvas branch is hidden with `display:
+  contents` rather than unmounted.
+
 ### Data and EDA
 
 ### Experiments and Inference
+
+- **Inferred:** `Navbar.tsx` exposes the Experiments and Inference entry
+  points as shell tabs (`setView('experiments')` / `setView('inference')`),
+  not top-level app routes. `MainLayout.tsx` mounts `ExperimentsPage` and
+  `InferencePage` lazily on first visit and keeps them mounted thereafter so
+  their local state survives navigation.
+- **Inferred:** `ExperimentsPage.tsx` starts with dataset and model-type
+  filters, a collapsible job list sidebar, and a tab strip for Visual
+  Comparison, Detailed Metrics & Params, Model Evaluation, Pipeline Diff,
+  Feature Importance, SHAP Explainability, and Segmentation. The Evaluation
+  tab carries its own slider/tuning sub-tabs plus split visibility toggles and
+  threshold state.
+- **Inferred:** `InferencePage.tsx` centers the audit on a JSON input editor,
+  sample-size segmented control, CSV upload/reload actions, a run button, a
+  list/table results toggle, advanced threshold overrides, and a recent-runs
+  restore strip. Its state is persisted in local storage and is restored when
+  the shell view is revisited.
 
 ### Operations
 
