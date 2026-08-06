@@ -939,6 +939,255 @@ Canvas finding is warranted solely for this repeated form root.
   restore strip. Its state is persisted in local storage and is restored when
   the shell view is revisited.
 
+#### Experiments and Inference audit evidence and limits
+
+- **Observed:** In local system Chrome at 390 px, the Canvas shell switcher
+  showed the Experiments button, but the visible Inference button was covered
+  by Notifications and Playwright reported that interception. This is
+  Experiments/Inference evidence for the already-recorded shared compact-shell
+  defect **FND-001**, not a duplicate EXP finding. At desktop width,
+  Experiments loaded one synthetic `test_job` with an unknown model/dataset;
+  it could be selected and its Visual Comparison, Detailed Metrics & Params,
+  Model Evaluation, and Pipeline Diff tabs could be reached. The table
+  reported no upstream steps/default parameters and the evaluation request
+  rendered “Failed to fetch evaluation data.”
+- **Observed:** The locally available Inference payload rendered an artifact
+  schema with four fields whose types were `unknown`. A malformed JSON array
+  named the parser position and disabled Run Prediction. A syntactically valid
+  row with one string-valued field and three missing schema fields displayed
+  “3 missing” plus Fix, while Run Prediction remained enabled. This proves
+  only the rendered client-side name check, not backend acceptance or a real
+  prediction result.
+- **Inferred:** The shared Playwright API stub returns `{}` for `/api/**`;
+  route/a11y coverage lists only `/`, `/canvas`, `/jobs`, `/data`, and `/eda`.
+  The focused unit tests cover threshold-tab visibility, threshold math, and
+  per-class matrix calculation, not an Experiments or Inference journey.
+  Consequently, mocks do **not** expose realistic multi-run classification,
+  regression, segmentation, feature-importance, SHAP, pipeline-diff,
+  deployment, long-running prediction, failure/retry, export, or result
+  fixtures. Claims about those unrendered states below are **Inferred** from
+  code/test evidence, not reproduced live behavior.
+
+- **EXP-001 — Inferred: filters can hide selected runs while comparison keeps
+  using them.**
+  - **Evidence:** `filteredJobs` applies dataset/task/status filters, but
+    `selectedJobs` independently resolves `selectedJobIds` against all jobs.
+    Selecting a run, then changing either header filter, can therefore leave a
+    comparison active with no corresponding visible selected row. `MainLayout`
+    intentionally retains this local state across shell switches.
+  - **Problem:** Context retention becomes ambiguous: filtering appears to
+    change the comparison population, while hidden prior selections can still
+    determine charts, table rows, evaluation, and deployment actions.
+  - **Surfaces:** Experiments dataset/task filters; run sidebar; Visual
+    Comparison; Detailed Metrics & Params; Evaluation; Pipeline Diff.
+  - **Proposed behavior:** Keep selections deliberately, but show a persistent
+    selected-run summary with visible/hidden counts and run/dataset/model
+    identity; offer “clear hidden” and “show selected” without silently
+    dropping comparison context.
+  - **Acceptance criteria:** Every selected run is either visible in the
+    sidebar or named in a persistent summary; filter changes state whether
+    hidden selections remain; all tabs identify their exact run set; clearing
+    or restoring a hidden selection updates every view consistently.
+  - **Validation method:** Playwright seeds mixed dataset/task completed jobs,
+    selects runs, applies/removes filters, switches every tab and shell view,
+    reloads where retained state is intended, and asserts selected identities,
+    chart/table input, evaluation target, and keyboard operation.
+  - **Impact:** High. **Frequency:** Frequent for cross-run comparison.
+    **Effort:** M. **Risk:** Medium. **Dependencies:** `useJobStore`,
+    `ExperimentsPage` selection state, and job fixture contract.
+    **Milestone:** Now.
+
+- **EXP-002 — Inferred: metric comparison does not make decision direction,
+  comparability, or missingness durable.**
+  - **Evidence:** `MetricsComparisonChart` groups numeric keys and renders
+    generic bars/axis values; `ComparisonTableView` renders unavailable values
+    as `-`. Descriptions are tooltip-only when `getMetricDescription` knows a
+    key. `BranchComparisonCard` locally guesses lower-is-better only for a
+    small string list. Neither surface establishes a selected primary metric,
+    units/scale, direction, or why a value is absent across the compared runs.
+  - **Problem:** Users can compare incompatible train/test/CV values or choose
+    the visually tallest bar when lower is better, while a dash can mean
+    unreported, unsupported, or unavailable.
+  - **Surfaces:** Visual Comparison; Detailed Metrics & Params; parallel
+    branch comparison; metric/split toggles; run-selection summary.
+  - **Proposed behavior:** Attach a comparison contract to each displayed
+    metric: evaluation population/split, direction, unit/scale, availability
+    reason, and explicit primary-metric/winner rule. Keep tooltips as detail,
+    not the only carrier of that context.
+  - **Acceptance criteria:** Each metric has visible higher/lower-is-better
+    and split context; unavailable values distinguish absent artifact,
+    unsupported metric, and filter exclusion; winner highlighting never
+    contradicts metric direction; mixed task types or incompatible scales
+    require an explicit user choice rather than a silent aggregate.
+  - **Validation method:** Render deterministic classification, regression,
+    tuned-CV, partial-metric, and parallel-branch fixtures. Assert direction,
+    units, missing reasons, winner calculation, accessible names, and
+    screenshot/geometry behavior at 1440 and 390 px in both themes.
+  - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** job metrics schema, metric metadata, chart/table
+    adapters, and experiment fixtures. **Milestone:** Now.
+
+- **EXP-003 — Inferred: conditional explanation and segmentation views can
+  conceal availability and overstate comparability.**
+  - **Evidence:** Feature Importance and SHAP tabs render only when at least
+    one selected job supplies an artifact. Feature-importance rows substitute
+    `0` for a feature not reported by a run after per-run normalization.
+    SHAP's detailed views use a single selected run, while the summary
+    aggregates selected runs. `SegmentationView` prints silhouette,
+    Calinski-Harabasz, and Davies-Bouldin values without per-metric
+    directionality beside the cards.
+  - **Problem:** A missing tab does not explain whether an artifact is
+    unsupported, pending, or failed; zero-like comparison bars can be read as
+    measured zero; and cluster-quality numbers do not tell a user which
+    direction supports a decision.
+  - **Surfaces:** Feature Importance; SHAP Summary/Beeswarm/Dependence/
+    Waterfall/Force/Interaction; Segmentation; artifact-empty states and
+    exports.
+  - **Proposed behavior:** Always expose an explainability/segmentation
+    availability state for selected runs, annotate artifact coverage and
+    normalization, render missing values distinctly from zero, and place
+    metric direction/limits next to cluster-quality values.
+  - **Acceptance criteria:** Every selected run names explainability artifact
+    status and reason; comparisons distinguish zero from not reported; SHAP
+    single-run views identify the active model/run/sample; segmentation marks
+    silhouette/Calinski-Harabasz as higher-is-better and Davies-Bouldin as
+    lower-is-better, with a non-ground-truth caveat; exports retain run,
+    split, and normalization context.
+  - **Validation method:** Use tree/non-tree, artifact-present/absent/pending/
+    failed, overlapping/non-overlapping feature, multi-run SHAP, and
+    clustering fixtures. Assert visible copy, data-table/export metadata,
+    keyboard selection, and light/dark/narrow rendering.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** training artifact schema, explanation services,
+    chart adapters, exports, and deterministic fixtures. **Milestone:** Next.
+
+- **EXP-004 — Inferred: Pipeline Diff lacks an explicit comparison decision
+  contract.**
+  - **Evidence:** `PipelineDiffView` accepts exactly two jobs in selection
+    order, labels them Baseline/Candidate, fetches their saved graphs, and
+    lists structural/config differences. It has no baseline chooser, swap,
+    run metadata/evaluation context in the header, or explanation of a
+    missing/snapshot-less graph beyond the fetch error.
+  - **Problem:** Selection order silently determines the baseline and users
+    cannot tell whether a structural/config difference corresponds to the
+    desired dataset, split, model outcome, or an incomplete historical graph.
+  - **Surfaces:** Run sidebar selection; Pipeline Diff tab; graph snapshots;
+    change list.
+  - **Proposed behavior:** Require an explicit baseline/candidate designation
+    (with swap), show each run's dataset, model, timestamp, scoring/split
+    context and snapshot availability, and keep structural changes clearly
+    separate from outcome differences.
+  - **Acceptance criteria:** Exactly-two selection explains how roles are
+    assigned and supports swapping; each side names enough metadata to verify
+    the intended comparison; no graph/no diff/error states name the affected
+    run and recovery next step; a change list preserves direction
+    baseline→candidate and is exportable/accessibly navigable.
+  - **Validation method:** Mock equal, changed, renamed, missing, malformed,
+    and request-failed graph snapshots for ordered job pairs; verify role
+    changes, metadata, keyboard controls, change direction, responsive graph
+    geometry, and error recovery.
+  - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    Medium. **Dependencies:** saved job graph contract, `graphDiff`, React
+    Flow snapshot renderer, and job metadata. **Milestone:** Next.
+
+- **EXP-005 — Inferred: threshold exploration, tuning, and prediction-time
+  activation need a durable decision record.**
+  - **Evidence:** `EvaluationView` distinguishes the client-only slider from
+    preview/save/toggle/clear tuning and explains its validation-then-test
+    fallback. `InferencePage` retrieves saved thresholds, allows ad-hoc
+    overrides, and displays thresholds returned by a prediction. Calls have
+    local error strings but no mutation-pending or post-save provenance
+    record; current tests only assert threshold-tab visibility/math.
+  - **Problem:** A user can change a model-wide prediction rule without a
+    compact record of metric, split, values, time/version, activation result,
+    and a recoverable state if a mutation fails or the selected run changes.
+  - **Surfaces:** Evaluation Threshold Slider/Tuning; confusion matrices;
+    saved-threshold API; Inference advanced overrides and results.
+  - **Proposed behavior:** Treat tuning as a versioned decision: preview
+    context, confirm/save/enable lifecycle, pending/error/retry feedback, and
+    an immutable applied-threshold summary carried into prediction results.
+    Preserve the existing distinction between exploratory slider and deployed
+    behavior.
+  - **Acceptance criteria:** Preview, save, enable, disable, clear, and
+    failed states name job/model version, metric, data split, threshold values,
+    and whether real prediction is affected; controls prevent duplicate
+    mutations; every result identifies default/saved/override thresholds;
+    switching jobs never attributes thresholds to the wrong job.
+  - **Validation method:** Mock validation/test fallback, saved-enabled,
+    save/toggle/clear success, delayed response, conflict, and failure for two
+    jobs. Exercise tune→save→enable→infer→override→clear through component and
+    Playwright tests, including tab/run switches and live/status assertions.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
+    High. **Dependencies:** threshold-tuning API/version semantics,
+    evaluation artifacts, deployment prediction response, and **FND-003** and
+    **FND-004** for shared async/retry behavior. **Milestone:** Now.
+
+- **EXP-006 — Observed: inference schema feedback permits a structurally
+  incomplete, type-incompatible request.**
+  - **Evidence:** The local artifact schema rendered four `unknown`-typed
+    fields. With valid JSON containing `"sepal.length": "wrong"` and omitting
+    three expected fields, the UI showed “3 missing” and an optional Fix while
+    Run Prediction remained enabled. `checkSchema` compares field names only,
+    and Fix fills every missing field with numeric `0`; no client type/value
+    check exists. This is not a claim that the backend accepted that request.
+  - **Problem:** A user can submit data that the available schema visibly
+    identifies as incomplete and potentially incompatible, or apply a
+    misleading zero-fill before understanding feature semantics.
+  - **Surfaces:** Inference editor; artifact schema chips; CSV/sample input;
+    schema badges/Fix; Run Prediction.
+  - **Proposed behavior:** Obtain a typed, required/nullable input contract
+    from the deployed artifact; validate each row before submission; make
+    repair an explicit, reviewable transform with per-field defaults/reasons,
+    never an unqualified zero-fill.
+  - **Acceptance criteria:** Run Prediction is blocked or requires an
+    explicit reviewed override for missing, extra, wrong-type, nullability,
+    range, categorical, and row-shape violations; each issue names
+    row/field/expected/received value; repair previews changed values and
+    preserves the original input; unknown schema types are honestly marked
+    unvalidated.
+  - **Validation method:** Render deployed-artifact fixtures for numeric,
+    string, categorical, nullable, defaultable, and unknown fields; enter
+    JSON, CSV, sample, and drag/drop variants; assert request gating/payload,
+    repair preview, keyboard feedback, and server-validation reconciliation.
+  - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
+    High. **Dependencies:** deployment artifact schema, prediction validation
+    response, CSV parser, and **FND-005** field semantics. **Milestone:** Now.
+
+- **EXP-007 — Inferred: inference execution and recovery are not a complete
+  durable run lifecycle.**
+  - **Evidence:** `InferencePage` has one `isLoading` flag, captures elapsed
+    client time, clears prior results before each request, renders a raw error
+    string, and keeps at most five restoreable runs only in component memory.
+    It persists input, sample size, and view choice in local storage, but not
+    result/error/run provenance. The local mock did not expose a realistic
+    deployment or prediction success/failure/long-running payload.
+  - **Problem:** A slow or failed prediction has no explicit cancellation,
+    retry-with-same-input, durable run record, server timing/version context,
+    or result-to-export provenance after reload; users can lose the evidence
+    needed to diagnose or reproduce a decision.
+  - **Surfaces:** Inference Run Prediction; loading/error/result panes;
+    recent runs; JSON/CSV export; deployment card; threshold display.
+  - **Proposed behavior:** Model each request as a named inference run with
+    submit/pending/success/failure/cancelled status, model/version/schema/
+    threshold/input summary, scoped retry/cancel where supported, and a
+    privacy-conscious local/session history that distinguishes retained input
+    from retained result.
+  - **Acceptance criteria:** Pending work names its run and prevents duplicate
+    submission; failure exposes safe cause, unchanged input, retry and next
+    action; success/export names model version, schema/threshold context,
+    row count, client/server latency, and result format; reload/history makes
+    retention/expiry explicit; no raw transport object is the only recovery
+    copy.
+  - **Validation method:** Mock active/no deployment, malformed/server schema
+    errors, delayed success, timeout, cancellation, retry, classification and
+    regression results, export, reset, and reload. Assert requests, retained
+    state, status announcements, CSV/JSON metadata, keyboard behavior, and
+    narrow/desktop layouts.
+  - **Impact:** High. **Frequency:** Occasional. **Effort:** L. **Risk:**
+    Medium. **Dependencies:** deployment/prediction APIs, job/status contract,
+    browser storage/privacy policy, exports, and **FND-003** and **FND-004**.
+    **Milestone:** Now.
+
 ### Operations
 
 - **Baseline entry-point mapping:** `/jobs` is the eager `JobsPage`; `/drift`,
@@ -971,6 +1220,13 @@ Canvas finding is warranted solely for this repeated form root.
 | DAT-005 | Inferred | EDA jobs and history lack durable input/status/recovery context. | EDA selection; jobs; failures; History | High | Frequent | M | Medium | EDA job API; useEDAStore; FND-003 | Now |
 | DAT-006 | Inferred | Filters and exclusions apply inconsistently without durable report context. | EDA sidebar; tabs; exports | High | Frequent | M | Medium | EDA schema; FND-005 | Next |
 | DAT-007 | Inferred | Charts lose interpretable color/axis/alternative-data context at density and narrow widths. | EDA charts, tables, exports | High | Frequent | L | Medium | Chart themes; exports; report payloads | Next |
+| EXP-001 | Inferred | Filters can hide selected runs while comparison keeps using them. | Experiments filters, run sidebar, comparison/evaluation/diff tabs | High | Frequent | M | Medium | useJobStore; experiment fixtures | Now |
+| EXP-002 | Inferred | Metric comparison does not make direction, comparability, or missingness durable. | Visual/table/branch metric comparison | High | Frequent | M | Medium | Metric metadata; chart/table adapters | Now |
+| EXP-003 | Inferred | Conditional explainability/segmentation views conceal availability and comparability. | Feature Importance, SHAP, Segmentation, exports | High | Occasional | M | Medium | Artifact schema; explanation services | Next |
+| EXP-004 | Inferred | Pipeline Diff lacks an explicit baseline/candidate decision contract. | Run sidebar, Pipeline Diff, saved graphs | Medium | Occasional | M | Medium | Graph snapshots; graphDiff; job metadata | Next |
+| EXP-005 | Inferred | Threshold exploration/tuning/activation lacks a durable decision record. | Evaluation, threshold API, Inference overrides/results | High | Occasional | M | High | Threshold API/version semantics; FND-003/FND-004 | Now |
+| EXP-006 | Observed | Inference permits visibly incomplete/type-incompatible input. | Editor, schema badges/Fix, prediction request | High | Frequent | M | High | Typed artifact schema; FND-005 | Now |
+| EXP-007 | Inferred | Inference execution/recovery is not a complete durable run lifecycle. | Run, pending/error/results, history, exports | High | Occasional | L | Medium | Prediction/status API; storage; FND-003/FND-004 | Now |
 
 ## Component-Boundary Recommendations
 
@@ -999,6 +1255,14 @@ Canvas finding is warranted solely for this repeated form root.
   export functions (`DAT-005`, `DAT-006`). Chart adapters own rendering and
   theme mechanics; EDA tabs own explanations, data alternatives, and applied
   context (`DAT-007`).
+- **Inference run boundary:** `InferencePage.tsx` currently combines
+  deployment/schema loading, input import/repair, per-request threshold
+  overrides, prediction transport, result/export rendering, and transient
+  history. Split a testable inference-run controller from input and
+  results/history views only to prevent those independently changing states
+  from attributing a result, error, or threshold to the wrong deployment
+  (`EXP-006`, `EXP-007`). Keep API truth in the deployment/threshold clients;
+  do not split presentational helpers merely for file size.
 
 ## Now / Next / Later Roadmap
 
@@ -1024,6 +1288,15 @@ Canvas finding is warranted solely for this repeated form root.
 - **DAT-004:** Make Data and EDA controls reachable at 390 px through
   **FND-001**'s compact-shell work.
 - **DAT-005:** Preserve dataset/input/job/history context across EDA outcomes.
+- **EXP-001:** Keep selected-run context visible when filters change.
+- **EXP-002:** Make metric direction, split/population, availability, and
+  winner logic explicit in every comparison.
+- **EXP-005:** Make threshold preview/save/enable state versioned, attributable,
+  recoverable, and visible at prediction time.
+- **EXP-006:** Validate typed deployed-schema input before inference and make
+  repairs reviewable.
+- **EXP-007:** Give prediction runs durable pending/failure/retry/result/export
+  context.
 
 ### Next
 
@@ -1038,6 +1311,10 @@ Canvas finding is warranted solely for this repeated form root.
   visible in every result/export.
 - **DAT-007:** Establish interpretable, responsive, theme-safe chart and
   alternative-data behavior.
+- **EXP-003:** Explain absent/partial explainability artifacts, missing versus
+  zero values, and segmentation metric direction.
+- **EXP-004:** Make baseline/candidate roles, snapshot availability, and
+  structural-versus-outcome differences explicit in Pipeline Diff.
 
 ### Later
 
@@ -1063,3 +1340,10 @@ Canvas finding is warranted solely for this repeated form root.
 | DAT-005 EDA job context | Dataset plus target/task/filter/exclusion inputs persist through pending/fail/history outcomes | Mock job/report/history and polling tests | Submit, cancel, retry, load history, switch dataset | 1440 and 390 px | Status/alert and current-report context |
 | DAT-006 EDA applied context | Filters/exclusions use labelled draft/apply/reset and annotate all outputs | Component payload/context/export tests | Refine analysis and inspect every tab/export | 1440 and 390 px | Labels, errors, keyboard, axe |
 | DAT-007 visualization contract | Legends/axes/tooltips/context/alternatives work in themes and at density | Deterministic chart fixture and visual/axe tests | Interpret, scroll, tabulate, and download each chart family | 1440 and 390 px, light/dark | Non-color meaning and data-table alternatives |
+| EXP-001 selected-run context | Filtered views identify all retained selected runs and their use | Mixed-job selection/filter Playwright tests | Filter, compare, switch tabs/views, clear/restore selection | 1440 and 390 px | Selection summary and keyboard operation |
+| EXP-002 metric decision contract | Metric direction/split/units/missingness/winner are explicit | Deterministic metric/branch fixture tests | Compare classification, regression, CV, and partial jobs | 1440 and 390 px, light/dark | Tooltip-independent labels and table semantics |
+| EXP-003 explanation/segmentation availability | Artifact coverage, missingness, normalization, and cluster metric direction are explicit | Artifact-state component/visual tests | Compare supported/unsupported/partial SHAP and clustering jobs | 1440 and 390 px, light/dark | Non-color and data/export alternatives |
+| EXP-004 Pipeline Diff roles | Baseline/candidate, graph status, and difference direction are unambiguous | Ordered graph-pair, missing/error snapshot tests | Swap roles and inspect equal/changed/failed pairs | 1440 and 390 px | Keyboard role controls and change-list semantics |
+| EXP-005 threshold decision lifecycle | Preview/save/enable/clear/provenance cannot be misattributed | Two-job threshold API state-transition tests | Tune, enable, infer, override, clear, retry | 1440 and 390 px | Status/error announcements and control labels |
+| EXP-006 typed inference input | Invalid field/value/row shapes are actionable before submit | Typed-schema JSON/CSV request-gating tests | Review repair/default/unknown-type input | 1440 and 390 px | Field/error relationships and keyboard repair |
+| EXP-007 inference run lifecycle | Pending/failure/retry/results/export/history retain clear provenance | Delayed/success/failure/cancel/reload/export tests | Execute, reset, retry, reload, restore, export | 1440 and 390 px | Live status, error recovery, and focus review |
