@@ -15,6 +15,7 @@ from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.core.schema import SkyulfSchema
 from skyulf.data.dataset import SplitDataset
+from skyulf.preprocessing.encoding._common import _extract_target
 from skyulf.preprocessing.encoding.target import (
     TargetEncoderApplier,
     TargetEncoderCalculator,
@@ -99,6 +100,21 @@ def _fit_target_encoder_pipeline(
 def _unpack_split_xy(split: Any) -> tuple[Any, Any]:
     """Return one pipeline split as an ``(X, y)`` tuple for test assertions."""
     return cast(tuple[Any, Any], split)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_shared_extract_target_supports_both_engines(engine: str) -> None:
+    """The shared helper should resolve target_col without changing explicit y."""
+    frame_pd = pd.DataFrame({"city": ["a", "b"], "target": [0, 1]})
+    frame = pl.from_pandas(frame_pd) if engine == "polars" else frame_pd
+
+    extracted = _extract_target(frame, None, "target")
+    values = extracted.to_list() if engine == "polars" else extracted.tolist()
+    assert values == [0, 1]
+
+    explicit = np.array([1, 0])
+    assert _extract_target(frame, explicit, "target") is explicit
+    assert _extract_target(frame, None, "missing") is None
 
 
 def test_binary_target_encoding_matches_raw_sklearn() -> None:
@@ -657,12 +673,10 @@ def test_unknown_label_type_error_is_translated_to_actionable_message() -> None:
         TargetEncoderCalculator().fit((X, y), config)
 
 
-def test_maybe_extract_y_polars_returns_y_when_target_col_missing_from_x() -> None:
-    """_maybe_extract_y_polars falls through to `y` unchanged if target_col isn't in X."""
-    from skyulf.preprocessing.encoding.target import _maybe_extract_y_polars
-
+def test_extract_target_returns_none_when_target_col_missing_from_x() -> None:
+    """_extract_target falls through to ``y`` unchanged if target_col isn't in X."""
     X = pl.DataFrame({"city": ["a", "b"]})
-    assert _maybe_extract_y_polars(X, None, "missing_col") is None
+    assert _extract_target(X, None, "missing_col") is None
 
 
 def test_y_to_numpy_uses_to_pandas_fallback() -> None:

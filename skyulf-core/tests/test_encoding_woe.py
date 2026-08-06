@@ -218,8 +218,8 @@ def test_polars_apply_no_valid_columns_is_noop() -> None:
     assert list(y_out) == list(y_pl)
 
 
-def test_extract_y_returns_none_when_target_column_missing_from_x() -> None:
-    """_extract_y's final fallback: y stays None if target_col isn't found in X either."""
+def test_extract_target_returns_none_when_target_column_missing_from_x() -> None:
+    """Shared target extraction should leave y as None when target_col is absent."""
     X = pd.DataFrame({"city": ["a", "b"]})
     params = WOEEncoderCalculator().fit(X, {"columns": ["city"], "target_column": "nonexistent"})
     assert params == {}
