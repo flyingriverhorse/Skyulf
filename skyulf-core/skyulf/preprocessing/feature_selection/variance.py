@@ -7,9 +7,9 @@ from sklearn.feature_selection import VarianceThreshold
 from ...core.meta.decorators import node_meta
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns
+from ...utils import detect_numeric_columns
 from .._artifacts import VarianceThresholdArtifact
-from .._helpers import to_pandas
+from .._helpers import resolve_columns_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 from ._common import _drop_selected_pandas, _drop_selected_polars
@@ -35,9 +35,8 @@ class VarianceThresholdCalculator(BaseCalculator):
         threshold = config.get("threshold", 0.0)
         drop_columns = config.get("drop_columns", True)
 
-        X_pd = to_pandas(X)
-        cols = resolve_columns(
-            X_pd,
+        X_pd, cols = resolve_columns_then_to_pandas(
+            X,
             config,
             lambda d: detect_numeric_columns(d, exclude_binary=False, exclude_constant=False),
         )

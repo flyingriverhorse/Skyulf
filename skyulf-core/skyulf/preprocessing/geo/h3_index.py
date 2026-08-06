@@ -15,7 +15,7 @@ import pandas as pd
 from ...core.artifacts import H3IndexArtifact
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from .._helpers import to_pandas
+from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 
@@ -122,10 +122,9 @@ class H3IndexCalculator(BaseCalculator):
         # rather than only failing later inside Applier.apply().
         _import_h3()
 
-        X_pd = to_pandas(X)
-
         lat_col = config.get("lat_col", "")
         lon_col = config.get("lon_col", "")
+        X_pd = select_then_to_pandas(X, [lat_col, lon_col])
         _validate_h3_columns(X_pd, lat_col, lon_col)
 
         resolution = config.get("resolution", 9)

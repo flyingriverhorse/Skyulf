@@ -37,6 +37,13 @@ POLARS_NUMERIC_BOOL_DTYPES: frozenset = (
     else frozenset()
 )
 
+# Polars numeric dtypes (float/int/uint), excluding bool — mirrors pandas'
+# `select_dtypes(include=["number"])`. Shared so numeric-only column detection
+# stays consistent as new native-Polars paths are added.
+POLARS_NUMERIC_DTYPES: frozenset = (
+    POLARS_NUMERIC_BOOL_DTYPES - frozenset((pl.Boolean,)) if HAS_POLARS else frozenset()
+)
+
 
 class SkyulfPolarsWrapper:
     """Wrapper for Polars DataFrame to implement SkyulfDataFrame protocol."""

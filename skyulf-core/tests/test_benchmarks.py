@@ -25,8 +25,8 @@ from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.modeling._evaluation import clustering as clustering_module
 from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
 from skyulf.pipeline import SkyulfPipeline
+from skyulf.preprocessing._helpers import to_pandas as _bucketing_to_pandas_for_fit
 from skyulf.preprocessing.bucketing import GeneralBinningCalculator
-from skyulf.preprocessing.bucketing import _to_pandas_for_fit as _bucketing_to_pandas_for_fit
 from skyulf.preprocessing.feature_selection import correlation as correlation_module
 from skyulf.preprocessing.feature_selection.correlation import CorrelationThresholdCalculator
 from skyulf.profiling._analyzer.multivariate import MultivariateMixin
