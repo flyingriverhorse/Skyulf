@@ -232,6 +232,10 @@ tasks add live walkthrough evidence.
 
 - **FND-003 — Inferred: Shared loading and error states do not announce
   async changes.**
+  - **Evidence:** Source review found that `LoadingState.tsx`, `EmptyState.tsx`,
+    `ErrorState.tsx`, and `toast.ts` do not provide a shared live
+    status/alert contract for equivalent state transitions across the affected
+    journeys.
   - **User problem:** A spinner, empty result, or request error can appear
     without a status or alert announcement, leaving screen-reader users
     unaware that a load or failure has completed.
@@ -369,6 +373,9 @@ tasks add live walkthrough evidence.
 ### Responsive Behavior
 
 - **FND-001 — Observed: the shared shell is not usable at 390 px.**
+  - **Evidence:** A 390 px Chrome walkthrough measured the Dashboard's fixed
+    256 px sidebar, leaving a 134 px main pane, and Canvas's 353 px view
+    switcher inside a 326 px pane, where it overlapped adjacent controls.
   - **User problem:** On Dashboard, the fixed 256 px sidebar leaves only
     134 px for the main content; it begins beyond the visible content area.
     On Canvas, the 353 px view switcher overflows its 326 px main pane and
