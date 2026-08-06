@@ -20,10 +20,11 @@ import numpy as np
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
+from .._helpers import select_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _exclude_target_column, detect_categorical_columns
+from ._common import _exclude_target_column, _extract_target, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
 
@@ -95,16 +96,6 @@ class WOEEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _extract_y(X: Any, y: Any, target_col: str | None) -> Any:
-    """Pull ``y`` out of ``X`` if it was not provided separately."""
-    if y is not None or not target_col:
-        return y
-    if target_col in X.columns:
-        getter = getattr(X, "get_column", None)
-        return getter(target_col) if getter else X[target_col]
-    return y
-
-
 def _binary_target(y: Any) -> np.ndarray | None:
     """Coerce ``y`` to a 0/1 numpy array, or ``None`` if not binary."""
     arr = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
@@ -173,30 +164,22 @@ def _woe_fit_common(
     return _build_woe_artifact(frame, y_bin, cols, reg)
 
 
-def _woe_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    y = _extract_y(X, y, config.get("target_column"))
+def _woe_fit(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
+    """Fit WOE for either dataframe engine using one narrow Pandas boundary."""
+    y = _extract_target(X, y, config.get("target_column"))
     if y is None:
         logger.warning("WOEEncoder requires a target variable (y). Skipping.")
         return {}
     cols = _exclude_target_column(
-        resolve_columns(X, config, detect_categorical_columns), config, "WOEEncoder", y
+        resolve_columns(X, config, detect_categorical_columns),
+        config,
+        "WOEEncoder",
+        y,
     )
     if not cols:
         return {}
-    return _woe_fit_common(X.select(cols).to_pandas(), y, cols, config)
-
-
-def _woe_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    y = _extract_y(X, y, config.get("target_column"))
-    if y is None:
-        logger.warning("WOEEncoder requires a target variable (y). Skipping.")
-        return {}
-    cols = _exclude_target_column(
-        resolve_columns(X, config, detect_categorical_columns), config, "WOEEncoder", y
-    )
-    if not cols:
-        return {}
-    return _woe_fit_common(X[cols], y, cols, config)
+    frame = select_then_to_pandas(X, cols)
+    return _woe_fit_common(frame[cols], y, cols, config)
 
 
 @NodeRegistry.register("WOEEncoder", WOEEncoderApplier)
@@ -220,8 +203,8 @@ class WOEEncoderCalculator(BaseCalculator):
             fit_dual_engine(
                 (X, y) if y is not None else X,
                 config,
-                polars_func=_woe_fit_polars,
-                pandas_func=_woe_fit_pandas,
+                polars_func=_woe_fit,
+                pandas_func=_woe_fit,
             ),
         )
 

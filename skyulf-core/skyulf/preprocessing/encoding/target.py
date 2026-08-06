@@ -18,7 +18,7 @@ from .._artifacts import TargetEncoderArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine, fit_dual_engine, fit_transform_train_dual_engine
-from ._common import _exclude_target_column, detect_categorical_columns
+from ._common import _exclude_target_column, _extract_target, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
 
@@ -111,24 +111,6 @@ class TargetEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 # Fit
 # -----------------------------------------------------------------------------
-
-
-def _maybe_extract_y_polars(X: Any, y: Any, target_col: str | None) -> Any:
-    """Polars fit-time fallback: pull ``y`` out of ``X`` if missing."""
-    if y is not None or not target_col:
-        return y
-    if target_col in X.columns:
-        return X.get_column(target_col)
-    return y
-
-
-def _maybe_extract_y_pandas(X: Any, y: Any, target_col: str | None) -> Any:
-    """Pandas fit-time fallback: pull ``y`` out of ``X`` if missing."""
-    if y is not None or not target_col:
-        return y
-    if target_col in X.columns:
-        return X[target_col]
-    return y
 
 
 def _y_to_numpy(y: Any) -> Any:
@@ -248,7 +230,7 @@ def _fit_transform_target_encoder(X_subset: Any, y: Any, config: dict[str, Any])
 
 
 def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    y = _maybe_extract_y_polars(X, y, config.get("target_column"))
+    y = _extract_target(X, y, config.get("target_column"))
     if y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
         return {}
@@ -262,7 +244,7 @@ def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
 
 
 def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    y = _maybe_extract_y_pandas(X, y, config.get("target_column"))
+    y = _extract_target(X, y, config.get("target_column"))
     if y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
         return {}
@@ -279,7 +261,7 @@ def _target_fit_transform_train_polars(
     X: Any, y: Any, config: dict[str, Any]
 ) -> tuple[Mapping[str, Any], Any, Any]:
     """Fit and cross-fit training rows for Polars-backed inputs."""
-    fit_y = _maybe_extract_y_polars(X, y, config.get("target_column"))
+    fit_y = _extract_target(X, y, config.get("target_column"))
     if fit_y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
         return {}, X, y
@@ -297,7 +279,7 @@ def _target_fit_transform_train_pandas(
     X: Any, y: Any, config: dict[str, Any]
 ) -> tuple[Mapping[str, Any], Any, Any]:
     """Fit and cross-fit training rows for Pandas-backed inputs."""
-    fit_y = _maybe_extract_y_pandas(X, y, config.get("target_column"))
+    fit_y = _extract_target(X, y, config.get("target_column"))
     if fit_y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
         return {}, X, y
