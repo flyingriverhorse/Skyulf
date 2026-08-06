@@ -14,8 +14,10 @@ diagnostics or changing model, tuning, or explainability results.
 
 2. Skyulf tuning fits final sklearn estimators on numpy arrays. During
    multiclass SHAP processing, `_predicted_class_index()` calls
-   `model.predict()` with the named Pandas display sample. Sklearn warns because
-   the estimator was fitted without feature names.
+   `model.predict()` with the named Pandas display sample. Sklearn therefore
+   warns for every affected estimator fitted without feature names, confirmed
+   with `DecisionTreeClassifier`, `RandomForestClassifier`, and
+   `ExtraTreesClassifier`.
 
 ## Design
 
@@ -47,9 +49,11 @@ avoids both directions of sklearn's feature-name warning.
 
 - Add an Optuna tuning regression test that records warnings and asserts the
   known `ExperimentalWarning` is absent while tuning succeeds.
-- Add a multiclass DecisionTree SHAP regression test where the estimator is
-  fitted on numpy and the explainability input is a named Pandas DataFrame;
-  assert no feature-name warning and a valid explanation.
+- Add a parameterized multiclass SHAP regression test for
+  `DecisionTreeClassifier`, `RandomForestClassifier`, and
+  `ExtraTreesClassifier`, fitting each estimator on numpy while passing a named
+  Pandas DataFrame to explainability; assert no feature-name warning and a
+  valid explanation.
 - Keep existing DataFrame-fitted explainability tests to cover the
   `feature_names_in_` branch.
 - Run focused tuning/explainability tests, Ruff, type checking, and the full
