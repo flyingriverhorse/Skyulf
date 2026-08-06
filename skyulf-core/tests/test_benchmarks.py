@@ -22,6 +22,8 @@ import pandas as pd
 import pytest
 
 from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+from skyulf.modeling._evaluation import clustering as clustering_module
+from skyulf.modeling._evaluation.clustering import evaluate_clustering_model
 from skyulf.pipeline import SkyulfPipeline
 from skyulf.preprocessing.feature_selection import correlation as correlation_module
 from skyulf.preprocessing.feature_selection.correlation import CorrelationThresholdCalculator
@@ -168,3 +170,98 @@ def test_correlation_threshold_fit_peak_rss(benchmark, rows, columns, wrapped, r
     delta = max(0, _peak_rss_bytes() - baseline)
     print(f"route={route} wrapped={wrapped} rows={rows} columns={columns} peak_rss_delta={delta}")
     assert "feature_1" in artifact["columns_to_drop"]
+
+
+def _clustering_benchmark_frame(rows: int, numeric_cols: int) -> pd.DataFrame:
+    """Build a deterministic mixed numeric/bool/string/reference Polars-ready frame."""
+    rng = np.random.default_rng(20260806)
+    data: dict[str, object] = {f"num_{i}": rng.standard_normal(rows) for i in range(numeric_cols)}
+    data["flag"] = rng.integers(0, 2, rows).astype(bool)
+    data["id"] = [f"r{i}" for i in range(rows)]
+    data["species"] = rng.choice(["setosa", "versicolor", "virginica"], rows)
+    return pd.DataFrame(data)
+
+
+_RUN_LARGE_CLUSTERING_BENCHMARKS = os.environ.get("SKYULF_RUN_LARGE_BENCHMARKS") == "1"
+_LARGE_CLUSTERING_CASE = pytest.mark.skipif(
+    not _RUN_LARGE_CLUSTERING_BENCHMARKS,
+    reason="set SKYULF_RUN_LARGE_BENCHMARKS=1 to run large clustering benchmarks",
+)
+_CLUSTERING_BENCHMARK_CASES = [
+    pytest.param(100_000, 30, id="100k-x-30"),
+    pytest.param(1_000_000, 15, marks=_LARGE_CLUSTERING_CASE, id="1m-x-15"),
+]
+
+
+def _legacy_evaluate_clustering(frame: object, labels: np.ndarray) -> object:
+    """Force the pre-native Pandas-only clustering evaluation route.
+
+    Mirrors the body of ``evaluate_clustering_model``'s Pandas branch, but
+    always converts through ``_feature_frame`` first (as the legacy
+    implementation always did) even when ``frame`` is a raw/wrapped Polars
+    frame, so the benchmark measures the same conversion cost the pre-native
+    code paid on every call.
+    """
+    X_df = clustering_module._feature_frame(frame)
+    X_df = X_df.reset_index(drop=True)
+    reference_values = None
+    if "species" in X_df.columns:
+        reference_values = X_df["species"].reset_index(drop=True)
+        X_df = X_df.drop(columns=["species"])
+    X_numeric = X_df.select_dtypes(include=["number", "bool"])
+    metrics = clustering_module.calculate_clustering_metrics(X_numeric, labels)
+    centroids = clustering_module._compute_centroids(X_df, labels, X_numeric)
+    crosstab = clustering_module._compute_reference_crosstab(labels, reference_values)
+    return metrics, centroids, crosstab
+
+
+@pytest.mark.parametrize(("rows", "numeric_cols"), _CLUSTERING_BENCHMARK_CASES)
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
+@pytest.mark.parametrize("route", ["legacy", "native"])
+def test_evaluate_clustering_model_fit_benchmark(benchmark, rows, numeric_cols, wrapped, route):
+    """Benchmark equivalent legacy and native clustering-evaluation routes."""
+    pl = pytest.importorskip("polars")
+    pdf = _clustering_benchmark_frame(rows, numeric_cols)
+    raw = pl.from_pandas(pdf)
+    frame = SkyulfPolarsWrapper(raw) if wrapped else raw
+    labels = np.random.default_rng(7).integers(0, 4, rows)
+
+    if route == "legacy":
+        metrics, _, _ = benchmark(_legacy_evaluate_clustering, frame, labels)
+    else:
+        report = benchmark(evaluate_clustering_model, None, frame, labels, "bench", "species")
+        metrics = report.metrics
+
+    assert metrics["n_clusters"] == 4.0
+
+
+@pytest.mark.skipif(
+    os.environ.get("SKYULF_MEASURE_CLUSTERING_RSS") != "1",
+    reason="set SKYULF_MEASURE_CLUSTERING_RSS=1 for isolated RSS output",
+)
+@pytest.mark.parametrize(("rows", "numeric_cols"), _CLUSTERING_BENCHMARK_CASES)
+@pytest.mark.parametrize("wrapped", [False, True], ids=["raw", "wrapped"])
+@pytest.mark.parametrize("route", ["legacy", "native"])
+def test_evaluate_clustering_model_fit_peak_rss(benchmark, rows, numeric_cols, wrapped, route):
+    """Print incremental process RSS for one separately invoked clustering-evaluation route."""
+    pl = pytest.importorskip("polars")
+    pdf = _clustering_benchmark_frame(rows, numeric_cols)
+    raw = pl.from_pandas(pdf)
+    frame = SkyulfPolarsWrapper(raw) if wrapped else raw
+    labels = np.random.default_rng(7).integers(0, 4, rows)
+    baseline = _peak_rss_bytes()
+
+    def _fit():
+        if route == "legacy":
+            return _legacy_evaluate_clustering(frame, labels)
+        report = evaluate_clustering_model(None, frame, labels, "bench", "species")
+        return report.metrics, None, None
+
+    result = benchmark.pedantic(_fit, rounds=1, iterations=1, warmup_rounds=0)
+
+    delta = max(0, _peak_rss_bytes() - baseline)
+    print(
+        f"route={route} wrapped={wrapped} rows={rows} numeric_cols={numeric_cols} "
+        f"peak_rss_delta={delta}"
+    )
+    assert result[0]["n_clusters"] == 4.0
