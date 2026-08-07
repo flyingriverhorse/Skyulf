@@ -32,7 +32,7 @@ const noop = async () => {};
 
 function baseProps(overrides: Partial<React.ComponentProps<typeof EvaluationView>> = {}) {
   return {
-    selectedJobIds: ['job-1'],
+    eligibleJobIds: ['job-1'],
     evalJobId: 'job-1',
     fetchEvaluationData: noop,
     isEvalLoading: false,

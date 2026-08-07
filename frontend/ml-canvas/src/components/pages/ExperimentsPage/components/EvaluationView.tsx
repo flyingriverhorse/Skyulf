@@ -17,7 +17,8 @@ interface BestMetricInfo {
 }
 
 interface Props {
-  selectedJobIds: string[];
+  /** Selected runs this tab can actually render, in selection order. */
+  eligibleJobIds: string[];
   evalJobId: string | null;
   fetchEvaluationData: (jobId: string) => void | Promise<void>;
   isEvalLoading: boolean;
@@ -57,7 +58,7 @@ interface Props {
 }
 
 export const EvaluationView: React.FC<Props> = ({
-  selectedJobIds,
+  eligibleJobIds,
   evalJobId,
   fetchEvaluationData,
   isEvalLoading,
@@ -144,13 +145,13 @@ export const EvaluationView: React.FC<Props> = ({
   return (
     <div className="space-y-6">
       {/* Job Selector if multiple */}
-      {selectedJobIds.length > 1 && (
+      {eligibleJobIds.length > 1 && (
         <div
           className="flex gap-2 overflow-x-auto pb-2"
           role="tablist"
           aria-label="Select run for evaluation"
         >
-          {selectedJobIds.map(id => {
+          {eligibleJobIds.map(id => {
             const isActive = evalJobId === id;
             return (
               <button
