@@ -123,6 +123,24 @@ In the canvas:
 
 ---
 
+## "…reintroduced N columns removed by an upstream Drop Columns step"
+
+A second, different advisory can appear alongside the fan-in banner:
+
+> *MissingIndicator merged a branch that reintroduced 1 column removed by an upstream Drop Columns step: `Id`. They were dropped again, so any transform applied to them on that branch is discarded.*
+
+### What it means
+
+A Drop Columns / Drop Missing Columns node is treated as authoritative for its **entire** subgraph, not just its own branch. When a sibling branch that bypassed it feeds the same merge, the union would resurrect the dropped columns — so the engine removes them again after merging.
+
+The consequence is easy to miss: if the *other* branch applied a transformation to one of those columns, that work is thrown away with the column.
+
+### Fix
+
+Move the Drop Columns node **after** the merge if you want the columns to survive, or route the transforming branch through the Drop Columns node so both branches agree on which columns exist.
+
+---
+
 ## Target column not found after encoding
 
 If your target column is categorical and you apply `OneHotEncoder` with `drop_original=True`, the target column may be dropped or expanded.

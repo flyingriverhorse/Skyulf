@@ -15,7 +15,13 @@
 
 import type { ExecutionMode } from './executionMode';
 
-export type MergeStrategy = 'last_wins' | 'first_wins' | 'concat' | string;
+/**
+ * Column-overlap policy the engine accepts. `_get_merge_strategy` in
+ * `backend/ml_pipeline/_execution/engine/_merge.py` recognises exactly these
+ * two and falls back to `last_wins` for anything else, so the union must not
+ * be widened without adding the matching engine branch.
+ */
+export type MergeStrategy = 'last_wins' | 'first_wins';
 
 /**
  * Universal envelope present on every node's `data`.
