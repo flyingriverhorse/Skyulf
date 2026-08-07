@@ -25,10 +25,11 @@ import { LoadingState, ErrorState } from '../components/shared';
 import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
 import type { ColumnProfile } from '../core/types/edaProfile';
 import { edaKeys } from '../core/hooks/useEdaJobs';
+import { resolveEdaDatasetSelection, shouldSyncDatasetParam, isSelectionMissingFromDatasets } from '../core/utils/edaDatasetSelection';
 import { toast } from '../core/toast';
 
 export const EDAPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
   // Only UI-toggle state remains local; server data lives in React Query, view state in the slice.
@@ -50,15 +51,6 @@ export const EDAPage: React.FC = () => {
   const scatter = useEDAStore((s) => s.scatter);
   const setScatter = useEDAStore((s) => s.setScatter);
   const excludedDirty = useEDAStore(selectExcludedDirty);
-
-  // Seed the dataset id from `?dataset_id=…` once on mount.
-  useEffect(() => {
-    const id = searchParams.get('dataset_id');
-    if (id && useEDAStore.getState().selectedDataset == null) {
-      setSelectedDataset(Number(id));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // ── React Query: datasets / latest report / history ──
   const datasetsQuery = useQuery({
@@ -117,12 +109,32 @@ export const EDAPage: React.FC = () => {
   });
   const analyzing = analyzeMutation.isPending;
 
-  // Default-select the first dataset once the list loads.
+  // The URL owns the dataset selection: an explicit `?dataset_id=` always wins,
+  // so deep links and back/forward can't be silently overridden by the store
+  // (which is a module singleton and survives page unmount).
+  const datasetParam = searchParams.get('dataset_id');
   useEffect(() => {
-    if (!selectedDataset && datasets.length > 0) {
-      setSelectedDataset(Number(datasets[0]!.id));
+    const resolved = resolveEdaDatasetSelection(datasetParam, selectedDataset, datasets);
+    if (resolved !== selectedDataset) {
+      setSelectedDataset(resolved);
     }
-  }, [datasets, selectedDataset, setSelectedDataset]);
+  }, [datasetParam, datasets, selectedDataset, setSelectedDataset]);
+
+  // Mirror the resolved selection back into the URL so a reload or share
+  // reopens the dataset the user is actually looking at.
+  useEffect(() => {
+    if (!shouldSyncDatasetParam(datasetParam, selectedDataset)) return;
+    const next = new URLSearchParams(searchParams);
+    next.set('dataset_id', String(selectedDataset));
+    setSearchParams(next, { replace: true });
+  }, [datasetParam, selectedDataset, searchParams, setSearchParams]);
+
+  const selectionUnavailable = isSelectionMissingFromDatasets(
+    selectedDataset,
+    datasets,
+    datasetsQuery.isSuccess,
+  );
+
 
   // Wipe per-dataset slice fields whenever the user switches datasets.
   useEffect(() => {
@@ -470,8 +482,12 @@ export const EDAPage: React.FC = () => {
             <div className="flex flex-col">
                 <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</span>
                 <select
-                    value={selectedDataset || ''}
-                    onChange={(e) => setSelectedDataset(Number(e.target.value))}
+                    value={selectionUnavailable ? '' : selectedDataset || ''}
+                    onChange={(e) => {
+                        const next = new URLSearchParams(searchParams);
+                        next.set('dataset_id', e.target.value);
+                        setSearchParams(next);
+                    }}
                     className="block w-48 text-sm font-medium bg-transparent border-none p-0 focus:ring-0 text-gray-900 dark:text-white cursor-pointer hover:text-blue-600"
                 >
                     <option value="" disabled>Select a dataset</option>
@@ -587,6 +603,56 @@ export const EDAPage: React.FC = () => {
                     </button>
                 ))}
             </div>
+        </div>
+      )}
+
+      {/* A deep link can name a dataset EDA can't analyse (still ingesting, or
+          no usable columns). Say so instead of letting the <select> fall back
+          to an unrelated option while the queries target the requested id. */}
+      {selectionUnavailable && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span className="flex-1 min-w-[12rem]">
+            Dataset #{selectedDataset} isn&apos;t available for analysis — it may still be
+            processing or have no usable columns. Pick another dataset above to continue.
+          </span>
+        </div>
+      )}
+
+      {/* A rejected submission never reaches the report poller, so surface it
+          here with the inputs still intact rather than failing silently. */}
+      {analyzeMutation.isError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center gap-3 border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span className="flex-1 min-w-[12rem]">
+            Could not start the analysis: {analyzeMutation.error instanceof Error
+              ? analyzeMutation.error.message
+              : 'the request was rejected.'}{' '}
+            Your dataset, target, and filter choices were kept.
+          </span>
+          <button
+            onClick={() => {
+              const last = analyzeMutation.variables;
+              runAnalysis(last?.excluded, last?.filters);
+            }}
+            disabled={analyzing}
+            className="flex items-center rounded-md border border-red-300 px-3 py-1.5 font-medium hover:bg-red-100 disabled:opacity-50 dark:border-red-800 dark:hover:bg-red-900/40"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try again
+          </button>
+          <button
+            onClick={() => analyzeMutation.reset()}
+            className="rounded-md px-2 py-1.5 font-medium underline hover:no-underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 

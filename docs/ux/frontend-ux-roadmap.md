@@ -2293,6 +2293,44 @@ Canvas finding is warranted solely for this repeated form root.
     subsequent in-app return navigation to a bare `/eda` route with no query
     parameter (sidebar link, browser back/forward, or any other internal
     link that doesn't carry `dataset_id`).
+  - **2026-08-07 resolution (partial — dataset context only):**
+    **Correction to the recorded evidence.** Re-reproduced live against the
+    real backend: bare `/eda` return navigation does **not** reset the
+    selection. `useEDAStore` is created with `create<EDAState>(...)` at module
+    scope, so it is a singleton that *survives* `EDAPage` unmount — the
+    previously recorded root cause ("wiped to `null` on every unmount") is
+    wrong, and the scope narrowing derived from it was inverted. Selecting
+    dataset 68, navigating to `/data`, and returning via the sidebar kept 68.
+    The **actual** defect is the opposite path: because the seeding effect
+    ran only on mount *and* only when `selectedDataset == null`, a retained
+    selection made every subsequent deep link a no-op. Clicking "EDA" on a
+    Data Sources row navigated to `/eda?dataset_id=212` while the page kept
+    showing dataset 68 — URL, dropdown, and the report/history queries all
+    disagreeing. A second, independent defect surfaced during the fix: when
+    the requested id is absent from the usable-datasets list, the controlled
+    `<select>` silently falls back to its first enabled option, so the page
+    displayed `customer_churn_dataset.csv` while querying id 212.
+    **Fixed:** dataset resolution moved to pure, tested helpers in
+    `core/utils/edaDatasetSelection.ts` (`resolveEdaDatasetSelection`,
+    `shouldSyncDatasetParam`, `isSelectionMissingFromDatasets`, 32 tests,
+    written test-first). The URL is now authoritative when it names a usable
+    id — deliberately never rewritten from a not-yet-reconciled selection,
+    which a live run showed would otherwise clobber the incoming deep link —
+    the dropdown writes the URL, a bare `/eda` persists its selection back
+    into the URL, an unavailable selection is disclosed via a `role="alert"`
+    notice naming the id, and a rejected `analyzeMutation` now renders a
+    recoverable error banner with "Try again" (same inputs) and "Dismiss".
+    **Verified live:** deep link 206 over a retained 68 → URL/dropdown/label
+    all 206; deep link 212 (unavailable) → placeholder + alert, no
+    misrepresentation; back/forward restored 68; a forced analyze failure
+    rendered and dismissed the error banner. tsc/lint clean, 402/402 tests,
+    build clean.
+    **Still open:** the rest of this finding is unchanged — analyses are
+    still not presented as named jobs with a persistent input summary,
+    phase/progress, main-screen cancel, or completed timestamp, and history
+    load still does not visibly re-label the current-report context. Those
+    depend on the EDA job/report/history API contract and **FND-003**, and
+    are not addressable from the frontend alone.
   - **Delta:** Upgrades this behavior's core reproduction from Inferred to
     directly **Observed** (a real dataset with a real report was lost on a
     real return navigation, not only a `404` no-analysis case), and fully
