@@ -31,7 +31,86 @@ class MergeMixin:
     _resolve_all_inputs: Any
     _merge_input_order: Any
     _ancestors_of: Any
+    artifact_store: Any
     """Frame coercion + multi-input merging split out of :class:`PipelineEngine`."""
+
+    def _nearest_common_ancestor_id(self, node_id: str) -> str | None:
+        """Deepest ancestor shared by every input of ``node_id``, or ``None``.
+
+        Used as the "before" snapshot when deciding which branch actually
+        modified an overlapping column, so the merge can prefer the branch that
+        did real work instead of whichever edge happens to be last.
+        """
+        cfg = self._node_configs.get(node_id)
+        if cfg is None:
+            return None
+        inputs = self._merge_input_order(cfg)
+        if len(inputs) < 2:
+            return None
+        shared = set.intersection(*(self._ancestors_of(nid) for nid in inputs))
+        if not shared:
+            return None
+        return max(shared, key=lambda nid: len(self._ancestors_of(nid)))
+
+    def _baseline_frame(self, node_id: str) -> pd.DataFrame | None:
+        """Load the nearest common ancestor's output as a DataFrame, if obtainable."""
+        ancestor_id = self._nearest_common_ancestor_id(node_id)
+        if ancestor_id is None:
+            return None
+        try:
+            return self._coerce_to_frame(self.artifact_store.load(ancestor_id))
+        except Exception as exc:  # noqa: BLE001 - baseline is an optimisation, never fatal
+            self.log(f"Node {node_id}: could not load merge baseline '{ancestor_id}': {exc}")
+            return None
+
+    @staticmethod
+    def _column_changed(frame: pd.DataFrame, baseline: pd.DataFrame, col: str) -> bool:
+        """True when ``frame`` holds different values for ``col`` than ``baseline``.
+
+        A differing row count means the branch reshaped the data, which counts
+        as a change because the values can no longer be compared position-wise.
+        """
+        if col not in baseline.columns:
+            return True
+        if len(frame) != len(baseline):
+            return True
+        return not frame[col].reset_index(drop=True).equals(baseline[col].reset_index(drop=True))
+
+    def _column_modifiers(self, frames: list[pd.DataFrame], node_id: str) -> dict[str, list[int]]:
+        """Map each column shared by 2+ frames to the indices of frames that changed it.
+
+        Columns nobody changed, or that only one branch changed, are not real
+        conflicts: the merge can pick the single meaningful version regardless
+        of input order. Returns an empty map when no baseline is available, in
+        which case callers fall back to the configured merge strategy.
+        """
+        baseline = self._baseline_frame(node_id)
+        if baseline is None:
+            return {}
+
+        counts: dict[str, int] = {}
+        for df in frames:
+            for col in df.columns:
+                counts[col] = counts.get(col, 0) + 1
+
+        modifiers: dict[str, list[int]] = {}
+        for col, count in counts.items():
+            if count < 2:
+                continue
+            modifiers[col] = [
+                idx
+                for idx, df in enumerate(frames)
+                if col in df.columns and self._column_changed(df, baseline, col)
+            ]
+        return modifiers
+
+    def _column_owners(self, frames: list[pd.DataFrame], node_id: str) -> dict[str, int]:
+        """Frame index that should supply each unambiguously-owned overlapping column."""
+        owners: dict[str, int] = {}
+        for col, changed_by in self._column_modifiers(frames, node_id).items():
+            if len(changed_by) == 1:
+                owners[col] = changed_by[0]
+        return owners
 
     def _coerce_tuple_to_frame(self, payload: tuple, target_col: str) -> pd.DataFrame | None:
         """Coerce an ``(X, y)``-shaped tuple payload to a DataFrame, or ``None`` if empty/unusable."""
@@ -105,30 +184,35 @@ class MergeMixin:
         strategy: str,
         prefix: str,
     ) -> pd.DataFrame:
-        """Merge same-row-count frames column-wise, applying the merge strategy on overlap.
+        """Merge same-row-count frames column-wise, resolving overlapping columns.
 
-        Iterates frames in the order dictated by the strategy. The dict update
-        semantics give us "later writes win", so iterating forward yields
-        last_wins and reversed yields first_wins.
+        A column carried unchanged by one branch and rewritten by another is not
+        a conflict — the branch that actually modified it owns it, whatever the
+        input order. The configured strategy only breaks ties between two or
+        more branches that each changed the same column.
         """
-        iter_frames = frames if strategy == "last_wins" else list(reversed(frames))
+        owners = self._column_owners(frames, node_id)
+        indexed = list(enumerate(frames))
+        ordered = indexed if strategy == "last_wins" else list(reversed(indexed))
+
         result_cols: dict[str, pd.Series] = {}
-        overwrites: list[str] = []
-        new_only: list[str] = []
-        for df in iter_frames:
+        contested: list[str] = []
+        for idx, df in ordered:
             df_aligned = df.reset_index(drop=True)
             for col in df.columns:
-                if col in result_cols:
-                    overwrites.append(col)
-                else:
-                    new_only.append(col)
+                owner = owners.get(col)
+                if owner is not None and owner != idx:
+                    continue
+                if col in result_cols and owner is None:
+                    contested.append(col)
                 result_cols[col] = df_aligned[col]
+
         merged = pd.DataFrame(result_cols)
         shape_log = " + ".join(str(df.shape) for df in frames)
-        if overwrites:
+        if contested:
             self.log(
                 f"{prefix}: column-wise merge {shape_log} -> {merged.shape} "
-                f"({strategy} overwrote {sorted(set(overwrites))})"
+                f"({strategy} broke ties on {sorted(set(contested))})"
             )
         else:
             self.log(f"{prefix}: column-wise merge {shape_log} -> {merged.shape}")
@@ -239,19 +323,24 @@ class MergeMixin:
             return list(art[0].columns)
         return []
 
-    def _sibling_fan_in_overlap_columns(self, artifacts: list[Any]) -> list[str]:
-        """Return column names that appear in 2+ artifacts (subject to last-wins)."""
-        input_cols = [self._artifact_columns(art) for art in artifacts]
+    def _sibling_fan_in_overlap_columns(self, artifacts: list[Any], node_id: str) -> list[str]:
+        """Return columns two or more branches actually modified — the real conflicts.
+
+        A column merely carried through by one branch and rewritten by another
+        has an unambiguous owner and needs no tiebreak, so it is not reported.
+        Falls back to plain name overlap when no baseline is available.
+        """
+        frames = [f for f in (self._coerce_to_frame(art) for art in artifacts) if f is not None]
+        if len(frames) == len(artifacts):
+            modifiers = self._column_modifiers(frames, node_id)
+            if modifiers:
+                return [col for col, changed_by in modifiers.items() if len(changed_by) > 1]
 
         seen: dict[str, int] = {}
-        overlap: list[str] = []
-        for cols in input_cols:
-            for c in cols:
+        for art in artifacts:
+            for c in self._artifact_columns(art):
                 seen[c] = seen.get(c, 0) + 1
-        for c, cnt in seen.items():
-            if cnt > 1:
-                overlap.append(c)
-        return overlap
+        return [c for c, cnt in seen.items() if cnt > 1]
 
     def _has_redundant_ancestor_edge(
         self, unique_inputs: list[str], ancestors_per_input: list[set[str]]
@@ -270,12 +359,16 @@ class MergeMixin:
         unique_inputs: list[str],
         shared: set[str],
         artifacts: list[Any],
-    ) -> dict[str, Any]:
-        """Build the sibling fan-in warning advisory payload for the UI banner."""
-        # Compute concrete overlap columns + winner per artifact pair so
-        # the UI banner can show "Tx overrides DMC on [Id, SepalLengthCm]"
-        # instead of vague "last-wins on overlap".
-        overlap = self._sibling_fan_in_overlap_columns(artifacts)
+    ) -> dict[str, Any] | None:
+        """Build the sibling fan-in advisory, or ``None`` when no branch conflicts.
+
+        Only genuine conflicts — a column two or more branches each rewrote —
+        need a winner. Reporting one otherwise puts a "wins merge" label on the
+        canvas for a merge where nothing was actually discarded.
+        """
+        overlap = self._sibling_fan_in_overlap_columns(artifacts, node.node_id)
+        if not overlap:
+            return None
 
         strategy = self._get_merge_strategy(node.node_id)
         winner_id = unique_inputs[-1] if strategy == "last_wins" else unique_inputs[0]
@@ -290,9 +383,10 @@ class MergeMixin:
             "message": (
                 f"Node '{node.node_id}' merges {len(unique_inputs)} sibling "
                 f"branches that share ancestor(s) {sorted(shared)}. "
-                f"Columns are unioned; on overlap ({len(overlap)} column(s)) "
-                f"the {strategy} input '{winner_id}' wins. If you wanted sequential "
-                "application, chain the transformers linearly instead."
+                f"{len(overlap)} column(s) were modified by more than one branch; "
+                f"the {strategy} input '{winner_id}' wins and the other branch's "
+                "edits to those columns are discarded. Chain the transformers "
+                "linearly instead if you wanted both applied."
             ),
         }
 
@@ -321,6 +415,8 @@ class MergeMixin:
             return
 
         advisory = self._build_sibling_fan_in_advisory(node, unique_inputs, shared, artifacts)
+        if advisory is None:
+            return
         self.merge_warnings.append(advisory)
         self.log(f"WARN: {advisory['message']}")
 

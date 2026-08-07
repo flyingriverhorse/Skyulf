@@ -48,8 +48,8 @@ export const CanvasLegend: React.FC<CanvasLegendProps> = ({ onClose }) => (
         <div>
           <div className="font-medium">Risky merge</div>
           <div className="text-xs text-muted-foreground">
-            Inputs share columns &mdash; one branch wins (overwrite). Check Results banner;
-            tweak strategy in properties.
+            Inputs share column names. Only columns two branches both modified need a
+            tiebreak &mdash; run a preview to see whether any are actually contested.
           </div>
         </div>
       </li>
@@ -205,8 +205,9 @@ export const CanvasLegend: React.FC<CanvasLegendProps> = ({ onClose }) => (
         <div>
           <div className="font-medium">Winning merge edge</div>
           <div className="text-xs text-muted-foreground">
-            After a preview run, the branch whose values survived an overlapping-column merge is
-            rendered thicker in amber with a &quot;WINS MERGE&quot; label.
+            After a preview run, if two branches each modified the same column, the branch
+            whose values survived is rendered thicker in amber with a &quot;WINS MERGE&quot;
+            label. Branches editing different columns never contest one, so no label appears.
           </div>
         </div>
       </li>
