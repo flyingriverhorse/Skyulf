@@ -3,7 +3,8 @@
 ## Goal
 
 Initialize branch `075` for application version `0.7.5` and `skyulf-core`
-version `0.5.6` without adding release features or changelog content.
+version `0.5.6` without adding release features or substantive changelog
+content.
 
 ## Version Sources
 
@@ -13,6 +14,7 @@ version `0.5.6` without adding release features or changelog content.
   `frontend/ml-canvas/package.json` and `package-lock.json` to `0.7.5`.
 - Refresh `uv.lock` so the workspace package metadata records `0.7.5`, while
   retaining existing third-party dependency versions.
+- Add an empty `## v0.7.5` section at the top of `changelog/0.7.x.md`.
 
 ## Validation
 
@@ -20,6 +22,7 @@ version `0.5.6` without adding release features or changelog content.
 - Confirm `skyulf-core/setup.py --version` reports `0.5.6`.
 - Confirm `uv lock --check` passes and the lock diff contains no unrelated
   dependency upgrades.
+- Confirm `changelog/0.7.x.md` starts with the empty `v0.7.5` section.
 - Run repository static checks affected by the edited Python metadata.
 
 ## Delivery

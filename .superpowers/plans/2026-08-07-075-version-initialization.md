@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Initialize branch `075` with application/frontend version `0.7.5` and `skyulf-core` version `0.5.6`.
+**Goal:** Initialize branch `075` with application/frontend version `0.7.5`, `skyulf-core` version `0.5.6`, and an empty `v0.7.5` changelog section.
 
 **Architecture:** Keep the root `pyproject.toml` as the application version source of truth, use the existing frontend synchronization script for npm metadata, and retain `skyulf-core/setup.py` as the core package version source. Refresh `uv.lock` only to synchronize workspace metadata, without upgrading third-party dependencies.
 
@@ -12,7 +12,8 @@
 
 - Application and frontend version must be exactly `0.7.5`.
 - `skyulf-core` version must be exactly `0.5.6`.
-- Do not add features, changelog entries, or unrelated dependency updates.
+- Add only an empty `## v0.7.5` changelog section; do not add release claims.
+- Do not add features or unrelated dependency updates.
 - Commit with a DCO sign-off and the required Copilot co-author trailer.
 
 ---
@@ -25,6 +26,7 @@
 - Modify: `frontend/ml-canvas/package.json:4`
 - Modify: `frontend/ml-canvas/package-lock.json:3,9`
 - Modify: `uv.lock`
+- Modify: `changelog/0.7.x.md:3`
 
 **Interfaces:**
 - Consumes: Root `[project].version`, core setuptools `version`, and `frontend/ml-canvas/scripts/sync-version.mjs`.
@@ -43,14 +45,17 @@ from pathlib import Path
 root = Path("pyproject.toml").read_text()
 core = Path("skyulf-core/setup.py").read_text()
 package = json.loads(Path("frontend/ml-canvas/package.json").read_text())
+changelog = Path("changelog/0.7.x.md").read_text()
 
 assert re.search(r'^version = "0\\.7\\.5"$', root, re.MULTILINE)
 assert re.search(r'version="0\\.5\\.6"', core)
 assert package["version"] == "0.7.5"
+assert changelog.startswith("# Changelog — 0.7.x Series\\n\\n## v0.7.5\\n\\n## v0.7.4")
 PY
 ```
 
-Expected: FAIL because the files still contain `0.7.4` and `0.5.5`.
+Expected: FAIL because the files still contain `0.7.4` and `0.5.5`, and the
+changelog does not contain the `v0.7.5` section.
 
 - [ ] **Step 2: Update the root and core version sources**
 
@@ -66,7 +71,19 @@ Change `skyulf-core/setup.py`:
 version="0.5.6",
 ```
 
-- [ ] **Step 3: Synchronize frontend npm metadata**
+- [ ] **Step 3: Add the empty changelog section**
+
+Change the top of `changelog/0.7.x.md` to:
+
+```markdown
+# Changelog — 0.7.x Series
+
+## v0.7.5
+
+## v0.7.4
+```
+
+- [ ] **Step 4: Synchronize frontend npm metadata**
 
 Run:
 
@@ -76,7 +93,7 @@ cd frontend/ml-canvas && npm run sync-version
 
 Expected: `Synced version to 0.7.5 (from pyproject.toml).`
 
-- [ ] **Step 4: Refresh workspace lock metadata**
+- [ ] **Step 5: Refresh workspace lock metadata**
 
 Run:
 
@@ -86,7 +103,7 @@ uv lock
 
 Expected: the workspace package `skyulf` changes to `0.7.5`; no third-party package versions change.
 
-- [ ] **Step 5: Verify no third-party lock versions changed**
+- [ ] **Step 6: Verify no third-party lock versions changed**
 
 Run:
 
@@ -119,7 +136,7 @@ PY
 
 Expected: PASS with no output.
 
-- [ ] **Step 6: Run version and metadata verification**
+- [ ] **Step 7: Run version and metadata verification**
 
 Run:
 
@@ -133,12 +150,14 @@ root = Path("pyproject.toml").read_text()
 core = Path("skyulf-core/setup.py").read_text()
 package = json.loads(Path("frontend/ml-canvas/package.json").read_text())
 lock = json.loads(Path("frontend/ml-canvas/package-lock.json").read_text())
+changelog = Path("changelog/0.7.x.md").read_text()
 
 assert re.search(r'^version = "0\\.7\\.5"$', root, re.MULTILINE)
 assert re.search(r'version="0\\.5\\.6"', core)
 assert package["version"] == "0.7.5"
 assert lock["version"] == "0.7.5"
 assert lock["packages"][""]["version"] == "0.7.5"
+assert changelog.startswith("# Changelog — 0.7.x Series\\n\\n## v0.7.5\\n\\n## v0.7.4")
 PY
 cd frontend/ml-canvas && npm run check-version
 cd ../.. && python skyulf-core/setup.py --version
@@ -154,7 +173,7 @@ OK — package.json/package-lock.json already match pyproject.toml (0.7.5).
 
 `uv lock --check` exits successfully.
 
-- [ ] **Step 7: Run affected repository static checks**
+- [ ] **Step 8: Run affected repository static checks**
 
 Run:
 
@@ -168,26 +187,27 @@ git diff --check
 
 Expected: all checks pass with no formatting or type diagnostics.
 
-- [ ] **Step 8: Review the final diff**
+- [ ] **Step 9: Review the final diff**
 
 Run:
 
 ```bash
 git diff --stat
-git diff -- pyproject.toml skyulf-core/setup.py frontend/ml-canvas/package.json frontend/ml-canvas/package-lock.json uv.lock
+git diff -- pyproject.toml skyulf-core/setup.py frontend/ml-canvas/package.json frontend/ml-canvas/package-lock.json uv.lock changelog/0.7.x.md
 ```
 
 Expected: only the specified version metadata changes.
 
-- [ ] **Step 9: Commit the version initialization**
+- [ ] **Step 10: Commit the version initialization**
 
 Run:
 
 ```bash
-git add pyproject.toml skyulf-core/setup.py frontend/ml-canvas/package.json frontend/ml-canvas/package-lock.json uv.lock
+git add pyproject.toml skyulf-core/setup.py frontend/ml-canvas/package.json frontend/ml-canvas/package-lock.json uv.lock changelog/0.7.x.md
 git commit -s -m "chore: initialize 0.7.5 versions" \
   -m "Set skyulf-core to 0.5.6 and synchronize application, frontend, and lock metadata." \
   -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 ```
 
-Expected: one signed commit containing only the version initialization files.
+Expected: one signed commit containing only the version initialization files
+and empty changelog heading.
