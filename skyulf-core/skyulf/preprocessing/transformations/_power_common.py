@@ -11,6 +11,36 @@ import numpy as np
 from sklearn.preprocessing import PowerTransformer, StandardScaler
 
 
+def _narrow_scaler_values(
+    values: Any,
+    col_indices: list[int] | None,
+    n_total_cols: int | None,
+) -> np.ndarray:
+    """Narrow stored scaler values to the columns being transformed."""
+    values_arr = np.array(values)
+    if col_indices is not None and n_total_cols is not None and len(values_arr) == n_total_cols:
+        return values_arr[col_indices]
+    return values_arr
+
+
+def _build_pretrained_scaler(
+    scaler_params: dict[str, Any],
+    col_indices: list[int] | None,
+    n_total_cols: int | None,
+) -> StandardScaler | None:
+    """Reconstruct a fitted StandardScaler from stored mean and scale values."""
+    mean = scaler_params.get("mean")
+    scale = scaler_params.get("scale")
+    if mean is None or scale is None:
+        return None
+
+    scaler = StandardScaler()
+    scaler.mean_ = _narrow_scaler_values(mean, col_indices, n_total_cols)
+    scaler.scale_ = _narrow_scaler_values(scale, col_indices, n_total_cols)
+    scaler.var_ = np.square(scaler.scale_)
+    return scaler
+
+
 def build_pretrained_power_transformer(
     method: str,
     standardize: bool,
@@ -31,22 +61,7 @@ def build_pretrained_power_transformer(
     if not standardize or not scaler_params:
         return pt
 
-    scaler = StandardScaler()
-    mean = scaler_params.get("mean")
-    scale = scaler_params.get("scale")
-    if mean is None or scale is None:
-        return pt
-
-    mean_arr = np.array(mean)
-    scale_arr = np.array(scale)
-    if col_indices is not None and n_total_cols is not None:
-        if len(mean_arr) == n_total_cols:
-            mean_arr = mean_arr[col_indices]
-        if len(scale_arr) == n_total_cols:
-            scale_arr = scale_arr[col_indices]
-
-    scaler.mean_ = mean_arr
-    scaler.scale_ = scale_arr
-    scaler.var_ = np.square(scale_arr)
-    pt._scaler = scaler
+    scaler = _build_pretrained_scaler(scaler_params, col_indices, n_total_cols)
+    if scaler is not None:
+        pt._scaler = scaler
     return pt
