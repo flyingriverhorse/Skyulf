@@ -43,8 +43,6 @@ from backend.health.routes import router as health_router
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.logging import LoggingMiddleware
 from backend.middleware.rate_limiter import limiter
-
-# from core.feature_engineering.routes import router as feature_engineering_router
 from backend.ml_pipeline.api import router as ml_pipeline_router
 from backend.ml_pipeline.deployment.api import router as deployment_router
 from backend.ml_pipeline.model_registry.api import router as model_registry_router
@@ -254,10 +252,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("✅ Realtime subscriber started")
     except Exception as exc:
         logger.warning("Realtime subscriber failed to start: %s", exc)
-
-    # Initialize other services here as needed
-    # await init_cache()
-    # await init_background_tasks()
 
     startup_time = time.time() - start_time
     logger.info(f"🎉 Application started in {startup_time:.2f} seconds")

@@ -8,9 +8,9 @@ from sklearn.covariance import EllipticEnvelope
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import EllipticEnvelopeArtifact
-from .._helpers import to_pandas
+from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -101,10 +101,13 @@ class EllipticEnvelopeCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
 
-        X_pd = to_pandas(X)
         contamination = config.get("contamination", 0.01)
         random_state = config.get("random_state", 42)
-        cols = resolve_columns(X_pd, config, detect_numeric_columns)
+        # TODO(pandas-removal): same per-column coercion/dropna caveat as
+        # zscore.py — EllipticEnvelope.fit itself takes numpy fine, but the
+        # per-column pd.to_numeric(errors="coerce").dropna() skip-logic for
+        # non-numeric/short columns needs a native-Polars equivalent first.
+        X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}
 

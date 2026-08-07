@@ -23,7 +23,7 @@ from ._common import (
     _sklearn_vectorizer_apply_pandas,
     _warn_large_output,
     apply_text_pandas_only,
-    resolve_fit_text_columns,
+    resolve_fit_text_valid_columns,
 )
 
 logger = logging.getLogger(__name__)
@@ -115,9 +115,8 @@ class HashingVectorizerCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> HashingVectorizerArtifact:  # pylint: disable=arguments-differ
-        resolved = resolve_fit_text_columns(X, config)
-        if resolved is None:
+        valid_cols = resolve_fit_text_valid_columns(X, config)
+        if valid_cols is None:
             return {}
-        X, valid_cols = resolved
 
         return _build_hashing_artifact(config, valid_cols)

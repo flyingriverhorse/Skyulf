@@ -6,9 +6,9 @@ import pandas as pd
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import WinsorizeArtifact
-from .._helpers import auto_detect_numeric_columns, to_pandas
+from .._helpers import auto_detect_numeric_columns, resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -78,10 +78,12 @@ class WinsorizeCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
 
-        X_pd = to_pandas(X)
         lower_p = config.get("lower_percentile", 5.0)
         upper_p = config.get("upper_percentile", 95.0)
-        cols = resolve_columns(X_pd, config, detect_numeric_columns)
+        # TODO(pandas-removal): same quantile-interpolation caveat as iqr.py —
+        # keep on resolve_columns_then_to_pandas until Polars' quantile
+        # interpolation mode is matched to Pandas' "linear" default.
+        X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}
 

@@ -91,13 +91,8 @@ def run_pipeline(df, engine_name: str):
         times[name] = time.time() - t0
         return res_df
 
-    # 1. Drop Missing Rows (if > 50% missing, generally not applicable here, but lets drop strict nulls in subset)
-    # Using small threshold to drop rows with any missing in 'zone' (none currently) or strict drop on age
-    # NOTE: To be fair, let's just drop rows where 'zone' is null (0 rows) to test overhead,
-    # or drop rows with > 2 missing values.
-    # Let's simple use "Drop Missing Rows" where "age" is missing to clean up dataset first?
-    # Actually standard flow is Impute first usually.
-    # Let's Drop Missing Rows where 'noise_1' is NaN (none) to test speed of "check".
+    # 1. Drop Missing Rows: measures the overhead of the check itself, since
+    # 'noise_1' has no missing values so no rows are actually dropped.
     df = measure(
         "DropMissing",
         DropMissingRowsCalculator,

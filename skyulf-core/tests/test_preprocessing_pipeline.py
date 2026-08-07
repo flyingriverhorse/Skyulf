@@ -130,6 +130,67 @@ def test_impute_then_scale_pipeline(numeric_df: pd.DataFrame) -> None:
     assert isinstance(metrics, dict)
 
 
+def test_multistep_metrics_keep_each_step_details(numeric_df: pd.DataFrame) -> None:
+    """Two metric-emitting steps must not overwrite one another."""
+    fe = FeatureEngineer(
+        _steps(
+            _step("impute", "SimpleImputer", strategy="mean", columns=["a", "b"]),
+            _step("scale", "StandardScaler", columns=["a", "b"]),
+        )
+    )
+
+    _, metrics = fe.fit_transform(numeric_df)
+
+    assert set(metrics) == {
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "summary",
+        "steps",
+    }
+    assert set(metrics["steps"]) == {"0:impute", "1:scale"}
+
+    impute = metrics["steps"]["0:impute"]
+    scale = metrics["steps"]["1:scale"]
+
+    assert set(impute) == {
+        "name",
+        "transformer",
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "details",
+    }
+    assert impute["name"] == "impute"
+    assert impute["transformer"] == "SimpleImputer"
+    assert "fill_values" in impute["details"]
+    assert impute["rows_in"] == len(numeric_df)
+    assert impute["rows_out"] == len(numeric_df)
+
+    assert set(scale) == set(impute)
+    assert scale["name"] == "scale"
+    assert scale["transformer"] == "StandardScaler"
+    assert scale["details"]["columns"] == ["a", "b"]
+    assert scale["rows_in"] == len(numeric_df)
+    assert scale["rows_out"] == len(numeric_df)
+
+    summary = metrics["summary"]
+    assert summary["fit_time"] == pytest.approx(impute["fit_time"] + scale["fit_time"])
+    assert summary["peak_memory_bytes"] == max(
+        impute["peak_memory_bytes"], scale["peak_memory_bytes"]
+    )
+    assert summary["rows_in"] == len(numeric_df)
+    assert summary["rows_out"] == len(numeric_df)
+    assert metrics["fit_time"] == pytest.approx(summary["fit_time"])
+    assert metrics["peak_memory_bytes"] == summary["peak_memory_bytes"]
+    assert metrics["rows_in"] == summary["rows_in"]
+    assert metrics["rows_out"] == summary["rows_out"]
+    assert "fill_values" not in metrics
+    assert "mean" not in metrics
+
+
 def test_fit_transform_then_transform_gives_same_result(numeric_df: pd.DataFrame) -> None:
     """transform() with fitted_steps should replicate fit_transform output on same data."""
     steps = _steps(_step("impute", "SimpleImputer", strategy="mean"))
@@ -207,22 +268,27 @@ def test_transform_applies_scaler_artifact(numeric_df: pd.DataFrame) -> None:
 
 
 def test_metrics_contain_fit_time_after_step(numeric_df: pd.DataFrame) -> None:
-    """fit_time metric must be set after running any standard transformer step."""
+    """fit_time compatibility alias must mirror the summary after a standard step."""
     steps = _steps(_step("scale", "StandardScaler", columns=["a", "b"]))
     fe = FeatureEngineer(steps_config=steps)
     _, metrics = fe.fit_transform(numeric_df.dropna())
     assert "fit_time" in metrics
-    assert metrics["fit_time"] >= 0.0
+    assert metrics["fit_time"] == pytest.approx(metrics["summary"]["fit_time"])
+    assert metrics["steps"]["0:scale"]["fit_time"] >= 0.0
 
 
 def test_metrics_rows_in_out(numeric_df: pd.DataFrame) -> None:
-    """rows_in and rows_out metrics must equal the frame row count."""
+    """rows_in/out aliases and summary must match the frame row count."""
     steps = _steps(_step("scale", "StandardScaler", columns=["a", "b"]))
     fe = FeatureEngineer(steps_config=steps)
     clean = numeric_df.dropna()
     _, metrics = fe.fit_transform(clean)
     assert metrics["rows_in"] == len(clean)
     assert metrics["rows_out"] == len(clean)
+    assert metrics["summary"]["rows_in"] == len(clean)
+    assert metrics["summary"]["rows_out"] == len(clean)
+    assert metrics["steps"]["0:scale"]["rows_in"] == len(clean)
+    assert metrics["steps"]["0:scale"]["rows_out"] == len(clean)
 
 
 # ---------------------------------------------------------------------------
@@ -273,12 +339,15 @@ def test_count_winsorize_diffs_simple(before: Any, after: Any, expected: int) ->
 
 
 def test_imputer_pipeline_metrics_contain_fill_values(numeric_df: pd.DataFrame) -> None:
-    """SimpleImputer step must populate fill_values in the metrics dict."""
+    """SimpleImputer step must populate fill_values only inside step details."""
     steps = _steps(_step("impute", "SimpleImputer", strategy="mean", columns=["a", "b"]))
     fe = FeatureEngineer(steps_config=steps)
     _, metrics = fe.fit_transform(numeric_df)
-    # fill_values key is only populated when the imputer fits columns.
-    assert "fill_values" in metrics or "missing_counts" in metrics or "fit_time" in metrics
+    details = metrics["steps"]["0:impute"]["details"]
+    assert "fill_values" in details
+    assert "missing_counts" in details
+    assert "fill_values" not in metrics
+    assert "missing_counts" not in metrics
 
 
 # ---------------------------------------------------------------------------

@@ -633,12 +633,8 @@ def test_elliptic_envelope_parity():
     res_pd = applier.apply(df_pd, params)
     res_pl = applier.apply(df_pl, params)
 
-    # Since EllipticEnvelope is deterministic with fixed random_state (but we didn't set it in the node),
-    # we might have slight variations if the fit wasn't controlled.
-    # However, we fit ONCE on pandas (in the test setup above, we fit params on df_pd).
-    # Wait, we fit params on df_pd for both.
-    # The applier uses the fitted model.
-    # The model.predict() should be deterministic for the same input.
+    # Both engines apply the same fitted model, so predictions must match
+    # exactly regardless of random_state (no re-fitting happens in apply()).
 
     pd.testing.assert_frame_equal(
         res_pd.reset_index(drop=True), res_pl.to_pandas().reset_index(drop=True), check_dtype=False

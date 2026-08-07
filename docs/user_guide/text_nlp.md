@@ -20,7 +20,7 @@ and the script `examples/06_text_nlp_vectorization.py`.
 | TF-IDF Vectorizer | `tfidf_vectorizer` | Like counts, but down-weights words common to every document | Yes (vocabulary + IDF weights) |
 | Hashing Vectorizer | `hashing_vectorizer` | Hashes words into a fixed number of columns — no vocabulary | No (stateless) |
 | Tokenizer | `tokenizer` | Splits / cleans text into tokens (lowercase, stop-words, n-grams) | No (stateless) |
-| Sentence Embedder | `sentence_embedder` | Encodes text into dense semantic vectors (needs `skyulf[nlp]`) | Yes (loads a model) |
+| Sentence Embedder | `sentence_embedder` | Encodes text into dense semantic vectors (needs `skyulf-core[nlp]`) | Yes (loads a model) |
 | Multinomial NB | `multinomial_nb` | Fast, strong classifier for word-count / TF-IDF features | Yes |
 | Bernoulli NB | `bernoulli_nb` | Classifier for "word present / absent" features | Yes |
 
@@ -183,7 +183,7 @@ which can help on short text. This node is powered by
 [`sentence-transformers`](https://www.sbert.net/) and is an **optional** dependency.
 
 ```bash
-pip install skyulf[nlp]          # or: pip install -r requirements-nlp.txt
+pip install skyulf-core[nlp]     # or: pip install -r requirements-nlp.txt
 ```
 
 ```python

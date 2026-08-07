@@ -9,6 +9,7 @@ import { RecommendationsPanel } from '../../../components/panels/Recommendations
 import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { clickableProps } from '../../../core/utils/a11y';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
 
@@ -74,10 +75,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics: Record<string, unknown> | null =
-    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
-      ? (nodeResult.metrics as Record<string, unknown>)
-      : null;
+  const metrics = getNodeMetricDetails(nodeResult?.metrics);
   const generatedFeatures: string[] =
     metrics && Array.isArray(metrics.generated_features)
       ? (metrics.generated_features as unknown[]).map((v) => String(v))
@@ -116,9 +114,7 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
     scope: 'column'
   });
 
-  const handleApplyRecommendation = (_rec: Recommendation) => {
-    // console.log("Applying recommendation:", _rec);
-  };
+  const handleApplyRecommendation = (_rec: Recommendation) => {};
 
   const addOperation = (type: MathOperation['operation_type']) => {
     const newOp: MathOperation = {

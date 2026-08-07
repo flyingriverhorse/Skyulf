@@ -303,6 +303,18 @@ Learned params:
 
 Requires a target series (`y`).
 
+In a `FeatureEngineer` or `SkyulfPipeline`, training rows are encoded with
+sklearn's cross-fitted `TargetEncoder.fit_transform` behavior. Test,
+validation, and inference rows use the fitted encoder's `transform`
+behavior. Skyulf uses deterministic five-fold cross-fitting with seed 42
+whenever the training split supports it; smaller leakage-safe splits
+deterministically shrink to the largest supported fold count (for
+classification, capped by the smallest class size; for regression, capped by
+the training-row count). A one-row split, or a classification split where any
+target class appears only once, raises a clear error instead of leaking the
+row's target into its encoded value. Direct Calculator/Applier use remains an
+advanced API and uses the explicit fit/apply calls supplied by the caller.
+
 Config:
 
 - `columns`: list[str]

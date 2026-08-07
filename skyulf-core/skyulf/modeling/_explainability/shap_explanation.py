@@ -65,7 +65,8 @@ def _predicted_class_index(model: Any, sample: pd.DataFrame, n_classes: int) -> 
     """
     try:
         classes = list(getattr(model, "classes_", []))
-        preds = model.predict(sample)
+        predict_input = sample if hasattr(model, "feature_names_in_") else sample.to_numpy()
+        preds = model.predict(predict_input)
         if classes and len(classes) == n_classes:
             return np.array([classes.index(p) if p in classes else 0 for p in preds], dtype=int)
     except Exception:

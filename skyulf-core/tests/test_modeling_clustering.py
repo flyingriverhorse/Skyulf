@@ -86,6 +86,7 @@ def test_evaluate_with_empty_target_column_returns_clustering_report(blobs_split
     # ...and the quality metrics (silhouette/CH/DB), so the frontend can show
     # them per-split without relying on job-level flattened metric keys.
     assert raw_train["metrics"]["silhouette_score"] > 0.8
+    assert raw_train["metrics"]["silhouette_sample_size"] == len(blobs_split_dataset.train)
 
 
 def test_refit_with_empty_target_column_does_not_crash_on_y_concat(blobs_split_dataset):

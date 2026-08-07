@@ -220,21 +220,11 @@ def _is_binary_numeric(series: pd.Series | Any) -> bool:
 
 def _polars_numeric_dtype_cols(frame: Any) -> list[str]:
     """List the columns of a Polars frame whose dtype is numeric (float/int/uint)."""
-    import polars as pl
+    from .engines import POLARS_NUMERIC_DTYPES
 
-    numeric_dtypes = [
-        pl.Float32,
-        pl.Float64,
-        pl.Int8,
-        pl.Int16,
-        pl.Int32,
-        pl.Int64,
-        pl.UInt8,
-        pl.UInt16,
-        pl.UInt32,
-        pl.UInt64,
+    return [
+        c for c, t in zip(frame.columns, frame.dtypes, strict=True) if t in POLARS_NUMERIC_DTYPES
     ]
-    return [c for c, t in zip(frame.columns, frame.dtypes, strict=True) if t in numeric_dtypes]
 
 
 def _polars_column_excluded(series: Any, exclude_binary: bool, exclude_constant: bool) -> bool:
@@ -244,7 +234,7 @@ def _polars_column_excluded(series: Any, exclude_binary: bool, exclude_constant:
     if series.dtype == pl.Boolean:
         return True
 
-    valid = series.drop_nulls()
+    valid = series.fill_nan(None).drop_nulls() if series.dtype.is_float() else series.drop_nulls()
     if valid.is_empty():
         return True
     if exclude_binary and _is_binary_numeric(valid):

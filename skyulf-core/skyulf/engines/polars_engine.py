@@ -13,6 +13,37 @@ except ImportError:
 from .protocol import SkyulfDataFrame
 from .registry import BaseEngine, EngineName, EngineRegistry
 
+# Polars dtypes treated as numeric/bool for feature-matrix purposes (e.g.
+# correlation and clustering evaluation), mirroring pandas'
+# `select_dtypes(include=["number", "bool"])`. Shared so call sites stay
+# consistent as new native-Polars paths are added.
+POLARS_NUMERIC_BOOL_DTYPES: frozenset = (
+    frozenset(
+        (
+            pl.Boolean,
+            pl.Float32,
+            pl.Float64,
+            pl.Int8,
+            pl.Int16,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt8,
+            pl.UInt16,
+            pl.UInt32,
+            pl.UInt64,
+        )
+    )
+    if HAS_POLARS
+    else frozenset()
+)
+
+# Polars numeric dtypes (float/int/uint), excluding bool — mirrors pandas'
+# `select_dtypes(include=["number"])`. Shared so numeric-only column detection
+# stays consistent as new native-Polars paths are added.
+POLARS_NUMERIC_DTYPES: frozenset = (
+    POLARS_NUMERIC_BOOL_DTYPES - frozenset((pl.Boolean,)) if HAS_POLARS else frozenset()
+)
+
 
 class SkyulfPolarsWrapper:
     """Wrapper for Polars DataFrame to implement SkyulfDataFrame protocol."""

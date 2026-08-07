@@ -17,6 +17,7 @@ from tests.utils.test_case_loader import TestCaseLoader
 from skyulf.preprocessing.vectorization._common import (
     _join_text_columns,
     _warn_large_output,
+    resolve_fit_text_columns,
 )
 from skyulf.preprocessing.vectorization.count_vectorizer import (
     CountVectorizerApplier,
@@ -145,6 +146,34 @@ def test_fit_accepts_polars_input(node: str, fit_extra: dict[str, Any]) -> None:
     art = calculator_cls().fit(df, {"columns": ["text"], **fit_extra})
     assert art["columns"] == ["text"]
     assert len(art["output_columns"]) > 0
+
+
+def test_resolve_fit_text_columns_narrows_before_pandas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only resolved text columns should cross the Polars-to-Pandas boundary."""
+    frame = pl.DataFrame(
+        {
+            "title": ["hello", "goodbye"],
+            "body": ["world", "moon"],
+            "unused_numeric": [1, 2],
+        }
+    )
+    converted_columns: list[list[str]] = []
+    original_to_pandas = pl.DataFrame.to_pandas
+
+    def tracked_to_pandas(self: pl.DataFrame, *args: Any, **kwargs: Any) -> pd.DataFrame:
+        converted_columns.append(self.columns)
+        return original_to_pandas(self, *args, **kwargs)
+
+    monkeypatch.setattr(pl.DataFrame, "to_pandas", tracked_to_pandas)
+    resolved = resolve_fit_text_columns(frame, {"columns": ["title", "body", "missing"]})
+
+    assert resolved is not None
+    frame_pd, columns = resolved
+    assert columns == ["title", "body"]
+    assert frame_pd.columns.tolist() == ["title", "body"]
+    assert converted_columns == [["title", "body"]]
 
 
 # ---------------------------------------------------------------------------

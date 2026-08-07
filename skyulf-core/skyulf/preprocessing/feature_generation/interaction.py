@@ -15,7 +15,7 @@ from ..._validation import raise_invalid_choice
 from ...core.artifacts import FeatureInteractionArtifact
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from .._helpers import to_pandas
+from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 
@@ -165,8 +165,8 @@ class FeatureInteractionApplier(BaseApplier):
 class FeatureInteractionCalculator(BaseCalculator):
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> FeatureInteractionArtifact:  # pylint: disable=arguments-differ
-        X_pd = to_pandas(X)
         cols = list(config.get("columns", []))
+        X_pd = select_then_to_pandas(X, cols)
 
         _validate_interaction_columns(X_pd, cols)
 

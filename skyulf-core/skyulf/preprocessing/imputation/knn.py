@@ -5,11 +5,10 @@ from typing import Any
 from sklearn.impute import KNNImputer
 
 from ...core.meta.decorators import node_meta
-from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import KNNImputerArtifact
-from .._helpers import resolve_valid_columns
+from .._helpers import resolve_columns_then_to_numpy, resolve_valid_columns
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -60,15 +59,13 @@ class KNNImputerCalculator(BaseCalculator):
 
         n_neighbors = config.get("n_neighbors", 5)
         weights = config.get("weights", "uniform")
-        cols = resolve_columns(X, config, detect_numeric_columns)
+
+        # KNN/Iterative imputers always fit through numpy — engine choice
+        # doesn't affect the fit math, so we skip the Pandas hop entirely.
+        X_np, cols = resolve_columns_then_to_numpy(X, config, detect_numeric_columns)
         if not cols:
             return {}
 
-        # KNN/Iterative imputers always fit through the sklearn bridge which
-        # operates on numpy — engine choice doesn't affect the fit math, just
-        # which subset selector we use.
-        X_subset = X.select(cols) if hasattr(X, "select") and not hasattr(X, "loc") else X[cols]
-        X_np, _ = SklearnBridge.to_sklearn(X_subset)
         imputer = KNNImputer(n_neighbors=n_neighbors, weights=weights)
         imputer.fit(X_np)
 

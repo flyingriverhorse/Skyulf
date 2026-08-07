@@ -7,6 +7,7 @@ import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { useIsWideContainer } from '../../../core/hooks/useIsWideContainer';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 
 interface ScalingConfig {
   columns: string[];
@@ -39,6 +40,7 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
 
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
+  const metrics = getNodeMetricDetails(nodeResult?.metrics);
 
   // Responsive layout: switch to a 2-column layout once the panel is wider than 450px.
   const [containerRef, isWide] = useIsWideContainer();
@@ -52,9 +54,8 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
     : [];
 
   const renderFeedback = () => {
-    if (!nodeResult || !nodeResult.metrics) return null;
-    const m = nodeResult.metrics;
-    const cols = m.columns as string[] | undefined;
+    if (!metrics) return null;
+    const cols = metrics.columns as string[] | undefined;
 
     if (!cols) return null;
 
@@ -80,19 +81,19 @@ const ScalingSettings: React.FC<{ config: ScalingConfig; onChange: (c: ScalingCo
           {cols.map((col, idx) => {
             let details = "";
             if (config.method === 'standard') {
-               const mean = m.mean ? (m.mean as number[])[idx] : undefined;
-               const scale = m.scale ? (m.scale as number[])[idx] : undefined;
+               const mean = metrics.mean ? (metrics.mean as number[])[idx] : undefined;
+               const scale = metrics.scale ? (metrics.scale as number[])[idx] : undefined;
                if (typeof mean === 'number') details = `μ=${mean.toFixed(2)}, σ=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
             } else if (config.method === 'minmax') {
-               const min = m.data_min ? (m.data_min as number[])[idx] : undefined;
-               const max = m.data_max ? (m.data_max as number[])[idx] : undefined;
+               const min = metrics.data_min ? (metrics.data_min as number[])[idx] : undefined;
+               const max = metrics.data_max ? (metrics.data_max as number[])[idx] : undefined;
                if (typeof min === 'number') details = `Min=${min.toFixed(2)}, Max=${typeof max === 'number' ? max.toFixed(2) : '-'}`;
             } else if (config.method === 'robust') {
-               const center = m.center ? (m.center as number[])[idx] : undefined;
-               const scale = m.scale ? (m.scale as number[])[idx] : undefined;
+               const center = metrics.center ? (metrics.center as number[])[idx] : undefined;
+               const scale = metrics.scale ? (metrics.scale as number[])[idx] : undefined;
                if (typeof center === 'number') details = `Med=${center.toFixed(2)}, IQR=${typeof scale === 'number' ? scale.toFixed(2) : '-'}`;
             } else if (config.method === 'maxabs') {
-               const maxAbs = m.max_abs ? (m.max_abs as number[])[idx] : undefined;
+               const maxAbs = metrics.max_abs ? (metrics.max_abs as number[])[idx] : undefined;
                if (typeof maxAbs === 'number') details = `MaxAbs=${maxAbs.toFixed(2)}`;
             }
 

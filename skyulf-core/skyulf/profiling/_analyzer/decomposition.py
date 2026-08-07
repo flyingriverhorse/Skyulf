@@ -5,24 +5,14 @@ from typing import Any, cast
 
 import polars as pl
 
+from ...engines import POLARS_NUMERIC_DTYPES
 from ._utils import _AnalyzerState
 
 
 class DecompositionMixin(_AnalyzerState):
     """Decomposition-tree helpers for :class:`EDAAnalyzer`."""
 
-    _NUMERIC_DTYPES = (
-        pl.Float32,
-        pl.Float64,
-        pl.Int8,
-        pl.Int16,
-        pl.Int32,
-        pl.Int64,
-        pl.UInt8,
-        pl.UInt16,
-        pl.UInt32,
-        pl.UInt64,
-    )
+    _NUMERIC_DTYPES = POLARS_NUMERIC_DTYPES
 
     def _coerce_filter_value(self, dtype: pl.DataType, val: Any) -> Any:
         """Coerce a string filter value to numeric when the target column is numeric.

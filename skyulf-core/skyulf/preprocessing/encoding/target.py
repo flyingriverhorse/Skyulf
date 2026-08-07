@@ -4,17 +4,21 @@ import logging
 from collections.abc import Mapping
 from typing import Any, cast
 
+import numpy as np
+import pandas as pd
 from sklearn.preprocessing import TargetEncoder
+from sklearn.utils.multiclass import type_of_target
 
 from ...core.meta.decorators import node_meta
+from ...engines import SkyulfDataFrame
 from ...engines.sklearn_bridge import SklearnBridge
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._artifacts import TargetEncoderArtifact
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine, fit_dual_engine
-from ._common import _exclude_target_column, detect_categorical_columns
+from ..dispatcher import apply_dual_engine, fit_dual_engine, fit_transform_train_dual_engine
+from ._common import _exclude_target_column, _extract_target, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +38,44 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
     return valid_cols, encoder
 
 
-def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+def _replace_target_encoded_polars(
+    X: Any, y: Any, valid_cols: list[str], encoded: Any
+) -> tuple[Any, Any]:
+    """Replace encoded columns in a Polars frame."""
     import polars as pl
 
+    n_feats = len(valid_cols)
+    if encoded.shape[1] == n_feats:
+        new_cols = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
+        return X.with_columns(new_cols), y
+
+    n_classes = encoded.shape[1] // n_feats
+    new_cols = []
+    for fi, col in enumerate(valid_cols):
+        for ci in range(n_classes):
+            new_cols.append(pl.Series(f"{col}_cls{ci}", encoded[:, fi * n_classes + ci]))
+    return X.drop(valid_cols).with_columns(new_cols), y
+
+
+def _replace_target_encoded_pandas(
+    X: Any, y: Any, valid_cols: list[str], encoded: Any
+) -> tuple[Any, Any]:
+    """Replace encoded columns in a Pandas frame."""
+    X_out = X.copy()
+    n_feats = len(valid_cols)
+    if encoded.shape[1] == n_feats:
+        X_out[valid_cols] = encoded
+        return X_out, y
+
+    n_classes = encoded.shape[1] // n_feats
+    X_out = X_out.drop(columns=valid_cols)
+    for fi, col in enumerate(valid_cols):
+        for ci in range(n_classes):
+            X_out[f"{col}_cls{ci}"] = encoded[:, fi * n_classes + ci]
+    return X_out, y
+
+
+def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     valid_cols, encoder = _resolve_apply_inputs(X, params)
     if not valid_cols:
         return X, y
@@ -44,20 +83,7 @@ def _target_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     X_subset = X.select(valid_cols)
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     encoded = encoder.transform(X_np)
-    n_feats = len(valid_cols)
-    if encoded.shape[1] == n_feats:
-        # Standard binary / regression: replace in-place.
-        new_cols = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
-    else:
-        # Multiclass: (n_samples, n_feats * n_classes) — create per-class cols.
-        n_classes = encoded.shape[1] // n_feats
-        new_cols = []
-        for fi, col in enumerate(valid_cols):
-            for ci in range(n_classes):
-                new_cols.append(pl.Series(f"{col}_cls{ci}", encoded[:, fi * n_classes + ci]))
-        # Drop original columns to avoid schema conflict.
-        X = X.drop(valid_cols)
-    return X.with_columns(new_cols), y
+    return _replace_target_encoded_polars(X, y, valid_cols, encoded)
 
 
 def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
@@ -65,22 +91,10 @@ def _target_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, A
     if not valid_cols:
         return X, y
 
-    X_out = X.copy()
-    X_subset = X_out[valid_cols]
+    X_subset = X[valid_cols]
     X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
     encoded = encoder.transform(X_input)
-    n_feats = len(valid_cols)
-    if encoded.shape[1] == n_feats:
-        # Standard binary / regression: replace in-place.
-        X_out[valid_cols] = encoded
-    else:
-        # Multiclass: (n_samples, n_feats * n_classes) — create per-class cols.
-        n_classes = encoded.shape[1] // n_feats
-        X_out = X_out.drop(columns=valid_cols)
-        for fi, col in enumerate(valid_cols):
-            for ci in range(n_classes):
-                X_out[f"{col}_cls{ci}"] = encoded[:, fi * n_classes + ci]
-    return X_out, y
+    return _replace_target_encoded_pandas(X, y, valid_cols, encoded)
 
 
 class TargetEncoderApplier(BaseApplier):
@@ -99,24 +113,6 @@ class TargetEncoderApplier(BaseApplier):
 # -----------------------------------------------------------------------------
 
 
-def _maybe_extract_y_polars(X: Any, y: Any, target_col: str | None) -> Any:
-    """Polars fit-time fallback: pull ``y`` out of ``X`` if missing."""
-    if y is not None or not target_col:
-        return y
-    if target_col in X.columns:
-        return X.get_column(target_col)
-    return y
-
-
-def _maybe_extract_y_pandas(X: Any, y: Any, target_col: str | None) -> Any:
-    """Pandas fit-time fallback: pull ``y`` out of ``X`` if missing."""
-    if y is not None or not target_col:
-        return y
-    if target_col in X.columns:
-        return X[target_col]
-    return y
-
-
 def _y_to_numpy(y: Any) -> Any:
     """Best-effort conversion of ``y`` into a 1-D numpy array."""
     if hasattr(y, "to_numpy"):
@@ -132,22 +128,32 @@ def _resolve_fit_cols(X: Any, y: Any, config: dict[str, Any]) -> list[str]:
     return _exclude_target_column(cols, config, "TargetEncoder", y)
 
 
-def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> TargetEncoder:
-    """Run sklearn ``TargetEncoder.fit`` on a prepared subset.
+def _translate_target_encoder_error(exc: ValueError) -> None:
+    """Raise a clearer error for sklearn target-type failures."""
+    msg = str(exc)
+    if "unknown label type" in msg.lower() or "multiclass" in msg.lower():
+        raise ValueError(
+            "TargetEncoder failed: check your target column and your Target Type."
+            f"(sklearn said: {msg})"
+        ) from exc
+    raise exc
 
-    Handles both numeric and string (categorical) target columns:
-    - For multiclass with string y, sklearn needs label-encoded integers.
-    - Translates sklearn's ``ValueError: Unknown label type`` into a clear
-      actionable message so the user knows exactly which config knob to turn.
-    """
+
+def _build_target_encoder(
+    X_subset: Any, y: Any, config: dict[str, Any], *, cv: int = 5
+) -> tuple[TargetEncoder, Any]:
+    """Build the sklearn encoder and normalize the target array."""
     from sklearn.preprocessing import LabelEncoder
 
+    _ = X_subset
     target_type = config.get("target_type", "auto")
     encoder = TargetEncoder(
         smooth=config.get("smooth", "auto"),
         target_type=target_type,
+        cv=cv,
+        shuffle=True,
+        random_state=42,
     )
-    X_np, _ = SklearnBridge.to_sklearn(X_subset)
     y_np = _y_to_numpy(y)
 
     # If y is object/string and target_type is multiclass (or auto with many classes),
@@ -156,21 +162,75 @@ def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> Target
         le = LabelEncoder()
         y_np = le.fit_transform(y_np)
 
+    return encoder, y_np
+
+
+def _resolve_target_encoder_training_cv(y_np: Any, target_type: str) -> int:
+    """Return the highest deterministic non-leaky fold count for training rows."""
+    y_array = np.asarray(y_np)
+    n_samples = len(y_array)
+    if n_samples < 2:
+        raise ValueError(
+            "TargetEncoder pipeline training requires at least 2 training rows for "
+            f"leakage-safe cross-fitting; got {n_samples}."
+        )
+
+    safe_cv = min(5, n_samples)
+    if y_array.ndim != 1:
+        return safe_cv
+
+    resolved_target_type = target_type
+    if resolved_target_type == "auto":
+        inferred_target_type = type_of_target(y_array)
+        if inferred_target_type == "continuous":
+            resolved_target_type = "regression"
+        elif inferred_target_type in {"binary", "multiclass"}:
+            resolved_target_type = inferred_target_type
+
+    if resolved_target_type in {"binary", "multiclass"}:
+        classes, counts = np.unique(y_array, return_counts=True)
+        min_class_count = int(counts.min())
+        if min_class_count < 2:
+            class_counts = dict(zip(classes.tolist(), counts.tolist(), strict=False))
+            raise ValueError(
+                "TargetEncoder pipeline training requires at least 2 training rows in every "
+                "target class for leakage-safe cross-fitting; "
+                f"got class counts {class_counts}."
+            )
+        safe_cv = min(safe_cv, min_class_count)
+
+    return safe_cv
+
+
+def _fit_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> TargetEncoder:
+    """Run sklearn ``TargetEncoder.fit`` on a prepared subset."""
+    encoder, y_np = _build_target_encoder(X_subset, y, config)
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+
     try:
         encoder.fit(X_np, y_np)
     except ValueError as exc:
-        msg = str(exc)
-        if "unknown label type" in msg.lower() or "multiclass" in msg.lower():
-            raise ValueError(
-                "TargetEncoder failed: check your target column and your Target Type."
-                f"(sklearn said: {msg})"
-            ) from exc
-        raise
+        _translate_target_encoder_error(exc)
     return encoder
 
 
+def _fit_transform_target_encoder(X_subset: Any, y: Any, config: dict[str, Any]) -> tuple[Any, Any]:
+    """Fit sklearn ``TargetEncoder`` and cross-fit the training rows."""
+    encoder, y_np = _build_target_encoder(X_subset, y, config)
+    train_cv = _resolve_target_encoder_training_cv(y_np, str(config.get("target_type", "auto")))
+    if train_cv != 5:
+        encoder, y_np = _build_target_encoder(X_subset, y, config, cv=train_cv)
+    X_np, _ = SklearnBridge.to_sklearn(X_subset)
+
+    try:
+        encoded = encoder.fit_transform(X_np, y_np)
+    except ValueError as exc:
+        _translate_target_encoder_error(exc)
+    return encoder, encoded
+
+
 def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    y = _maybe_extract_y_polars(X, y, config.get("target_column"))
+    y = _extract_target(X, y, config.get("target_column"))
     if y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
         return {}
@@ -184,7 +244,7 @@ def _target_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
 
 
 def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    y = _maybe_extract_y_pandas(X, y, config.get("target_column"))
+    y = _extract_target(X, y, config.get("target_column"))
     if y is None:
         logger.warning("TargetEncoder requires a target variable (y). Skipping.")
         return {}
@@ -195,6 +255,42 @@ def _target_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
 
     encoder = _fit_target_encoder(X[cols], y, config)
     return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}
+
+
+def _target_fit_transform_train_polars(
+    X: Any, y: Any, config: dict[str, Any]
+) -> tuple[Mapping[str, Any], Any, Any]:
+    """Fit and cross-fit training rows for Polars-backed inputs."""
+    fit_y = _extract_target(X, y, config.get("target_column"))
+    if fit_y is None:
+        logger.warning("TargetEncoder requires a target variable (y). Skipping.")
+        return {}, X, y
+
+    cols = _resolve_fit_cols(X, fit_y, config)
+    if not cols:
+        return {}, X, y
+
+    encoder, encoded = _fit_transform_target_encoder(X.select(cols), fit_y, config)
+    X_out, y_out = _replace_target_encoded_polars(X, y, cols, encoded)
+    return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}, X_out, y_out
+
+
+def _target_fit_transform_train_pandas(
+    X: Any, y: Any, config: dict[str, Any]
+) -> tuple[Mapping[str, Any], Any, Any]:
+    """Fit and cross-fit training rows for Pandas-backed inputs."""
+    fit_y = _extract_target(X, y, config.get("target_column"))
+    if fit_y is None:
+        logger.warning("TargetEncoder requires a target variable (y). Skipping.")
+        return {}, X, y
+
+    cols = _resolve_fit_cols(X, fit_y, config)
+    if not cols:
+        return {}, X, y
+
+    encoder, encoded = _fit_transform_target_encoder(X[cols], fit_y, config)
+    X_out, y_out = _replace_target_encoded_pandas(X, y, cols, encoded)
+    return {"type": "target_encoder", "columns": cols, "encoder_object": encoder}, X_out, y_out
 
 
 @NodeRegistry.register("TargetEncoder", TargetEncoderApplier)
@@ -219,6 +315,24 @@ class TargetEncoderCalculator(BaseCalculator):
                 pandas_func=_target_fit_pandas,
             ),
         )
+
+    def fit_transform_train(
+        self, df: pd.DataFrame | SkyulfDataFrame | tuple, config: dict[str, Any]
+    ) -> tuple[TargetEncoderArtifact, Any]:
+        """Fit sklearn TargetEncoder and cross-fit the pipeline training rows."""
+        if user_picked_no_columns(config):
+            return {}, df
+
+        artifact, transformed = fit_transform_train_dual_engine(
+            df,
+            config,
+            polars_func=_target_fit_transform_train_polars,
+            pandas_func=_target_fit_transform_train_pandas,
+        )
+        return cast(
+            TargetEncoderArtifact,
+            artifact,
+        ), transformed
 
     def infer_output_schema(
         self,

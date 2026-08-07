@@ -123,13 +123,8 @@ class DeploymentService:
             update(Deployment).where(Deployment.is_active).values(is_active=False)
         )
 
-        # 4. Create Deployment
-        # We need to store the pipeline_id to know where to look for the artifact
-        # For now, we'll append it to the artifact_uri if it's just a node_id
-        # Or better, we assume the store path logic is consistent.
-        # In api.py: persistent_path = Path.cwd() / "exports" / "models" / config.pipeline_id
-        # So we need pipeline_id to reconstruct the path.
-        # Let's store "pipeline_id/node_id" as the URI if it's not already.
+        # 4. Create Deployment — the artifact URI must encode pipeline_id so it can
+        # be resolved back to the export path (exports/models/<pipeline_id>/...).
         final_uri = DeploymentService._resolve_final_deployment_uri(
             artifact_uri, job_id, pipeline_id
         )

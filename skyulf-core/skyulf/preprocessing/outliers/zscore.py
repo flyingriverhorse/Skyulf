@@ -6,9 +6,9 @@ import pandas as pd
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import ZScoreArtifact
-from .._helpers import to_pandas
+from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
@@ -84,9 +84,16 @@ class ZScoreCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
 
-        X_pd = to_pandas(X)
         threshold = config.get("threshold", 3.0)
-        cols = resolve_columns(X_pd, config, detect_numeric_columns)
+        # TODO(pandas-removal): mean/std alone would be numpy-safe (Polars std
+        # ddof=0 already matches Pandas — verified), but this loop relies on
+        # per-column pd.to_numeric(errors="coerce") to gracefully skip
+        # non-numeric/mixed-dtype columns and .dropna() per column before
+        # computing stats. Revisit once there's a native Polars equivalent
+        # (pl.col(col).cast(pl.Float64, strict=False).drop_nulls()) wired in
+        # to replace the coercion step without changing which columns get a
+        # "non-numeric" warning.
+        X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         if not cols:
             return {}
 
