@@ -1117,7 +1117,10 @@ Canvas finding is warranted solely for this repeated form root.
     `.superpowers/sdd/task-3-1440-overlap.png`, not committed). Source
     re-reading confirms `Sidebar.tsx`'s 30 px cascading placement,
     `CustomNodeWrapper.tsx`'s `min-w-[200px]` card, and `useGraphStore.ts`'s
-    `addNode()` are unchanged.
+    `addNode()` are unchanged. I did not separately repeat Split or Training
+    click-adds after Dataset, Encoding, and Feature Generation independently
+    reproduced the shared `addNode()` selection failure; those nodes use the
+    same insertion path, so this is not separate successful coverage.
   - **Delta:** Broadened root-cause scope: `addNode()` never sets
     `selected: true` regardless of insertion method (click-to-add **or**
     native drag-and-drop both call `addNode()`), not only for click-to-add
@@ -1236,8 +1239,13 @@ Canvas finding is warranted solely for this repeated form root.
     creating a real Dataset→transform edge to reach the enabled Run Preview
     state was not achievable through this session's browser automation (see
     the Task 3 Method notes above) — the same connection-gesture limit the
-    original audit already recorded. This keeps the evidence at its original
-    level (source-confirmed, not live-observed end to end).
+    original audit already recorded. Re-reading
+    `frontend/ml-canvas/src/core/utils/pipelineLeakageValidation.ts`, its four
+    call sites, and `pipelineLeakageValidation.test.ts` shows no leakage-
+    validation source change; that unchanged source evidence still supports
+    CAN-002 staying Confirmed / No material change even without a fresh live
+    invalid-run reproduction. This keeps the evidence at its original level
+    (source-confirmed, not live-observed end to end).
   - **Delta:** No material change.
 
 - **CAN-003 — Inferred: recovery sources are not explainable when Canvas
