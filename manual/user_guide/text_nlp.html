@@ -3212,7 +3212,7 @@ and the script <code>examples/06_text_nlp_vectorization.py</code>.</p>
 <tr>
 <td>Sentence Embedder</td>
 <td><code>sentence_embedder</code></td>
-<td>Encodes text into dense semantic vectors (needs <code>skyulf[nlp]</code>)</td>
+<td>Encodes text into dense semantic vectors (needs <code>skyulf-core[nlp]</code>)</td>
 <td>Yes (loads a model)</td>
 </tr>
 <tr>
@@ -3353,7 +3353,7 @@ because stop-word removal focuses the vocabulary on meaningful words.</p>
 embeddings</strong> map text into a dense vector space where similar <em>meanings</em> land close together,
 which can help on short text. This node is powered by
 <a href="https://www.sbert.net/"><code>sentence-transformers</code></a> and is an <strong>optional</strong> dependency.</p>
-<pre><code class="language-bash">pip install skyulf[nlp]          # or: pip install -r requirements-nlp.txt
+<pre><code class="language-bash">pip install skyulf-core[nlp]     # or: pip install -r requirements-nlp.txt
 </code></pre>
 <pre><code class="language-python">from skyulf.preprocessing.vectorization import (
     SentenceEmbedderCalculator,

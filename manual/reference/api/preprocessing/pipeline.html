@@ -3687,7 +3687,55 @@
 <span class="normal">560</span>
 <span class="normal">561</span>
 <span class="normal">562</span>
-<span class="normal">563</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span>
+<span class="normal">594</span>
+<span class="normal">595</span>
+<span class="normal">596</span>
+<span class="normal">597</span>
+<span class="normal">598</span>
+<span class="normal">599</span>
+<span class="normal">600</span>
+<span class="normal">601</span>
+<span class="normal">602</span>
+<span class="normal">603</span>
+<span class="normal">604</span>
+<span class="normal">605</span>
+<span class="normal">606</span>
+<span class="normal">607</span>
+<span class="normal">608</span>
+<span class="normal">609</span>
+<span class="normal">610</span>
+<span class="normal">611</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">FeatureEngineer</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Orchestrates a sequence of feature engineering steps.</span>
 
@@ -3748,12 +3796,22 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Reset fitted steps</span>
         <span class="n">current_data</span> <span class="o">=</span> <span class="n">data</span>
-        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="s2">&quot;fit_time&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+                <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;rows_in&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;rows_out&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="p">},</span>
+            <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="p">}</span>
 
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps_config</span><span class="p">):</span>
             <span class="n">name</span> <span class="o">=</span> <span class="n">step</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
             <span class="n">transformer_type</span> <span class="o">=</span> <span class="n">step</span><span class="p">[</span><span class="s2">&quot;transformer&quot;</span><span class="p">]</span>
             <span class="n">params</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;params&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="n">step_metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">step_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 
             <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">transformer_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FeatureEngineer running step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">transformer_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
@@ -3776,13 +3834,6 @@
                 <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span>
             <span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="c1"># Add node-level performance metrics directly into `metrics` dictionary</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;fit_time&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_in&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-                <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_out&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-
             <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> complete. New data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
             <span class="n">rows_after</span><span class="p">,</span> <span class="n">cols_after</span> <span class="o">=</span> <span class="n">get_data_stats</span><span class="p">(</span><span class="n">current_data</span><span class="p">)</span>
@@ -3797,8 +3848,49 @@
                 <span class="n">rows_after</span><span class="o">=</span><span class="n">rows_after</span><span class="p">,</span>
                 <span class="n">cols_after</span><span class="o">=</span><span class="n">cols_after</span><span class="p">,</span>
                 <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>
+                <span class="n">metrics</span><span class="o">=</span><span class="n">step_metrics</span><span class="p">,</span>
             <span class="p">)</span>
+
+            <span class="n">step_record</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                <span class="s2">&quot;transformer&quot;</span><span class="p">:</span> <span class="n">transformer_type</span><span class="p">,</span>
+                <span class="s2">&quot;fit_time&quot;</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;fit_time&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">else</span> <span class="mf">0.0</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">else</span> <span class="mi">0</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;rows_in&quot;</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_in&quot;</span><span class="p">,</span> <span class="n">rows_before</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">else</span> <span class="n">rows_before</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;rows_out&quot;</span><span class="p">:</span> <span class="p">(</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_out&quot;</span><span class="p">,</span> <span class="n">rows_after</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="k">else</span> <span class="n">rows_after</span>
+                <span class="p">),</span>
+                <span class="s2">&quot;details&quot;</span><span class="p">:</span> <span class="n">step_metrics</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;steps&quot;</span><span class="p">][</span><span class="n">step_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">step_record</span>
+
+            <span class="n">summary</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">]</span>
+            <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span>
+            <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+                <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">],</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span>
+            <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span>
+
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span>
 
         <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">metrics</span>
 
@@ -3926,7 +4018,7 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Aggregate per-step metrics into the running metrics dict.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one step record&#39;s details dict with node-specific metrics.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">fitted_params</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_metrics_from_fitted_params</span><span class="p">(</span>
@@ -3955,7 +4047,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_copy_present_keys</span><span class="p">(</span>
         <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">keys</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Copy each key from fitted_params into metrics, skipping keys that aren&#39;t present.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Copy fitted params into a single step&#39;s details dict when present.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
                 <span class="n">metrics</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
@@ -3972,7 +4064,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_apply_outlier_metrics</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">transformer_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">fitted_params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate outlier-detection related metrics (warnings/bounds/stats/contamination).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one step&#39;s outlier details (warnings/bounds/stats/contamination).&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_TYPES</span> <span class="ow">and</span> <span class="s2">&quot;warnings&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;warnings&quot;</span><span class="p">]</span>
         <span class="k">for</span> <span class="n">types</span><span class="p">,</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OUTLIER_METRIC_RULES</span><span class="p">:</span>
@@ -3986,7 +4078,7 @@
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate operations count/list and newly generated feature columns metrics.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one step&#39;s generated-feature details and operation metadata.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="s2">&quot;operations&quot;</span> <span class="ow">in</span> <span class="n">fitted_params</span><span class="p">:</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;operations_count&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">])</span>
             <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fitted_params</span><span class="p">[</span><span class="s2">&quot;operations&quot;</span><span class="p">]</span>
@@ -4002,6 +4094,7 @@
         <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one step&#39;s details from fitted parameters and derived artifacts.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_IMPUTATION_TYPES</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_copy_present_keys</span><span class="p">(</span>
                 <span class="n">fitted_params</span><span class="p">,</span> <span class="n">metrics</span><span class="p">,</span> <span class="p">(</span><span class="s2">&quot;missing_counts&quot;</span><span class="p">,</span> <span class="s2">&quot;total_missing&quot;</span><span class="p">,</span> <span class="s2">&quot;fill_values&quot;</span><span class="p">)</span>
@@ -4114,6 +4207,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_resampling</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one resampling step&#39;s class-balance details.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">y_res</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_extract_y_for_resampling</span><span class="p">(</span><span class="n">current_data</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">y_res</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -4163,6 +4257,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_metrics_winsorize_clipped</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">data_before</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">current_data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one Winsorize step&#39;s clipped-value count detail.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">clipped_count</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data_before</span><span class="p">,</span> <span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">SkyulfDataFrame</span><span class="p">))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
@@ -4191,6 +4286,7 @@
         <span class="n">cols_after</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
         <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Populate one step&#39;s shape-change details such as dropped rows/columns.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">transformer_type</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ROW_DROP_TYPES</span><span class="p">:</span>
             <span class="n">dropped</span> <span class="o">=</span> <span class="n">rows_before</span> <span class="o">-</span> <span class="n">rows_after</span>
             <span class="n">metrics</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">transformer_type</span><span class="si">}</span><span class="s2">_rows_removed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dropped</span>
@@ -4320,19 +4416,73 @@ Returns: (transformed_data, metrics_dict)</p>
 <span class="normal">133</span>
 <span class="normal">134</span>
 <span class="normal">135</span>
-<span class="normal">136</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span> <span class="o">|</span> <span class="n">Any</span><span class="p">,</span> <span class="n">node_id_prefix</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Runs the pipeline on data.</span>
 <span class="sd">    Returns: (transformed_data, metrics_dict)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">fitted_steps</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># Reset fitted steps</span>
     <span class="n">current_data</span> <span class="o">=</span> <span class="n">data</span>
-    <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;fit_time&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span>
+            <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;rows_in&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;rows_out&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="p">}</span>
 
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">step</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">steps_config</span><span class="p">):</span>
         <span class="n">name</span> <span class="o">=</span> <span class="n">step</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
         <span class="n">transformer_type</span> <span class="o">=</span> <span class="n">step</span><span class="p">[</span><span class="s2">&quot;transformer&quot;</span><span class="p">]</span>
         <span class="n">params</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;params&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">step_metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">step_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Running step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">transformer_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;FeatureEngineer running step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">transformer_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
@@ -4355,13 +4505,6 @@ Returns: (transformed_data, metrics_dict)</p>
             <span class="n">params</span><span class="o">=</span><span class="n">params</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="c1"># Add node-level performance metrics directly into `metrics` dictionary</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;fit_time&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_in&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-            <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_out&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-
         <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Step </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> complete. New data type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">current_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="n">rows_after</span><span class="p">,</span> <span class="n">cols_after</span> <span class="o">=</span> <span class="n">get_data_stats</span><span class="p">(</span><span class="n">current_data</span><span class="p">)</span>
@@ -4376,8 +4519,49 @@ Returns: (transformed_data, metrics_dict)</p>
             <span class="n">rows_after</span><span class="o">=</span><span class="n">rows_after</span><span class="p">,</span>
             <span class="n">cols_after</span><span class="o">=</span><span class="n">cols_after</span><span class="p">,</span>
             <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
-            <span class="n">metrics</span><span class="o">=</span><span class="n">metrics</span><span class="p">,</span>
+            <span class="n">metrics</span><span class="o">=</span><span class="n">step_metrics</span><span class="p">,</span>
         <span class="p">)</span>
+
+        <span class="n">step_record</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+            <span class="s2">&quot;transformer&quot;</span><span class="p">:</span> <span class="n">transformer_type</span><span class="p">,</span>
+            <span class="s2">&quot;fit_time&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;fit_time&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="mf">0.0</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="mi">0</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;rows_in&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_in&quot;</span><span class="p">,</span> <span class="n">rows_before</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">rows_before</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;rows_out&quot;</span><span class="p">:</span> <span class="p">(</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">transformer_inst</span><span class="p">,</span> <span class="s2">&quot;rows_out&quot;</span><span class="p">,</span> <span class="n">rows_after</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">transformer_inst</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">rows_after</span>
+            <span class="p">),</span>
+            <span class="s2">&quot;details&quot;</span><span class="p">:</span> <span class="n">step_metrics</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;steps&quot;</span><span class="p">][</span><span class="n">step_key</span><span class="p">]</span> <span class="o">=</span> <span class="n">step_record</span>
+
+        <span class="n">summary</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">]</span>
+        <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span>
+        <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">],</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span>
+        <span class="n">summary</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">step_record</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span>
+
+    <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;fit_time&quot;</span><span class="p">]</span>
+    <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;peak_memory_bytes&quot;</span><span class="p">]</span>
+    <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;rows_in&quot;</span><span class="p">]</span>
+    <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span><span class="p">[</span><span class="s2">&quot;summary&quot;</span><span class="p">][</span><span class="s2">&quot;rows_out&quot;</span><span class="p">]</span>
 
     <span class="k">return</span> <span class="n">current_data</span><span class="p">,</span> <span class="n">metrics</span>
 </code></pre></div></td></tr></table></div>
