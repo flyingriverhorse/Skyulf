@@ -79,12 +79,16 @@ branch actually changed each column**:
 1. **Nobody changed it** — the value is identical everywhere; any branch can supply it.
 2. **Exactly one branch changed it** — that branch owns the column. Its value always survives,
    regardless of edge order or merge strategy. This is the common case, and it produces **no banner**.
-3. **Two or more branches changed it** — a genuine conflict. The merge strategy (`last_wins` by
-   default, i.e. the last input edge) picks the winner, the losing branch's edits to that column are
-   discarded, and this banner appears naming the contested columns.
+3. **Two or more branches changed it to different values** — a genuine conflict. The merge strategy
+   (`last_wins` by default, i.e. the last input edge) picks the winner, the losing branch's edits to
+   that column are discarded, and this banner appears naming the contested columns.
+
+Branches that changed a column but **agree** on the result (e.g. two MissingIndicator steps emitting
+the same `*_missing` flags) fall under case 2, not case 3: nothing is discarded, so no banner.
 
 The **Merge Strategy** dropdown in the Properties panel is only shown after a run has detected case 3
-for that node — there is nothing to choose when nothing is contested.
+for that node — there is nothing to choose when nothing is contested. It names the node it applies to
+and both contesting branches.
 
 ### Why it's usually a bug
 

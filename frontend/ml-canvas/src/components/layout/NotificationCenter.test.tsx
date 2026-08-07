@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { NotificationCenter } from './NotificationCenter';
 import { useNotificationsStore } from '../../core/store/useNotificationsStore';
@@ -67,5 +68,43 @@ describe('NotificationCenter detail modal', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog', { name: /TrainingNode details/ })).toBeNull());
     await waitFor(() => expect(bell).toHaveFocus());
+  });
+
+  it('keeps the row and Dismiss controls separate and independent', async () => {
+    const user = userEvent.setup();
+
+    const { container } = render(
+      <MemoryRouter>
+        <NotificationCenter />
+      </MemoryRouter>,
+    );
+
+    const bell = screen.getByRole('button', { name: /Notifications/ });
+    await act(async () => {
+      await user.click(bell);
+    });
+
+    const row = await screen.findByRole('button', { name: /Training took too long/ });
+    expect(container.querySelector('button button')).toBeNull();
+
+    await act(async () => {
+      await user.click(row);
+    });
+    await screen.findByRole('dialog', { name: /TrainingNode details/ });
+    await act(async () => {
+      await user.keyboard('{Escape}');
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /TrainingNode details/ })).toBeNull());
+
+    await act(async () => {
+      await user.click(bell);
+    });
+    const dismiss = await screen.findByRole('button', { name: 'Dismiss' });
+    await act(async () => {
+      await user.click(dismiss);
+    });
+
+    await waitFor(() => expect(screen.queryByText('Training took too long')).toBeNull());
+    expect(screen.queryByRole('dialog', { name: /TrainingNode details/ })).toBeNull();
   });
 });

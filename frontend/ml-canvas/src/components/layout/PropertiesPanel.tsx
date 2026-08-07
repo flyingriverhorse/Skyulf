@@ -9,6 +9,7 @@ import {
   supportsExecutionModeToggle,
 } from '../../core/types/executionMode';
 import { getMergeStrategy, type MergeStrategy } from '../../core/types/nodeData';
+import { predictMergeConflict } from '../../core/utils/predictMergeConflict';
 import { X, Maximize2, Minimize2, Settings2, Merge } from 'lucide-react';
 import { Node } from '@xyflow/react';
 
@@ -187,6 +188,7 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
 };
 
 const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }) => {
+  const nodes = useGraphStore((state) => state.nodes);
   const edges = useGraphStore((state) => state.edges);
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
   const executionResult = useGraphStore((state) => state.executionResult);
@@ -222,29 +224,53 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
 
   // Branches editing different columns have an unambiguous owner per column,
   // so the engine never needs a tiebreak and this setting would do nothing.
-  // The engine only emits a `sibling_fan_in` advisory when two branches really
-  // did contest a column, so gate the control on that rather than guessing
-  // from the wiring alone.
-  const contested = (executionResult?.merge_warnings ?? []).find(
+  // A run's `sibling_fan_in` advisory is authoritative (it diffs real values);
+  // before the first run we fall back to a config-time prediction so the
+  // control is discoverable while wiring, not only after a run.
+  const advisory = (executionResult?.merge_warnings ?? []).find(
     (w) => w.kind === 'sibling_fan_in' && w.node_id === selectedNode.id
   );
-  if (!contested) return null;
+  const predicted = advisory ? null : predictMergeConflict(selectedNode.id, nodes, edges);
+  if (!advisory && !predicted) return null;
 
-  const contestedColumns = contested.overlap_columns ?? [];
+  const contestedColumns = advisory ? (advisory.overlap_columns ?? []) : predicted!.columns;
+  const contestingInputs = advisory ? (advisory.inputs ?? []) : predicted!.branchIds;
   const current = getMergeStrategy(selectedNode.data);
+
+  const labelOf = (nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    return (node?.data.label as string | undefined) ?? nodeId;
+  };
+  const firstLabel = contestingInputs.length ? labelOf(contestingInputs[0]!) : 'the first branch';
+  const lastLabel = contestingInputs.length
+    ? labelOf(contestingInputs[contestingInputs.length - 1]!)
+    : 'the last branch';
+  const selectedLabel = (selectedNode.data.label as string | undefined) ?? selectedNode.id;
 
   return (
     <div className="border-t pt-4">
       <div className="flex items-center gap-2 mb-2">
         <Merge className="w-4 h-4 text-muted-foreground" />
         <h3 className="text-sm font-semibold">Merge Strategy</h3>
+        {!advisory && (
+          <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+            Predicted
+          </span>
+        )}
       </div>
-      <p className="text-xs text-muted-foreground mb-2">
+      <p className="text-xs text-muted-foreground mb-1">
+        At <span className="font-medium text-foreground">{selectedLabel}</span>,{' '}
         {contestedColumns.length} column
-        {contestedColumns.length === 1 ? '' : 's'} were modified by more than one incoming branch.
-        Pick which branch&apos;s version to keep
+        {contestedColumns.length === 1 ? ' is' : 's are'} changed by both{' '}
+        <span className="font-medium text-foreground">{firstLabel}</span> and{' '}
+        <span className="font-medium text-foreground">{lastLabel}</span>
         {contestedColumns.length > 0 ? `: ${contestedColumns.slice(0, 4).join(', ')}` : ''}
         {contestedColumns.length > 4 ? `, +${contestedColumns.length - 4} more` : ''}.
+      </p>
+      <p className="text-xs text-muted-foreground mb-2">
+        {advisory
+          ? 'Pick which branch’s version of those columns to keep. Every other column is unaffected.'
+          : 'Based on the current node settings. Run a preview to confirm which columns actually collide.'}
       </p>
       <select
         value={current}
@@ -253,8 +279,8 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
         }
         className="w-full px-2 py-1.5 text-sm bg-background border rounded-md"
       >
-        <option value="last_wins">Last wins (default) - downstream input overwrites</option>
-        <option value="first_wins">First wins - earlier input kept</option>
+        <option value="last_wins">Keep {lastLabel} (last connected, default)</option>
+        <option value="first_wins">Keep {firstLabel} (first connected)</option>
       </select>
     </div>
   );
