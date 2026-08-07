@@ -170,10 +170,146 @@ baseline captured in `## Method and Evidence`:
 
 | Status | Count | Meaning |
 |--------|-------|---------|
-| New | 0 | Not present in the previous roadmap. |
-| Changed | 0 | Evidence, scope, priority, or proposed behavior materially changed. |
-| Confirmed | 0 | Current evidence still supports the finding without material change. |
+| New | 1 | Not present in the previous roadmap. |
+| Changed | 1 | Evidence, scope, priority, or proposed behavior materially changed. |
+| Confirmed | 5 | Current evidence still supports the finding without material change. |
 | Resolved | 0 | Current evidence demonstrates that the prior user problem no longer occurs. |
+
+Task 2 reconciled every `FND-*` finding (`FND-001` through `FND-006`) and added one
+new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
+`OPS-*`) are reconciled by their own dedicated tasks and are not counted here.
+
+### Task 2 — Shared Foundations Rerun
+
+#### Shared-state usage reinspection
+
+- **Measured:** From `frontend/ml-canvas/`,
+  `grep -RInE "LoadingState|EmptyState|ErrorState|PageSkeleton|toast\.|disabled=" src --include="*.ts" --include="*.tsx"`
+  returned `256` matches. `LoadingState`/`EmptyState`/`ErrorState` are used
+  consistently for first-load, empty, and failure states in Dashboard, Data
+  Sources, Jobs, Model Registry, Deployments, EDA, Error Log, Evaluation, and
+  Segmentation, with the same neither-`role`-nor-`aria-live` composition as the
+  original baseline: `LoadingState.tsx`, `EmptyState.tsx`, and `ErrorState.tsx`
+  still contain no `role=` or `aria-live` attribute. `PageSkeleton` is still
+  used only once, as the route-level `Suspense` fallback in `App.tsx`
+  (`RouteFallback`). `toast.` call sites (`success`/`error`/`info`/`warning`)
+  now number `80` across the app (`grep -RIn "toast\.\(success\|error\|info\|warning\)"`),
+  consistent with `toast.ts`'s own comment estimating "~40 call sites" as an
+  approximation, not a hard count; this is not a material change to `FND-003`
+  or `FND-004`, which are about shared-semantics/retry-consistency gaps, not
+  call-site volume. `disabled=` appears `85` times, unchanged in kind from the
+  original evidence (used for in-flight/unavailable actions across the same
+  surfaces).
+- **Inferred:** Re-reading `Dashboard.tsx`, `EDAPage.tsx`, and
+  `DeploymentsPage.tsx` confirms they still pass `onRetry` to `ErrorState`,
+  while `ModelRegistry.tsx` (`ErrorState error={error}` with no `onRetry`,
+  line 158) and the Experiments `EvaluationView.tsx`/`SegmentationView.tsx`
+  (`ErrorState error={evalError}` with no `onRetry`) still render it without
+  one. This is the same asymmetry as the original `FND-004` evidence, with no
+  material change.
+
+#### Shared live walkthroughs (1440 / 1024 / 768 / 390)
+
+- **Method:** Started the Vite dev server used by the project's own Playwright
+  config (`npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`) and
+  drove a live Chromium browser against it with the Playwright MCP browser
+  tool (`playwright-browser_navigate`, `_resize`, `_snapshot`, `_evaluate`,
+  `_click`, `_press_key`, `_take_screenshot`). This is a real, interactive
+  browser session against the actual running frontend, not a static reading
+  of source — every measurement below is **Observed** unless explicitly
+  marked otherwise. Widths exercised: `1440×900`, `1024×900`, `768×1024`, and
+  `390×844` (portrait), matching the required breakpoints.
+- **Observed — 1440/1024/768/390, `/canvas`:** The Canvas view switcher
+  (`[data-testid="navbar-views"]`) measured `352.55px` wide at every width
+  and stayed fully inside the main content pane with no overlap at 1440
+  (main pane starts at collapsed-sidebar `x=64`), 1024, 768, and 390 px
+  (main pane `326px` wide at 390, switcher ending at `x=403.28` while the
+  Notifications bell sat at `x=342–378`, both inside the `390px` viewport
+  with no measured document horizontal overflow, `scrollWidth === 390`).
+  This matches the existing `FND-001` evidence for Canvas's own view-switcher
+  clipping risk (the original finding cites a `353px`-wide switcher inside a
+  `326px` pane); this rerun did not reproduce switcher/main-pane overlap at
+  390 px on this route in this environment, but the Dashboard shell clipping
+  below reproduces the same underlying compact-shell defect on a different
+  top-level route, so `FND-001` is not resolved.
+- **Observed — 390 px, `/` (Dashboard):** The persistent sidebar (`<aside>`)
+  measured `256px` wide with the main content pane immediately following at
+  `x=256`, `width=134px`, and no document horizontal overflow
+  (`scrollWidth === 390`). This reproduces the original `FND-001` evidence
+  exactly: the fixed 256 px sidebar leaves only 134 px for Dashboard's main
+  content at 390 px.
+- **Observed — `FND-002` overlay focus containment, 1440 px, `/canvas`:**
+  Opened the Shortcuts overlay (`?`/click); the next Tab moved focus to the
+  covered "Open command palette" navbar button, outside the dialog
+  (`role="dialog" aria-label="Keyboard shortcuts"`), reproducing the original
+  evidence exactly. Opened Command Palette (Ctrl/Cmd+K) and focused its last
+  in-dialog focusable element; the next Tab moved focus to the "Open Tanstack
+  query devtools" button behind the (still-open) dialog — this is new,
+  concrete **Observed** evidence for Command Palette, which the original
+  audit only **Inferred**. Seeded one notification via `localStorage`
+  (`skyulf-notifications`) and opened its detail modal
+  (`role="presentation"` backdrop, no `role="dialog"`); focus was never
+  moved into the modal on open (`document.activeElement` remained on
+  `<body>`), and the next Tab moved focus to the sidebar's "Collapse
+  sidebar" button, escaping the modal entirely — this is new, concrete
+  **Observed** evidence for the notification detail modal, which the
+  original audit only **Inferred**.
+- **Observed — `FND-006` shell-view history, 1440 px, `/canvas`:** Clicking
+  "Experiments" in the shared view switcher left the URL at `/canvas` (no
+  navigation, no history entry) and none of the three switcher buttons
+  exposed `aria-current`, `aria-selected`, or `aria-pressed`. Navigating back
+  (`browser_navigate_back`) returned to `/` (the route visited before
+  `/canvas`), leaving the shell entirely rather than returning to the prior
+  shell view. This reproduces the original `Observed`/`Inferred` evidence
+  exactly, now confirmed for the Canvas→Experiments transition with an
+  explicit `aria-*` state check.
+- **New — Observed: `NotificationCenter` nests an interactive Dismiss button
+  inside another interactive row button.** With a seeded notification, the
+  browser logged a live React `validateDOMNesting(...)` warning
+  ("`<button>` cannot appear as a descendant of `<button>`") at
+  `NotificationCenter.tsx:274`. The accessibility snapshot's computed
+  accessible name for the row button concatenated the nested Dismiss
+  button's text into the row's own name (`"error Encoding 12:02 PM Test
+  warning message node-1 Click to see full details Dismiss"`). Tabbing from
+  the row button moved focus onto the nested `aria-label="Dismiss"` button,
+  confirming the invalid button-in-button nesting is live and
+  keyboard-reachable, not just a static markup smell. Recorded as `FND-007`
+  below.
+- **Inferred (not reproduced this rerun):** Inference's own shell-view
+  focus/history/selected-state behavior, EDA/Data/Operations route-level
+  compact-navigation behavior at 390 px beyond the already-Observed
+  Dashboard/Canvas cases, and full keyboard-only completion of the Canvas
+  node forms, Add Source modal, EDA setup/filter controls, and the Inference
+  editor were not independently re-driven this rerun; their standing
+  evidence is the source-level review recorded in `FND-005` and the
+  Reconciliation notes below, unchanged from the original audit.
+
+#### Accessibility automation rerun
+
+- **Measured:** `cd frontend/ml-canvas && npm run test:e2e -- e2e/a11y.spec.ts --project=chromium`
+  exited `1`. All `4` tests (`dashboard (/)`, `canvas (/canvas)`, `data
+  (/data)`, `eda (/eda)`) failed identically before any route loaded or axe
+  ran: `browserType.launch: Executable doesn't exist at
+  /Users/BH7043/Library/Caches/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-mac-arm64/chrome-headless-shell`,
+  the same missing-Chromium root cause recorded in the Task 1 rerun baseline.
+  Because no browser launched, axe-core never ran and produced zero
+  critical or non-blocking (`serious`) findings this rerun — there is no
+  current automated evidence, positive or negative, for the dashboard
+  `color-contrast` or canvas `scrollable-region-focusable` findings the
+  original audit recorded from a working system-Chrome run. This gap is
+  recorded as-is, per audit scope; the executable was not installed and no
+  product or test code was modified to make it pass.
+- **Inferred (environment note, not a code finding):** `node_modules/playwright-core/browsers.json`
+  in this checkout still pins Chromium headless-shell revision `1217`, while
+  `~/Library/Caches/ms-playwright/` on this machine only has revision `1228`
+  installed; the two do not match, so no locally cached browser satisfies
+  this project's pinned revision without running `npx playwright install`.
+  A system Google Chrome installation exists at `/Applications/Google
+  Chrome.app` (`151.0.7922.76`), but the project's `playwright.config.ts`
+  targets the default Chromium channel, not `channel: 'chrome'`, and no
+  `.superpowers/sdd/playwright.chrome.config.ts` fallback (used by the
+  original audit) exists in this checkout, matching the Task 1 rerun's
+  documented limitation.
 
 ## Synthesis, Deduplication, and Ranking
 
@@ -373,6 +509,17 @@ tasks add live walkthrough evidence.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     Medium. **Dependencies:** `useViewStore` and retained-view behavior.
     **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed** again at 1440 px on `/canvas`:
+    clicking "Experiments" left the URL at `/canvas` with no new history
+    entry, none of the three switcher buttons exposed `aria-current`,
+    `aria-selected`, or `aria-pressed`, and Back returned to `/` (the route
+    visited before Canvas) rather than to a prior shell view. Source
+    re-reading confirms `Navbar.tsx`, `useViewStore.ts`, and `MainLayout.tsx`
+    are unchanged from the original evidence. Inference's own switch was not
+    independently re-driven this rerun, so that inventory row remains
+    Inferred, as in the original audit.
+  - **Delta:** No material change.
 
 ### Async and Feedback States
 
@@ -403,6 +550,14 @@ tasks add live walkthrough evidence.
     axe afterward.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** S. **Risk:**
     Low. **Dependencies:** None. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** Re-reading `LoadingState.tsx`, `EmptyState.tsx`,
+    and `ErrorState.tsx` confirms none contain a `role=` or `aria-live`
+    attribute; `grep -RInE "LoadingState|EmptyState|ErrorState|PageSkeleton|toast\.|disabled=" src`
+    found `256` matches across the same affected journeys, with no shared
+    live-region contract introduced. Inferred: source review, not a live
+    screen-reader reproduction.
+  - **Delta:** No material change.
 
 - **FND-004 — Inferred: Retry affordances are inconsistent for equivalent
   request failures.**
@@ -432,6 +587,15 @@ tasks add live walkthrough evidence.
     affected journeys.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** S. **Risk:**
     Low. **Dependencies:** Existing page fetch functions. **Milestone:** Next.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** Re-grepped and re-read all five call sites:
+    `Dashboard.tsx`, `EDAPage.tsx`, and `DeploymentsPage.tsx` still pass
+    `onRetry`; `ModelRegistry.tsx` (line 158, `<ErrorState error={error} />`)
+    and `EvaluationView.tsx`/`SegmentationView.tsx` (`<ErrorState
+    error={evalError} />`) still render `ErrorState` with no `onRetry`.
+    Inferred: source review, not a live reproduction of each failure path.
+  - **Delta:** No material change.
+
 
 ### Forms and Validation
 
@@ -479,6 +643,19 @@ tasks add live walkthrough evidence.
     Medium. **Dependencies:** shared form primitives, node configuration
     metadata, and existing source/EDA/inference validation rules.
     **Milestone:** Next.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** Re-read all four cited files. `EncodingNode.tsx`
+    still places `<span className="block text-sm font-medium">Encoding
+    Method</span>` beside its `<select>` with no `htmlFor`/`id`/ARIA
+    association. `AddSourceModal.tsx` still uses `<span
+    className="...">Name</span>` and `<span className="...">S3 Path</span>`
+    beside their inputs with no `id`/`htmlFor`. `EDASidebar.tsx` still has no
+    `htmlFor`/`aria-label`/`<label>` for its filter controls (placeholder
+    `"Value"` only). `InferencePage.tsx` still renders the prediction
+    `<textarea>` with no `label`, `aria-label`, or `aria-labelledby`.
+    Inferred: source review, not a live keyboard-only reproduction across
+    all four surfaces this rerun.
+  - **Delta:** No material change.
 
 ### Accessibility and Keyboard UX
 
@@ -515,6 +692,75 @@ tasks add live walkthrough evidence.
     overlay/component tests.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** S. **Risk:**
     Low. **Dependencies:** `ModalShell` focus helpers. **Milestone:** Now.
+  - **2026-08-07 status:** Changed.
+  - **Current evidence:** **Observed** again at 1440 px on `/canvas` for
+    Shortcuts: the next Tab after opening it moved focus to the covered
+    "Open command palette" navbar button, outside the dialog — reproducing
+    the original evidence exactly. **Newly Observed** (previously Inferred)
+    for the other two surfaces: opening Command Palette (Ctrl/Cmd+K) and
+    focusing its last in-dialog element, the next Tab moved focus to the
+    "Open Tanstack query devtools" button behind the still-open dialog.
+    Seeding one notification and opening its detail modal, focus was never
+    moved into the dialog on open, and the next Tab moved focus to the
+    sidebar's "Collapse sidebar" button, escaping the modal entirely. All
+    three shell overlays now have direct, live confirmation of the same
+    missing focus-containment/return contract.
+  - **Delta:** Evidence for Command Palette and the notification detail
+    modal upgraded from Inferred to Observed; the user problem, affected
+    surfaces, proposed behavior, and priority are unchanged.
+
+- **FND-007 — Observed: `NotificationCenter` nests an interactive Dismiss
+  button inside another interactive row button.**
+  - **Evidence:** With a seeded notification (`localStorage`
+    `skyulf-notifications`), opening the panel triggered a live React
+    `validateDOMNesting(...)` console warning ("`<button>` cannot appear as
+    a descendant of `<button>`") pointing at
+    `NotificationCenter.tsx:274`, where each `<li>` row (lines 247–284)
+    renders `<button onClick={() => openDetail(it)}>...<button
+    aria-label="Dismiss" onClick={(e) => { e.stopPropagation();
+    dismiss(it.id); }}>...</button></button>` — an interactive Dismiss
+    button nested inside the interactive row button, which is invalid per
+    the HTML interactive-content model. The accessibility tree's computed
+    accessible name for the outer row concatenated the nested button's own
+    text into the row's name (`"error Encoding 12:02 PM Test warning
+    message node-1 Click to see full details Dismiss"`), and Tab from the
+    row moved focus onto the nested `aria-label="Dismiss"` button,
+    confirming the invalid nesting is live in the rendered DOM and
+    keyboard-reachable, not only a static markup smell.
+  - **User problem:** A screen-reader user tabbing to a notification row
+    hears an accessible name that folds in the unrelated "Dismiss" action
+    text, making it unclear whether activating the row opens details or
+    dismisses the notification; the underlying invalid DOM structure is
+    also fragile across browsers/AT that may reflow or drop the nested
+    control.
+  - **Affected surfaces:** `NotificationCenter.tsx` notification list rows,
+    reachable from the shared Navbar in Canvas, Experiments, and Inference.
+  - **Proposed behavior:** Restructure each row so the open-detail action
+    and the Dismiss action are sibling interactive elements (for example, a
+    non-interactive row container plus two independent buttons, or an
+    interactive row using `role="button"` with the Dismiss control placed
+    outside it), so no button is a descendant of another button.
+  - **Acceptance criteria:** No interactive element is nested inside
+    another interactive element in the notification list; each row and its
+    Dismiss control expose distinct, correctly scoped accessible names; Tab
+    order and activation semantics remain unchanged for sighted mouse and
+    keyboard users.
+  - **Validation method:** A component test renders a populated
+    notification list and asserts no `button` has a `button` ancestor
+    within the list, plus that each row's and Dismiss control's accessible
+    name does not include the other's text; Playwright keyboard test tabs
+    through a populated list and asserts focus order and the two controls'
+    accessible names.
+  - **Impact:** Medium. **Frequency:** Occasional (only reachable once at
+    least one pipeline warning has been buffered). **Effort:** S. **Risk:**
+    Low. **Dependencies:** None. **Milestone:** Next.
+  - **2026-08-07 status:** New.
+  - **Current evidence:** Observed live via a seeded `localStorage`
+    notification and a real browser session (console warning, accessible
+    name concatenation, and Tab focus landing on the nested button); not
+    present in the previous roadmap because the notification panel was
+    previously exercised only in its empty state.
+  - **Delta:** New finding; no prior entry to compare against.
 
 ### Responsive Behavior
 
@@ -545,6 +791,18 @@ tasks add live walkthrough evidence.
   - **Impact:** High. **Frequency:** Frequent on narrow screens. **Effort:**
     M. **Risk:** Medium. **Dependencies:** Shared Layout and Canvas
     read-only breakpoint behavior. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed** again at 390 px with a live
+    Playwright MCP browser session against the project's own Vite dev
+    server: Dashboard's `<aside>` measured `256px` wide with the main pane
+    starting at `x=256` and measuring `134px` wide (no document horizontal
+    overflow). Canvas's view switcher measured `352.55px` wide and stayed
+    inside the `326px` main pane at 390 px in this rerun (ending at
+    `x=403.28` against a `390px` viewport, with the Notifications bell at
+    `x=342–378`, no clipping/overlap detected this run); the underlying
+    compact-shell defect is nonetheless reproduced on Dashboard, so the
+    finding is not resolved.
+  - **Delta:** No material change.
 ### Terminology and Visual Hierarchy
 
 ### Perceived Performance
@@ -1777,6 +2035,7 @@ Canvas finding is warranted solely for this repeated form root.
 | FND-004 | Inferred | Route-fetch errors inconsistently offer Retry; Canvas uses a different, toast-scoped pattern. | Dashboard; Data/EDA; Registry; Deployments; Experiments evaluation | Medium | Occasional | S | Low | Page fetch functions | Next |
 | FND-005 | Inferred | Canvas, Data/EDA, and Inference forms lack consistent field semantics. | Canvas node forms; Data Sources Add Source; EDA analysis/filter controls; Inference editor; shared controls | High | Frequent | M | Medium | Shared form primitives; node metadata/validation; source/EDA/inference validation | Next |
 | FND-006 | Inferred | Shell view selection is not history-restorable or programmatically selected. | Canvas; Experiments; Inference | High | Frequent | M | Medium | useViewStore; retained views | Now |
+| FND-007 | Observed | `NotificationCenter` nests an interactive Dismiss button inside another interactive row button. | Shared Navbar `NotificationCenter` (Canvas, Experiments, Inference) | Medium | Occasional | S | Low | None | Next |
 | CAN-001 | Observed | Click-added node cards overlap and do not enter configuration. | Canvas palette, graph, Properties panel | High | Frequent | S | Low | Custom-node bounds; Sidebar; selection | Now |
 | CAN-005 | Observed | Canvas toolbar clusters overlap and intercept visible actions when Properties narrows the Flow pane. | Canvas Toolbar, Flow viewport, Properties panel | High | Frequent | S | Low | Toolbar responsive layout; panel width | Now |
 | CAN-002 | Inferred | Run readiness and failures lack an actionable node-level diagnostic loop. | Canvas run controls, node warnings, Results | High | Occasional | M | Medium | Validators; converter; FND-003 | Now |
