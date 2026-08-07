@@ -16,6 +16,7 @@ import pandas as pd
 
 from skyulf.data.dataset import SplitDataset
 
+from ..graph_utils import _extract_columns
 from ..schemas import NodeConfig
 
 logger = logging.getLogger(__name__)
@@ -459,6 +460,68 @@ class MergeMixin:
 
         return self._merge_frames(dataframes, node.node_id)
 
+    def _upstream_dropped_columns(self, node: NodeConfig) -> list[str]:
+        """Columns explicitly removed by any Drop Columns / feature-selection ancestor.
+
+        Only statically declared columns are returned; threshold-based drops are
+        data-dependent and can't be known from the graph alone.
+        """
+        dropped: list[str] = []
+        for ancestor_id in self._ancestors_of(node.node_id):
+            cfg = self._node_configs.get(ancestor_id)
+            if cfg is None:
+                continue
+            dropped.extend(_extract_columns(cfg.step_type, cfg.params or {}))
+        return sorted(set(dropped))
+
+    def _strip_columns_from_frame(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+        present = [c for c in columns if c in df.columns]
+        return df.drop(columns=present) if present else df
+
+    def _strip_columns(self, payload: Any, columns: list[str]) -> Any:
+        """Remove ``columns`` from any merge-result shape, leaving other shapes untouched."""
+        if isinstance(payload, pd.DataFrame):
+            return self._strip_columns_from_frame(payload, columns)
+        if isinstance(payload, SplitDataset):
+            return SplitDataset(
+                train=self._strip_columns(payload.train, columns),
+                test=self._strip_columns(payload.test, columns),
+                validation=self._strip_columns(payload.validation, columns),
+            )
+        if isinstance(payload, tuple) and payload and isinstance(payload[0], pd.DataFrame):
+            return (self._strip_columns_from_frame(payload[0], columns), *payload[1:])
+        return payload
+
+    def _enforce_upstream_drops(self, node: NodeConfig, merged: Any) -> Any:
+        """Re-apply upstream drops so a sibling branch can't resurrect a dropped column.
+
+        A fan-in merge unions columns, so a branch that bypassed a Drop Columns
+        node silently reintroduces what the user asked to remove — and the model
+        then trains on it. A drop is treated as authoritative for the whole
+        subgraph below it, not just its own branch.
+        """
+        dropped = self._upstream_dropped_columns(node)
+        if not dropped:
+            return merged
+
+        before = set(self._artifact_columns(merged))
+        restored = [c for c in dropped if c in before]
+        if not restored:
+            return merged
+
+        self.log(
+            f"Node {node.node_id}: merge reintroduced upstream-dropped column(s) "
+            f"{restored} from a sibling branch — dropping them again."
+        )
+        self.merge_warnings.append(
+            {
+                "node_id": node.node_id,
+                "kind": "upstream_drop_reapplied",
+                "dropped_columns": restored,
+            }
+        )
+        return self._strip_columns(merged, restored)
+
     def _merge_inputs(self, node: NodeConfig, target_col: str = "") -> Any:
         """Resolve and merge all upstream inputs for a multi-input node.
 
@@ -470,6 +533,9 @@ class MergeMixin:
         * Mixed or all-DataFrame inputs → flatten to DataFrames and merge.
           A warning is logged when SplitDatasets are flattened so the loss of
           held-out splits is visible in job logs.
+
+        Whatever the shape, columns removed by an upstream Drop Columns node are
+        stripped again afterwards so a sibling branch cannot resurrect them.
         """
         artifacts = self._resolve_all_inputs(node)
         if len(artifacts) == 1:
@@ -483,9 +549,10 @@ class MergeMixin:
         all_splits = all(isinstance(a, SplitDataset) for a in artifacts)
         all_xy_tuples = all(isinstance(a, tuple) and len(a) == 2 for a in artifacts)
         if all_xy_tuples:
-            return self._merge_xy_tuples(node, artifacts)
+            merged = self._merge_xy_tuples(node, artifacts)
+        elif all_splits:
+            merged = self._merge_split_datasets(node, artifacts, target_col)
+        else:
+            merged = self._merge_fallback_frames(node, artifacts, target_col)
 
-        if all_splits:
-            return self._merge_split_datasets(node, artifacts, target_col)
-
-        return self._merge_fallback_frames(node, artifacts, target_col)
+        return self._enforce_upstream_drops(node, merged)

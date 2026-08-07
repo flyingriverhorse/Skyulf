@@ -1141,17 +1141,62 @@ export const InferencePage: React.FC = () => {
     );
 
     return (
-        <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-6 overflow-hidden">
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6 shrink-0 flex items-center gap-2">
-                <Zap className="w-6 h-6 text-blue-500" />
-                Testing Model Inference
-            </h1>
+        <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 overflow-y-auto lg:overflow-hidden">
+            {/* Deployment status lives in the header rather than a half-height card:
+                it's a one-line fact, and the space it used to occupy is what the
+                results panel needs to stay readable on short/narrow viewports. */}
+            <header className="shrink-0 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                    <Zap className="w-6 h-6 text-blue-500 shrink-0" />
+                    Testing Model Inference
+                </h1>
+                {activeDeployment ? (
+                    <div className="flex items-center gap-2 flex-wrap text-xs min-w-0">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 font-medium">
+                            <CheckCircle className="w-3.5 h-3.5 shrink-0" /> Active
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 min-w-0">
+                            <Box className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate max-w-[10rem]">{activeDeployment.model_type}</span>
+                        </span>
+                        <span
+                            className="hidden sm:inline-flex items-center px-2 py-1 rounded-full bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 font-mono min-w-0"
+                            title={`Job ${activeDeployment.job_id} · deployed ${new Date(activeDeployment.created_at).toLocaleString()}`}
+                        >
+                            <span className="truncate max-w-[8rem]">{activeDeployment.job_id}</span>
+                        </span>
+                        <button
+                            onClick={() => void handleDeactivate()}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50 transition-colors"
+                            title="Undeploy model"
+                        >
+                            <Power className="w-3.5 h-3.5" /> Undeploy
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 italic">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            No model is currently deployed.
+                        </span>
+                        <Link
+                            to="/registry"
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/50 transition-colors"
+                        >
+                            <Box className="w-3.5 h-3.5" /> Browse Model Registry
+                        </Link>
+                    </div>
+                )}
+            </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+            {/* Only the desktop two-column layout is height-constrained. Stacked on
+                narrower viewports the panels keep a usable minimum height and the
+                page scrolls instead of compressing both to a few pixels. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:flex-1 lg:min-h-0">
                 {/* Left column: input editor */}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full min-h-0">
+                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col lg:h-full lg:min-h-0">
                     <div className="flex justify-between items-start mb-3 gap-3 flex-wrap">
-                        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">
+                        <h3 id="inference-input-heading" className="text-lg font-medium text-gray-800 dark:text-gray-100">
                             Input Data (JSON)
                         </h3>
                         <div className="flex items-center gap-1 flex-wrap">
@@ -1265,9 +1310,13 @@ export const InferencePage: React.FC = () => {
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                        className="relative flex-1 min-h-0"
+                        className="relative flex-1 min-h-[16rem] lg:min-h-0"
                     >
                         <textarea
+                            id="inference-input-editor"
+                            aria-labelledby="inference-input-heading"
+                            aria-describedby="inference-input-status"
+                            aria-invalid={!inputStatus.valid}
                             className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                             value={inputData}
                             onChange={e => setInputData(e.target.value)}
@@ -1369,6 +1418,8 @@ export const InferencePage: React.FC = () => {
 
                     <div className="mt-3 flex justify-between items-center gap-3 flex-wrap">
                         <span
+                            id="inference-input-status"
+                            role="status"
                             className={`text-xs flex items-center gap-1 ${
                                 inputStatus.valid
                                     ? 'text-gray-500 dark:text-gray-400'
@@ -1419,7 +1470,7 @@ export const InferencePage: React.FC = () => {
                     </div>
 
                     {/* Ad-hoc override thresholds — applied only to this prediction, not persisted server-side. */}
-                    <details className="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 group">
+                    <details className="mt-3 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 group overflow-hidden">
                         <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                             <Sparkles className="w-3.5 h-3.5" /> Advanced: override thresholds
                         </summary>
@@ -1462,7 +1513,7 @@ export const InferencePage: React.FC = () => {
                             {Object.entries(overrideThresholdsValue).length > 0 && (
                                 <div className="space-y-1">
                                     {Object.entries(overrideThresholdsValue).map(([cls, thr]) => (
-                                        <div key={cls} className="flex items-center gap-2">
+                                        <div key={cls} className="flex items-center gap-2 flex-wrap">
                                             <span
                                                 className="font-mono text-xs w-28 truncate text-gray-700 dark:text-gray-200"
                                                 title={cls}
@@ -1492,7 +1543,7 @@ export const InferencePage: React.FC = () => {
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <input
                                     type="text"
                                     value={newOverrideClass}
@@ -1535,70 +1586,10 @@ export const InferencePage: React.FC = () => {
                     </details>
                 </div>
 
-                {/* Right column: deployment status + results */}
-                <div className="flex flex-col gap-6 h-full min-h-0">
-                    {/* Active deployment card */}
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 shrink-0">
-                        <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Box className="w-5 h-5 text-blue-500" />
-                                Active Deployment
-                            </div>
-                            {activeDeployment && (
-                                <button
-                                    onClick={() => void handleDeactivate()}
-                                    className="flex items-center gap-1 text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors"
-                                    title="Undeploy model"
-                                >
-                                    <Power className="w-3 h-3" /> Undeploy
-                                </button>
-                            )}
-                        </h2>
-                        {activeDeployment ? (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Model Type</div>
-                                    <div className="font-medium text-gray-800 dark:text-gray-200">
-                                        {activeDeployment.model_type}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Job ID</div>
-                                    <div className="font-mono text-sm text-gray-800 dark:text-gray-200 break-all">
-                                        {activeDeployment.job_id}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Deployed At</div>
-                                    <div className="text-sm text-gray-800 dark:text-gray-200">
-                                        {new Date(activeDeployment.created_at).toLocaleDateString()}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
-                                    <div className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium text-sm">
-                                        <CheckCircle className="w-4 h-4" /> Active
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-3">
-                                <div className="text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4" />
-                                    No model is currently deployed.
-                                </div>
-                                <Link
-                                    to="/registry"
-                                    className="self-start inline-flex items-center gap-2 text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
-                                >
-                                    <Box className="w-3 h-3" /> Browse Model Registry
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-
+                {/* Right column: results (deployment status now lives in the page header) */}
+                <div className="flex flex-col lg:h-full lg:min-h-0">
                     {/* Results panel */}
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col flex-1 min-h-0">
+                    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col flex-1 min-h-[20rem] lg:min-h-0">
                         <div className="flex justify-between items-center mb-4 gap-3 flex-wrap">
                             <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">
                                 Prediction Results

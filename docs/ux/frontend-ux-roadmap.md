@@ -1409,6 +1409,50 @@ tasks add live walkthrough evidence.
     Inferred: source review, not a live keyboard-only reproduction across
     all four surfaces this rerun.
   - **Delta:** No material change.
+  - **2026-08-07 resolution (partial):**
+    - **The roadmap's `AddSourceModal.tsx` evidence was stale.** Re-reading the
+      file found it already fully corrected: `Name` and `S3 Path` use
+      `<label htmlFor>`, carry `required`, flip `aria-invalid`, and link
+      `aria-describedby` to a `role="alert"` error; the credential inputs are
+      labelled too. Live-verified at 390 px — submitting the empty form sets
+      `aria-invalid="true"` on both required fields with "Name is required." /
+      "S3 Path is required." as their accessible descriptions. No change was
+      needed there, and none was made.
+    - Fixed the genuinely unlabelled controls: `EncodingNode`'s Encoding Method
+      select (`span` → `<label htmlFor>` + `useId`), EDA's toolbar
+      Dataset/Target Column/Task Type selects, EDA's no-analysis setup Target
+      Column input and Task Type select, `EDASidebar`'s filter
+      column/operator/value and exclusion-column controls, and Data Sources'
+      dataset search input.
+    - Inference's prediction `<textarea>` now uses `aria-labelledby` to its
+      "Input Data (JSON)" heading, `aria-describedby` to the parse-status line
+      (given `role="status"`), and `aria-invalid` driven by `inputStatus.valid`.
+      Live-verified: typing `[{broken` flips `aria-invalid` to `true` and the
+      accessible description becomes the parser's message.
+    - Added `components/ui/FormField.tsx` (11 tests, TDD) as the shared
+      primitive so future forms get label/required/error association by
+      construction.
+    - Added accessible-name regression tests for `EDASidebar` (2) and
+      `EncodingNode` (1). The `EncodingNode` test was written after the fix, so
+      it was **verified by reverting the fix and watching it fail** with
+      "Unable to find an accessible element with the role combobox and name
+      Encoding Method".
+    - Live sweep of every rendered control: `/eda` (3 controls at 1440 px and
+      390 px, plus 4 more with the filter/exclusion forms open) and `/data`
+      with the Add Source modal and credentials expanded (6 controls) — **zero
+      unnamed controls** on either surface.
+  - **Still open (deliberately not claimed as done):**
+    - Only the four cited surfaces were swept. Experiments and Operations forms
+      were **not** audited, matching the finding's own scope note.
+    - The `FormField` primitive is built and tested but not yet adopted by the
+      existing forms — they were fixed in place with native `label`/`aria-*`.
+      Migrating them is follow-up work.
+    - "Enter submits only forms with a defined, announced submit action" was
+      not systematically audited.
+    - **axe was not run** on these surfaces. `@axe-core/playwright` is a
+      dependency but the finding's validation method needs an E2E lane; the
+      verification above is a DOM-level accessible-name computation, not a full
+      axe pass.
 
 ### Accessibility and Keyboard UX
 

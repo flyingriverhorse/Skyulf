@@ -239,6 +239,7 @@ export const DataSources: React.FC = () => {
             <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" />
             <input
               type="text"
+              aria-label="Search datasets"
               placeholder="Search datasets..."
               value={searchQuery}
               onChange={e => { setSearchQuery(e.target.value); }}

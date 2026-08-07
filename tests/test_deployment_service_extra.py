@@ -6,6 +6,7 @@ test_deployment.py (deploy -> predict happy path).
 """
 
 from datetime import UTC, datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -232,7 +233,7 @@ def test_resolve_predict_store_and_key_s3_without_suffix():
 
 def test_resolve_pipeline_node_path():
     store_uri, key = DeploymentService._resolve_pipeline_node_path("pipe1", "node1")
-    assert store_uri.endswith("exports/models/pipe1")
+    assert Path(store_uri).parts[-3:] == ("exports", "models", "pipe1")
     assert key == "node1"
 
 
@@ -245,7 +246,7 @@ def test_resolve_predict_store_and_key_local_absolute(tmp_path):
 
 def test_resolve_predict_store_and_key_local_two_parts_nonexistent():
     store_uri, key = DeploymentService._resolve_predict_store_and_key_local("pipeA/nodeB")
-    assert store_uri.endswith("exports/models/pipeA")
+    assert Path(store_uri).parts[-3:] == ("exports", "models", "pipeA")
     assert key == "nodeB"
 
 
@@ -266,7 +267,7 @@ def test_resolve_predict_store_and_key_local_nonexistent_three_parts(tmp_path, m
     store_uri, key = DeploymentService._resolve_predict_store_and_key_local(
         "pipeA/subdir/nodeB.joblib"
     )
-    assert store_uri == "pipeA/subdir"
+    assert Path(store_uri).parts == ("pipeA", "subdir")
     assert key == "nodeB.joblib"
 
 
@@ -489,7 +490,7 @@ def test_resolve_local_base_and_key_for_details_absolute(tmp_path):
 
 def test_resolve_local_base_and_key_for_details_two_part_relative():
     base, key = DeploymentService._resolve_local_base_and_key_for_details("pipeA/nodeB")
-    assert base.endswith("exports/models/pipeA")
+    assert Path(base).parts[-3:] == ("exports", "models", "pipeA")
     assert key == "nodeB"
 
 
