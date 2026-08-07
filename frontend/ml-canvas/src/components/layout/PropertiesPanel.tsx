@@ -8,7 +8,7 @@ import {
   isAutoParallelType,
   supportsExecutionModeToggle,
 } from '../../core/types/executionMode';
-import { getMergeStrategy } from '../../core/types/nodeData';
+import { getMergeStrategy, type MergeStrategy } from '../../core/types/nodeData';
 import { X, Maximize2, Minimize2, Settings2, Merge } from 'lucide-react';
 import { Node } from '@xyflow/react';
 
@@ -189,6 +189,7 @@ const MultiInputModeSection: React.FC<{ selectedNode: Node }> = ({ selectedNode 
 const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }) => {
   const edges = useGraphStore((state) => state.edges);
   const updateNodeData = useGraphStore((state) => state.updateNodeData);
+  const executionResult = useGraphStore((state) => state.executionResult);
 
   const definitionType = selectedNode.data.definitionType as string;
   const definition = registry.get(definitionType);
@@ -219,6 +220,17 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
   // not an ensemble (model-spec fan-in), and not explicitly set to parallel.
   if (!canMerge || incomingSourceCount < 2 || isAutoParallel || isEnsemble || isParallelMode) return null;
 
+  // Branches editing different columns have an unambiguous owner per column,
+  // so the engine never needs a tiebreak and this setting would do nothing.
+  // The engine only emits a `sibling_fan_in` advisory when two branches really
+  // did contest a column, so gate the control on that rather than guessing
+  // from the wiring alone.
+  const contested = (executionResult?.merge_warnings ?? []).find(
+    (w) => w.kind === 'sibling_fan_in' && w.node_id === selectedNode.id
+  );
+  if (!contested) return null;
+
+  const contestedColumns = contested.overlap_columns ?? [];
   const current = getMergeStrategy(selectedNode.data);
 
   return (
@@ -228,11 +240,17 @@ const MergeStrategySection: React.FC<{ selectedNode: Node }> = ({ selectedNode }
         <h3 className="text-sm font-semibold">Merge Strategy</h3>
       </div>
       <p className="text-xs text-muted-foreground mb-2">
-        How to resolve columns present in more than one input.
+        {contestedColumns.length} column
+        {contestedColumns.length === 1 ? '' : 's'} were modified by more than one incoming branch.
+        Pick which branch&apos;s version to keep
+        {contestedColumns.length > 0 ? `: ${contestedColumns.slice(0, 4).join(', ')}` : ''}
+        {contestedColumns.length > 4 ? `, +${contestedColumns.length - 4} more` : ''}.
       </p>
       <select
         value={current}
-        onChange={(e) => updateNodeData(selectedNode.id, { merge_strategy: e.target.value })}
+        onChange={(e) =>
+          updateNodeData(selectedNode.id, { merge_strategy: e.target.value as MergeStrategy })
+        }
         className="w-full px-2 py-1.5 text-sm bg-background border rounded-md"
       >
         <option value="last_wins">Last wins (default) - downstream input overwrites</option>

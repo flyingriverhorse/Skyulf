@@ -76,9 +76,10 @@ def _merged_frame(payload: Any) -> pd.DataFrame:
 
 
 @pytest.mark.parametrize("transformation_first", [False, True])
-def test_last_wins_follows_edge_order_not_nodes_array(
+def test_transform_survives_regardless_of_nodes_array_order(
     tmp_path: Path, transformation_first: bool
 ) -> None:
+    """Moving a node in the canvas must not change which branch's values survive."""
     csv = _make_iris(tmp_path)
     store = LocalArtifactStore(str(tmp_path / "art"))
     engine = PipelineEngine(store, catalog=FileSystemCatalog())
@@ -86,12 +87,78 @@ def test_last_wins_follows_edge_order_not_nodes_array(
     result = engine.run(_build_config(csv, transformation_first=transformation_first))
     assert result.status == "success"
 
-    advisory = next(w for w in result.merge_warnings if w.get("kind") == "sibling_fan_in")
-    assert advisory["winner_input"] == "transformation"
+    expected = np.log1p(pd.read_csv(csv)["SepalLengthCm"].to_numpy())
+    actual = _merged_frame(store.load("missing_indicator"))["SepalLengthCm"].to_numpy()
+    np.testing.assert_allclose(actual, expected, atol=1e-9)
+
+
+def test_unchanged_passthrough_column_does_not_beat_a_real_transform(tmp_path: Path) -> None:
+    """A branch that merely carries a column through must not overwrite one that rewrote it."""
+    csv = _make_iris(tmp_path)
+    store = LocalArtifactStore(str(tmp_path / "art"))
+    engine = PipelineEngine(store, catalog=FileSystemCatalog())
+
+    # first_wins would hand the sepal columns to the pass-through branch under
+    # the old order-based rule; ownership must override that.
+    cfg = _build_config(csv, transformation_first=True)
+    merge_node = next(n for n in cfg.nodes if n.node_id == "missing_indicator")
+    merge_node.params["_merge_strategy"] = "first_wins"
+
+    result = engine.run(cfg)
+    assert result.status == "success"
 
     expected = np.log1p(pd.read_csv(csv)["SepalLengthCm"].to_numpy())
     actual = _merged_frame(store.load("missing_indicator"))["SepalLengthCm"].to_numpy()
     np.testing.assert_allclose(actual, expected, atol=1e-9)
+
+
+def test_no_winner_advisory_when_branches_do_not_contest_a_column(tmp_path: Path) -> None:
+    """No branch conflict means no winner, so the canvas shows no 'wins merge' label."""
+    csv = _make_iris(tmp_path)
+    store = LocalArtifactStore(str(tmp_path / "art"))
+    engine = PipelineEngine(store, catalog=FileSystemCatalog())
+
+    result = engine.run(_build_config(csv, transformation_first=False))
+
+    assert not [w for w in result.merge_warnings if w.get("kind") == "sibling_fan_in"]
+
+
+def test_two_branches_editing_the_same_column_still_report_a_winner(tmp_path: Path) -> None:
+    """A real contest keeps the advisory so the discarded edit stays visible."""
+    csv = _make_iris(tmp_path)
+    store = LocalArtifactStore(str(tmp_path / "art"))
+    engine = PipelineEngine(store, catalog=FileSystemCatalog())
+
+    cfg = PipelineConfig(
+        pipeline_id="contested_column",
+        nodes=[
+            NodeConfig(node_id="data", step_type=StepType.DATA_LOADER, params={"path": csv}),
+            NodeConfig(
+                node_id="log_branch",
+                step_type="SimpleTransformation",
+                inputs=["data"],
+                params={"transformations": [{"column": "SepalLengthCm", "method": "log"}]},
+            ),
+            NodeConfig(
+                node_id="scale_branch",
+                step_type="MinMaxScaler",
+                inputs=["data"],
+                params={"columns": ["SepalLengthCm"]},
+            ),
+            NodeConfig(
+                node_id="merge_node",
+                step_type="MissingIndicator",
+                inputs=["log_branch", "scale_branch"],
+                params={"columns": ["PetalLengthCm"]},
+            ),
+        ],
+    )
+    result = engine.run(cfg)
+    assert result.status == "success"
+
+    advisory = next(w for w in result.merge_warnings if w.get("kind") == "sibling_fan_in")
+    assert advisory["overlap_columns"] == ["SepalLengthCm"]
+    assert advisory["winner_input"] == "scale_branch"
 
 
 def test_upstream_drop_warning_carries_inputs(tmp_path: Path) -> None:

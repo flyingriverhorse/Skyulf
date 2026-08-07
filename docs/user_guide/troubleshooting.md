@@ -72,14 +72,24 @@ You see an amber banner in the Results panel like:
 
 ### What it means
 
-A node has **two or more incoming edges** that trace back to a common ancestor (sibling fan-in). The engine merges them with two rules:
+A node has **two or more incoming edges** that trace back to a common ancestor (sibling fan-in). The
+engine merges them per column, using the nearest shared ancestor as a baseline to decide **which
+branch actually changed each column**:
 
-1. **Union of columns** — any column unique to one branch is kept as-is.
-2. **Last-wins on overlap** — for columns present in two or more branches, the **last input** in the node's input list overwrites the earlier ones. Earlier branches' modifications to those columns are silently dropped.
+1. **Nobody changed it** — the value is identical everywhere; any branch can supply it.
+2. **Exactly one branch changed it** — that branch owns the column. Its value always survives,
+   regardless of edge order or merge strategy. This is the common case, and it produces **no banner**.
+3. **Two or more branches changed it** — a genuine conflict. The merge strategy (`last_wins` by
+   default, i.e. the last input edge) picks the winner, the losing branch's edits to that column are
+   discarded, and this banner appears naming the contested columns.
+
+The **Merge Strategy** dropdown in the Properties panel is only shown after a run has detected case 3
+for that node — there is nothing to choose when nothing is contested.
 
 ### Why it's usually a bug
 
-If both branches modify the same columns (e.g. `TransformationNode` rescales `SepalLengthCm` and `MissingIndicator` outputs the original `SepalLengthCm` plus `*_missing` flags), only the last branch's values survive. You lose the work the other branch did.
+If both branches modify the same columns (e.g. both rescale `SepalLengthCm`), only the winning
+branch's values survive. You lose the work the other branch did on that column.
 
 ### How to entirely fix it
 
