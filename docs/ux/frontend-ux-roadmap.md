@@ -759,6 +759,186 @@ new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
   user-state risk beyond the label itself), so it is captured only as
   `EXP-008`'s own finding, not as a new boundary section.
 
+### Task 6 — Operations Rerun
+
+#### Method
+
+- **Method:** Reused an already-running local dev stack rather than starting a
+  fresh one: FastAPI backend (`run_skyulf.py`, port 8000, SQLite-backed, real
+  seeded data — 56 registered model versions, 1 active deployment, dozens of
+  tuning-job history rows, 30 HTTP error events) and Vite dev server (port
+  5173); neither process was started or stopped by this task. Live
+  walkthroughs used the Playwright MCP browser tools at **1440, 1024, 768, and
+  390 px** against routes confirmed directly from `App.tsx`: `/jobs`,
+  `/registry`, `/deployments`, `/drift` (there is no literal
+  `/monitoring/drift` route), `/errors`, `/slow-nodes`, `/audit`, plus the
+  Canvas-mounted Job History drawer (`JobsDrawer`/`JobDetailsView`, opened via
+  the toolbar's "Job runs history" button, not a route). Source re-reading
+  covered `Jobs.tsx`, `components/panels/jobs/` (`JobsDrawer.tsx`,
+  `JobDetailsView.tsx`), `ModelRegistry.tsx`, `DeploymentsPage.tsx`,
+  `DataDriftPage.tsx`, `ErrorLogPage.tsx`, `SlowNodesPage.tsx`,
+  `AuditLogPage.tsx`, and `core/api/monitoring.ts`/`core/api/deployment.ts`,
+  plus a dedicated `explore` sub-agent line-by-line re-check of every OPS-00N
+  claim against current code. `git diff --stat` for these files against the
+  original audit commit is empty — no source changed since `OPS-001`–`OPS-007`
+  were first written, so absent new live findings, priors read as *Confirmed*,
+  not *Changed*. **Correction carried over from the task brief, not silently
+  fixed:** the brief names `core/api/registry.ts` as the model-registry API
+  file; that file is actually the pipeline **node catalog**
+  (`GET /pipeline/registry`) used by `Jobs.tsx`/`JobsDrawer` to resolve a
+  job's `model_type` to a task tab. The real model-registry client backing
+  `ModelRegistry.tsx` is `core/hooks/useModelRegistry.ts`
+  (`useRegistryStats`/`useRegistryModels`/`useArtifacts`/`useDeployModel`,
+  hitting `/registry/stats`, `/registry/models`, `/registry/artifacts/{jobId}`,
+  `POST /deployment/deploy/{jobId}`); all OPS-002 evidence below cites the
+  correct file.
+- **No destructive mutation was submitted.** No deploy, redeploy, deactivate,
+  resolve, or drift-analysis run was executed to completion against the live
+  system; every affordance for those actions was confirmed to exist and be
+  reachable, not exercised to completion.
+- **Shared-browser limitation.** This session's Playwright browser instance
+  was shared with sibling background agents concurrently doing related Task
+  4/5/6 UX-audit work from the same root session. Several actions landed on a
+  tab that had been silently navigated by another agent between a snapshot
+  and the next action, producing stale-`ref` errors. Mitigation: every page
+  visit in the second half of this pass used a fresh `browser_navigate` call
+  and an immediate fresh snapshot before acting. Where an interaction could
+  not be completed live before the tab was reclaimed — the Drift Thresholds
+  dialog contents, the Errors Traceback dialog contents, a populated Audit Log
+  entry, and a full second 390 px pass on Deployments/Drift/Errors/Slow
+  Nodes/Audit — the corresponding evidence below is marked **Inferred (source
+  only)** for that specific control rather than **Observed (live)**, and this
+  distinction is preserved per finding rather than collapsed.
+- **No fixture seeding**, as in the original audit: no populated Drift report,
+  representative-sample Slow Nodes node, or populated Audit Log fixture was
+  constructed. Live behavior is **Observed** only for the empty/current-data
+  state actually present, and **Inferred (source)** for other lifecycle states
+  (e.g., populated drift alert, acknowledged/resolved disposition).
+
+#### Jobs and job-detail walkthrough
+
+- **Observed (live, 1440 px, `/jobs`):** a fresh table load shows
+  completed/failed rows with status, truncated ID, model type, one metric
+  value, duration, and created time; clicking any row/cell produces no
+  navigation, modal, or visible affordance. The only interactive control
+  besides tabs is a "Filters" button revealing a single Status facet (All /
+  Completed / Failed) — no task/model/date facets.
+- **Observed (live, Canvas Job History drawer):** the drawer lists the same
+  job pool as cards; clicking a completed job card opened a
+  `JobDetailsView` dialog with Overview/Live Logs tabs, Status/Dataset/
+  Duration, Execution Results, full Tuning Configuration, Best Score, and an
+  Evaluation Metrics table. No Retry action was present for the terminal job
+  (consistent with cancel-only framing); no cross-links to the source
+  dataset, registry version, or deployment were rendered — the dataset
+  filename shown as plain text only.
+- **Observed (live, new this rerun):** on two separate fresh, uncached
+  `/jobs` page loads, the table intermittently rendered **duplicate rows for
+  the same `job_id`**, accompanied by a live React console warning
+  (`Warning: Encountered two children with the same key, '<job_id>'...`).
+  Root-caused in `Jobs.tsx` — see **OPS-008** below.
+- **Observed (live, responsive, 390 px):** the fixed 256 px sidebar leaves
+  ~134 px for the main pane; the Jobs table, Refresh button, and tabs are
+  clipped/overflowed — this reconfirms `FND-001`, not a new Operations
+  finding, but the OPS-001 investigation gap is present at every width
+  tested and compounds with the layout defect at 390 px. At 768 px the tab
+  row and table header text are also clipped at the viewport edge.
+
+#### Registry and deployment walkthrough
+
+- **Observed (live, 1440 px, `/registry`):** "View Versions" opens a
+  version-history dialog (version, date, `best_score`, status, per-row
+  Deploy/View Artifacts). "View Artifacts" lists raw artifact/pipeline-step
+  file names as plain text with no link back to the originating job or
+  dataset. At least one live registry entry shows `model_type: "unknown"`
+  and `dataset_id: "unknown"` — a real backend data gap, not a UI bug.
+- **Observed (live, 1440 px, `/deployments`):** the Active Deployment card
+  shows model_type, the full Job ID as plain unlinked text, deployed
+  timestamp, artifact URI, and Deactivate; Deployment History shows a
+  truncated Job ID, model_type, Active status, deployed-at, and an empty
+  Actions column for the sole entry. No link from either surface back to
+  Jobs or a Registry version detail was found.
+- **New this rerun — client-side-only "manual deployment" tracker
+  (source-confirmed, `ModelRegistry.tsx` lines 53–68, 261–318):**
+  `ModelRegistry.tsx` maintains a `localStorage` key
+  `skyulf_manual_deployments` that lets a user mark a registry row's model
+  family as "Manual"-deployed via a checkbox, independent of any real backend
+  deployment record. The checkbox is `disabled` when the backend already
+  reports `deployment_count > 0` for that row (so it cannot override a real
+  active deployment), but for any model family the backend has not deployed,
+  a user can locally flip its Registry-displayed state to "Manual"/deployed
+  with no corresponding record in Deployments' active/history data, and this
+  state is scoped to one browser's `localStorage` only — invisible to any
+  other user or session. This is folded into **OPS-002** as an addendum below
+  (same lineage-consistency problem space), not treated as a new ID.
+- **Responsive (390 px, `/registry`):** reconfirms `FND-001`-style sidebar
+  clipping — not new Operations content, but confirms OPS-002's journey is
+  also blocked by the layout defect at narrow widths.
+
+#### Monitoring investigations walkthrough
+
+- **Observed (live, 1440 px, `/drift`):** live data has no drift report yet;
+  the "No Drift Report Yet" empty state reproduces exactly, with a
+  reference-job selector, Upload CSV/Parquet control, a disabled "Run
+  Analysis" button, a "Refresh jobs" control, and a "Drift thresholds"
+  button.
+- **Inferred (source only — Drift Thresholds dialog contents):** not
+  confirmed via a completed live open this pass (tab reclaimed mid-
+  interaction, per the shared-browser limitation above). Confirmed instead
+  via `core/api/monitoring.ts`: `DriftThresholds` (PSI/KS/Wasserstein/KL
+  fields) is a page-state object passed per-request to the analysis call;
+  `DriftHistoryEntry` has no threshold-snapshot field, confirming thresholds
+  are not versioned against history, exactly as `OPS-003` states.
+- **Observed (live, 1440 px, `/errors`):** Events(30)/Issues(6) tabs, stat
+  cards (HTTP events: 30, Server errors: 30, Pipeline failures: 0), an hourly
+  bar chart, a generic Search box, time-range buttons (1h/6h/24h/7d/All), a
+  "Show resolved" toggle, and a populated table of 500-level exception events
+  with per-row "✓ Resolve" and "Traceback" buttons. The Node/Route column
+  renders plain-text values (e.g. `/api/pipeline/datasets/273/schema`,
+  `celery/pipeline`) — text, not links.
+- **Inferred (source only — Traceback dialog contents, Resolve mutation
+  outcome):** not re-opened to completion this pass; corroborated instead by
+  `ErrorLogPage.tsx`'s generic search matching an HTTP event's `job_id` and a
+  pipeline log's `node_id` as substrings of a combined searchable text field,
+  while the actual API request only accepts time-range and resolved-state
+  parameters — confirming no typed severity/resource facet exists
+  server-side to expose. No Resolve mutation was submitted.
+- **Observed (live, 1440 px, `/slow-nodes`):** lookback controls
+  (24h/7d/30d/90d), Top-10/25/50 controls, a Refresh button, summary stats
+  (Step types: 8, Node runs: 65, Jobs scanned: 12, Window: 7 days), a "Total
+  time by step type" bar chart, and a sortable table. Each step-type row's
+  `sample_node_id` renders as literal "e.g. `<uuid-like string>`" text with no
+  click handler or drill-down — confirmed via `SlowNodesResponse`'s type
+  shape, which supplies only aggregate statistics plus an optional
+  `sample_node_id` string, no run-ID list or dataset/pipeline/deployment
+  linkage field.
+- **Limitation:** the responsive (1024/768/390 px) pass for Slow Nodes
+  specifically was not completed live this session; given `FND-001`'s
+  confirmed uniform sidebar-clipping pattern at 390 px across every other
+  Operations page tested, the same clipping is expected here but is
+  **Inferred, not directly Observed**, for this page.
+- **Observed (live, 1440 px, `/audit`):** a Dataset combobox populated with
+  dozens of real dataset entries and a Limit control (25/50/100/200), a
+  Refresh button, and — for the default-selected dataset — the exact
+  empty-state copy "No saves recorded for this dataset yet." No time-range,
+  actor, or action-type filter exists; the only two facets are Dataset and
+  Limit.
+- **Inferred (source only — populated-entry rendering):** not re-confirmed
+  against a populated dataset this pass (interrupted by a tab reclaim before
+  a populated entry could be captured); confirmed instead via
+  `AuditLogPage.tsx` calling `pipelineVersionsApi.audit(datasetId, limit)`
+  and rendering actor, timestamp, save action kind, version, and
+  added/removed/modified node diffs when entries exist — matching
+  `OPS-006`'s existing Inferred framing exactly.
+- **Source-verified (`OPS-007`, absence claim):** grepped Jobs, Registry,
+  Deployments, Drift, Errors, Slow Nodes, and Audit Log route/page sources
+  for `useSearchParams`, `<Link`, or any shared record-link/query-
+  serialization helper — none exists; every page's filter/search/tab/
+  selection state is local `useState`. Live corroboration: every page
+  visited reset its filter/tab/search state on reload or route re-entry
+  (e.g., returning to `/jobs` after opening the Canvas Job History drawer did
+  not preserve prior Jobs-table filter state across the two decoupled
+  surfaces).
+
 ## Synthesis, Deduplication, and Ranking
 
 ### Root-cause decisions
@@ -2804,6 +2984,37 @@ Canvas finding is warranted solely for this repeated form root.
     **Milestone:** Next. This follows **OPS-007** because the related-record
     links and return context require its serializer/boundary; no independent
     slice is claimed here.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live, 1440 px, `/jobs`):** a fresh
+    table load reproduces completed/failed rows with status, truncated ID,
+    model type, one metric value, duration, and created time; no row/cell
+    click produces navigation, a modal, or any visible affordance, and the
+    only other control is a Status-only Filters facet. **Observed (live,
+    Canvas Job History drawer):** opening a completed job card reproduces
+    the `JobDetailsView` Overview/Live Logs dialog exactly as described —
+    Status/Dataset/Duration, Execution Results, full Tuning Configuration,
+    Best Score, and an Evaluation Metrics table — with no Retry action
+    (terminal job) and no cross-links to the source dataset, registry
+    version, or deployment. **Observed (source, `Jobs.tsx`):** `pool`/
+    filter/search/tab state remains local `useState`, not URL-synced; row
+    rendering has no `onClick`/link wrapper; the status filter remains
+    hardcoded to `all|completed|failed`. **Observed (source,
+    `JobDetailsView.tsx`/`JobsDrawer.tsx`, `components/panels/jobs/`,
+    globally mounted at `MainLayout.tsx`):** the drawer remains
+    architecturally decoupled from the `/jobs` route; `useJobStore().
+    cancelJob` remains the only mutation exposed, with no retry mutation in
+    the store. **Responsive (1440/1024/768/390 px):** the 390 px clipping
+    from `FND-001` reconfirms at every width tested; at 768 px the tab row
+    and table header text are also clipped. **New this rerun, reported as
+    OPS-008 rather than folded here:** a duplicate-row/colliding-React-key
+    defect was found in the same Jobs table during this pass; it is a live
+    rendering/data-integrity bug distinct from OPS-001's missing-
+    investigation-affordance framing, so it is not treated as a revision to
+    this finding.
+  - **Delta:** No change. All originally cited behavior (no row action,
+    drawer-only detail, cancel-only, no retry, no cross-links, local filter
+    state, Status-only filter) reproduces exactly on current code and
+    current live data.
 
 - **OPS-002 — Observed: model registration and deployment history do not form
   a traceable model-to-deployment decision chain.**
@@ -2846,6 +3057,50 @@ Canvas finding is warranted solely for this repeated form root.
     **Milestone:** Next. This follows **OPS-007** because the bidirectional
     links and contextual return require its serializer/boundary; no independent
     slice is claimed here.
+  - **2026-08-07 status:** Confirmed, with one addendum.
+  - **Current evidence:** **Observed (live, 1440 px, `/registry`):** "View
+    Versions" reproduces the version-history dialog (version, date,
+    `best_score`, status, per-row Deploy/View Artifacts); "View Artifacts"
+    reproduces the plain-text artifact/pipeline-step file list with no link
+    to the originating job or dataset. At least one live registry entry
+    shows `model_type: "unknown"` and `dataset_id: "unknown"` — a real
+    backend data gap that further supports the "cannot reliably answer which
+    ... belong together" framing, not a UI regression. **Observed (live,
+    1440 px, `/deployments`):** the Active Deployment card and Deployment
+    History reproduce exactly as described — full Job ID as plain unlinked
+    text, artifact URI, Deactivate, and an empty Actions column for the sole
+    history entry; no link from either surface back to Jobs or a Registry
+    version detail. **Observed (source, `ModelRegistry.tsx`,
+    `useModelRegistry.ts`):** Deploy still calls `POST
+    /deployment/deploy/{jobId}` keyed only by `version.job_id`; Deployments
+    still fetches active/history independently via separate hooks; IDs
+    remain text, not links, throughout. **New addendum, not previously
+    documented — client-side-only "manual deployment" tracker
+    (source-confirmed, `ModelRegistry.tsx` lines 53–68, 261–318):**
+    `ModelRegistry.tsx` maintains a `localStorage` key
+    `skyulf_manual_deployments` that lets a user check a "Manual" deployment
+    checkbox per registry row (keyed by `${model_type}-${dataset_id}`),
+    rendering that row as deployed (`isManuallyDeployed`) purely in this
+    browser's local storage. The checkbox is `disabled` (cannot override)
+    only when the backend already reports `deployment_count > 0` for that
+    row; for every other row a user can locally mark a version "deployed" in
+    the Registry UI with no corresponding record in Deployments' active or
+    history data, and this marking is invisible to any other browser/session
+    since it is not persisted server-side. This is the same lineage-
+    consistency surface OPS-002 already targets — a version can appear
+    "deployed" in Registry while the real Deployments record disagrees, with
+    no reconciliation — so it is treated as an addendum to this finding's
+    evidence rather than a new ID. When this finding's Proposed behavior/
+    Acceptance criteria are next revised, they should add: "the Registry's
+    deployed-state display must derive from the same source of truth as the
+    Deployments active record, with no client-only override that other
+    sessions cannot see." **Responsive (390 px, `/registry`):** reconfirms
+    `FND-001`-style sidebar clipping — not new content, but confirms this
+    journey is also blocked by the layout defect at narrow widths.
+  - **Delta:** No change to the finding's status or core claim. The
+    manual-deployment `localStorage` behavior is a newly documented,
+    concrete instance of the same lineage-consistency risk the finding
+    already describes, added here as evidence to inform its next revision.
 
 - **OPS-003 — Inferred: drift detection has no durable alert-to-investigation
   and remediation lifecycle.**
@@ -2889,6 +3144,26 @@ Canvas finding is warranted solely for this repeated form root.
     **OPS-007** because its alert, report, and related-record links consume the
     shared serializer/boundary; no independent slice is claimed here.
     **Milestone:** Next.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live, 1440 px, `/drift`):** live data
+    still has no drift report; the "No Drift Report Yet" empty state
+    reproduces exactly, with a reference-job selector, Upload CSV/Parquet
+    control, a disabled "Run Analysis" button, a "Refresh jobs" control, and
+    a "Drift thresholds" button. **Inferred (source only — thresholds
+    dialog contents):** not confirmed via a completed live open this pass
+    (tab reclaimed mid-interaction by a sibling agent sharing this session's
+    browser — see Task 6 Method above). Confirmed instead via
+    `core/api/monitoring.ts`: `DriftThresholds` (PSI/KS/Wasserstein/KL
+    fields) remains a page-state object passed per-request to the analysis
+    call; `DriftHistoryEntry` still has no threshold-snapshot field,
+    confirming thresholds are not versioned against history exactly as this
+    finding states. **Observed (source, `DataDriftPage.tsx`):** selected
+    job/file/thresholds/report still live in page `useState`, refreshed
+    per-job after each calculation; no `severity`, `acknowledged`, `owner`,
+    or `resolved` field exists anywhere in the drift API surface.
+  - **Delta:** No change. The finding remains correctly framed as Inferred
+    for lifecycle states beyond the empty state, since no populated drift
+    fixture exists in this environment either.
 
 - **OPS-004 — Observed: Error Log generic identifier search lacks typed
   investigation facets and resource handoffs.**
@@ -2936,6 +3211,27 @@ Canvas finding is warranted solely for this repeated form root.
     **FND-003**/**FND-004**. **Milestone:** Next. This follows **OPS-007**
     because the contextual View actions and return state require its
     serializer/boundary; no independent slice is claimed here.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live, 1440 px, `/errors`):** Events(30)/
+    Issues(6) tabs, stat cards (HTTP events: 30, Server errors: 30, Pipeline
+    failures: 0), an hourly bar chart, a generic Search box, time-range
+    buttons (1h/6h/24h/7d/All), a "Show resolved" toggle, and a populated
+    table of 500-level exception events with per-row "✓ Resolve" and
+    "Traceback" buttons all reproduce exactly. The Node/Route column
+    continues to render plain-text values (e.g.
+    `/api/pipeline/datasets/273/schema`, `celery/pipeline`) — text, not
+    links. **Inferred (source only — Traceback dialog contents, Resolve
+    mutation outcome):** the Traceback dialog was not re-opened to
+    completion this pass before the tab was reclaimed by a sibling agent; the
+    route string + HTTP code already visible in the row is corroborated by
+    source: `ErrorLogPage.tsx`'s generic search still matches an HTTP
+    event's `job_id` and a pipeline log's `node_id` as substrings of a
+    combined searchable text field, while the actual API request
+    (`monitoring.ts`) still only accepts time-range and resolved-state
+    parameters — confirming no typed severity/resource facet exists
+    server-side to expose. No Resolve mutation was submitted, per the
+    no-destructive-mutation constraint.
+  - **Delta:** No change from the original finding.
 
 - **OPS-005 — Observed: Slow Nodes identifies aggregate cost but cannot lead
   an operator to the slow run, node configuration, or remediation.**
@@ -2971,6 +3267,27 @@ Canvas finding is warranted solely for this repeated form root.
     investigation links and return state consume the shared
     serializer/boundary; no independent slice is claimed here.
     **Milestone:** Later.
+  - **2026-08-07 status:** Confirmed, with direct live confirmation added.
+  - **Current evidence:** **Observed (live, 1440 px, `/slow-nodes`):**
+    lookback controls (24h/7d/30d/90d), Top-10/25/50 controls, a Refresh
+    button, summary stats (Step types: 8, Node runs: 65, Jobs scanned: 12,
+    Window: 7 days), a "Total time by step type" bar chart, and a sortable
+    table all reproduce; each step-type row's `sample_node_id` renders as
+    literal "e.g. `<uuid-like string>`" text (e.g. "e.g.
+    classification-2b51bfcd-…") confirmed to have no click handler and no
+    drill-down. **Observed (source, `SlowNodesPage.tsx`, `monitoring.ts`
+    `SlowNodesResponse` type):** the response shape still supplies only
+    aggregate step statistics plus an optional `sample_node_id` string; no
+    run-ID list, no dataset/pipeline/deployment linkage field exists to
+    render a drill-down into even if the UI wanted one.
+  - **Limitation:** the responsive (1024/768/390 px) pass for this specific
+    page was not completed live this session (shared-browser/time
+    constraints); given `FND-001`'s confirmed uniform sidebar/layout
+    clipping pattern at 390 px across every other Operations page tested,
+    the same clipping is expected here but is **Inferred, not directly
+    Observed**, for this page.
+  - **Delta:** No change from the original finding, now with a direct live
+    1440 px confirmation supplementing the prior source-only evidence.
 
 - **OPS-006 — Inferred: Audit Log has attributed version/diff entries but lacks
   filter, retention, and cross-record investigation context.**
@@ -3017,6 +3334,24 @@ Canvas finding is warranted solely for this repeated form root.
     consume the shared serializer/boundary; no independent slice is claimed
     here.
     **Milestone:** Later.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live, 1440 px, `/audit`):** the Dataset
+    combobox (populated with dozens of real dataset entries, e.g. "test
+    source (3)", "s3 source (5)", "f7009f5b-b59b-…csv (9)") and Limit control
+    (25/50/100/200) reproduce, along with the exact empty-state copy "No
+    saves recorded for this dataset yet. Saves appear here automatically once
+    you click Save on the canvas." for the default-selected dataset. No
+    time-range, actor, or action-type filter exists anywhere on the page;
+    the only two facets remain Dataset and Limit. **Inferred (source
+    only — populated-entry rendering: actor/timestamp/diff detail):** not
+    re-confirmed against a populated dataset this pass (a tab reclaim by a
+    sibling agent interrupted the dataset switch before a populated entry
+    could be captured); confirmed instead via source: `AuditLogPage.tsx`
+    still calls `pipelineVersionsApi.audit(datasetId, limit)` and renders
+    actor (`user_id` or anonymous), timestamp, save action kind, version,
+    and added/removed/modified node diffs when entries exist — matching this
+    finding's original Inferred framing exactly.
+  - **Delta:** No change from the original finding.
 
 - **OPS-007 — Inferred: Operations lacks a shared typed context-serialization
   and record-link primitive.**
@@ -3059,6 +3394,108 @@ Canvas finding is warranted solely for this repeated form root.
     rather than duplicating it beside **FND-003** status semantics or
     **FND-004** retry behavior.
     **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Source-verified (no live-only claim possible for
+    an absence):** grepped Jobs, Registry, Deployments, Drift, Errors, Slow
+    Nodes, and Audit Log route/page sources for `useSearchParams`, `<Link`,
+    or any shared record-link/query-serialization helper — none exists.
+    Every page's filter/search/tab/selection state remains local `useState`,
+    confirmed directly for `Jobs.tsx`, `DataDriftPage.tsx`,
+    `ErrorLogPage.tsx`, `SlowNodesPage.tsx`, and `AuditLogPage.tsx`, and by a
+    dedicated `explore` sub-agent re-check for `ModelRegistry.tsx`/
+    `DeploymentsPage.tsx`. No tests exercise query-state parsing or
+    round-tripping for any Operations page. **Live corroboration:** every
+    page visited in this pass reset its filter/tab/search state on reload or
+    route re-entry (e.g., returning to `/jobs` after opening the Canvas Job
+    History drawer did not preserve any prior Jobs-table filter selection
+    state across the two separate surfaces, consistent with them being fully
+    decoupled per OPS-001).
+  - **Delta:** No change from the original finding. Still fully absent.
+
+- **OPS-008 — Observed (new): the Jobs table renders duplicate rows with
+  colliding React keys on fresh load, driven by a `poolSkip` closure race in
+  the auto-load-more effect.**
+  - **Evidence:** On a fresh, uncached `/jobs` page load, the table
+    intermittently renders duplicate rows for the same `job_id` (e.g.,
+    `7c1ec203…`, `a9d86dae…`, `250f18f2…` each appearing twice in the same
+    render), accompanied by a live React console error: `Warning:
+    Encountered two children with the same key, '<job_id>'. Keys should be
+    unique...` at `<tbody><table>`. This was reproduced independently on two
+    separate fresh tab loads of `/jobs` in this session, not a one-off
+    artifact of a prior action — the visible symptom is a table that briefly
+    (or persistently, until a manual Refresh) shows more job rows than
+    distinct jobs exist, with the duplicated rows scrolling/paginating
+    independently of each other. **Root cause, confirmed by direct source
+    reading (`Jobs.tsx`):** an auto-load-more `useEffect` (lines 181–190,
+    dependency array `[activeTab, pool, poolHasMore, loading,
+    registryItems]`) calls `fetchPool(false)` (an append fetch) whenever the
+    active tab's matching-job count is below `LIMIT`. `fetchPool` (lines
+    69–92) reads `poolSkip` via component-closure state
+    (`const currentSkip = reset ? 0 : poolSkip;`, line 78) rather than a
+    functional state updater. Two effect invocations that fire before the
+    first fetch's state update commits (plausible under React 18
+    `StrictMode`'s intentional development-mode double-invoke of effects —
+    confirmed present via `main.tsx` lines 33/47 — or under any
+    overlapping-request race) can both read the same stale `poolSkip`, each
+    fetch the same page of jobs, and both append that page into the `pool`
+    array via `setPool(prev => reset ? fetchedJobs : [...prev,
+    ...fetchedJobs])` (line 85). The table's row `key={job.job_id}` (line
+    339, confirmed) then collides for every duplicated entry.
+  - **Problem:** A user reviewing the Jobs table on a fresh load may see the
+    same job listed twice, be uncertain whether two attempts actually ran,
+    and encounter a broken/duplicated key state that React explicitly warns
+    is unsafe (list reordering, incorrect DOM reuse, or dropped updates are
+    the documented risks of duplicate keys in React). This directly
+    undermines the same Jobs-investigation trust that **OPS-001** already
+    flags as needing durable, accurate job records, independent of
+    OPS-001's separate missing-detail-affordance problem.
+  - **Surfaces:** Jobs route (`/jobs`) table/pool-loading; the auto-load-more
+    effect specifically; potentially the Canvas Job History drawer's job
+    list if it shares the same pool/fetch logic (not independently
+    confirmed — flagged as an open question, not a claim).
+  - **Proposed behavior:** Guard the auto-load-more effect against
+    re-entrant/duplicate fetches for the same `poolSkip` (e.g., an
+    in-flight-request ref/flag checked before calling `fetchPool`, or a
+    functional-updater pattern that reads the latest `poolSkip` atomically),
+    and de-duplicate by `job_id` when appending fetched pages into the
+    `pool` array (e.g., merge into a `Map` keyed by `job_id` rather than
+    concatenating arrays) as a defensive backstop even if the request race
+    itself is not fully eliminated.
+  - **Acceptance criteria:** A fresh, uncached `/jobs` load under React 18
+    `StrictMode` (development) and under production builds never renders two
+    rows for the same `job_id`, and the browser console never emits a
+    duplicate-key warning for the Jobs table; the auto-load-more effect
+    either serializes its fetches or de-duplicates the resulting `pool` by
+    `job_id` before render.
+  - **Validation method:** Component/integration test that mounts `JobsPage`
+    under `StrictMode` with a mocked `jobsApi.getJobs` and asserts the
+    rendered row count equals the distinct `job_id` count after the
+    auto-load-more effect settles; a second test forces two overlapping
+    `fetchPool(false)` calls with the same `poolSkip` and asserts the `pool`
+    array contains no duplicate `job_id` values. Reproduced live this rerun
+    via two independent fresh-tab loads of `/jobs` at 1440 px with the
+    browser console open; not verified across all four widths (the defect
+    is state/timing-based, not layout-based, and is expected to reproduce at
+    any width) nor confirmed/excluded for the Canvas Job History drawer.
+  - **Impact:** Medium (visually confusing and technically unsafe per
+    React's own key-collision warning, but the underlying job data itself is
+    not corrupted — only the rendered list). **Frequency:** Occasional
+    (timing-dependent; reproduced on 2 of a small number of fresh-load
+    attempts this session, not on every load). **Effort:** S (a functional
+    `poolSkip` updater and/or a `Map`-based de-duplication at one call site).
+    **Risk:** Low. **Dependencies:** `Jobs.tsx`'s `fetchPool`/`pool`/
+    `poolSkip` state and the auto-load-more `useEffect`; no shared
+    Operations primitive required. **Milestone:** Now.
+  - **2026-08-07 status:** New.
+  - **Current evidence:** Observed live against the real backend on two
+    independent fresh-tab loads at 1440 px, with the root cause traced by
+    directly reading current `Jobs.tsx` source (line numbers cited above,
+    verified against the file as it exists on this branch); this is a live,
+    reproducible rendering/data-integrity defect distinct from every other
+    `OPS-*` finding, which describe missing investigation affordances,
+    lifecycle context, or cross-record links rather than an active rendering
+    bug.
+  - **Delta:** New finding; no prior entry to compare against.
 
 ## Prioritized Findings Inventory
 
@@ -3100,6 +3537,7 @@ Canvas finding is warranted solely for this repeated form root.
 | OPS-005 | Observed | Slow-node aggregates cannot lead to the measured run/node or remediation. | Slow Nodes; Jobs; Canvas; Audit Log | Medium | Occasional | M | Medium | Slow-node drill-down API; run snapshots; OPS-007; CAN-002 | Later |
 | OPS-006 | Inferred | Attributed version/diff history lacks filters, retention/time clarity, and related-record correlation. | Audit Log; Canvas versions; Jobs; Deployments; Drift; Errors | Medium | Occasional | L | Medium | Audit filtering/correlation API; identity/retention policy; graph snapshots; OPS-007; EXP-004 | Later |
 | OPS-007 | Inferred | Operations lacks a shared typed context serializer and record-link primitive. | Shared Operations link/query-state utilities; future rows/details across Operations | High | Frequent | M | Medium | Operational context schema; router/query state; API identities | Now |
+| OPS-008 | Observed | Jobs table renders duplicate rows with colliding React keys on fresh load (`poolSkip` closure race). | Jobs table/pool-loading; auto-load-more effect | Medium | Occasional | S | Low | `Jobs.tsx` `fetchPool`/`poolSkip`/auto-load-more effect | Now |
 
 ## Component-Boundary Recommendations
 
@@ -3318,3 +3756,4 @@ supplement, not a substitute. The table states any additional coverage.
 | OPS-005 slow-node diagnosis | Aggregate source, unit/window, contributing run context, and returnable remediation links are explicit | After OPS-007, aggregate/outlier/no-data/drill-down tests | Sort, investigate, open job/Canvas, return with controls retained | 1440 and 390 px | Sort/button names and chart/table alternatives |
 | OPS-006 version audit trail | Existing actor/timestamp/action/version/diff detail remains visible; filters, time/retention scope, and supplied correlations are clear | After OPS-007, multi-dataset/version/actor/time/filter/query-state and linked/unlinked-record tests | Filter, inspect scope copy, reload link, follow and return | 1440 and 390 px | Expandable audit detail and filter semantics |
 | OPS-007 operational context primitive | Typed operational identities, origin, and time/filter context round-trip without loss and build shared href/return payloads | Schema/serializer/parser round-trip and shared record-link component tests | Generate representative job/model/deployment/error/drift/slow/audit contexts, copy the link, reload, and confirm the same parsed payload | 1440 and 390 px for primitive rendering | Accessible link names and copyable target semantics |
+| OPS-008 duplicate Jobs rows | A fresh, uncached `/jobs` load never renders two rows for the same `job_id`, under both `StrictMode` and production builds | Component/integration test mounting `JobsPage` under `StrictMode`; forced-overlapping-fetch test asserting no duplicate `job_id` in `pool` | Load `/jobs` fresh, inspect rendered row count vs. distinct `job_id` count, watch console for key warnings | 1440 px (timing-based, not layout-based) | No duplicate-key console warning; accurate row count |
