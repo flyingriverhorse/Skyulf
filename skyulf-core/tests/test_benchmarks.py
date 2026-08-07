@@ -16,6 +16,7 @@ per-engine regressions independently.
 
 import os
 import sys
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -215,7 +216,11 @@ def _legacy_evaluate_clustering(frame: object, labels: np.ndarray) -> object:
     X_numeric = X_df.select_dtypes(include=["number", "bool"])
     metrics = clustering_module.calculate_clustering_metrics(X_numeric, labels)
     centroids = clustering_module._compute_centroids(X_df, labels, X_numeric)
-    crosstab = clustering_module._compute_reference_crosstab(labels, reference_values)
+    crosstab = (
+        clustering_module._compute_reference_crosstab(labels, reference_values)
+        if reference_values is not None
+        else None
+    )
     return metrics, centroids, crosstab
 
 
@@ -367,7 +372,7 @@ def _bucketing_benchmark_frame(rows: int, cols: int, null_frac: float = 0.0) -> 
     return pl.DataFrame(data)
 
 
-def _legacy_general_binning_fit(df: pl.DataFrame, config: dict[str, object]) -> object:
+def _legacy_general_binning_fit(df: pl.DataFrame, config: dict[str, Any]) -> object:
     """Force the pre-native full-frame ``to_pandas()`` bucketing-fit route.
 
     Mirrors ``GeneralBinningCalculator.fit`` before the column-subset

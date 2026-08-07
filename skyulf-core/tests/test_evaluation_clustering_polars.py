@@ -56,7 +56,7 @@ _GOLDEN_CROSSTAB = {
 }
 
 
-def _frames() -> dict[str, object]:
+def _frames() -> dict[str, pd.DataFrame | pl.DataFrame | SkyulfPolarsWrapper]:
     return {
         "pandas": pd.DataFrame(_FIXTURE),
         "raw_polars": pl.DataFrame(_FIXTURE),
@@ -157,7 +157,7 @@ def test_evaluate_clustering_model_raw_polars_avoids_full_frame_pandas_conversio
     original_to_pandas = pl.DataFrame.to_pandas
     called = {"count": 0}
 
-    def _tracking_to_pandas(self: pl.DataFrame, *args: object, **kwargs: object) -> pd.DataFrame:
+    def _tracking_to_pandas(self: pl.DataFrame, *args: object, **kwargs: bool) -> pd.DataFrame:
         called["count"] += 1
         return original_to_pandas(self, *args, **kwargs)
 
@@ -179,12 +179,12 @@ def test_evaluate_clustering_model_polars_path_peak_memory_not_worse_than_pandas
 
     rng = np.random.default_rng(42)
     rows, numeric_cols = 2_000, 30
-    data = {f"num_{i}": rng.random(rows) for i in range(numeric_cols)}
+    data: dict[str, object] = {f"num_{i}": rng.random(rows) for i in range(numeric_cols)}
     data["id"] = [f"r{i}" for i in range(rows)]
     data["species"] = rng.choice(["a", "b", "c"], size=rows)
     labels = rng.integers(0, 3, size=rows)
 
-    def _peak_for(df: object) -> int:
+    def _peak_for(df: pd.DataFrame | pl.DataFrame) -> int:
         gc.collect()
         tracemalloc.start()
         try:

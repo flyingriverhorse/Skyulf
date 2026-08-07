@@ -182,7 +182,7 @@ def _compute_reference_crosstab(
 
 def evaluate_clustering_model(
     model: Any,
-    X: pd.DataFrame | SkyulfDataFrame,
+    X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
     labels: Any,
     dataset_name: str = "test",
     reference_column: str = "",
