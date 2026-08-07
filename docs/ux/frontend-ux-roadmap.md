@@ -37,6 +37,144 @@ opportunities are:
    drift, errors, performance, and audit history using only API-supported
    correlations (`OPS-007`, `OPS-001`–`OPS-006`).
 
+## 2026-08-07 Audit Rerun
+
+### Delta Summary
+
+This rerun repeats the complete engineering baseline and refreshes the route
+and navigation inventory recorded in `## Method and Evidence` below. Task 1
+only reestablishes the baseline; it does not yet reconcile individual
+journey findings against this new evidence. Compared with the original
+baseline captured in `## Method and Evidence`:
+
+- `npm run lint`, `npx tsc --project tsconfig.json --noEmit`, `npm run build`,
+  `npm run test -- --reporter=dot`, and `npm run size-check` all still exit
+  `0` with results consistent with the original baseline (same warnings, same
+  budget headroom, same `335` passing unit tests across `40` files).
+- `npm run test:e2e -- --project=chromium` still exits `1` for the same
+  root cause as the original baseline: the Chromium
+  `chrome-headless-shell` executable is not installed in this environment
+  (`npx playwright install` was not run, per audit scope). All `12` Chromium
+  E2E tests fail before route interaction. Unlike the original baseline run,
+  no `.superpowers/sdd/playwright.chrome.config.ts` fallback config or
+  system-Chrome installation is present in this environment, so no
+  alternate-browser measurement could be taken this rerun; this gap is
+  recorded as a rerun limitation rather than fixed.
+- The route and navigation baseline (lazy-loading, sidebar-collapse, alert
+  badges, and `e2e/routes.spec.ts` coverage) is unchanged from the original
+  baseline: the same 5 of 11 top-level routes (`/`, `/canvas`, `/jobs`,
+  `/data`, `/eda`) are covered by the routes smoke spec, and `/drift`,
+  `/registry`, `/deployments`, `/errors`, `/slow-nodes`, and `/audit` remain
+  uncovered.
+- No product source code, dependencies, or test files were modified while
+  collecting this evidence.
+
+### Current Engineering Baseline
+
+- **Measured:** `npm run lint` exited `0` with no warnings or errors.
+- **Measured:** `npx tsc --project tsconfig.json --noEmit` exited `0` with no
+  reported diagnostics.
+- **Measured:** `npm run build` exited `0` after Vite transformed `2996`
+  modules and completed in `9.15s`. The output repeated the same two
+  pre-existing warnings as the original baseline:
+  `Circular chunk: vendor-flow -> vendor-charts -> vendor-flow` and
+  `Generated an empty chunk: "vendor-react"`.
+
+| Build chunk | Raw size | Gzip size |
+|-------------|----------|-----------|
+| `index.html` | `1.43 kB` | `0.71 kB` |
+| `EDAPage-Dgihpmma.css` | `15.04 kB` | `6.38 kB` |
+| `index-BbfmQ8_Q.css` | `133.01 kB` | `21.49 kB` |
+| `vendor-react-l0sNRNKZ.js` | `0.00 kB` | `0.02 kB` |
+| `DeploymentsPage-Cbf33fBc.js` | `7.36 kB` | `2.11 kB` |
+| `AuditLogPage-D7Ib8q8L.js` | `9.66 kB` | `3.07 kB` |
+| `SlowNodesPage-D9XNrHug.js` | `9.92 kB` | `3.16 kB` |
+| `ModelRegistry-Dxe1jfMI.js` | `20.60 kB` | `5.17 kB` |
+| `DataDriftPage-GYap9hgX.js` | `35.30 kB` | `9.91 kB` |
+| `vendor-flow-CnABvqEr.js` | `167.70 kB` | `53.47 kB` |
+| `vendor-utils-BhHEl1zz.js` | `215.21 kB` | `68.32 kB` |
+| `EDAPage-B2QWV4Sw.js` | `295.82 kB` | `79.61 kB` |
+| `vendor-charts--VuOzEp7.js` | `700.94 kB` | `216.58 kB` |
+| `index-DEWG0WD0.js` | `1,005.54 kB` | `254.97 kB` |
+| `vendor-plotly-B9LYHcu8.js` | `1,686.94 kB` | `537.39 kB` |
+
+- **Measured:** `npm run test -- --reporter=dot` exited `0` with
+  `Test Files 40 passed (40)` and `Tests 335 passed (335)` in `5.07s`. The
+  output repeated the same pre-existing console noise as the original
+  baseline: jsdom `localStorage` `ExperimentalWarning`s, `Unknown node type:
+  StandardScaler` in `pipelineConverter.snapshot.test.ts`, and Recharts
+  zero-size container warnings.
+- **Measured:** `npm run test:e2e -- --project=chromium` exited `1`.
+  Playwright attempted `12` Chromium tests across `e2e/a11y.spec.ts`,
+  `e2e/preview.spec.ts`, `e2e/routes.spec.ts`, and `e2e/smoke.spec.ts`, and
+  all `12` failed before route interaction because the Chromium
+  `chrome-headless-shell` executable is missing at
+  `/Users/BH7043/Library/Caches/ms-playwright/chromium_headless_shell-1217/chrome-headless-shell-mac-arm64/chrome-headless-shell`.
+  The runner advised `npx playwright install`. Per audit scope, this failure
+  is recorded as current baseline evidence and was not fixed. Unlike the
+  original baseline, no `.superpowers/sdd/playwright.chrome.config.ts`
+  fallback configuration or system Google Chrome installation exists in this
+  environment, so no alternate-browser E2E measurement was possible this
+  rerun.
+- **Measured:** `npm run size-check` exited `0`; all checked chunks were
+  within budget.
+
+| Size-check target | Raw size | Gzip size | Budget | Result |
+|-------------------|----------|-----------|--------|--------|
+| `vendor-plotly` | `1647.4 KB` | `524.8 KB` | `750.0 KB` | `OK (70%)` |
+| `vendor-charts` | `684.5 KB` | `211.5 KB` | `220.0 KB` | `OK (96%)` |
+| `vendor-flow` | `163.8 KB` | `52.2 KB` | `80.0 KB` | `OK (65%)` |
+| `vendor-react` | `0.0 KB` | `0.0 KB` | `70.0 KB` | `OK (0%)` |
+| `vendor-utils` | `210.2 KB` | `66.7 KB` | `90.0 KB` | `OK (74%)` |
+| `index (main)` | `982.0 KB` | `249.0 KB` | `260.0 KB` | `OK (96%)` |
+| `route:EDA` | `288.9 KB` | `77.7 KB` | `140.0 KB` | `OK (56%)` |
+| `route:DataDrift` | `34.5 KB` | `9.7 KB` | `20.0 KB` | `OK (48%)` |
+| `route:ModelRegistry` | `20.1 KB` | `5.1 KB` | `15.0 KB` | `OK (34%)` |
+| `route:Deployments` | `7.2 KB` | `2.1 KB` | `10.0 KB` | `OK (21%)` |
+
+### Current Route and Navigation Baseline
+
+| Route | Surface | Lazy-loaded | Sidebar collapsed | Alert badge | Covered by `e2e/routes.spec.ts` | Evidence |
+|-------|---------|-------------|-------------------|-------------|----------------------------------|----------|
+| `/` | Dashboard | No | No | No | Yes | `Inferred` |
+| `/jobs` | Jobs | No | No | No | Yes | `Inferred` |
+| `/data` | Data Sources | No | No | No | Yes | `Inferred` |
+| `/eda` | EDA | Yes | Yes | No | Yes | `Inferred` |
+| `/drift` | Data Drift | Yes | No | Yes | No | `Inferred` |
+| `/canvas` | ML Canvas | No | Yes | No | Yes | `Inferred` |
+| `/registry` | Model Registry | Yes | No | No | No | `Inferred` |
+| `/deployments` | Deployments | Yes | No | No | No | `Inferred` |
+| `/errors` | Error Log | No | No | Yes | No | `Inferred` |
+| `/slow-nodes` | Slow Nodes | Yes | No | No | No | `Inferred` |
+| `/audit` | Audit Log | Yes | No | No | No | `Inferred` |
+
+- **Inferred:** `src/App.tsx` still lazy-loads `EDAPage`, `DataDriftPage`,
+  `ModelRegistry`, `DeploymentsPage`, `SlowNodesPage`, and `AuditLogPage`
+  behind per-route `Suspense` + `ErrorBoundary` wrappers (`LazyRoute`); `/`,
+  `/jobs`, `/data`, and `/canvas` remain eagerly imported.
+- **Inferred:** `src/components/Layout.tsx` still collapses the sidebar only
+  on `/canvas` and `/eda` (`isCollapsed`), and still exposes alert badges
+  only on `/drift` (`driftAlert`, from `monitoringApi.getDriftStatus()`) and
+  `/errors` (`errorAlert`, polled every 5 minutes from
+  `monitoringApi.getUnresolvedCount()` while the tab is visible and the user
+  is not already on `/errors`).
+- **Inferred:** `e2e/routes.spec.ts` still covers only `/`, `/canvas`,
+  `/jobs`, `/data`, and `/eda`; `/drift`, `/registry`, `/deployments`,
+  `/errors`, `/slow-nodes`, and `/audit` remain outside that smoke coverage
+  file.
+- **Inferred:** `playwright.config.ts` still targets a single `chromium`
+  project against a Vite dev server on `http://127.0.0.1:5173`, with every
+  backend call stubbed via `page.route()` rather than a live API.
+
+### Finding Status Summary
+
+| Status | Count | Meaning |
+|--------|-------|---------|
+| New | 0 | Not present in the previous roadmap. |
+| Changed | 0 | Evidence, scope, priority, or proposed behavior materially changed. |
+| Confirmed | 0 | Current evidence still supports the finding without material change. |
+| Resolved | 0 | Current evidence demonstrates that the prior user problem no longer occurs. |
+
 ## Synthesis, Deduplication, and Ranking
 
 ### Root-cause decisions
