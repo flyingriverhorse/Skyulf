@@ -604,6 +604,161 @@ new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
   own finding (see "Not recommended as new findings" reasoning folded into
   DAT-007 below).
 
+### Task 5 — Experiments and Inference Rerun
+
+#### Method
+
+- **Method:** Reused the already-running `vite` dev server (`localhost:5173`)
+  and FastAPI backend (`localhost:8000`) for this checkout. Live walkthrough
+  used the Playwright MCP browser tools (`browser_run_code_unsafe` against a
+  `Page` object, plus navigate/click/snapshot/screenshot) at four widths —
+  **1440×900**, **1024×900**, **768×1024**, **390×844** — against the real
+  active deployment (`random_forest_classifier`, job
+  `7c1ec203-dadc-4cb2-8e04-fd4a52c11813`) and real completed jobs. Source
+  re-reading covered every file in the task brief plus files it referenced
+  transitively (`jobMeta.ts`, `EvaluationView.tsx`, `PipelineDiffView.tsx`,
+  `FeatureImportanceView.tsx`, `ShapSummaryView.tsx`). `git diff --stat` for
+  every Experiments/Inference file named in the brief against the original
+  audit commit is **empty** — no source changed since `EXP-001`–`EXP-007`
+  were first written, so absent new live findings, priors read as
+  *Confirmed*, not *Changed*.
+- **Environment limitation (shared browser):** this session ran concurrently
+  with sibling background agents doing the same kind of rerun for other
+  journeys, sharing one Playwright MCP browser instance/context. Standard
+  navigation calls repeatedly landed on another agent's page instead of the
+  intended one, and tabs were intermittently closed or had state mutated
+  mid-script by a sibling. Workaround: every scripted step re-resolved the
+  target `Page` by exact URL inside one atomic `run_code_unsafe` call. Two
+  attempts still failed outright because a sibling closed/repurposed the
+  page mid-script; those are called out per finding below rather than
+  silently retried into a misleading result. Console error/warning counts
+  during navigation are **not attributed to the app**, since they correlate
+  with sibling-agent navigation timing, not with any action this session
+  took. This session also clicked **Undeploy** on the shared active
+  deployment to test the confirmation dialog, then clicked **Cancel** — the
+  deployment was left **Active** and unchanged (confirmed via follow-up
+  screenshot); no destructive backend mutation was left behind
+  intentionally. Several unrelated working-tree changes (`.superpowers/plans/
+  *.md`, `.superpowers/sdd/progress.md`) were observed via `git status` but
+  not made by this session — flagged for transparency, out of scope.
+- **Incomplete-view limitation:** at 390 px, a second scripted attempt to
+  open Inference failed because the notification-bell button intercepted
+  the click target used by Playwright's strict-mode locator; the same
+  "Inference" tab was clickable earlier in the session at 1440/1024/768, so
+  this looks like tight header spacing at narrow widths rather than a
+  functional block, but it was not re-verified with a different click
+  strategy before time ran out — the 390 px Inference view is treated as
+  **not captured**, not as broken. The SHAP Beeswarm/Dependence/Waterfall/
+  Force/Interaction sub-tabs beyond Summary, Segmentation's metric cards for
+  a genuinely-selected clustering pair, the CSV/drag-drop input path, a
+  genuinely long-running/timeout prediction, and Save/Toggle/Clear threshold
+  mutations were not exercised live this rerun (time-boxing and/or shared-
+  browser contention); each is called out inline below as **not
+  independently re-verified**, code-evidence-only where cited, rather than
+  silently assumed equivalent to a live reproduction.
+
+#### Experiment comparison walkthrough
+
+- **Observed (live):** selecting 2 classification jobs, then switching the
+  task-type filter to Segmentation, hides both selected rows from the
+  sidebar with no visible selected-state indicator anywhere in the list, yet
+  the header still reads `SELECT RUNS (2)` and Visual Comparison keeps
+  rendering both hidden jobs' bars (`ExperimentsPage.tsx` lines 329–338: the
+  effect that resolves `evalJobId` only re-picks `selectedJobIds[0]` when
+  the current `evalJobId` drops out of the visible/selected set, never
+  preferring a job compatible with the active tab). Selecting 2 additional,
+  *visible* clustering jobs on top of the hidden pair (`SELECT RUNS (4)`)
+  still left Model Evaluation showing the confusion-matrix UI for the
+  hidden classification job, and the newly-revealed Segmentation tab
+  defaulted to "The selected run is not a Segmentation (clustering) job"
+  even though 2 of the 4 selected runs are valid clustering jobs — see
+  **EXP-001** and **EXP-003** below.
+- **Observed (live):** Visual Comparison's per-metric bars carry no
+  direction/unit indicator, and Detailed Metrics & Params renders the same
+  `—` glyph for "this run's pipeline has fewer/different steps than the
+  compared run" as for "value not reported," with no visual distinction —
+  confirms **EXP-002** unchanged.
+- **Observed (live):** Feature Importance and SHAP Summary rendered 4
+  features normalized 0–1 per run with a "values normalised per-run (max =
+  1.0)" legend note but no explanation of what a 0 bar means — confirms
+  **EXP-003**'s explainability-availability claim; the Segmentation
+  present-but-wrong-default behavior above is new corroborating evidence for
+  the same finding.
+- **Observed (live):** Pipeline Diff assigned Baseline/Candidate by
+  selection order exactly as documented, with no swap control and no
+  dataset/timestamp/scoring context in the header — confirms **EXP-004**.
+  **New this rerun:** the two short IDs shown in Pipeline Diff's header
+  (`27b2bf2b`, `e58ea66c`) are **not** the same identifiers the sidebar,
+  Detailed Metrics, and Visual Comparison show for the identical two jobs
+  (`f245bcf3`, `6cdfb46e`) — see **EXP-008** below.
+- **Observed (live):** Model Evaluation's Threshold Slider/Tuning tabs
+  produced per-class confusion matrices and an F1-best-threshold badge for
+  Train/Test; Threshold Tuning Preview showed the caption "Computed from
+  test split (no validation split available — using test split)," directly
+  confirming the validation→test fallback **EXP-005** describes. Save was
+  not exercised this run to avoid mutating the shared active deployment's
+  threshold state for sibling agents relying on the same fixture.
+
+#### Inference walkthrough
+
+- **Observed (live), against the real active deployment** (schema
+  `sepal.length`/`sepal.width`/`petal.length`/`petal.width`, all
+  `unknown`-typed): entering `[{"sepal.length": "wrong"}]` (1 wrong-type
+  field, 3 missing) showed "3 missing" plus Fix while Run Prediction stayed
+  enabled. Running it produced a clean backend rejection: `"Missing
+  required column(s) for prediction: ['sepal.width', 'petal.length',
+  'petal.width']. Expected columns: [...]"`. Clicking Fix zero-filled only
+  the 3 *missing* fields, leaving the existing wrong-type field untouched
+  (`checkSchema`'s name-only comparison cannot see it); running again
+  crashed the backend with a raw, verbatim exception —
+  `"Feature engineering failed: unsupported operand type(s) for -: 'str'
+  and 'float'"` — shown at the same time as a green "✓ Added 3 missing
+  field(s)" success toast. This is a materially stronger reproduction of
+  **EXP-006** than the original audit's single-mechanism claim.
+- **Observed (live):** both failure reproductions above rendered as raw,
+  unstyled strings in the Prediction Results pane with no structured cause,
+  scoped retry, or next-action guidance, directly confirming **EXP-007**'s
+  raw-error-string and no-explicit-retry claims. A successful run (5
+  sampled rows) produced List/Table toggle, Copy/JSON/CSV export, and a
+  "RECENT RUNS" entry, confirming the export/recent-runs affordances exist.
+  **Undeploy** required an explicit confirm dialog (Cancel/Undeploy) —
+  a positive detail not previously called out: destructive reset is not
+  one-click.
+- **Observed (live):** the Inference page's "Advanced: override thresholds"
+  panel stated verbatim that saved, enabled thresholds from Evaluation
+  apply automatically to every real prediction; a subsequent real
+  prediction run displayed a "THRESHOLDS APPLIED 0:1 1:1 2:1" banner above
+  the results list. This is a live, end-to-end confirmation that saved
+  thresholds affect real predictions and are surfaced back to the user,
+  upgrading the tuning-affects-inference half of **EXP-005** from inferred
+  to directly observed; the "no durable decision record / no provenance"
+  half of the problem statement was not contradicted.
+
+#### Component-boundary reassessment
+
+- `useJobPolling.ts` and `useNodeJobSummaries.ts` are **not used** by
+  `ExperimentsPage.tsx` or `InferencePage.tsx` (grep-confirmed; both hooks
+  are consumed only by Canvas/Jobs-panel components). No user-facing risk
+  currently traces through these hooks for the Experiments/Inference
+  journeys, so no boundary recommendation is added for them.
+- Experiments and Inference remain non-route views toggled under `/canvas`
+  by `MainLayout.tsx` (`display:contents`/`none`, lazily mounted once and
+  kept mounted) — this is unchanged and already the mechanism behind
+  `FND-006` and the local-state-retention evidence in `EXP-001`/`EXP-007`;
+  it does not warrant a new or revised boundary entry.
+- The existing `InferencePage.tsx` boundary recommendation (see
+  Component-Boundary Recommendations below) is reconfirmed unchanged: its
+  cited risk (`EXP-005`–`EXP-007`) still matches current behavior, and this
+  rerun found no new risk inside `InferencePage.tsx` requiring a revision.
+- The `EXP-008` cross-tab identifier mismatch is a genuine duplicated-logic
+  risk (6 components independently deciding how to label "a job" instead of
+  sharing `shortRunId`), but its fix is a same-file, low-effort call-site
+  swap with no shared mutable state or lifecycle coordination at stake —
+  it does not meet this roadmap's bar for a component-boundary
+  recommendation (no measured reliability failure or independently testable
+  user-state risk beyond the label itself), so it is captured only as
+  `EXP-008`'s own finding, not as a new boundary section.
+
 ## Synthesis, Deduplication, and Ranking
 
 ### Root-cause decisions
@@ -2131,6 +2286,29 @@ Canvas finding is warranted solely for this repeated form root.
     **Effort:** M. **Risk:** Medium. **Dependencies:** `useJobStore`,
     `ExperimentsPage` selection state, and job fixture contract.
     **Milestone:** Now.
+  - **2026-08-07 status:** Observed (upgrade from Inferred).
+  - **Current evidence:** Live reproduction at 1440 px: selecting 2
+    classification jobs, then switching the task-type filter to
+    Segmentation, hid both selected sidebar rows with no selected-state
+    indicator, yet the header still read `SELECT RUNS (2)` and Visual
+    Comparison kept rendering both hidden jobs' bars. A stronger
+    reproduction, same session, selected 2 additional *visible* clustering
+    jobs (`SELECT RUNS (4)`); Model Evaluation still defaulted to the
+    hidden classification job rather than either newly-selected visible
+    run, and the newly-revealed Segmentation tab defaulted to "The selected
+    run is not a Segmentation (clustering) job" even though 2 of the 4
+    selected runs are valid clustering jobs. Source re-confirmed:
+    `ExperimentsPage.tsx` lines 329–338 — the effect resolving `evalJobId`
+    only re-picks `selectedJobIds[0]` (the first, i.e. oldest, selected job)
+    when the current `evalJobId` drops out of `selectedJobIds`; it never
+    prefers a job compatible with the active tab.
+  - **Delta:** Upgrades from code-level ("Inferred") to a live, twice-
+    reproduced failure, including a previously undocumented consequence:
+    newly-added, valid, *visible* selections do not become the active
+    target for Model Evaluation/Segmentation — the stale, hidden selection
+    wins by array order. This "wrong-tab-default" behavior should be folded
+    into the Evidence/Acceptance-criteria language; it intersects with the
+    identifier-mismatch problem in **EXP-008** below.
 
 - **EXP-002 — Inferred: metric comparison does not make decision direction,
   comparability, or missingness durable.**
@@ -2161,6 +2339,20 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     Medium. **Dependencies:** job metrics schema, metric metadata, chart/table
     adapters, and experiment fixtures. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed (no material delta), evidence
+    strengthened with live screenshots.
+  - **Current evidence:** Observed (live) at 1440 px: Visual Comparison's
+    `ACCURACY` chart renders three bars per job group (test/train/val) with
+    no direction indicator, unit, or explanation of why a metric was chosen;
+    Detailed Metrics & Params shows `—` for one run's pipeline steps 6–11
+    and the other run's steps 1–5 — the same dash glyph representing "this
+    run's pipeline has fewer/different steps than the compared run" with no
+    visual distinction from "value not reported." Source unchanged since the
+    original audit (`git diff` empty for `ComparisonTableView.tsx`,
+    `MetricsComparisonChart`/chart adapters).
+  - **Delta:** None in substance. Live evidence directly confirms the two
+    example mechanisms (`MetricsComparisonChart` generic bars,
+    `ComparisonTableView`'s `-` placeholder) named in the original finding.
 
 - **EXP-003 — Inferred: conditional explanation and segmentation views can
   conceal availability and overstate comparability.**
@@ -2195,6 +2387,27 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** training artifact schema, explanation services,
     chart adapters, exports, and deterministic fixtures. **Milestone:** Next.
+  - **2026-08-07 status:** Confirmed, with one refinement.
+  - **Current evidence:** Observed (live) at 1440 px: Feature Importance and
+    SHAP Summary rendered without incident for 2 selected classification
+    jobs, each showing 4 features normalized 0–1 per run with a "values
+    normalised per-run (max = 1.0)" legend note; no copy explains what a bar
+    of 0 means (unreported vs. genuinely negligible importance), consistent
+    with the original finding. **Refinement:** with only classification jobs
+    selected, the Segmentation tab is present but showed "The selected run
+    is not a Segmentation (clustering) job" by default (see **EXP-001**),
+    rather than being hidden/disabled or auto-selecting a compatible run —
+    a slightly different and arguably worse manifestation than "a missing
+    tab does not explain availability," since here the tab *is* present and
+    *is* wrong-by-default. The Beeswarm/Dependence/Waterfall/Force/
+    Interaction SHAP sub-tabs and a genuinely-selected pair of clustering
+    jobs' Segmentation metric cards were not reached live this rerun
+    (time-boxed out); that portion of the finding is **code-evidence-only,
+    unchanged since the original audit** (empty `git diff`), not
+    independently re-verified live this time.
+  - **Delta:** Adds the present-but-wrong-default Segmentation tab behavior
+    as new corroborating evidence; no change to the finding's substance
+    otherwise.
 
 - **EXP-004 — Inferred: Pipeline Diff lacks an explicit comparison decision
   contract.**
@@ -2224,6 +2437,25 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** saved job graph contract, `graphDiff`, React
     Flow snapshot renderer, and job metadata. **Milestone:** Next.
+  - **2026-08-07 status:** Confirmed, plus new cross-referenced evidence.
+  - **Current evidence:** Observed (live) at 1440 px: selection order
+    determined Baseline (`random_forest_classifier`) vs. Candidate
+    (`decision_tree_classifier`) exactly as documented; "Diff summary: 1
+    added · 4 modified · 2 unchanged (6 renamed across runs) · edges 4+/3−"
+    banner and full graph snapshots rendered with no baseline/candidate swap
+    control, and no dataset/timestamp/scoring context in the header beyond
+    the model type and a short ID — all as originally described. Source
+    unchanged (`PipelineDiffView.tsx`, confirmed via `git diff`). **New,
+    related finding this rerun surfaced:** the two short IDs shown in each
+    side's header (`27b2bf2b`, `e58ea66c`) are **not** the same identifiers
+    shown for the same two jobs anywhere else in the Experiments page
+    (sidebar, Detailed Metrics, Visual Comparison all showed
+    `f245bcf3`/`6cdfb46e` for the identical pair) — see **EXP-008** below.
+    This compounds this finding's "no run metadata in the header" problem:
+    a user cannot even use the ID to confirm which sidebar selection
+    produced this diff.
+  - **Delta:** Substance unchanged; cross-reference to new finding
+    **EXP-008** added.
 
 - **EXP-005 — Inferred: threshold exploration, tuning, and prediction-time
   activation need a durable decision record.**
@@ -2259,6 +2491,34 @@ Canvas finding is warranted solely for this repeated form root.
     High. **Dependencies:** threshold-tuning API/version semantics,
     evaluation artifacts, deployment prediction response, and **FND-003**.
     **Milestone:** Now.
+  - **2026-08-07 status:** Observed (upgrade) for the tuning-affects-
+    inference half of the claim; the no-provenance half is unchanged.
+  - **Current evidence:** Observed (live) at 1440 px, in sequence: Model
+    Evaluation's Threshold Slider/Tuning tabs produced per-class confusion
+    matrices (0/1/2 vs Rest), ROC/ROC-AUC=1.000, and F1-best-threshold
+    badges for Train/Test. Threshold Tuning → Preview (metric=F1) produced
+    per-split confusion matrices with the caption "Computed from test split
+    (no validation split available — using test split)" — the validation→
+    test fallback this finding describes is real and user-visible. The
+    Inference page's "Advanced: override thresholds" panel stated verbatim:
+    *"This model already has tuned thresholds saved and enabled from the
+    Evaluation tab — they're applied automatically to every real prediction
+    unless you turn on an override below: 0:1, 1:1, 2:1."* A subsequent real
+    prediction run displayed a "THRESHOLDS APPLIED 0:1 1:1 2:1" banner
+    directly above the results list — a live, end-to-end confirmation that
+    saved thresholds genuinely affect real predictions and are surfaced back
+    to the user. No mutation-pending/error/retry affordance was observed on
+    the Preview action itself (it completed near-instantly against local
+    data); Save was not exercised this run to avoid mutating the shared
+    active deployment's threshold state for sibling agents relying on the
+    same fixture — a limitation, not a finding of absence.
+  - **Delta:** Upgrades to Observed for the tuning-affects-inference half of
+    the claim (previously only inferred from separate reads of
+    `EvaluationView`/`InferencePage` source). The "no durable decision
+    record / no mutation-pending or provenance" half of the problem
+    statement was not contradicted — the override panel shows raw threshold
+    numbers with no save-time/version/who-changed-it metadata, consistent
+    with the original.
 
 - **EXP-006 — Observed: inference schema feedback permits a structurally
   incomplete, type-incompatible request.**
@@ -2292,6 +2552,36 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     High. **Dependencies:** deployment artifact schema, prediction validation
     response, and CSV parser. **Milestone:** Now.
+  - **2026-08-07 status:** Observed (reconfirmed), with a materially
+    stronger new reproduction.
+  - **Current evidence:** Observed (live) at 1440 px, against the real
+    active deployment (`random_forest_classifier`, job
+    `7c1ec203-dadc-4cb2-8e04-fd4a52c11813`, schema `sepal.length/sepal.width/
+    petal.length/petal.width`, all `unknown`-typed): entered
+    `[{"sepal.length": "wrong"}]` (1 wrong-type field, 3 missing) — the UI
+    showed "3 missing" plus Fix while Run Prediction stayed enabled. Ran it
+    anyway: the backend rejected it cleanly — `"Missing required column(s)
+    for prediction: ['sepal.width', 'petal.length', 'petal.width']. Expected
+    columns: [...]"` — rendered as a raw string in the results pane, directly
+    answering the original finding's open question: **the backend does
+    reject missing columns**, but only after a client round-trip, with no
+    client-side hard gate. Clicked Fix: it zero-filled only the 3 *missing*
+    fields, leaving the existing wrong-type field (`"sepal.length":
+    "wrong"`) untouched, since `checkSchema`'s name-only comparison cannot
+    see it. Ran again: this time the backend **crashed** with a raw Python
+    exception surfaced verbatim to the user — **`"Feature engineering
+    failed: unsupported operand type(s) for -: 'str' and 'float'"`** — shown
+    at the same time as a green "✓ Added 3 missing field(s)" success toast,
+    i.e. the UI signals success while the request is actively failing.
+  - **Delta:** A materially stronger, previously undemonstrated failure
+    mode: the documented "Fix" zero-fill is not just semantically
+    questionable (as flagged) — combined with a client-supplied wrong-type
+    value, it produces a genuine unhandled backend exception whose raw
+    message reaches the end user, while the UI simultaneously reports the
+    Fix as a success. This exact reproduction
+    (`"unsupported operand type(s) for -: 'str' and 'float'"`) is the
+    concrete illustration of "potentially incompatible" and "no client
+    type/value check" the original Evidence bullet already claimed.
 
 - **EXP-007 — Inferred: inference execution and recovery are not a complete
   durable run lifecycle.**
@@ -2329,6 +2619,99 @@ Canvas finding is warranted solely for this repeated form root.
     Medium. **Dependencies:** deployment/prediction APIs, job/status contract,
     browser storage/privacy policy, exports, and **FND-003**. **Milestone:**
     Now.
+  - **2026-08-07 status:** Observed (upgrade) for the raw-error-string and
+    no-cancel/no-explicit-retry claims; Confirmed for the rest.
+  - **Current evidence:** Observed (live) at 1440 px: both failure
+    reproductions above (`Missing required column(s)…` and `Feature
+    engineering failed: …`, see **EXP-006**) rendered as raw, unstyled
+    strings in the Prediction Results pane with no structured cause, no
+    scoped retry button, and no "next action" guidance — directly confirms
+    "renders a raw error string" and "no explicit retry." A successful run
+    (5 sampled rows, Setosa × 5) produced List/Table toggle, Copy/JSON/CSV
+    export buttons, and a "RECENT RUNS" entry (`02:14:11 PM · 5 rows · 57
+    ms`) — confirms the recent-runs/export affordances exist as described.
+    **Undeploy** requires an explicit confirm dialog ("Are you sure you want
+    to undeploy the current model?" / Cancel / Undeploy) — a positive
+    finding not previously called out: destructive reset is *not*
+    one-click. Tested the Cancel path only, to avoid mutating the shared
+    active deployment. Did not exercise a genuinely long-running/timeout
+    scenario (no slow endpoint available in this environment) or the
+    CSV/drag-drop input path — time-boxed out this rerun; treat as **not
+    independently re-verified**, code evidence unchanged per `git diff`.
+  - **Delta:** Upgrades the raw-error-string claim to directly observed (two
+    concrete verbatim examples now on record). Adds the
+    Undeploy-confirmation-dialog detail as new, positive evidence the
+    original finding didn't mention (does not change the finding's overall
+    thrust, since the core gap — no named run record, no cancel, no
+    retry-with-same-input — remains unaddressed).
+
+- **EXP-008 — Observed (new): cross-tab run-identifier mismatch breaks
+  selection traceability on the Experiments page.**
+  - **Evidence:** The sidebar list, Visual Comparison chart axis, and
+    Detailed Metrics & Params column headers all label a run using
+    `shortRunId(job)` (`ExperimentsPage/utils/jobMeta.ts` lines 119–123), an
+    8-char prefix of the job's **`pipeline_id`** (parent pipeline
+    preferred) — confirmed via grep: `JobListSidebar.tsx:78`,
+    `ComparisonTableView.tsx:246`. Model Evaluation's job-selector pills
+    (`EvaluationView.tsx` line 169), Pipeline Diff's Baseline/Candidate
+    badges (`PipelineDiffView.tsx` lines 194/198), Feature Importance's
+    chart legend (`FeatureImportanceView.tsx` lines 91/99), and SHAP
+    Summary's chart legend (`ShapSummaryView.tsx` lines 82/90) all instead
+    label the **same** two selected jobs using `job.job_id.slice(0, 8)` /
+    `j.jobId.slice(0, 8)` — an 8-char prefix of the job's own **UUID**, an
+    entirely different identifier space (the same `jobId.slice(0, 8)`
+    pattern also appears in `ShapBeeswarmView.tsx`, `ShapDependenceView.tsx`,
+    `ShapForceView.tsx`, `ShapInteractionView.tsx`, and
+    `ShapWaterfallView.tsx`, not independently checked live on every
+    sub-view but from the same call-site pattern in each file). Live,
+    controlled reproduction at 1440 px (fresh page, single job selected
+    first to rule out stale state): selecting exactly the sidebar rows
+    labeled `f245bcf3` and `6cdfb46e` (confirmed via `SELECT RUNS (1)` →
+    `(2)` header transition tied to each click) caused Model Evaluation,
+    Pipeline Diff, Feature Importance, and SHAP Summary to all label the
+    *same two jobs* as `27b2bf2b` and `e58ea66c` — with no shared/
+    correlating label anywhere on screen.
+  - **Problem:** A user selecting runs "f245bcf3" and "6cdfb46e" in the
+    sidebar has no way to confirm — short of matching on
+    `model_type`/dataset text — that the "27b2bf2b" vs. "e58ea66c" labels
+    shown in Model Evaluation, Pipeline Diff, Feature Importance, or SHAP
+    are the runs they just selected. This directly compounds **EXP-001**
+    (hidden-selection ambiguity) and **EXP-004** (Pipeline Diff header lacks
+    run metadata): even when a user does look at the ID shown, it is the
+    wrong one to cross-reference against their sidebar action.
+  - **Surfaces:** Model Evaluation job-selector pills; Pipeline Diff
+    Baseline/Candidate header; Feature Importance chart legend; SHAP
+    Summary/Beeswarm/Dependence/Waterfall/Force/Interaction legends.
+  - **Proposed behavior:** Use `shortRunId(job)` consistently across every
+    tab that identifies a selected run, exactly as the sidebar/Visual
+    Comparison/Detailed Metrics already do; if `job_id` must be shown
+    anywhere (e.g. for support/debugging), label it explicitly as "Job ID"
+    rather than as the bare short ID a user just clicked.
+  - **Acceptance criteria:** Given 2+ selected runs, every tab that names a
+    run by a short ID uses the same identifier the sidebar used to select
+    it; no two different 8-char strings represent the same run within one
+    comparison session.
+  - **Validation method:** Component/unit test asserting `EvaluationView`,
+    `PipelineDiffView`, `FeatureImportanceView`, and `ShapSummaryView` all
+    render `shortRunId(job)` (not `job.job_id`) for a fixture job set with
+    distinct `job_id` and `pipeline_id` values; Playwright regression
+    selecting 2 named runs and asserting the same label string appears in
+    the sidebar, Model Evaluation pill row, and Pipeline Diff header.
+  - **Impact:** Medium (confusing but not data-corrupting — the underlying
+    comparison data is for the correct jobs; only the on-screen label is
+    wrong). **Frequency:** Frequent (any 2+-job comparison touching Model
+    Evaluation/Pipeline Diff/Feature Importance/SHAP). **Effort:** S (swap
+    one function call at ~4-6 call sites). **Risk:** Low. **Dependencies:**
+    none beyond `jobMeta.ts`'s existing `shortRunId` export. **Milestone:**
+    Now.
+  - **2026-08-07 status:** New.
+  - **Current evidence:** Observed live against the real backend, as
+    described above; independently evidenced by grep-confirmed source
+    citations and a controlled two-job reproduction distinct from every
+    other `EXP-*` finding (it is about label-identifier consistency across
+    components, not selection retention, metric semantics, artifact
+    availability, diff roles, threshold provenance, or run lifecycle).
+  - **Delta:** New finding; no prior entry to compare against.
 
 ### Operations
 
@@ -2709,6 +3092,7 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-005 | Inferred | Threshold exploration/tuning/activation lacks a durable decision record. | Evaluation, threshold API, Inference overrides/results | High | Occasional | M | High | Threshold API/version semantics; FND-003 | Now |
 | EXP-006 | Observed | Inference permits visibly incomplete/type-incompatible input. | Editor, schema badges/Fix, prediction request | High | Frequent | M | High | Typed artifact schema | Now |
 | EXP-007 | Inferred | Inference execution/recovery is not a complete durable run lifecycle. | Run, pending/error/results, history, exports | High | Occasional | L | Medium | Prediction/status API; storage; FND-003 | Now |
+| EXP-008 | Observed | Cross-tab run-identifier mismatch (`job_id` vs `pipeline_id`) breaks selection traceability. | Model Evaluation pills; Pipeline Diff header; Feature Importance/SHAP legends | Medium | Frequent | S | Low | `jobMeta.ts` `shortRunId` export | Now |
 | OPS-001 | Observed | Jobs history cannot open a unified details/recovery investigation. | Jobs; Job History drawer; logs; related resources | High | Frequent | L | Medium | Job/status/log APIs; useJobStore; DAT-003/DAT-005; OPS-007; FND-003 | Next |
 | OPS-002 | Observed | Registered versions and deployments do not form a traceable decision chain. | Registry; Deployments; Jobs; Experiments; Inference | High | Occasional | L | High | Registry/deployment lineage; job/evaluation provenance; OPS-007; FND-003/FND-004 | Next |
 | OPS-003 | Inferred | Drift reports lack a durable alert, investigation, and remediation lifecycle. | Drift; alert badge; Registry/Deployments; Jobs; Errors | High | Occasional | L | High | Drift/alert schema; threshold versioning; deployment lineage; OPS-007; FND-003 | Next |
@@ -2926,6 +3310,7 @@ supplement, not a substitute. The table states any additional coverage.
 | EXP-005 threshold decision lifecycle | Preview/save/enable/clear/provenance cannot be misattributed and failed mutations retry in place on the current surface | Two-job threshold API state-transition tests | Tune, enable, infer, override, clear, retry | 1440 and 390 px | Status/error announcements and control labels |
 | EXP-006 typed inference input | Invalid field/value/row shapes and editor-local issue state are actionable before submit | Typed-schema JSON/CSV request-gating tests | Review repair/default/unknown-type input | 1440 and 390 px | Field/error relationships and keyboard repair |
 | EXP-007 inference run lifecycle | Pending/failure/retry/results/export/history retain clear provenance on the Inference surface | Delayed/success/failure/cancel/reload/export tests | Execute, reset, retry, reload, restore, export | 1440 and 390 px | Live status, error recovery, and focus review |
+| EXP-008 cross-tab run identifiers | Every tab naming a selected run by short ID uses the same identifier the sidebar used to select it | Component test asserting `shortRunId(job)` usage across EvaluationView/PipelineDiffView/FeatureImportanceView/ShapSummaryView; Playwright label-consistency check | Select 2 named runs and compare the label shown in sidebar, Model Evaluation, and Pipeline Diff | 1440 and 390 px | Accessible label consistency |
 | OPS-001 job investigation lifecycle | Job details name lifecycle/input/error/log/result context; supported actions recover in place and Back restores list state | After OPS-007, paginated multi-type job, cancel/retry/unavailable-action component and Playwright fixtures | Search/filter/load/details/log/cancel/retry/return | 1440 and 390 px | Detail/action names, live status, keyboard return |
 | OPS-002 model deployment lineage | Model/job/version/artifact/deployment/inference identities remain traceable across action outcomes | After OPS-007, multi-version/deployment mutation and deep-link Playwright tests | Deploy, replace, deactivate, redeploy, refresh, follow links | 1440 and 390 px | Confirmation/modal focus and action status |
 | OPS-003 drift investigation lifecycle | Alert, severity, threshold version, evidence, owner/disposition, and related resources persist per check | After OPS-007, drift/alert history and transition fixtures | Alert→report→job/deployment, threshold change, acknowledge/reopen | 1440 and 390 px | Alert/status semantics and feature-table navigation |
