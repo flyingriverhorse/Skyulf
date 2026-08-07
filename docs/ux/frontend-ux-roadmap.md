@@ -5,8 +5,13 @@
 This synthesis groups the reviewed Foundations, Canvas, Data/EDA,
 Experiments/Inference, and Operations evidence by the user outcome it changes.
 It does not treat an inferred risk as a reproduced defect, and it does not let
-one well-instrumented journey stand in for another. The highest-value
-opportunities are:
+one well-instrumented journey stand in for another. The **2026-08-07 audit
+rerun** (see `## 2026-08-07 Audit Rerun`) repeated the engineering baseline and
+refreshed every journey's evidence, reconciling all `37` current findings:
+`5` New (`FND-007`, `DAT-008`, `DAT-009`, `EXP-008`, `OPS-008`), `6` Changed,
+`26` Confirmed, and `0` Resolved. Much of the prior work moved from `Inferred`
+to directly `Observed` against a live frontend and, for several Experiments and
+Data/EDA findings, a real backend. The highest-value opportunities are:
 
 1. **Let people complete core work on every supported screen size.**
    Eliminate clipped global, Data/EDA, and Canvas controls rather than asking
@@ -20,22 +25,27 @@ opportunities are:
    ingestion, EDA, and inference failures into recoverable states
    (`FND-003`, `CAN-002`, `DAT-002`, `DAT-003`, `DAT-005`, `EXP-007`).
 4. **Prevent invalid ML decisions before they are submitted.** Make source,
-   Canvas, EDA, and inference inputs identify their purpose and make typed
-   inference validation and repairs reviewable (`DAT-001`, `FND-005`,
-   `DAT-006`, `EXP-006`).
+   Canvas, EDA, and inference inputs identify their purpose — including
+   disambiguating look-alike dataset choices — and make typed inference
+   validation and repairs reviewable (`DAT-001`, `FND-005`, `DAT-006`,
+   `DAT-008`, `EXP-006`).
 5. **Make the Canvas reliably operable while building a pipeline.** A newly
    added node should be selectable and configurable, and every visible toolbar
    action should receive its own click (`CAN-001`, `CAN-005`).
 6. **Make analysis results attributable and interpretable.** Preserve analysis
-   inputs through history and then add explicit applied context and accessible
-   chart interpretation (`DAT-005`, `DAT-006`, `DAT-007`).
+   inputs through history and then add explicit applied context, accessible
+   chart interpretation, and honest chart-export gating (`DAT-005`, `DAT-006`,
+   `DAT-007`, `DAT-009`).
 7. **Make model comparison and threshold choices defensible.** Expose selected
-   runs, metric direction and missingness, then carry threshold provenance to
-   prediction (`EXP-001`, `EXP-002`, `EXP-005`).
-8. **Let operators investigate a record instead of copying an identifier.**
-   Build the shared context contract first, then connect jobs, model lineage,
-   drift, errors, performance, and audit history using only API-supported
-   correlations (`OPS-007`, `OPS-001`–`OPS-006`).
+   runs, metric direction and missingness, keep run identifiers consistent
+   across every comparison tab, then carry threshold provenance to prediction
+   (`EXP-001`, `EXP-002`, `EXP-008`, `EXP-005`).
+8. **Let operators investigate a record instead of copying an identifier, and
+   trust the records they see.** Build the shared context contract first, then
+   connect jobs, model lineage, drift, errors, performance, and audit history
+   using only API-supported correlations, and fix the duplicate-row/colliding-
+   key defect that undermines the Jobs table (`OPS-007`, `OPS-001`–`OPS-006`,
+   `OPS-008`).
 
 ## 2026-08-07 Audit Rerun
 
@@ -170,14 +180,39 @@ baseline captured in `## Method and Evidence`:
 
 | Status | Count | Meaning |
 |--------|-------|---------|
-| New | 1 | Not present in the previous roadmap. |
-| Changed | 1 | Evidence, scope, priority, or proposed behavior materially changed. |
-| Confirmed | 5 | Current evidence still supports the finding without material change. |
+| New | 5 | Not present in the previous roadmap. |
+| Changed | 6 | Evidence, scope, priority, or proposed behavior materially changed. |
+| Confirmed | 26 | Current evidence still supports the finding without material change. |
 | Resolved | 0 | Current evidence demonstrates that the prior user problem no longer occurs. |
 
-Task 2 reconciled every `FND-*` finding (`FND-001` through `FND-006`) and added one
-new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
-`OPS-*`) are reconciled by their own dedicated tasks and are not counted here.
+These counts are the reconciled totals across all rerun tasks (Task 2 shared
+foundations, Task 3 Canvas, Task 4 Data/EDA, Task 5 Experiments/Inference, and
+Task 6 Operations) and cover all `37` current findings (`5 + 6 + 26 + 0 = 37`).
+They match the required
+`grep -c "**2026-08-07 status:** <Status>"` count for each status:
+
+- **New (5):** `FND-007`, `DAT-008`, `DAT-009`, `EXP-008`, `OPS-008`.
+- **Changed (6):** `FND-005`, `CAN-001`, `CAN-005`, `DAT-004`, `DAT-005`,
+  `DAT-007`.
+- **Confirmed (26):** `FND-001`–`FND-004`, `FND-006`, `CAN-002`–`CAN-004`,
+  `DAT-001`–`DAT-003`, `DAT-006`, `EXP-001`–`EXP-007`, and `OPS-001`–`OPS-007`.
+- **Resolved (0):** none this rerun. No prior finding's user problem was
+  demonstrated resolved by current evidence; `## Historically Resolved
+  Findings` below records this explicitly so a future rerun preserves any
+  resolution rather than silently deleting a finding.
+
+**Synthesis reconciliation (Task 7):** the Task 5 Experiments/Inference pass
+originally labeled `EXP-001`, `EXP-005`, `EXP-006`, and `EXP-007` with a
+non-vocabulary status string (`Observed (upgrade from Inferred)` /
+`Observed (reconfirmed)`), which mixed the evidence-label vocabulary
+(`Observed`/`Measured`/`Inferred`) with the rerun-status vocabulary and left
+those four findings uncounted by the required status grep. This synthesis
+normalized each to exactly one of the required `New`/`Changed`/`Confirmed`/
+`Resolved` values, choosing `Confirmed` for all four — consistent with how the
+sibling `EXP-002`/`EXP-003`/`EXP-004` evidence-upgrades and cross-references were
+classified, since in every case the finding's user problem, scope, and proposed
+behavior are unchanged and only the evidence strength moved from inferred to
+observed. The evidence/delta prose for each still records the upgrade nuance.
 
 ### Task 2 — Shared Foundations Rerun
 
@@ -966,6 +1001,29 @@ new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
   Operations investigation likewise remain journey-specific. This preserves
   equal representation instead of collapsing evidence from less-observed
   journeys into a generic finding.
+- **New rerun findings kept distinct (not merged):** the five findings added
+  this rerun each describe a defect separable from its nearest neighbor, with
+  its own fix, so none is folded into an existing ID:
+  - `FND-007` (button-in-button DOM nesting in `NotificationCenter`) is a
+    shared-shell accessibility defect distinct from `FND-002`'s focus-
+    containment contract; its fix is a markup change, not a focus-management
+    change.
+  - `DAT-008` (indistinguishable duplicate Dataset-dropdown option labels) is
+    about making an informed selection in the first place, upstream of and
+    separable from `DAT-005`'s loss of a selection after navigation, and
+    unrelated to `DAT-007`'s chart-interpretation scope from which it was spun
+    off.
+  - `DAT-009` (chart Download never disabled for empty/unconfigured charts) is
+    an export-gating defect in `chartUtils.ts`/EDA tabs, separable from
+    `DAT-007`'s visualization-interpretation contract.
+  - `EXP-008` (cross-tab `job_id`-vs-`pipeline_id` label mismatch) compounds
+    `EXP-001` and `EXP-004` but is a single-file label-consistency swap, not a
+    selection-retention or diff-role change; it does not meet the component-
+    boundary bar (see Component-Boundary Recommendations) and stays its own
+    finding.
+  - `OPS-008` (duplicate Jobs rows / colliding React keys from a `poolSkip`
+    closure race) is an active rendering/data-integrity bug distinct from
+    `OPS-001`'s missing-investigation-affordance framing for the same table.
 
 ### Normalized ranking
 
@@ -979,11 +1037,12 @@ change.
 
 | Rank | Finding IDs in priority order | Sequencing rationale |
 |------|-------------------------------|----------------------|
-| 1–6 | FND-001, FND-005, FND-006, EXP-006, CAN-001, CAN-005 | Frequent high-impact access, task-completion, or data-validity risks; observed evidence leads where available. |
-| 7–12 | DAT-001, DAT-004, DAT-005, EXP-001, EXP-002, OPS-007 | Frequent journey blockers or cross-page foundations spanning Data/EDA, Experiments, and Operations. |
-| 13–19 | FND-003, CAN-002, DAT-002, DAT-003, EXP-005, EXP-007, FND-002 | High-impact recovery, decision, or overlay-accessibility work; dependencies fit within Now. |
-| 20–26 | OPS-001, OPS-004, OPS-002, OPS-003, DAT-006, DAT-007, EXP-003 | Important journey redesigns or broad interpretation work, sequenced after their foundations and API contracts. |
-| 27–32 | FND-004, EXP-004, CAN-003, OPS-005, OPS-006, CAN-004 | Lower-frequency normalization, larger historical-context work, or optional polish after the preceding outcomes. |
+| 1–6 | FND-001, FND-006, CAN-001, CAN-005, EXP-006, DAT-001 | Frequent high-impact access, task-completion, or data-validity risks with observed evidence and dependency-light fixes; the shared shell and Canvas blockers lead. |
+| 7–12 | OPS-007, DAT-004, DAT-005, EXP-001, EXP-002, FND-005 | Frequent journey blockers and the cross-page Operations foundation, plus shared form semantics that rank highly even though its normalization slice lands in Next. |
+| 13–18 | FND-003, FND-002, CAN-002, DAT-002, DAT-003, EXP-005 | High-impact recovery, overlay-accessibility, and decision-provenance work whose dependencies fit within Now. |
+| 19–24 | EXP-007, OPS-001, OPS-004, DAT-006, DAT-007, EXP-003 | High-impact run lifecycle and Frequent Operations investigations, then broad Data/EDA and explainability interpretation sequenced after their foundations. |
+| 25–30 | OPS-002, OPS-003, EXP-004, OPS-008, DAT-008, EXP-008 | High-impact Operations lineage/drift redesigns, then the Medium data-integrity Jobs defect (`OPS-008`, elevated by its React-key data-loss risk) ahead of the Medium label-consistency fixes `DAT-008`/`EXP-008`. |
+| 31–37 | FND-004, FND-007, OPS-005, OPS-006, CAN-003, CAN-004, DAT-009 | Lower-frequency normalization, a contained accessibility DOM-nesting fix, larger historical-context work, and optional polish after the preceding outcomes. |
 
 ## Method and Evidence
 
@@ -2466,7 +2525,9 @@ Canvas finding is warranted solely for this repeated form root.
     **Effort:** M. **Risk:** Medium. **Dependencies:** `useJobStore`,
     `ExperimentsPage` selection state, and job fixture contract.
     **Milestone:** Now.
-  - **2026-08-07 status:** Observed (upgrade from Inferred).
+  - **2026-08-07 status:** Confirmed (evidence upgraded from Inferred to a
+    live, twice-reproduced failure; the finding's user problem, scope, and
+    proposed behavior are unchanged, so it is not classified Changed).
   - **Current evidence:** Live reproduction at 1440 px: selecting 2
     classification jobs, then switching the task-type filter to
     Segmentation, hid both selected sidebar rows with no selected-state
@@ -2671,8 +2732,9 @@ Canvas finding is warranted solely for this repeated form root.
     High. **Dependencies:** threshold-tuning API/version semantics,
     evaluation artifacts, deployment prediction response, and **FND-003**.
     **Milestone:** Now.
-  - **2026-08-07 status:** Observed (upgrade) for the tuning-affects-
-    inference half of the claim; the no-provenance half is unchanged.
+  - **2026-08-07 status:** Confirmed (evidence upgraded to Observed for the
+    tuning-affects-inference half of the claim; the no-provenance half is
+    unchanged).
   - **Current evidence:** Observed (live) at 1440 px, in sequence: Model
     Evaluation's Threshold Slider/Tuning tabs produced per-class confusion
     matrices (0/1/2 vs Rest), ROC/ROC-AUC=1.000, and F1-best-threshold
@@ -2732,8 +2794,8 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent. **Effort:** M. **Risk:**
     High. **Dependencies:** deployment artifact schema, prediction validation
     response, and CSV parser. **Milestone:** Now.
-  - **2026-08-07 status:** Observed (reconfirmed), with a materially
-    stronger new reproduction.
+  - **2026-08-07 status:** Confirmed (reconfirmed with a materially stronger
+    new reproduction; the finding's substance is unchanged).
   - **Current evidence:** Observed (live) at 1440 px, against the real
     active deployment (`random_forest_classifier`, job
     `7c1ec203-dadc-4cb2-8e04-fd4a52c11813`, schema `sepal.length/sepal.width/
@@ -2799,8 +2861,9 @@ Canvas finding is warranted solely for this repeated form root.
     Medium. **Dependencies:** deployment/prediction APIs, job/status contract,
     browser storage/privacy policy, exports, and **FND-003**. **Milestone:**
     Now.
-  - **2026-08-07 status:** Observed (upgrade) for the raw-error-string and
-    no-cancel/no-explicit-retry claims; Confirmed for the rest.
+  - **2026-08-07 status:** Confirmed (evidence upgraded to Observed for the
+    raw-error-string and no-cancel/no-explicit-retry claims; unchanged for the
+    rest).
   - **Current evidence:** Observed (live) at 1440 px: both failure
     reproductions above (`Missing required column(s)…` and `Feature
     engineering failed: …`, see **EXP-006**) rendered as raw, unstyled
@@ -2883,7 +2946,20 @@ Canvas finding is warranted solely for this repeated form root.
     Evaluation/Pipeline Diff/Feature Importance/SHAP). **Effort:** S (swap
     one function call at ~4-6 call sites). **Risk:** Low. **Dependencies:**
     none beyond `jobMeta.ts`'s existing `shortRunId` export. **Milestone:**
-    Now.
+    Next.
+  - **Milestone reassessment (Task 7):** originally proposed as `Now`, this
+    finding is reassessed to `Next` for consistency with `DAT-008`, which
+    shares the identical normalized profile (Impact **Medium**, Frequency
+    **Frequent**, Effort **S**, Risk **Low**) and is also a label/selection-
+    clarity gap whose underlying data is correct. The `Now` milestone is
+    reserved for the smallest dependency-complete **high-impact** set;
+    a `Medium`-impact label-consistency fix with no data-loss or reliability
+    risk belongs in `Next` alongside `DAT-008`. This diverges from `OPS-008`,
+    which keeps `Now` despite also being `Medium`/`S`: `OPS-008` is an active
+    data-integrity/React-key-collision defect (React documents key collisions
+    as causing list reordering, incorrect DOM reuse, or dropped updates), a
+    data-loss/reliability risk the ranking order weighs above raw impact,
+    whereas `EXP-008`/`DAT-008` only mislabel correctly-computed data.
   - **2026-08-07 status:** New.
   - **Current evidence:** Observed live against the real backend, as
     described above; independently evidenced by grep-confirmed source
@@ -3286,8 +3362,13 @@ Canvas finding is warranted solely for this repeated form root.
     clipping pattern at 390 px across every other Operations page tested,
     the same clipping is expected here but is **Inferred, not directly
     Observed**, for this page.
-  - **Delta:** No change from the original finding, now with a direct live
-    1440 px confirmation supplementing the prior source-only evidence.
+  - **Delta:** No change from the original finding. The original audit already
+    recorded live Chrome evidence for this page (lookback/top-N controls,
+    aggregate metrics, sortable columns, and sample-node-ID `e.g.` text), so
+    the prior evidence was **not** source-only; this rerun re-confirms that
+    same behavior live at 1440 px and adds source-level confirmation that
+    `SlowNodesResponse` still exposes no run-ID/pipeline/deployment drill-down
+    field for the UI to render.
 
 - **OPS-006 — Inferred: Audit Log has attributed version/diff entries but lacks
   filter, retention, and cross-record investigation context.**
@@ -3529,7 +3610,7 @@ Canvas finding is warranted solely for this repeated form root.
 | EXP-005 | Inferred | Threshold exploration/tuning/activation lacks a durable decision record. | Evaluation, threshold API, Inference overrides/results | High | Occasional | M | High | Threshold API/version semantics; FND-003 | Now |
 | EXP-006 | Observed | Inference permits visibly incomplete/type-incompatible input. | Editor, schema badges/Fix, prediction request | High | Frequent | M | High | Typed artifact schema | Now |
 | EXP-007 | Inferred | Inference execution/recovery is not a complete durable run lifecycle. | Run, pending/error/results, history, exports | High | Occasional | L | Medium | Prediction/status API; storage; FND-003 | Now |
-| EXP-008 | Observed | Cross-tab run-identifier mismatch (`job_id` vs `pipeline_id`) breaks selection traceability. | Model Evaluation pills; Pipeline Diff header; Feature Importance/SHAP legends | Medium | Frequent | S | Low | `jobMeta.ts` `shortRunId` export | Now |
+| EXP-008 | Observed | Cross-tab run-identifier mismatch (`job_id` vs `pipeline_id`) breaks selection traceability. | Model Evaluation pills; Pipeline Diff header; Feature Importance/SHAP legends | Medium | Frequent | S | Low | `jobMeta.ts` `shortRunId` export | Next |
 | OPS-001 | Observed | Jobs history cannot open a unified details/recovery investigation. | Jobs; Job History drawer; logs; related resources | High | Frequent | L | Medium | Job/status/log APIs; useJobStore; DAT-003/DAT-005; OPS-007; FND-003 | Next |
 | OPS-002 | Observed | Registered versions and deployments do not form a traceable decision chain. | Registry; Deployments; Jobs; Experiments; Inference | High | Occasional | L | High | Registry/deployment lineage; job/evaluation provenance; OPS-007; FND-003/FND-004 | Next |
 | OPS-003 | Inferred | Drift reports lack a durable alert, investigation, and remediation lifecycle. | Drift; alert badge; Registry/Deployments; Jobs; Errors | High | Occasional | L | High | Drift/alert schema; threshold versioning; deployment lineage; OPS-007; FND-003 | Next |
@@ -3546,6 +3627,27 @@ reliability failure or independently testable user-state risk; no split is
 recommended merely because a file is large. React Flow continues to own graph
 viewport, pan/zoom, handles, and node movement. APIs remain the authoritative
 source for ingestion, analysis, deployment, and Operations records.
+
+**Synthesis disclosure — `ClassificationChartsForSplit.tsx` independently
+re-reviewed (Task 7):** the Task 5 Experiments/Inference pass flagged that
+`ClassificationChartsForSplit.tsx` had not been independently re-reviewed for
+component-boundary evidence. This synthesis read the file directly
+(`frontend/ml-canvas/src/components/pages/ExperimentsPage/components/ClassificationChartsForSplit.tsx`,
+650 lines). Result: **no boundary change.** It is a pure presentational
+component that renders all classification charts for one split from props
+(`splitName`, `splitData`, `selectedRocClass`, `threshold`, and download
+callbacks) plus one memoized `applyThreshold(...)` result. It holds no local
+user state, no store subscription, no fetch/mutation lifecycle, and does **not**
+reference `job_id`/`shortRunId`/`.slice(0, 8)`, so it is not one of the
+components implicated in `EXP-008`'s cross-tab identifier mismatch (that logic
+lives in `EvaluationView`, `PipelineDiffView`, `FeatureImportanceView`, and the
+SHAP views). Its nine chart Download buttons are each correctly disabled while a
+download is in flight (`disabled={downloadingChart === ...}`) and marked
+`data-export-ignore`, so it does not exhibit the `DAT-009` empty-chart-download
+pattern either. It therefore introduces no measured reliability failure or
+independently testable user-state risk and does not warrant its own
+component-boundary recommendation; the existing `InferencePage.tsx` and
+Experiments boundary reasoning is unchanged.
 
 ### `Toolbar.tsx`
 
@@ -3632,11 +3734,13 @@ source for ingestion, analysis, deployment, and Operations records.
 
 This is the smallest dependency-complete high-impact set: four shared
 foundations, the Operations primitive, and independently complete journey
-slices. Re-evaluation finds **18** Now items; every finding-ID dependency named
+slices. Re-evaluation finds **19** Now items; every finding-ID dependency named
 by one is also in Now (or is an external API/product contract rather than a
 later roadmap item). Work foundations first: `FND-001`/`FND-002`/`FND-003`/
 `FND-006` and `OPS-007`; then land the dependent Canvas, Data/EDA, and
-Experiments/Inference slices.
+Experiments/Inference slices. `OPS-008` is the one Medium-impact item admitted
+to Now, because its React-key collision is an active data-integrity/reliability
+defect (not a cosmetic gap) whose fix is self-contained in `Jobs.tsx`.
 
 - **FND-001:** Make the shared shell and Canvas subview navigation usable at
   390 px without degrading 768 px and desktop workflows.
@@ -3671,6 +3775,11 @@ Experiments/Inference slices.
 - **OPS-007:** Define a typed, URL-restorable operational-context schema plus
   serializer/parser round-trip behavior and a shared contextual record-link
   primitive; leave view-specific row/detail adoption to `OPS-001`–`OPS-006`.
+- **OPS-008:** Eliminate the duplicate Jobs-row/colliding-React-key defect on
+  fresh `/jobs` load by serializing the auto-load-more fetch and/or
+  de-duplicating the pool by `job_id`, so the table never renders two rows for
+  one job. Self-contained in `Jobs.tsx`; no shared Operations primitive
+  required.
 
 ### Next
 
@@ -3679,14 +3788,23 @@ Experiments/Inference slices.
 - **FND-005:** Normalize labels, required-state messaging, and field-error
   relationships in Canvas, Data/EDA, and Inference after route-specific source
   and inference validation fixes land.
+- **FND-007:** Remove the invalid button-in-button DOM nesting in
+  `NotificationCenter` so the Dismiss control is not a descendant of the row
+  button, restoring a valid accessible name and keyboard focus order.
 - **DAT-006:** Make filter and exclusion application accessible, explicit, and
   visible in every result/export.
 - **DAT-007:** Establish interpretable, responsive, theme-safe chart and
   alternative-data behavior.
+- **DAT-008:** Give each EDA Dataset-dropdown option a disambiguating label
+  (id fragment, date, or row/column count) so no two options render identical
+  visible text.
 - **EXP-003:** Explain absent/partial explainability artifacts, missing versus
   zero values, and segmentation metric direction.
 - **EXP-004:** Make baseline/candidate roles, snapshot availability, and
   structural-versus-outcome differences explicit in Pipeline Diff.
+- **EXP-008:** Use `shortRunId(job)` consistently across every Experiments tab
+  that names a selected run, so Model Evaluation, Pipeline Diff, Feature
+  Importance, and SHAP use the same identifier the sidebar used to select it.
 - **OPS-001:** After `OPS-007`, make every Jobs history record open a
   context-rich details and supported-recovery view with contextual return.
 - **OPS-002:** After `OPS-007`, trace every registered model version through
@@ -3709,6 +3827,20 @@ Experiments/Inference slices.
 - **OPS-006:** After `OPS-007` and `EXP-004`, preserve attributed version/diff
   history while adding filters, retention/time-scope clarity, and
   API-supplied related-record correlation.
+- **DAT-009:** Disable or hide each EDA chart Download button (Bivariate, PCA,
+  and any tab sharing the pattern) until its chart's required inputs are
+  selected and rendered, or make `downloadChart` refuse a container holding
+  only empty-state content, so a download never silently captures placeholder
+  text.
+
+## Historically Resolved Findings
+
+No finding was demonstrated resolved by current evidence this rerun, so this
+section is intentionally empty (`Resolved` count `0`). It exists to preserve
+resolved findings historically: when a future rerun demonstrates that a prior
+user problem no longer occurs, move that finding here with its evidence and the
+date resolved rather than deleting it, so the roadmap keeps an auditable record
+of what was fixed and why it was removed from the active inventory.
 
 ## Validation Matrix
 
@@ -3727,6 +3859,7 @@ supplement, not a substitute. The table states any additional coverage.
 | FND-004 retry consistency | Every recoverable route fetch error retries in place | Page request-failure tests | Preserve filters and selection after retry | 1440 and 390 px | Retry button keyboard operation |
 | FND-005 shared form semantics | Controls have labels, required/invalid states, and linked errors | Component accessibility tests and axe | Keyboard-only Canvas configuration, Add Source, EDA filter/setup, and Inference entry | 1440 and 390 px | Accessible-name/error relationship review |
 | FND-006 shell-view history | Back/Forward restores selected Canvas, Experiments, or Inference view | Playwright history tests | Verify retained local state | 1440, 1024, 768, 390 px | Selected-state snapshot |
+| FND-007 notification button nesting | `NotificationCenter` renders no interactive control as a descendant of another button; each row and its Dismiss are separate focus stops with correct accessible names | Component test asserting no nested `<button>`; render/DOM-nesting assertion (no `validateDOMNesting` warning) | Seed a notification, Tab through the row and Dismiss, confirm distinct focus stops and no concatenated accessible name | 1440 and 390 px | Keyboard focus order and accessible-name review; axe |
 | CAN-001 Canvas click-add | New nodes never overlap, are selected, and expose required settings | Playwright palette/drag/palette placement checks | Build a representative pipeline by each insertion method | 1440, 1024, 768, 390 px | Keyboard reachability and focus check |
 | CAN-005 Canvas toolbar collision | Every visible enabled toolbar target has an independent hit area with either panel open | Playwright rectangle-intersection and pointer-action checks | Open/close both panels, then undo/redo/load/save and overflow actions | 1440, 1024, 768, 390 px | Focus, menu role, and keyboard Undo/Redo check |
 | CAN-002 Canvas diagnosis | Invalid/failing nodes identify a next action and open their settings | Validator and mocked-failure tests | Fix every issue from the Canvas summary | 1440 and 390 px | Summary role, focus, and live feedback |
