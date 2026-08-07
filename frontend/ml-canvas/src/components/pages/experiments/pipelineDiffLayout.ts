@@ -16,6 +16,8 @@ export interface JobLite {
   job_id: string;
   pipeline_id: string;
   model_type?: string;
+  dataset_name?: string;
+  created_at?: string;
   parent_pipeline_id?: string | null;
 }
 

@@ -19,6 +19,11 @@ interface PCATabProps {
 }
 
 export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, downloadChart }) => {
+    const canDownload = Array.isArray(profile.pca_data) && profile.pca_data.length > 0;
+    const downloadHint = canDownload
+        ? 'Download Chart'
+        : 'Not enough numeric data for PCA';
+
     return (
         <>
             <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
@@ -30,9 +35,11 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                     </h3>
                     <div className="flex items-center gap-2">
                         <button
+                            disabled={!canDownload}
                             onClick={() => downloadChart('pca-chart', 'pca-analysis', 'Multivariate Structure (PCA)', isPCA3D ? '3D Projection' : '2D Projection')}
-                            className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
-                            title="Download Chart"
+                            className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 disabled:opacity-50"
+                            title={downloadHint}
+                            aria-label={downloadHint}
                         >
                             <Download className="w-4 h-4" />
                         </button>

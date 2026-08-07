@@ -11,7 +11,15 @@ refreshed every journey's evidence, reconciling all `37` current findings:
 `5` New (`FND-007`, `DAT-008`, `DAT-009`, `EXP-008`, `OPS-008`), `6` Changed,
 `26` Confirmed, and `0` Resolved. Much of the prior work moved from `Inferred`
 to directly `Observed` against a live frontend and, for several Experiments and
-Data/EDA findings, a real backend. The highest-value opportunities are:
+Data/EDA findings, a real backend.
+
+> **This document mixes two timelines.** Everything below records the
+> `2026-08-07` audit as it was taken. A separate implementation pass has since
+> resolved `28` of the `37` findings; that record lives in
+> `## Historically Resolved Findings` at the end of this file. Audit sections
+> are deliberately not edited in place so the audit stays reproducible.
+
+The highest-value opportunities are:
 
 1. **Let people complete core work on every supported screen size.**
    Eliminate clipped global, Data/EDA, and Canvas controls rather than asking
@@ -184,6 +192,12 @@ baseline captured in `## Method and Evidence`:
 | Changed | 6 | Evidence, scope, priority, or proposed behavior materially changed. |
 | Confirmed | 26 | Current evidence still supports the finding without material change. |
 | Resolved | 0 | Current evidence demonstrates that the prior user problem no longer occurs. |
+
+> **As-audited counts.** The table records the state of the `2026-08-07` audit
+> and is intentionally frozen. A later implementation pass has since fixed `28`
+> of these findings — see `## Historically Resolved Findings` for the list and
+> `changelog/0.7.x.md` for per-fix evidence. The next audit rerun should recount
+> from live evidence rather than adjusting these numbers in place.
 
 These counts are the reconciled totals across all rerun tasks (Task 2 shared
 foundations, Task 3 Canvas, Task 4 Data/EDA, Task 5 Experiments/Inference, and
@@ -1102,13 +1116,18 @@ dependency-complete slice is intentionally broader than the smallest Now
 change.
 
 | Rank | Finding IDs in priority order | Sequencing rationale |
-|------|-------------------------------|----------------------|
-| 1–6 | FND-001, FND-006, CAN-001, CAN-005, EXP-006, DAT-001 | Frequent high-impact access, task-completion, or data-validity risks with observed evidence and dependency-light fixes; the shared shell and Canvas blockers lead. |
+|------|-------------------------------|----------------------|| 1–6 | FND-001, FND-006, CAN-001, CAN-005, EXP-006, DAT-001 | Frequent high-impact access, task-completion, or data-validity risks with observed evidence and dependency-light fixes; the shared shell and Canvas blockers lead. |
 | 7–12 | OPS-007, DAT-004, DAT-005, EXP-001, EXP-002, FND-005 | Frequent journey blockers and the cross-page Operations foundation, plus shared form semantics that rank highly even though its normalization slice lands in Next. |
 | 13–18 | FND-003, FND-002, CAN-002, DAT-002, DAT-003, EXP-005 | High-impact recovery, overlay-accessibility, and decision-provenance work whose dependencies fit within Now. |
 | 19–24 | EXP-007, OPS-001, OPS-004, DAT-006, DAT-007, EXP-003 | High-impact run lifecycle and Frequent Operations investigations, then broad Data/EDA and explainability interpretation sequenced after their foundations. |
 | 25–30 | OPS-002, OPS-003, EXP-004, OPS-008, DAT-008, EXP-008 | High-impact Operations lineage/drift redesigns, then the nominally Medium-impact Jobs defect `OPS-008` — its live data-integrity/duplicate-key defect (colliding React keys causing reordering, incorrect DOM reuse, or dropped updates) raises its effective severity under ranking criterion 1 (impact/severity) above a plain label-consistency gap, so it is sequenced ahead of the Medium label-consistency fixes `DAT-008`/`EXP-008` while its normalized `Impact` value and `Now` milestone remain unchanged. |
 | 31–37 | FND-004, FND-007, OPS-005, OPS-006, CAN-003, CAN-004, DAT-009 | Lower-frequency normalization, a contained accessibility DOM-nesting fix, larger historical-context work, and optional polish after the preceding outcomes. |
+
+**Implementation status (2026-08-08):** ranks `1–18` are complete, as are
+`DAT-006`, `EXP-004`, `EXP-008`, `OPS-006`, `OPS-008`, `DAT-008`, `FND-004`,
+`FND-007`, `CAN-004`, and `DAT-009` out of order. `9` findings remain — see
+`## Historically Resolved Findings` for the full breakdown, including which
+resolutions shipped a scoped slice rather than the full proposed behavior.
 
 ## Method and Evidence
 
@@ -4245,12 +4264,74 @@ defect (not a cosmetic gap) whose fix is self-contained in `Jobs.tsx`.
 
 ## Historically Resolved Findings
 
-No finding was demonstrated resolved by current evidence this rerun, so this
-section is intentionally empty (`Resolved` count `0`). It exists to preserve
-resolved findings historically: when a future rerun demonstrates that a prior
-user problem no longer occurs, move that finding here with its evidence and the
-date resolved rather than deleting it, so the roadmap keeps an auditable record
-of what was fixed and why it was removed from the active inventory.
+**2026-08-08 implementation pass.** The `2026-08-07` audit rerun recorded
+`Resolved` count `0` because no *prior* finding's user problem had been
+demonstrated fixed at audit time. Since then an implementation pass has landed
+fixes for the findings below. This section is the auditable record; the
+`## Finding Status Summary` counts above are deliberately left at their
+as-audited values, because they describe the state of the `2026-08-07` audit,
+not the state of the codebase today. A future audit rerun should recount from
+scratch and move these into its own `Resolved` bucket.
+
+Each entry names the finding, the release the fix shipped in, and where to find
+the change. Per-finding evidence lives in `changelog/0.7.x.md`; the finding's
+full original entry remains in place above so the problem statement and
+acceptance criteria stay readable.
+
+### Resolved in v0.7.5
+
+| Finding | Rank | What changed |
+|---------|------|--------------|
+| FND-001 | 1 | Responsive app shell and navigation down to 390 px; global controls no longer clip. |
+| FND-006 | 2 | Shell-view selection restored through browser history. |
+| CAN-001 | 3 | Canvas click-to-add no longer overlaps an existing node; the new node is selected and its settings open. |
+| CAN-005 | 4 | Container-aware toolbar; every visible enabled toolbar target has an independent hit area with either panel open. |
+| EXP-006 | 5 | Typed inference input validation blocks schema violations before submit. |
+| DAT-001 | 6 | Accessible Add Source form; source fields are labelled and success names the next step. |
+| OPS-007 | 7 | `RecordLink` operational-context primitive (35 tests) — the shared contract the other OPS findings depend on. |
+| DAT-004 | 8 | Data/EDA controls reachable at narrow widths. |
+| DAT-005 | 9 | EDA job context: dataset, target, task, filter, and exclusion inputs persist through pending/fail/history outcomes; deep-link fixes. |
+| EXP-001 | 10 | Experiments discloses hidden selected runs; evaluation tabs target renderable runs. |
+| EXP-002 | 11 | Metric direction explicit across run comparison; missing metric values state why. |
+| FND-005 | 12 | `FormField` primitive; shared form semantics across Canvas, Data, EDA, and Inference. |
+| FND-003 | 13 | Shared async-state live regions (`LoadingState` / `EmptyState` / `ErrorState`); removed the duplicate toast announcement. |
+| FND-002 | 14 | Shared `useModalFocus` focus contract across all overlays. |
+| CAN-002 | 15 | `validateGraph` returns structured per-node issues; Results renders a selectable issue list that opens the offending node's settings. |
+| DAT-002 | 16 | Dataset preview stops rendering unavailable metadata as `0` and surfaces the backend's real error; sample and profile failures reported independently. |
+| DAT-003 | 17 | Ingestion Jobs separates active ingestions from completed history; failed sources get a Retry route. |
+| EXP-005 | 18 | Threshold mutations expose scoped pending state, cannot be double-submitted, retry in place, and display their provenance. |
+| OPS-008 | 28 | Verified already fixed: `Jobs.tsx` keys on `job.job_id` and dedupes by `job_id`. No code change was required — recorded here so a future audit does not re-open it without re-checking. |
+| DAT-008 | 29 | EDA dataset dropdown disambiguates same-named datasets with a stable id suffix (`core/utils/edaDatasetOptions.ts`). |
+| FND-007 | 32 | `NotificationCenter` no longer nests the Dismiss `<button>` inside the row `<button>`; `markAllRead()` moved out of the render phase. |
+| FND-004 | 31 | Model Registry, Model Evaluation, and Segmentation pass `onRetry` to the shared `ErrorState`; the button disables itself while an async retry is in flight. |
+| CAN-004 | 35 | Feature Generation's dead "Apply Recommendation" control removed — recommendations are informational, because the payload does not map onto the node's multi-operation config. |
+| DAT-009 | 37 | Bivariate and PCA Download buttons disable until the chart has renderable data and state why. |
+| EXP-008 | 30 | Every Experiments tab naming a run by short ID now uses `shortRunId(job)`; an unavailable pipeline id is labelled `Job ID:` rather than shown bare. |
+| DAT-006 | 22 | EDA filters use an explicit draft/apply model instead of re-running analysis on every add/remove; filter controls have accessible names and linked numeric validation. **Partial:** the finding's applied-context banner across tabs/exports/history is not implemented. |
+| EXP-004 | 27 | Pipeline Diff gained a Swap control, per-side dataset/model/timestamp metadata, and run-specific missing-snapshot messaging. **Partial:** change-list export is not implemented. |
+| OPS-006 | 33 | Audit Log gained actor/action/time filters plus scope, limit, and ordering copy. Filters are applied **server-side across the dataset's full history** (`actor`, `kind`, `created_after`, `created_before` on `/versions/{id}/audit`), with server-computed `facets` keeping the dropdowns complete and `total_unfiltered` distinguishing "no history" from "nothing matched". **Partial:** no cross-record links were added, because the payload carries no such correlation. Also fixed a latent diff-walk bug where a pinned version made the route diff every entry against the wrong predecessor. |
+
+**Known gap in this record:** these fixes were validated by unit/component
+tests plus `tsc`, `lint`, and `build`, not by re-running each finding's full
+`## Validation Matrix` row. In particular the responsive (1440/1024/768/390 px)
+and screen-reader passes specified for `FND-001`, `CAN-005`, and `DAT-004` have
+not been repeated end-to-end since the fixes landed. Treat the entries above as
+"fix implemented and unit-verified", not "acceptance criteria fully
+re-validated".
+
+### Still open (9)
+
+Rank order, per `### Normalized ranking` above:
+
+- **19–24:** `EXP-007`, `OPS-001`, `OPS-004`, `DAT-007`, `EXP-003`
+- **25–30:** `OPS-002`, `OPS-003`
+- **31–37:** `OPS-005`, `CAN-003`
+
+Three of the resolved entries above (`DAT-006`, `EXP-004`, `OPS-006`) shipped a
+scoped slice rather than the finding's full proposed behavior; each names its
+remaining gap in the table. Those gaps are deliberately *not* tracked as
+separate open findings — a future audit rerun should re-evaluate them against
+live evidence and decide whether the residue still constitutes a user problem.
 
 ## Validation Matrix
 

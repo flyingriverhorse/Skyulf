@@ -3,7 +3,7 @@ import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { LoadingState, ErrorState } from '../../../shared';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationData, EvaluationSplit } from '../types';
-import type { ThresholdMetric } from '../utils/jobMeta';
+import { shortRunId, type ThresholdMetric } from '../utils/jobMeta';
 import { thresholdMetricOptions, metricLabel, normalizeThresholdMetric } from '../utils/classificationCharts';
 import type { ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
 import { RegressionChartsForSplit } from './RegressionChartsForSplit';
@@ -20,6 +20,12 @@ interface BestMetricInfo {
 interface Props {
   /** Selected runs this tab can actually render, in selection order. */
   eligibleJobIds: string[];
+  /** Selected runs with pipeline metadata for stable display labels. */
+  eligibleJobs?: Array<{
+    jobId: string;
+    pipeline_id: string;
+    parent_pipeline_id?: string | null;
+  }>;
   evalJobId: string | null;
   fetchEvaluationData: (jobId: string) => void | Promise<void>;
   isEvalLoading: boolean;
@@ -97,6 +103,7 @@ const thresholdMutationLabel = (kind: ThresholdMutationKind): string => {
 
 export const EvaluationView: React.FC<Props> = ({
   eligibleJobIds,
+  eligibleJobs,
   evalJobId,
   fetchEvaluationData,
   isEvalLoading,
@@ -164,6 +171,7 @@ export const EvaluationView: React.FC<Props> = ({
   const isThresholdMutationPending = pendingThresholdMutation !== null;
   const pendingThresholdMutationText = pendingThresholdMutation ? thresholdMutationMessage(pendingThresholdMutation) : null;
   const thresholdMutationRetryLabel = thresholdMutationError ? `Retry ${thresholdMutationLabel(thresholdMutationError.kind).toLowerCase()}` : 'Retry';
+  const retryJobId = evalJobId ?? eligibleJobIds[0] ?? null;
 
   // Regression split tabs (Train/Test/Validation). Hoisted here and
   // memoized because this exact derivation was previously duplicated
@@ -211,32 +219,39 @@ export const EvaluationView: React.FC<Props> = ({
     );
   }, [selectedRegressionSplit, availableRegressionSplits, regressionSplitTabs]);
 
+  const eligibleRunLabels = useMemo(() => {
+    if (eligibleJobs && eligibleJobs.length > 0) {
+      return eligibleJobs.map((job) => ({ jobId: job.jobId, label: shortRunId(job) }));
+    }
+    return eligibleJobIds.map((jobId) => ({ jobId, label: `Job ID: ${jobId}` }));
+  }, [eligibleJobs, eligibleJobIds]);
+
   return (
     <div className="space-y-6">
       {/* Job Selector if multiple */}
-      {eligibleJobIds.length > 1 && (
+      {eligibleRunLabels.length > 1 && (
         <div
           className="flex gap-2 overflow-x-auto pb-2"
           role="tablist"
           aria-label="Select run for evaluation"
         >
-          {eligibleJobIds.map(id => {
-            const isActive = evalJobId === id;
+          {eligibleRunLabels.map(({ jobId, label }) => {
+            const isActive = evalJobId === jobId;
             return (
               <button
-                key={id}
+                key={jobId}
                 type="button"
                 role="tab"
                 aria-selected={isActive}
-                title={isActive ? `Active run: ${id}` : `Switch to run ${id}`}
-                onClick={() => { void fetchEvaluationData(id); }}
+                title={isActive ? `Active run: ${label}` : `Switch to run ${label}`}
+                onClick={() => { void fetchEvaluationData(jobId); }}
                 className={`px-3 py-1 text-xs font-mono rounded border whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
                   isActive
                     ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-300'
                     : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700'
                 }`}
               >
-                {id.slice(0, 8)}
+                {label}
               </button>
             );
           })}
@@ -252,7 +267,10 @@ export const EvaluationView: React.FC<Props> = ({
        *     job switch (the "blink" the user reported). */}
       {evalError ? (
         <div className="h-64 flex items-center justify-center">
-          <ErrorState error={evalError} />
+          <ErrorState
+            error={evalError}
+            onRetry={retryJobId ? () => fetchEvaluationData(retryJobId) : undefined}
+          />
         </div>
       ) : !evaluationData ? (
         isEvalLoading ? (

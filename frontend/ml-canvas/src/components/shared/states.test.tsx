@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { LoadingState } from './LoadingState';
@@ -55,6 +55,29 @@ describe('ErrorState', () => {
     expect(btn).toHaveAccessibleDescription('boom');
     fireEvent.click(btn);
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables retry while an async retry is pending', async () => {
+    let resolveRetry: (() => void) | undefined;
+    const onRetry = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRetry = () => resolve();
+        }),
+    );
+
+    render(<ErrorState error="boom" onRetry={onRetry} />);
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+
+    expect(screen.getByRole('button', { name: /retry/i })).toBeDisabled();
+
+    if (resolveRetry) {
+      resolveRetry();
+    }
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /retry/i })).not.toBeDisabled();
+    });
   });
 
   it('hides every decorative icon inside the alert', () => {
