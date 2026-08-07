@@ -121,6 +121,82 @@ describe('useGraphStore', () => {
     useGraphStore.getState().setExecutionResult(null);
     expect(useGraphStore.getState().executionResult).toBeNull();
   });
+
+  it('validateGraph returns structured issues for configuration, connection, and leakage failures', () => {
+    initializeRegistry();
+    useGraphStore.getState().setGraph(
+      [
+        {
+          id: 'dataset-missing',
+          type: 'custom',
+          position: { x: 0, y: 0 },
+          data: { definitionType: 'dataset_node' },
+        },
+        {
+          id: 'orphan-encoding',
+          type: 'custom',
+          position: { x: 120, y: 0 },
+          data: { definitionType: 'encoding', method: 'label', columns: ['status'] },
+        },
+        {
+          id: 'leak-dataset',
+          type: 'custom',
+          position: { x: 0, y: 160 },
+          data: { definitionType: 'dataset_node', datasetId: 'ds-1' },
+        },
+        {
+          id: 'leaky-imputer',
+          type: 'custom',
+          position: { x: 120, y: 160 },
+          data: {
+            definitionType: 'imputation_node',
+            columns: ['feature_a'],
+            method: 'simple',
+            strategy: 'mean',
+          },
+        },
+        {
+          id: 'splitter',
+          type: 'custom',
+          position: { x: 240, y: 160 },
+          data: {
+            definitionType: 'TrainTestSplitter',
+            test_size: 0.2,
+            validation_size: 0,
+            random_state: 42,
+            stratify: false,
+            shuffle: true,
+          },
+        },
+      ],
+      [
+        { id: 'e1', source: 'leak-dataset', target: 'leaky-imputer' },
+        { id: 'e2', source: 'leaky-imputer', target: 'splitter' },
+      ],
+    );
+
+    const issues = useGraphStore.getState().validateGraph();
+    expect(issues).toHaveLength(3);
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          nodeId: 'dataset-missing',
+          nodeLabel: 'Dataset',
+          category: 'configuration',
+        }),
+        expect.objectContaining({
+          nodeId: 'orphan-encoding',
+          nodeLabel: 'Encoding',
+          category: 'connection',
+        }),
+        expect.objectContaining({
+          nodeId: 'leaky-imputer',
+          nodeLabel: 'Imputation',
+          category: 'leakage',
+        }),
+      ]),
+    );
+  });
 });
 
 // Registry-dependent reducers — bootstrap the registry once so addNode,

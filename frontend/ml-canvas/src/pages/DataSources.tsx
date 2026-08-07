@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Dataset } from '../core/types/api';
 import { FileUpload } from '../modules/nodes/data/FileUpload';
-import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download, Search, Filter, FileClock } from 'lucide-react';
+import { Trash2, Play, FileText, Calendar, Database, Plus, Eye, Loader2, XCircle, BarChart2, Download, Search, Filter, FileClock, RefreshCw } from 'lucide-react';
 import { formatBytes } from '../core/utils/format';
 import { DatasetPreviewModal } from '../components/data/DatasetPreviewModal';
 import { AddSourceModal } from '../components/data/AddSourceModal';
@@ -51,6 +51,22 @@ export const DataSources: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   // Track per-row export-in-flight state (no mutation hook backs this call).
   const [exportingIds, setExportingIds] = useState<Set<string>>(new Set());
+
+  const getIngestionStatus = (dataset: Dataset) => dataset.source_metadata?.ingestion_status?.status || 'completed';
+  const getIngestionMessage = (dataset: Dataset) => {
+    const ingestionStatus = dataset.source_metadata?.ingestion_status;
+    const status = getIngestionStatus(dataset);
+
+    if (status === 'failed') {
+      return ingestionStatus?.message || ingestionStatus?.error || 'Ingestion failed';
+    }
+
+    if (status === 'cancelled') {
+      return ingestionStatus?.message || ingestionStatus?.error || 'Ingestion cancelled';
+    }
+
+    return ingestionStatus?.message || '';
+  };
 
   const filteredDatasets = datasets.filter(d => {
     const status = d.source_metadata?.ingestion_status?.status || 'completed';
@@ -116,6 +132,18 @@ export const DataSources: React.FC = () => {
     }
   };
 
+  const handleRetry = async (dataset: Dataset) => {
+    if (dataset.type === 'file') {
+      setShowUpload(true);
+      setShowAddSource(false);
+    } else {
+      setShowAddSource(true);
+      setShowUpload(false);
+    }
+    setShowIngestionJobs(false);
+    toast.info('Open the source form to retry ingestion.');
+  };
+
   const handleUseInCanvas = (id: string) => {
     navigate(`/canvas?source_id=${id}`);
   };
@@ -130,7 +158,7 @@ export const DataSources: React.FC = () => {
   };
 
   const getStatusBadge = (dataset: Dataset) => {
-    const status = dataset.source_metadata?.ingestion_status?.status;
+    const status = getIngestionStatus(dataset);
     if (!status || status === 'completed') return null;
 
     if (status === 'failed') {
@@ -151,8 +179,8 @@ export const DataSources: React.FC = () => {
 
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-        <Loader2 size={12} className="animate-spin" />
-        {status === 'processing' ? 'Processing...' : 'Pending...'}
+        <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+        {status === 'processing' ? 'Processing ingestion' : 'Queued for ingestion'}
       </span>
     );
   };
@@ -176,6 +204,7 @@ export const DataSources: React.FC = () => {
         onClose={() => { setShowIngestionJobs(false); }}
         datasets={datasets}
         onRefresh={() => { void datasetsQuery.refetch(); }}
+        onRetry={handleRetry}
       />
 
       <PipelineVersionsModal
@@ -365,11 +394,22 @@ export const DataSources: React.FC = () => {
                             {d.name}
                             {getStatusBadge(d)}
                           </div>
-                          <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5" title="Dataset ID">
-                            {d.source_id || d.id}
+                            {(getIngestionStatus(d) === 'failed' || getIngestionStatus(d) === 'cancelled') && (
+                              <p
+                                className={`mt-1 text-xs rounded px-2 py-1 ${
+                                  getIngestionStatus(d) === 'failed'
+                                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/10'
+                                    : 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800'
+                                }`}
+                              >
+                                {getIngestionMessage(d)}
+                              </p>
+                            )}
+                            <div className="text-xs text-slate-500 dark:text-slate-400 font-mono mt-0.5" title="Dataset ID">
+                              {d.source_id || d.id}
+                            </div>
                           </div>
                         </div>
-                      </div>
                     </td>
                     <td className="px-3 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
@@ -458,14 +498,24 @@ export const DataSources: React.FC = () => {
                             onClick={() => { void handleCancel(d.id); }}
                             disabled={cancellingId === d.id}
                             className="p-2 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-md transition-colors disabled:opacity-50"
-                            title="Cancel Ingestion"
+                            title="Cancel ingestion"
                             aria-label="Cancel ingestion"
                           >
                             {cancellingId === d.id ? (
-                              <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" />
+                              <div className="w-4 h-4 border-2 border-orange-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
                             ) : (
-                              <XCircle size={16} />
+                              <XCircle size={16} aria-hidden="true" />
                             )}
+                          </button>
+                        )}
+                        {d.source_metadata?.ingestion_status?.status === 'failed' && (
+                          <button
+                            onClick={() => { void handleRetry(d); }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors"
+                            aria-label="Retry ingestion"
+                          >
+                            <RefreshCw size={16} aria-hidden="true" />
+                            Retry
                           </button>
                         )}
                         <button
@@ -476,9 +526,9 @@ export const DataSources: React.FC = () => {
                           aria-label="Delete dataset"
                         >
                           {deletingId === d.id ? (
-                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" aria-hidden="true" />
                           ) : (
-                            <Trash2 size={16} />
+                            <Trash2 size={16} aria-hidden="true" />
                           )}
                         </button>
                       </div>

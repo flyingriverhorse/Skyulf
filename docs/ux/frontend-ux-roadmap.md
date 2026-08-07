@@ -1943,6 +1943,39 @@ Canvas finding is warranted solely for this repeated form root.
     (source-confirmed, not live-observed end to end).
   - **Delta:** No material change.
 
+  - **2026-08-07 RESOLVED (frontend slice).**
+    - `useGraphStore.validateGraph` now returns `GraphValidationIssue[]`
+      (`nodeId`, `nodeLabel`, `category`, `message`) via the exported
+      `collectGraphValidationIssues`, replacing the `console.warn`-and-return-
+      `false` behavior. Both call sites in `useRunControls.ts` (`handleRun`,
+      `handleRunAll`) now block submission when issues exist, so an invalid
+      graph never reaches the backend.
+    - `ResultsPanel` renders the issue list; each entry names the node and a
+      next action, and selecting one selects that node — which opens its
+      Properties panel automatically, since `PropertiesPanel` keys off
+      `nodes.find(n => n.selected)`. Leakage issues name both the
+      preprocessing node and the splitter.
+    - `lastRunError` keeps a failed preview inspectable after the toast
+      disappears.
+    - Accessibility: the issue list is deliberately **outside** any live
+      region — it recomputes on every graph edit, so an `aria-live` wrapper
+      would re-read every issue on each keystroke. A polite `role="status"`
+      announces only the count. Verified live in Chrome: the a11y tree shows
+      `region "Validation issues"` containing a `status` with
+      "2 validation issues blocking preview" and two issue buttons outside it,
+      with 0 unhidden icons in any live region.
+    - Verified live end to end at 1440 px against a seeded invalid graph
+      (Dataset + Encoding, no edge): clicking the "Label Encoder" issue
+      selected that node and opened Properties headed "Label Encoder".
+    - **Still open:** selecting an issue does **not** pan/zoom the viewport to
+      the node (only selects it), so an off-screen node stays off-screen; no
+      Playwright coverage for creating each invalid graph and fixing it
+      through the list; run-by-Ctrl/Cmd+Enter path not separately tested; no
+      axe run on the summary; node-level chips on the canvas itself are still
+      non-actionable status spans; the preview-failure toast still reads
+      "Check console for details." even though the error is now durably in
+      Results.
+
 - **CAN-003 — Inferred: recovery sources are not explainable when Canvas
   autosave cannot be restored.**
   - **Evidence:** `useCanvasAutoSave.ts` writes a single local snapshot every
@@ -2197,6 +2230,30 @@ Canvas finding is warranted solely for this repeated form root.
     to a real reproduction) and reconfirms the missing `role`/`aria-live`
     observation.
 
+  - **2026-08-07 RESOLVED (frontend slice).**
+    - `DatasetPreviewModal` no longer coerces missing metadata to `0`. Row,
+      column, and size each render an `aria-label="Unknown"` em-dash when the
+      value is genuinely unavailable, while a real `0` from a successful
+      profile still renders as `0`. Backend JSON `null` is normalized so the
+      distinction survives without crashing `toLocaleString`.
+    - `DatasetService.getSample`/`getProfile` now parse the error body and
+      propagate the real backend `message`/`detail`/`error` into
+      `DatasetApiError`, so "Invalid file path" reaches the user instead of
+      the generic string.
+    - The two requests use `Promise.allSettled`, so sample and profile
+      failures are reported independently and a 404 reads as a
+      deleted/missing source rather than a transient error. Retry refreshes
+      both and preserves the selected tab.
+    - Accessibility: the modal now uses the shared `ErrorState`/`LoadingState`/
+      `EmptyState` primitives, so the error is a `role="alert"` with the retry
+      button associated via `aria-describedby` — closing the missing
+      `role`/`aria-live` observation.
+    - **Still open:** the modal does **not** show source/job status or
+      last-successful metadata alongside the failure; wide-schema horizontal
+      table overflow was not exercised; 390 px behavior was not measured; no
+      Playwright coverage. Verified by component tests only — not re-observed
+      live against the real `400`.
+
 - **DAT-003 — Inferred: ingestion states expose activity but not a complete,
   recoverable lifecycle.**
   - **Evidence:** `DataSources.tsx` polls pending/processing rows every five
@@ -2249,6 +2306,31 @@ Canvas finding is warranted solely for this repeated form root.
     genuinely no Retry action anywhere. User problem, proposed behavior, and
     acceptance criteria are unchanged; the eventual fix direction should
     surface `job.message` on the Data Sources row badge too, and add Retry.
+
+  - **2026-08-07 RESOLVED (partial — frontend slice only).**
+    - `IngestionJobsModal` no longer maps the whole dataset inventory to
+      "jobs"; active ingestions and completed history are separated, and the
+      `// For now, we show all as 'jobs'` comment is gone with the behavior.
+    - The Data Sources row now surfaces `job.message` for failed/cancelled
+      sources — previously only the modal had this text — and the status badge
+      names the lifecycle phase ("Processing ingestion" / "Queued for
+      ingestion") instead of "Processing..." / "Pending...".
+    - Failed sources get a Retry action, and the icon-only Cancel button now
+      has a real `aria-label`; decorative icons are `aria-hidden`.
+    - Accessibility: the persistent row failure text is deliberately **not** a
+      live region. The page polls every 5 s and there can be many failed rows,
+      so `role="alert"` there would fire a burst of assertive announcements on
+      arrival; the status badge already names the phase.
+    - **Still open — needs backend work:** there is **no** retry/re-ingest
+      endpoint, so Retry only routes the user back to the upload/add-source
+      form rather than genuinely re-running ingestion. There is **no**
+      job-history API, so "history" is still derived from the dataset list
+      rather than being real job records. Determinate upload progress exists
+      in `FileUpload.tsx` (XHR) but is still not represented in this page's
+      ingestion list. Phase granularity (upload vs queue vs parse vs profile)
+      is not available from the current status contract, so failures still do
+      not distinguish credentials/format/connection/transient causes. No 390 px
+      measurement and no Playwright coverage.
 
 - **DAT-004 — Observed: Data and EDA controls become off-screen at narrow
   widths, blocking the journey before a source can be used or analyzed.**
@@ -3045,6 +3127,35 @@ Canvas finding is warranted solely for this repeated form root.
     statement was not contradicted — the override panel shows raw threshold
     numbers with no save-time/version/who-changed-it metadata, consistent
     with the original.
+
+  - **2026-08-07 RESOLVED (partial — frontend slice only).**
+    - Every threshold mutation (preview, save, enable/disable, clear) now
+      carries mutation-scoped pending state, disables its own control while in
+      flight so it cannot be double-submitted, and announces the pending
+      status. `ExperimentsPage` handlers rethrow so the surface can render the
+      failure.
+    - A failed mutation offers an in-place retry on the same surface instead
+      of a fire-and-forget toast.
+    - `InferencePage` now shows provenance for saved thresholds — job, model
+      type, the metric they were optimized for, the split they were computed
+      from, and `computed_at` — and distinguishes "saved and enabled" from
+      "saved but disabled", which the previous copy conflated.
+    - Cross-job misattribution is closed by the new `useSavedThresholdInfo`
+      hook, which is keyed to the active job and guards with both a cancel
+      flag and a request sequence number, so a slow response for a previous
+      job can never land on the current one.
+    - The verified-working behavior was preserved: the exploratory slider is
+      still distinct from deployed tuning, the validation→test fallback
+      caption is unchanged, and the applied-threshold results banner still
+      renders.
+    - **Still open — needs backend work:** the threshold API returns only
+      `thresholds`, `classes`, `metric`, `split_used`, `computed_at`, and
+      `enabled`. There is **no** save timestamp distinct from `computed_at`,
+      **no** model/job version, and **no** actor, so the record is not yet a
+      full immutable, attributable decision as the acceptance criteria
+      require. Conflict/delayed-response handling was not exercised against a
+      real backend, and no Playwright coverage of
+      tune→save→enable→infer→override→clear exists. No 390 px measurement.
 
 - **EXP-006 — Observed: inference schema feedback permits a structurally
   incomplete, type-incompatible request.**

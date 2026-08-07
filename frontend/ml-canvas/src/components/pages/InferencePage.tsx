@@ -77,6 +77,39 @@ interface RecentRun {
     predictions: unknown[];
 }
 
+/** Fetch and keep the saved threshold record for the currently active job. */
+export const useSavedThresholdInfo = (jobId: string | null): SavedThresholdInfo | null => {
+    const [savedThresholds, setSavedThresholds] = useState<SavedThresholdInfo | null>(null);
+    const requestSeq = useRef(0);
+
+    useEffect(() => {
+        const requestId = ++requestSeq.current;
+        if (!jobId) {
+            setSavedThresholds(null);
+            return;
+        }
+
+        let cancelled = false;
+        setSavedThresholds(null);
+        void thresholdTuningApi.get(jobId)
+            .then(saved => {
+                if (cancelled || requestSeq.current !== requestId) return;
+                setSavedThresholds(saved);
+            })
+            .catch(err => {
+                if (cancelled || requestSeq.current !== requestId) return;
+                console.warn('Failed to fetch saved tuned thresholds', err);
+                setSavedThresholds(null);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [jobId]);
+
+    return savedThresholds;
+};
+
 /** Try to extract a (line, column) tuple from a JSON parse error message. */
 const extractJsonErrorPosition = (
     msg: string,
@@ -544,7 +577,7 @@ export const InferencePage: React.FC = () => {
     /** Tuned thresholds already saved for the active deployment's job (from the
      * Evaluation tab's Threshold Tuning panel) — these are applied automatically
      * at /predict time whenever `enabled` is true and no ad-hoc override is set. */
-    const [savedThresholds, setSavedThresholds] = useState<SavedThresholdInfo | null>(null);
+    const savedThresholds = useSavedThresholdInfo(activeDeployment?.job_id ?? null);
 
     const [autoFilterInfo, setAutoFilterInfo] = useState<string | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -657,7 +690,6 @@ export const InferencePage: React.FC = () => {
             if (!deployment) {
                 setDatasetId(null);
                 setExcludedColumns(new Set());
-                setSavedThresholds(null);
                 return;
             }
 
@@ -676,13 +708,6 @@ export const InferencePage: React.FC = () => {
             }
 
             if (deployment.job_id) {
-                thresholdTuningApi.get(deployment.job_id)
-                    .then(setSavedThresholds)
-                    .catch(err => {
-                        console.warn('Failed to fetch saved tuned thresholds', err);
-                        setSavedThresholds(null);
-                    });
-
                 try {
                     const job = await jobsApi.getJob(deployment.job_id);
                     const targetColumn = job.target_column;
@@ -721,10 +746,7 @@ export const InferencePage: React.FC = () => {
                 } catch (err) {
                     console.warn('Failed to fetch dataset sample', err);
                 }
-            } else {
-                setSavedThresholds(null);
             }
-
             setExcludedColumns(excluded);
 
             // Only seed the editor with a fresh sample when there is no
@@ -1475,18 +1497,46 @@ export const InferencePage: React.FC = () => {
                             <Sparkles className="w-3.5 h-3.5" /> Advanced: override thresholds
                         </summary>
                         <div className="px-3 pb-3 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-700">
-                            {savedThresholds?.enabled && savedThresholds.thresholds && (
-                                <div className="p-2 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 text-[11px] text-blue-700 dark:text-blue-300">
-                                    <p className="mb-1">
-                                        This model already has <strong>tuned thresholds saved and enabled</strong> from
-                                        the Evaluation tab — they&apos;re applied automatically to every real prediction
-                                        unless you turn on an override below:
-                                    </p>
+                            {savedThresholds?.thresholds && activeDeployment && (
+                                <div
+                                    className={`p-2 rounded border text-[11px] ${
+                                        savedThresholds.enabled
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                                    }`}
+                                >
+                                    <div className="flex flex-wrap items-center gap-1 mb-1">
+                                        <strong>
+                                            {savedThresholds.enabled
+                                                ? 'Saved tuned thresholds are enabled'
+                                                : 'Saved tuned thresholds are available but disabled'}
+                                        </strong>
+                                        <span className="font-mono opacity-80">
+                                            · Job {activeDeployment.job_id} · {activeDeployment.model_type}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-0.5 mb-1.5">
+                                        <span>
+                                            Optimized for <strong>{savedThresholds.metric ?? 'unknown metric'}</strong>
+                                        </span>
+                                        <span>
+                                            Computed from <strong>{savedThresholds.split_used ?? 'unknown'}</strong> split
+                                        </span>
+                                        {savedThresholds.computed_at && (
+                                            <span>
+                                                Computed at <strong>{new Date(savedThresholds.computed_at).toLocaleString()}</strong>
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex flex-wrap gap-1 mb-1.5">
                                         {Object.entries(savedThresholds.thresholds).map(([cls, thr]) => (
                                             <span
                                                 key={cls}
-                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 font-mono"
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono ${
+                                                    savedThresholds.enabled
+                                                        ? 'bg-blue-100 dark:bg-blue-900/40'
+                                                        : 'bg-slate-100 dark:bg-slate-700/80'
+                                                }`}
                                             >
                                                 {cls}: {thr}
                                             </span>
@@ -1494,7 +1544,7 @@ export const InferencePage: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handlePrefillFromSavedThresholds}
-                                        className="text-blue-700 dark:text-blue-300 hover:underline font-medium"
+                                        className="text-current hover:underline font-medium"
                                     >
                                         Copy into override editor to tweak
                                     </button>
