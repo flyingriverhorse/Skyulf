@@ -68,6 +68,16 @@ def _detect_target_column(config: dict[str, Any], y: Any) -> str | None:
     return target_col
 
 
+def _extract_target(X: Any, y: Any, target_col: str | None) -> Any:
+    """Return explicit y or extract target_col from a Pandas/Polars frame."""
+    if y is not None or not target_col:
+        return y
+    if target_col not in X.columns:
+        return y
+    getter = getattr(X, "get_column", None)
+    return getter(target_col) if getter else X[target_col]
+
+
 def _warn_excluding_target_column(encoder_name: str, target_col: str) -> None:
     """Log a warning explaining why the target column is excluded from encoding."""
     if encoder_name in _COLUMN_DESTROYING_ENCODERS:

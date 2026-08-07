@@ -19,11 +19,10 @@ from ..engines import SkyulfDataFrame
 from ..registry import NodeRegistry
 from ..utils import (
     detect_numeric_columns,
-    resolve_columns,
     user_picked_no_columns,
 )
 from ._artifacts import GeneralBinningArtifact
-from ._helpers import to_pandas
+from ._helpers import resolve_columns_then_to_pandas
 from .base import BaseApplier, BaseCalculator, apply_method, fit_method
 from .dispatcher import apply_dual_engine
 
@@ -367,11 +366,6 @@ def _fit_one_column_edges(
     return None, None
 
 
-def _to_pandas_for_fit(X: Any) -> Any:
-    """Always operate on a pandas frame in fit (sklearn-bound)."""
-    return to_pandas(X)
-
-
 def _passthrough_artifact_options(config: dict[str, Any]) -> dict[str, Any]:
     """Apply-time options that don't depend on the fit math."""
     return {
@@ -443,8 +437,7 @@ class GeneralBinningCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
-        X = _to_pandas_for_fit(X)
-        columns = resolve_columns(X, config, detect_numeric_columns)
+        X, columns = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
 
         defaults = {
             "default_n_bins": config.get("n_bins", 5),
@@ -489,8 +482,7 @@ class CustomBinningCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return cast(GeneralBinningArtifact, {})
 
-        X = _to_pandas_for_fit(X)
-        columns = resolve_columns(X, config, detect_numeric_columns)
+        X, columns = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         bins = config.get("bins")
 
         bin_edges_map: dict[str, list[float]] = {}

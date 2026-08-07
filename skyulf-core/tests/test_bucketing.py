@@ -705,6 +705,121 @@ def test_fit_general_binning_unknown_strategy_yields_no_edges() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Fit — polars engine parity (Candidate D: column-subset conversion)
+# ---------------------------------------------------------------------------
+
+
+def _wide_polars_fixture() -> pl.DataFrame:
+    """A frame wide enough that binning only column ``x`` would be cheaper if
+    the fit route converts just that column instead of the whole frame.
+    """
+    return pl.DataFrame(
+        {
+            "x": [0.0, 5.0, 10.0, 15.0, 20.0, None],
+            "freq": [1.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+            "km": [0.0, 1.0, 10.0, 11.0, 20.0, 21.0],
+            "kb": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0],
+        }
+    )
+
+
+def test_fit_general_binning_polars_input_matches_pandas_equal_width() -> None:
+    """Fitting on a raw Polars frame must produce identical bin edges to
+    fitting on the equivalent pandas frame (equal_width strategy).
+    """
+    df_pl = _wide_polars_fixture()
+    df_pd = df_pl.to_pandas()
+    config = {
+        "columns": ["x"],
+        "strategy": "equal_width",
+        "n_bins": 2,
+        "label_format": "range",
+        "include_lowest": True,
+        "precision": 1,
+    }
+    from_polars = GeneralBinningCalculator().fit(df_pl, config)
+    from_pandas = GeneralBinningCalculator().fit(df_pd, config)
+    assert from_polars["bin_edges"] == from_pandas["bin_edges"]
+
+
+def test_fit_general_binning_polars_input_matches_pandas_equal_frequency() -> None:
+    """equal_frequency strategy must produce identical bin edges regardless of
+    whether the input is a raw Polars or pandas frame.
+    """
+    df_pl = _wide_polars_fixture()
+    df_pd = df_pl.to_pandas()
+    config = {"columns": ["freq"], "strategy": "equal_frequency", "n_bins": 3, "duplicates": "drop"}
+    from_polars = GeneralBinningCalculator().fit(df_pl, config)
+    from_pandas = GeneralBinningCalculator().fit(df_pd, config)
+    assert from_polars["bin_edges"] == from_pandas["bin_edges"]
+
+
+def test_fit_general_binning_polars_input_matches_pandas_kmeans() -> None:
+    """kmeans strategy (sklearn KBinsDiscretizer-backed) must produce identical
+    bin edges regardless of whether the input is a raw Polars or pandas frame.
+    """
+    df_pl = _wide_polars_fixture()
+    df_pd = df_pl.to_pandas()
+    config = {"columns": ["km"], "strategy": "kmeans", "n_bins": 3}
+    from_polars = GeneralBinningCalculator().fit(df_pl, config)
+    from_pandas = GeneralBinningCalculator().fit(df_pd, config)
+    assert from_polars["bin_edges"] == from_pandas["bin_edges"]
+
+
+def test_fit_kbins_discretizer_polars_input_matches_pandas() -> None:
+    """KBinsDiscretizerCalculator on a raw Polars frame must match the pandas route."""
+    df_pl = _wide_polars_fixture()
+    df_pd = df_pl.to_pandas()
+    config = {"columns": ["kb"], "n_bins": 3, "strategy": "quantile"}
+    from_polars = KBinsDiscretizerCalculator().fit(df_pl, config)
+    from_pandas = KBinsDiscretizerCalculator().fit(df_pd, config)
+    assert from_polars["bin_edges"] == from_pandas["bin_edges"]
+
+
+def test_fit_custom_binning_polars_input_matches_pandas() -> None:
+    """CustomBinningCalculator on a raw Polars frame must match the pandas route."""
+    df_pl = _wide_polars_fixture()
+    df_pd = df_pl.to_pandas()
+    config = {"columns": ["x"], "bins": [0.0, 10.0, 20.0]}
+    from_polars = CustomBinningCalculator().fit(df_pl, config)
+    from_pandas = CustomBinningCalculator().fit(df_pd, config)
+    assert from_polars["bin_edges"] == from_pandas["bin_edges"]
+
+
+def test_fit_general_binning_polars_input_only_converts_selected_columns(monkeypatch) -> None:
+    """Fitting on a raw Polars frame must not pay for a full-frame ``to_pandas()``
+    conversion when only a subset of columns is selected for binning — this is
+    the Candidate D optimization: assert the converted pandas frame only has
+    the selected column(s), not every column in the input.
+    """
+    df_pl = _wide_polars_fixture()
+    seen_shapes: list[tuple[int, int]] = []
+    original_to_pandas = pl.DataFrame.to_pandas
+
+    def _tracking_to_pandas(self, *args, **kwargs):
+        result = original_to_pandas(self, *args, **kwargs)
+        seen_shapes.append(result.shape)
+        return result
+
+    monkeypatch.setattr(pl.DataFrame, "to_pandas", _tracking_to_pandas)
+    GeneralBinningCalculator().fit(
+        df_pl, {"columns": ["x"], "strategy": "equal_width", "n_bins": 2}
+    )
+
+    assert seen_shapes, "expected to_pandas() to be called at least once"
+    # Only the selected column ("x") should be converted, not all 4 columns.
+    assert all(shape[1] == 1 for shape in seen_shapes)
+
+
+def test_fit_general_binning_polars_input_no_columns_selected_returns_empty() -> None:
+    """An explicit empty columns list on a raw Polars frame must still short-circuit
+    to `{}` without attempting any conversion (matches the pandas-input behavior).
+    """
+    df_pl = _wide_polars_fixture()
+    assert GeneralBinningCalculator().fit(df_pl, {"columns": []}) == {}
+
+
+# ---------------------------------------------------------------------------
 # Real-shaped dataset integration
 # ---------------------------------------------------------------------------
 

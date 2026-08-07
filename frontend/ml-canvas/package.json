@@ -1,7 +1,7 @@
 {
   "name": "ml-canvas",
   "private": true,
-  "version": "0.7.3",
+  "version": "0.7.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -54,7 +54,7 @@
     "react-hook-form": "^7.51.1",
     "react-leaflet": "^4.2.1",
     "react-plotly.js": "^2.6.0",
-    "react-router-dom": "^7.10.1",
+    "react-router-dom": "^7.18.2",
     "recharts": "^3.5.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.2.2",

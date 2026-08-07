@@ -5,6 +5,7 @@ import { useUpstreamData } from '../../../core/hooks/useUpstreamData';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
+import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
 import { ColumnMultiSelect } from '../shared/ColumnMultiSelect';
 import { parseIntSafe } from '../../../core/utils/numberInput';
@@ -49,10 +50,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   const droppedUpstream = useUpstreamDroppedColumns(nodeId);
   const executionResult = useGraphStore((state) => state.executionResult);
   const nodeResult = nodeId ? executionResult?.node_results[nodeId] : null;
-  const metrics: Record<string, unknown> | null =
-    nodeResult?.metrics && typeof nodeResult.metrics === 'object'
-      ? (nodeResult.metrics as Record<string, unknown>)
-      : null;
+  const metrics = getNodeMetricDetails(nodeResult?.metrics);
   const categoriesCount: Record<string, unknown> | null =
     metrics?.categories_count && typeof metrics.categories_count === 'object'
       ? (metrics.categories_count as Record<string, unknown>)

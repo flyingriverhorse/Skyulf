@@ -5,46 +5,19 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import PowerTransformer, StandardScaler
+from sklearn.preprocessing import PowerTransformer
 
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from ...utils import detect_numeric_columns, resolve_columns, user_picked_no_columns
+from ...utils import detect_numeric_columns, user_picked_no_columns
 from .._artifacts import PowerTransformerArtifact
-from .._helpers import to_pandas
+from .._helpers import resolve_columns_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
+from ._power_common import build_pretrained_power_transformer
 
 logger = logging.getLogger(__name__)
-
-
-def _build_pretrained_power_transformer(
-    method: str,
-    standardize: bool,
-    lambdas_arr: np.ndarray,
-    scaler_params: dict[str, Any],
-    col_indices: list[int],
-    n_total_cols: int,
-) -> PowerTransformer:
-    """Reconstruct a fitted PowerTransformer from stored lambdas + scaler params."""
-    pt = PowerTransformer(method=method, standardize=standardize)
-    pt.lambdas_ = lambdas_arr
-    if not standardize:
-        return pt
-
-    scaler = StandardScaler()
-    mean = np.array(scaler_params.get("mean"))
-    scale = np.array(scaler_params.get("scale"))
-    if len(mean) == n_total_cols:
-        mean = mean[col_indices]
-    if len(scale) == n_total_cols:
-        scale = scale[col_indices]
-    scaler.mean_ = mean
-    scaler.scale_ = scale
-    scaler.var_ = np.square(scale)
-    pt._scaler = scaler
-    return pt
 
 
 def _power_transform_array(
@@ -53,7 +26,7 @@ def _power_transform_array(
     """Run the rebuilt PowerTransformer over a numpy array; return transformed array."""
     col_indices = [cols.index(c) for c in valid_cols]
     lambdas_arr = np.array(params["lambdas"])[col_indices]
-    pt = _build_pretrained_power_transformer(
+    pt = build_pretrained_power_transformer(
         method=params.get("method", "yeo-johnson"),
         standardize=params.get("standardize", True),
         lambdas_arr=lambdas_arr,
@@ -152,10 +125,15 @@ class PowerTransformerCalculator(BaseCalculator):
         if user_picked_no_columns(config):
             return {}
 
-        X_pd = to_pandas(X)
         method = config.get("method", "yeo-johnson")
         standardize = config.get("standardize", True)
-        cols = resolve_columns(X_pd, config, detect_numeric_columns)
+        # TODO(pandas-removal): PowerTransformer.fit accepts numpy directly,
+        # but _filter_power_columns() uses Pandas column-wise boolean
+        # indexing (`X_pd[c] <= 0`) to drop non-positive columns for box-cox.
+        # That check is easy to port to numpy (X_np[:, i] <= 0), but do it
+        # together with a matching rewrite of _filter_power_columns to take
+        # an ndarray, so both stay in sync.
+        X_pd, cols = resolve_columns_then_to_pandas(X, config, detect_numeric_columns)
         valid_cols = _filter_power_columns(X_pd, cols, method)
         if not valid_cols:
             return {}

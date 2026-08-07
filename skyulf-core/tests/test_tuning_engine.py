@@ -3,6 +3,7 @@
 import importlib.util
 import sys
 import typing
+import warnings
 from typing import Any
 
 import pandas as pd
@@ -836,8 +837,8 @@ def test_fit_halving_random_with_log_callback_and_string_min_resources():
 
 
 def test_fit_optuna_strategy_basic():
-    """optuna strategy (default TPE sampler / median pruner) should tune successfully."""
-    pytest.importorskip("optuna")
+    """Optuna tuning succeeds without leaking its known experimental notice."""
+    optuna_module = pytest.importorskip("optuna")
     X, y = _clf_xy(n=150)
     tuner = _tuner_clf()
     cfg = TuningConfig(
@@ -850,12 +851,20 @@ def test_fit_optuna_strategy_basic():
     )
     progress_calls: list[tuple] = []
     logs: list[str] = []
-    model, result = tuner.fit(
-        X,
-        y,
-        config=cfg.__dict__,
-        progress_callback=lambda *a: progress_calls.append(a),
-        log_callback=logs.append,
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        model, result = tuner.fit(
+            X,
+            y,
+            config=cfg.__dict__,
+            progress_callback=lambda *a: progress_calls.append(a),
+            log_callback=logs.append,
+        )
+
+    assert not any(
+        issubclass(item.category, optuna_module.exceptions.ExperimentalWarning)
+        and "OptunaSearchCV is experimental" in str(item.message)
+        for item in caught
     )
     assert hasattr(model, "predict")
     assert result.n_trials > 0

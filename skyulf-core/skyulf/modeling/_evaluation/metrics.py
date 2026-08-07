@@ -3,11 +3,13 @@
 import contextlib
 import importlib
 import math
+import numbers
 import warnings
 from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -37,21 +39,131 @@ geometric_mean_score = None
 if _imblearn_metrics is not None:
     geometric_mean_score = getattr(_imblearn_metrics, "geometric_mean_score", None)
 
+DEFAULT_SILHOUETTE_SAMPLE_SIZE = 10_000
+DEFAULT_SILHOUETTE_RANDOM_STATE = 42
+_NAN_CLUSTER_LABEL = object()
+SilhouetteSampleSize = int | np.integer[Any]
+
+
+def _validate_silhouette_sample_size(sample_size: Any) -> int:
+    """Validate silhouette sample caps and return a plain Python integer."""
+    if isinstance(sample_size, (bool, np.bool_)) or not isinstance(
+        sample_size, (numbers.Integral, np.integer)
+    ):
+        raise ValueError("silhouette_sample_size must be an integer")
+    validated_sample_size = int(sample_size)
+    if validated_sample_size < 2:
+        raise ValueError("silhouette_sample_size must be at least 2")
+    return validated_sample_size
+
+
+def _cluster_label_key(label: Any) -> Any:
+    """Return a stable dictionary key for a scalar predicted cluster label."""
+    if isinstance(label, (float, np.floating)) and np.isnan(label):
+        return _NAN_CLUSTER_LABEL
+    return label
+
+
+def _collect_silhouette_representatives(
+    labels: np.ndarray,
+    *,
+    sample_size: SilhouetteSampleSize,
+) -> dict[Any, int]:
+    """Retain first cluster occurrences without exceeding the scoring cap."""
+    sample_size = _validate_silhouette_sample_size(sample_size)
+    representatives: dict[Any, int] = {}
+    for index, label in enumerate(labels):
+        key = _cluster_label_key(label)
+        if key in representatives:
+            continue
+        if len(representatives) == sample_size:
+            raise ValueError(
+                f"silhouette_sample_size={sample_size} is too small for more than "
+                f"{sample_size} clusters; increase it above the number of clusters "
+                "when scoring datasets larger than the cap"
+            )
+        representatives[key] = int(index)
+    return representatives
+
+
+def _select_silhouette_sample_indices(
+    labels: np.ndarray,
+    *,
+    sample_size: SilhouetteSampleSize,
+    random_state: int,
+    representative_by_label: dict[Any, int] | None = None,
+) -> np.ndarray:
+    """Select a deterministic bounded silhouette sample that keeps every cluster represented."""
+    sample_size = _validate_silhouette_sample_size(sample_size)
+    n_samples = len(labels)
+    if n_samples <= sample_size:
+        return np.arange(n_samples, dtype=int)
+
+    representatives = (
+        representative_by_label
+        if representative_by_label is not None
+        else _collect_silhouette_representatives(labels, sample_size=sample_size)
+    )
+    n_clusters = len(representatives)
+    if sample_size <= n_clusters:
+        raise ValueError(
+            f"silhouette_sample_size={sample_size} is too small for {n_clusters} clusters; "
+            "increase it above the number of clusters when scoring datasets larger than the cap"
+        )
+
+    required_indices = list(representatives.values())
+    required_index_set = set(required_indices)
+    remaining_slots = sample_size - len(required_indices)
+    optional_indices: list[int] = []
+    optional_seen = 0
+    rng = np.random.RandomState(random_state)
+
+    for index in range(n_samples):
+        if index in required_index_set:
+            continue
+        optional_seen += 1
+        if len(optional_indices) < remaining_slots:
+            optional_indices.append(index)
+            continue
+        replacement_index = rng.randint(optional_seen)
+        if replacement_index < remaining_slots:
+            optional_indices[replacement_index] = index
+
+    selected = required_indices + optional_indices
+    return np.asarray(selected, dtype=int)
+
 
 def calculate_classification_metrics(
-    model: Any, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
+    model: Any,
+    X: pd.DataFrame | SkyulfDataFrame,
+    y: pd.Series | Any,
+    *,
+    X_np: Any = None,
+    y_np: Any = None,
+    predictions: Any = None,
+    proba: Any = None,
 ) -> dict[str, float]:
-    """Compute classification metrics for predictions."""
+    """Compute classification metrics for predictions.
 
-    # Convert to Numpy for compatibility
-    X_np, y_np = SklearnBridge.to_sklearn((X, y))
+    ``X_np``/``y_np``/``predictions``/``proba`` let a caller that already
+    converted ``X``/``y`` to numpy and/or already called
+    ``model.predict()``/``model.predict_proba()`` (e.g.
+    ``evaluate_classification_model``) pass those results straight through,
+    avoiding a redundant conversion/inference pass on the same data. When
+    omitted, each is (re)computed here exactly as before.
+    """
+
+    # Convert to Numpy for compatibility (skip if the caller already has it)
+    if X_np is None or y_np is None:
+        X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
     # Use DataFrame directly if possible to preserve feature names
     # Only convert to numpy if model doesn't support pandas or if X is not pandas
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=".*valid feature names.*")
-        predictions = model.predict(X_np)
+    if predictions is None:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*valid feature names.*")
+            predictions = model.predict(X_np)
 
     # For metrics calculation, we might need numpy arrays for y
     y_arr = y_np
@@ -75,7 +187,7 @@ def calculate_classification_metrics(
         with contextlib.suppress(Exception):
             metrics["g_score"] = float(geometric_mean_score(y_arr, predictions, average="weighted"))
 
-    _add_probability_based_metrics(metrics, model, X_np, y_arr)
+    _add_probability_based_metrics(metrics, model, X_np, y_arr, proba=proba)
 
     return metrics
 
@@ -168,37 +280,53 @@ def _add_roc_pr_auc_metrics(
 
 
 def _add_probability_based_metrics(
-    metrics: dict[str, float], model: Any, X_np: Any, y_arr: Any
+    metrics: dict[str, float], model: Any, X_np: Any, y_arr: Any, *, proba: Any = None
 ) -> None:
     """Adds log-loss, ROC-AUC and PR-AUC metrics to ``metrics`` in-place, using ``predict_proba``.
 
     No-op if the model doesn't expose ``predict_proba``, or any of these optional metrics
     fail to compute (errors are swallowed so other metrics are still returned).
+    ``proba`` lets a caller that already called ``model.predict_proba()`` pass the result
+    through instead of triggering another redundant inference pass.
     """
     try:
-        if hasattr(model, "predict_proba"):
+        if proba is None and hasattr(model, "predict_proba"):
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", message=".*valid feature names.*")
                 proba = model.predict_proba(X_np)
-            if proba.ndim == 2 and proba.shape[1] >= 2:
-                class_count = proba.shape[1]
-                with contextlib.suppress(Exception):
-                    metrics["log_loss"] = float(log_loss(y_arr, proba))
-                _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
+        if proba is not None and proba.ndim == 2 and proba.shape[1] >= 2:
+            class_count = proba.shape[1]
+            with contextlib.suppress(Exception):
+                metrics["log_loss"] = float(log_loss(y_arr, proba))
+            _add_roc_pr_auc_metrics(metrics, model, y_arr, proba, class_count)
     except Exception:
         pass  # nosec B110 - multiclass PR-AUC block is optional; other metrics still returned
 
 
 def calculate_regression_metrics(
-    model: Any, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any
+    model: Any,
+    X: pd.DataFrame | SkyulfDataFrame,
+    y: pd.Series | Any,
+    *,
+    X_np: Any = None,
+    y_np: Any = None,
+    predictions: Any = None,
 ) -> dict[str, float]:
-    """Compute regression metrics for predictions."""
+    """Compute regression metrics for predictions.
 
-    # Convert to Numpy for compatibility
-    X_np, y_np = SklearnBridge.to_sklearn((X, y))
+    ``X_np``/``y_np``/``predictions`` let a caller that already converted
+    ``X``/``y`` to numpy and/or already called ``model.predict()`` (e.g.
+    ``evaluate_regression_model``) pass those results straight through,
+    avoiding a redundant conversion/inference pass on the same data.
+    """
+
+    # Convert to Numpy for compatibility (skip if the caller already has it)
+    if X_np is None or y_np is None:
+        X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
     # Use DataFrame directly if possible to preserve feature names
-    predictions = model.predict(X_np)
+    if predictions is None:
+        predictions = model.predict(X_np)
 
     y_arr = y_np
 
@@ -216,7 +344,11 @@ def calculate_regression_metrics(
 
 
 def calculate_clustering_metrics(
-    X: pd.DataFrame | SkyulfDataFrame, labels: Any
+    X: pd.DataFrame | pl.DataFrame | SkyulfDataFrame,
+    labels: Any,
+    *,
+    silhouette_sample_size: SilhouetteSampleSize = DEFAULT_SILHOUETTE_SAMPLE_SIZE,
+    random_state: int = DEFAULT_SILHOUETTE_RANDOM_STATE,
 ) -> dict[str, float]:
     """Compute unsupervised clustering-quality metrics for a fitted model's labels.
 
@@ -231,15 +363,32 @@ def calculate_clustering_metrics(
     )
 
     X_np, _ = SklearnBridge.to_sklearn((X, None))
-    labels_np = np.asarray(labels)
+    labels_np = np.asarray(labels).ravel()
+    silhouette_sample_size = _validate_silhouette_sample_size(silhouette_sample_size)
+    if X_np.shape[0] != len(labels_np):
+        raise ValueError("X and labels must have the same number of rows")
 
-    n_unique = len(np.unique(labels_np))
+    n_samples = len(labels_np)
+    representative_by_label = _collect_silhouette_representatives(
+        labels_np,
+        sample_size=silhouette_sample_size,
+    )
+    n_unique = len(representative_by_label)
     metrics: dict[str, float] = {"n_clusters": float(n_unique)}
 
     # These metrics are undefined for fewer than 2 clusters, or when the
     # cluster count reaches the sample count — guard rather than let sklearn raise.
-    if 1 < n_unique < len(labels_np):
-        metrics["silhouette_score"] = float(silhouette_score(X_np, labels_np))
+    if 1 < n_unique < n_samples:
+        sampled_indices = _select_silhouette_sample_indices(
+            labels_np,
+            sample_size=silhouette_sample_size,
+            random_state=random_state,
+            representative_by_label=representative_by_label,
+        )
+        sampled_X = X_np[sampled_indices]
+        sampled_labels = labels_np[sampled_indices]
+        metrics["silhouette_score"] = float(silhouette_score(sampled_X, sampled_labels))
+        metrics["silhouette_sample_size"] = float(len(sampled_indices))
         metrics["calinski_harabasz_score"] = float(calinski_harabasz_score(X_np, labels_np))
         metrics["davies_bouldin_score"] = float(davies_bouldin_score(X_np, labels_np))
 

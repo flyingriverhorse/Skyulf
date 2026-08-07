@@ -15,7 +15,7 @@ from ..._validation import raise_invalid_choice
 from ...core.artifacts import GeoDistanceArtifact
 from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
-from .._helpers import to_pandas
+from .._helpers import select_then_to_pandas
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ..dispatcher import apply_dual_engine
 
@@ -162,13 +162,12 @@ class GeoDistanceApplier(BaseApplier):
 class GeoDistanceCalculator(BaseCalculator):
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> GeoDistanceArtifact:  # pylint: disable=arguments-differ
-        X_pd = to_pandas(X)
-
         lat1_col = config.get("lat1_col", "")
         lon1_col = config.get("lon1_col", "")
         lat2_col = config.get("lat2_col", "")
         lon2_col = config.get("lon2_col", "")
         cols = [lat1_col, lon1_col, lat2_col, lon2_col]
+        X_pd = select_then_to_pandas(X, cols)
         _validate_geo_distance_columns(X_pd, cols)
 
         method = config.get("method", "haversine")

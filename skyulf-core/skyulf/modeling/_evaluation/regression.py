@@ -33,13 +33,16 @@ def evaluate_regression_model(
     # Convert to Numpy for compatibility
     X_test_np, y_test_np = SklearnBridge.to_sklearn((X_test, y_test))
 
-    # Calculate scalar metrics
-    metrics = calculate_regression_metrics(model, X_test, y_test)
-
-    # Generate predictions
+    # Generate predictions once, then reuse for both metrics and residuals
+    # (previously metrics recomputed its own predict() on the same data).
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=".*valid feature names.*")
         y_pred = model.predict(X_test_np)
+
+    # Calculate scalar metrics, reusing the already-computed conversion/predictions
+    metrics = calculate_regression_metrics(
+        model, X_test, y_test, X_np=X_test_np, y_np=y_test_np, predictions=y_pred
+    )
 
     # Ensure numpy arrays
     y_true_arr = y_test_np

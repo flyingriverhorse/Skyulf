@@ -154,7 +154,19 @@ Same thing via a pipeline config:
   Agglomerative, OPTICS) don't support this and aren't wired in.
 - **Metrics need real clusters.** Silhouette/Calinski-Harabasz/Davies-Bouldin
   are only computed when there's more than 1 cluster and fewer clusters than
-  rows — otherwise they're omitted rather than raising.
+  rows — otherwise they're omitted rather than raising. For datasets above
+  10,000 rows, Skyulf manually builds a deterministic representative
+  10,000-row silhouette sample (seed 42): it guarantees every predicted
+  cluster is represented, then fills the remaining slots without replacement
+  from the leftover rows. `silhouette_sample_size` reports the actual number
+  of rows sent to silhouette scoring. If sampling is required (`rows >
+  silhouette_sample_size`) and the selected silhouette cap is not larger than
+  the number of predicted clusters, Skyulf raises a clear `ValueError`
+  instead of asking sklearn to score an impossible sample. This applies both
+  to the default cap and to any custom cap. When all rows already fit under
+  the cap, Skyulf scores the full input even if `silhouette_sample_size <=
+  n_clusters`. Calinski-Harabasz and Davies-Bouldin retain their existing
+  full-input behavior.
 - **Advanced mode (hyperparameter tuning) doesn't apply.** Tuning scores
   candidates with a supervised metric (accuracy, R², etc.), which clustering
   has no equivalent of — Segmentation has no `run_mode` toggle at all, and

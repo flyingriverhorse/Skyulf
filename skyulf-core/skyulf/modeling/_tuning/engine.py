@@ -988,19 +988,25 @@ class TuningCalculator(BaseModelCalculator):
 
         study = optuna.create_study(sampler=sampler, pruner=pruner, direction="maximize")
 
-        return OptunaSearchCV(
-            estimator=base_estimator,
-            param_distributions=distributions,
-            n_trials=config.n_trials,
-            timeout=config.timeout,
-            cv=cv,
-            scoring=metric,
-            n_jobs=config.n_jobs,
-            refit=False,
-            verbose=0,
-            callbacks=callbacks,
-            study=study,
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=r"OptunaSearchCV is experimental.*",
+                category=optuna.exceptions.ExperimentalWarning,
+            )
+            return OptunaSearchCV(
+                estimator=base_estimator,
+                param_distributions=distributions,
+                n_trials=config.n_trials,
+                timeout=config.timeout,
+                cv=cv,
+                scoring=metric,
+                n_jobs=config.n_jobs,
+                refit=False,
+                verbose=0,
+                callbacks=callbacks,
+                study=study,
+            )
 
     @staticmethod
     def _to_numpy(data: Any) -> Any:

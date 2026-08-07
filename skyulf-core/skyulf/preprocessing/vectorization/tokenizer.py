@@ -18,7 +18,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import TokenizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import apply_text_pandas_only, resolve_fit_text_columns
+from ._common import apply_text_pandas_only, resolve_fit_text_valid_columns
 
 logger = logging.getLogger(__name__)
 
@@ -131,9 +131,8 @@ class TokenizerCalculator(BaseCalculator):
 
     @fit_method
     def fit(self, X: Any, _y: Any, config: dict[str, Any]) -> TokenizerArtifact:  # pylint: disable=arguments-differ
-        resolved = resolve_fit_text_columns(X, config)
-        if resolved is None:
+        valid_cols = resolve_fit_text_valid_columns(X, config)
+        if valid_cols is None:
             return {}
-        _, valid_cols = resolved
 
         return _build_tokenizer_artifact(config, valid_cols)

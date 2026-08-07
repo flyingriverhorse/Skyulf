@@ -62,6 +62,32 @@ class TestBasicTrainingStrategy(unittest.TestCase):
         self.assertEqual(self.job.metrics["accuracy"], 0.95)
         self.assertEqual(self.job.metrics["dropped_columns"], ["col_A"])
 
+    def test_handle_success_collects_nested_step_dropped_columns(self):
+        """Nested preprocessing step details must still feed dropped_columns rollups."""
+        node_res = NodeExecutionResult(
+            node_id="node_1",
+            status="success",
+            output_artifact_id="path/to/artifact",
+            metrics={
+                "accuracy": 0.95,
+                "steps": {
+                    "0:select": {
+                        "details": {
+                            "dropped_columns": ["col_A", "col_B"],
+                        }
+                    }
+                },
+            },
+        )
+        pipeline_res = PipelineExecutionResult(
+            pipeline_id="pipe_123", status="success", node_results={"node_1": node_res}
+        )
+
+        self.strategy.handle_success(self.job, pipeline_res)
+
+        self.assertEqual(self.job.metrics["accuracy"], 0.95)
+        self.assertCountEqual(self.job.metrics["dropped_columns"], ["col_A", "col_B"])
+
     def test_handle_failure(self):
         error_msg = "Out of Memory"
         self.strategy.handle_failure(self.job, error_msg)

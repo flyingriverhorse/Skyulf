@@ -1,6 +1,6 @@
 # NLP / Text Stack (Optional)
 # Install with: pip install -r requirements-nlp.txt
-#   (or, from the core package:  pip install skyulf[nlp])
+#   (or, from the core package:  pip install skyulf-core[nlp])
 #
 # These are NOT required for core Skyulf functionality.
 # The Count / TF-IDF / Hashing vectorizers, Tokenizer, and the

@@ -3,7 +3,7 @@ import time
 import tracemalloc
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
-from typing import Any, cast
+from typing import Any, Protocol, cast, runtime_checkable
 
 import pandas as pd
 
@@ -16,6 +16,17 @@ from ._schema import SkyulfSchema
 # TypeVar lets the specific NodeArtifact TypedDict flow through fit_method
 # so callers see the concrete return type. Bound to Mapping (not Dict) so
 # TypedDicts — which are not LSP-substitutable for Dict — are valid returns.
+
+
+@runtime_checkable
+class TrainTransformCalculatorProtocol(Protocol):
+    """Optional calculator hook for special training-set representations."""
+
+    def fit_transform_train(
+        self,
+        df: pd.DataFrame | SkyulfDataFrame | tuple,
+        config: dict[str, Any],
+    ) -> tuple[Mapping[str, Any], Any]: ...
 
 
 def apply_method(fn: Callable[..., Any]) -> Callable[..., Any]:
@@ -66,9 +77,6 @@ def fit_method[T: Mapping[str, Any]](fn: Callable[..., T]) -> Callable[..., T]:
         return fn(self, X, y, config)
 
     return wrapper  # type: ignore[return-value]
-
-
-# from ..artifacts.store import ArtifactStore # Removed dependency on ArtifactStore for now
 
 
 class BaseCalculator(ABC):
@@ -153,20 +161,49 @@ class StatefulTransformer:
         config: dict[str, Any],
     ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
         self.rows_in, _ = get_data_stats(dataset)
-        tracemalloc.start()
+        tracing_was_active = tracemalloc.is_tracing()
+        if not tracing_was_active:
+            tracemalloc.start()
+            tracemalloc.reset_peak()
+        peak_baseline = tracemalloc.get_traced_memory()[1] if tracemalloc.is_tracing() else 0
+        # With caller-owned tracing we can only report new global peak growth since entry.
+        self.peak_memory_bytes = 0
+        self.rows_out = 0
         start = time.time()
 
-        result = self._fit_transform_inner(dataset, config)
+        try:
+            result = self._fit_transform_inner(dataset, config)
+            self.rows_out, _ = get_data_stats(result)
+            return result
+        finally:
+            self.fit_time = time.time() - start
+            if tracemalloc.is_tracing():
+                _, peak = tracemalloc.get_traced_memory()
+                self.peak_memory_bytes = max(0, peak - peak_baseline)
+            if not tracing_was_active and tracemalloc.is_tracing():
+                tracemalloc.stop()
 
-        self.fit_time = time.time() - start
+    def _fit_and_apply_training_data(
+        self,
+        data: Any,
+        config: dict[str, Any],
+        *,
+        guard_split_output: bool = True,
+    ) -> Any:
+        """Fit one training input and return its train-time representation."""
+        if isinstance(self.calculator, TrainTransformCalculatorProtocol):
+            params, transformed = self.calculator.fit_transform_train(data, config)
+            self.params = cast(dict[str, Any], params)
+            if isinstance(transformed, SplitDataset):
+                raise TypeError(
+                    "Calculator returned SplitDataset from fit_transform_train, which is not supported."
+                )
+            return transformed
 
-        if tracemalloc.is_tracing():
-            _, peak = tracemalloc.get_traced_memory()
-            self.peak_memory_bytes = peak
-            tracemalloc.stop()
-
-        self.rows_out, _ = get_data_stats(result)
-        return result
+        self.params = cast(dict[str, Any], self.calculator.fit(data, config))
+        if guard_split_output:
+            return self._apply_guarded(data, self.params)
+        return self.applier.apply(data, self.params)
 
     def _fit_transform_inner(
         self,
@@ -182,22 +219,26 @@ class StatefulTransformer:
             # Fit on the whole dataframe (be careful about leakage!)
             # ty can't narrow a Union through hasattr — cast once for both calls.
             frame = cast(Any, dataset)
-            # Calculator.fit returns Mapping (TypedDicts allowed); cast to Dict
-            # for storage so Appliers continue to receive a concrete Dict.
-            self.params = cast(dict[str, Any], self.calculator.fit(frame, config))
-            return self.applier.apply(frame, self.params)
+            return self._fit_and_apply_training_data(frame, config, guard_split_output=False)
 
         # If dataset is a tuple (e.g. from FeatureTargetSplitter), pass it through.
         # This allows nodes like TrainTestSplitter to accept (X, y) tuples.
         if isinstance(dataset, tuple):
-            self.params = cast(dict[str, Any], self.calculator.fit(dataset, config))
-            return self.applier.apply(dataset, self.params)
+            return self._fit_and_apply_training_data(dataset, config, guard_split_output=False)
 
         # 1. Calculate on Train
-        self.params = cast(dict[str, Any], self.calculator.fit(dataset.train, config))
+        new_train = self._fit_and_apply_training_data(dataset.train, config)
 
-        # 2. Apply to all splits
-        return self._apply_to_split_dataset(dataset, self.params)
+        # 2. Apply fitted params to held-out splits only
+        new_test = dataset.test
+        if self.apply_on_test:
+            new_test = self._apply_guarded(dataset.test, self.params)
+
+        new_val = dataset.validation
+        if self.apply_on_validation and dataset.validation is not None:
+            new_val = self._apply_guarded(dataset.validation, self.params)
+
+        return SplitDataset(train=new_train, test=new_test, validation=new_val)
 
     def _apply_guarded(self, data: Any, params: dict[str, Any]) -> Any:
         """Apply the applier to `data` and raise if it produces a nested SplitDataset."""
