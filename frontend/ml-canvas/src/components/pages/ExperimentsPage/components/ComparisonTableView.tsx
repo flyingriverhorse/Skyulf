@@ -11,6 +11,8 @@ import {
   extractEnsembleSummary,
   formatBaseEstimator,
 } from '../../../../core/utils/format';
+import { getMetricDirection, getMetricSplitLabel, pickBestIndex } from '../../../../core/utils/metricMeta';
+import { MetricDirectionBadge } from '../../../ui/MetricDirectionBadge';
 import { getJobScoringMetric, hasTuningMetadata, shortRunId } from '../utils/jobMeta';
 
 type GraphNode = {
@@ -351,27 +353,50 @@ export const ComparisonTableView: React.FC<Props> = ({
                 Key Metrics
               </td>
             </tr>
-            {isMetricsExpanded && metricKeys.map(metricKey => (
+            {isMetricsExpanded && metricKeys.map(metricKey => {
+              const direction = getMetricDirection(metricKey);
+              const splitLabel = getMetricSplitLabel(metricKey);
+              const rowValues = selectedJobs.map(job => {
+                const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
+                const raw = m[metricKey];
+                return typeof raw === 'number' ? raw : undefined;
+              });
+              const bestIndex = pickBestIndex(rowValues, direction);
+
+              return (
               <tr key={metricKey} className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50">
                 <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 flex-wrap">
                     {metricKey === 'best_score'
                       ? `Best Score (${formatMetricName(getJobScoringMetric(selectedJobs[0] ?? {} as JobInfo)) || 'CV'})`
                       : metricKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    <MetricDirectionBadge direction={direction} />
+                    {splitLabel && (
+                      <span className="text-[10px] px-1 py-px rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                        {splitLabel}
+                      </span>
+                    )}
                     {getMetricDescription(metricKey) && <InfoTooltip size="sm" text={getMetricDescription(metricKey)!} />}
                   </div>
                 </td>
-                {selectedJobs.map(job => {
-                  const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
-                  const val = m[metricKey];
+                {selectedJobs.map((job, i) => {
+                  const val = rowValues[i];
+                  const isBest = bestIndex === i;
                   return (
-                    <td key={job.job_id} className="px-4 py-1.5 font-mono text-gray-600 dark:text-gray-300">
-                      {typeof val === 'number' ? (metricKey.endsWith('_std') ? val.toFixed(6) : val.toFixed(4)) : '-'}
+                    <td
+                      key={job.job_id}
+                      className={`px-4 py-1.5 font-mono ${isBest ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                      {val === undefined
+                        ? <span className="text-gray-400" title={`${metricKey} was not reported by this run`}>—</span>
+                        : (metricKey.endsWith('_std') ? val.toFixed(6) : val.toFixed(4))}
+                      {isBest && ' ★'}
                     </td>
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
             {/* Hyperparameters (actual model params only) */}
             <tr
               className="bg-gray-50/50 dark:bg-gray-900/20 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors"

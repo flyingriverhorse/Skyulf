@@ -2672,6 +2672,38 @@ Canvas finding is warranted solely for this repeated form root.
     wins by array order. This "wrong-tab-default" behavior should be folded
     into the Evidence/Acceptance-criteria language; it intersects with the
     identifier-mismatch problem in **EXP-008** below.
+  - **2026-08-07 resolution:** Selection bookkeeping extracted into pure,
+    test-first helpers in `ExperimentsPage/utils/runSelection.ts`
+    (`partitionSelection`, `resolveEvaluationTarget`, `selectRunsForView`; 17
+    tests). `ExperimentsPage.tsx` now renders a persistent `role="status"`
+    summary whenever the active filters hide a selected run — visible/total
+    counts, the hidden runs named by short id, plus "Show all selected"
+    (resets both filters, keeps the selection) and "Clear hidden" (reduces the
+    selection to the visible runs). The evaluation/segmentation effect no
+    longer re-picks `selectedJobIds[0]`: it keeps a still-selected, renderable
+    target, otherwise prefers the first *visible* compatible run, and clears
+    the view when no selected run suits the tab. `EvaluationView`'s run picker
+    receives only renderable runs (prop renamed `selectedJobIds` →
+    `eligibleJobIds`), so a clustering run can no longer be clicked into the
+    Model Evaluation tab.
+    **Verified live (1440 px, real backend):** selecting a classification run
+    and switching the task filter to Segmentation/Regression produced
+    "0 of 1 selected runs visible / Still comparing 1 run hidden by the current
+    filters: 9ad0c0c6"; "Show all selected" reset both filters to `all` and
+    kept `SELECT RUNS (1)`; "Clear hidden" dropped it to `SELECT RUNS (0)`. The
+    rewritten effect showed no render loop or React error in the console.
+    tsc/lint clean, 419/419 tests, build clean.
+    **Verification caveat:** the backend had only **one** completed job at the
+    time, so the multi-run, mixed-task path (this finding's original
+    classification-plus-clustering reproduction) could not be re-exercised
+    live. That behavior is covered by unit tests over the pure resolver, not by
+    a live run — worth re-checking against a seeded fixture set, which is also
+    what this finding's stated Playwright validation method calls for.
+    **Still open:** per-tab "this view is showing run X" labelling across the
+    non-evaluation tabs (Visual Comparison, Detailed Metrics, Pipeline Diff)
+    is not implemented; those tabs still render the whole selected set without
+    naming it beyond the chart series. The identifier-mismatch overlap with
+    **EXP-008** is untouched.
 
 - **EXP-002 — Inferred: metric comparison does not make decision direction,
   comparability, or missingness durable.**
@@ -2716,6 +2748,46 @@ Canvas finding is warranted solely for this repeated form root.
   - **Delta:** None in substance. Live evidence directly confirms the two
     example mechanisms (`MetricsComparisonChart` generic bars,
     `ComparisonTableView`'s `-` placeholder) named in the original finding.
+  - **2026-08-07 resolution (partial — direction and split shipped):**
+    - Added `frontend/ml-canvas/src/core/utils/metricMeta.ts` (34 tests,
+      TDD) exposing `getMetricDirection`, `getMetricSplitLabel`, and
+      `pickBestIndex` as machine-readable metric metadata, plus a shared
+      `components/ui/MetricDirectionBadge.tsx`.
+    - Direction and split are now rendered **visibly** (badge + split chip) in
+      `ComparisonTableView` metric rows and above the `MetricsComparisonChart`
+      bar chart, rather than only inside an `InfoTooltip` the user must hover.
+      The chart legend now names the split ("Test (held-out)") or the metric,
+      instead of the previous meaningless `other` label.
+    - **Winner highlighting no longer contradicts direction.** `pickBestIndex`
+      returns `null` for unknown-direction metrics, ties, and rows where fewer
+      than two runs reported a value, so Skyulf never asserts a "best" it
+      cannot justify. `BranchComparisonCard`'s local substring heuristic
+      (`includes('loss'|'error'|'mse'|'mae')`) was deleted — it mis-ranked
+      `mape`, every `cv_*_std`, and `davies_bouldin`, and silently treated all
+      unrecognised metrics as higher-is-better.
+    - Live-verified at 1440 px against a real run: `Fit Time` and
+      `Peak Memory Bytes` display "Lower is better"; `Rows In`/`Rows Out`
+      display "Direction unknown — not ranked" and the chart states "Skyulf
+      cannot rank this metric — read the bars against your own objective."
+      All five comparison tabs render with no console error.
+    - Missing values now render a muted `—` titled "was not reported by this
+      run", separating that case from a genuine zero.
+  - **Still open (deliberately not claimed as done):**
+    - **Units/scale** are not yet rendered — this needs an authoritative
+      per-metric unit contract from the job metrics schema (backend), so it is
+      out of scope for a frontend-only change.
+    - **Three-way missing-reason distinction** is only two-way today ("not
+      reported by this run" vs. a value). Separating "unsupported for this
+      task type" from "excluded by the current split filter" requires a
+      metric↔task compatibility contract that does not exist yet.
+    - **Mixed task types / incompatible scales** still do not force an
+      explicit user choice.
+    - **Validation caveat:** the acceptance criteria call for deterministic
+      classification/regression/tuned-CV/partial-metric/parallel-branch
+      fixtures. Only **one** completed job existed in the local backend, so
+      the multi-run winner-highlighting and parallel-branch paths are covered
+      by unit tests but were **not** exercised live. Seeded E2E fixtures
+      remain the right way to close this.
 
 - **EXP-003 — Inferred: conditional explanation and segmentation views can
   conceal availability and overstate comparability.**

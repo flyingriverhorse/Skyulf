@@ -10,7 +10,9 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
+import { MetricDirectionBadge } from '../../../ui/MetricDirectionBadge';
 import { getMetricDescription } from '../../../../core/utils/format';
+import { getMetricDirection, getMetricSplitLabel } from '../../../../core/utils/metricMeta';
 
 interface Props {
   metricsData: Record<string, unknown>[];
@@ -134,6 +136,15 @@ export const MetricsComparisonChart: React.FC<Props> = ({
 
       {activeMetric && metricGroups.has(activeMetric) && (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-2 mb-3 text-xs text-gray-600 dark:text-gray-400">
+            <span className="font-medium text-gray-800 dark:text-gray-200">{activeMetric.toUpperCase()}</span>
+            <MetricDirectionBadge direction={getMetricDirection(activeMetric)} />
+            <span>
+              {getMetricDirection(activeMetric) === 'unknown'
+                ? 'Skyulf cannot rank this metric — read the bars against your own objective.'
+                : `Taller bars are ${getMetricDirection(activeMetric) === 'higher' ? 'better' : 'worse'} for this metric.`}
+            </span>
+          </div>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={metricsData} margin={{ top: 5, right: 30, left: 30, bottom: 40 }}>
@@ -155,7 +166,7 @@ export const MetricsComparisonChart: React.FC<Props> = ({
                   if (type === 'test') color = '#22c55e';
                   if (type === 'val') color = '#f97316';
                   if (type === 'other') color = '#a855f7';
-                  return <Bar key={key} dataKey={key} fill={color} name={`${type} (${activeMetric})`} />;
+                  return <Bar key={key} dataKey={key} fill={color} name={getMetricSplitLabel(key) ?? key.replace(/_/g, ' ')} />;
                 })}
               </BarChart>
             </ResponsiveContainer>

@@ -10,6 +10,7 @@ import { formatDuration } from '../../core/utils/format';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 import type { EvaluationData, ShapExplanationData } from './ExperimentsPage/types';
 import { getJobScoringMetric, getTaskForModelType, mapJobMetricToDropdown, shortRunId, type ThresholdMetric } from './ExperimentsPage/utils/jobMeta';
+import { partitionSelection, resolveEvaluationTarget, selectRunsForView, type SelectableRun } from './ExperimentsPage/utils/runSelection';
 import { registryApi, type RegistryItem } from '../../core/api/registry';
 import { findBestThreshold } from './ExperimentsPage/utils/classificationCharts';
 import { thresholdTuningApi, type ThresholdPreviewResult } from '../../core/api/thresholdTuning';
@@ -323,19 +324,9 @@ export const ExperimentsPage: React.FC = () => {
     }
   };
 
-  // Effect to fetch evaluation data when view changes or selection changes
-  useEffect(() => {
-    if (activeView === 'evaluation' || activeView === 'segmentation') {
-      if (!evalJobId && selectedJobIds.length > 0) {
-        void fetchEvaluationData(selectedJobIds[0]!);
-      } else if (evalJobId && !selectedJobIds.includes(evalJobId) && selectedJobIds.length > 0) {
-        void fetchEvaluationData(selectedJobIds[0]!);
-      } else if (selectedJobIds.length === 0) {
-        setEvaluationData(null);
-        setEvalJobId(null);
-      }
-    }
-  }, [activeView, selectedJobIds, evalJobId]);
+  // Effect to fetch evaluation data when view changes or selection changes.
+  // Moved below `selectableRuns` so the target resolution can prefer a run the
+  // active tab can actually render.
 
   const filteredJobs = useMemo(() => jobs.filter(job => {
     const typeMatch = filterType === 'all' || getTaskForModelType(job.model_type, registryItems) === filterType;
@@ -353,6 +344,53 @@ export const ExperimentsPage: React.FC = () => {
     () => jobs.filter(job => selectedJobIds.includes(job.job_id)),
     [jobs, selectedJobIds]
   );
+
+  // Selections deliberately survive filter changes, so a selected run can be
+  // driving the comparison while absent from the sidebar. Track that split
+  // explicitly rather than letting it stay invisible.
+  const selectableRuns = useMemo<SelectableRun[]>(() => {
+    const visibleIds = new Set(filteredJobs.map(job => job.job_id));
+    return selectedJobIds.flatMap(id => {
+      const job = jobs.find(j => j.job_id === id);
+      if (!job) return [];
+      return [{
+        jobId: id,
+        task: getTaskForModelType(job.model_type, registryItems),
+        visible: visibleIds.has(id),
+      }];
+    });
+  }, [selectedJobIds, jobs, filteredJobs, registryItems]);
+
+  const selectionSplit = useMemo(() => partitionSelection(selectableRuns), [selectableRuns]);
+  const hiddenSelectedJobs = useMemo(
+    () => selectionSplit.hidden.flatMap(id => jobs.filter(j => j.job_id === id)),
+    [selectionSplit.hidden, jobs]
+  );
+
+  const evaluableRunIds = useMemo(
+    () => selectRunsForView('evaluation', selectableRuns),
+    [selectableRuns]
+  );
+
+  // Resolve the run the evaluation/segmentation tab should display. Picking
+  // `selectedJobIds[0]` blindly meant the Segmentation tab could report "not a
+  // clustering job" while valid clustering runs were selected.
+  const evaluationTarget = useMemo(() => {
+    if (activeView !== 'evaluation' && activeView !== 'segmentation') return null;
+    return resolveEvaluationTarget(activeView, selectableRuns, evalJobId);
+  }, [activeView, selectableRuns, evalJobId]);
+
+  useEffect(() => {
+    if (activeView !== 'evaluation' && activeView !== 'segmentation') return;
+    if (evaluationTarget === null) {
+      setEvaluationData(null);
+      setEvalJobId(null);
+      return;
+    }
+    if (evaluationTarget !== evalJobId) {
+      void fetchEvaluationData(evaluationTarget);
+    }
+  }, [activeView, evaluationTarget, evalJobId]);
 
   const toggleJobSelection = (jobId: string) => {
     setSelectedJobIds(prev =>
@@ -465,6 +503,36 @@ export const ExperimentsPage: React.FC = () => {
         setFilterType={setFilterType}
       />
 
+      {/* Selections survive filter changes by design, so any run the filter
+          hides is named here rather than silently driving the comparison. */}
+      {hiddenSelectedJobs.length > 0 && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+        >
+          <span className="font-medium">
+            {selectionSplit.visible.length} of {selectableRuns.length} selected runs visible
+          </span>
+          <span className="flex-1 min-w-[14rem]">
+            Still comparing {hiddenSelectedJobs.length} run
+            {hiddenSelectedJobs.length === 1 ? '' : 's'} hidden by the current filters:{' '}
+            {hiddenSelectedJobs.map(job => shortRunId(job)).join(', ')}
+          </span>
+          <button
+            onClick={() => { setFilterType('all'); setSelectedDatasetId('all'); }}
+            className="rounded-md border border-amber-300 px-2.5 py-1 font-medium hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
+          >
+            Show all selected
+          </button>
+          <button
+            onClick={() => setSelectedJobIds(selectionSplit.visible)}
+            className="rounded-md border border-amber-300 px-2.5 py-1 font-medium hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
+          >
+            Clear hidden
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         <JobListSidebar
           filteredJobs={filteredJobs}
@@ -538,7 +606,7 @@ export const ExperimentsPage: React.FC = () => {
 
               {activeView === 'evaluation' && (
                 <EvaluationView
-                  selectedJobIds={selectedJobIds}
+                  eligibleJobIds={evaluableRunIds}
                   evalJobId={evalJobId}
                   fetchEvaluationData={fetchEvaluationData}
                   isEvalLoading={isEvalLoading}
