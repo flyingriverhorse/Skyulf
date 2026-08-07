@@ -449,10 +449,13 @@ export const EDAPage: React.FC = () => {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-white dark:bg-slate-950">
       {/* Top Navigation Bar */}
-      <header className="flex-none h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 px-4 flex items-center justify-between gap-4 z-20 shadow-sm">
+      {/* Fixed 64px height only once the three control groups fit side by side
+          (≥1024px). Below that the header wraps and grows instead of clipping
+          Analyze/History off-screen. */}
+      <header className="flex-none bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 flex flex-wrap items-center justify-between gap-3 z-20 shadow-sm lg:h-16 lg:flex-nowrap lg:py-0 lg:gap-4">
 
         {/* Left: Title & Dataset */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 lg:gap-6">
             <div>
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">Exploratory Analysis</h1>
                 {report && report.created_at && (
@@ -480,7 +483,7 @@ export const EDAPage: React.FC = () => {
         </div>
 
         {/* Center: Controls */}
-        <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 lg:flex-nowrap lg:gap-4">
             <div className="flex flex-col px-2">
                 <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</span>
                 <select

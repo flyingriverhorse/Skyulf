@@ -2215,6 +2215,24 @@ Canvas finding is warranted solely for this repeated form root.
     ≥1024 px, rather than a single "narrow screens" descriptor for both
     surfaces. The Validation Matrix should record pass/fail per surface at
     each of 1440/1024/768/390 px rather than one shared per-width verdict.
+  - **2026-08-07 resolution:** Fixed and re-measured per surface. Data Sources'
+    header action row (`DataSources.tsx`) was a non-wrapping
+    `flex justify-between`, pushing `Ingestion Jobs`/`Add Source`/`Upload File`
+    to `right=508px` inside a 382 px pane; it now stacks (`flex-col` →
+    `sm:flex-row`) with a wrapping button row, bringing `main` `scrollWidth`
+    from 508 px to 382 px (= `clientWidth`). EDA's header (`EDAPage.tsx`) was a
+    fixed `h-16` three-column flex with `overflow-x: visible`
+    (`clientWidth=390` vs `scrollWidth=932`); it now wraps and grows below
+    `lg`, keeping the single-row 64 px layout at ≥1024 px. Verified in Chrome
+    at all four widths with populated rows and an existing EDA report: zero
+    unreachable controls at 390 px and 768 px on both surfaces, header height
+    back to 64 px at 1024 px and 1440 px. The table and filter-chip rows retain
+    their own horizontal scroll, which the finding already classified as a
+    normal responsive pattern rather than a regression.
+  - **Measurement caveat:** the long-running dev server on port 5173 was
+    serving a stale transformed module and initially masked the EDA fix; these
+    measurements were taken against a freshly started server after clearing
+    `node_modules/.vite`.
 
 - **DAT-005 — Inferred: EDA analysis selection, job progress, failure, and
   history do not form a durable, contextual analysis loop.**
@@ -3558,6 +3576,21 @@ Canvas finding is warranted solely for this repeated form root.
     state across the two separate surfaces, consistent with them being fully
     decoupled per OPS-001).
   - **Delta:** No change from the original finding. Still fully absent.
+  - **2026-08-07 resolution:** Primitive landed. `core/utils/operationalContext.ts`
+    defines the typed `OperationalRef` union (job, pipeline, node, dataset,
+    modelVersion, deployment, driftCheck, incident, auditEntry, slowNode) plus
+    `origin`, `timeRange`, and `filters`, with `serializeOperationalContext`/
+    `parseOperationalContext`/`buildRecordHref`/`describeOperationalRef`.
+    Numeric server ids stay numeric across a round trip; unknown kinds, blank
+    and malformed identifiers parse to `null` rather than inventing a target;
+    unrelated params and unrecognised time ranges are ignored so links stay
+    forward/backward compatible. `components/shared/RecordLink.tsx` builds the
+    href and return payload from a typed ref and exposes the full identifier as
+    its accessible name even when the visible label is truncated. Covered by 35
+    tests (`operationalContext.test.ts`, `RecordLink.test.tsx`). **Consumer
+    adoption by the individual Operations pages remains outstanding** and is
+    tracked by the dependent findings (`OPS-001`–`OPS-006`), which this
+    foundation unblocks.
 
 - **OPS-008 — Observed (new): the Jobs table renders duplicate rows with
   colliding React keys on fresh load, driven by a `poolSkip` closure race in

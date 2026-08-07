@@ -194,12 +194,14 @@ export const DataSources: React.FC = () => {
         }}
       />
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">Data Sources</h1>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your uploaded datasets and use them in experiments.</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
+            Upload a file or connect an S3 source, then send it to the Canvas pipeline builder or the EDA explorer.
+          </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={() => { setShowIngestionJobs(true); }}
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
