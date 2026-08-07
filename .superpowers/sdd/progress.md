@@ -661,3 +661,11 @@ targeted RED failed with the promoted warning; GREEN passed; focused
 integration/warning set passed (`5 passed`); Ruff clean; full Core suite passed
 (`2926 passed, 69 skipped, 1 xfailed`), with no target warning in the warning
 summary.
+
+Frontend UX roadmap rerun (`docs/superpowers/plans/2026-08-07-frontend-ux-roadmap-rerun.md`)
+Task 1: complete (commits 54a2b174..d5f51611, review clean) — added the dated rerun scaffold, refreshed the engineering and route/navigation baseline, and recorded the missing Chromium executable as current evidence without changing product code.
+Task 2: complete (commits d5f51611..b98dac53, review clean after evidence and scope fixes) — refreshed shared-foundation evidence at four widths, reconciled FND-001 through FND-006, added observed FND-007, corrected the 390px Canvas overlap evidence, synchronized FND-002's evidence label, and removed the accidentally tracked task report.
+Task 3: complete (commits b98dac53..b5ef0ef1, review clean after one evidence fix) — refreshed Canvas evidence at four widths, marked CAN-001/CAN-005 Changed and CAN-002/CAN-003/CAN-004 Confirmed, documented the shared insertion-path and connection-gesture limitations, and explicitly rechecked leakage-validation source and call sites.
+Task 4: complete (commit a37c8c61, review clean) — refreshed Data/EDA evidence, reconciled DAT-001 through DAT-007, added observed DAT-008/DAT-009, documented current breakpoint and navigation-state scope, and extended the inventory and validation matrix without premature reprioritization.
+Task 5: complete (commit 241edaec, review approved with minor synthesis notes) — refreshed Experiments/Inference evidence, reconciled EXP-001 through EXP-007, added observed EXP-008, and recorded browser and sub-view limitations. Final synthesis must reassess EXP-008's milestone against DAT-008 and note that ClassificationChartsForSplit.tsx was not independently re-reviewed.
+Task 6: complete (commit 627bc7f5, review approved with minor wording notes) — refreshed Operations evidence, reconciled OPS-001 through OPS-007, folded the localStorage deployment-tracker risk into OPS-002, and added observed OPS-008 for duplicate Jobs rows. Final synthesis should correct OPS-005's claim that prior evidence was source-only.
