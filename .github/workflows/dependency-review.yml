@@ -32,4 +32,7 @@ jobs:
         uses: actions/dependency-review-action@v5
         with:
           fail-on-severity: high
+          # No patched React Router release exists yet. Skyulf is a BrowserRouter
+          # SPA and does not use the affected RSC/server-action mode.
+          allow-ghsas: GHSA-qwww-vcr4-c8h2
           comment-summary-in-pr: always
