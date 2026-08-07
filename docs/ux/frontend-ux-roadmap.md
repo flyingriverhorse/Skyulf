@@ -459,6 +459,151 @@ new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
   source re-reading only, matching this rerun's evidence level for those
   forms; no row in that table required an update.
 
+### Task 4 — Data and EDA Rerun
+
+#### Method
+
+- **Method:** Drove a live Chromium browser with the Playwright MCP browser
+  tools (`browser_navigate`, `_resize`, `_evaluate`, `_click`, `_find`,
+  `_take_screenshot`, `_tabs`) against an **already-running** local dev
+  stack rather than a fresh Playwright-launched server: the project's own
+  Vite dev server (`localhost:5173`) proxying to an already-running FastAPI
+  backend (`localhost:8000`) via `vite.config.ts`'s `/api` and `/data/api`
+  rules. Unlike the Task 2/3 reruns, which drove a Playwright-launched dev
+  server with `page.route()` request mocks, every response below (including
+  the reproduced failures) is a real backend response against real,
+  accumulated seed/test data (dozens of pre-existing "test source"/"s3
+  source" datasets, real jobs history). Findings are labelled **Observed
+  (live, real backend)** where this applies, versus **Observed (source)**
+  for claims confirmed by reading code only. Widths exercised: `1440×900`,
+  `1024×768/900`, `768×1024`, and `390×844`, matching the required
+  breakpoints. Source files re-read: `DataSources.tsx`, `EDAPage.tsx`,
+  `useEDAStore.ts`, `core/api/datasets.ts`, `core/api/eda.ts`,
+  `AddSourceModal.tsx`, `DatasetPreviewModal.tsx`, `IngestionJobsModal.tsx`,
+  `PipelineVersionsModal.tsx`, `EDASidebar.tsx`, `CorrelationHeatmap.tsx`,
+  `CanvasScatterPlot.tsx`, `ThreeDScatterPlot.tsx`, `VariableRow.tsx`,
+  `chartUtils.ts`, and the 14 files under `components/eda/tabs/*.tsx`.
+- **Real backend interactions performed:** created a real S3 source pointed
+  at a nonexistent bucket (reached `status: failed`), opened Dataset Preview
+  on a broken dataset (real `400`), opened the Ingestion Jobs modal, ran a
+  real EDA analysis end-to-end on a 150-row/5-column Iris-like dataset via
+  `POST /api/eda/9/analyze` → `GET /api/eda/9/latest`, inspected
+  Dashboard/Correlations/Variables/Bivariate tabs, toggled dark mode, added a
+  sidebar filter, and tested return navigation (`/data` → `/eda`) and
+  deep-link handoffs (`/canvas?source_id=`, `/eda?dataset_id=`).
+- **Evidence-collection limitations (weighed in the reconciliation below):**
+  1. **No Chromium/axe automation available**, the same limitation already
+     recorded in the Task 2 rerun (`#### Accessibility automation rerun`
+     above): no `.superpowers/sdd/playwright.chrome.config.ts` exists in
+     this checkout, so every accessibility claim in this task is manual DOM
+     inspection (`querySelectorAll`, attribute checks), not an automated
+     axe-core scan.
+  2. **Shared-browser anomaly.** Partway through the EDA tab/filter
+     investigation, the controlled browser began spontaneously navigating to
+     unrelated routes (`/jobs`, `/registry`, `/deployments`, `/drift`,
+     `/canvas`, `/errors`, `/slow-nodes`) and spawning extra tabs with no
+     corresponding tool call causing it; a grep of the frontend source found
+     no `window.open`/`target="_blank"` that could explain this, and `lsof`
+     showed a VS Code "Code Helper" process also connected to port 5173 —
+     strongly suggesting a second, externally-controlled client shared the
+     same Chrome/CDP session. Every measurement below was taken immediately
+     after an explicit `browser_navigate`/`browser_tabs close` sequence to
+     re-establish a known single-tab state, so nothing here was reported from
+     a stale or ambiguous page. This is recorded as an **evidence-collection
+     risk for this rerun**, not a product finding: this session was less
+     isolated than Task 2/3's own Playwright-launched-server sessions, and a
+     future rerun should insist on a dedicated, unshared browser profile.
+  3. Some deeper per-tab interactions (Expand/Collapse All in Variables,
+     Bivariate X/Y custom dropdowns, Outliers tab detail) were cut short by
+     the anomaly above and were confirmed via source reading rather than a
+     full live click-through; this is noted per finding below.
+
+#### Data source onboarding walkthrough
+
+- **Observed (live, real backend):** Add Source at 1440 px offers only S3;
+  its Name and S3 Path inputs have no `id`, `aria-label`, or
+  `aria-labelledby`, and submitting the empty form is blocked purely by
+  native HTML5 `required` validation. Submitting a real S3 path to a
+  nonexistent bucket created a real source that reached `status: failed`;
+  the Data Sources row rendered only a bare "Failed" badge with a single
+  "Delete dataset" action and no retry or error text, while the real backend
+  error is visible only inside the Ingestion Jobs modal.
+- **Observed (live, real backend), positive:** `DataSources.tsx` correctly
+  passes `?source_id=` to `/canvas` and `?dataset_id=` to `/eda`, and both
+  `CanvasPage.tsx` and `EDAPage.tsx` consume these correctly on first mount —
+  the onboarding→handoff context is preserved for the very first navigation.
+- **Observed (live, real backend):** Preview on a broken dataset showed
+  "0 rows • 0 columns • 0 Bytes" with the generic "Failed to load dataset
+  preview." text; the underlying request returned a real `400` with
+  `{"error":"HTTP 400","message":"Invalid file path"}`, a specific message
+  the UI discards. The error paragraph has no `role`/`aria-live` attribute.
+- **Observed (source + live):** `IngestionJobsModal.tsx` builds its job list
+  from every dataset (`// For now, we show all as 'jobs'`), but it does
+  surface the real backend `job.message` for failed/cancelled jobs — the
+  modal is the one place error detail surfaces; only the Data Sources row is
+  silent. Only pending/processing jobs expose a Cancel action; there is no
+  Retry action anywhere in the flow.
+
+#### EDA workflow walkthrough
+
+- **Observed (live, real backend):** Selected dataset id 9 (a real completed
+  report), navigated `/data` → `/eda` via the sidebar's EDA link (confirmed
+  client-side SPA navigation, not a reload) — the Dataset dropdown silently
+  reset to the first dataset (id 3) every time, discarding the dataset-9
+  selection and its report view. The `/data → EDA button → /eda?dataset_id=X`
+  deep-link path itself was unaffected.
+- **Observed (source):** `EDAPage.tsx` seeds `selectedDataset` from
+  `?dataset_id=` only once on mount and only if the store's
+  `selectedDataset` is `null` (lines 54–61), while a separate effect
+  auto-selects the first dataset whenever `!selectedDataset && datasets.length
+  > 0` (lines 121–125); `useEDAStore.ts` has no `persist` middleware (plain
+  `create<EDAState>(...)`), so `selectedDataset` is wiped to `null` on every
+  `EDAPage` unmount. On a bare `/eda` navigation with no `dataset_id` param,
+  the seeding effect is a no-op and the auto-select effect resets to the
+  first dataset.
+- **Observed (live + source):** Opened "Add Filter" in `EDASidebar` — the
+  Column select, Operator select, and Value input all have no
+  `id`/`aria-label`/`aria-labelledby`. `handleAddFilter` (lines 178–183) and
+  `handleRemoveFilter` (lines 185–189) both immediately call `runAnalysis`
+  with no confirmation/apply step or undo affordance, while
+  `handleApplyExcluded` (lines 195–199) gates its own re-analysis behind an
+  explicit Apply button — filters are the only control on this page without
+  that pattern.
+- **Observed (live, real backend):** At 1440 px, the EDA Dataset `<select>`
+  (`EDAPage.tsx` line 469, `datasets.map((ds) => <option key={ds.id}
+  value={ds.id}>{ds.name}</option>)`) contains dozens of options with
+  identical visible text (e.g. "test source" appears roughly 50+ times),
+  differentiated only by the underlying numeric `value` (dataset id), which
+  is never shown.
+
+#### Visualization usability recheck
+
+- **Observed (live, real data, Iris dataset id 9):** In both light and dark
+  mode, the Correlations tab renders no persistent −1/0/+1 legend, and
+  column headers are truncated (e.g. "sepal.le…") relying solely on the
+  native `title` attribute for the full name on hover. The correlation
+  **values** themselves (e.g. "0.87") are printed as visible text inside
+  each cell, so cell color is reinforced by text for the magnitude — only
+  the axis/column **labels** are hover-only. Dark-mode toggling is correct
+  across the app; the permanently near-black left icon rail is confirmed
+  (source + DOM) to be an intentional fixed-dark nav-rail choice, not a
+  theming bug.
+- **Observed (source):** `BivariateTab.tsx` wraps both the actual scatter
+  chart and its "Select X and Y variables to generate scatter plot."
+  empty-state placeholder inside the same `id="bivariate-chart"` container
+  (lines 54–61 render the always-enabled Download button; lines 147–174
+  wrap chart-or-placeholder), and `downloadChart` (`chartUtils.ts`) calls
+  `document.getElementById(elementId)` unconditionally and rasterizes
+  whatever is inside — clicking "Download Chart" before selecting X/Y
+  silently produces a PNG of the placeholder text with no warning. The same
+  `id`-wraps-empty-state pattern, with the same always-enabled Download
+  button, is confirmed in `PCATab.tsx` (`id="pca-chart"`).
+- **Observed (source):** `SampleDataTab.tsx` is table-only; no CSV/tabular
+  export exists anywhere in the EDA surface, only the chart tabs' PNG
+  Download button — noted as a related but separate gap, not raised as its
+  own finding (see "Not recommended as new findings" reasoning folded into
+  DAT-007 below).
+
 ## Synthesis, Deduplication, and Ranking
 
 ### Root-cause decisions
@@ -1432,6 +1577,32 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent for new sources. **Effort:** M.
     **Risk:** Medium. **Dependencies:** source-type capability contract,
     ingestion API errors, and router handoff state. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live, real backend)** again at 1440 px:
+    Add Source still offers only S3, and the Name/S3 Path `<input>`s still
+    have no `id`, `aria-label`, or `aria-labelledby`
+    (`document.querySelectorAll('[role="dialog"] input')` — all three
+    attributes null on both fields); submitting the empty form is blocked
+    purely by native HTML5 `required`/`valueMissing` validation. **New:**
+    submitted a real (nonexistent) S3 path and it created an actual backend
+    source (`POST /data/api/sources` succeeded) that asynchronously reached
+    `status: failed`; the Data Sources row (`getStatusBadge`,
+    `DataSources.tsx` lines 132–155) rendered only a bare "Failed" badge with
+    a single "Delete dataset" action — no retry, no error text, no way to see
+    *why* it failed from the table itself. The real backend error
+    ("Failed to connect to S3 path s3://nonexistent-bucket-uxaudit/data.csv")
+    is visible only inside the Ingestion Jobs modal (see `DAT-003`).
+    Confirmed, positive: `DataSources.tsx` correctly passes `?source_id=` to
+    `/canvas` (line 120) and `?dataset_id=` to `/eda` (line 422), and both
+    `CanvasPage.tsx` and `EDAPage.tsx` (lines 54–61) consume these on first
+    mount — the onboarding→handoff context is preserved for the very first
+    navigation.
+  - **Delta:** No contradiction. Adds a real, backend-verified reproduction
+    of the failed-creation-with-no-feedback path, and confirms the
+    Canvas/EDA deep-link handoff itself works correctly on first navigation —
+    narrowing (not resolving) the acceptance-criteria gap specifically to
+    in-app return navigation without a fresh query param, cross-referenced
+    under `DAT-005`.
 
 - **DAT-002 — Observed: failed dataset preview presents fabricated-looking
   zero metadata and insufficient recovery context.**
@@ -1461,6 +1632,20 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** dataset sample/profile endpoint error shape and
     **FND-003**. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live, real backend)** again at
+    1440 px: clicking "Preview" on a broken dataset showed "0 rows • 0
+    columns • 0 Bytes" in the modal header and "Failed to load dataset
+    preview." with Retry in the body. Network inspection of the underlying
+    request showed the real backend response was a `400 Bad Request` with
+    body `{"error":"HTTP 400","message":"Invalid file path"}` — a specific,
+    actionable message the UI discards in favor of the generic string. The
+    error paragraph still has no `role`/`aria-live` attribute.
+  - **Delta:** No material change to the problem, surfaces, or acceptance
+    criteria; this rerun reproduces the behavior against a real backend
+    `400` with a real message payload (upgrading the citation from a mocked
+    to a real reproduction) and reconfirms the missing `role`/`aria-live`
+    observation.
 
 - **DAT-003 — Inferred: ingestion states expose activity but not a complete,
   recoverable lifecycle.**
@@ -1494,6 +1679,26 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** ingestion status/progress/error contract,
     upload mutation, job-history API, and **FND-003**. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (source):** `IngestionJobsModal.tsx`
+    lines 41–50 still contain the literal comment `// For now, we show all
+    as 'jobs'` and build the job list via `datasets.map(...)` — every
+    dataset ever created (including long-completed ones) appears in this
+    list, not just active/queued ingestions. **New nuance (source + live):**
+    lines 88–96 show the modal DOES surface the real backend `job.message`
+    string for failed/cancelled jobs; opening the modal after the real
+    S3-failure reproduction under `DAT-001` confirmed the full error text
+    ("Failed to connect to S3 path s3://nonexistent-bucket-uxaudit/data.csv")
+    is indeed shown there — this modal is actually **more** informative than
+    the Data Sources row, which shows nothing. Only pending/processing jobs
+    get a Cancel action (icon-only, `title="Cancel Ingestion"`, no
+    `aria-label`), and there is no Retry action anywhere in this modal or on
+    the Data Sources row for failed jobs.
+  - **Delta:** Adds the positive nuance that the modal shows real error text
+    (only the Data Sources row itself is silent) and confirms there is
+    genuinely no Retry action anywhere. User problem, proposed behavior, and
+    acceptance criteria are unchanged; the eventual fix direction should
+    surface `job.message` on the Data Sources row badge too, and add Retry.
 
 - **DAT-004 — Observed: Data and EDA controls become off-screen at narrow
   widths, blocking the journey before a source can be used or analyzed.**
@@ -1524,6 +1729,32 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent on narrow screens. **Effort:**
     M. **Risk:** Medium. **Dependencies:** **FND-001**, Data table/card
     presentation, EDA header, and responsive action menu. **Milestone:** Now.
+  - **2026-08-07 status:** Changed.
+  - **Current evidence:** **Observed** again at 390 px: Data Sources' `aside`
+    measured 256 px with `main` at `x=256`/`width=134px` (no page-level
+    overflow), and its table's own `.overflow-x-auto` wrapper measured a
+    `clientWidth` well below that 134 px pane against a `scrollWidth` above
+    1100 px — a nested-container squeeze beyond the single outer-container
+    width previously documented. EDA's `aside`=64 px (collapsed) with
+    `header` `clientWidth=326px` vs `scrollWidth=962px` (no page-level
+    overflow), matching the original evidence almost exactly. **New,
+    width-boundary-correcting measurements not in the original evidence:** at
+    1024 px, Data Sources shows no clipping, and EDA's header narrows to a
+    2 px overflow (`clientWidth=960px` vs `scrollWidth=962px`) that is
+    effectively resolved; at 768 px, Data Sources shows no page-level
+    overflow (its table's own self-contained horizontal-scroll region is a
+    normal responsive-table pattern, not a clipping regression), but EDA's
+    header overflow **reappears** at a real 258 px (`clientWidth=704px` vs
+    `scrollWidth=962px`) — the EDA header clipping is not confined to
+    390 px; it persists at 768 px and only clears at ≥1024 px.
+  - **Delta:** Strengthens the 390 px evidence with a nested-container
+    detail, and corrects the width framing: this rerun's per-width
+    measurements show Data Sources and EDA now have measurably different
+    breakpoint behavior — Data Sources fails materially only at 390 px,
+    while EDA's header regression spans 390–768 px and clears only at
+    ≥1024 px, rather than a single "narrow screens" descriptor for both
+    surfaces. The Validation Matrix should record pass/fail per surface at
+    each of 1440/1024/768/390 px rather than one shared per-width verdict.
 
 - **DAT-005 — Inferred: EDA analysis selection, job progress, failure, and
   history do not form a durable, contextual analysis loop.**
@@ -1561,6 +1792,38 @@ Canvas finding is warranted solely for this repeated form root.
     M. **Risk:** Medium. **Dependencies:** EDA job/report/history API
     contract, React Query invalidation, `useEDAStore`, and **FND-003**.
     **Milestone:** Now.
+  - **2026-08-07 status:** Changed.
+  - **Current evidence:** **Observed (live, real backend):** selected
+    dataset id 9 (a real, completed report from a real end-to-end EDA run),
+    navigated `/data` → `/eda` via the sidebar's EDA link (confirmed
+    client-side SPA navigation, not a full reload) — the Dataset dropdown
+    silently **reset to the first dataset** (id 3) every time, discarding
+    the dataset-9 selection and its report view. **Root cause fully
+    confirmed (source):** `EDAPage.tsx` seeds `selectedDataset` from
+    `?dataset_id=` only once on mount and only if the store's
+    `selectedDataset` is `null` (lines 54–61); a separate effect
+    auto-selects the first dataset whenever `!selectedDataset &&
+    datasets.length > 0` (lines 121–125); `useEDAStore.ts` uses a plain
+    `create<EDAState>(...)` with no `persist` middleware, so
+    `selectedDataset` is wiped to `null` on every `EDAPage` unmount. On a
+    bare `/eda` navigation with no `dataset_id` param, the seeding effect is
+    a no-op and the auto-select effect resets to the first dataset. **New,
+    scope-narrowing finding:** the `/data → EDA button → /eda?dataset_id=X`
+    deep-link path is **not** affected — the seeding effect successfully
+    seeds the correct dataset on that path (confirmed via `DataSources.tsx`
+    line 422 and the seeding effect). The regression is specific to any
+    subsequent in-app return navigation to a bare `/eda` route with no query
+    parameter (sidebar link, browser back/forward, or any other internal
+    link that doesn't carry `dataset_id`).
+  - **Delta:** Upgrades this behavior's core reproduction from Inferred to
+    directly **Observed** (a real dataset with a real report was lost on a
+    real return navigation, not only a `404` no-analysis case), and fully
+    confirms the previously-inferred root cause via source. Also narrows
+    scope: the first Data Sources → EDA handoff via the dedicated button is
+    unaffected; only sidebar/back-nav-style return visits regress. Suggested
+    fix direction: persist `selectedDataset` (Zustand `persist` middleware
+    or sessionStorage), or have the sidebar EDA link carry the last-viewed
+    `dataset_id`.
 
 - **DAT-006 — Inferred: EDA filter and exclusion controls hide consequential
   reanalysis behind unlabelled, immediately applied configuration.**
@@ -1595,6 +1858,25 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent when refining analysis. **Effort:**
     M. **Risk:** Medium. **Dependencies:** `useEDAStore`, EDA request/report
     schema, download utilities, and **FND-005**. **Milestone:** Next.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed (live):** opened "Add Filter" in
+    `EDASidebar` and inspected the DOM — the Column select, Operator select,
+    and Value input (`placeholder="Value"`) all still have no
+    `id`/`aria-label`/`aria-labelledby`. **Observed (source, unambiguous):**
+    `handleAddFilter` (lines 178–183) and `handleRemoveFilter` (lines
+    185–189) both update the filter list and immediately call `runAnalysis`,
+    firing a full `POST /api/eda/{id}/analyze` re-run the instant a filter is
+    added or removed, with no explicit apply/confirmation step, no debounce,
+    and no undo affordance beyond manually removing the filter again (which
+    itself immediately re-runs analysis). By contrast, `handleApplyExcluded`
+    (lines 195–199) gates its own re-analysis behind an explicit Apply
+    button — filters are the only control on this page without that pattern.
+  - **Delta:** No contradiction; both claims (unlabelled controls, immediate
+    re-run) are now each independently confirmed via a different method
+    (live DOM vs. unambiguous source) rather than either alone, a stronger
+    evidence basis with no change to problem, surfaces, or acceptance
+    criteria. Worth noting the asymmetry with the Excluded-columns
+    Apply-button pattern as a concrete, low-effort consistency fix reference.
 
 - **DAT-007 — Inferred: EDA visualizations do not consistently preserve color
   meaning, interpretation, and accessible alternatives across result density,
@@ -1639,6 +1921,138 @@ Canvas finding is warranted solely for this repeated form root.
     **Effort:** L. **Risk:** Medium. **Dependencies:** chart adapters,
     Plotly/Recharts/Chart.js theme tokens, report payloads, export utilities,
     and visualization data-table design. **Milestone:** Next.
+  - **2026-08-07 status:** Changed.
+  - **Current evidence:** **Observed (live, real Iris dataset id 9),
+    Correlations tab, light and dark mode:** confirmed no persistent
+    −1/0/+1 (or equivalent) legend is rendered anywhere on the page, and
+    column headers are truncated to fixed-width strings (e.g. "sepal.le…")
+    relying solely on the native `title` attribute for the full name on
+    hover, with no rotated label, wrap, or on-focus expansion alternative.
+    **New, partially mitigating nuance not in the original finding:** the
+    actual correlation **values** (e.g. "0.87", "−0.12") ARE printed as
+    visible text directly inside each colored cell — cell color is
+    reinforced by text for the correlation magnitude itself; only the
+    axis/column **labels** are hover-only. This softens (but does not
+    invalidate) the finding's implied "relies solely on color" framing.
+    Dark-mode toggling is confirmed correct app-wide; the permanently
+    near-black left icon rail (`bg-slate-900 dark:bg-slate-950` in both
+    themes) is confirmed via source/DOM to be an intentional fixed-dark
+    nav-rail design choice, not a theming bug, and is not reported as a
+    separate finding. **New, related observations spun off as `DAT-008` and
+    `DAT-009` below:** the EDA Dataset dropdown's duplicate/ambiguous option
+    labels, and both `BivariateTab.tsx`/`PCATab.tsx`'s Download buttons
+    remaining enabled with no chart rendered. Also confirmed
+    `SampleDataTab.tsx` has no CSV/tabular export anywhere in the EDA
+    surface (only the chart tabs' PNG Download button) — a related but
+    separate completeness gap, not severe/novel enough on its own to warrant
+    a new ID.
+  - **Delta:** Confirms the legend/label-truncation claims exactly as
+    **Observed** rather than **Inferred**, and adds the "cell values ARE
+    legible" nuance, which materially refines the finding's framing:
+    write-ups should distinguish "value legibility: fine" from "column
+    identity legibility: hover-only, a real gap," since these are different
+    severities. This rerun also surfaced two closely related but distinct
+    usability gaps while re-checking these visualizations: the chart
+    Download-when-empty behavior is spun off as its own new finding,
+    `DAT-009`, rather than folded into this finding's scope; the EDA Dataset
+    dropdown's duplicate-option-label gap is unrelated to color/legend
+    interpretation and is recorded separately as `DAT-008`.
+
+- **DAT-008 — Observed: the EDA Dataset dropdown renders many indistinguishable
+  duplicate-text options with no disambiguating detail.**
+  - **Evidence:** At 1440 px, on a real, unfiltered dataset list, the EDA
+    Dataset `<select>` (`EDAPage.tsx` line 469,
+    `datasets.map((ds) => <option key={ds.id} value={ds.id}>{ds.name}</option>)`)
+    auto-selects the first dataset on load and, on inspection
+    (`document.querySelector('select').options`), contains dozens of entries
+    with **identical visible text** (e.g. "test source" appears roughly 50+
+    times), differentiated only by the underlying numeric `value` (dataset
+    id), which is never shown to the user. There is no id, creation date,
+    size, row/column count, or any other disambiguating detail in the option
+    label.
+  - **User problem:** A user with more than a handful of similarly-named
+    sources has no way to tell which literal dataset they are selecting
+    without trial-and-error (select → wait for the report/"no analysis"
+    state → check the dataset id elsewhere, e.g. via the URL or Data
+    Sources). This is upstream of `DAT-005`: `DAT-005` is about *losing
+    track* of a selection after navigating away, while `DAT-008` is about
+    being unable to *make an informed selection in the first place* even on
+    a first, uninterrupted visit. They compound but are separable defects
+    with separable fixes (option-label content versus state persistence).
+  - **Affected surfaces:** EDA Dataset selector (`EDAPage.tsx`); dataset
+    listing consumed from `DatasetService.getUsable()`.
+  - **Proposed behavior:** Give each dataset option a disambiguating label
+    (for example, name plus a short id fragment, creation date, or row/column
+    count), and consider grouping or de-duplicating visually identical
+    source names in the selector.
+  - **Acceptance criteria:** No two entries in the Dataset selector render
+    identical visible text without an additional disambiguating detail
+    (id fragment, date, or size); the selected option's label remains
+    sufficient on its own to confirm which dataset is active without
+    cross-referencing another surface.
+  - **Validation method:** Component test seeds a dataset list containing
+    duplicate names and asserts each rendered option has a unique,
+    disambiguated label; Playwright opens the selector with a realistic
+    duplicate-heavy fixture and asserts no two option texts are identical at
+    1440 and 390 px; run axe on the control.
+  - **Impact:** Medium. **Frequency:** Frequent once a workspace accumulates
+    several similarly-named sources. **Effort:** S. **Risk:** Low.
+    **Dependencies:** dataset list/labeling logic in `EDAPage.tsx` and the
+    dataset service response shape. **Milestone:** Next.
+  - **2026-08-07 status:** New.
+  - **Current evidence:** Observed live against a real, accumulated backend
+    dataset list (not previously present in the roadmap because prior audits
+    did not inspect the rendered `<option>` text against a workspace with
+    dozens of similarly-named sources).
+  - **Delta:** New finding; no prior entry to compare against.
+
+- **DAT-009 — Observed: chart "Download" buttons are never disabled for
+  empty/unconfigured charts and silently export the placeholder text.**
+  - **Evidence:** `BivariateTab.tsx` wraps both the actual scatter chart and
+    its "Select X and Y variables to generate scatter plot." empty-state
+    placeholder inside the same `id="bivariate-chart"` container (lines
+    147–174), and its Download button (lines 54–61) is never disabled based
+    on whether X/Y are selected. `chartUtils.ts`'s `downloadChart` calls
+    `document.getElementById(elementId)` unconditionally and — if present —
+    rasterizes whatever is inside that container via `html-to-image`. Net
+    effect: clicking "Download Chart" before selecting X/Y axes silently
+    produces a PNG of the placeholder text with no error or warning that the
+    download is empty/meaningless. The same `id`-wraps-empty-state pattern,
+    with the same always-enabled Download button, is confirmed in
+    `PCATab.tsx` (`id="pca-chart"`).
+  - **User problem:** A user who clicks Download before configuring a chart
+    receives a file that appears successfully downloaded but contains only
+    placeholder text, with no indication that nothing useful was exported —
+    the user has no signal to configure the chart first or to know the
+    download failed to capture anything meaningful.
+  - **Affected surfaces:** `BivariateTab.tsx`, `PCATab.tsx`, and any other
+    tab sharing this download-container pattern; `chartUtils.ts`'s
+    `downloadChart` helper.
+  - **Proposed behavior:** Disable (or hide) each Download button until its
+    chart's required inputs are selected and a chart is actually rendered,
+    or give `downloadChart` a defensive check that refuses to export a
+    container that only holds empty-state content.
+  - **Acceptance criteria:** The Download button in Bivariate and PCA (and
+    any tab sharing this pattern) is disabled or hidden whenever the
+    underlying container renders only empty-state content; when enabled,
+    activating it always produces a file containing the rendered chart, never
+    placeholder text.
+  - **Validation method:** Component test renders Bivariate/PCA with no
+    X/Y or component selection and asserts the Download control is
+    disabled/hidden; a second test selects valid inputs and asserts the
+    control becomes enabled and its `downloadChart` call receives a
+    container that contains the chart, not the empty-state text.
+  - **Impact:** Low. **Frequency:** Occasional (only when a user reaches for
+    Download before configuring the chart). **Effort:** S. **Risk:** Low.
+    **Dependencies:** `chartUtils.ts` `downloadChart`, `BivariateTab.tsx`,
+    `PCATab.tsx`. **Milestone:** Later.
+  - **2026-08-07 status:** New.
+  - **Current evidence:** Source-confirmed (`BivariateTab.tsx` lines 54–61,
+    147–174; `PCATab.tsx` same pattern; `chartUtils.ts`'s unconditional
+    `getElementById`); observed indirectly via DOM/empty-state inspection in
+    the live session, not by actually clicking the button and inspecting the
+    resulting file.
+  - **Delta:** New finding; no prior entry to compare against.
 
 ### Experiments and Inference
 
@@ -2286,6 +2700,8 @@ Canvas finding is warranted solely for this repeated form root.
 | DAT-005 | Inferred | EDA jobs and history lack durable input/status/recovery context. | EDA selection; jobs; failures; History | High | Frequent | M | Medium | EDA job API; useEDAStore; FND-003 | Now |
 | DAT-006 | Inferred | Filters and exclusions apply inconsistently without durable report context. | EDA sidebar; tabs; exports | High | Frequent | M | Medium | EDA schema; FND-005 | Next |
 | DAT-007 | Inferred | Charts lose interpretable color/axis/alternative-data context at density and narrow widths. | EDA charts, tables, exports | High | Frequent | L | Medium | Chart themes; exports; report payloads | Next |
+| DAT-008 | Observed | EDA Dataset dropdown renders many indistinguishable duplicate-text options. | EDA Dataset selector | Medium | Frequent | S | Low | Dataset list/labeling logic; dataset service | Next |
+| DAT-009 | Observed | Chart Download buttons are never disabled for empty/unconfigured charts. | Bivariate/PCA tabs; chart download helper | Low | Occasional | S | Low | `chartUtils.ts` downloadChart; BivariateTab; PCATab | Later |
 | EXP-001 | Inferred | Filters can hide selected runs while comparison keeps using them. | Experiments filters, run sidebar, comparison/evaluation/diff tabs | High | Frequent | M | Medium | useJobStore; experiment fixtures | Now |
 | EXP-002 | Inferred | Metric comparison does not make direction, comparability, or missingness durable. | Visual/table/branch metric comparison | High | Frequent | M | Medium | Metric metadata; chart/table adapters | Now |
 | EXP-003 | Inferred | Conditional explainability/segmentation views conceal availability and comparability. | Feature Importance, SHAP, Segmentation, exports | High | Occasional | M | Medium | Artifact schema; explanation services | Next |
@@ -2501,6 +2917,8 @@ supplement, not a substitute. The table states any additional coverage.
 | DAT-005 EDA job context | Dataset plus target/task/filter/exclusion inputs persist through pending/fail/history outcomes | Mock job/report/history and polling tests | Submit, cancel, retry, load history, switch dataset | 1440 and 390 px | Status/alert and current-report context |
 | DAT-006 EDA applied context | Filters/exclusions use labelled draft/apply/reset and annotate all outputs | Component payload/context/export tests | Refine analysis and inspect every tab/export | 1440 and 390 px | Labels, errors, keyboard, axe |
 | DAT-007 visualization contract | Legends/axes/tooltips/context/alternatives work in themes and at density | Deterministic chart fixture and visual/axe tests | Interpret, scroll, tabulate, and download each chart family | 1440 and 390 px, light/dark | Non-color meaning and data-table alternatives |
+| DAT-008 Dataset dropdown labels | No two Dataset selector options render identical visible text without a disambiguating detail | Component test with a duplicate-name fixture; Playwright option-text uniqueness check | Inspect the selector against a realistic duplicate-heavy dataset list | 1440 and 390 px | Accessible option text and axe |
+| DAT-009 chart Download gating | Download is disabled/hidden for empty/unconfigured charts; enabled Download always captures the rendered chart | Component tests for Bivariate/PCA empty and configured states | Attempt Download before and after selecting chart inputs | 1440 and 390 px | Disabled-state semantics and focus |
 | EXP-001 selected-run context | Filtered views identify all retained selected runs and their use | Mixed-job selection/filter Playwright tests | Filter, compare, switch tabs/views, clear/restore selection | 1440 and 390 px | Selection summary and keyboard operation |
 | EXP-002 metric decision contract | Metric direction/split/units/missingness/winner are explicit | Deterministic metric/branch fixture tests | Compare classification, regression, CV, and partial jobs | 1440 and 390 px, light/dark | Tooltip-independent labels and table semantics |
 | EXP-003 explanation/segmentation availability | Artifact coverage, missingness, normalization, and cluster metric direction are explicit | Artifact-state component/visual tests | Compare supported/unsupported/partial SHAP and clustering jobs | 1440 and 390 px, light/dark | Non-color and data/export alternatives |
