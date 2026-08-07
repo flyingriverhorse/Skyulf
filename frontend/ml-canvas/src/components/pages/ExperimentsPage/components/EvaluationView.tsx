@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { LoadingState, ErrorState } from '../../../shared';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import type { EvaluationData, EvaluationSplit } from '../types';
@@ -57,6 +58,43 @@ interface Props {
   onClearThresholds: () => void | Promise<void>;
 }
 
+type ThresholdMutationKind = 'preview' | 'save' | 'enable' | 'disable' | 'clear';
+
+interface ThresholdMutationError {
+  kind: ThresholdMutationKind;
+  message: string;
+}
+
+const thresholdMutationMessage = (kind: ThresholdMutationKind): string => {
+  switch (kind) {
+    case 'preview':
+      return 'Previewing tuned thresholds…';
+    case 'save':
+      return 'Saving tuned thresholds…';
+    case 'enable':
+      return 'Enabling tuned thresholds…';
+    case 'disable':
+      return 'Disabling tuned thresholds…';
+    case 'clear':
+      return 'Clearing tuned thresholds…';
+  }
+};
+
+const thresholdMutationLabel = (kind: ThresholdMutationKind): string => {
+  switch (kind) {
+    case 'preview':
+      return 'Preview';
+    case 'save':
+      return 'Save';
+    case 'enable':
+      return 'Enable';
+    case 'disable':
+      return 'Disable';
+    case 'clear':
+      return 'Clear';
+  }
+};
+
 export const EvaluationView: React.FC<Props> = ({
   eligibleJobIds,
   evalJobId,
@@ -89,13 +127,44 @@ export const EvaluationView: React.FC<Props> = ({
   selectedTuningMetric,
   onSelectedTuningMetricChange,
   tuningPreview,
-  tuningError,
   useTunedThresholds,
   onPreviewThresholds,
   onSaveThresholds,
   onToggleThresholds,
   onClearThresholds,
 }) => {
+  const [pendingThresholdMutation, setPendingThresholdMutation] = useState<ThresholdMutationKind | null>(null);
+  const [thresholdMutationError, setThresholdMutationError] = useState<ThresholdMutationError | null>(null);
+  const retryThresholdMutationRef = useRef<null | (() => void)>(null);
+
+  const runThresholdMutation = useCallback(async (kind: ThresholdMutationKind, action: () => void | Promise<void>) => {
+    setPendingThresholdMutation(kind);
+    setThresholdMutationError(null);
+    retryThresholdMutationRef.current = () => {
+      void runThresholdMutation(kind, action);
+    };
+    try {
+      await Promise.resolve(action());
+      retryThresholdMutationRef.current = null;
+    } catch (error) {
+      setThresholdMutationError({
+        kind,
+        message: error instanceof Error ? error.message : `Failed to ${thresholdMutationLabel(kind).toLowerCase()} thresholds`,
+      });
+    } finally {
+      setPendingThresholdMutation(current => (current === kind ? null : current));
+    }
+  }, []);
+
+  const handleRetryThresholdMutation = useCallback(() => {
+    if (!retryThresholdMutationRef.current) return;
+    retryThresholdMutationRef.current();
+  }, []);
+
+  const isThresholdMutationPending = pendingThresholdMutation !== null;
+  const pendingThresholdMutationText = pendingThresholdMutation ? thresholdMutationMessage(pendingThresholdMutation) : null;
+  const thresholdMutationRetryLabel = thresholdMutationError ? `Retry ${thresholdMutationLabel(thresholdMutationError.kind).toLowerCase()}` : 'Retry';
+
   // Regression split tabs (Train/Test/Validation). Hoisted here and
   // memoized because this exact derivation was previously duplicated
   // verbatim in two places below (the control-bar tab strip and the
@@ -404,8 +473,9 @@ export const EvaluationView: React.FC<Props> = ({
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => { void onPreviewThresholds(); }}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors"
+                  onClick={() => { void runThresholdMutation('preview', onPreviewThresholds); }}
+                  disabled={isThresholdMutationPending}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Preview
                 </button>
@@ -424,8 +494,9 @@ export const EvaluationView: React.FC<Props> = ({
                   </span>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => { void onSaveThresholds(); }}
-                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors"
+                      onClick={() => { void runThresholdMutation('save', onSaveThresholds); }}
+                      disabled={isThresholdMutationPending}
+                      className="px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-500 text-white hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Save
                     </button>
@@ -441,7 +512,11 @@ export const EvaluationView: React.FC<Props> = ({
                   <input
                     type="checkbox"
                     checked={useTunedThresholds}
-                    onChange={(e) => { void onToggleThresholds(e.target.checked); }}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      void runThresholdMutation(enabled ? 'enable' : 'disable', () => onToggleThresholds(enabled));
+                    }}
+                    disabled={isThresholdMutationPending}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700"
                   />
                   <span className="text-gray-700 dark:text-gray-300">Use tuned thresholds at prediction time</span>
@@ -453,8 +528,9 @@ export const EvaluationView: React.FC<Props> = ({
               </div>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => { void onClearThresholds(); }}
-                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                  onClick={() => { void runThresholdMutation('clear', onClearThresholds); }}
+                  disabled={isThresholdMutationPending}
+                  className="px-3 py-1.5 rounded-lg text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Clear
                 </button>
@@ -463,8 +539,25 @@ export const EvaluationView: React.FC<Props> = ({
                   align="center"
                 />
               </div>
-              {tuningError && (
-                <span className="text-xs text-red-600 dark:text-red-400">{tuningError}</span>
+              {pendingThresholdMutationText && (
+                <span className="inline-flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400" role="status" aria-atomic="true">
+                  <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
+                  {pendingThresholdMutationText}
+                </span>
+              )}
+              {thresholdMutationError && (
+                <div className="inline-flex items-center gap-2 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-2 py-1 text-xs text-red-700 dark:text-red-300" role="alert" aria-atomic="true">
+                  <AlertTriangle className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <span>{thresholdMutationError.message}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetryThresholdMutation}
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium text-red-700 dark:text-red-200 hover:bg-red-100 dark:hover:bg-red-900/40 disabled:opacity-50"
+                  >
+                    <RefreshCw className="w-3 h-3" aria-hidden="true" />
+                    {thresholdMutationRetryLabel}
+                  </button>
+                </div>
               )}
             </div>
           )}

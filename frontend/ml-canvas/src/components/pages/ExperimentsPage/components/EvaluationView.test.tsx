@@ -4,7 +4,7 @@
 // active tab), and Tab 2 shows a placeholder until a preview exists.
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EvaluationView } from './EvaluationView';
 import type { EvaluationData } from '../types';
 import type { ThresholdPreviewResult } from '../../../../core/api/thresholdTuning';
@@ -109,6 +109,84 @@ describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
   it('shows a placeholder in Tab 2 until a tuning preview exists', () => {
     render(<EvaluationView {...baseProps({ activeTab: 'tuning', tuningPreview: null })} />);
     expect(screen.getByText(/Click Preview above/)).toBeInTheDocument();
+  });
+
+  it('announces preview mutations as pending and disables the triggering control', async () => {
+    let resolvePreview: (() => void) | undefined;
+    const onPreviewThresholds = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolvePreview = () => resolve();
+        }),
+    );
+
+    render(<EvaluationView {...baseProps({ activeTab: 'tuning', onPreviewThresholds })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+
+    expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Previewing tuned thresholds…');
+
+    if (resolvePreview) {
+      resolvePreview();
+    }
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Preview' })).not.toBeDisabled();
+    });
+  });
+
+  it('disables the tuned-threshold toggle while the mutation is in flight', async () => {
+    let resolveToggle: (() => void) | undefined;
+    const onToggleThresholds = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolveToggle = () => resolve();
+        }),
+    );
+
+    render(<EvaluationView {...baseProps({ activeTab: 'tuning', onToggleThresholds })} />);
+    fireEvent.click(screen.getByRole('checkbox', { name: /use tuned thresholds at prediction time/i }));
+
+    expect(screen.getByRole('checkbox', { name: /use tuned thresholds at prediction time/i })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('Enabling tuned thresholds…');
+
+    if (resolveToggle) {
+      resolveToggle();
+    }
+    await waitFor(() => {
+      expect(screen.getByRole('checkbox', { name: /use tuned thresholds at prediction time/i })).not.toBeDisabled();
+    });
+  });
+
+  it('surfaces clear failures inline with a scoped retry', async () => {
+    const onClearThresholds = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('clear failed'))
+      .mockResolvedValueOnce(undefined);
+
+    render(
+      <EvaluationView
+        {...baseProps({
+          activeTab: 'tuning',
+          tuningPreview: {
+            thresholds: { a: 1 },
+            classes: [0],
+            metric: 'f1',
+            split_used: 'validation',
+          },
+          onClearThresholds,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('clear failed');
+    fireEvent.click(screen.getByRole('button', { name: /retry clear/i }));
+
+    await waitFor(() => {
+      expect(onClearThresholds).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('renders the confusion matrix in Tab 2 once a tuning preview exists', () => {

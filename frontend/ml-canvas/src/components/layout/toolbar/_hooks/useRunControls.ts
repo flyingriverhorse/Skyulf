@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useGraphStore } from '../../../../core/store/useGraphStore';
+import { collectGraphValidationIssues, useGraphStore } from '../../../../core/store/useGraphStore';
 import { useJobStore } from '../../../../core/store/useJobStore';
+import { useViewStore } from '../../../../core/store/useViewStore';
 import { runPipelinePreview } from '../../../../core/api/client';
 import { jobsApi } from '../../../../core/api/jobs';
 import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
-import { warnAndBlockOnLeakage } from '../../../../core/utils/pipelineLeakageValidation';
 import { RUN_PREVIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
 import { toast } from '../../../../core/toast';
 
@@ -19,22 +19,28 @@ export interface RunControls {
   handleRunAll: () => Promise<void>;
 }
 
+/** Computes the toolbar's run availability and submit handlers. */
 export function useRunControls(): RunControls {
   const nodes = useGraphStore((s) => s.nodes);
   const edges = useGraphStore((s) => s.edges);
   const setExecutionResult = useGraphStore((s) => s.setExecutionResult);
+  const setLastRunError = useGraphStore((s) => s.setLastRunError);
   const { toggleDrawer, setActiveParallelRun, startPolling } = useJobStore();
+  const { setResultsPanelExpanded } = useViewStore();
 
   const [isRunning, setIsRunning] = useState(false);
   const [isRunningAll, setIsRunningAll] = useState(false);
+
+  const validationIssues = useMemo(() => collectGraphValidationIssues(nodes, edges), [nodes, edges]);
 
   const canRunPreview = useMemo(() => {
     const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
     if (!datasetNode) return false;
     const datasetId = datasetNode.data.datasetId as string | undefined;
     if (!datasetId) return false;
-    return edges.some((e) => e.source === datasetNode.id);
-  }, [nodes, edges]);
+    if (!edges.some((e) => e.source === datasetNode.id)) return false;
+    return validationIssues.length === 0;
+  }, [nodes, edges, validationIssues]);
 
   const hasMultipleBranches = useMemo(() => {
     const trainingNodes = nodes.filter(
@@ -56,6 +62,18 @@ export function useRunControls(): RunControls {
   }, [nodes, edges]);
 
   const handleRun = async (): Promise<void> => {
+    const issues = useGraphStore.getState().validateGraph();
+    if (issues.length > 0) {
+      setExecutionResult(null);
+      setLastRunError(null);
+      setResultsPanelExpanded(true);
+      toast.error(
+        'Fix validation issues before running preview',
+        'Open Preview Results to inspect the blocking issues.',
+      );
+      return;
+    }
+
     const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
     const datasetId = datasetNode?.data.datasetId as string;
     if (!datasetId) {
@@ -64,33 +82,49 @@ export function useRunControls(): RunControls {
     }
     setIsRunning(true);
     setExecutionResult(null);
-    try {
-      // Exclude Data Preview nodes — they're inspection sinks, not pipeline steps.
-      const previewIds = new Set(
-        nodes.filter((n) => n.data.definitionType === 'data_preview').map((n) => n.id),
-      );
-      const filteredNodes = nodes.filter((n) => !previewIds.has(n.id));
-      const filteredEdges = edges.filter(
-        (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
-      );
-      const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
-      if (warnAndBlockOnLeakage(pipelineConfig)) return;
+    setLastRunError(null);
+      try {
+        // Exclude Data Preview nodes — they're inspection sinks, not pipeline steps.
+        const previewIds = new Set(
+          nodes.filter((n) => n.data.definitionType === 'data_preview').map((n) => n.id),
+        );
+        const filteredNodes = nodes.filter((n) => !previewIds.has(n.id));
+        const filteredEdges = edges.filter(
+          (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
+        );
+        const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
       const result = await runPipelinePreview(pipelineConfig);
       setExecutionResult(result);
-    } catch (error) {
-      console.error('Pipeline failed:', error);
-      toast.error('Pipeline execution failed', 'Check console for details.');
-    } finally {
-      setIsRunning(false);
-    }
-  };
+        setLastRunError(null);
+      } catch (error) {
+        console.error('Pipeline failed:', error);
+        setExecutionResult(null);
+        setLastRunError(error instanceof Error ? error.message : String(error));
+        setResultsPanelExpanded(true);
+        toast.error('Pipeline execution failed', 'Check console for details.');
+      } finally {
+        setIsRunning(false);
+      }
+    };
 
-  const handleRunAll = async (): Promise<void> => {
-    const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
-    const datasetId = datasetNode?.data.datasetId as string;
-    if (!datasetId) {
-      toast.error('No dataset node found');
-      return;
+    const handleRunAll = async (): Promise<void> => {
+      const issues = useGraphStore.getState().validateGraph();
+      if (issues.length > 0) {
+        setExecutionResult(null);
+        setLastRunError(null);
+        setResultsPanelExpanded(true);
+        toast.error(
+          'Fix validation issues before running experiments',
+          'Open Preview Results to inspect the blocking issues.',
+        );
+        return;
+      }
+
+      const datasetNode = nodes.find((n) => n.data.definitionType === 'dataset_node');
+      const datasetId = datasetNode?.data.datasetId as string;
+      if (!datasetId) {
+        toast.error('No dataset node found');
+        return;
     }
     setIsRunningAll(true);
     try {
@@ -102,7 +136,6 @@ export function useRunControls(): RunControls {
         (e) => !previewIds.has(e.source) && !previewIds.has(e.target),
       );
       const pipelineConfig = convertGraphToPipelineConfig(filteredNodes, filteredEdges);
-      if (warnAndBlockOnLeakage(pipelineConfig)) return;
       const response = await jobsApi.runPipeline({
         ...pipelineConfig,
         job_type: 'training',

@@ -283,7 +283,9 @@ export const ExperimentsPage: React.FC = () => {
       setTuningPreview(result);
     } catch (err: unknown) {
       console.error('Failed to preview thresholds', err);
-      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to preview thresholds');
+      const message = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to preview thresholds';
+      setTuningError(message);
+      throw err;
     }
   };
 
@@ -295,7 +297,9 @@ export const ExperimentsPage: React.FC = () => {
       setUseTunedThresholds(true);
     } catch (err: unknown) {
       console.error('Failed to save thresholds', err);
-      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to save thresholds');
+      const message = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to save thresholds';
+      setTuningError(message);
+      throw err;
     }
   };
 
@@ -307,7 +311,9 @@ export const ExperimentsPage: React.FC = () => {
       setUseTunedThresholds(enabled);
     } catch (err: unknown) {
       console.error('Failed to toggle thresholds', err);
-      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to toggle thresholds');
+      const message = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to toggle thresholds';
+      setTuningError(message);
+      throw err;
     }
   };
 
@@ -320,7 +326,9 @@ export const ExperimentsPage: React.FC = () => {
       setUseTunedThresholds(false);
     } catch (err: unknown) {
       console.error('Failed to clear thresholds', err);
-      setTuningError((err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to clear thresholds');
+      const message = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail || 'Failed to clear thresholds';
+      setTuningError(message);
+      throw err;
     }
   };
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useGraphStore } from '../../core/store/useGraphStore';
+import { collectGraphValidationIssues, useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
-import { ChevronUp, ChevronDown, Table } from 'lucide-react';
+import { AlertTriangle, ChevronUp, ChevronDown, Table, XCircle } from 'lucide-react';
 import type { PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
 import { clickableProps } from '../../core/utils/a11y';
@@ -19,15 +19,24 @@ function toDatasetMap(previewData: PreviewData | null | undefined): Record<strin
   return {};
 }
 
+/** Shows preview results alongside canvas validation and run failure summaries. */
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const canvasNodes = useGraphStore((state) => state.nodes);
+  const canvasEdges = useGraphStore((state) => state.edges);
+  const lastRunError = useGraphStore((state) => state.lastRunError);
+  const onNodesChange = useGraphStore((state) => state.onNodesChange);
   const chainSiblings = useGraphStore((state) => state.chainSiblings);
   const confirm = useConfirm();
   const { isResultsPanelExpanded, setResultsPanelExpanded } = useViewStore();
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [mergeWarningsOpen, setMergeWarningsOpen] = useState<boolean>(false);
+  const validationHeadingId = React.useId();
+  const validationIssues = useMemo(
+    () => collectGraphValidationIssues(canvasNodes, canvasEdges),
+    [canvasNodes, canvasEdges],
+  );
 
   // Map node id → readable label (falls back to a prettified definitionType
   // so users see "Drop Rows" instead of "drop_rows-04475cca-eef7-4fdb-...").
@@ -156,23 +165,92 @@ export const ResultsPanel: React.FC = () => {
     return counts;
   }, [rawMergeWarnings, branchNodeIdsMemo, branchLabels]);
 
-  if (!executionResult) return null;
+  const selectNode = (nodeId: string): void => {
+    onNodesChange(
+      canvasNodes.map((node) => ({
+        id: node.id,
+        type: 'select',
+        selected: node.id === nodeId,
+      })),
+    );
+  };
 
-  const currentRows = (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
+  const showSummary = validationIssues.length > 0 || lastRunError !== null;
+  if (!executionResult && !showSummary) return null;
+
+  const currentRows = executionResult && (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
   // Real dataset size for the active tab; falls back to the preview row
   // count when the backend didn't ship a total (older response, or single
   // list payload registered under the synthetic `_total` key).
-  const currentTotal = effectiveTab
+  const currentTotal = executionResult && effectiveTab
     ? (totals[effectiveTab] ?? totals._total ?? currentRows.length)
     : 0;
   const columns = currentRows.length > 0 ? Object.keys(currentRows[0] ?? {}) : [];
   // When viewing a specific branch, restrict the applied-steps pills to nodes
   // that actually ran in that branch (otherwise every tab shows every node).
-  const allNodeIds = executionResult.node_results ? Object.keys(executionResult.node_results) : [];
-  const branchNodeIds = executionResult.branch_node_ids;
+  const allNodeIds = executionResult?.node_results ? Object.keys(executionResult.node_results) : [];
+  const branchNodeIds = executionResult?.branch_node_ids;
   const applied_steps = (branchNodeIds && activeBranch && branchNodeIds[activeBranch])
     ? branchNodeIds[activeBranch]
     : allNodeIds;
+
+  const validationBanner = validationIssues.length > 0 && (
+    <section
+      className="m-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-100"
+      aria-labelledby={validationHeadingId}
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p id={validationHeadingId} className="font-semibold">Validation issues</p>
+          <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
+            Fix one of the items below, then run preview again.
+          </p>
+          {/* Only the count is announced: the list recomputes on every graph
+              edit, so a live region around it would re-read every issue on
+              each keystroke. */}
+          <p className="sr-only" role="status" aria-atomic="true">
+            {validationIssues.length === 1
+              ? '1 validation issue blocking preview'
+              : `${validationIssues.length} validation issues blocking preview`}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {validationIssues.map((issue) => (
+              <li key={`${issue.nodeId}-${issue.category}-${issue.message}`}>
+                <button
+                  type="button"
+                  onClick={() => selectNode(issue.nodeId)}
+                  className="w-full rounded-md border border-red-200 bg-white/80 px-3 py-2 text-left transition-colors hover:bg-red-100 dark:border-red-900/40 dark:bg-slate-950/30 dark:hover:bg-red-950/40"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-red-700 dark:text-red-300">
+                    <span className="rounded bg-red-100 px-1.5 py-0.5 dark:bg-red-950/50">{issue.category}</span>
+                    <span className="font-semibold normal-case tracking-normal">{issue.nodeLabel}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{issue.message}</p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+
+  const runErrorBanner = lastRunError && (
+    <section
+      className="m-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-100"
+      role="alert"
+      aria-atomic="true"
+    >
+      <div className="flex items-start gap-2">
+        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="font-semibold">Last preview run failed</p>
+          <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-100">{lastRunError}</p>
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <div
@@ -188,17 +266,19 @@ export const ResultsPanel: React.FC = () => {
         <div className="flex items-center gap-2">
           <Table className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">Preview Results</span>
-          <span className="text-xs text-muted-foreground ml-2">
-            {currentRows.length === currentTotal
-              ? `${currentTotal} rows`
-              : `${currentRows.length} of ${currentTotal} rows shown`}
-          </span>
+          {executionResult && (
+            <span className="text-xs text-muted-foreground ml-2">
+              {currentRows.length === currentTotal
+                ? `${currentTotal} rows`
+                : `${currentRows.length} of ${currentTotal} rows shown`}
+            </span>
+          )}
           {branchLabels.length > 0 && (
             <span className="text-xs text-muted-foreground ml-2">
               · {branchLabels.length} branches
             </span>
           )}
-          {executionResult.status === 'failed' && (
+          {executionResult?.status === 'failed' && (
             <span className="text-xs text-red-600 font-bold ml-2">
               (Failed)
             </span>
@@ -212,9 +292,11 @@ export const ResultsPanel: React.FC = () => {
       {/* Content */}
       {isResultsPanelExpanded && (
         <div className="flex-1 overflow-hidden flex flex-col">
+          {validationBanner}
+          {runErrorBanner}
 
           {/* Branch Tabs (multi-branch parallel runs only) */}
-          {branchLabels.length > 0 && (
+          {executionResult && branchLabels.length > 0 && (
             <BranchTabs
               branchLabels={branchLabels}
               activeBranch={activeBranch}
@@ -225,7 +307,7 @@ export const ResultsPanel: React.FC = () => {
           )}
 
           {/* Split Tabs (train / test / X / y …) */}
-          {tabNames.length > 1 && (
+          {executionResult && tabNames.length > 1 && (
             <SplitTabs
               tabNames={tabNames}
               datasets={datasets}
@@ -238,7 +320,7 @@ export const ResultsPanel: React.FC = () => {
           {/* Merge advisories (sibling fan-in etc.) — engine-emitted.
               Collapsed by default to a one-line summary; click to expand
               full per-warning detail (inputs, overlap columns, winner). */}
-          {mergeWarnings.length > 0 && (
+          {executionResult && mergeWarnings.length > 0 && (
             <MergeWarningsBanner
               mergeWarnings={mergeWarnings}
               mergeWarningsOpen={mergeWarningsOpen}
@@ -250,7 +332,7 @@ export const ResultsPanel: React.FC = () => {
           )}
 
           {/* Signals / Warnings */}
-          {applied_steps.length > 0 && executionResult.status !== 'failed' && (
+          {executionResult && applied_steps.length > 0 && executionResult.status !== 'failed' && (
              <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border-b dark:border-blue-900/30 flex gap-2 overflow-x-auto">
                 {applied_steps.map((step: string, idx: number) => (
                   <div key={idx} className="text-xs text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">
@@ -261,7 +343,9 @@ export const ResultsPanel: React.FC = () => {
           )}
 
           {/* Data Table */}
-          <ResultsTable columns={columns} currentRows={currentRows} effectiveTab={effectiveTab} />
+          {executionResult && (
+            <ResultsTable columns={columns} currentRows={currentRows} effectiveTab={effectiveTab} />
+          )}
         </div>
       )}
     </div>
