@@ -250,7 +250,9 @@ export const EDAPage: React.FC = () => {
 
           <div className="flex flex-col items-center space-y-4">
             <div className="w-64 space-y-2">
+                <label htmlFor="eda-setup-target-column" className="sr-only">Target Column (Optional)</label>
                 <input
+                id="eda-setup-target-column"
                 type="text"
                 value={targetCol}
                 onChange={(e) => setTargetCol(e.target.value)}
@@ -259,7 +261,9 @@ export const EDAPage: React.FC = () => {
                 />
 
                 <div className="flex items-center space-x-2">
+                    <label htmlFor="eda-setup-task-type" className="sr-only">Task Type</label>
                     <select
+                        id="eda-setup-task-type"
                         value={taskType}
                         onChange={(e) => setTaskType(e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
@@ -480,8 +484,9 @@ export const EDAPage: React.FC = () => {
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
 
             <div className="flex flex-col">
-                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</span>
+                <label htmlFor="eda-toolbar-dataset" className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</label>
                 <select
+                    id="eda-toolbar-dataset"
                     value={selectionUnavailable ? '' : selectedDataset || ''}
                     onChange={(e) => {
                         const next = new URLSearchParams(searchParams);
@@ -501,8 +506,9 @@ export const EDAPage: React.FC = () => {
         {/* Center: Controls */}
         <div className="flex flex-wrap items-center gap-3 bg-gray-50 dark:bg-gray-800/50 p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 lg:flex-nowrap lg:gap-4">
             <div className="flex flex-col px-2">
-                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</span>
+                <label htmlFor="eda-toolbar-target-column" className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Target Column</label>
                 <select
+                    id="eda-toolbar-target-column"
                     value={targetCol}
                     onChange={(e) => setTargetCol(e.target.value)}
                     disabled={!report || !report.profile_data}
@@ -521,7 +527,7 @@ export const EDAPage: React.FC = () => {
 
             <div className="flex flex-col px-2">
                 <div className="flex items-center gap-1">
-                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</span>
+                    <label htmlFor="eda-toolbar-task-type" className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Task Type</label>
                     <div className="group relative">
                         <HelpCircle className="w-3 h-3 text-gray-400 cursor-help" />
                         <div className="absolute bottom-full mb-2 w-56 p-2 bg-slate-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-50 pointer-events-none left-1/2 -translate-x-1/2">
@@ -530,6 +536,7 @@ export const EDAPage: React.FC = () => {
                     </div>
                 </div>
                 <select
+                    id="eda-toolbar-task-type"
                     value={taskType}
                     onChange={(e) => setTaskType(e.target.value)}
                     disabled={!report || !report.profile_data}

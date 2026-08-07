@@ -177,6 +177,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                             {isAddingFilter ? (
                                 <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 space-y-2 shadow-sm">
                                     <select
+                                        aria-label="Filter column"
                                         value={newFilterCol}
                                         onChange={(e) => setNewFilterCol(e.target.value)}
                                         className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
@@ -186,6 +187,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                     </select>
                                     <div className="flex gap-1">
                                         <select
+                                            aria-label="Filter operator"
                                             value={newFilterOp}
                                             onChange={(e) => setNewFilterOp(e.target.value)}
                                             className="w-1/3 text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
@@ -198,6 +200,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                             <option value="<=">&lt;=</option>
                                         </select>
                                         <input
+                                            aria-label="Filter value"
                                             type="text"
                                             value={newFilterVal}
                                             onChange={(e) => setNewFilterVal(e.target.value)}
@@ -264,6 +267,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                             {isAddingExclusion ? (
                                 <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 space-y-2 shadow-sm">
                                     <select
+                                        aria-label="Column to exclude from analysis"
                                         className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
                                         onChange={(e) => {
                                             if (e.target.value) {
