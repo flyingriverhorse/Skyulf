@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useModalFocus } from '../shared/useModalFocus';
 
 interface ShortcutsOverlayProps {
   open: boolean;
@@ -42,6 +43,8 @@ export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({
   open,
   onClose,
 }) => {
+  const dialogRef = React.useRef<HTMLDivElement | null>(null);
+
   // Esc dismisses the overlay even if the global hook misses it
   // (e.g. focus inside the overlay itself when it has no input).
   useEffect(() => {
@@ -53,6 +56,8 @@ export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
+  useModalFocus({ isOpen: open, containerRef: dialogRef });
+
   if (!open) return null;
 
   const mac = isMac();
@@ -63,6 +68,7 @@ export const ShortcutsOverlay: React.FC<ShortcutsOverlayProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Keyboard shortcuts"
+      ref={dialogRef}
     >
       {/* Backdrop button: click-outside-to-dismiss without violating
           jsx-a11y rules. Esc also closes via the global handler. */}
