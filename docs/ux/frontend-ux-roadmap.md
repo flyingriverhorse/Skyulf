@@ -220,18 +220,19 @@ new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
   marked otherwise. Widths exercised: `1440×900`, `1024×900`, `768×1024`, and
   `390×844` (portrait), matching the required breakpoints.
 - **Observed — 1440/1024/768/390, `/canvas`:** The Canvas view switcher
-  (`[data-testid="navbar-views"]`) measured `352.55px` wide at every width
-  and stayed fully inside the main content pane with no overlap at 1440
-  (main pane starts at collapsed-sidebar `x=64`), 1024, 768, and 390 px
-  (main pane `326px` wide at 390, switcher ending at `x=403.28` while the
-  Notifications bell sat at `x=342–378`, both inside the `390px` viewport
-  with no measured document horizontal overflow, `scrollWidth === 390`).
-  This matches the existing `FND-001` evidence for Canvas's own view-switcher
-  clipping risk (the original finding cites a `353px`-wide switcher inside a
-  `326px` pane); this rerun did not reproduce switcher/main-pane overlap at
-  390 px on this route in this environment, but the Dashboard shell clipping
-  below reproduces the same underlying compact-shell defect on a different
-  top-level route, so `FND-001` is not resolved.
+  (`[data-testid="navbar-views"]`) measured `352.56px` wide at every width.
+  At 390 px, the switcher spans `x=50.72–403.28` while the main content pane
+  spans `x=64–390` (`326px` wide) and the viewport is `390px` wide — the
+  switcher's right edge (`403.28`) extends `13.28px` beyond both the main
+  pane and the viewport. In the same layout, the Inference button
+  (`x=289.14–399.28`) overlaps the Read-only toggle (`x=298–334`) and the
+  Notifications bell (`x=342–378`), both of which sit inside the switcher's
+  overrun span. This reproduces and strengthens the existing `FND-001`
+  evidence for Canvas's own view-switcher clipping risk (the original
+  finding cites a `353px`-wide switcher inside a `326px` pane); the
+  Dashboard shell clipping below reproduces the same underlying
+  compact-shell defect on a different top-level route, so `FND-001` remains
+  Confirmed with no material change.
 - **Observed — 390 px, `/` (Dashboard):** The persistent sidebar (`<aside>`)
   measured `256px` wide with the main content pane immediately following at
   `x=256`, `width=134px`, and no document horizontal overflow
@@ -659,18 +660,20 @@ tasks add live walkthrough evidence.
 
 ### Accessibility and Keyboard UX
 
-- **FND-002 — Inferred: shell overlays lack a shared focus-containment and
+- **FND-002 — Observed: shell overlays lack a shared focus-containment and
   focus-return contract.**
-  - **Evidence:** **Observed** only in Canvas `ShortcutsOverlay`: Tab reached
-    the covered “More canvas tools” control instead of a dialog control.
-    **Inferred** for the other shell overlays: `ShortcutsOverlay.tsx`,
-    `CommandPalette.tsx`, and the notification detail modal in
-    `NotificationCenter.tsx` each render custom dialogs without
-    `ModalShell.tsx`'s containment/return helpers. `MainLayout.tsx` mounts
-    Shortcuts and Command Palette alongside Canvas, Experiments, and
-    Inference, and `Navbar.tsx` renders NotificationCenter for the same three
-    views. Command Palette and notification detail were not separately
-    reproduced, so the inventory label is Inferred.
+  - **Evidence:** **Observed** at 1440 px on `/canvas` for all three shell
+    overlays: Shortcuts (Tab reached the covered “More canvas tools” control
+    instead of a dialog control), Command Palette (Tab from its last
+    in-dialog element reached a covered devtools button behind the still-open
+    dialog), and the notification detail modal (focus never moved into the
+    dialog on open, and the next Tab escaped to the sidebar's "Collapse
+    sidebar" button). **Inferred** that this generalizes to the Experiments
+    and Inference shell views: `MainLayout.tsx` mounts Shortcuts and Command
+    Palette alongside Canvas, Experiments, and Inference, and `Navbar.tsx`
+    renders NotificationCenter for the same three views, but these overlays
+    were only independently re-driven from `/canvas`, not from Experiments or
+    Inference, so that cross-view scope remains source-inferred.
   - **User problem:** With the shortcuts overlay open, the next Tab focused
     the covered “More canvas tools” button instead of an element in the
     dialog. Other shell overlays have the same missing shared focus-management
@@ -796,12 +799,13 @@ tasks add live walkthrough evidence.
     Playwright MCP browser session against the project's own Vite dev
     server: Dashboard's `<aside>` measured `256px` wide with the main pane
     starting at `x=256` and measuring `134px` wide (no document horizontal
-    overflow). Canvas's view switcher measured `352.55px` wide and stayed
-    inside the `326px` main pane at 390 px in this rerun (ending at
-    `x=403.28` against a `390px` viewport, with the Notifications bell at
-    `x=342–378`, no clipping/overlap detected this run); the underlying
-    compact-shell defect is nonetheless reproduced on Dashboard, so the
-    finding is not resolved.
+    overflow). Canvas's view switcher measured `352.56px` wide at
+    `x=50.72–403.28` against a `326px` main pane (`x=64–390`) and a `390px`
+    viewport: the switcher's right edge extends `13.28px` beyond both,
+    and the Inference button (`x=289.14–399.28`) overlaps the Read-only
+    toggle (`x=298–334`) and the Notifications bell (`x=342–378`). This
+    strengthens the finding's existing evidence of clipping/overlap at
+    390 px; the finding is not resolved.
   - **Delta:** No material change.
 ### Terminology and Visual Hierarchy
 
@@ -2030,7 +2034,7 @@ Canvas finding is warranted solely for this repeated form root.
 | ID | Evidence | User problem | Surfaces | Impact | Frequency | Effort | Risk | Dependencies | Milestone |
 |----|----------|--------------|----------|--------|-----------|--------|------|--------------|-----------|
 | FND-001 | Observed | Global navigation and Canvas view controls clip/overlap at 390 px. | Layout; Canvas, Experiments, Inference; Data/EDA; Operations | High | Frequent | M | Medium | Layout; read-only breakpoint | Now |
-| FND-002 | Inferred | Shell overlays lack a shared focus-containment and focus-return contract. | Canvas, Experiments, Inference overlays; shared Navbar | High | Occasional | S | Low | ModalShell focus helpers | Now |
+| FND-002 | Observed | Shell overlays lack a shared focus-containment and focus-return contract. | Canvas, Experiments, Inference overlays; shared Navbar | High | Occasional | S | Low | ModalShell focus helpers | Now |
 | FND-003 | Inferred | Async state changes lack shared live-region semantics. | Canvas; Data/EDA; Experiments/Inference; Operations | High | Occasional | S | Low | None | Now |
 | FND-004 | Inferred | Route-fetch errors inconsistently offer Retry; Canvas uses a different, toast-scoped pattern. | Dashboard; Data/EDA; Registry; Deployments; Experiments evaluation | Medium | Occasional | S | Low | Page fetch functions | Next |
 | FND-005 | Inferred | Canvas, Data/EDA, and Inference forms lack consistent field semantics. | Canvas node forms; Data Sources Add Source; EDA analysis/filter controls; Inference editor; shared controls | High | Frequent | M | Medium | Shared form primitives; node metadata/validation; source/EDA/inference validation | Next |
