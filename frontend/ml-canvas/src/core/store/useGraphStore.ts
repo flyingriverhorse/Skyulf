@@ -341,6 +341,12 @@ export const useGraphStore = create<GraphState>()(
       id,
       type: 'custom', // We'll use a generic wrapper component
       position,
+      // Selected on arrival (CAN-001): every insertion path — palette
+      // click, drag-and-drop, and command palette — shares this action,
+      // so a newly added node always opens Properties and is
+      // immediately configurable instead of requiring a second click to
+      // discover it needs a required field filled in.
+      selected: true,
       data: {
         // Store the definition type so we can look it up later
         definitionType: type,
@@ -351,7 +357,12 @@ export const useGraphStore = create<GraphState>()(
       },
     };
 
-    set({ nodes: [...get().nodes, newNode] });
+    set({
+      nodes: [
+        ...get().nodes.map((n) => (n.selected ? { ...n, selected: false } : n)),
+        newNode,
+      ],
+    });
     return id;
   },
 
