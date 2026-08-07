@@ -1311,6 +1311,30 @@ tasks add live walkthrough evidence.
     live-region contract introduced. Inferred: source review, not a live
     screen-reader reproduction.
   - **Delta:** No material change.
+  - **RESOLVED (v0.7.5).** `LoadingState` and `EmptyState` render a polite
+    `role="status"`; `ErrorState` renders an assertive `role="alert"` whose
+    retry button is bound to the message via `aria-describedby`. Every
+    decorative icon (including `RefreshCw` inside the Retry button) is
+    `aria-hidden="true"`. Verified live in Chrome against a running app, not
+    only in jsdom: filtering Data Sources to an empty result exposed a single
+    `role="status"` reading "No datasets match your search or filters" with
+    zero unhidden icons; injecting an API failure on the Dashboard exposed
+    `role="alert"` whose Retry button's accessible description resolved to the
+    error text. Covered by `states.test.tsx` (11 tests).
+    **`toast.ts` intentionally unchanged:** the finding's premise was wrong.
+    `sonner`'s `<Toaster>` already renders `aria-live="polite"
+    aria-relevant="additions text"`, so toasts were always announced; grepping
+    `toast.ts` for `role=` missed it because the live region lives in the
+    `<Toaster>` component, not the helper. An added second announcer was
+    measured reading each toast twice, violating the "one intelligible
+    message" criterion, and was removed. `toastAnnouncement.test.tsx` renders
+    the real `Toaster` and pins each toast to exactly one live region.
+    **Still open:** the Playwright mocked success/empty/failure runs across
+    Canvas, Data/EDA, Experiments/Inference, and Operations, and the axe pass,
+    were not added — this repo has no seeded E2E fixtures for those paths.
+    Announcements were verified by direct live DOM inspection instead. The
+    "retries retain the user's current filters, dataset, and view" clause is
+    owned by FND-004 (retry affordance coverage) and is not claimed here.
 
 - **FND-004 — Inferred: Retry affordances are inconsistent for equivalent
   request failures.**
@@ -1507,6 +1531,28 @@ tasks add live walkthrough evidence.
   - **Delta:** Evidence for Command Palette and the notification detail
     modal upgraded from Inferred to Observed; the user problem, affected
     surfaces, proposed behavior, and priority are unchanged.
+  - **RESOLVED (v0.7.5).** The focus-trap and focus-return logic already
+    embedded in `ModalShell.tsx` was extracted into a shared `useModalFocus`
+    hook and applied to `ShortcutsOverlay`, `CommandPalette`, and the
+    NotificationCenter detail modal; `ModalShell` now consumes the same hook,
+    losing ~90 duplicated lines with no behavior change. The hook also skips
+    `tabindex="-1"` elements, which the original selector matched but should
+    never have trapped, and both backdrops were made non-tabbable.
+    Re-driven live in Chrome at the same viewport as the original evidence,
+    all three overlays now pass the full contract: focus moves into the dialog
+    on open (Shortcuts → "Close shortcuts overlay", Palette → its search
+    input, Notification detail → "Close detail"), Tab and Shift+Tab stay
+    inside, Escape closes, and focus returns to the invoker ("Keyboard
+    shortcuts", "Keyboard shortcuts", "Notifications (1)" respectively). The
+    Command Palette's arrow-key navigation still moves the selection
+    (Dataset → Drop Columns) and its search input still takes initial focus.
+    **Still open:** the Playwright keyboard tests driving these overlays from
+    Experiments and Inference were not added; only Canvas was re-driven live.
+    `MainLayout` mounts the same three overlays for all three views, so the
+    fix is shared, but the cross-view assertion remains source-inferred.
+    jsdom cannot traverse real tab order, so the committed component tests
+    assert initial focus, Escape handling, focus return, and dialog
+    semantics — the Tab containment evidence is the live Chrome run above.
 
 - **FND-007 — Observed: `NotificationCenter` nests an interactive Dismiss
   button inside another interactive row button.**

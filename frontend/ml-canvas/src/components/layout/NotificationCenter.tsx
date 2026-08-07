@@ -13,6 +13,7 @@ import {
   type StoredNotification,
 } from '../../core/store/useNotificationsStore';
 import { toast } from '../../core/toast';
+import { useModalFocus } from '../shared/useModalFocus';
 
 const formatTime = (ts: number): string => {
   const d = new Date(ts);
@@ -41,7 +42,16 @@ const NotificationDetailModal: React.FC<{
   item: StoredNotification;
   onClose: () => void;
   onViewErrorLog: () => void;
-}> = ({ item, onClose, onViewErrorLog }) => {
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
+}> = ({ item, onClose, onViewErrorLog, returnFocusRef }) => {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  useModalFocus({
+    isOpen: true,
+    containerRef: dialogRef,
+    ...(returnFocusRef ? { returnFocusRef } : {}),
+  });
+
   // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent): void => { if (e.key === 'Escape') onClose(); };
@@ -57,13 +67,15 @@ const NotificationDetailModal: React.FC<{
       : 'text-blue-600 dark:text-blue-400 bg-blue-500/10';
 
   return (
-    // Backdrop — dismiss on click outside
-    <div
-      role="presentation"
-      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="relative w-full max-w-lg mx-4 bg-card border rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
+    <>
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Close notification details backdrop"
+        className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-default"
+        onClick={onClose}
+      />
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`${item.node_type ?? 'Pipeline notification'} details`} className="relative w-full max-w-lg mx-4 bg-card border rounded-xl shadow-2xl flex flex-col max-h-[80vh]">
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b">
           <LevelIcon level={item.level} />
@@ -143,7 +155,7 @@ const NotificationDetailModal: React.FC<{
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -161,6 +173,7 @@ export const NotificationCenter: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<StoredNotification | null>(null);
   const ref = useRef<HTMLDivElement | null>(null);
+  const bellRef = useRef<HTMLButtonElement | null>(null);
 
   // Auto-open removed — badge count is sufficient signal; panel opens on click only.
   useEffect(() => {
@@ -193,6 +206,7 @@ export const NotificationCenter: React.FC = () => {
     <>
       <div ref={ref} className="relative">
         <button
+          ref={bellRef}
           type="button"
           onClick={togglePanel}
           title="Pipeline notifications"
@@ -297,6 +311,7 @@ export const NotificationCenter: React.FC = () => {
           item={selected}
           onClose={() => setSelected(null)}
           onViewErrorLog={() => { setSelected(null); setOpen(false); navigate('/errors'); }}
+          returnFocusRef={bellRef as React.RefObject<HTMLElement | null>}
         />,
         document.body,
       )}
