@@ -192,10 +192,11 @@ They match the required
 `grep -c "**2026-08-07 status:** <Status>"` count for each status:
 
 - **New (5):** `FND-007`, `DAT-008`, `DAT-009`, `EXP-008`, `OPS-008`.
-- **Changed (6):** `FND-005`, `CAN-001`, `CAN-005`, `DAT-004`, `DAT-005`,
+- **Changed (6):** `FND-002`, `CAN-001`, `CAN-005`, `DAT-004`, `DAT-005`,
   `DAT-007`.
-- **Confirmed (26):** `FND-001`–`FND-004`, `FND-006`, `CAN-002`–`CAN-004`,
-  `DAT-001`–`DAT-003`, `DAT-006`, `EXP-001`–`EXP-007`, and `OPS-001`–`OPS-007`.
+- **Confirmed (26):** `FND-001`, `FND-003`, `FND-004`, `FND-005`, `FND-006`,
+  `CAN-002`–`CAN-004`, `DAT-001`–`DAT-003`, `DAT-006`, `EXP-001`–`EXP-007`, and
+  `OPS-001`–`OPS-007`.
 - **Resolved (0):** none this rerun. No prior finding's user problem was
   demonstrated resolved by current evidence; `## Historically Resolved
   Findings` below records this explicitly so a future rerun preserves any
@@ -1041,7 +1042,7 @@ change.
 | 7–12 | OPS-007, DAT-004, DAT-005, EXP-001, EXP-002, FND-005 | Frequent journey blockers and the cross-page Operations foundation, plus shared form semantics that rank highly even though its normalization slice lands in Next. |
 | 13–18 | FND-003, FND-002, CAN-002, DAT-002, DAT-003, EXP-005 | High-impact recovery, overlay-accessibility, and decision-provenance work whose dependencies fit within Now. |
 | 19–24 | EXP-007, OPS-001, OPS-004, DAT-006, DAT-007, EXP-003 | High-impact run lifecycle and Frequent Operations investigations, then broad Data/EDA and explainability interpretation sequenced after their foundations. |
-| 25–30 | OPS-002, OPS-003, EXP-004, OPS-008, DAT-008, EXP-008 | High-impact Operations lineage/drift redesigns, then the Medium data-integrity Jobs defect (`OPS-008`, elevated by its React-key data-loss risk) ahead of the Medium label-consistency fixes `DAT-008`/`EXP-008`. |
+| 25–30 | OPS-002, OPS-003, EXP-004, OPS-008, DAT-008, EXP-008 | High-impact Operations lineage/drift redesigns, then the nominally Medium-impact Jobs defect `OPS-008` — its live data-integrity/duplicate-key defect (colliding React keys causing reordering, incorrect DOM reuse, or dropped updates) raises its effective severity under ranking criterion 1 (impact/severity) above a plain label-consistency gap, so it is sequenced ahead of the Medium label-consistency fixes `DAT-008`/`EXP-008` while its normalized `Impact` value and `Now` milestone remain unchanged. |
 | 31–37 | FND-004, FND-007, OPS-005, OPS-006, CAN-003, CAN-004, DAT-009 | Lower-frequency normalization, a contained accessibility DOM-nesting fix, larger historical-context work, and optional polish after the preceding outcomes. |
 
 ## Method and Evidence
@@ -3641,7 +3642,7 @@ user state, no store subscription, no fetch/mutation lifecycle, and does **not**
 reference `job_id`/`shortRunId`/`.slice(0, 8)`, so it is not one of the
 components implicated in `EXP-008`'s cross-tab identifier mismatch (that logic
 lives in `EvaluationView`, `PipelineDiffView`, `FeatureImportanceView`, and the
-SHAP views). Its nine chart Download buttons are each correctly disabled while a
+SHAP views). Its seven chart Download buttons are each correctly disabled while a
 download is in flight (`disabled={downloadingChart === ...}`) and marked
 `data-export-ignore`, so it does not exhibit the `DAT-009` empty-chart-download
 pattern either. It therefore introduces no measured reliability failure or
