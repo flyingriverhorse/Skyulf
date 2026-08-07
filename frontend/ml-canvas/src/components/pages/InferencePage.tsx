@@ -48,11 +48,24 @@ interface InputStatus {
     column?: number;
 }
 
+/** Per-row breakdown of which schema fields a specific row omits. */
+interface RowSchemaIssue {
+    rowIndex: number; // 0-based index into the parsed input array
+    missing: string[];
+}
+
 /** Schema-vs-input drift summary surfaced under the editor. */
 interface SchemaCheck {
-    missing: string[]; // schema fields that no row provides
+    missing: string[]; // schema fields that no row provides at all
     extra: string[]; // row fields that the schema does not declare
     rows: number;
+    /** Rows that are individually missing at least one schema field — even
+     * when every field is *somewhere* present across the batch, a single
+     * row silently sent with a hole in it is still the exact request the
+     * backend rejects (or, worse, crashes on). Named per row/field so the
+     * user can see and fix the actual offending rows, not just an
+     * aggregate count. */
+    rowIssues: RowSchemaIssue[];
 }
 
 /** A previous prediction run kept in memory so the user can re-load it. */
@@ -136,7 +149,19 @@ const checkSchema = (raw: string, schema: { name: string; type: string }[]): Sch
     });
     const missing = [...schemaNames].filter(n => !seen.has(n));
     const extra = [...seen].filter(n => !schemaNames.has(n));
-    return { missing, extra, rows: parsed.length };
+
+    // Per-row detail: a field can be "not missing overall" (some other row
+    // provides it) while this specific row still omits it — that row would
+    // still be sent with a hole in it, so surface it individually.
+    const rowIssues: RowSchemaIssue[] = [];
+    parsed.forEach((row, rowIndex) => {
+        const keys =
+            row && typeof row === 'object' ? new Set(Object.keys(row as Record<string, unknown>)) : new Set<string>();
+        const rowMissing = [...schemaNames].filter(n => !keys.has(n));
+        if (rowMissing.length > 0) rowIssues.push({ rowIndex, missing: rowMissing });
+    });
+
+    return { missing, extra, rows: parsed.length, rowIssues };
 };
 
 /**
@@ -535,6 +560,15 @@ export const InferencePage: React.FC = () => {
     });
     const [isDragging, setIsDragging] = useState(false);
 
+    // EXP-006: missing schema fields block Run Prediction by default — the
+    // backend rejects (or, when a field is also wrong-typed, crashes on)
+    // exactly this request shape, so silently letting it through just moves
+    // the failure one network round-trip later. An explicit, reviewable
+    // override is offered instead of a hard block, since a user may
+    // legitimately want to send a partial row (e.g. relying on a
+    // server-side default) and know what they're doing.
+    const [acknowledgeMissingFields, setAcknowledgeMissingFields] = useState(false);
+
     const inputStatus = useMemo(() => analyseInput(inputData), [inputData]);
 
     const schemaChips = useMemo(
@@ -546,6 +580,26 @@ export const InferencePage: React.FC = () => {
         () => checkSchema(inputData, schemaChips),
         [inputData, schemaChips],
     );
+
+    // Any field the deployment schema can't type (the common case today —
+    // the artifact-derived schema currently reports every field as
+    // `unknown`) never gets a value/type check below; be explicit about
+    // that instead of silently skipping it, per EXP-006's "unknown schema
+    // types are honestly marked unvalidated" requirement.
+    const hasUnknownTypedFields = useMemo(
+        () => schemaChips.some(col => col.type === 'unknown'),
+        [schemaChips],
+    );
+
+    // Re-require acknowledgement whenever the actual set of missing rows/
+    // fields changes (edit, Fix, new sample, etc.) — a stale checkbox
+    // ticked for a previous violation must not silently authorize a new one.
+    const missingSignature = schemaCheck?.rowIssues
+        .map(i => `${i.rowIndex}:${i.missing.join(',')}`)
+        .join('|') ?? '';
+    useEffect(() => {
+        setAcknowledgeMissingFields(false);
+    }, [missingSignature]);
 
     const predictionStats = useMemo(() => {
         if (!predictions || predictions.length === 0) return null;
@@ -794,9 +848,38 @@ export const InferencePage: React.FC = () => {
         handleCsvFile(file);
     };
 
-    /** Pad missing schema fields with zero in every row of the input. */
-    const handleFixMissingFields = () => {
-        if (!schemaCheck || schemaCheck.missing.length === 0) return;
+    /** Pad missing schema fields with zero in every row of the input — after
+     * an explicit reviewed preview of exactly which row/field pairs will be
+     * touched, since the previous silent apply made a partial repair look
+     * like a full fix (a field that already existed with a wrong-typed
+     * value was left untouched and only surfaced once the backend crashed
+     * on it — see EXP-006). */
+    const handleFixMissingFields = async () => {
+        if (!schemaCheck || schemaCheck.rowIssues.length === 0) return;
+        const preview = schemaCheck.rowIssues
+            .slice(0, 8)
+            .map(issue => `Row ${issue.rowIndex + 1}: ${issue.missing.join(', ')} → 0`);
+        const more = schemaCheck.rowIssues.length > 8 ? schemaCheck.rowIssues.length - 8 : 0;
+        const ok = await confirm({
+            title: 'Fill missing fields with 0?',
+            message: (
+                <div className="space-y-2">
+                    <p>
+                        This only fills in fields that are absent from a row. Fields that are
+                        already present keep their current value even if it looks wrong for
+                        this model — review those yourself before running.
+                    </p>
+                    <ul className="text-xs font-mono bg-gray-50 dark:bg-gray-900 rounded p-2 space-y-0.5 max-h-32 overflow-auto">
+                        {preview.map(line => (
+                            <li key={line}>{line}</li>
+                        ))}
+                        {more > 0 && <li>…and {more} more row(s)</li>}
+                    </ul>
+                </div>
+            ),
+            confirmLabel: 'Fill with 0',
+        });
+        if (!ok) return;
         try {
             const arr = JSON.parse(inputData) as Record<string, unknown>[];
             const padded = arr.map(row => {
@@ -807,7 +890,7 @@ export const InferencePage: React.FC = () => {
                 return next;
             });
             setInputData(JSON.stringify(padded, null, 2));
-            toast.success(`Added ${schemaCheck.missing.length} missing field(s)`);
+            toast.success(`Filled ${schemaCheck.missing.length} missing field(s) with 0 — verify values before running`);
         } catch {
             toast.error('Cannot pad: invalid JSON');
         }
@@ -837,6 +920,13 @@ export const InferencePage: React.FC = () => {
 
     const handlePredict = useCallback(async () => {
         if (!activeDeployment || isLoading) return;
+        // EXP-006: a row missing a schema field is the same partial request
+        // the backend either rejects or crashes on — require the explicit
+        // acknowledgement checkbox before sending it, even via Ctrl+Enter
+        // (which otherwise bypasses the disabled Run Prediction button).
+        if (schemaCheck && schemaCheck.rowIssues.length > 0 && !acknowledgeMissingFields) {
+            return;
+        }
 
         // Soft warning before sending huge payloads — the network round-trip
         // and JSON serialisation balloon, and it's almost always a mistake.
@@ -899,6 +989,8 @@ export const InferencePage: React.FC = () => {
         confirm,
         overrideThresholdsEnabled,
         overrideThresholdsValue,
+        schemaCheck,
+        acknowledgeMissingFields,
     ]);
 
     const handleFormatJson = () => {
@@ -1037,6 +1129,12 @@ export const InferencePage: React.FC = () => {
     const showBanner = autoFilterInfo && !bannerDismissed;
     const hasSchemaIssues =
         schemaCheck && (schemaCheck.missing.length > 0 || schemaCheck.extra.length > 0);
+    // Missing fields are the one violation we can determine with certainty
+    // from a nameless "unknown"-typed schema — block the request on those
+    // unless the user has explicitly reviewed and accepted the current set.
+    const hasBlockingMissingFields = Boolean(schemaCheck && schemaCheck.rowIssues.length > 0);
+    const canRunPrediction =
+        !hasBlockingMissingFields || acknowledgeMissingFields;
     const recentLatencies = useMemo(
         () => [...recentRuns].reverse().map(r => r.latencyMs),
         [recentRuns],
@@ -1189,37 +1287,83 @@ export const InferencePage: React.FC = () => {
 
                     {/* Schema validation badges + one-click fix. */}
                     {hasSchemaIssues && (
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                            {schemaCheck.missing.length > 0 && (
-                                <>
+                        <div className="mt-2 flex flex-col gap-1.5 text-[11px]">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {schemaCheck.missing.length > 0 && (
+                                    <>
+                                        <span
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                                            title={schemaCheck.missing.join(', ')}
+                                        >
+                                            <AlertCircle className="w-3 h-3" />
+                                            {schemaCheck.missing.length} missing
+                                        </span>
+                                        <button
+                                            onClick={() => void handleFixMissingFields()}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                            title="Review and fill missing fields with value 0"
+                                        >
+                                            <Wand2 className="w-3 h-3" /> Fix
+                                        </button>
+                                    </>
+                                )}
+                                {schemaCheck.extra.length > 0 && (
                                     <span
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                                        title={schemaCheck.missing.join(', ')}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                        title={schemaCheck.extra.join(', ')}
                                     >
                                         <AlertCircle className="w-3 h-3" />
-                                        {schemaCheck.missing.length} missing
+                                        {schemaCheck.extra.length} extra
                                     </span>
-                                    <button
-                                        onClick={handleFixMissingFields}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                                        title="Add missing fields with value 0 in every row"
-                                    >
-                                        <Wand2 className="w-3 h-3" /> Fix
-                                    </button>
-                                </>
-                            )}
-                            {schemaCheck.extra.length > 0 && (
-                                <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                                    title={schemaCheck.extra.join(', ')}
-                                >
-                                    <AlertCircle className="w-3 h-3" />
-                                    {schemaCheck.extra.length} extra
+                                )}
+                                <span className="text-[10px] text-gray-400 italic ml-1">
+                                    Hover badges for field names.
                                 </span>
+                            </div>
+
+                            {/* Per-row detail: which specific rows are still missing
+                                fields, since a field being present "somewhere" in the
+                                batch doesn't help the row that's actually missing it. */}
+                            {schemaCheck.rowIssues.length > 0 && (
+                                <ul
+                                    data-testid="schema-row-issues"
+                                    className="font-mono bg-rose-50/60 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/40 rounded px-2 py-1 space-y-0.5 max-h-20 overflow-auto"
+                                >
+                                    {schemaCheck.rowIssues.slice(0, 5).map(issue => (
+                                        <li key={issue.rowIndex} className="text-rose-700 dark:text-rose-300">
+                                            Row {issue.rowIndex + 1}: missing {issue.missing.join(', ')}
+                                        </li>
+                                    ))}
+                                    {schemaCheck.rowIssues.length > 5 && (
+                                        <li className="text-rose-500 dark:text-rose-400">
+                                            …and {schemaCheck.rowIssues.length - 5} more row(s)
+                                        </li>
+                                    )}
+                                </ul>
                             )}
-                            <span className="text-[10px] text-gray-400 italic ml-1">
-                                Hover badges for field names.
-                            </span>
+
+                            {hasBlockingMissingFields && (
+                                <label className="flex items-start gap-1.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={acknowledgeMissingFields}
+                                        onChange={e => setAcknowledgeMissingFields(e.target.checked)}
+                                        className="mt-0.5"
+                                        data-testid="acknowledge-missing-fields"
+                                    />
+                                    <span>
+                                        I understand some rows are missing schema fields and want to
+                                        run anyway.
+                                    </span>
+                                </label>
+                            )}
+
+                            {hasUnknownTypedFields && (
+                                <p className="text-[10px] text-gray-400 italic">
+                                    This model&apos;s schema doesn&apos;t report field types — values
+                                    are checked for presence only, not type or range, before sending.
+                                </p>
+                            )}
                         </div>
                     )}
 
@@ -1249,9 +1393,16 @@ export const InferencePage: React.FC = () => {
                             </kbd>
                             <button
                                 onClick={() => void handlePredict()}
-                                disabled={!activeDeployment || isLoading || !inputStatus.valid}
+                                disabled={
+                                    !activeDeployment || isLoading || !inputStatus.valid || !canRunPrediction
+                                }
+                                title={
+                                    !canRunPrediction
+                                        ? 'Some rows are missing schema fields — fix them or check the acknowledgement above to run anyway'
+                                        : undefined
+                                }
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                    !activeDeployment || isLoading || !inputStatus.valid
+                                    !activeDeployment || isLoading || !inputStatus.valid || !canRunPrediction
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
                                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
                                 }`}
