@@ -418,15 +418,22 @@ export const useGraphStore = create<GraphState>()(
         if (!proceed) return;
       } else if (isNewSource && uniqueSourceCount >= 2 && !modelTypes.includes(targetType)) {
         // Pre-flight lint for non-training nodes (audit issue #7).
-        // Direction-A means non-training nodes also auto-merge fan-in via
-        // column union + last-wins. Surface that contract before the user
-        // wires it so silent column overwrites aren't a surprise at run time.
+        // Non-training nodes auto-merge fan-in per column: each column is
+        // supplied by whichever branch actually changed it (see the engine's
+        // `_column_modifiers`). Only a column two branches BOTH rewrote to
+        // different values needs the merge strategy to break the tie, and
+        // that can only be known after a run — so this confirm states the
+        // union contract and defers the conflict report to the Results panel.
         // window.confirm: see note above on sync onConnect contract.
         const proceed = window.confirm(
           `This node will receive ${uniqueSourceCount} inputs.\n\n` +
-          'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
-          '(the last connected input overwrites earlier ones on shared columns).\n\n' +
-          'For sequential transformations, chain the nodes linearly instead.\n\n' +
+          'Inputs are merged into one dataset. Each column keeps the value of ' +
+          'whichever branch changed it, so branches editing different columns ' +
+          'are combined without loss.\n\n' +
+          'If two branches change the SAME column to different values, one of ' +
+          'them is discarded. The run Results panel reports any such conflict ' +
+          'and lets you choose which branch wins.\n\n' +
+          'For strictly sequential transformations, chain the nodes linearly instead.\n\n' +
           'Click OK to connect (merge), or Cancel to abort.'
         );
         if (!proceed) return;

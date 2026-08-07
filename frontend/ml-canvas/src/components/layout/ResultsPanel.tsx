@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { collectGraphValidationIssues, useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
-import { AlertTriangle, ChevronUp, ChevronDown, Table, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, XCircle } from 'lucide-react';
 import type { PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
 import { clickableProps } from '../../core/utils/a11y';
@@ -19,6 +19,9 @@ function toDatasetMap(previewData: PreviewData | null | undefined): Record<strin
   return {};
 }
 
+/** Which pane of the results panel is showing. */
+type ResultsPane = 'data' | 'issues' | 'steps';
+
 /** Shows preview results alongside canvas validation and run failure summaries. */
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
@@ -32,6 +35,8 @@ export const ResultsPanel: React.FC = () => {
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [mergeWarningsOpen, setMergeWarningsOpen] = useState<boolean>(false);
+  const [pane, setPane] = useState<ResultsPane | null>(null);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
   const validationHeadingId = React.useId();
   const validationIssues = useMemo(
     () => collectGraphValidationIssues(canvasNodes, canvasEdges),
@@ -252,99 +257,172 @@ export const ResultsPanel: React.FC = () => {
     </section>
   );
 
+  const issueCount =
+    validationIssues.length + (lastRunError ? 1 : 0) + (executionResult ? mergeWarnings.length : 0);
+
+  // Land on whichever pane has something to act on: a failed or blocked run
+  // has no table worth showing, so default to Issues in that case.
+  const defaultPane: ResultsPane =
+    validationIssues.length > 0 || lastRunError ? 'issues' : 'data';
+  const activePane = pane ?? defaultPane;
+
+  const paneTabs: { id: ResultsPane; label: string; count?: number }[] = [
+    { id: 'data', label: 'Data' },
+    { id: 'issues', label: 'Issues', count: issueCount },
+    { id: 'steps', label: 'Steps', count: applied_steps.length },
+  ];
+
   return (
     <div
       className={`absolute bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 z-20 flex flex-col ${
-        isResultsPanelExpanded ? 'h-96' : 'h-10'
+        !isResultsPanelExpanded ? 'h-10' : isMaximized ? 'top-0' : 'h-96'
       }`}
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
+        className="flex items-center justify-between gap-2 px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
         {...clickableProps(() => setResultsPanelExpanded(!isResultsPanelExpanded))}
       >
-        <div className="flex items-center gap-2">
-          <Table className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">Preview Results</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <Table className="w-4 h-4 text-primary shrink-0" />
+          <span className="font-semibold text-sm shrink-0">Preview Results</span>
           {executionResult && (
-            <span className="text-xs text-muted-foreground ml-2">
+            <span className="text-xs text-muted-foreground truncate">
               {currentRows.length === currentTotal
                 ? `${currentTotal} rows`
                 : `${currentRows.length} of ${currentTotal} rows shown`}
-            </span>
-          )}
-          {branchLabels.length > 0 && (
-            <span className="text-xs text-muted-foreground ml-2">
-              · {branchLabels.length} branches
+              {branchLabels.length > 0 ? ` · ${branchLabels.length} branches` : ''}
             </span>
           )}
           {executionResult?.status === 'failed' && (
-            <span className="text-xs text-red-600 font-bold ml-2">
-              (Failed)
+            <span className="text-xs text-red-600 font-bold shrink-0">(Failed)</span>
+          )}
+          {issueCount > 0 && (
+            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
             </span>
           )}
         </div>
-        <button className="p-1 hover:bg-muted rounded">
-          {isResultsPanelExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {isResultsPanelExpanded && (
+            <button
+              type="button"
+              className="p-1 hover:bg-muted rounded"
+              aria-label={isMaximized ? 'Restore results panel' : 'Maximize results panel'}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMaximized((v) => !v);
+              }}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
+          <button type="button" className="p-1 hover:bg-muted rounded" aria-label={isResultsPanelExpanded ? 'Collapse results panel' : 'Expand results panel'}>
+            {isResultsPanelExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       {isResultsPanelExpanded && (
         <div className="flex-1 overflow-hidden flex flex-col">
-          {validationBanner}
-          {runErrorBanner}
+          {/* Pane tabs keep advisories and step pills from pushing the table
+              off-screen — each lives in its own pane instead of stacking. */}
+          <div className="flex items-center gap-1 px-2 border-b bg-muted/5 shrink-0" role="tablist">
+            {paneTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activePane === tab.id}
+                onClick={() => setPane(tab.id)}
+                className={`px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors ${
+                  activePane === tab.id
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tab.label}
+                {tab.count ? (
+                  <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
+                    {tab.count}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
 
-          {/* Branch Tabs (multi-branch parallel runs only) */}
-          {executionResult && branchLabels.length > 0 && (
-            <BranchTabs
-              branchLabels={branchLabels}
-              activeBranch={activeBranch}
-              setActiveBranch={setActiveBranch}
-              branchColors={branchColors}
-              branchAdvisoryCounts={branchAdvisoryCounts}
-            />
+          {activePane === 'data' && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {executionResult && branchLabels.length > 0 && (
+                <BranchTabs
+                  branchLabels={branchLabels}
+                  activeBranch={activeBranch}
+                  setActiveBranch={setActiveBranch}
+                  branchColors={branchColors}
+                  branchAdvisoryCounts={branchAdvisoryCounts}
+                />
+              )}
+              {executionResult && tabNames.length > 1 && (
+                <SplitTabs
+                  tabNames={tabNames}
+                  datasets={datasets}
+                  totals={totals}
+                  effectiveTab={effectiveTab}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+              {executionResult ? (
+                <ResultsTable columns={columns} currentRows={currentRows} effectiveTab={effectiveTab} />
+              ) : (
+                <p className="p-4 text-sm text-muted-foreground">
+                  Run a preview to see the resulting rows here.
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Split Tabs (train / test / X / y …) */}
-          {executionResult && tabNames.length > 1 && (
-            <SplitTabs
-              tabNames={tabNames}
-              datasets={datasets}
-              totals={totals}
-              effectiveTab={effectiveTab}
-              setActiveTab={setActiveTab}
-            />
+          {activePane === 'issues' && (
+            <div className="flex-1 overflow-y-auto">
+              {validationBanner}
+              {runErrorBanner}
+              {executionResult && mergeWarnings.length > 0 && (
+                <MergeWarningsBanner
+                  mergeWarnings={mergeWarnings}
+                  mergeWarningsOpen={mergeWarningsOpen}
+                  setMergeWarningsOpen={setMergeWarningsOpen}
+                  nodeLabelMap={nodeLabelMap}
+                  confirm={confirm}
+                  chainSiblings={chainSiblings}
+                />
+              )}
+              {issueCount === 0 && (
+                <p className="p-4 text-sm text-muted-foreground">
+                  No validation issues, run errors, or merge advisories.
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Merge advisories (sibling fan-in etc.) — engine-emitted.
-              Collapsed by default to a one-line summary; click to expand
-              full per-warning detail (inputs, overlap columns, winner). */}
-          {executionResult && mergeWarnings.length > 0 && (
-            <MergeWarningsBanner
-              mergeWarnings={mergeWarnings}
-              mergeWarningsOpen={mergeWarningsOpen}
-              setMergeWarningsOpen={setMergeWarningsOpen}
-              nodeLabelMap={nodeLabelMap}
-              confirm={confirm}
-              chainSiblings={chainSiblings}
-            />
-          )}
-
-          {/* Signals / Warnings */}
-          {executionResult && applied_steps.length > 0 && executionResult.status !== 'failed' && (
-             <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border-b dark:border-blue-900/30 flex gap-2 overflow-x-auto">
-                {applied_steps.map((step: string, idx: number) => (
-                  <div key={idx} className="text-xs text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">
-                    {nodeLabelMap[step] ?? step}
-                  </div>
-                ))}
-             </div>
-          )}
-
-          {/* Data Table */}
-          {executionResult && (
-            <ResultsTable columns={columns} currentRows={currentRows} effectiveTab={effectiveTab} />
+          {activePane === 'steps' && (
+            <div className="flex-1 overflow-y-auto p-3">
+              {applied_steps.length > 0 && executionResult?.status !== 'failed' ? (
+                <div className="flex flex-wrap gap-2">
+                  {applied_steps.map((step: string) => (
+                    <span
+                      key={step}
+                      className="text-xs text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800"
+                    >
+                      {nodeLabelMap[step] ?? step}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No steps ran. Run a preview to see which nodes executed.
+                </p>
+              )}
+            </div>
           )}
         </div>
       )}

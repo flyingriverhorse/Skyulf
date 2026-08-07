@@ -123,6 +123,59 @@ def test_no_winner_advisory_when_branches_do_not_contest_a_column(tmp_path: Path
     assert not [w for w in result.merge_warnings if w.get("kind") == "sibling_fan_in"]
 
 
+def test_branches_producing_identical_values_are_not_a_conflict(tmp_path: Path) -> None:
+    """Two branches adding the same column with the same values discard nothing.
+
+    Reproduces the Feature-Target Split false positive: two MissingIndicator
+    branches each append identical ``*_missing`` flags. Both "changed" the
+    column relative to the shared ancestor, but they agree, so naming a winner
+    tells the user work was discarded when none was.
+    """
+    csv = _make_iris(tmp_path)
+    store = LocalArtifactStore(str(tmp_path / "art"))
+    engine = PipelineEngine(store, catalog=FileSystemCatalog())
+
+    flags = {"columns": ["SepalLengthCm", "SepalWidthCm"]}
+    cfg = PipelineConfig(
+        pipeline_id="agreeing_branches",
+        nodes=[
+            NodeConfig(node_id="data", step_type=StepType.DATA_LOADER, params={"path": csv}),
+            NodeConfig(
+                node_id="transformation",
+                step_type="SimpleTransformation",
+                inputs=["data"],
+                params={"transformations": [{"column": c, "method": "log"} for c in SEPALS]},
+            ),
+            NodeConfig(
+                node_id="drop_missing",
+                step_type="DropMissingColumns",
+                inputs=["data"],
+                params={"columns": ["Id"], "missing_threshold": 0},
+            ),
+            NodeConfig(
+                node_id="mi_a",
+                step_type="MissingIndicator",
+                inputs=["transformation"],
+                params=flags,
+            ),
+            NodeConfig(
+                node_id="mi_b", step_type="MissingIndicator", inputs=["drop_missing"], params=flags
+            ),
+            NodeConfig(
+                node_id="merge",
+                step_type="MissingIndicator",
+                inputs=["mi_a", "mi_b"],
+                params={"columns": ["PetalLengthCm"]},
+            ),
+        ],
+    )
+
+    result = engine.run(cfg)
+    assert result.status == "success"
+
+    assert not [w for w in result.merge_warnings if w.get("kind") == "sibling_fan_in"]
+
+
 def test_two_branches_editing_the_same_column_still_report_a_winner(tmp_path: Path) -> None:
     """A real contest keeps the advisory so the discarded edit stays visible."""
     csv = _make_iris(tmp_path)

@@ -76,13 +76,26 @@ class MergeMixin:
             return True
         return not frame[col].reset_index(drop=True).equals(baseline[col].reset_index(drop=True))
 
+    @staticmethod
+    def _modifiers_agree(frames: list[pd.DataFrame], changed_by: list[int], col: str) -> bool:
+        """True when every branch that changed ``col`` produced the same values.
+
+        Two branches independently deriving an identical column (e.g. two
+        MissingIndicator steps emitting the same ``*_missing`` flags) discard
+        nothing when merged, so they are not a conflict the user must resolve.
+        """
+        reference = frames[changed_by[0]][col]
+        return all(frames[idx][col].equals(reference) for idx in changed_by[1:])
+
     def _column_modifiers(self, frames: list[pd.DataFrame], node_id: str) -> dict[str, list[int]]:
         """Map each column shared by 2+ frames to the indices of frames that changed it.
 
         Columns nobody changed, or that only one branch changed, are not real
         conflicts: the merge can pick the single meaningful version regardless
-        of input order. Returns an empty map when no baseline is available, in
-        which case callers fall back to the configured merge strategy.
+        of input order. Branches that changed a column but agree on the result
+        collapse to a single owner for the same reason. Returns an empty map
+        when no baseline is available, in which case callers fall back to the
+        configured merge strategy.
         """
         baseline = self._baseline_frame(node_id)
         if baseline is None:
@@ -97,11 +110,14 @@ class MergeMixin:
         for col, count in counts.items():
             if count < 2:
                 continue
-            modifiers[col] = [
+            changed_by = [
                 idx
                 for idx, df in enumerate(frames)
                 if col in df.columns and self._column_changed(df, baseline, col)
             ]
+            if len(changed_by) > 1 and self._modifiers_agree(frames, changed_by, col):
+                changed_by = changed_by[:1]
+            modifiers[col] = changed_by
         return modifiers
 
     def _column_owners(self, frames: list[pd.DataFrame], node_id: str) -> dict[str, int]:

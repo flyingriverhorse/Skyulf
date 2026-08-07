@@ -26,6 +26,7 @@ import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/
 import type { ColumnProfile } from '../core/types/edaProfile';
 import { edaKeys } from '../core/hooks/useEdaJobs';
 import { resolveEdaDatasetSelection, shouldSyncDatasetParam, isSelectionMissingFromDatasets } from '../core/utils/edaDatasetSelection';
+import { buildEdaDatasetOptions } from '../core/utils/edaDatasetOptions';
 import { toast } from '../core/toast';
 
 export const EDAPage: React.FC = () => {
@@ -59,6 +60,7 @@ export const EDAPage: React.FC = () => {
   });
   // Memoize the fallback so dependent effects don't refire on every render.
   const datasets = useMemo(() => datasetsQuery.data ?? [], [datasetsQuery.data]);
+  const datasetOptions = useMemo(() => buildEdaDatasetOptions(datasets), [datasets]);
 
   const reportQuery = useQuery({
     queryKey: edaKeys.report(selectedDataset ?? null),
@@ -496,8 +498,8 @@ export const EDAPage: React.FC = () => {
                     className="block w-48 text-sm font-medium bg-transparent border-none p-0 focus:ring-0 text-gray-900 dark:text-white cursor-pointer hover:text-blue-600"
                 >
                     <option value="" disabled>Select a dataset</option>
-                    {datasets.map((ds) => (
-                    <option key={ds.id} value={ds.id}>{ds.name}</option>
+                    {datasetOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
                     ))}
                 </select>
             </div>

@@ -194,12 +194,12 @@ export const NotificationCenter: React.FC = () => {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (open) markAllRead();
+  }, [markAllRead, open]);
+
   const togglePanel = (): void => {
-    setOpen((prev) => {
-      const next = !prev;
-      if (next) markAllRead();
-      return next;
-    });
+    setOpen((prev) => !prev);
   };
 
   return (
@@ -257,13 +257,12 @@ export const NotificationCenter: React.FC = () => {
               <ul className="overflow-y-auto divide-y">
                 {items.map((it) => (
                   <li key={it.id} className="group">
-                    {/* Click the row to open the detail modal */}
-                    <button
-                      type="button"
-                      onClick={() => { setSelected(it); setOpen(false); }}
-                      className="w-full text-left px-3 py-2 hover:bg-accent/40 flex items-start justify-between gap-2"
-                    >
-                      <div className="min-w-0 flex-1">
+                    <div className="flex items-stretch gap-2 px-3 py-2 hover:bg-accent/40">
+                      <button
+                        type="button"
+                        onClick={() => { setSelected(it); setOpen(false); }}
+                        className="min-w-0 flex-1 text-left"
+                      >
                         <div className="flex items-center gap-2 text-xs">
                           <LevelIcon level={it.level} />
                           <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-medium">
@@ -287,16 +286,16 @@ export const NotificationCenter: React.FC = () => {
                         <p className="mt-1 text-[10px] text-muted-foreground/60 italic">
                           Click to see full details
                         </p>
-                      </div>
+                      </button>
                       <button
                         type="button"
-                        onClick={(e) => { e.stopPropagation(); dismiss(it.id); }}
+                        onClick={() => dismiss(it.id)}
                         aria-label="Dismiss"
                         className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground shrink-0 mt-0.5"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
-                    </button>
+                    </div>
                   </li>
                 ))}
               </ul>
