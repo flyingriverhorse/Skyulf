@@ -215,6 +215,56 @@ classified, since in every case the finding's user problem, scope, and proposed
 behavior are unchanged and only the evidence strength moved from inferred to
 observed. The evidence/delta prose for each still records the upgrade nuance.
 
+### Final Validation (2026-08-07)
+
+Task 8 re-ran the complete brief-required validation against the corrected
+roadmap (post Task 7 review-correction commit) from `frontend/ml-canvas/`:
+
+- **Measured:** the brief's placeholder/vague-language scan (checking for
+  incomplete-language markers and hedging phrases) against
+  `docs/ux/frontend-ux-roadmap.md` — **pass, exit `0`, zero matches**.
+- **Measured:** finding-ID coverage grep
+  (`FND-[0-9]{3}|CAN-[0-9]{3}|DAT-[0-9]{3}|EXP-[0-9]{3}|OPS-[0-9]{3}`) —
+  **37 distinct IDs, complete coverage**: every ID has a detailed finding
+  block, a `## Prioritized Findings Inventory` row, a `## Now / Next / Later
+  Roadmap` bullet, and a `## Validation Matrix` row (37/37 each, 0
+  milestone/dependency-ordering mismatches).
+- **Measured:** full frontend baseline rerun — `npm run lint` **pass**
+  (exit `0`, no warnings); `npx tsc --project tsconfig.json --noEmit`
+  **pass** (exit `0`, no diagnostics); `npm run build` **pass** (exit `0`,
+  `2996` modules transformed) with a **byte-identical chunk manifest** versus
+  the Task 1 baseline recorded above (every filename, content hash, raw size,
+  and gzip size matches exactly); `npm run test -- --reporter=dot` **pass**
+  (exit `0`, `335/335` tests across `40/40` files); `npm run size-check`
+  **pass** (exit `0`, all chunks within budget, sizes byte-identical to the
+  Task 1 table above).
+- **Measured:** `npm run test:e2e -- --project=chromium` — **all 12 tests
+  fail** (exit `1`), every failure for the identical cause already recorded
+  in the Task 1 baseline: the Chromium `chrome-headless-shell` executable for
+  revision `1217` is missing from
+  `~/Library/Caches/ms-playwright/` in this environment. This is an
+  environment/tooling gap (missing browser binary), not a product or roadmap
+  defect, and is **not** claimed as passing; it is recorded as an
+  unresolved, out-of-scope environment limitation per audit rules (no
+  product/environment fix applied).
+- **Measured:** zero baseline drift — every command above produced the same
+  exit code, counts, warnings, and (for build/size-check) the same
+  byte-for-byte output as this rerun's own Task 1 baseline; no further
+  regression or improvement occurred between Task 1 and this final
+  validation pass.
+- **Measured:** repository scope — `git diff --check` exits `0` (no
+  whitespace/conflict-marker errors); `git status --short` shows only the
+  pre-existing, controller-owned `.superpowers/sdd/progress.md`
+  modification; every audit/design/plan commit in `merge-base..HEAD`
+  modifies only its own document, and the roadmap-only commit scope is
+  preserved. No product code, dependency, completed-plan cleanup, or
+  progress-ledger change was made or is claimed by this validation.
+
+**Conclusion:** the rerun is validated as internally consistent and
+implementation-ready. The only outstanding item is the pre-existing,
+environment-caused Chromium E2E gap above, which remains explicitly
+unresolved and undisguised in this record.
+
 ### Task 2 — Shared Foundations Rerun
 
 #### Shared-state usage reinspection
