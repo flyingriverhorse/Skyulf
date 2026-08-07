@@ -312,6 +312,153 @@ new finding (`FND-007`). Journey-specific findings (`CAN-*`, `DAT-*`, `EXP-*`,
   original audit) exists in this checkout, matching the Task 1 rerun's
   documented limitation.
 
+### Task 3 — Canvas Rerun
+
+#### Method
+
+- **Method:** Started the same project Vite dev server used by Task 1/2
+  (`npm run dev -- --host 127.0.0.1 --port 5173 --strictPort`) and drove a
+  live Chromium session against `/canvas` with the Playwright MCP browser
+  tool (`playwright-browser_navigate`, `_resize`, `_snapshot`, `_evaluate`,
+  `_click`, `_press_key`, `_find`, `_take_screenshot`, plus
+  `_run_code_unsafe` for CDP-level `page.mouse` sequences). Every measurement
+  below is **Observed** in this live session unless marked otherwise. Widths
+  exercised: `1440×900`, `1024×900`, `768×1024`, and `390×844` (portrait),
+  matching the required breakpoints. Scenarios exercised: click-to-add
+  pipeline creation (Dataset, Encoding, Feature Generation), the click-to-add
+  overlap/pointer-interception reproduction, the toolbar-cluster collision at
+  1440 px, keyboard Undo/Redo (`⌘Z`/`⌘⇧Z`) against a real click-added graph,
+  the autosave Restore/Discard banner, the Keyboard Shortcuts sheet at all
+  four widths, per-width toolbar/control-panel geometry, and Feature
+  Generation's validation chip and Apply-recommendation surface. Two
+  screenshots were captured to `.superpowers/sdd/` (git-ignored, not
+  committed): the Dataset/Encoding overlap and the toolbar collision.
+- **Evidence limit (unchanged from the original audit):** The local
+  environment's only usable dataset source still returns
+  `500 Internal Server Error` on `GET /api/pipeline/datasets/{id}/schema`
+  ("No schema available."), so a real column schema, a completed
+  Dataset → Encoding drag/handle connection, a real invalid-run submission,
+  and a real Feature Generation recommendation payload remain unavailable
+  live, exactly as the original audit's "Canvas audit evidence and limits"
+  section already recorded. This rerun did not claim a completed edge
+  connection for the same reason the original audit did not: React Flow
+  handle-to-handle drag requires a continuous native pointer gesture that
+  this environment's automation could not reliably reproduce (both raw
+  `PointerEvent` dispatch and CDP-level `page.mouse` down/move/up sequences
+  on the exact handle coordinates left `.react-flow__edge` count at `0`);
+  this is recorded as a test-automation limitation, not a product regression,
+  since the underlying `onConnect` wiring in `FlowCanvas.tsx` is unchanged
+  from the original evidence and library defaults (`connectOnClick: true`)
+  are unchanged in `node_modules/@xyflow/react`.
+- **Discarded test artifact (not reported as a finding):** An earlier attempt
+  to build the pipeline using synthetically dispatched HTML5 `DragEvent`s
+  (bypassing Playwright's actionability checks) left the undo/redo history
+  in an inconsistent state (a single `⌘Z` removed two nodes at once, and
+  `⌘⇧Z` did not restore them). Repeating the same sequence with only real
+  palette clicks — the method the original audit used — showed correct
+  one-step Undo/Redo behavior (`1 node → 0 → 1`), confirming the earlier
+  anomaly was an artifact of the synthetic-dispatch method bypassing the
+  store's normal history middleware, not a live product defect. No finding
+  was created for it.
+
+#### Pipeline creation walkthrough (1440 px)
+
+- **Observed:** Clicking the Dataset palette card inserted a new node that
+  was **not** selected (no Properties panel opened); a second click on the
+  same card selected it and opened Properties, exactly reproducing the
+  original `CAN-001` evidence. Source re-reading confirms `addNode()` in
+  `useGraphStore.ts` never sets `selected: true` on a newly inserted node —
+  unlike `duplicateSelectedNodes`, which does — and this applies to both the
+  click-to-add and native drag-and-drop insertion paths, since both call the
+  same `addNode()` action. This slightly broadens the original finding's
+  described root cause (click-to-add only) without changing its user-facing
+  problem or proposed fix.
+  - Selecting a local "test source" from the Dataset dropdown reproduced the
+    documented `500` schema error and "No schema available." message — the
+    known, unchanged evidence limit above.
+  - Clicking the Encoding palette card placed a new card only ~60 px from the
+    Dataset card, mostly underneath it, reproducing `CAN-005`'s companion
+    evidence for `CAN-001`. Attempting to click the Encoding card's heading
+    directly (`playwright-browser_click`) failed after a 5 s actionability
+    timeout with an explicit Playwright log confirming the Dataset node's
+    subtree "intercepts pointer events" over the Encoding node at the same
+    screen coordinates — a live, reproducible pointer-interception failure
+    (screenshot: `.superpowers/sdd/task-3-1440-overlap.png`), not just the
+    original's static geometry inference. `CAN-001` remains **Changed**
+    below with this stronger, directly observed evidence.
+  - Adding a Feature Generation node the same way reproduced the same
+    unselected-on-first-click behavior and rendered a
+    `Configuration issue: Add at least one operation.` chip; its Properties
+    panel showed empty `Add:` operation-type buttons and no `Apply`
+    recommendation control, matching the original "recommendations are
+    conditional" / local-schema-limited evidence for `CAN-004` — no material
+    change.
+- **Observed — toolbar collision, 1440 px:** Clicking "Clear canvas" in the
+  Toolbar (`playwright-browser_click`) failed after a 5 s actionability
+  timeout because the right-cluster "Templates" button intercepted the
+  pointer event, not just "Undo" as the original finding stated.
+  `getBoundingClientRect()` measured Templates at `x=492.3–610.5`; Undo
+  (`x=528–568`) sits fully inside that span, and Clear canvas
+  (`x=576–616`) overlaps it by ~34 px (`x=576–610`) — both left-cluster
+  destructive/undo actions are occluded, not one
+  (screenshot: `.superpowers/sdd/task-3-1440-toolbar-collision.png`).
+  `CAN-005` remains **Changed** below with this broadened affected-surface
+  evidence.
+- **Observed — keyboard recovery still works despite the pointer occlusion:**
+  With a single real click-added Dataset node, `⌘Z` removed it (`1 → 0`) and
+  `⌘⇧Z` restored it (`0 → 1`), confirming Undo/Redo history is intact and
+  keyboard-reachable even though the equivalent pointer controls are
+  occluded at 1440 px — unchanged from the original evidence.
+
+#### Diagnosis and recovery
+
+- **Observed — autosave/restore banner:** Reloading `/canvas` with a
+  previously saved local snapshot surfaced "Restore previous session?" with
+  Restore, Discard, a relative timestamp, and a node count; Discard cleared
+  the prompt. This is unchanged from the original evidence for `CAN-003`.
+- **Observed — node removal confirmation:** Clicking a node's "Remove node"
+  control opened a "Delete node?" confirmation dialog ("The selected node
+  and any connected edges will be removed. You can undo with Ctrl+Z.") with
+  Cancel/Delete actions; this safeguard is consistent, unrelated to any
+  existing `CAN-*` finding, and is not reported as a new finding.
+  Run Preview could not be exercised against a real invalid graph live
+  because `canRunPreview` in `useRunControls.ts` (unchanged, confirmed by
+  source re-reading) requires a Dataset with an outgoing edge, which the
+  connection-gesture evidence limit above prevented from being created live;
+  `CAN-002` therefore keeps its original evidence level (source-confirmed,
+  not independently re-observed end-to-end) below.
+
+#### Responsive and keyboard verification (1024 / 768 / 390 px)
+
+- **Observed — 1024 px:** The right toolbar cluster collapsed into a single
+  "More canvas tools" button, leaving only Undo (`528,72 40×40`) and Clear
+  canvas (`576,72 40×40`) in the left cluster with no overlap between them
+  and no other visible control at that row — the `CAN-005` collision is
+  specific to the 1440 px two-cluster layout, unchanged from the original
+  table.
+- **Observed — 768 px:** Both side panels collapsed; "More canvas tools"
+  (`710,72 42×34`) remained reachable and in-bounds; document
+  `scrollWidth` equalled the 768 px viewport width. Unchanged from the
+  original table.
+- **Observed — 390 px:** Both panels stayed collapsed; the shell's
+  "Inference" switcher button spans `x=289.14–399.28`, ending `9.28px`
+  beyond the 390 px viewport — reproducing the exact `FND-001` shell-clipping
+  evidence already reconciled under Task 2, cited here only because it
+  appears on the Canvas route. The Keyboard Shortcuts sheet still listed
+  Undo, Redo, Command palette, Run Preview, and Escape. No Canvas-owned
+  clipping was observed at this width, unchanged from the original table.
+
+#### Representative node-form recomparison
+
+- **Observed:** Dataset (Select Dataset control, `500` schema error) and
+  Feature Generation (empty-operations validation chip, no Apply button
+  under the current evidence limit) were re-opened live and match the
+  existing "Representative node-form comparison" table with no material
+  change. The remaining six representatives (Encoding, Feature Selection,
+  Training, Ensemble, Segmentation, Data Preview) were re-confirmed by
+  source re-reading only, matching this rerun's evidence level for those
+  forms; no row in that table required an update.
+
 ## Synthesis, Deduplication, and Ranking
 
 ### Root-cause decisions
@@ -959,6 +1106,25 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent for click-to-add workflows.
     **Effort:** S. **Risk:** Low. **Dependencies:** custom-node bounds,
     Sidebar placement, and Properties panel selection. **Milestone:** Now.
+  - **2026-08-07 status:** Changed.
+  - **Current evidence:** **Observed** again live at 1440 px: click-adding
+    Dataset left it unselected until a second click, and click-adding
+    Encoding 60 px from Dataset reproduced the overlap; attempting to click
+    the Encoding card directly failed after a 5 s Playwright actionability
+    timeout with an explicit log confirming the Dataset node's subtree
+    "intercepts pointer events" over Encoding — a directly reproduced live
+    failure, not only the original's static geometry inference (screenshot:
+    `.superpowers/sdd/task-3-1440-overlap.png`, not committed). Source
+    re-reading confirms `Sidebar.tsx`'s 30 px cascading placement,
+    `CustomNodeWrapper.tsx`'s `min-w-[200px]` card, and `useGraphStore.ts`'s
+    `addNode()` are unchanged.
+  - **Delta:** Broadened root-cause scope: `addNode()` never sets
+    `selected: true` regardless of insertion method (click-to-add **or**
+    native drag-and-drop both call `addNode()`), not only for click-to-add
+    as originally described. User problem, proposed behavior, and
+    acceptance criteria are unchanged since both insertion paths already
+    fell under this finding's "drag-and-drop and command-palette insertion
+    retain predictable placement" acceptance criterion.
 
 - **CAN-005 — Observed: Canvas toolbar clusters overlap and intercept actions
   when Properties narrows the 1440 px Flow pane.**
@@ -998,6 +1164,25 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Frequent when configuring an existing
     graph. **Effort:** S. **Risk:** Low. **Dependencies:** `Toolbar`,
     responsive panel state, and z-index/positioning rules. **Milestone:** Now.
+  - **2026-08-07 status:** Changed.
+  - **Current evidence:** **Observed** again live at 1440 px: clicking
+    "Clear canvas" failed after a 5 s Playwright actionability timeout
+    because "Templates" intercepted the pointer event. Measured rectangles:
+    Templates `x=492.3–610.5`; Undo `x=528–568` (fully inside); Clear canvas
+    `x=576–616` (overlaps by ~34 px, `x=576–610`) — screenshot:
+    `.superpowers/sdd/task-3-1440-toolbar-collision.png` (not committed).
+    `⌘Z`/`⌘⇧Z` against a real click-added node still worked (`1 → 0 → 1`),
+    confirming history remains intact while the pointer path stays occluded.
+    At 1024 px the right cluster collapses into one "More canvas tools"
+    button, removing the collision entirely; 768 px and 390 px are unchanged
+    from the original table. Source re-reading confirms `Toolbar.tsx`'s
+    independent `left-4`/`right-4` absolute clusters are unchanged.
+  - **Delta:** Broadened affected surface: **both** Undo and Clear canvas
+    are occluded by Templates at 1440 px, not only Undo as originally
+    described. User problem, proposed behavior, and acceptance criteria are
+    unchanged, since the acceptance criteria already require every visible
+    enabled toolbar target (not just Undo) to have a non-overlapping hit
+    rectangle.
 
 - **CAN-002 — Inferred: run readiness and diagnosis do not form an actionable
   validation loop.**
@@ -1039,6 +1224,21 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** High. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** Node registry validators, pipeline converter,
     leakage validator, Results panel, and **FND-003**. **Milestone:** Now.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** Source re-reading confirms `useRunControls.ts`'s
+    `canRunPreview` still requires a Dataset node with a `datasetId` and an
+    outgoing edge, still does not call `useGraphStore.ts`'s `validateGraph`,
+    and a preview failure still only toasts "Check console for details";
+    `validateGraph` still only `console.warn`s and returns `false`. A real
+    invalid Run Preview submission could not be independently re-observed
+    live this rerun: the local dataset source still returns a `500` on
+    `GET /api/pipeline/datasets/{id}/schema` (unchanged evidence limit), and
+    creating a real Dataset→transform edge to reach the enabled Run Preview
+    state was not achievable through this session's browser automation (see
+    the Task 3 Method notes above) — the same connection-gesture limit the
+    original audit already recorded. This keeps the evidence at its original
+    level (source-confirmed, not live-observed end to end).
+  - **Delta:** No material change.
 
 - **CAN-003 — Inferred: recovery sources are not explainable when Canvas
   autosave cannot be restored.**
@@ -1080,6 +1280,18 @@ Canvas finding is warranted solely for this repeated form root.
   - **Impact:** Medium. **Frequency:** Occasional. **Effort:** M. **Risk:**
     Medium. **Dependencies:** canvas persistence, recent-pipeline utilities,
     pipeline versions API, and **FND-003**. **Milestone:** Later.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** **Observed** live: reloading `/canvas` with a
+    previously saved local snapshot surfaced "Restore previous session?"
+    with Restore, Discard, a relative timestamp, and a node count; Discard
+    cleared the prompt as documented. Source re-reading confirms
+    `useCanvasAutoSave.ts`'s one-second single snapshot,
+    `canvasPersistence.ts`'s silent error/corrupt/mismatch handling, and
+    `RestoreSessionBanner.tsx`'s one-shot empty-graph-only probe are all
+    unchanged. Server-version load, Recent-pipeline fallback, and a
+    storage-failure/corrupt-payload live reproduction remain **Inferred**
+    only, unchanged from the original evidence level.
+  - **Delta:** No material change.
 
 - **CAN-004 — Inferred: Feature Generation presents an Apply action that
   silently does nothing.**
@@ -1117,6 +1329,20 @@ Canvas finding is warranted solely for this repeated form root.
     available. **Effort:** S. **Risk:** Low. **Dependencies:** recommendation
     payload schema, Feature Generation config shape, and **FND-005**.
     **Milestone:** Later.
+  - **2026-08-07 status:** Confirmed.
+  - **Current evidence:** Source re-reading confirms
+    `FeatureGenerationNode.tsx`'s `handleApplyRecommendation` is still an
+    empty function, and Imputation/Resampling/Drop Columns still implement
+    non-empty handlers. **Observed** live: a freshly added Feature
+    Generation node showed a `Configuration issue: Add at least one
+    operation.` chip and empty `Add:` operation-type buttons with no
+    `Apply` recommendation control rendered — consistent with
+    `RecommendationsPanel` only rendering Apply when recommendations exist,
+    which the unchanged local schema limit still prevents from being
+    populated live. This matches the original evidence level exactly
+    (source-confirmed empty handler; recommendation payload still
+    unavailable locally).
+  - **Delta:** No material change.
 
 ### Data and EDA
 
