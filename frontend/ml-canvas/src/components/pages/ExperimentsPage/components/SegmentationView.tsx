@@ -67,6 +67,7 @@ export const SegmentationView: React.FC<Props> = ({
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([clusterId, size]) => ({ cluster: `Cluster ${clusterId}`, size, clusterId: Number(clusterId) }));
   }, [currentSplit]);
+  const retryJobId = evalJobId ?? selectedJobIds[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -108,7 +109,10 @@ export const SegmentationView: React.FC<Props> = ({
 
       {evalError ? (
         <div className="h-64 flex items-center justify-center">
-          <ErrorState error={evalError} />
+          <ErrorState
+            error={evalError}
+            onRetry={retryJobId ? () => fetchEvaluationData(retryJobId) : undefined}
+          />
         </div>
       ) : !evaluationData ? (
         isEvalLoading ? (

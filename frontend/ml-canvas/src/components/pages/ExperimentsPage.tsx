@@ -352,6 +352,7 @@ export const ExperimentsPage: React.FC = () => {
     () => jobs.filter(job => selectedJobIds.includes(job.job_id)),
     [jobs, selectedJobIds]
   );
+  const jobsById = useMemo(() => new Map(jobs.map(job => [job.job_id, job] as const)), [jobs]);
 
   // Selections deliberately survive filter changes, so a selected run can be
   // driving the comparison while absent from the sidebar. Track that split
@@ -378,6 +379,13 @@ export const ExperimentsPage: React.FC = () => {
   const evaluableRunIds = useMemo(
     () => selectRunsForView('evaluation', selectableRuns),
     [selectableRuns]
+  );
+  const evaluableJobs = useMemo(
+    () => evaluableRunIds.flatMap((id) => {
+      const job = jobsById.get(id);
+      return job ? [{ jobId: id, pipeline_id: job.pipeline_id, parent_pipeline_id: job.parent_pipeline_id ?? null }] : [];
+    }),
+    [evaluableRunIds, jobsById],
   );
 
   // Resolve the run the evaluation/segmentation tab should display. Picking
@@ -474,7 +482,13 @@ export const ExperimentsPage: React.FC = () => {
     const result = (job.result ?? {}) as Record<string, unknown>;
     const metrics = result.metrics as Record<string, unknown> | undefined;
     const raw = (metrics?.feature_importances ?? result.feature_importances) as Record<string, number> | undefined;
-    return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', importances: raw ?? null };
+    return {
+      jobId: job.job_id,
+      pipeline_id: job.pipeline_id,
+      parent_pipeline_id: job.parent_pipeline_id ?? null,
+      modelType: job.model_type ?? 'unknown',
+      importances: raw ?? null,
+    };
   }), [selectedJobs]);
   const hasFeatureImportances = useMemo(
     () => featureImportancesByJob.some(j => j.importances !== null),
@@ -486,7 +500,13 @@ export const ExperimentsPage: React.FC = () => {
     const result = (job.result ?? {}) as Record<string, unknown>;
     const metrics = result.metrics as Record<string, unknown> | undefined;
     const raw = (metrics?.shap_explanation ?? result.shap_explanation) as ShapExplanationData | undefined;
-    return { jobId: job.job_id, modelType: job.model_type ?? 'unknown', shapExplanation: raw ?? null };
+    return {
+      jobId: job.job_id,
+      pipeline_id: job.pipeline_id,
+      parent_pipeline_id: job.parent_pipeline_id ?? null,
+      modelType: job.model_type ?? 'unknown',
+      shapExplanation: raw ?? null,
+    };
   }), [selectedJobs]);
   const hasShapSummary = useMemo(
     () => shapExplanationByJob.some(j => j.shapExplanation !== null),
@@ -615,6 +635,7 @@ export const ExperimentsPage: React.FC = () => {
               {activeView === 'evaluation' && (
                 <EvaluationView
                   eligibleJobIds={evaluableRunIds}
+                  eligibleJobs={evaluableJobs}
                   evalJobId={evalJobId}
                   fetchEvaluationData={fetchEvaluationData}
                   isEvalLoading={isEvalLoading}

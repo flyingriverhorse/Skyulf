@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { DatasetService } from '../core/api/datasets';
@@ -22,7 +22,12 @@ import { DecompositionTab } from '../components/eda/tabs/DecompositionTab';
 import { Loader2, RefreshCw, AlertCircle, BarChart2, List, Play, HelpCircle, Target } from 'lucide-react';
 import { downloadChart } from '../core/utils/chartUtils';
 import { LoadingState, ErrorState } from '../components/shared';
-import { useEDAStore, selectExcludedDirty, type EDAFilter } from '../core/store/useEDAStore';
+import {
+  useEDAStore,
+  selectExcludedDirty,
+  selectFiltersDirty,
+  type EDAFilter,
+} from '../core/store/useEDAStore';
 import type { ColumnProfile } from '../core/types/edaProfile';
 import { edaKeys } from '../core/hooks/useEdaJobs';
 import { resolveEdaDatasetSelection, shouldSyncDatasetParam, isSelectionMissingFromDatasets } from '../core/utils/edaDatasetSelection';
@@ -36,6 +41,8 @@ export const EDAPage: React.FC = () => {
   // Only UI-toggle state remains local; server data lives in React Query, view state in the slice.
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  const applyingFiltersRef = useRef(false);
 
   // ── View + analysis-input state lives in the EDA zustand slice ──
   const activeTab = useEDAStore((s) => s.activeTab);
@@ -48,10 +55,12 @@ export const EDAPage: React.FC = () => {
   const setTaskType = useEDAStore((s) => s.setTaskType);
   const excludedColsDraft = useEDAStore((s) => s.excludedColsDraft);
   const excludedColsApplied = useEDAStore((s) => s.excludedColsApplied);
-  const filters = useEDAStore((s) => s.filters);
+  const filtersDraft = useEDAStore((s) => s.filtersDraft);
+  const filtersApplied = useEDAStore((s) => s.filtersApplied);
   const scatter = useEDAStore((s) => s.scatter);
   const setScatter = useEDAStore((s) => s.setScatter);
   const excludedDirty = useEDAStore(selectExcludedDirty);
+  const filtersDirty = useEDAStore(selectFiltersDirty);
 
   // ── React Query: datasets / latest report / history ──
   const datasetsQuery = useQuery({
@@ -108,8 +117,12 @@ export const EDAPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: edaKeys.report(selectedDataset ?? null) });
       queryClient.invalidateQueries({ queryKey: edaKeys.history(selectedDataset ?? null) });
     },
+    onSettled: () => {
+      applyingFiltersRef.current = false;
+      setIsApplyingFilters(false);
+    },
   });
-  const analyzing = analyzeMutation.isPending;
+  const analyzing = analyzeMutation.isPending || isApplyingFilters;
 
   // The URL owns the dataset selection: an explicit `?dataset_id=` always wins,
   // so deep links and back/forward can't be silently overridden by the store
@@ -168,7 +181,7 @@ export const EDAPage: React.FC = () => {
   const runAnalysis = (overrideExcluded?: string[], overrideFilters?: EDAFilter[]) => {
     if (!selectedDataset) return;
     const actualExcluded = Array.isArray(overrideExcluded) ? overrideExcluded : excludedColsApplied;
-    const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filters;
+    const actualFilters = Array.isArray(overrideFilters) ? overrideFilters : filtersApplied;
     analyzeMutation.mutate({ excluded: actualExcluded, filters: actualFilters });
   };
 
@@ -189,17 +202,34 @@ export const EDAPage: React.FC = () => {
     }
   };
 
-  const handleAddFilter = (column: string, value: string | number | boolean | Array<string | number>, operator: string) => {
-      const newFilter: EDAFilter = { column, operator: (operator || '==') as EDAFilter['operator'], value };
-      const newFilters = [...filters, newFilter];
-      useEDAStore.getState().setFilters(newFilters);
-      runAnalysis(undefined, newFilters);
+  const handleAddFilter = (
+    column: string,
+    value: string | number | boolean | Array<string | number>,
+    operator: string,
+  ) => {
+    const newFilter: EDAFilter = {
+      column,
+      operator: (operator || '==') as EDAFilter['operator'],
+      value,
+    };
+    useEDAStore.getState().addFilterDraft(newFilter);
   };
 
   const handleRemoveFilter = (index: number) => {
-      const newFilters = filters.filter((_, i) => i !== index);
-      useEDAStore.getState().setFilters(newFilters);
-      runAnalysis(undefined, newFilters);
+    useEDAStore.getState().removeFilterDraft(index);
+  };
+
+  const handleResetFilters = () => {
+    useEDAStore.getState().setFiltersDraft(filtersApplied);
+  };
+
+  const handleApplyFilters = () => {
+    if (applyingFiltersRef.current || analyzing) return;
+    applyingFiltersRef.current = true;
+    setIsApplyingFilters(true);
+    const draft = useEDAStore.getState().filtersDraft;
+    useEDAStore.getState().applyFilters();
+    runAnalysis(undefined, draft);
   };
 
   const handleToggleExclude = (colName: string, exclude: boolean) => {
@@ -342,19 +372,22 @@ export const EDAPage: React.FC = () => {
     return (
       <div className="flex h-full w-full overflow-hidden bg-white dark:bg-gray-900">
         <EDASidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            profile={profile}
-            filters={filters}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          profile={profile}
+          filtersDraft={filtersDraft}
+          filtersApplied={filtersApplied}
+          filtersDirty={filtersDirty}
           columns={allColumns}
-            excludedCols={excludedColsDraft}
-            excludedDirty={excludedDirty}
-            analyzing={analyzing}
-            onAddFilter={handleAddFilter}
-            onRemoveFilter={handleRemoveFilter}
-            onClearFilters={() => { useEDAStore.getState().clearFilters(); runAnalysis(undefined, []); }}
-            onToggleExclude={handleToggleExclude}
-            onApplyExcluded={handleApplyExcluded}
+          excludedCols={excludedColsDraft}
+          excludedDirty={excludedDirty}
+          analyzing={analyzing}
+          onAddFilter={handleAddFilter}
+          onRemoveFilter={handleRemoveFilter}
+          onResetFilters={handleResetFilters}
+          onApplyFilters={handleApplyFilters}
+          onToggleExclude={handleToggleExclude}
+          onApplyExcluded={handleApplyExcluded}
         />
 
         <div className="flex-1 overflow-y-auto p-6 pt-4 bg-gray-50 dark:bg-gray-900/50">
@@ -447,15 +480,15 @@ export const EDAPage: React.FC = () => {
             {activeTab === 'decomposition' && selectedDataset && (
                 <DecompositionTab
                     datasetId={selectedDataset}
-                columns={allColumns}
-                    initialFilters={filters}
+                    columns={allColumns}
+                    initialFilters={filtersApplied}
                 />
             )}
 
             {activeTab === 'sample' && profile.sample_data && (
                 <SampleDataTab
                     profile={profile}
-                excludedCols={excludedColsDraft}
+                    excludedCols={excludedColsDraft}
                     handleToggleExclude={handleToggleExclude}
                 />
             )}

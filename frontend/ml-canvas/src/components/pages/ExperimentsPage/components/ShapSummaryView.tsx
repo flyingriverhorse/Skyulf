@@ -12,9 +12,12 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import { useChartTheme } from '../../../../core/hooks/useChartTheme';
+import { shortRunId } from '../utils/jobMeta';
 
 export interface ShapSummaryEntry {
   jobId: string;
+  pipeline_id: string;
+  parent_pipeline_id?: string | null;
   modelType: string;
   shapSummary: Record<string, number> | null;
 }
@@ -79,7 +82,7 @@ export const ShapSummaryView: React.FC<Props> = ({
     const chartData = topFeatures.map(feature => {
       const row: Record<string, string | number> = { feature };
       normalized.forEach(j => {
-        const shortId = j.jobId.slice(0, 8);
+        const shortId = shortRunId(j);
         const label = j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
         row[label] = j.shapSummary[feature] ?? 0;
       });
@@ -87,7 +90,7 @@ export const ShapSummaryView: React.FC<Props> = ({
     });
 
     const barKeys = normalized.map((j) => {
-      const shortId = j.jobId.slice(0, 8);
+      const shortId = shortRunId(j);
       return j.modelType !== 'unknown' ? `${j.modelType} (${shortId})` : shortId;
     });
 

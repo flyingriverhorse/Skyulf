@@ -9,6 +9,7 @@ plus a small JSON-on-disk fallback for the "json" storage backend.
 import json
 import logging
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -42,6 +43,9 @@ router = APIRouter(tags=["ML Pipeline"])
 # character outright, so the on-disk path can never leave `storage_dir`
 # regardless of how it's later joined/formatted.
 _SAFE_DATASET_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+# Sentinel the audit-log `actor` filter uses to mean "saves with no user_id".
+ANONYMOUS_ACTOR = "__anonymous__"
 
 
 def _pipeline_json_path(storage_dir: str | Path, dataset_id: str) -> Path:
@@ -305,6 +309,10 @@ def _diff_versions(prev: Any, curr: Any) -> dict[str, Any]:
 async def get_pipeline_audit_log(
     dataset_source_id: str,
     limit: int | None = None,
+    actor: str | None = None,
+    kind: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
     session: AsyncSession = Depends(get_async_session),
 ) -> dict[str, Any]:
     """Return a chronological audit trail for one dataset's pipeline.
@@ -312,13 +320,46 @@ async def get_pipeline_audit_log(
     Each entry is a saved `PipelineVersion` augmented with a per-node diff
     against its immediate predecessor. The first version has no predecessor
     so its diff lists every node as `added`.
+
+    Args:
+        dataset_source_id: Dataset whose pipeline history is returned.
+        limit: Maximum entries to return, capped at 200.
+        actor: Restrict to saves made by this `user_id`, or `ANONYMOUS_ACTOR`
+            to select saves that have no `user_id`.
+        kind: Restrict to saves of this kind (e.g. `save`, `autosave`).
+        created_after: ISO-8601 lower bound (inclusive) on `created_at`.
+        created_before: ISO-8601 upper bound (inclusive) on `created_at`.
+
+    Returns:
+        A mapping with the dataset id, `total` matching the applied filters,
+        `total_unfiltered`, `facets` of every actor/kind in the full history,
+        the echoed `filters`, and the capped `entries`.
+
+    Raises:
+        HTTPException: If `created_after`/`created_before` is not ISO-8601.
     """
     default_limit = get_settings().DEFAULT_PAGE_SIZE
     capped_limit = max(1, min(int(limit or default_limit), 200))
+
+    def _parse_bound(raw: str | None, field: str) -> datetime | None:
+        if raw is None:
+            return None
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field} must be an ISO-8601 datetime, got {raw!r}",
+            ) from exc
+
+    after = _parse_bound(created_after, "created_after")
+    before = _parse_bound(created_before, "created_before")
+
     versions = await PipelineVersionsService.list_versions(session, dataset_source_id)
-    # Service returns newest-first; walk oldest->newest so each diff sees the
-    # prior version, then re-reverse for the response.
-    chronological = list(reversed(versions))
+    # `list_versions` sorts pinned-first for the version picker, which is not a
+    # chronological ordering — reversing it would diff a version against the
+    # wrong predecessor. Sort on `version_int` so each diff sees true history.
+    chronological = sorted(versions, key=lambda v: v.version_int)
     entries: list[dict[str, Any]] = []
     prev_graph: Any = None
     for v in chronological:
@@ -337,13 +378,60 @@ async def get_pipeline_audit_log(
                 "diff": diff,
             }
         )
+        # Advance the baseline for every version, including filtered-out ones,
+        # so a filtered view still reports each entry's real change.
         prev_graph = v.graph
+
+    total_unfiltered = len(entries)
+    # Facets are computed before filtering so the client's dropdowns list every
+    # actor/kind in the dataset's history, not only those on the current page.
+    # Actor ids are stringified because they arrive back as query-string values.
+    facet_actors = sorted({str(e["user_id"]) for e in entries if e["user_id"] is not None})
+    facet_kinds = sorted({e["kind"] for e in entries if e["kind"] is not None})
+    has_anonymous_actor = any(e["user_id"] is None for e in entries)
+
+    def _matches(entry: dict[str, Any]) -> bool:
+        if actor is not None:
+            # Saves made outside an authenticated session have no `user_id`;
+            # ANONYMOUS_ACTOR is the only way for a client to select them.
+            # `user_id` may be an int, so compare on its string form.
+            if actor == ANONYMOUS_ACTOR:
+                if entry["user_id"] is not None:
+                    return False
+            elif entry["user_id"] is None or str(entry["user_id"]) != actor:
+                return False
+        if kind is not None and entry["kind"] != kind:
+            return False
+        if after is not None or before is not None:
+            raw = entry["created_at"]
+            if raw is None:
+                return False
+            stamp = datetime.fromisoformat(raw)
+            if after is not None and stamp < after:
+                return False
+            if before is not None and stamp > before:
+                return False
+        return True
+
+    entries = [e for e in entries if _matches(e)]
     # Newest-first for UI consumption; cap after the diff walk so each
     # `diff` is computed against its true predecessor, not a window edge.
     entries.reverse()
     return {
         "dataset_source_id": dataset_source_id,
         "total": len(entries),
+        "total_unfiltered": total_unfiltered,
+        "facets": {
+            "actors": facet_actors,
+            "kinds": facet_kinds,
+            "has_anonymous_actor": has_anonymous_actor,
+        },
+        "filters": {
+            "actor": actor,
+            "kind": kind,
+            "created_after": created_after,
+            "created_before": created_before,
+        },
         "entries": entries[:capped_limit],
     }
 

@@ -95,12 +95,13 @@ describe('EDAPage dataset selector', () => {
     vi.mocked(EDAService.getReport).mockResolvedValue({} as never);
     useEDAStore.setState({
       activeTab: 'dashboard',
-      selectedDataset: null,
+      selectedDataset: 101,
       targetCol: '',
       taskType: '',
       excludedColsDraft: [],
       excludedColsApplied: [],
-      filters: [],
+      filtersDraft: [],
+      filtersApplied: [],
       scatter: {
         x: '',
         y: '',
@@ -136,5 +137,104 @@ describe('EDAPage dataset selector', () => {
 
     fireEvent.change(datasetSelect, { target: { value: '202' } });
     expect(datasetSelect).toHaveValue('202');
+  });
+});
+
+describe('EDAPage filter workflow', () => {
+  it('keeps filter edits draft-only until Apply is pressed and blocks duplicate submits', async () => {
+    vi.mocked(DatasetService.getUsable).mockResolvedValue([
+      {
+        id: '101',
+        source_id: 'source-a',
+        name: 'EDA dataset',
+        type: 'file',
+        created_at: '2026-08-07T08:00:00.000Z',
+        rows: 1200,
+        columns: 12,
+        format: 'csv',
+      },
+    ] as Dataset[]);
+    vi.mocked(EDAService.getLatestReport).mockResolvedValue({
+      id: 11,
+      status: 'COMPLETED',
+      profile_data: {
+        columns: {
+          age: {},
+          income: {},
+        },
+      },
+    } as never);
+    vi.mocked(EDAService.getHistory).mockResolvedValue([] as never);
+    let resolveAnalyze: (() => void) | undefined;
+    vi.mocked(EDAService.analyze).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        resolveAnalyze = () => resolve({} as never);
+      }),
+    );
+    useEDAStore.setState({
+    activeTab: 'dashboard',
+    selectedDataset: null,
+      targetCol: '',
+      taskType: '',
+      excludedColsDraft: [],
+      excludedColsApplied: [],
+      filtersDraft: [],
+      filtersApplied: [],
+      scatter: {
+        x: '',
+        y: '',
+        z: '',
+        color: '',
+        is3D: false,
+        isPCA3D: false,
+      },
+    });
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={['/eda?dataset_id=101']}>
+          <EDAPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const addFilterButton = await screen.findByRole('button', { name: /Add Filter/i });
+    fireEvent.click(addFilterButton);
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter column' }), {
+      target: { value: 'age' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Filter operator' }), {
+      target: { value: '>' },
+    });
+    fireEvent.change(screen.getByRole('textbox', { name: 'Filter value' }), {
+      target: { value: '18' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save draft/i }));
+
+    expect(EDAService.analyze).not.toHaveBeenCalled();
+    expect(useEDAStore.getState().filtersDraft).toHaveLength(1);
+    expect(useEDAStore.getState().filtersApplied).toHaveLength(0);
+    expect(screen.getByText(/Draft Filters \(1\)/)).toBeInTheDocument();
+    const applyButton = screen.getByRole('button', { name: /Apply filters/i });
+    await waitFor(() => expect(applyButton).toBeEnabled());
+    fireEvent.click(applyButton);
+    fireEvent.click(applyButton);
+
+    await waitFor(() => expect(EDAService.analyze).toHaveBeenCalledTimes(1));
+    expect(resolveAnalyze).toBeDefined();
+    resolveAnalyze?.();
+
+    // Once the draft has been applied there is nothing left to apply, so the
+    // control goes back to disabled rather than inviting a duplicate re-run.
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Apply filters/i })).toBeDisabled();
+    });
+    expect(useEDAStore.getState().filtersApplied).toHaveLength(1);
   });
 });

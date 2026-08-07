@@ -45,7 +45,8 @@ export interface EDAState {
    */
   excludedColsDraft: string[];
   excludedColsApplied: string[];
-  filters: EDAFilter[];
+  filtersDraft: EDAFilter[];
+  filtersApplied: EDAFilter[];
 
   // ── Visualisation picks ───────────────────────────────────────────
   scatter: ScatterAxes;
@@ -63,10 +64,12 @@ export interface EDAState {
   /** Copy draft → applied. Caller is responsible for kicking off re-analysis. */
   applyExcluded: () => void;
 
-  addFilter: (filter: EDAFilter) => void;
-  removeFilter: (index: number) => void;
-  clearFilters: () => void;
-  setFilters: (filters: EDAFilter[]) => void;
+  addFilterDraft: (filter: EDAFilter) => void;
+  removeFilterDraft: (index: number) => void;
+  clearFiltersDraft: () => void;
+  setFiltersDraft: (filters: EDAFilter[]) => void;
+  setFiltersApplied: (filters: EDAFilter[]) => void;
+  applyFilters: () => void;
 
   setScatter: (patch: Partial<ScatterAxes>) => void;
 
@@ -83,6 +86,14 @@ const EMPTY_SCATTER: ScatterAxes = {
   isPCA3D: false,
 };
 
+const filterSignature = (filter: EDAFilter): string =>
+  `${filter.column}\u001f${filter.operator}\u001f${JSON.stringify(filter.value)}`;
+
+const areFiltersEqual = (left: EDAFilter[], right: EDAFilter[]): boolean => {
+  if (left.length !== right.length) return false;
+  return left.every((filter, index) => filterSignature(filter) === filterSignature(right[index]!));
+};
+
 export const useEDAStore = create<EDAState>((set, get) => ({
   activeTab: 'dashboard',
   selectedDataset: null,
@@ -90,7 +101,8 @@ export const useEDAStore = create<EDAState>((set, get) => ({
   taskType: '',
   excludedColsDraft: [],
   excludedColsApplied: [],
-  filters: [],
+  filtersDraft: [],
+  filtersApplied: [],
   scatter: { ...EMPTY_SCATTER },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -112,11 +124,14 @@ export const useEDAStore = create<EDAState>((set, get) => ({
   setExcludedApplied: (cols) => set({ excludedColsApplied: cols }),
   applyExcluded: () => set({ excludedColsApplied: [...get().excludedColsDraft] }),
 
-  addFilter: (filter) => set((state) => ({ filters: [...state.filters, filter] })),
-  removeFilter: (index) =>
-    set((state) => ({ filters: state.filters.filter((_, i) => i !== index) })),
-  clearFilters: () => set({ filters: [] }),
-  setFilters: (filters) => set({ filters }),
+  addFilterDraft: (filter) =>
+    set((state) => ({ filtersDraft: [...state.filtersDraft, filter] })),
+  removeFilterDraft: (index) =>
+    set((state) => ({ filtersDraft: state.filtersDraft.filter((_, i) => i !== index) })),
+  clearFiltersDraft: () => set({ filtersDraft: [] }),
+  setFiltersDraft: (filters) => set({ filtersDraft: filters }),
+  setFiltersApplied: (filters) => set({ filtersApplied: filters }),
+  applyFilters: () => set((state) => ({ filtersApplied: [...state.filtersDraft] })),
 
   setScatter: (patch) => set((state) => ({ scatter: { ...state.scatter, ...patch } })),
 
@@ -124,7 +139,8 @@ export const useEDAStore = create<EDAState>((set, get) => ({
     set({
       excludedColsDraft: [],
       excludedColsApplied: [],
-      filters: [],
+      filtersDraft: [],
+      filtersApplied: [],
       targetCol: '',
       activeTab: 'dashboard',
       scatter: { ...EMPTY_SCATTER },
@@ -133,7 +149,7 @@ export const useEDAStore = create<EDAState>((set, get) => ({
 
 /**
  * Selector — the draft and applied lists differ. EDAPage uses this to
- * decide whether to enable the "Apply Exclusions" button.
+ * decide whether to enable the "Apply Filters" button.
  */
 export const selectExcludedDirty = (state: EDAState): boolean => {
   if (state.excludedColsApplied.length !== state.excludedColsDraft.length) return true;
@@ -143,3 +159,7 @@ export const selectExcludedDirty = (state: EDAState): boolean => {
   }
   return false;
 };
+
+/** Selector — filters are dirty whenever the draft differs from the applied snapshot. */
+export const selectFiltersDirty = (state: EDAState): boolean =>
+  !areFiltersEqual(state.filtersDraft, state.filtersApplied);

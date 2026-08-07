@@ -200,4 +200,12 @@ describe('EvaluationView — Threshold Slider / Threshold Tuning tabs', () => {
     expect(screen.queryByText(/Click Preview above/)).not.toBeInTheDocument();
     expect(screen.getByText('a vs Rest')).toBeInTheDocument();
   });
+
+  it('renders a retry button when evaluation loading fails', () => {
+    const fetchEvaluationData = vi.fn();
+    render(<EvaluationView {...baseProps({ evalError: 'Failed to fetch evaluation data', fetchEvaluationData })} />);
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(fetchEvaluationData).toHaveBeenCalledTimes(1);
+    expect(fetchEvaluationData).toHaveBeenCalledWith('job-1');
+  });
 });

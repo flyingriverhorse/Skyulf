@@ -30,7 +30,7 @@ import {
     User as UserIcon,
 } from 'lucide-react';
 import { useUsableDatasets } from '../core/hooks/useDatasets';
-import { pipelineVersionsApi, AuditLogResponse, AuditLogEntry } from '../core/api/pipelineVersions';
+import { pipelineVersionsApi, AuditLogResponse, AuditLogEntry, ANONYMOUS_ACTOR } from '../core/api/pipelineVersions';
 import { toast } from '../core/toast';
 
 const LIMIT_OPTIONS: ReadonlyArray<number> = [25, 50, 100, 200];
@@ -220,6 +220,10 @@ export const AuditLogPage: React.FC = () => {
     const { data: datasets, isLoading: datasetsLoading } = useUsableDatasets();
     const [datasetId, setDatasetId] = useState<string>('');
     const [limit, setLimit] = useState<number>(50);
+    const [actorFilter, setActorFilter] = useState<string>('all');
+    const [kindFilter, setKindFilter] = useState<string>('all');
+    const [fromTime, setFromTime] = useState<string>('');
+    const [toTime, setToTime] = useState<string>('');
     const [data, setData] = useState<AuditLogResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -243,7 +247,12 @@ export const AuditLogPage: React.FC = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const resp = await pipelineVersionsApi.audit(datasetId, limit);
+            const resp = await pipelineVersionsApi.audit(datasetId, limit, {
+                ...(actorFilter !== 'all' ? { actor: actorFilter } : {}),
+                ...(kindFilter !== 'all' ? { kind: kindFilter } : {}),
+                ...(fromTime ? { createdAfter: fromTime } : {}),
+                ...(toTime ? { createdBefore: toTime } : {}),
+            });
             if (myRequestId !== requestIdRef.current) return;
             setData(resp);
         } catch (e) {
@@ -254,7 +263,7 @@ export const AuditLogPage: React.FC = () => {
         } finally {
             if (myRequestId === requestIdRef.current) setIsLoading(false);
         }
-    }, [datasetId, limit]);
+    }, [datasetId, limit, actorFilter, kindFilter, fromTime, toTime]);
 
     useEffect(() => {
         void load();
@@ -282,6 +291,47 @@ export const AuditLogPage: React.FC = () => {
             modified,
         };
     }, [data]);
+
+    // Facets come from the server's pre-filter pass, so selecting one actor
+    // never removes the other actors from the dropdown.
+    const actorOptions = useMemo(
+        () => ({
+            hasAnonymous: data?.facets?.has_anonymous_actor ?? false,
+            userIds: data?.facets?.actors ?? [],
+        }),
+        [data],
+    );
+
+    const kindOptions = useMemo(() => data?.facets?.kinds ?? [], [data]);
+
+    const datasetLabel = useMemo(() => {
+        const match = datasets?.find(d => resolveDatasetSourceId(d) === datasetId);
+        return match?.name ?? 'this dataset';
+    }, [datasets, datasetId]);
+
+    const filteredEntries = data?.entries ?? [];
+
+    const hasFilters =
+        actorFilter !== 'all' || kindFilter !== 'all' || fromTime !== '' || toTime !== '';
+    const matchingTotal = data?.total ?? 0;
+    const historyTotal = data?.total_unfiltered ?? 0;
+    const visibleCount = filteredEntries.length;
+    const limitLabel = `${limit}`;
+    const historyScopeText = data
+        ? hasFilters
+            ? `Showing ${visibleCount} of ${matchingTotal} matching saves for ${datasetLabel}. History total ${historyTotal}.`
+            : `Showing ${visibleCount} of ${historyTotal} saves for ${datasetLabel}.`
+        : null;
+    const historyMetaText = data
+        ? `Page limit ${limitLabel}. Newest first. Retention is not reported by the API. Filters are applied across the full history, not just this page.`
+        : null;
+    const emptyStateText = data
+        ? visibleCount === 0
+            ? historyTotal === 0
+                ? `No saves recorded for ${datasetLabel} yet. The audit API shows the newest ${limitLabel} saves first, but this dataset currently has no history. Retention is not reported by the API.`
+                : `No audit records match the current filters for ${datasetLabel}. Filters were applied across all ${historyTotal} saves, so widening them is the only way to see more. Retention is not reported by the API.`
+            : null
+        : null;
 
     return (
         <div className="p-6 max-w-7xl mx-auto">
@@ -339,6 +389,85 @@ export const AuditLogPage: React.FC = () => {
                         )}
                     </select>
                 </div>
+                <div className="min-w-[220px]">
+                    <label
+                        htmlFor="audit-actor"
+                        className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1"
+                    >
+                        Actor
+                    </label>
+                    <select
+                        id="audit-actor"
+                        value={actorFilter}
+                        onChange={e => setActorFilter(e.target.value)}
+                        disabled={!data}
+                        className="w-full px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    >
+                        <option value="all">All actors</option>
+                        {actorOptions.userIds.map(userId => (
+                            <option key={userId} value={userId}>
+                                user #{userId}
+                            </option>
+                        ))}
+                        {actorOptions.hasAnonymous && (
+                            <option value={ANONYMOUS_ACTOR}>anonymous</option>
+                        )}
+                    </select>
+                </div>
+                <div className="min-w-[180px]">
+                    <label
+                        htmlFor="audit-kind"
+                        className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1"
+                    >
+                        Action kind
+                    </label>
+                    <select
+                        id="audit-kind"
+                        value={kindFilter}
+                        onChange={e => setKindFilter(e.target.value)}
+                        disabled={!data}
+                        className="w-full px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    >
+                        <option value="all">All kinds</option>
+                        {kindOptions.map(kind => (
+                            <option key={kind} value={kind}>
+                                {kind}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="min-w-[190px]">
+                    <label
+                        htmlFor="audit-from"
+                        className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1"
+                    >
+                        From time
+                    </label>
+                    <input
+                        id="audit-from"
+                        type="datetime-local"
+                        value={fromTime}
+                        onChange={e => setFromTime(e.target.value)}
+                        disabled={!data}
+                        className="w-full px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    />
+                </div>
+                <div className="min-w-[190px]">
+                    <label
+                        htmlFor="audit-to"
+                        className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1"
+                    >
+                        To time
+                    </label>
+                    <input
+                        id="audit-to"
+                        type="datetime-local"
+                        value={toTime}
+                        onChange={e => setToTime(e.target.value)}
+                        disabled={!data}
+                        className="w-full px-3 py-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                    />
+                </div>
                 <div>
                     <span className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                         Limit
@@ -361,6 +490,12 @@ export const AuditLogPage: React.FC = () => {
                     </div>
                 </div>
             </div>
+            {data && (
+                <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">
+                    Filters apply only to the loaded page; the backend currently supports dataset
+                    and page limit only.
+                </p>
+            )}
 
             {error && (
                 <div className="mb-4 flex items-start gap-2 p-3 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm">
@@ -405,28 +540,30 @@ export const AuditLogPage: React.FC = () => {
                     </div>
                 ) : !data || data.entries.length === 0 ? (
                     <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                        No saves recorded for this dataset yet. Saves appear here automatically
-                        once you click Save on the canvas.
+                        {emptyStateText}
+                    </div>
+                ) : filteredEntries.length === 0 ? (
+                    <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        {emptyStateText}
                     </div>
                 ) : (
                     <div>
-                        {data.entries.map((entry, idx) => (
+                        {filteredEntries.map((entry, idx) => (
                             <AuditRow
                                 key={entry.id}
                                 entry={entry}
                                 // entries is newest-first; the chronologically-first save is
                                 // the LAST element in the array.
-                                isFirst={idx === data.entries.length - 1}
+                                isFirst={idx === filteredEntries.length - 1}
                             />
                         ))}
                     </div>
                 )}
             </div>
 
-            {data && data.entries.length > 0 && data.entries.length < data.total && (
+            {historyScopeText && (
                 <p className="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">
-                    Showing {data.entries.length} of {data.total} saves. Increase the limit to see
-                    older history.
+                    {historyScopeText} {historyMetaText}
                 </p>
             )}
         </div>

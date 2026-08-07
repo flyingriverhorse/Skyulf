@@ -19,8 +19,9 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Loader2, GitCompare } from 'lucide-react';
+import { ArrowLeftRight, GitCompare, Loader2 } from 'lucide-react';
 import { jobsApi } from '../../../core/api/jobs';
+import { shortRunId } from '../ExperimentsPage/utils/jobMeta';
 import {
   diffGraphs,
   type GraphDiff,
@@ -43,30 +44,80 @@ interface Props {
 
 const nodeTypes = { diff: DiffNode };
 
+type SnapshotState =
+  | { status: 'loading' }
+  | { status: 'ready'; graph: SideGraph }
+  | { status: 'missing' }
+  | { status: 'error'; message: string };
+
+const formatTimestamp = (timestamp?: string): string => {
+  if (!timestamp) return 'Unknown time';
+  const value = new Date(timestamp);
+  return Number.isNaN(value.getTime()) ? timestamp : value.toLocaleString();
+};
+
+const describeJob = (job: JobLite): string => {
+  const dataset = job.dataset_name ?? 'Unknown dataset';
+  const model = job.model_type ?? 'Unknown model';
+  return `${dataset} · ${model} · ${formatTimestamp(job.created_at)}`;
+};
+
+const snapshotMessage = (role: 'Baseline' | 'Candidate', job: JobLite, detail: string): string =>
+  `${role} run ${shortRunId(job)} (${describeJob(job)}) ${detail}. Re-run the pipeline or save the canvas snapshot, then compare again.`;
+
 export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
-  const [leftGraph, setLeftGraph] = useState<SideGraph | null>(null);
-  const [rightGraph, setRightGraph] = useState<SideGraph | null>(null);
+  const [swapped, setSwapped] = useState(false);
+  const [snapshots, setSnapshots] = useState<Record<string, SnapshotState>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Always diff in display order (sidebar's selection order). Two
-  // jobs is the supported case; we surface a guard message otherwise.
-  const [leftJob, rightJob] = jobs;
+  const selectedJobs = useMemo(
+    () => (jobs.length === 2 ? [jobs[0]!, jobs[1]!] : []),
+    [jobs],
+  );
+  const baselineJob = selectedJobs.length === 2 ? (swapped ? selectedJobs[1] : selectedJobs[0]) : undefined;
+  const candidateJob = selectedJobs.length === 2 ? (swapped ? selectedJobs[0] : selectedJobs[1]) : undefined;
 
   useEffect(() => {
-    if (!leftJob || !rightJob) {
-      setLeftGraph(null);
-      setRightGraph(null);
+    setSwapped(false);
+  }, [selectedJobs]);
+
+  useEffect(() => {
+    if (selectedJobs.length !== 2) {
+      setSnapshots({});
+      setLoading(false);
+      setError(null);
       return;
     }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    Promise.all([jobsApi.getJob(leftJob.job_id), jobsApi.getJob(rightJob.job_id)])
-      .then(([l, r]) => {
+    const [firstJob, secondJob] = selectedJobs as [JobLite, JobLite];
+    setSnapshots({
+      [firstJob.job_id]: { status: 'loading' },
+      [secondJob.job_id]: { status: 'loading' },
+    });
+    Promise.allSettled(selectedJobs.map(job => jobsApi.getJob(job.job_id)))
+      .then((results) => {
         if (cancelled) return;
-        setLeftGraph(readSideFromGraph(l.graph));
-        setRightGraph(readSideFromGraph(r.graph));
+        const next: Record<string, SnapshotState> = {};
+        results.forEach((result, index) => {
+          const job = selectedJobs[index];
+          if (!job) return;
+          if (result.status === 'fulfilled') {
+            if (!result.value.graph) {
+              next[job.job_id] = { status: 'missing' };
+              return;
+            }
+            next[job.job_id] = { status: 'ready', graph: readSideFromGraph(result.value.graph) };
+            return;
+          }
+          next[job.job_id] = {
+            status: 'error',
+            message: result.reason instanceof Error ? result.reason.message : 'Failed to load job graph',
+          };
+        });
+        setSnapshots(next);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -78,21 +129,25 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
     return () => {
       cancelled = true;
     };
-  }, [leftJob, rightJob]);
+  }, [selectedJobs]);
 
   const diff = useMemo<GraphDiff | null>(() => {
-    if (!leftGraph || !rightGraph) return null;
-    return diffGraphs(leftGraph.nodes, leftGraph.edges, rightGraph.nodes, rightGraph.edges);
-  }, [leftGraph, rightGraph]);
+    const baseline = baselineJob ? snapshots[baselineJob.job_id] : undefined;
+    const candidate = candidateJob ? snapshots[candidateJob.job_id] : undefined;
+    if (baseline?.status !== 'ready' || candidate?.status !== 'ready') return null;
+    return diffGraphs(baseline.graph.nodes, baseline.graph.edges, candidate.graph.nodes, candidate.graph.edges);
+  }, [baselineJob, candidateJob, snapshots]);
 
   const styled = useMemo(() => {
-    if (!leftGraph || !rightGraph || !diff) return null;
-    const { positions } = layoutUnified(leftGraph, rightGraph, diff.aliases);
+    const baseline = baselineJob ? snapshots[baselineJob.job_id] : undefined;
+    const candidate = candidateJob ? snapshots[candidateJob.job_id] : undefined;
+    if (baseline?.status !== 'ready' || candidate?.status !== 'ready' || !diff) return null;
+    const { positions } = layoutUnified(baseline.graph, candidate.graph, diff.aliases);
     return {
-      left: applyLayout(applyDiffStylingToSide(leftGraph, diff, 'left'), positions, diff.aliases),
-      right: applyLayout(applyDiffStylingToSide(rightGraph, diff, 'right'), positions, diff.aliases),
+      baseline: applyLayout(applyDiffStylingToSide(baseline.graph, diff, 'left'), positions, diff.aliases),
+      candidate: applyLayout(applyDiffStylingToSide(candidate.graph, diff, 'right'), positions, diff.aliases),
     };
-  }, [leftGraph, rightGraph, diff]);
+  }, [baselineJob, candidateJob, snapshots, diff]);
 
   if (jobs.length !== 2) {
     return (
@@ -119,15 +174,51 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
     );
   }
 
-  if (error) {
+  const baselineSnapshot = baselineJob ? snapshots[baselineJob.job_id] : undefined;
+  const candidateSnapshot = candidateJob ? snapshots[candidateJob.job_id] : undefined;
+  const snapshotIssue = [baselineSnapshot, candidateSnapshot].find(
+    (snapshot) => snapshot && snapshot.status !== 'ready',
+  );
+  if (snapshotIssue && baselineJob && candidateJob) {
+    const baselineMessage =
+      baselineSnapshot?.status === 'missing'
+        ? snapshotMessage('Baseline', baselineJob, 'has no saved pipeline snapshot')
+        : baselineSnapshot?.status === 'error'
+          ? snapshotMessage('Baseline', baselineJob, `could not be loaded: ${baselineSnapshot.message}`)
+          : null;
+    const candidateMessage =
+      candidateSnapshot?.status === 'missing'
+        ? snapshotMessage('Candidate', candidateJob, 'has no saved pipeline snapshot')
+        : candidateSnapshot?.status === 'error'
+          ? snapshotMessage('Candidate', candidateJob, `could not be loaded: ${candidateSnapshot.message}`)
+          : null;
     return (
-      <div className="rounded-md border border-red-500/40 bg-red-500/5 p-4 text-sm text-red-600 dark:text-red-400">
-        Failed to load pipeline graphs: {error}
+      <div className="space-y-3 rounded-md border bg-card p-4 text-sm text-muted-foreground">
+        <div className="flex items-start gap-3 text-foreground">
+          <GitCompare className="mt-0.5 h-5 w-5 shrink-0" />
+          <div>
+            <div className="font-medium">Pipeline Diff needs two saved snapshots</div>
+            <p className="text-muted-foreground">
+              Selection order sets the baseline first and the candidate second; use Swap to flip the roles.
+            </p>
+          </div>
+        </div>
+        {baselineMessage && <p>{baselineMessage}</p>}
+        {candidateMessage && <p>{candidateMessage}</p>}
       </div>
     );
   }
 
-  if (!styled || !diff || !leftJob || !rightJob) return null;
+  if (error) {
+    return (
+      <div className="rounded-md border border-red-500/40 bg-red-500/5 p-4 text-sm text-red-600 dark:text-red-400">
+        Failed to load pipeline graphs for {baselineJob ? describeJob(baselineJob) : 'baseline'} and{' '}
+        {candidateJob ? describeJob(candidateJob) : 'candidate'}: {error}. Re-run the comparison or refresh the page.
+      </div>
+    );
+  }
+
+  if (!styled || !diff || !baselineJob || !candidateJob) return null;
 
   const summary = diff.summary;
   const modifiedNodes = Array.from(diff.nodes.values()).filter(
@@ -137,66 +228,76 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
   return (
     <div className="space-y-4">
       <div className="rounded-md border bg-card p-4">
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="font-medium">Diff summary:</span>
-          {summary.nodesAdded > 0 && (
-            <span className="inline-flex items-center gap-1.5">
-              <StatusDot status="added" /> {summary.nodesAdded} added
-            </span>
-          )}
-          {summary.nodesRemoved > 0 && (
-            <span className="inline-flex items-center gap-1.5">
-              <StatusDot status="removed" /> {summary.nodesRemoved} removed
-            </span>
-          )}
-          {summary.nodesModified > 0 && (
-            <span className="inline-flex items-center gap-1.5">
-              <StatusDot status="modified" /> {summary.nodesModified} modified
-            </span>
-          )}
-          <span className="text-muted-foreground">
-            {summary.nodesUnchanged} unchanged
-            {summary.nodesRenamed > 0 && ` (${summary.nodesRenamed} renamed across runs)`}
-            {(summary.edgesAdded > 0 || summary.edgesRemoved > 0) && (
-              <> · edges {summary.edgesAdded}+ / {summary.edgesRemoved}−</>
+        <div className="flex flex-wrap items-start justify-between gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-medium">Diff summary:</span>
+            {summary.nodesAdded > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <StatusDot status="added" /> {summary.nodesAdded} added
+              </span>
             )}
-          </span>
+            {summary.nodesRemoved > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <StatusDot status="removed" /> {summary.nodesRemoved} removed
+              </span>
+            )}
+            {summary.nodesModified > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <StatusDot status="modified" /> {summary.nodesModified} modified
+              </span>
+            )}
+            <span className="text-muted-foreground">
+              {summary.nodesUnchanged} unchanged
+              {summary.nodesRenamed > 0 && ` (${summary.nodesRenamed} renamed across runs)`}
+              {(summary.edgesAdded > 0 || summary.edgesRemoved > 0) && (
+                <> · edges {summary.edgesAdded}+ / {summary.edgesRemoved}−</>
+              )}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
+            onClick={() => setSwapped((current) => !current)}
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+            Swap
+          </button>
         </div>
         {modifiedNodes.length === 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
-            No structural or config differences detected — the two pipelines are functionally
-            identical (only run-time results differ).
+            No structural or config differences detected between {describeJob(baselineJob)} and{' '}
+            {describeJob(candidateJob)}. Swap the roles or re-run after saving a changed pipeline
+            if you expected a different result.
           </p>
         )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          Baseline uses the first selected run and Candidate uses the second selected run unless you
+          swap them.
+        </p>
       </div>
 
-      {/* Stacked top/bottom (Baseline above Candidate) so each canvas
-          gets the full container width — linear pipelines fit on a
-          single row instead of squeezing into half-width side-by-side
-          panels. The unified layout still keeps unchanged nodes at
-          the same X coordinate so the eye scans straight up/down. */}
       <div className="flex flex-col gap-4">
-        {(['left', 'right'] as const).map((side) => {
-          const job = side === 'left' ? leftJob : rightJob;
-          const sideGraph = side === 'left' ? styled.left : styled.right;
+        {([
+          ['Baseline', baselineJob, styled.baseline],
+          ['Candidate', candidateJob, styled.candidate],
+        ] as const).map(([role, job, sideGraph]) => {
           return (
             <div
-              key={side}
+              key={role}
               className="rounded-md border bg-card overflow-hidden flex flex-col"
               style={{ height: 320 }}
             >
-              <div className="px-3 py-2 border-b text-xs flex items-center justify-between bg-muted/30">
-                <div className="truncate">
-                  <span className="font-semibold mr-2">
-                    {side === 'left' ? 'Baseline' : 'Candidate'}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {job.model_type ?? job.job_id.slice(0, 8)}
-                  </span>
+              <div className="px-3 py-2 border-b text-xs flex items-start justify-between gap-3 bg-muted/30">
+                <div className="min-w-0 truncate">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{role}</span>
+                    <span className="text-muted-foreground font-mono">{shortRunId(job)}</span>
+                  </div>
+                  <div className="text-muted-foreground">
+                    {job.dataset_name ?? 'Unknown dataset'} · {job.model_type ?? 'Unknown model'} ·{' '}
+                    {formatTimestamp(job.created_at)}
+                  </div>
                 </div>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  {job.job_id.slice(0, 8)}
-                </span>
               </div>
               <div className="flex-1 min-h-0">
                 <ReactFlowProvider>
