@@ -218,7 +218,13 @@ observed. The evidence/delta prose for each still records the upgrade nuance.
 ### Final Validation (2026-08-07)
 
 Task 8 re-ran the complete brief-required validation against the corrected
-roadmap (post Task 7 review-correction commit) from `frontend/ml-canvas/`:
+roadmap (post Task 7 review-correction commit) from `frontend/ml-canvas/`.
+A review of that Task 8 pass found that its recorded baseline numbers had
+been carried over from an earlier, uncommitted evidence pass rather than
+physically re-executed at commit time. This subsection now reflects a
+genuinely fresh baseline, with every command below re-executed after the
+prior final-validation commit (`docs: finalize frontend UX audit rerun`,
+`6f8d594a`) and its review, not reused from that earlier pass:
 
 - **Measured:** the brief's placeholder/vague-language scan (checking for
   incomplete-language markers and hedging phrases) against
@@ -232,25 +238,32 @@ roadmap (post Task 7 review-correction commit) from `frontend/ml-canvas/`:
 - **Measured:** full frontend baseline rerun — `npm run lint` **pass**
   (exit `0`, no warnings); `npx tsc --project tsconfig.json --noEmit`
   **pass** (exit `0`, no diagnostics); `npm run build` **pass** (exit `0`,
-  `2996` modules transformed) with a **byte-identical chunk manifest** versus
-  the Task 1 baseline recorded above (every filename, content hash, raw size,
-  and gzip size matches exactly); `npm run test -- --reporter=dot` **pass**
-  (exit `0`, `335/335` tests across `40/40` files); `npm run size-check`
-  **pass** (exit `0`, all chunks within budget, sizes byte-identical to the
-  Task 1 table above).
+  `2996` modules transformed, `14` emitted asset chunks, repeating the same
+  `Circular chunk: vendor-flow -> vendor-charts -> vendor-flow` and
+  `Generated an empty chunk: "vendor-react"` warnings) — this fresh build's
+  own chunk output was diffed against the Task 1 baseline table recorded
+  above and every filename (content hash), raw size, and gzip size matched
+  exactly, so the manifest is confirmed byte-identical by this rerun itself,
+  not merely asserted from a prior pass; `npm run test -- --reporter=dot`
+  **pass** (exit `0`, `335/335` tests across `40/40` files); `npm run
+  size-check` **pass** (exit `0`, all chunks within budget, sizes matching
+  the Task 1 table above exactly, likewise freshly diffed rather than
+  assumed).
 - **Measured:** `npm run test:e2e -- --project=chromium` — **all 12 tests
   fail** (exit `1`), every failure for the identical cause already recorded
   in the Task 1 baseline: the Chromium `chrome-headless-shell` executable for
   revision `1217` is missing from
-  `~/Library/Caches/ms-playwright/` in this environment. This is an
+  `~/Library/Caches/ms-playwright/` in this environment, and Playwright's own
+  output advises running `npx playwright install`. This is an
   environment/tooling gap (missing browser binary), not a product or roadmap
   defect, and is **not** claimed as passing; it is recorded as an
   unresolved, out-of-scope environment limitation per audit rules (no
   product/environment fix applied).
-- **Measured:** zero baseline drift — every command above produced the same
-  exit code, counts, warnings, and (for build/size-check) the same
-  byte-for-byte output as this rerun's own Task 1 baseline; no further
-  regression or improvement occurred between Task 1 and this final
+- **Measured:** zero baseline drift — this fresh rerun produced the same
+  exit code, counts, and warnings as the Task 1 baseline for every command
+  above, and the build/size-check outputs were directly compared
+  line-for-line against the Task 1 table and found byte-for-byte identical;
+  no regression or improvement occurred between Task 1 and this fresh final
   validation pass.
 - **Measured:** repository scope — `git diff --check` exits `0` (no
   whitespace/conflict-marker errors); `git status --short` shows only the
@@ -260,10 +273,12 @@ roadmap (post Task 7 review-correction commit) from `frontend/ml-canvas/`:
   preserved. No product code, dependency, completed-plan cleanup, or
   progress-ledger change was made or is claimed by this validation.
 
-**Conclusion:** the rerun is validated as internally consistent and
-implementation-ready. The only outstanding item is the pre-existing,
-environment-caused Chromium E2E gap above, which remains explicitly
-unresolved and undisguised in this record.
+**Conclusion:** this fresh rerun is validated as internally consistent and
+implementation-ready, and corrects the prior report's gap by physically
+re-executing every baseline command rather than reusing earlier numbers.
+The only outstanding item is the pre-existing, environment-caused Chromium
+E2E gap above, which remains explicitly unresolved and undisguised in this
+record.
 
 ### Task 2 — Shared Foundations Rerun
 
