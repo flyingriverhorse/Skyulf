@@ -98,10 +98,10 @@ Expected: `Synced version to 0.7.5 (from pyproject.toml).`
 Run:
 
 ```bash
-uv lock
+uv lock --offline
 ```
 
-Expected: the workspace package `skyulf` changes to `0.7.5`; no third-party package versions change.
+Expected: the workspace package `skyulf` changes to `0.7.5`; no third-party package versions change; `uv.lock` makes no additional diff after the offline refresh.
 
 - [ ] **Step 6: Verify no third-party lock versions changed**
 
@@ -160,7 +160,7 @@ assert lock["packages"][""]["version"] == "0.7.5"
 assert changelog.startswith("# Changelog — 0.7.x Series\\n\\n## v0.7.5\\n\\n## v0.7.4")
 PY
 cd frontend/ml-canvas && npm run check-version
-cd ../.. && python skyulf-core/setup.py --version
+cd ../.. && (cd skyulf-core && python setup.py --version)
 uv lock --check
 ```
 
