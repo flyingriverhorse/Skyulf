@@ -29,6 +29,7 @@ class MergeMixin:
     merge_warnings: list[dict[str, Any]]
     log: Callable[[str], None]
     _resolve_all_inputs: Any
+    _merge_input_order: Any
     _ancestors_of: Any
     """Frame coercion + multi-input merging split out of :class:`PipelineEngine`."""
 
@@ -306,7 +307,7 @@ class MergeMixin:
         independent siblings off a shared ancestor get fanned in (the
         "Path A" UX trap), because the user likely meant a sequential chain.
         """
-        unique_inputs = list(dict.fromkeys(node.inputs or []))
+        unique_inputs = self._merge_input_order(node)
         if len(unique_inputs) <= 1:
             return
 
@@ -332,7 +333,7 @@ class MergeMixin:
         # noqa: B905 -- `artifacts` may be shorter than `node.inputs` when duplicate
         # input edges are deduped in `_resolve_all_inputs`; `strict=True` would raise
         # in that legitimate case, so the length mismatch is intentional here.
-        for input_id, art in zip(node.inputs, artifacts):  # noqa: B905
+        for input_id, art in zip(self._merge_input_order(node), artifacts):  # noqa: B905
             if hasattr(art, "predict") or (hasattr(art, "fit") and not hasattr(art, "transform")):
                 raise ValueError(
                     f"Node {node.node_id}: input from '{input_id}' is a Model object "
@@ -517,6 +518,7 @@ class MergeMixin:
             {
                 "node_id": node.node_id,
                 "kind": "upstream_drop_reapplied",
+                "inputs": self._merge_input_order(node),
                 "dropped_columns": restored,
             }
         )
