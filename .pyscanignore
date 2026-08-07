@@ -7,3 +7,10 @@
 # Bumping to the fixed 26.x line would re-flow the entire codebase (a separate,
 # deliberate change). Tracked for a future formatter upgrade.
 GHSA-3936-cmfr-pm3m
+
+# GHSA-wj6h-64fc-37mp — python-ecdsa 0.19.2 is vulnerable to a Minerva
+# timing attack, but no patched release exists. The package is transitive via
+# python-jose's optional ECDSA support; Skyulf authentication uses asymmetric
+# cryptography-backed algorithms rather than ECDSA signing.
+GHSA-wj6h-64fc-37mp
+PYSEC-2026-1325
