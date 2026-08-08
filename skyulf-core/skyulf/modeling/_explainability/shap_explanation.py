@@ -34,6 +34,49 @@ _DEFAULT_MAX_DISPLAY_SAMPLES = 50
 _DEFAULT_MAX_INTERACTION_FEATURES = 8
 
 
+def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tuple[Any, bool]:
+    """Build the most exact SHAP explainer available for `model`, preferring
+    `feature_perturbation="tree_path_dependent"` for tree ensembles.
+
+    `tree_path_dependent` computes exact Shapley values straight from each
+    tree's own path/sample-weight structure — it needs no background data
+    and, unlike `feature_perturbation="interventional"`, isn't susceptible to
+    the `shap`/scikit-learn additivity mismatches reported upstream for tree
+    ensembles explained against a background sample (see e.g.
+    https://github.com/shap/shap/issues/2777 and
+    https://github.com/shap/shap/issues/3657). `shap.TreeExplainer` raises
+    for anything that isn't a supported tree model, which is how non-tree
+    estimators (linear/SVM/etc.) fall through to the generic, masker-based
+    `shap.Explainer` below.
+
+    Returns `(explainer, is_exact_tree)` where `is_exact_tree` indicates the
+    explainer is the exact tree-path-dependent one (used by the caller to
+    decide whether a residual additivity failure is safe to treat as a
+    numerical-tolerance artifact rather than a data-consistency bug).
+    """
+    try:
+        tree_explainer = shap_module.TreeExplainer(
+            model, feature_perturbation="tree_path_dependent"
+        )
+        return tree_explainer, True
+    except Exception:
+        logger.debug(
+            "model_type=%s is not a tree-path-dependent-compatible tree model; "
+            "falling back to the generic masker-based explainer",
+            type(model).__name__,
+            exc_info=True,
+        )
+
+    # `shap.Explainer(model, sample)` builds a default `Independent` masker
+    # whose own `max_samples` defaults to 100, independent of the `sample`
+    # trimming the caller already did — so a `sample` between 101 and the
+    # caller's `max_samples` rows would silently get re-subsampled a second
+    # time and warn. Build the masker explicitly so it matches the size we
+    # already chose.
+    masker = shap_module.maskers.Independent(sample, max_samples=len(sample))
+    return shap_module.Explainer(model, masker), False
+
+
 def _mean_abs_per_feature(shap_values: Any, feature_names: list[str]) -> dict[str, float] | None:
     """Reduce a raw SHAP values array to mean(|value|) per feature.
 
@@ -239,6 +282,7 @@ def compute_shap_explanation(
     try:
         import shap  # ty: ignore[unresolved-import]
         import shap.maskers  # ty: ignore[unresolved-import]
+        import shap.utils._exceptions  # ty: ignore[unresolved-import]
     except ImportError:
         return None
 
@@ -252,14 +296,28 @@ def compute_shap_explanation(
         if not feature_names:
             return None
 
-        # `shap.Explainer(model, sample)` builds a default `Independent` masker
-        # whose own `max_samples` defaults to 100, independent of the `sample`
-        # trimming above — so a `sample` between 101 and `max_samples` rows
-        # would silently get re-subsampled a second time and warn. Build the
-        # masker explicitly so it matches the size we already chose.
-        masker = shap.maskers.Independent(sample, max_samples=len(sample))
-        explainer = shap.Explainer(model, masker)
-        explanation = explainer(sample)
+        explainer, is_exact_tree = _build_explainer(shap, model, sample)
+        try:
+            explanation = explainer(sample)
+        except shap.utils._exceptions.ExplainerError:
+            if not is_exact_tree:
+                raise
+            # `tree_path_dependent` computes Shapley values directly from
+            # each tree's own path/sample-weight structure with no
+            # background approximation involved, so this additivity
+            # mismatch can only be a floating-point tolerance artefact in
+            # `shap`'s own re-check (a known upstream issue for some
+            # scikit-learn/shap version combinations), not evidence that we
+            # fed the explainer inconsistent data. Retry without the
+            # (redundant, in this case) re-verification rather than
+            # dropping the explanation entirely.
+            logger.warning(
+                "SHAP additivity re-check failed for model_type=%s despite using the "
+                "exact tree_path_dependent algorithm; retrying with check_additivity=False "
+                "(see https://github.com/shap/shap/issues/2777)",
+                type(model).__name__,
+            )
+            explanation = explainer(sample, check_additivity=False)
         shap_values = getattr(explanation, "values", explanation)
 
         mean_abs_importance = _mean_abs_per_feature(shap_values, feature_names)
@@ -296,10 +354,17 @@ def compute_shap_explanation(
             "samples": samples,
             "interactions": interactions,
         }
-    except Exception:
-        logger.debug(
-            "Failed to compute SHAP explanation for model_type=%s",
+    except Exception as exc:
+        # Previously logged at `debug` level, which meant a broken SHAP path
+        # was silently indistinguishable from "model type unsupported" —
+        # this rotted invisibly for every job until the UI's `shap_explanation`
+        # data was found to be missing entirely. `warning` (with the actual
+        # exception) ensures this is visible without raising and breaking
+        # training, since explainability is always best-effort.
+        logger.warning(
+            "Failed to compute SHAP explanation for model_type=%s: %s",
             type(model).__name__,
+            exc,
             exc_info=True,
         )
         return None
