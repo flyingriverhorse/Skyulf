@@ -91,7 +91,7 @@ The project migrated off `black` + `flake8` + `isort` to a single **Ruff** binar
 .\.venv\Scripts\python.exe -m ruff format .
 
 # Type check (ty is installed in the venv)
-.\.venv\Scripts\python.exe -m ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+.\\.venv\Scripts\python.exe -m ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 
 # Complexity gate
 .\.venv\Scripts\python.exe -m lizard skyulf-core/skyulf -C 9 -w
@@ -101,10 +101,10 @@ The project migrated off `black` + `flake8` + `isort` to a single **Ruff** binar
 <summary>Deprecated (pre-0.6.x) — black / flake8</summary>
 
 ```powershell
-black --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+black --check backend skyulf-core tests run_skyulf.py celery_worker.py
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
 # mypy (replaced by ty)
-mypy backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+mypy backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
 ```
 </details>
 

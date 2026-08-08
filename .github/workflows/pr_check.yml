@@ -61,7 +61,7 @@ jobs:
         run: bash .github/scripts/run_check.sh "Ruff lint" ruff check .
 
       - name: Format check (Ruff)
-        run: bash .github/scripts/run_check.sh "Ruff format" ruff format --check backend skyulf-core tests run_fastapi.py run_skyulf.py celery_worker.py
+        run: bash .github/scripts/run_check.sh "Ruff format" ruff format --check backend skyulf-core tests run_skyulf.py celery_worker.py
 
       - name: Type check (Ty)
-        run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_fastapi.py run_skyulf.py celery_worker.py
+        run: bash .github/scripts/run_check.sh "Ty type check" ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py

@@ -282,9 +282,23 @@ def compute_shap_explanation(
     try:
         import shap  # ty: ignore[unresolved-import]
         import shap.maskers  # ty: ignore[unresolved-import]
-        import shap.utils._exceptions  # ty: ignore[unresolved-import]
     except ImportError:
         return None
+
+    # `shap.utils._exceptions` is a private module that may not exist in all
+    # SHAP versions. We try to import it for the precise `ExplainerError`
+    # catch below, but if it's unavailable we fall back to a broader
+    # `Exception` catch + message-based heuristic — this keeps explainability
+    # working across SHAP versions instead of silently returning `None`.
+    _shap_exceptions: Any = None
+    try:
+        import shap.utils._exceptions  # ty: ignore[unresolved-import]
+
+        _shap_exceptions = shap.utils._exceptions
+    except ImportError:
+        logger.debug(
+            "shap.utils._exceptions unavailable; using broad catch for additivity failures"
+        )
 
     try:
         if X is None or X.empty:
@@ -299,8 +313,17 @@ def compute_shap_explanation(
         explainer, is_exact_tree = _build_explainer(shap, model, sample)
         try:
             explanation = explainer(sample)
-        except shap.utils._exceptions.ExplainerError:
-            if not is_exact_tree:
+        except Exception as exc:
+            # Only catch additivity failures here — everything else
+            # propagates to the outer handler. When `_shap_exceptions` is
+            # available we check via `isinstance` against `ExplainerError`;
+            # otherwise we fall back to a message-based heuristic so
+            # explainability isn't silently disabled on SHAP versions that
+            # don't expose the private `_exceptions` module.
+            _is_additivity = (
+                _shap_exceptions is not None and isinstance(exc, _shap_exceptions.ExplainerError)
+            ) or (_shap_exceptions is None and "additivity" in str(exc).lower())
+            if not _is_additivity or not is_exact_tree:
                 raise
             # `tree_path_dependent` computes Shapley values directly from
             # each tree's own path/sample-weight structure with no
