@@ -1612,7 +1612,7 @@ export const InferencePage: React.FC = () => {
                                     title={`${col.name} (${col.type})`}
                                 >
                                     <span className="font-mono">{col.name}</span>
-                                    <span className="text-gray-400 dark:text-gray-500">{col.type}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">{col.type}</span>
                                 </span>
                             ))}
                         </div>

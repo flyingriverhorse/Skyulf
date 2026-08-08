@@ -180,7 +180,7 @@ describe('JobDetailsView', () => {
     expect(screen.getByText('Something exploded')).toBeInTheDocument();
   });
 
-  it('links related records (dataset, pipeline) using the shared RecordLink primitive', () => {
+  it('links the dataset using the shared RecordLink primitive', () => {
     renderDetails(
       makeJob({ dataset_id: 'ds-1', dataset_name: 'Sales Data', pipeline_id: 'pipe-42' }),
       { origin: '/jobs', filters: { tab: 'classification' } },
@@ -188,9 +188,49 @@ describe('JobDetailsView', () => {
     const datasetLink = screen.getByRole('link', { name: 'Dataset ds-1' });
     expect(datasetLink.getAttribute('href')).toContain('oc.kind=dataset');
     expect(datasetLink.getAttribute('href')).toContain('oc.origin=%2Fjobs');
+  });
 
-    const pipelineLink = screen.getByRole('link', { name: 'Pipeline pipe-42' });
-    expect(pipelineLink.getAttribute('href')).toContain('oc.kind=pipeline');
+  it('reveals pipeline run context on activation instead of linking into a dead end', () => {
+    renderDetails(makeJob({ pipeline_id: 'pipe-42' }));
+
+    const expander = screen.getByRole('button', { name: /Pipeline run/ });
+    expect(expander).toHaveAttribute('aria-expanded', 'false');
+    // Not a link — there's no saved-pipeline route this id can resolve to.
+    expect(screen.queryByRole('link', { name: /pipe-42/ })).not.toBeInTheDocument();
+
+    fireEvent.click(expander);
+
+    expect(expander).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('pipe-42')).toBeInTheDocument();
+    expect(screen.getByText(/not a separately saved pipeline/)).toBeInTheDocument();
+  });
+
+  it('explains a preview/branch pipeline id as a non-navigable synthetic run', () => {
+    const previewId = 'preview_275b9aa6-7636-4642-afc1-226ea420ddc6__branch_0';
+    renderDetails(makeJob({ pipeline_id: previewId }));
+
+    const expander = screen.getByRole('button', { name: /Preview run/ });
+    fireEvent.click(expander);
+
+    expect(screen.getByText(previewId)).toBeInTheDocument();
+    expect(screen.getByText(/Preview run — not a saved pipeline/)).toBeInTheDocument();
+    expect(screen.getByText(/branch 0/)).toBeInTheDocument();
+  });
+
+  it('is keyboard operable and keeps the full pipeline id available via a copy control', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderDetails(makeJob({ pipeline_id: 'pipe-99' }));
+
+    const expander = screen.getByRole('button', { name: /Pipeline run/ });
+    expander.focus();
+    expect(expander).toHaveFocus();
+    fireEvent.click(expander);
+
+    const copyButton = screen.getByRole('button', { name: 'Copy run id' });
+    fireEvent.click(copyButton);
+    expect(writeText).toHaveBeenCalledWith('pipe-99');
+    expect(await screen.findByRole('button', { name: 'Run id copied' })).toBeInTheDocument();
   });
 
   it('reports progress honestly instead of implying a bar it cannot back', async () => {

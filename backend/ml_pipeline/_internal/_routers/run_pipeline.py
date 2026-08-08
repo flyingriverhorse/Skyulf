@@ -299,9 +299,12 @@ async def resubmit_job_from_graph(
     """Resubmit a terminal job using its persisted single-branch graph snapshot.
 
     Used by ``POST /jobs/{job_id}/retry`` (OPS-001). ``job.graph`` already
-    holds one resolved branch (see `_build_branch_graph`), so this creates
-    exactly one new Job row and dispatches it the same way `run_pipeline`
-    dispatches a single branch, instead of re-running the full partitioner.
+    holds one resolved branch (see `_build_branch_graph`), so this creates one
+    new Job row and dispatches it the same way `run_pipeline` dispatches a
+    single branch, instead of re-running the full partitioner. Goes through
+    the same submit-lock/dedupe check as a normal run submission, so two
+    concurrent retries of the same job return the same new job id rather than
+    both creating one.
 
     Raises:
         ValueError: if the job has no usable stored graph to resubmit.
@@ -327,17 +330,25 @@ async def resubmit_job_from_graph(
     )
     branch_graph = _build_branch_graph(sub)
     dataset_id = job.dataset_id or "unknown"
+    branch_index = job.branch_index or 0
 
-    new_job_id = await JobManager.create_job(
-        session=db,
-        pipeline_id=sub.pipeline_id,
-        node_id=job.node_id,
-        job_type=cast(Literal["training", "tuning"], job.job_type),
-        dataset_id=dataset_id,
-        model_type=job.model_type or "unknown",
-        graph=branch_graph,
-        branch_index=job.branch_index or 0,
+    # Reuse the same submit-lock/dedupe check `run_pipeline` uses for double
+    # submissions, keyed on (dataset_id, node_id, branch_index) — two
+    # concurrent retries of the same failed job resolve to a single new job
+    # instead of racing into two duplicate training jobs.
+    new_job_id, was_existing = await _submit_or_dedupe_branch_job(
+        db,
+        dataset_id,
+        job.node_id,
+        branch_index,
+        sub,
+        cast(Literal["training", "tuning"], job.job_type),
+        job.model_type or "unknown",
+        branch_graph,
     )
+    if was_existing:
+        return new_job_id
+
     publish_job_event(JobEvent(event="created", job_id=new_job_id, status="queued", progress=0))
 
     settings = get_settings()

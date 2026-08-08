@@ -69,7 +69,7 @@ export const ShapInteractionView: React.FC<Props> = ({
           </div>
         )}
         {!interactions || interactions.feature_names.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-12">
+          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-12">
             Interaction values are not available for this run — they only support tree-based
             models (Random Forest, Gradient Boosting, XGBoost, etc.).
           </p>
@@ -128,7 +128,7 @@ export const ShapInteractionView: React.FC<Props> = ({
                 ))}
               </div>
             </div>
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3 text-center">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-3 text-center">
               Diagonal cells (indigo) show each feature&apos;s main effect strength · off-diagonal cells
               (purple) show pairwise interaction strength · darker = stronger
             </p>

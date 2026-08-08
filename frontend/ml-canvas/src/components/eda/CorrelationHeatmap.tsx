@@ -28,7 +28,7 @@ const CorrelationScaleLegend: React.FC = () => (
     <span>0</span>
     <span className="w-6" />
     <span>+1</span>
-    <span className="ml-2 italic text-gray-400 dark:text-gray-500">Negative (blue) · Positive (red)</span>
+    <span className="ml-2 italic text-gray-500 dark:text-gray-400">Negative (blue) · Positive (red)</span>
   </div>
 );
 

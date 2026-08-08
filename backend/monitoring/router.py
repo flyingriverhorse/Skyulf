@@ -868,6 +868,30 @@ def _classify_error_severity(status_code: int) -> str:
     return "info"
 
 
+def _normalize_since_for_naive_column(since_dt: datetime) -> datetime:
+    """Convert a `since` filter value to the naive-UTC form stored in `created_at`/`run_at`.
+
+    The timestamp columns are `DateTime` without timezone, so they are always
+    naive (treated as UTC). A tz-aware `since` is converted to UTC and then
+    stripped of tzinfo so the comparison is apples-to-apples in SQL.
+    """
+    if since_dt.tzinfo is not None:
+        return since_dt.astimezone(UTC).replace(tzinfo=None)
+    return since_dt
+
+
+def _q_like_condition(q: str, *columns):
+    """Build a case-insensitive, wildcard-escaped `LIKE` OR-condition across `columns`."""
+    from sqlalchemy import func as sa_func
+    from sqlalchemy import or_
+
+    escaped = q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    return or_(
+        *(sa_func.lower(sa_func.coalesce(col, "")).like(pattern, escape="\\") for col in columns)
+    )
+
+
 @router.get("/errors", response_model=ErrorEventSearchResponse)
 async def list_error_events(
     limit: int = 100,
@@ -887,9 +911,12 @@ async def list_error_events(
     ``job_id`` are exact-match typed facets; ``q`` is the generic free-text
     search, matched case-insensitively against message, route, error type,
     and job id (so an exact HTTP `job_id` is still found by generic search).
-    All filters are applied server-side across the full stored history, not
-    only the capped page returned in ``entries``.
+    All filters, pagination, and facets are computed with SQL aggregates and a
+    bounded ``LIMIT`` — the full table is never materialized into Python.
     """
+    from sqlalchemy import case
+    from sqlalchemy import func as sa_func
+
     limit = min(max(1, limit), 500)
 
     since_dt: datetime | None = None
@@ -899,45 +926,68 @@ async def list_error_events(
         except ValueError:
             since_dt = None  # ignore malformed since param
 
-    stmt = select(ErrorEvent).order_by(ErrorEvent.created_at.desc())
-    result = await db.execute(stmt)
-    all_events = list(result.scalars().all())
+    conditions = []
+    if not show_resolved:
+        conditions.append(ErrorEvent.resolved_at.is_(None))
+    if since_dt is not None:
+        conditions.append(ErrorEvent.created_at >= _normalize_since_for_naive_column(since_dt))
+    if severity == "critical":
+        conditions.append(ErrorEvent.status_code >= 500)
+    elif severity == "warning":
+        conditions.append(ErrorEvent.status_code.between(400, 499))
+    elif severity == "info":
+        conditions.append(ErrorEvent.status_code < 400)
+    if error_type is not None:
+        conditions.append(ErrorEvent.error_type == error_type)
+    if job_id is not None:
+        conditions.append(sa_func.coalesce(ErrorEvent.job_id, "") == job_id)
+    if q:
+        conditions.append(
+            _q_like_condition(
+                q, ErrorEvent.message, ErrorEvent.route, ErrorEvent.error_type, ErrorEvent.job_id
+            )
+        )
 
-    total_unfiltered = len(all_events)
-    facet_severities = sorted({_classify_error_severity(e.status_code) for e in all_events})
-    facet_error_types = sorted({e.error_type for e in all_events})
-    facet_job_ids = sorted({e.job_id for e in all_events if e.job_id})
+    total_unfiltered_result = await db.execute(select(sa_func.count()).select_from(ErrorEvent))
+    total_unfiltered = int(total_unfiltered_result.scalar() or 0)
 
-    def _matches(e: ErrorEvent) -> bool:
-        if not show_resolved and e.resolved_at is not None:
-            return False
-        if since_dt is not None:
-            created = e.created_at
-            if created.tzinfo is None and since_dt.tzinfo is not None:
-                created = created.replace(tzinfo=UTC)
-            elif created.tzinfo is not None and since_dt.tzinfo is None:
-                created = created.replace(tzinfo=None)
-            if created < since_dt:
-                return False
-        if severity is not None and _classify_error_severity(e.status_code) != severity:
-            return False
-        if error_type is not None and e.error_type != error_type:
-            return False
-        if job_id is not None and (e.job_id or "") != job_id:
-            return False
-        if q:
-            haystack = f"{e.message} {e.route} {e.error_type} {e.job_id or ''}".lower()
-            if q.lower() not in haystack:
-                return False
-        return True
+    severity_case = case(
+        (ErrorEvent.status_code >= 500, "critical"),
+        (ErrorEvent.status_code >= 400, "warning"),
+        else_="info",
+    )
+    facet_severities_result = await db.execute(select(severity_case).distinct())
+    facet_severities = sorted({row[0] for row in facet_severities_result.all()})
 
-    filtered = [e for e in all_events if _matches(e)]
+    facet_error_types_result = await db.execute(
+        select(ErrorEvent.error_type).distinct().order_by(ErrorEvent.error_type)
+    )
+    facet_error_types = [row[0] for row in facet_error_types_result.all()]
+
+    facet_job_ids_result = await db.execute(
+        select(ErrorEvent.job_id)
+        .where(ErrorEvent.job_id.isnot(None))
+        .distinct()
+        .order_by(ErrorEvent.job_id)
+    )
+    facet_job_ids = [row[0] for row in facet_job_ids_result.all()]
+
+    total_result = await db.execute(
+        select(sa_func.count()).select_from(ErrorEvent).where(*conditions)
+    )
+    total = int(total_result.scalar() or 0)
+
+    entries_stmt = (
+        select(ErrorEvent).where(*conditions).order_by(ErrorEvent.created_at.desc()).limit(limit)
+    )
+    entries_result = await db.execute(entries_stmt)
     entries = [
         ErrorEventResponse(**e.to_dict(), severity=_classify_error_severity(e.status_code))
-        for e in filtered[:limit]
+        for e in entries_result.scalars().all()
     ]
+
     return ErrorEventSearchResponse(
-        total=len(filtered),
+        total=total,
         total_unfiltered=total_unfiltered,
         facets=ErrorFacets(
             severities=facet_severities,
@@ -1438,9 +1488,12 @@ async def list_pipeline_logs(
     ``level`` (error/warning/info), ``node_type``, and ``node_id`` are exact-match
     typed facets; ``q`` is the generic free-text search, matched case-insensitively
     against message, node type, and node id (so an exact pipeline `node_id` is
-    still found by generic search). All filters are applied server-side across the
-    full stored history, not only the capped page returned in ``entries``.
+    still found by generic search). All filters, pagination, and facets are
+    computed with SQL aggregates and a bounded ``LIMIT`` — the full table is
+    never materialized into Python.
     """
+    from sqlalchemy import func as sa_func
+
     since_dt: datetime | None = None
     if since:
         try:
@@ -1449,43 +1502,76 @@ async def list_pipeline_logs(
             since_dt = None  # ignore malformed since param
 
     limit = min(max(1, limit), 500)
-    stmt = select(PipelineRunLog).order_by(PipelineRunLog.run_at.desc())
-    result = await db.execute(stmt)
-    all_logs = list(result.scalars().all())
 
-    total_unfiltered = len(all_logs)
-    facet_levels = sorted({log.level for log in all_logs if log.level})
-    facet_node_types = sorted({log.node_type for log in all_logs if log.node_type})
-    facet_pipeline_ids = sorted({log.pipeline_id for log in all_logs if log.pipeline_id})
-    facet_node_ids = sorted({log.node_id for log in all_logs if log.node_id})
+    conditions = []
+    if since_dt is not None:
+        conditions.append(PipelineRunLog.run_at >= _normalize_since_for_naive_column(since_dt))
+    if pipeline_id is not None:
+        conditions.append(PipelineRunLog.pipeline_id == pipeline_id)
+    if level is not None:
+        conditions.append(PipelineRunLog.level == level)
+    if node_type is not None:
+        conditions.append(PipelineRunLog.node_type == node_type)
+    if node_id is not None:
+        conditions.append(sa_func.coalesce(PipelineRunLog.node_id, "") == node_id)
+    if q:
+        conditions.append(
+            _q_like_condition(
+                q, PipelineRunLog.message, PipelineRunLog.node_type, PipelineRunLog.node_id
+            )
+        )
 
-    def _matches(log: PipelineRunLog) -> bool:
-        if since_dt is not None:
-            run_at = log.run_at
-            if run_at.tzinfo is None and since_dt.tzinfo is not None:
-                run_at = run_at.replace(tzinfo=UTC)
-            elif run_at.tzinfo is not None and since_dt.tzinfo is None:
-                run_at = run_at.replace(tzinfo=None)
-            if run_at < since_dt:
-                return False
-        if pipeline_id is not None and log.pipeline_id != pipeline_id:
-            return False
-        if level is not None and log.level != level:
-            return False
-        if node_type is not None and log.node_type != node_type:
-            return False
-        if node_id is not None and (log.node_id or "") != node_id:
-            return False
-        if q:
-            haystack = f"{log.message} {log.node_type or ''} {log.node_id or ''}".lower()
-            if q.lower() not in haystack:
-                return False
-        return True
+    total_unfiltered_result = await db.execute(select(sa_func.count()).select_from(PipelineRunLog))
+    total_unfiltered = int(total_unfiltered_result.scalar() or 0)
 
-    filtered = [log for log in all_logs if _matches(log)]
-    entries = [PipelineRunLogResponse(**log.to_dict()) for log in filtered[:limit]]
+    facet_levels_result = await db.execute(
+        select(PipelineRunLog.level)
+        .where(PipelineRunLog.level.isnot(None))
+        .distinct()
+        .order_by(PipelineRunLog.level)
+    )
+    facet_levels = [row[0] for row in facet_levels_result.all()]
+
+    facet_node_types_result = await db.execute(
+        select(PipelineRunLog.node_type)
+        .where(PipelineRunLog.node_type.isnot(None))
+        .distinct()
+        .order_by(PipelineRunLog.node_type)
+    )
+    facet_node_types = [row[0] for row in facet_node_types_result.all()]
+
+    facet_pipeline_ids_result = await db.execute(
+        select(PipelineRunLog.pipeline_id)
+        .where(PipelineRunLog.pipeline_id.isnot(None))
+        .distinct()
+        .order_by(PipelineRunLog.pipeline_id)
+    )
+    facet_pipeline_ids = [row[0] for row in facet_pipeline_ids_result.all()]
+
+    facet_node_ids_result = await db.execute(
+        select(PipelineRunLog.node_id)
+        .where(PipelineRunLog.node_id.isnot(None))
+        .distinct()
+        .order_by(PipelineRunLog.node_id)
+    )
+    facet_node_ids = [row[0] for row in facet_node_ids_result.all()]
+
+    total_result = await db.execute(
+        select(sa_func.count()).select_from(PipelineRunLog).where(*conditions)
+    )
+    total = int(total_result.scalar() or 0)
+
+    entries_stmt = (
+        select(PipelineRunLog)
+        .where(*conditions)
+        .order_by(PipelineRunLog.run_at.desc())
+        .limit(limit)
+    )
+    entries_result = await db.execute(entries_stmt)
+    entries = [PipelineRunLogResponse(**log.to_dict()) for log in entries_result.scalars().all()]
+
     return PipelineLogSearchResponse(
-        total=len(filtered),
+        total=total,
         total_unfiltered=total_unfiltered,
         facets=PipelineLogFacets(
             levels=facet_levels,

@@ -254,6 +254,20 @@ describe('SlowNodesPage — aggregate provenance, drill-down, and return state',
     expect(within(region).getByText('impute')).toBeInTheDocument();
   });
 
+  it('labels the bar chart as log-scaled so step types spanning orders of magnitude stay visible', async () => {
+    // Regression test for a bug where a step type ~1000x slower than the
+    // rest (e.g. a multi-second "training" step next to millisecond steps)
+    // rendered every other bar at ~0 height on a linear axis, making the
+    // chart look like only one step type existed.
+    const slow = aggregate({ step_type: 'training', total_seconds: 28.21 });
+    const fast = aggregate({ step_type: 'FeatureMath', total_seconds: 0.016 });
+    vi.mocked(monitoringApi.getSlowNodes).mockResolvedValue(response([slow, fast]));
+    renderPage();
+
+    await screen.findByText('training');
+    expect(screen.getByText(/log scale/i)).toBeInTheDocument();
+  });
+
   it('shows an explicit error state on fetch failure', async () => {
     vi.mocked(monitoringApi.getSlowNodes).mockRejectedValue(new Error('network down'));
     renderPage();

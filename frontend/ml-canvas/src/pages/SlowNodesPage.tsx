@@ -162,6 +162,18 @@ export const SlowNodesPage: React.FC = () => {
         return Math.max(...sortedAggregates.map(a => a.total_seconds));
     }, [sortedAggregates]);
 
+    // Step-type totals routinely span multiple orders of magnitude (e.g. a
+    // 28s "training" step next to a 70ms "FeatureMath" step), so a linear
+    // axis renders every step but the slowest as a zero-height bar — the
+    // chart then reads as if only one step type exists. A log scale keeps
+    // every step visible regardless of scale; the smallest observed total
+    // sets the axis floor (never 0, which is undefined on a log scale).
+    const chartFloor = useMemo(() => {
+        if (sortedAggregates.length === 0) return 0.001;
+        const smallest = Math.min(...sortedAggregates.map(a => a.total_seconds));
+        return Math.max(smallest * 0.5, 0.001);
+    }, [sortedAggregates]);
+
     // Carried on every RecordLink so following a job/node link and returning
     // (Back, or a "return to Slow Nodes" trip) restores this exact view.
     const linkFilters = useMemo(
@@ -276,7 +288,8 @@ export const SlowNodesPage: React.FC = () => {
                             Total time by step type
                         </h2>
                         <span className="text-[11px] text-gray-400">
-                            ({sortKey === 'total_seconds' ? 'sorted by total' : `sorted by ${sortKey.replace('_seconds', '')}`})
+                            ({sortKey === 'total_seconds' ? 'sorted by total' : `sorted by ${sortKey.replace('_seconds', '')}`}
+                            , log scale — totals span orders of magnitude)
                         </span>
                     </div>
                     <div className="h-56">
@@ -284,7 +297,14 @@ export const SlowNodesPage: React.FC = () => {
                             <BarChart
                                 data={sortedAggregates.map(a => ({
                                     step_type: a.step_type,
-                                    total: Number(a.total_seconds.toFixed(3)),
+                                    // The bar height uses a value floored above zero (log
+                                    // scale is undefined at 0); the tooltip reads totalRaw
+                                    // so a floored bar never misreports its own total.
+                                    total: Math.max(
+                                        Number(a.total_seconds.toFixed(3)),
+                                        chartFloor,
+                                    ),
+                                    totalRaw: Number(a.total_seconds.toFixed(3)),
                                     avg: Number(a.avg_seconds.toFixed(3)),
                                     runs: a.count,
                                 }))}
@@ -304,6 +324,9 @@ export const SlowNodesPage: React.FC = () => {
                                     height={50}
                                 />
                                 <YAxis
+                                    scale="log"
+                                    domain={[chartFloor, 'auto']}
+                                    allowDataOverflow
                                     tick={{ fill: '#64748b', fontSize: 10 }}
                                     tickFormatter={(v: number) => formatSeconds(v)}
                                     width={64}
@@ -318,9 +341,14 @@ export const SlowNodesPage: React.FC = () => {
                                     }}
                                     itemStyle={{ color: '#f8fafc' }}
                                     labelStyle={{ color: '#94a3b8' }}
-                                    formatter={(value: number, name: string) => {
+                                    formatter={(value: number, name: string, entry) => {
                                         if (name === 'runs') return [value, 'Runs'];
-                                        return [formatSeconds(value), name === 'total' ? 'Total time' : 'Avg per run'];
+                                        if (name === 'total') {
+                                            const raw = (entry?.payload as { totalRaw?: number } | undefined)
+                                                ?.totalRaw;
+                                            return [formatSeconds(raw ?? value), 'Total time'];
+                                        }
+                                        return [formatSeconds(value), 'Avg per run'];
                                     }}
                                 />
                                 <Bar dataKey="total" radius={[3, 3, 0, 0]}>

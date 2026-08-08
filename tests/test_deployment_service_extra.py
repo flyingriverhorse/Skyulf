@@ -693,40 +693,29 @@ def test_build_input_schema_from_artifact_with_features(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# _lookup_target_column
+# _lineage_fields_from_job
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_lookup_target_column_found(async_session):
-    job = SimpleNamespace(graph={"nodes": [{"params": {"target_column": "label"}}]})
-    with patch(
-        "backend.ml_pipeline._execution.jobs.JobManager.get_job",
-        new=AsyncMock(return_value=job),
-    ):
-        result = await DeploymentService._lookup_target_column(async_session, "job1")
-    assert result == "label"
+def test_lineage_fields_from_job_found():
+    job = SimpleNamespace(
+        graph={"nodes": [{"params": {"target_column": "label"}}]},
+        dataset_source_id="ds1",
+        version=3,
+    )
+    result = DeploymentService._lineage_fields_from_job(job)
+    assert result == {"dataset_id": "ds1", "version": 3, "target_column": "label"}
 
 
-@pytest.mark.asyncio
-async def test_lookup_target_column_no_job(async_session):
-    with patch(
-        "backend.ml_pipeline._execution.jobs.JobManager.get_job",
-        new=AsyncMock(return_value=None),
-    ):
-        result = await DeploymentService._lookup_target_column(async_session, "job1")
-    assert result is None
+def test_lineage_fields_from_job_no_job():
+    result = DeploymentService._lineage_fields_from_job(None)
+    assert result == {"dataset_id": None, "version": None, "target_column": None}
 
 
-@pytest.mark.asyncio
-async def test_lookup_target_column_job_no_graph(async_session):
-    job = SimpleNamespace(graph=None)
-    with patch(
-        "backend.ml_pipeline._execution.jobs.JobManager.get_job",
-        new=AsyncMock(return_value=job),
-    ):
-        result = await DeploymentService._lookup_target_column(async_session, "job1")
-    assert result is None
+def test_lineage_fields_from_job_no_graph():
+    job = SimpleNamespace(graph=None, dataset_source_id="ds1", version=1)
+    result = DeploymentService._lineage_fields_from_job(job)
+    assert result == {"dataset_id": "ds1", "version": 1, "target_column": None}
 
 
 # ---------------------------------------------------------------------------
@@ -746,6 +735,11 @@ async def test_get_deployment_details_success(async_session):
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
+    source_job = SimpleNamespace(
+        graph={"nodes": [{"params": {"target_column": "target_col"}}]},
+        dataset_source_id="ds1",
+        version=2,
+    )
 
     with (
         patch.object(
@@ -755,14 +749,16 @@ async def test_get_deployment_details_success(async_session):
         ),
         patch.object(
             DeploymentService,
-            "_lookup_target_column",
-            new=AsyncMock(return_value="target_col"),
+            "_get_job_for_deployment",
+            new=AsyncMock(return_value=source_job),
         ),
     ):
         info = await DeploymentService.get_deployment_details(async_session, deployment)
 
     assert info["input_schema"] == [{"name": "f1", "type": "unknown"}]
     assert info["target_column"] == "target_col"
+    assert info["dataset_id"] == "ds1"
+    assert info["version"] == 2
 
 
 @pytest.mark.asyncio

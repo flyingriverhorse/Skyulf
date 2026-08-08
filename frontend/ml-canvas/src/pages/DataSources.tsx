@@ -338,7 +338,7 @@ export const DataSources: React.FC = () => {
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${
                 filterStatus === status
                   ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
               }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -430,14 +430,14 @@ export const DataSources: React.FC = () => {
                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
                       <div className="flex flex-col">
                         <span className="font-medium">{formatBytes(d.size_bytes || 0)}</span>
-                        <span className="text-xs text-slate-400 dark:text-slate-500">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
                           {d.rows?.toLocaleString() || '-'} rows • {d.columns || '-'} cols
                         </span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
                       <div className="flex items-center gap-2">
-                        <Calendar size={14} className="text-slate-400 dark:text-slate-500" />
+                        <Calendar size={14} className="text-slate-500 dark:text-slate-400" />
                         {new Date(d.created_at).toLocaleDateString()}
                       </div>
                     </td>

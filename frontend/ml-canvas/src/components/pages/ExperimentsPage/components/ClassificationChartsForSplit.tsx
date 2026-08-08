@@ -108,7 +108,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                                     <div className="flex items-center mb-1">
                                                                         <div className="w-[100px] shrink-0" />
                                                                         <div className="flex-1 flex items-center justify-center gap-1">
-                                                                            <span className="text-[11px] text-gray-400 dark:text-gray-500">Predicted</span>
+                                                                            <span className="text-[11px] text-gray-500 dark:text-gray-400">Predicted</span>
                                                                             <InfoTooltip text="Columns = what the model predicted. Each column is one class. Read a column down ↓ to see all samples predicted as that class." size="sm" />
                                                                         </div>
                                                                     </div>
@@ -125,7 +125,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                                     <div className="flex items-stretch">
                                                                         <div className="flex flex-col items-center justify-center mr-1" style={{ width: '20px' }}>
                                                                             <InfoTooltip text="Rows = actual / true labels. Read a row across → to see where each true class ended up. Green diagonal = correct; red off-diagonal = misclassification." size="sm" />
-                                                                            <span className="text-[11px] text-gray-400 dark:text-gray-500" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Actual</span>
+                                                                            <span className="text-[11px] text-gray-500 dark:text-gray-400" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>Actual</span>
                                                                         </div>
                                                                         <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
                                                                             {matrix.map((row, i) => {
@@ -201,7 +201,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                                 {classes.length === 2 && (
                                                                     <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
                                                                         <div className="flex items-center gap-1 mb-2">
-                                                                            <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Per Class</span>
+                                                                            <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400">Per Class</span>
                                                                             <InfoTooltip text="Precision, Recall and F1 for each class individually. For binary problems both classes are always shown here." size="sm" />
                                                                         </div>
                                                                         <div className="grid grid-cols-2 gap-2">
@@ -296,7 +296,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                                         />
                                                                     </div>
                                                                     {/* TPR / FPR definitions */}
-                                                                    <div className="flex items-center justify-center gap-4 text-[10px] text-gray-400 dark:text-gray-500 mb-1">
+                                                                    <div className="flex items-center justify-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 mb-1">
                                                                         <div className="flex items-center gap-0.5">
                                                                             <span className="font-semibold">TPR</span>
                                                                             <InfoTooltip text="True Positive Rate (Recall / Sensitivity): TP ÷ (TP + FN). Of all actual positives, how many did the model correctly detect? Higher = fewer misses. This is the Y-axis." size="sm" />
@@ -343,7 +343,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                                                             <p className="font-semibold text-gray-600 dark:text-gray-300 mb-1">ROC point</p>
                                                                                             <p className="text-gray-700 dark:text-gray-200">TPR (Recall) <span className="font-mono text-purple-600 dark:text-purple-400">{d.tpr.toFixed(3)}</span></p>
                                                                                             <p className="text-gray-500 dark:text-gray-400">FPR (Fall-out) <span className="font-mono">{d.fpr.toFixed(3)}</span></p>
-                                                                                            <p className="text-gray-400 dark:text-gray-500 text-[10px] pt-0.5 border-t border-gray-100 dark:border-gray-700">Precision = TP / (TP+FP) &nbsp;·&nbsp; Recall = TP / (TP+FN)</p>
+                                                                                            <p className="text-gray-500 dark:text-gray-400 text-[10px] pt-0.5 border-t border-gray-100 dark:border-gray-700">Precision = TP / (TP+FP) &nbsp;·&nbsp; Recall = TP / (TP+FN)</p>
                                                                                         </div>
                                                                                     );
                                                                                 }}
@@ -591,7 +591,7 @@ export const ClassificationChartsForSplit: React.FC<Props> = ({
                                                                             const entry = payload.find(p => (p.payload as Record<string, unknown>).lift != null);
                                                                             if (!entry) return null;
                                                                             const d = entry.payload as { pct: number; gain: number; lift: number };
-                                                                            return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p className="font-semibold mb-1">Gains point</p><p>Population <span className="font-mono text-green-600 dark:text-green-400">{(d.pct * 100).toFixed(1)}%</span></p><p>Positives caught <span className="font-mono">{(d.gain * 100).toFixed(1)}%</span></p><p className="text-gray-500">Lift <span className="font-mono">{d.lift.toFixed(2)}×</span></p></div>;
+                                                                            return <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded text-xs shadow-sm"><p className="font-semibold mb-1">Gains point</p><p>Population <span className="font-mono text-green-600 dark:text-green-400">{(d.pct * 100).toFixed(1)}%</span></p><p>Positives caught <span className="font-mono">{(d.gain * 100).toFixed(1)}%</span></p><p className="text-gray-500 dark:text-gray-400">Lift <span className="font-mono">{d.lift.toFixed(2)}×</span></p></div>;
                                                                         }} />
                                                                         {/* Random baseline — same data array, no separate data prop */}
                                                                         <Line type="linear" dataKey="random" stroke="#d1d5db" strokeDasharray="4 3" dot={false} tooltipType="none" legendType="none" strokeWidth={1} isAnimationActive={false} />
