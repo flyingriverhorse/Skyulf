@@ -7,7 +7,7 @@ import {
 import {
   monitoringApi, ErrorEvent, ErrorSeverity, GroupedIssue, PipelineRunLog,
 } from '../core/api/monitoring';
-import { LoadingState, EmptyState, RecordLink, useConfirm } from '../components/shared';
+import { LoadingState, EmptyState, RecordLink, NodeInspectorLink, useConfirm } from '../components/shared';
 import type { OperationalTimeRange } from '../core/utils/operationalContext';
 import { toast } from '../core/toast';
 
@@ -139,10 +139,10 @@ const ErrorResourceLink: React.FC<{
   }
   if (nodeId) {
     return (
-      <RecordLink
-        recordRef={{ kind: 'node', nodeId, ...(pipelineId ? { pipelineId } : {}) }}
+      <NodeInspectorLink
+        nodeId={nodeId}
+        pipelineId={pipelineId ?? null}
         origin={origin}
-        timeRange={timeRange}
         filters={filters}
       />
     );

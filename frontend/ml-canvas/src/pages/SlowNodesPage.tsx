@@ -39,7 +39,7 @@ import {
 } from 'recharts';
 import { monitoringApi, SlowNodeAggregate, SlowNodesResponse } from '../core/api/monitoring';
 import { toast } from '../core/toast';
-import { EmptyState, ModalShell, RecordLink } from '../components/shared';
+import { EmptyState, ModalShell, RecordLink, NodeInspectorLink } from '../components/shared';
 import { ChartDataTable } from '../components/eda/ChartDataTable';
 
 type SortKey = 'total_seconds' | 'avg_seconds' | 'p95_seconds' | 'count' | 'max_seconds';
@@ -703,13 +703,11 @@ const SlowNodeInvestigationModal: React.FC<{
                                             origin="/slow-nodes"
                                             filters={filters}
                                         />
-                                        <RecordLink
-                                            recordRef={{
-                                                kind: 'node',
-                                                nodeId: run.node_id,
-                                                pipelineId: run.pipeline_id,
-                                            }}
-                                            label="Open in Canvas"
+                                        <NodeInspectorLink
+                                            nodeId={run.node_id}
+                                            jobId={run.job_id}
+                                            pipelineId={run.pipeline_id}
+                                            label="Inspect node"
                                             origin="/slow-nodes"
                                             filters={filters}
                                         />

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
 import { registryApi, RegistryItem } from '../core/api/registry';
-import { getTaskForModelType } from '../components/pages/ExperimentsPage/utils/jobMeta';
+import { getTaskForModelType, getJobTypeLabel } from '../components/pages/ExperimentsPage/utils/jobMeta';
 import { getEnsembleSubTask } from '../core/utils/format';
 import type { TaskType } from '../core/types/taskType';
 import { LoadingState, EmptyState, ErrorState, RecordLink } from '../components/shared';
@@ -480,8 +480,8 @@ export const JobsPage: React.FC = () => {
                         {job.job_id.substring(0, 8)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 capitalize">
-                      {job.job_type}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                      {getJobTypeLabel(job, registryItems)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                       {job.model_type || job.dataset_name || job.target_column || '-'}

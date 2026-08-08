@@ -9,7 +9,7 @@ import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
 import { formatMetricName, getMetricDescription, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { useConfirm, RecordLink } from '../../shared';
+import { useConfirm, RecordLink, NodeInspectorLink } from '../../shared';
 import { toast } from '../../../core/toast';
 
 /** Parse a log line into its level and message parts. */
@@ -628,6 +628,16 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 <span className="text-gray-500 dark:text-gray-400 font-medium pt-1">Related:</span>
                                 {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && (
                                     <RelatedPipelineEntry job={job} />
+                                )}
+                                {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && job.node_id && (
+                                    <NodeInspectorLink
+                                        nodeId={job.node_id}
+                                        jobId={job.job_id}
+                                        pipelineId={job.pipeline_id}
+                                        label="Inspect node"
+                                        {...(origin !== undefined ? { origin } : {})}
+                                        {...(filters !== undefined ? { filters } : {})}
+                                    />
                                 )}
                                 {job.promoted_at && job.version !== undefined && (
                                     <RecordLink

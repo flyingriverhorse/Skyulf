@@ -19,6 +19,8 @@ export interface JobInfo {
 
   // Extended fields
   model_type?: string;
+  /** Server-resolved model family (e.g. "classification", "ensemble"); `null`/absent when unresolvable. */
+  model_family?: string | null;
   hyperparameters?: Record<string, unknown>;
   created_at: string;
   metrics?: Record<string, number>;

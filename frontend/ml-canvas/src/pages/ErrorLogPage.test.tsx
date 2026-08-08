@@ -30,6 +30,8 @@ vi.mock('../core/api/monitoring', async () => {
       unresolveError: vi.fn(),
       clearErrors: vi.fn(),
       clearPipelineLogs: vi.fn(),
+      getPipelineRunNode: vi.fn(),
+      getJobNode: vi.fn(),
     },
   };
 });
@@ -252,14 +254,37 @@ describe('ErrorLogPage — server-side search, facets, links, and export', () =>
     expect(parsed?.origin).toBe('/errors');
   });
 
-  it('gives a pipeline log with a node_id a contextual View action to the node', async () => {
+  it('gives a pipeline log with a node_id a contextual action to inspect the node', async () => {
+    vi.mocked(monitoringApi.getPipelineRunNode).mockResolvedValue({
+      job_id: 'job-9',
+      node_id: 'node-xyz',
+      node_found: true,
+      node: {
+        node_id: 'node-xyz',
+        step_type: 'simple_imputer',
+        label: 'Simple Imputer',
+        params: { strategy: 'mean' },
+        upstream: [],
+        downstream: [],
+      },
+      pipeline_id: 'pipeline-1',
+      dataset_source_id: 'ds-1',
+      dataset_name: 'Dataset 1',
+      run_mode: 'fixed',
+      model_type: 'RandomForest',
+      status: 'completed',
+      is_synthetic_pipeline: false,
+      can_open_in_canvas: true,
+      recent_logs: [],
+    });
     renderPage();
     await screen.findByText('node failed');
 
-    const link = screen.getByRole('link', { name: /node node-xyz/i });
-    expect(link.getAttribute('href')?.split('?')[0]).toBe('/canvas');
-    const parsed = parseOperationalContext(link.getAttribute('href')?.split('?')[1] ?? '');
-    expect(parsed?.ref).toEqual({ kind: 'node', nodeId: 'node-xyz', pipelineId: 'pipeline-1' });
+    const trigger = screen.getByRole('button', { name: /node node-xyz/i });
+    fireEvent.click(trigger);
+
+    expect(await screen.findByText('Simple Imputer')).toBeInTheDocument();
+    expect(monitoringApi.getPipelineRunNode).toHaveBeenCalledWith('pipeline-1', 'node-xyz');
   });
 
   it('tells the investigator explicitly when no target is available', async () => {

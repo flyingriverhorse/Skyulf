@@ -85,6 +85,17 @@ describe('JobsPage', () => {
     });
   });
 
+  it('shows the real model family + run mode instead of the raw job_type ("training"/"tuning")', async () => {
+    vi.mocked(jobsApi.getJobs).mockResolvedValue([
+      makeJob({ job_id: 'job-basic', job_type: 'training', model_type: 'random_forest' }),
+    ]);
+
+    renderJobsPage();
+
+    expect(await screen.findByText('Classification (basic)')).toBeInTheDocument();
+    expect(screen.queryByText('training')).not.toBeInTheDocument();
+  });
+
   it('opens the Details view for the clicked job and returns to the list on Back', async () => {
     const user = userEvent.setup();
     vi.mocked(jobsApi.getJobs).mockResolvedValue([

@@ -14,6 +14,8 @@ import pytest
 from fastapi import HTTPException
 
 from backend.monitoring.router import (
+    _UNRESOLVED_TRAINING_KEY,
+    _UNRESOLVED_TRAINING_LABEL,
     DriftJobOption,
     SlowNodeRun,
     _accumulate_node_timing,
@@ -32,6 +34,7 @@ from backend.monitoring.router import (
     _load_feature_importances,
     _load_reference_dataframe,
     _percentile,
+    _resolve_training_step_type,
     _save_drift_alert,
     _scan_slow_node_jobs,
     list_drift_jobs,
@@ -551,6 +554,8 @@ def _make_timing_job(**kwargs):
     job.pipeline_id = kwargs.get("pipeline_id", "pipeline-1")
     job.dataset_source_id = kwargs.get("dataset_source_id", "dataset-1")
     job.finished_at = kwargs.get("finished_at", datetime(2026, 1, 1, 12, 0, 0))
+    job.graph = kwargs.get("graph", {})
+    job.model_type = kwargs.get("model_type")
     return job
 
 
@@ -563,15 +568,15 @@ def test_accumulate_node_timing_valid_entry():
         {"step_type": "impute", "execution_time": 1.5, "node_id": "n1"}, job, by_step, sample_node
     )
     assert contributed is True
-    assert len(by_step["impute"]) == 1
-    run = by_step["impute"][0]
+    assert len(by_step["Impute"]) == 1
+    run = by_step["Impute"][0]
     assert run.execution_seconds == 1.5
     assert run.node_id == "n1"
     assert run.job_id == "job-1"
     assert run.pipeline_id == "pipeline-1"
     assert run.dataset_source_id == "dataset-1"
     assert run.finished_at == "2026-01-01T12:00:00"
-    assert sample_node["impute"] == "n1"
+    assert sample_node["Impute"] == "n1"
 
 
 def test_accumulate_node_timing_non_dict_entry_ignored():
@@ -611,7 +616,94 @@ def test_accumulate_node_timing_missing_step_type_defaults_unknown():
     by_step: dict = {}
     sample_node: dict = {}
     _accumulate_node_timing({"execution_time": 2.0}, _make_timing_job(), by_step, sample_node)
-    assert "unknown" in by_step
+    assert "Unknown" in by_step
+
+
+# ---------------------------------------------------------------------------
+# _resolve_training_step_type / training-family grouping in _accumulate_node_timing
+# ---------------------------------------------------------------------------
+
+_FAKE_REGISTRY_TAGS = {
+    "random_forest_classifier": ["classification"],
+    "linear_regression": ["regression"],
+    "voting_classifier": ["classification"],
+    "kmeans": ["clustering"],
+}
+
+
+def test_resolve_training_step_type_from_graph_node_params():
+    """A training node's family is resolved from its own graph node's `algorithm` param."""
+    job = _make_timing_job(
+        graph={
+            "nodes": [
+                {
+                    "node_id": "n1",
+                    "step_type": "training",
+                    "params": {"algorithm": "random_forest_classifier"},
+                }
+            ]
+        },
+    )
+    assert _resolve_training_step_type(job, "n1", _FAKE_REGISTRY_TAGS) == "Classification"
+
+
+def test_resolve_training_step_type_legacy_run_falls_back_to_job_model_type():
+    """A legacy run whose graph doesn't contain the node still resolves via `job.model_type`."""
+    job = _make_timing_job(graph={}, model_type="linear_regression")
+    assert _resolve_training_step_type(job, "missing-node", _FAKE_REGISTRY_TAGS) == "Regression"
+
+
+def test_resolve_training_step_type_ensemble_model_type():
+    """Ensemble model types resolve to 'Ensemble' regardless of their classification/regression tags."""
+    job = _make_timing_job(model_type="voting_classifier")
+    assert _resolve_training_step_type(job, "n1", _FAKE_REGISTRY_TAGS) == "Ensemble"
+
+
+def test_resolve_training_step_type_unresolvable_falls_back_honestly():
+    """When neither the graph nor the job row resolve a known model type, fall back to an honest label."""
+    job = _make_timing_job(graph={}, model_type=None)
+    assert (
+        _resolve_training_step_type(job, "missing-node", _FAKE_REGISTRY_TAGS)
+        == _UNRESOLVED_TRAINING_KEY
+    )
+
+
+@patch("backend.monitoring.router.model_registry_tags", return_value=_FAKE_REGISTRY_TAGS)
+def test_accumulate_node_timing_groups_training_by_real_family(_mock_tags):
+    """A raw `training` step_type entry is grouped under its resolved model family, not 'training'."""
+    by_step: dict = {}
+    sample_node: dict = {}
+    job = _make_timing_job(
+        graph={
+            "nodes": [
+                {
+                    "node_id": "n1",
+                    "step_type": "training",
+                    "params": {"algorithm": "random_forest_classifier"},
+                }
+            ]
+        },
+    )
+    contributed = _accumulate_node_timing(
+        {"step_type": "training", "execution_time": 3.0, "node_id": "n1"}, job, by_step, sample_node
+    )
+    assert contributed is True
+    assert "training" not in by_step
+    assert by_step["Classification"][0].execution_seconds == 3.0
+
+
+@patch("backend.monitoring.router.model_registry_tags", return_value=_FAKE_REGISTRY_TAGS)
+def test_accumulate_node_timing_unresolvable_training_uses_honest_fallback(_mock_tags):
+    """A legacy `training` entry whose model family can't be resolved groups under the fallback label."""
+    by_step: dict = {}
+    sample_node: dict = {}
+    job = _make_timing_job(graph={}, model_type=None)
+    _accumulate_node_timing(
+        {"step_type": "training", "execution_time": 3.0, "node_id": "n1"}, job, by_step, sample_node
+    )
+    assert _UNRESOLVED_TRAINING_LABEL in by_step
+    assert "training" not in by_step
+    assert _UNRESOLVED_TRAINING_KEY not in by_step
 
 
 # ---------------------------------------------------------------------------
@@ -643,8 +735,8 @@ async def test_scan_slow_node_jobs_aggregates_across_tables():
 
     assert jobs_scanned == 2
     assert runs_seen == 2
-    assert [run.execution_seconds for run in by_step["impute"]] == [1.0, 2.0]
-    assert [run.job_id for run in by_step["impute"]] == ["job-1", "job-2"]
+    assert [run.execution_seconds for run in by_step["Impute"]] == [1.0, 2.0]
+    assert [run.job_id for run in by_step["Impute"]] == ["job-1", "job-2"]
 
 
 async def test_scan_slow_node_jobs_skips_jobs_without_node_timings():
@@ -778,7 +870,7 @@ async def test_list_slow_nodes_end_to_end():
     # Truncated to `limit=1`, and the highest total_seconds entry ("scale") wins.
     assert len(response.aggregates) == 1
     agg = response.aggregates[0]
-    assert agg.step_type == "scale"
+    assert agg.step_type == "Scale"
     assert agg.is_single_run is True
     assert len(agg.contributing_runs) == 1
     assert agg.contributing_runs[0].job_id == "job-1"

@@ -15,6 +15,7 @@ vi.mock('../core/api/monitoring', async () => {
     monitoringApi: {
       ...actual.monitoringApi,
       getSlowNodes: vi.fn(),
+      getJobNode: vi.fn(),
     },
   };
 });
@@ -180,8 +181,29 @@ describe('SlowNodesPage — aggregate provenance, drill-down, and return state',
     expect(await screen.findByText(/investigation unavailable/i)).toBeInTheDocument();
   });
 
-  it('gives each contributing run a returnable link to its job and Canvas node', async () => {
+  it('gives each contributing run a returnable link to its job and an in-place node inspector', async () => {
     vi.mocked(monitoringApi.getSlowNodes).mockResolvedValue(response([aggregate()]));
+    vi.mocked(monitoringApi.getJobNode).mockResolvedValue({
+      job_id: 'job-1',
+      node_id: 'impute-node-1',
+      node_found: true,
+      node: {
+        node_id: 'impute-node-1',
+        step_type: 'simple_imputer',
+        label: 'Simple Imputer',
+        params: {},
+        upstream: [],
+        downstream: [],
+      },
+      pipeline_id: 'pipeline-1',
+      dataset_source_id: 'dataset-1',
+      run_mode: 'fixed',
+      model_type: 'RandomForest',
+      status: 'completed',
+      is_synthetic_pipeline: false,
+      can_open_in_canvas: true,
+      recent_logs: [],
+    });
     renderPage();
 
     await screen.findByText('impute');
@@ -194,15 +216,11 @@ describe('SlowNodesPage — aggregate provenance, drill-down, and return state',
     expect(jobContext?.origin).toBe('/slow-nodes');
     expect(jobContext?.filters).toEqual({ days: '7', limit: '10', sort: 'total_seconds' });
 
-    const nodeLink = screen.getByRole('link', { name: /node impute-node-1/i });
-    expect(nodeLink).toHaveTextContent(/open in canvas/i);
-    expect(nodeLink.getAttribute('href')?.split('?')[0]).toBe('/canvas');
-    const nodeContext = parseOperationalContext(nodeLink.getAttribute('href')?.split('?')[1] ?? '');
-    expect(nodeContext?.ref).toEqual({
-      kind: 'node',
-      nodeId: 'impute-node-1',
-      pipelineId: 'pipeline-1',
-    });
+    const inspectTrigger = screen.getByRole('button', { name: /node impute-node-1/i });
+    fireEvent.click(inspectTrigger);
+
+    expect(await screen.findByText('Simple Imputer')).toBeInTheDocument();
+    expect(monitoringApi.getJobNode).toHaveBeenCalledWith('job-1', 'impute-node-1');
   });
 
   it('preserves lookback, top-N, sort, and the open row across a return trip', async () => {

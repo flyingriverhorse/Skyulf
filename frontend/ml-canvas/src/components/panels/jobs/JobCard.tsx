@@ -4,7 +4,7 @@ import { JobInfo } from '../../../core/api/jobs';
 import { clickableProps } from '../../../core/utils/a11y';
 import { formatMetricName, formatDuration, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { StatusBadge } from '../../shared/StatusBadge';
-import { getDisplayScore, getTaskForModelType, type ExperimentsTask } from '../../pages/ExperimentsPage/utils/jobMeta';
+import { getDisplayScore, getTaskForModelType, hasTuningMetadata, type ExperimentsTask } from '../../pages/ExperimentsPage/utils/jobMeta';
 import type { RegistryItem } from '../../../core/api/registry';
 
 const SPLIT_LABEL: Record<'test' | 'val' | 'train' | 'cv', string> = {
@@ -70,7 +70,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
       </div>
       <div className="flex items-center gap-1 mt-0.5 text-[10px] text-gray-500 flex-wrap">
         <span className="font-medium truncate">{job.model_type || 'Unknown Model'}</span>
-        {job.job_type === 'tuning' && job.search_strategy && (
+        {hasTuningMetadata(job) && job.search_strategy && (
           <span className="text-gray-400 truncate">({job.search_strategy})</span>
         )}
         {isEnsemble && (
@@ -117,7 +117,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
                  {score.split !== 'cv' && <span className="opacity-60"> ({SPLIT_LABEL[score.split]})</span>}
                </span>
              </div>
-          ) : job.job_type === 'tuning' && !!(job.result as Record<string, unknown>).best_params ? (
+          ) : hasTuningMetadata(job) && !!(job.result as Record<string, unknown>).best_params ? (
              <span className="text-[10px] text-gray-500 dark:text-gray-400">Params found</span>
           ) : <span className="text-gray-400 text-xs">-</span>
       ) : (
