@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
 from backend.database.engine import get_async_session
+from backend.database.models import DataSource
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._execution.jobs import JobInfo, JobManager
 from backend.ml_pipeline._internal._routers.run_pipeline import resubmit_job_from_graph
@@ -295,7 +296,8 @@ async def list_jobs(
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
     jobs = await JobManager.list_jobs(session, effective_limit, skip, job_type)
     if get_settings().DEMO_MODE:
-        jobs = [j for j in jobs if j.dataset_id == "iris-demo"]
+        iris_ids = await _get_iris_dataset_ids(session)
+        jobs = [j for j in jobs if j.dataset_id in iris_ids]
     return jobs
 
 
@@ -319,6 +321,19 @@ async def get_tuning_jobs_history(
 ):
     """History of completed tuning jobs for a specific model type."""
     return await JobManager.get_tuning_jobs_for_model(session, model_type)
+
+
+async def _get_iris_dataset_ids(session: AsyncSession) -> set[str]:
+    """Return all identifiers (PK and source_id) that map to the Iris dataset."""
+    from sqlalchemy import select
+
+    result = await session.execute(
+        select(DataSource.id, DataSource.source_id).where(DataSource.source_id == "iris-demo")
+    )
+    row = result.one_or_none()
+    if row is None:
+        return {"iris-demo"}
+    return {"iris-demo", str(row.id)}
 
 
 __all__ = ["router"]
