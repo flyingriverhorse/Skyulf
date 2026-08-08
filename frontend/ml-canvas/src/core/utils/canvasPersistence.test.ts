@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Edge, Node } from '@xyflow/react';
 import {
   saveCanvasSnapshot,
   loadCanvasSnapshot,
+  loadCanvasSnapshotDiagnostic,
   clearCanvasSnapshot,
 } from './canvasPersistence';
 
@@ -60,5 +61,61 @@ describe('canvasPersistence', () => {
     clearCanvasSnapshot();
     expect(loadCanvasSnapshot()).toBeNull();
     expect(window.localStorage.getItem(LS_KEY)).toBeNull();
+  });
+});
+
+describe('loadCanvasSnapshotDiagnostic (CAN-003)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it('reports "available" with the parsed snapshot for a valid payload', () => {
+    saveCanvasSnapshot(sampleNodes, sampleEdges);
+    const diagnostic = loadCanvasSnapshotDiagnostic();
+    expect(diagnostic.status).toBe('available');
+    if (diagnostic.status === 'available') {
+      expect(diagnostic.snapshot.nodes).toEqual(sampleNodes);
+      expect(diagnostic.snapshot.edges).toEqual(sampleEdges);
+    }
+  });
+
+  it('reports "empty" when nothing has been saved', () => {
+    expect(loadCanvasSnapshotDiagnostic()).toEqual({ status: 'empty' });
+  });
+
+  it('reports "corrupt" for invalid JSON', () => {
+    window.localStorage.setItem(LS_KEY, '{not json');
+    expect(loadCanvasSnapshotDiagnostic()).toEqual({ status: 'corrupt' });
+  });
+
+  it('reports "corrupt" when nodes/edges are missing or malformed', () => {
+    window.localStorage.setItem(
+      LS_KEY,
+      JSON.stringify({ version: 1, savedAt: new Date().toISOString() }),
+    );
+    expect(loadCanvasSnapshotDiagnostic()).toEqual({ status: 'corrupt' });
+  });
+
+  it('reports "version-mismatch" with the found version for a stale schema', () => {
+    window.localStorage.setItem(
+      LS_KEY,
+      JSON.stringify({ version: 999, savedAt: new Date().toISOString(), nodes: [], edges: [] }),
+    );
+    expect(loadCanvasSnapshotDiagnostic()).toEqual({ status: 'version-mismatch', foundVersion: 999 });
+  });
+
+  it('reports "storage-error" when localStorage.getItem throws (quota/disabled)', () => {
+    vi.spyOn(window.localStorage.__proto__, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError: storage disabled');
+    });
+    expect(loadCanvasSnapshotDiagnostic()).toEqual({ status: 'storage-error' });
+  });
+
+  it('loadCanvasSnapshot still collapses every non-available status to null', () => {
+    vi.spyOn(window.localStorage.__proto__, 'getItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+    expect(loadCanvasSnapshot()).toBeNull();
   });
 });

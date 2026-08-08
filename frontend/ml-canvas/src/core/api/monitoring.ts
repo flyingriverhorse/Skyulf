@@ -34,6 +34,11 @@ export interface DriftReport {
     missing_columns: string[];
     new_columns: string[];
     feature_importances?: Record<string, number>;
+    alert_id?: number | null;
+    severity: DriftAlertSeverity;
+    threshold_version?: number | null;
+    deployment_id?: number | null;
+    model_version?: string | null;
 }
 
 export interface DriftHistoryEntry {
@@ -46,6 +51,43 @@ export interface DriftHistoryEntry {
     total_columns?: number;
     summary?: Record<string, { drifted: boolean; psi?: number; wasserstein?: number; ks_p_value?: number }>;
     created_at?: string;
+    severity: DriftAlertSeverity;
+    status: DriftAlertStatus;
+    owner?: string | null;
+    acknowledged_at?: string | null;
+    resolved_at?: string | null;
+    threshold_version?: number | null;
+    threshold_psi?: number | null;
+    threshold_ks?: number | null;
+    threshold_wasserstein?: number | null;
+    threshold_kl?: number | null;
+    deployment_id?: number | null;
+    model_version?: string | null;
+    evaluation_status: DriftEvaluationStatus;
+    error_message?: string | null;
+}
+
+/** Triage severity derived server-side at evaluation time (`_classify_drift_severity`). */
+export type DriftAlertSeverity = 'none' | 'warning' | 'critical';
+
+/** Disposition lifecycle: new -> acknowledged -> (resolved | reopened) -> ... */
+export type DriftAlertStatus = 'new' | 'acknowledged' | 'resolved' | 'reopened';
+
+/** Distinguishes a completed check from an explicit no-baseline/failed evaluation outcome. */
+export type DriftEvaluationStatus = 'completed' | 'no_baseline' | 'failed';
+
+export type DriftDispositionAction = 'acknowledge' | 'resolve' | 'reopen';
+
+export interface DriftDispositionEntry {
+    status: DriftAlertStatus;
+    actor: string;
+    note: string | null;
+    at: string;
+}
+
+export interface DriftAlertDetail extends DriftHistoryEntry {
+    column_drifts?: Record<string, ColumnDrift> | null;
+    disposition_history: DriftDispositionEntry[];
 }
 
 export interface DriftJobOption {
@@ -72,7 +114,11 @@ export interface DriftStatusSummary {
     has_drift: boolean;
     drifted_jobs: number;
     latest_check?: string;
+    unacknowledged_critical: number;
 }
+
+/** Typed severity derived server-side from `status_code` (see `_classify_error_severity`). */
+export type ErrorSeverity = 'critical' | 'warning' | 'info';
 
 export interface ErrorEvent {
     id: number;
@@ -84,6 +130,69 @@ export interface ErrorEvent {
     status_code: number;
     created_at: string;
     resolved_at?: string | null;
+    severity: ErrorSeverity;
+}
+
+/** Every typed facet value present across the full unfiltered error history. */
+export interface ErrorEventFacets {
+    severities: ErrorSeverity[];
+    error_types: string[];
+    job_ids: string[];
+}
+
+/** Server-side error search filters. Omitted/empty fields are not sent. */
+export interface ErrorEventFilters {
+    severity?: ErrorSeverity;
+    errorType?: string;
+    jobId?: string;
+    q?: string;
+}
+
+export interface ErrorEventSearchResponse {
+    total: number;
+    /** History size before filters — lets the UI say "3 of 120" vs. "no history". */
+    total_unfiltered: number;
+    facets: ErrorEventFacets;
+    filters: {
+        since: string | null;
+        show_resolved: boolean;
+        severity: string | null;
+        error_type: string | null;
+        job_id: string | null;
+        q: string | null;
+    };
+    entries: ErrorEvent[];
+}
+
+/** Every typed facet value present across the full unfiltered pipeline log history. */
+export interface PipelineLogFacets {
+    levels: string[];
+    node_types: string[];
+    pipeline_ids: string[];
+    node_ids: string[];
+}
+
+/** Server-side pipeline log search filters. Omitted/empty fields are not sent. */
+export interface PipelineLogFilters {
+    level?: string;
+    nodeType?: string;
+    nodeId?: string;
+    q?: string;
+}
+
+export interface PipelineLogSearchResponse {
+    total: number;
+    total_unfiltered: number;
+    facets: PipelineLogFacets;
+    filters: {
+        since: string | null;
+        pipeline_id: string | null;
+        level: string | null;
+        node_type: string | null;
+        node_id: string | null;
+        q: string | null;
+    };
+    entries: PipelineRunLog[];
 }
 
 export interface GroupedIssue {
@@ -95,6 +204,16 @@ export interface GroupedIssue {
     sample_id: number;
 }
 
+export interface SlowNodeRun {
+    job_id: string;
+    pipeline_id: string;
+    node_id: string;
+    dataset_source_id: string;
+    execution_seconds: number;
+    finished_at?: string | null;
+    is_outlier: boolean;
+}
+
 export interface SlowNodeAggregate {
     step_type: string;
     count: number;
@@ -103,10 +222,14 @@ export interface SlowNodeAggregate {
     p95_seconds: number;
     max_seconds: number;
     sample_node_id?: string | null;
+    is_single_run: boolean;
+    sample_is_representative: boolean;
+    contributing_runs: SlowNodeRun[];
 }
 
 export interface SlowNodesResponse {
     days: number;
+    unit: string;
     total_jobs_scanned: number;
     total_node_runs: number;
     aggregates: SlowNodeAggregate[];
@@ -129,6 +252,57 @@ export interface PipelineRunLog {
     logger?: string | null;
     message: string;
     run_at?: string | null;
+}
+
+/** One upstream/downstream neighbour of an inspected node. */
+export interface NodeNeighbor {
+    node_id: string;
+    step_type: string;
+    label: string;
+}
+
+/** Full detail for a node found in a job's stored graph snapshot. */
+export interface NodeInspectorDetail {
+    node_id: string;
+    step_type: string;
+    label: string;
+    params: Record<string, unknown>;
+    upstream: NodeNeighbor[];
+    downstream: NodeNeighbor[];
+    execution_seconds?: number | null;
+    execution_status?: string | null;
+}
+
+export interface NodeInspectorLogEntry {
+    level: string;
+    message: string;
+    run_at?: string | null;
+}
+
+/**
+ * Read-only node-inspector payload, sourced entirely from a job's stored
+ * `graph`/`metrics` columns — the graph exactly as it executed, not live
+ * canvas state. `node_found: false` means the id isn't present in this run's
+ * graph (deleted/renamed node); the job-level context is still returned.
+ */
+export interface NodeInspectorResponse {
+    job_id: string;
+    node_id: string;
+    node_found: boolean;
+    node?: NodeInspectorDetail | null;
+    pipeline_id: string;
+    dataset_source_id: string;
+    dataset_name?: string | null;
+    branch_index?: number | null;
+    run_mode: string;
+    model_type: string;
+    status: string;
+    started_at?: string | null;
+    finished_at?: string | null;
+    /** True only for a `preview_*`/`*__branch_N` run that was never a saved pipeline. */
+    is_synthetic_pipeline: boolean;
+    can_open_in_canvas: boolean;
+    recent_logs: NodeInspectorLogEntry[];
 }
 
 export const monitoringApi = {
@@ -166,16 +340,43 @@ export const monitoringApi = {
         return response.data;
     },
 
+    getDriftAlert: async (alertId: number): Promise<DriftAlertDetail> => {
+        const response = await apiClient.get<DriftAlertDetail>(`/monitoring/drift/alerts/${alertId}`);
+        return response.data;
+    },
+
+    updateDriftAlertDisposition: async (
+        alertId: number,
+        action: DriftDispositionAction,
+        actor: string,
+        note?: string,
+    ): Promise<DriftAlertDetail> => {
+        const response = await apiClient.patch<DriftAlertDetail>(
+            `/monitoring/drift/alerts/${alertId}/disposition`,
+            { action, actor, note: note ?? null },
+        );
+        return response.data;
+    },
+
     getDriftStatus: async (): Promise<DriftStatusSummary> => {
         const response = await apiClient.get<DriftStatusSummary>('/monitoring/drift/status');
         return response.data;
     },
 
-    getErrors: async (limit = 100, since?: string, showResolved = false): Promise<ErrorEvent[]> => {
+    getErrors: async (
+        limit = 100,
+        since?: string,
+        showResolved = false,
+        filters: ErrorEventFilters = {},
+    ): Promise<ErrorEventSearchResponse> => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (since) params.set('since', since);
         if (showResolved) params.set('show_resolved', 'true');
-        const response = await apiClient.get<ErrorEvent[]>(`/monitoring/errors?${params}`);
+        if (filters.severity) params.set('severity', filters.severity);
+        if (filters.errorType) params.set('error_type', filters.errorType);
+        if (filters.jobId) params.set('job_id', filters.jobId);
+        if (filters.q) params.set('q', filters.q);
+        const response = await apiClient.get<ErrorEventSearchResponse>(`/monitoring/errors?${params}`);
         return response.data;
     },
 
@@ -229,15 +430,42 @@ export const monitoringApi = {
         await apiClient.post('/monitoring/pipeline-logs', { pipeline_id: pipelineId, entries });
     },
 
-    getPipelineLogs: async (limit = 200, since?: string, pipelineId?: string): Promise<PipelineRunLog[]> => {
+    getPipelineLogs: async (
+        limit = 200,
+        since?: string,
+        pipelineId?: string,
+        filters: PipelineLogFilters = {},
+    ): Promise<PipelineLogSearchResponse> => {
         const params = new URLSearchParams({ limit: String(limit) });
         if (since) params.set('since', since);
         if (pipelineId) params.set('pipeline_id', pipelineId);
-        const response = await apiClient.get<PipelineRunLog[]>(`/monitoring/pipeline-logs?${params}`);
+        if (filters.level) params.set('level', filters.level);
+        if (filters.nodeType) params.set('node_type', filters.nodeType);
+        if (filters.nodeId) params.set('node_id', filters.nodeId);
+        if (filters.q) params.set('q', filters.q);
+        const response = await apiClient.get<PipelineLogSearchResponse>(`/monitoring/pipeline-logs?${params}`);
         return response.data;
     },
 
     clearPipelineLogs: async (): Promise<void> => {
         await apiClient.delete('/monitoring/pipeline-logs');
+    },
+
+    // ── Node inspector ──────────────────────────────────────────────────
+    getJobNode: async (jobId: string, nodeId: string): Promise<NodeInspectorResponse> => {
+        const response = await apiClient.get<NodeInspectorResponse>(
+            `/monitoring/jobs/${encodeURIComponent(jobId)}/nodes/${encodeURIComponent(nodeId)}`,
+        );
+        return response.data;
+    },
+
+    getPipelineRunNode: async (
+        pipelineId: string,
+        nodeId: string,
+    ): Promise<NodeInspectorResponse> => {
+        const response = await apiClient.get<NodeInspectorResponse>(
+            `/monitoring/pipeline-runs/${encodeURIComponent(pipelineId)}/nodes/${encodeURIComponent(nodeId)}`,
+        );
+        return response.data;
     },
 };

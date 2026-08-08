@@ -63,6 +63,14 @@ interface GraphState {
    * Returns the count of cloned nodes (0 when nothing is selected).
    */
   duplicateSelectedNodes: () => number;
+  /**
+   * Selects exactly one node (deselecting every other node) so the
+   * Properties panel opens on it. Returns `false` without changing
+   * selection when `nodeId` isn't present in the current graph — used
+   * by deep-link consumers (e.g. Canvas node RecordLinks) to tell
+   * "found and selected" apart from "not in this graph".
+   */
+  selectNode: (nodeId: string) => boolean;
   validateGraph: () => GraphValidationIssue[];
   setGraph: (nodes: Node[], edges: Edge[]) => void;
   /**
@@ -525,6 +533,15 @@ export const useGraphStore = create<GraphState>()(
     );
     set({ nodes: [...deselected, ...clones] });
     return clones.length;
+  },
+
+  selectNode: (nodeId: string) => {
+    const current = get().nodes;
+    if (!current.some((n) => n.id === nodeId)) return false;
+    set({
+      nodes: current.map((n) => (n.id === nodeId ? { ...n, selected: true } : n.selected ? { ...n, selected: false } : n)),
+    });
+    return true;
   },
 
   chainSiblings: (consumerId: string, orderedInputIds: string[]) => {

@@ -46,7 +46,7 @@ export const InsightsTab: React.FC<InsightsTabProps> = ({ profile }) => {
                         ))}
                     </div>
                 ) : (
-                    <p className="text-gray-500 italic">No specific recommendations found. Your data looks clean!</p>
+                    <p className="text-gray-500 dark:text-gray-400 italic">No specific recommendations found. Your data looks clean!</p>
                 )}
             </div>
         </div>

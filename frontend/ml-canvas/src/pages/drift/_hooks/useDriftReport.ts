@@ -18,25 +18,32 @@ interface CalculateArgs {
  *   - submits an upload + job pair to the backend
  *   - re-evaluates `has_drift` per metric on the client when the user nudges
  *     the threshold sliders, so the table updates without a server round trip
+ *   - classifies a failed request into `errorKind` so the page can render the
+ *     no-baseline (404) and evaluation-failed (5xx) cases explicitly instead
+ *     of a single generic error banner (OPS-003)
  */
 export function useDriftReport(thresholds: DriftThresholds) {
     const [report, setReport] = useState<DriftReport | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorKind, setErrorKind] = useState<'no_baseline' | 'failed' | null>(null);
 
     const calculate = useCallback(async ({ selectedJob, file, job, thresholds: t }: CalculateArgs) => {
         setLoading(true);
         setError(null);
+        setErrorKind(null);
         try {
             const result = await monitoringApi.calculateDrift(selectedJob, file, job?.dataset_name, t);
             setReport(result);
             return result;
         } catch (err: unknown) {
-            const detail =
+            const response =
                 err && typeof err === 'object' && 'response' in err
-                    ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                    ? (err as { response?: { status?: number; data?: { detail?: string } } }).response
                     : undefined;
+            const detail = response?.data?.detail;
             setError(detail || 'Failed to calculate drift.');
+            setErrorKind(response?.status === 404 ? 'no_baseline' : 'failed');
             return null;
         } finally {
             setLoading(false);
@@ -78,6 +85,7 @@ export function useDriftReport(thresholds: DriftThresholds) {
         evaluatedReport,
         loading,
         error,
+        errorKind,
         setError,
         calculate,
     };

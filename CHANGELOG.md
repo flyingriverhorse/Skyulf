@@ -10,7 +10,7 @@ Each major/minor series has its own file in the [`changelog/`](changelog/) folde
 
 | Series | File | Status | Description |
 |--------|------|--------|-------------|
-| **0.7.x** | [changelog/0.7.x.md](changelog/0.7.x.md) | Active | Model Explainability, Segmentation Models & Unified Training Pipeline (v0.7.0 — v0.7.4) |
+| **0.7.x** | [changelog/0.7.x.md](changelog/0.7.x.md) | Active | Model Explainability, Segmentation Models & Unified Training Pipeline (v0.7.0 — v0.7.6) |
 | **0.6.x** | [changelog/0.6.x.md](changelog/0.6.x.md) | Stable | Ensemble Models, Security Hardening & Codebase Audit Sweeps (v0.6.0 — v0.6.10) |
 | **0.5.x** | [changelog/0.5.x.md](changelog/0.5.x.md) | Stable | Promote Winner, Branch-Aware Preview & Architecture Improvements |
 | **0.4.x** | [changelog/0.4.x.md](changelog/0.4.x.md) | Stable | Parallel Experiment Execution (v0.4.0+) |

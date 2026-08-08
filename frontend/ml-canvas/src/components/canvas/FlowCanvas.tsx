@@ -21,7 +21,12 @@ import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
 import { Sparkles } from 'lucide-react';
-import { SHOW_TEMPLATES_EVENT, FOCUS_NODE_EVENT, type FocusNodeDetail } from '../../core/hooks/useKeyboardShortcuts';
+import {
+  SHOW_TEMPLATES_EVENT,
+  FOCUS_NODE_EVENT,
+  FIT_VIEW_EVENT,
+  type FocusNodeDetail,
+} from '../../core/hooks/useKeyboardShortcuts';
 import { PerfOverlayLegend } from './PerfOverlayLegend';
 
 const nodeTypes = {
@@ -253,9 +258,22 @@ const FlowCanvasContent: React.FC = () => {
       const detail = (e as CustomEvent<FocusNodeDetail>).detail;
       if (!detail?.id) return;
       fitView({ nodes: [{ id: detail.id }], duration: 250, padding: 0.4, maxZoom: 1 });
+      if (detail.focusWrapper) reactFlowWrapper.current?.focus();
     };
     window.addEventListener(FOCUS_NODE_EVENT, handler);
     return () => window.removeEventListener(FOCUS_NODE_EVENT, handler);
+  }, [fitView]);
+
+  // CAN-003: after a graph is restored from any recovery source, fit the
+  // whole result into view and move DOM focus onto the canvas so the user
+  // (including keyboard users) lands on what just loaded.
+  useEffect(() => {
+    const handler = (): void => {
+      fitView({ duration: 250, padding: 0.15 });
+      reactFlowWrapper.current?.focus();
+    };
+    window.addEventListener(FIT_VIEW_EVENT, handler);
+    return () => window.removeEventListener(FIT_VIEW_EVENT, handler);
   }, [fitView]);
 
   const onDrop = useCallback(

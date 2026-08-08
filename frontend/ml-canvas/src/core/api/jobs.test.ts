@@ -60,6 +60,15 @@ describe('jobsApi.getJob / cancelJob / promote / unpromote', () => {
     await jobsApi.unpromoteJob('j4');
     expect(del).toHaveBeenCalledWith('/pipeline/jobs/j4/promote');
   });
+
+  it('retryJob POSTs /pipeline/jobs/:id/retry and returns the new job id', async () => {
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({
+      data: { job_id: 'j5-new', message: 'Retry submitted' },
+    } as unknown as Awaited<ReturnType<typeof apiClient.post>>);
+    const result = await jobsApi.retryJob('j5');
+    expect(post).toHaveBeenCalledWith('/pipeline/jobs/j5/retry');
+    expect(result).toEqual({ job_id: 'j5-new', message: 'Retry submitted' });
+  });
 });
 
 describe('jobsApi.getJobs', () => {

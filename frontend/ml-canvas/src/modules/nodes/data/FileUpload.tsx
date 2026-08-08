@@ -102,7 +102,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
           </div>
         ) : (
           <>
-            <FileSpreadsheet className="w-10 h-10 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
+            <FileSpreadsheet className="w-10 h-10 text-slate-500 dark:text-slate-400 mx-auto mb-3" />
             <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">
               Drag and drop your file here, or{' '}
               <label className="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium">

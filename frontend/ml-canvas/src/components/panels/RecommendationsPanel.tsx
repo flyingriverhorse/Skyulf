@@ -38,7 +38,7 @@ export const RecommendationsPanel: React.FC<RecommendationsPanelProps> = ({
                   {rec.description}
                 </p>
                 {rec.reasoning && (
-                  <p className="text-gray-400 dark:text-slate-500 text-[10px] mt-1 italic">
+                  <p className="text-gray-500 dark:text-slate-400 text-[10px] mt-1 italic">
                     Why: {rec.reasoning}
                   </p>
                 )}

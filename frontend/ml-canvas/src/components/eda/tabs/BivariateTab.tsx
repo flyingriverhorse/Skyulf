@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
     Download,
     ScatterChart as ScatterIcon,
@@ -7,6 +7,9 @@ import {
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { ThreeDScatterPlot, type ScatterPoint } from '../ThreeDScatterPlot';
 import { CanvasScatterPlot } from '../CanvasScatterPlot';
+import { ChartLegend } from '../ChartLegend';
+import { ChartDataTable } from '../ChartDataTable';
+import { buildScatterLegendEntries, groupScatterPoints } from '../scatterGrouping';
 import { EmptyState } from '../../shared/EmptyState';
 import type { EDAProfile, ColumnProfile } from '../../../core/types/edaProfile';
 
@@ -39,6 +42,28 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
     is3D,
     setIs3D
 }) => {
+    const sampleData = useMemo(() => (profile?.sample_data ?? []) as ScatterPoint[], [profile?.sample_data]);
+
+    const legendEntries = useMemo(
+        () => buildScatterLegendEntries(groupScatterPoints(sampleData, scatterColor || undefined)),
+        [sampleData, scatterColor]
+    );
+
+    const tableColumns = useMemo(() => {
+        const cols = [
+            { key: scatterX, label: scatterX || 'X' },
+            { key: scatterY, label: scatterY || 'Y' },
+        ];
+        if (is3D && scatterZ) cols.push({ key: scatterZ, label: scatterZ });
+        if (scatterColor) cols.push({ key: scatterColor, label: scatterColor });
+        return cols;
+    }, [scatterX, scatterY, scatterZ, scatterColor, is3D]);
+
+    const tableRows = useMemo(
+        () => sampleData.map((point) => point as Record<string, string | number | null | undefined>),
+        [sampleData]
+    );
+
     if (!profile?.columns || !profile?.sample_data) {
         return <EmptyState icon={<ScatterIcon className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Data Available" description="Sample data is required for bivariate analysis." />;
     }
@@ -179,6 +204,15 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                 </div>
             )}
             </div>
+
+            {scatterColor && legendEntries.length > 1 && <ChartLegend entries={legendEntries} />}
+
+            <ChartDataTable
+                caption="Bivariate scatter plot data"
+                filename="bivariate-analysis"
+                columns={tableColumns}
+                rows={tableRows}
+            />
         </div>
     );
 };

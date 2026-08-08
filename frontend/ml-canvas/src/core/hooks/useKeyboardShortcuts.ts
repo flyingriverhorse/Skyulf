@@ -58,7 +58,24 @@ export const FOCUS_NODE_EVENT = 'skyulf:focus-node';
 
 export interface FocusNodeDetail {
   id: string;
+  /**
+   * Moves DOM focus onto the canvas wrapper after fitting the node into
+   * view. Off by default since the Sidebar's palette-click origin already
+   * has its own focus (the clicked button); deep-link node navigation
+   * (OPS-007) opts in so keyboard/screen-reader users land on the canvas
+   * instead of a link that no longer exists in the DOM.
+   */
+  focusWrapper?: boolean;
 }
+
+/**
+ * Custom event fired after a graph is restored from any recovery source
+ * (autosave, local recent, or a server version — CAN-003). `FlowCanvas`
+ * listens and fits the whole restored graph into view, then moves DOM
+ * focus onto the canvas so keyboard users land on the result instead of a
+ * dismissed banner/menu button.
+ */
+export const FIT_VIEW_EVENT = 'skyulf:fit-view';
 
 interface ShortcutOptions {
   /** Toggles the `?` shortcuts cheatsheet overlay. */

@@ -11,6 +11,7 @@ import {
     History,
     LayoutGrid,
     List,
+    Loader2,
     Play,
     Power,
     RotateCcw,
@@ -19,13 +20,14 @@ import {
     Upload,
     Wand2,
     X,
+    XCircle,
     Zap,
 } from 'lucide-react';
 import { deploymentApi, DeploymentInfo } from '../../core/api/deployment';
 import { jobsApi } from '../../core/api/jobs';
 import { DatasetService } from '../../core/api/datasets';
 import { thresholdTuningApi, SavedThresholdInfo } from '../../core/api/thresholdTuning';
-import { useConfirm } from '../shared';
+import { useConfirm, ErrorState, EmptyState } from '../shared';
 import { toast } from '../../core/toast';
 
 const DEFAULT_INPUT = '[\n  {\n    "feature1": 0.5,\n    "feature2": 1.2\n  }\n]';
@@ -33,10 +35,19 @@ const MAX_RECENT_RUNS = 5;
 const SAMPLE_OPTIONS: ReadonlyArray<number> = [1, 5, 10, 25, 100];
 const HISTOGRAM_BINS = 10;
 const LARGE_BATCH_THRESHOLD = 500;
+// EXP-007: a hung request should surface as a distinct, actionable timeout
+// rather than spinning forever with no explicit recovery path.
+const PREDICT_TIMEOUT_MS = 30_000;
+// How long a settled run is kept in the durable, reload-surviving history
+// before it's treated as expired — bounds how long prediction inputs/results
+// linger in browser storage for privacy.
+const HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
 
 const LS_INPUT = 'inferencePage:lastInput';
 const LS_SAMPLE_SIZE = 'inferencePage:sampleSize';
 const LS_VIEW = 'inferencePage:resultsView';
+const LS_RUN_HISTORY = 'inferencePage:runHistory';
+const LS_PENDING_RUN = 'inferencePage:pendingRun';
 
 /** Live status of the JSON typed into the textarea. */
 interface InputStatus {
@@ -68,14 +79,88 @@ interface SchemaCheck {
     rowIssues: RowSchemaIssue[];
 }
 
-/** A previous prediction run kept in memory so the user can re-load it. */
-interface RecentRun {
+/** Which threshold source, if any, was in effect for a given run. */
+type RunThresholdContext = 'none' | 'saved-enabled' | 'override';
+
+/** How a settled prediction run ended up. */
+type RunOutcome = 'success' | 'failure' | 'cancelled';
+
+/**
+ * A single named inference run's full provenance: which model/version,
+ * which input, when, under what threshold context, and — once settled —
+ * what it produced or why it didn't. This is the durable unit EXP-007
+ * requires in place of a bare `predictions`/`error` pair, so a user (or a
+ * reviewer later) can always answer "which model, which input, which
+ * thresholds, when" for anything shown on this page.
+ */
+interface RunRecord {
+    runId: string;
+    /** Short, stable display name, e.g. "Run #3". */
+    label: string;
+    status: RunOutcome;
+    /** Epoch ms when the run settled (succeeded, failed, or was cancelled). */
     at: number;
     rows: number;
-    latencyMs: number;
+    /** Client-observed round-trip latency; null when the run never got a response. */
+    latencyMs: number | null;
+    jobId: string;
+    modelType: string;
+    /** Server-reported model/version identifier, when the run succeeded. */
+    modelVersion: string | null;
+    thresholdContext: RunThresholdContext;
+    /** Exact JSON payload submitted — kept so "retry" always resends the
+     * request that actually failed, even if the textarea has since changed. */
     input: string;
-    predictions: unknown[];
+    overrideThresholdsUsed: Record<string, number> | null;
+    predictions: unknown[] | null;
+    /** Safe, human-readable cause — never the raw transport/error object. */
+    errorMessage: string | null;
 }
+
+/** A run that is currently in flight, named so it can't be double-submitted. */
+interface PendingRun {
+    runId: string;
+    label: string;
+    submittedAt: number;
+    /** Set when this pending run is a retry of an earlier run. */
+    retryOf: string | null;
+}
+
+/** Best-effort read of the durable run history from localStorage, dropping
+ * anything past `HISTORY_TTL_MS` so retention/expiry stays explicit rather
+ * than silently accumulating prediction inputs/results forever. */
+const loadRunHistory = (): RunRecord[] => {
+    try {
+        const raw = localStorage.getItem(LS_RUN_HISTORY);
+        if (!raw) return [];
+        const parsed: unknown = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        const now = Date.now();
+        return (parsed as RunRecord[])
+            .filter(entry => entry && typeof entry.at === 'number' && now - entry.at < HISTORY_TTL_MS)
+            .slice(0, MAX_RECENT_RUNS);
+    } catch {
+        return [];
+    }
+};
+
+/** Persist the run history, best-effort (storage may be disabled/full). */
+const persistRunHistory = (entries: RunRecord[]): void => {
+    try {
+        localStorage.setItem(LS_RUN_HISTORY, JSON.stringify(entries));
+    } catch {
+        /* storage may be disabled in private mode — ignore */
+    }
+};
+
+/** True when `error` is an axios cancellation (user cancel or our own timeout-abort). */
+const isAbortError = (error: unknown): boolean =>
+    Boolean(
+        error &&
+            typeof error === 'object' &&
+            ('code' in error) &&
+            (error as { code?: unknown }).code === 'ERR_CANCELED',
+    );
 
 /** Fetch and keep the saved threshold record for the currently active job. */
 export const useSavedThresholdInfo = (jobId: string | null): SavedThresholdInfo | null => {
@@ -238,6 +323,18 @@ const toNumericArray = (preds: unknown[]): number[] =>
     preds
         .map(p => (typeof p === 'number' ? p : Number(p)))
         .filter(n => Number.isFinite(n));
+
+/** Human label for a run's threshold context — shown in run provenance. */
+const describeThresholdContext = (ctx: RunThresholdContext): string => {
+    switch (ctx) {
+        case 'override':
+            return 'ad-hoc override thresholds';
+        case 'saved-enabled':
+            return 'saved tuned thresholds';
+        default:
+            return 'default thresholds';
+    }
+};
 
 /** Format an epoch ms as HH:MM:SS for the recent-runs strip. */
 const formatTime = (ms: number): string =>
@@ -541,6 +638,22 @@ export const InferencePage: React.FC = () => {
     const confirm = useConfirm();
     const csvInputRef = useRef<HTMLInputElement>(null);
     const editorWrapRef = useRef<HTMLDivElement>(null);
+    /** Atomic guard against a second submission racing the pending-state
+     * update — checked synchronously before any async work starts. */
+    const activeRunIdRef = useRef<string | null>(null);
+    const activeAbortControllerRef = useRef<AbortController | null>(null);
+    /** Distinguishes a user-initiated Cancel from our own timeout-abort,
+     * since both surface to the catch block as the same cancellation error. */
+    const cancelReasonRef = useRef<'user' | 'timeout' | null>(null);
+    const runSeqRef = useRef(0);
+    /** Exact payload of the most recent submission, so "Retry" resends the
+     * request that actually failed rather than whatever is currently typed. */
+    const lastAttemptRef = useRef<{
+        data: unknown[];
+        overrideThresholds: Record<string, number> | null;
+        inputSnapshot: string;
+        runId: string;
+    } | null>(null);
 
     const [activeDeployment, setActiveDeployment] = useState<DeploymentInfo | null>(null);
     const [datasetId, setDatasetId] = useState<string | null>(null);
@@ -554,7 +667,14 @@ export const InferencePage: React.FC = () => {
         }
     });
     const [predictions, setPredictions] = useState<unknown[] | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    /** The one run currently in flight, if any — naming it prevents a second
+     * submission from starting while this one is still pending. */
+    const [activeRun, setActiveRun] = useState<PendingRun | null>(null);
+    /** Provenance for whichever settled run is currently shown in the results
+     * pane (success, failure, or cancellation) — survives across reload via
+     * `runHistory` hydration below. */
+    const [currentRunMeta, setCurrentRunMeta] = useState<RunRecord | null>(null);
+    const [runHistory, setRunHistory] = useState<RunRecord[]>(() => loadRunHistory());
     const [isReloadingSample, setIsReloadingSample] = useState(false);
     const [sampleSize, setSampleSize] = useState<number>(() => {
         try {
@@ -582,7 +702,6 @@ export const InferencePage: React.FC = () => {
     const [autoFilterInfo, setAutoFilterInfo] = useState<string | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
 
-    const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
     const [resultsView, setResultsView] = useState<'list' | 'table'>(() => {
         try {
             const v = localStorage.getItem(LS_VIEW);
@@ -659,6 +778,67 @@ export const InferencePage: React.FC = () => {
         if (!predictions || predictions.length !== 1) return null;
         return asProbabilityMap(predictions[0]);
     }, [predictions]);
+
+    /** Append a settled run to the durable, reload-surviving history. */
+    const appendRunHistory = useCallback((entry: RunRecord) => {
+        setRunHistory(prev => {
+            const next = [entry, ...prev].slice(0, MAX_RECENT_RUNS);
+            persistRunHistory(next);
+            return next;
+        });
+    }, []);
+
+    // On mount: if a run was in flight when the page was last closed/reloaded,
+    // its outcome is genuinely unknown — surface that explicitly rather than
+    // silently forgetting it (the localStorage marker itself is never a raw
+    // transport object, just the same provenance any settled run gets).
+    useEffect(() => {
+        let interrupted:
+            | (Omit<RunRecord, 'status' | 'errorMessage' | 'predictions' | 'latencyMs'> & { at: number })
+            | null = null;
+        try {
+            const raw = localStorage.getItem(LS_PENDING_RUN);
+            if (raw) interrupted = JSON.parse(raw);
+        } catch {
+            interrupted = null;
+        }
+        try {
+            localStorage.removeItem(LS_PENDING_RUN);
+        } catch {
+            /* ignore */
+        }
+        if (interrupted) {
+            const entry: RunRecord = {
+                ...interrupted,
+                status: 'failure',
+                latencyMs: null,
+                predictions: null,
+                errorMessage:
+                    'This run was still in progress when the page was reloaded or closed — its outcome is unknown. Retry to get a fresh result.',
+            };
+            setCurrentRunMeta(entry);
+            setError(entry.errorMessage);
+            appendRunHistory(entry);
+            return;
+        }
+        // Otherwise hydrate the results pane from the most recent surviving
+        // history entry so a reload doesn't wipe evidence the user still needs.
+        const latest = loadRunHistory()[0];
+        if (latest) {
+            setCurrentRunMeta(latest);
+            if (latest.status === 'success') {
+                setPredictions(latest.predictions);
+                setLatencyMs(latest.latencyMs);
+                setThresholdsApplied(latest.overrideThresholdsUsed);
+            } else {
+                setError(latest.errorMessage);
+            }
+        }
+        // Mount-only hydration — intentionally excludes appendRunHistory from
+        // deps since it's stable and re-running this on every render would
+        // re-import the interrupted-run marker.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     /** Persist user preferences across reloads. */
     useEffect(() => {
@@ -933,15 +1113,146 @@ export const InferencePage: React.FC = () => {
             setExcludedColumns(new Set());
             setPredictions(null);
             setLatencyMs(null);
-            setRecentRuns([]);
+            setCurrentRunMeta(null);
+            setRunHistory([]);
+            persistRunHistory([]);
         } catch (e) {
             console.error('Failed to deactivate', e);
             toast.error('Failed to undeploy model');
         }
     };
 
+    /**
+     * Core run executor shared by "Run Prediction" and "Retry" — always
+     * named, cancellable, and timed-out, and always settles into exactly one
+     * durable `RunRecord` (never a bare error string or raw transport object).
+     */
+    const submitRun = useCallback(
+        async (
+            data: unknown[],
+            overrideThresholds: Record<string, number> | null,
+            inputSnapshot: string,
+            opts?: { retryOf?: string },
+        ) => {
+            if (!activeDeployment || activeRunIdRef.current) return;
+
+            const seq = ++runSeqRef.current;
+            const runId = `run-${Date.now().toString(36)}-${seq}`;
+            const label = `Run #${seq}`;
+            const thresholdContext: RunThresholdContext = overrideThresholds
+                ? 'override'
+                : savedThresholds?.enabled
+                    ? 'saved-enabled'
+                    : 'none';
+
+            const controller = new AbortController();
+            activeAbortControllerRef.current = controller;
+            activeRunIdRef.current = runId;
+            cancelReasonRef.current = null;
+            lastAttemptRef.current = { data, overrideThresholds, inputSnapshot, runId };
+
+            const pendingMarker = {
+                runId,
+                label,
+                at: Date.now(),
+                rows: data.length,
+                jobId: activeDeployment.job_id,
+                modelType: activeDeployment.model_type,
+                modelVersion: null,
+                thresholdContext,
+                input: inputSnapshot,
+                overrideThresholdsUsed: overrideThresholds,
+            };
+            try {
+                localStorage.setItem(LS_PENDING_RUN, JSON.stringify(pendingMarker));
+            } catch {
+                /* ignore */
+            }
+
+            const timeoutId = window.setTimeout(() => {
+                cancelReasonRef.current = 'timeout';
+                controller.abort();
+            }, PREDICT_TIMEOUT_MS);
+
+            setActiveRun({ runId, label, submittedAt: Date.now(), retryOf: opts?.retryOf ?? null });
+            setError(null);
+
+            const start = performance.now();
+            try {
+                const response = await deploymentApi.predict(data, overrideThresholds, {
+                    signal: controller.signal,
+                });
+                const elapsed = Math.round(performance.now() - start);
+                setPredictions(response.predictions);
+                setLatencyMs(elapsed);
+                setThresholdsApplied(response.thresholds_applied ?? null);
+                const entry: RunRecord = {
+                    runId,
+                    label,
+                    status: 'success',
+                    at: Date.now(),
+                    rows: data.length,
+                    latencyMs: elapsed,
+                    jobId: activeDeployment.job_id,
+                    modelType: activeDeployment.model_type,
+                    modelVersion: response.model_version ?? null,
+                    thresholdContext,
+                    input: inputSnapshot,
+                    overrideThresholdsUsed: overrideThresholds,
+                    predictions: response.predictions,
+                    errorMessage: null,
+                };
+                setCurrentRunMeta(entry);
+                appendRunHistory(entry);
+            } catch (e: unknown) {
+                const canceled = isAbortError(e);
+                const timedOut = canceled && cancelReasonRef.current === 'timeout';
+                const status: RunOutcome = canceled && !timedOut ? 'cancelled' : 'failure';
+                const message = timedOut
+                    ? `The server did not respond within ${Math.round(PREDICT_TIMEOUT_MS / 1000)}s. Your input is unchanged — retry, or check the deployment.`
+                    : status === 'cancelled'
+                        ? 'Run cancelled — your input is unchanged.'
+                        : (e as Error).message || 'Prediction failed';
+                setPredictions(null);
+                setLatencyMs(null);
+                setThresholdsApplied(null);
+                setError(message);
+                const entry: RunRecord = {
+                    runId,
+                    label,
+                    status,
+                    at: Date.now(),
+                    rows: data.length,
+                    latencyMs: null,
+                    jobId: activeDeployment.job_id,
+                    modelType: activeDeployment.model_type,
+                    modelVersion: null,
+                    thresholdContext,
+                    input: inputSnapshot,
+                    overrideThresholdsUsed: overrideThresholds,
+                    predictions: null,
+                    errorMessage: message,
+                };
+                setCurrentRunMeta(entry);
+                appendRunHistory(entry);
+            } finally {
+                window.clearTimeout(timeoutId);
+                cancelReasonRef.current = null;
+                activeAbortControllerRef.current = null;
+                activeRunIdRef.current = null;
+                setActiveRun(null);
+                try {
+                    localStorage.removeItem(LS_PENDING_RUN);
+                } catch {
+                    /* ignore */
+                }
+            }
+        },
+        [activeDeployment, savedThresholds, appendRunHistory],
+    );
+
     const handlePredict = useCallback(async () => {
-        if (!activeDeployment || isLoading) return;
+        if (!activeDeployment || activeRun) return;
         // EXP-006: a row missing a schema field is the same partial request
         // the backend either rejects or crashes on — require the explicit
         // acknowledgement checkbox before sending it, even via Ctrl+Enter
@@ -972,48 +1283,35 @@ export const InferencePage: React.FC = () => {
             if (!ok) return;
         }
 
-        setIsLoading(true);
-        setError(null);
-        setPredictions(null);
-        setLatencyMs(null);
-        setThresholdsApplied(null);
-        const start = performance.now();
-        try {
-            const response = await deploymentApi.predict(
-                data,
-                overrideThresholdsEnabled ? overrideThresholdsValue : null,
-            );
-            const elapsed = Math.round(performance.now() - start);
-            setPredictions(response.predictions);
-            setLatencyMs(elapsed);
-            setThresholdsApplied(response.thresholds_applied ?? null);
-            setRecentRuns(prev =>
-                [
-                    {
-                        at: Date.now(),
-                        rows: data.length,
-                        latencyMs: elapsed,
-                        input: inputData,
-                        predictions: response.predictions,
-                    },
-                    ...prev,
-                ].slice(0, MAX_RECENT_RUNS),
-            );
-        } catch (e: unknown) {
-            setError((e as Error).message || 'Prediction failed');
-        } finally {
-            setIsLoading(false);
-        }
+        await submitRun(data, overrideThresholdsEnabled ? overrideThresholdsValue : null, inputData);
     }, [
         activeDeployment,
+        activeRun,
         inputData,
-        isLoading,
         confirm,
         overrideThresholdsEnabled,
         overrideThresholdsValue,
         schemaCheck,
         acknowledgeMissingFields,
+        submitRun,
     ]);
+
+    /** Re-run the exact request that failed/was cancelled — same input, same
+     * override thresholds — as a new named run. */
+    const handleRetryRun = useCallback(async () => {
+        const attempt = lastAttemptRef.current;
+        if (!attempt || activeRun) return;
+        await submitRun(attempt.data, attempt.overrideThresholds, attempt.inputSnapshot, {
+            retryOf: attempt.runId,
+        });
+    }, [activeRun, submitRun]);
+
+    /** Abort the in-flight run — distinguished from our own timeout-abort via `cancelReasonRef`. */
+    const handleCancelRun = useCallback(() => {
+        if (!activeAbortControllerRef.current) return;
+        cancelReasonRef.current = 'user';
+        activeAbortControllerRef.current.abort();
+    }, []);
 
     const handleFormatJson = () => {
         try {
@@ -1031,6 +1329,7 @@ export const InferencePage: React.FC = () => {
         setError(null);
         setLatencyMs(null);
         setThresholdsApplied(null);
+        setCurrentRunMeta(null);
     };
 
     const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1112,11 +1411,20 @@ export const InferencePage: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
+    /** Filename stem carrying run provenance (job + run label), so an
+     * exported file can be traced back to the run that produced it even
+     * once it's out of the browser. */
+    const exportFileStem = useMemo(() => {
+        const job = currentRunMeta?.jobId ?? 'unknown-job';
+        const runId = currentRunMeta?.runId ?? `run-${Date.now()}`;
+        return `predictions_${job}_${runId}`;
+    }, [currentRunMeta]);
+
     const handleDownloadJson = () => {
         if (!predictions) return;
         triggerDownload(
             new Blob([JSON.stringify(predictions, null, 2)], { type: 'application/json' }),
-            `predictions_${Date.now()}.json`,
+            `${exportFileStem}.json`,
         );
     };
 
@@ -1137,15 +1445,32 @@ export const InferencePage: React.FC = () => {
                 : predictions.map((p, i) => ({ row: i + 1, prediction: renderPrediction(p) }));
         triggerDownload(
             new Blob([rowsToCsv(rows)], { type: 'text/csv;charset=utf-8' }),
-            `predictions_${Date.now()}.csv`,
+            `${exportFileStem}.csv`,
         );
     };
 
-    const handleRestoreRun = (run: RecentRun) => {
+
+    const handleRestoreRun = (run: RunRecord) => {
         setInputData(run.input);
-        setPredictions(run.predictions);
-        setLatencyMs(run.latencyMs);
-        setError(null);
+        setCurrentRunMeta(run);
+        if (run.status === 'success') {
+            setPredictions(run.predictions);
+            setLatencyMs(run.latencyMs);
+            setThresholdsApplied(run.overrideThresholdsUsed);
+            setError(null);
+        } else {
+            setPredictions(null);
+            setLatencyMs(null);
+            setThresholdsApplied(null);
+            setError(run.errorMessage);
+        }
+    };
+
+    /** Remove the durable run history (both in-memory and localStorage) —
+     * does not touch the currently displayed run. */
+    const handleClearRunHistory = () => {
+        setRunHistory([]);
+        persistRunHistory([]);
     };
 
     const showBanner = autoFilterInfo && !bannerDismissed;
@@ -1158,8 +1483,12 @@ export const InferencePage: React.FC = () => {
     const canRunPrediction =
         !hasBlockingMissingFields || acknowledgeMissingFields;
     const recentLatencies = useMemo(
-        () => [...recentRuns].reverse().map(r => r.latencyMs),
-        [recentRuns],
+        () =>
+            [...runHistory]
+                .reverse()
+                .map(r => r.latencyMs)
+                .filter((v): v is number => v != null),
+        [runHistory],
     );
 
     return (
@@ -1283,7 +1612,7 @@ export const InferencePage: React.FC = () => {
                                     title={`${col.name} (${col.type})`}
                                 >
                                     <span className="font-mono">{col.name}</span>
-                                    <span className="text-gray-400 dark:text-gray-500">{col.type}</span>
+                                    <span className="text-gray-500 dark:text-gray-400">{col.type}</span>
                                 </span>
                             ))}
                         </div>
@@ -1464,24 +1793,38 @@ export const InferencePage: React.FC = () => {
                                 <span className="text-gray-400">+</span>
                                 Enter
                             </kbd>
+                            {activeRun && (
+                                <button
+                                    type="button"
+                                    onClick={handleCancelRun}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                    title={`Cancel ${activeRun.label}`}
+                                >
+                                    <XCircle className="w-4 h-4" /> Cancel
+                                </button>
+                            )}
                             <button
                                 onClick={() => void handlePredict()}
                                 disabled={
-                                    !activeDeployment || isLoading || !inputStatus.valid || !canRunPrediction
+                                    !activeDeployment || Boolean(activeRun) || !inputStatus.valid || !canRunPrediction
                                 }
                                 title={
                                     !canRunPrediction
                                         ? 'Some rows are missing schema fields — fix them or check the acknowledgement above to run anyway'
-                                        : undefined
+                                        : activeRun
+                                            ? `${activeRun.label} is already running`
+                                            : undefined
                                 }
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                    !activeDeployment || isLoading || !inputStatus.valid || !canRunPrediction
+                                    !activeDeployment || Boolean(activeRun) || !inputStatus.valid || !canRunPrediction
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
                                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
                                 }`}
                             >
-                                {isLoading ? (
-                                    'Running...'
+                                {activeRun ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" /> {activeRun.label} running…
+                                    </>
                                 ) : (
                                     <>
                                         <Play className="w-4 h-4" /> Run Prediction
@@ -1647,7 +1990,7 @@ export const InferencePage: React.FC = () => {
                             <div className="flex items-center gap-3 flex-wrap">
                                 {latencyMs != null && (
                                     <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                        <Zap className="w-3 h-3" /> {latencyMs} ms
+                                        <Zap className="w-3 h-3" /> {latencyMs} ms (client-observed)
                                     </span>
                                 )}
                                 {predictions && (
@@ -1701,6 +2044,57 @@ export const InferencePage: React.FC = () => {
                                 )}
                             </div>
                         </div>
+
+                        {/* Named-run provenance: which model/version, which input, when,
+                            and under what threshold context — durable across reload via
+                            `currentRunMeta`, not just an ephemeral in-memory flag. */}
+                        {currentRunMeta && (
+                            <div
+                                className={`mb-3 p-2.5 rounded border text-[11px] flex flex-wrap items-center gap-x-3 gap-y-1 ${
+                                    currentRunMeta.status === 'success'
+                                        ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300'
+                                        : currentRunMeta.status === 'cancelled'
+                                            ? 'bg-gray-50 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+                                            : 'bg-rose-50 dark:bg-rose-900/20 border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300'
+                                }`}
+                                data-testid="run-provenance"
+                            >
+                                <strong className="font-mono">{currentRunMeta.label}</strong>
+                                <span>
+                                    {currentRunMeta.modelType}
+                                    {currentRunMeta.modelVersion ? ` · v${currentRunMeta.modelVersion}` : ''} · job{' '}
+                                    {currentRunMeta.jobId}
+                                </span>
+                                <span>
+                                    {currentRunMeta.rows} row{currentRunMeta.rows === 1 ? '' : 's'}
+                                </span>
+                                <span>{describeThresholdContext(currentRunMeta.thresholdContext)}</span>
+                                {currentRunMeta.latencyMs != null && <span>{currentRunMeta.latencyMs} ms</span>}
+                                {currentRunMeta.status === 'success' && (
+                                    <span>{resultsView === 'table' ? 'table view' : 'list view'}</span>
+                                )}
+                                <span className="text-current opacity-70">
+                                    {new Date(currentRunMeta.at).toLocaleString()}
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Pending banner — kept separate from the settled-run display below so
+                            an earlier result stays visible (and legible) while a new run is in
+                            flight, instead of being wiped the instant a request starts. */}
+                        {activeRun && (
+                            <div
+                                role="status"
+                                aria-atomic="true"
+                                className="mb-3 p-2.5 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 text-[11px] flex items-center gap-2"
+                            >
+                                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                <span>
+                                    {activeRun.label}
+                                    {activeRun.retryOf ? ' (retry)' : ''} is running…
+                                </span>
+                            </div>
+                        )}
 
                         {/* Numeric stats strip + tiny histogram. */}
                         {predictionStats && (
@@ -1759,10 +2153,34 @@ export const InferencePage: React.FC = () => {
 
                         <div className="flex-1 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                             {error ? (
-                                <div className="p-4 text-red-600 dark:text-red-400 flex items-start gap-2">
-                                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                                    <pre className="whitespace-pre-wrap font-mono text-sm">{error}</pre>
-                                </div>
+                                currentRunMeta?.status === 'cancelled' ? (
+                                    <div
+                                        role="status"
+                                        aria-atomic="true"
+                                        className="p-4 flex flex-col items-center justify-center gap-3 text-center h-full"
+                                    >
+                                        <XCircle className="w-8 h-8 text-gray-400" aria-hidden="true" />
+                                        <p className="text-sm text-gray-600 dark:text-gray-300">{error}</p>
+                                        {lastAttemptRef.current && (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleRetryRun()}
+                                                disabled={Boolean(activeRun)}
+                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <RotateCcw className="w-4 h-4" /> Retry same input
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col">
+                                        <ErrorState error={error} onRetry={lastAttemptRef.current ? handleRetryRun : undefined} />
+                                        <p className="px-4 pb-4 -mt-6 text-xs text-gray-500 dark:text-gray-400 text-center">
+                                            Your input above hasn&apos;t changed — fix it, or retry the exact same
+                                            request that failed.
+                                        </p>
+                                    </div>
+                                )
                             ) : predictions ? (
                                 resultsView === 'table' && parsedInputRows.length > 0 ? (
                                     <InputOutputTable
@@ -1796,43 +2214,70 @@ export const InferencePage: React.FC = () => {
                                     </div>
                                 )
                             ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm italic gap-2 p-4 text-center">
-                                    <Play className="w-8 h-8 opacity-40" />
-                                    Run a prediction to see results here.
-                                    {schemaChips.length > 0 && (
-                                        <span className="text-[11px] not-italic text-gray-500 dark:text-gray-500">
-                                            Tip: click <strong>Sample</strong> to load fresh rows from
-                                            the training dataset.
-                                        </span>
-                                    )}
-                                </div>
+                                <EmptyState
+                                    icon={<Play className="w-12 h-12 opacity-40" />}
+                                    title="Run a prediction to see results here."
+                                    {...(schemaChips.length > 0
+                                        ? { description: 'Tip: click Sample to load fresh rows from the training dataset.' }
+                                        : {})}
+                                />
                             )}
                         </div>
 
-                        {/* Recent runs strip — click to restore an earlier run. */}
-                        {recentRuns.length > 0 && (
+                        {/* Recent runs strip — click to restore an earlier run's exact input
+                            and outcome. Durable across reload (localStorage-backed), with
+                            explicit retention/expiry so it's clear this isn't a server copy. */}
+                        {runHistory.length > 0 && (
                             <div className="mt-3 border-t border-gray-100 dark:border-gray-700 pt-3">
-                                <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
                                     <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-gray-400">
                                         <History className="w-3 h-3" /> Recent runs
                                     </div>
-                                    <LatencySparkline values={recentLatencies} />
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {recentRuns.map(run => (
+                                    <div className="flex items-center gap-2">
+                                        <LatencySparkline values={recentLatencies} />
                                         <button
-                                            key={run.at}
+                                            type="button"
+                                            onClick={handleClearRunHistory}
+                                            className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30"
+                                            title="Clear stored run history from this browser"
+                                        >
+                                            <Trash2 className="w-3 h-3" /> Clear history
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-gray-400 mb-2">
+                                    Stored on this device only for {Math.round(HISTORY_TTL_MS / (60 * 60 * 1000))}h,
+                                    kept to the {MAX_RECENT_RUNS} most recent runs — inputs and results, not a server
+                                    record.
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {runHistory.map(run => (
+                                        <button
+                                            key={run.runId}
                                             onClick={() => handleRestoreRun(run)}
                                             className="flex items-center gap-2 text-[11px] px-2 py-1 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-                                            title="Restore inputs and predictions from this run"
+                                            title={`Restore input and outcome from ${run.label}`}
                                         >
+                                            {run.status === 'success' ? (
+                                                <CheckCircle className="w-3 h-3 text-emerald-500 shrink-0" />
+                                            ) : run.status === 'cancelled' ? (
+                                                <XCircle className="w-3 h-3 text-gray-400 shrink-0" />
+                                            ) : (
+                                                <AlertCircle className="w-3 h-3 text-rose-500 shrink-0" />
+                                            )}
+                                            <span className="font-mono">{run.label}</span>
+                                            <span className="text-gray-400">·</span>
                                             <span className="font-mono">{formatTime(run.at)}</span>
                                             <span className="text-gray-400">·</span>
                                             <span>
                                                 {run.rows} row{run.rows === 1 ? '' : 's'}
                                             </span>
-                                            <span className="text-gray-400">·</span>
-                                            <span className="tabular-nums">{run.latencyMs} ms</span>
+                                            {run.latencyMs != null && (
+                                                <>
+                                                    <span className="text-gray-400">·</span>
+                                                    <span className="tabular-nums">{run.latencyMs} ms</span>
+                                                </>
+                                            )}
                                         </button>
                                     ))}
                                 </div>

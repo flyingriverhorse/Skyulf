@@ -60,11 +60,17 @@ async def list_deployments(
     limit: int | None = None, skip: int = 0, session: AsyncSession = Depends(get_async_session)
 ):
     """
-    Lists deployment history.
+    Lists deployment history, enriched with the same model-version lineage
+    (dataset id, version, replacement chain) shown on the active deployment
+    and Registry, so History rows are traceable rather than bare job ids.
+
+    Unlike the single-deployment and active-deployment endpoints, this never
+    loads the deployed artifact — the input/output schema requires per-row
+    artifact deserialization and isn't rendered by the history list UI, so
+    it stays null here and is only populated by the per-row endpoints.
     """
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
-    deployments = await DeploymentService.list_deployments(session, effective_limit, skip)
-    return deployments
+    return await DeploymentService.list_deployment_details(session, effective_limit, skip)
 
 
 @router.post("/deactivate")

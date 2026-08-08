@@ -12,6 +12,8 @@ import {
   deleteRecentPipeline,
   type RecentPipelineEntry,
 } from '../../../../core/utils/recentPipelines';
+import { RECOVERY_KIND_LABEL } from '../../../../core/utils/canvasRecovery';
+import { FIT_VIEW_EVENT } from '../../../../core/hooks/useKeyboardShortcuts';
 import { toast } from '../../../../core/toast';
 import { useConfirm } from '../../../shared';
 import { convertGraphToPipelineConfig } from '../../../../core/utils/pipelineConverter';
@@ -195,7 +197,7 @@ export function usePipelineActions(): PipelineActions {
     setShowLoadMenu(false);
     const ok = await confirm({
       title: `Load v${entry.versionInt} "${entry.name}"?`,
-      message: 'Loading this version will overwrite your current canvas. Continue?',
+      message: `${RECOVERY_KIND_LABEL['server-version']} — loading this version will overwrite your current canvas. Continue?`,
       confirmLabel: 'Load',
       variant: 'danger',
     });
@@ -207,6 +209,9 @@ export function usePipelineActions(): PipelineActions {
     }
     setGraph(graph.nodes, graph.edges);
     toast.success(`Loaded "${entry.name}"`, `Version v${entry.versionInt}`);
+    // CAN-003: focus the restored graph rather than leaving the viewport
+    // wherever it was before the overwrite.
+    window.dispatchEvent(new CustomEvent(FIT_VIEW_EVENT));
   };
 
   const openRecentMenu = (): void => {
@@ -224,8 +229,8 @@ export function usePipelineActions(): PipelineActions {
       curDatasetId !== undefined &&
       entry.datasetId !== curDatasetId;
     const message = mismatch
-      ? `This snapshot was saved against "${entry.datasetName ?? entry.datasetId}", but the canvas is currently on a different dataset. Column-bound nodes may need to be reconfigured. Continue?`
-      : 'Loading this snapshot will overwrite your current canvas. Continue?';
+      ? `${RECOVERY_KIND_LABEL['local-recent']} — this snapshot was saved against "${entry.datasetName ?? entry.datasetId}", but the canvas is currently on a different dataset. Column-bound nodes may need to be reconfigured. Continue?`
+      : `${RECOVERY_KIND_LABEL['local-recent']} — loading this snapshot will overwrite your current canvas. Continue?`;
     const ok = await confirm({
       title: `Restore "${entry.name}"?`,
       message,
@@ -235,6 +240,9 @@ export function usePipelineActions(): PipelineActions {
     if (!ok) return;
     setGraph(entry.nodes, entry.edges);
     toast.success(`Restored "${entry.name}"`);
+    // CAN-003: focus the restored graph rather than leaving the viewport
+    // wherever it was before the overwrite.
+    window.dispatchEvent(new CustomEvent(FIT_VIEW_EVENT));
   };
 
   const handleClearRecent = async (): Promise<void> => {

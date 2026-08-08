@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 
 from backend.config import get_settings
 from backend.database.models import TrainingJob
-from backend.ml_pipeline._execution.graph_utils import extract_job_details
+from backend.ml_pipeline._execution.graph_utils import (
+    extract_job_details,
+    resolve_training_model_family,
+)
 from backend.ml_pipeline._execution.job_manager_base import TrainingJobManagerBase
 from backend.ml_pipeline._execution.schemas import JobInfo, JobStatus
 from backend.ml_pipeline._execution.utils import (
@@ -101,6 +104,9 @@ class BasicTrainingManager(TrainingJobManagerBase):
             error=job.error_message,
             result={"metrics": job.metrics},
             model_type=job.model_type,
+            model_family=resolve_training_model_family(
+                type_cast(dict[str, Any], job.graph), job.node_id, job.model_type
+            ),
             hyperparameters=t_cast(dict[str, Any], hyperparameters),
             created_at=t_cast(datetime, job.created_at),
             metrics=t_cast(dict[str, Any] | None, job.metrics),
