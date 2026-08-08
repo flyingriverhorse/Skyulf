@@ -4,6 +4,14 @@
   <img src="static/img/logo.png" alt="Skyulf Logo" width="200">
 </p>
 
+<p align="center">
+  <a href="https://api.skyulf.com">
+    <img src="https://img.shields.io/badge/Try_Live_Demo-api.skyulf.com-3b82f6?style=for-the-badge&logo=rocket&logoColor=white" alt="Live Demo">
+  </a>
+  <br/>
+  <sub>🟢&nbsp;no signup required</sub>
+</p>
+
 [![Backend License](https://img.shields.io/badge/backend-AGPLv3-blue)](LICENSE)
 [![Frontend License](https://img.shields.io/badge/frontend-AGPLv3-blue)](frontend/ml-canvas/LICENSE)
 [![Core License](https://img.shields.io/badge/skyulf--core-Apache--2.0-green)](skyulf-core/LICENSE)
@@ -15,7 +23,7 @@
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/format.json)](https://github.com/astral-sh/ruff)
 [![Type check: Ty](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ty/main/assets/badge/v0.json)](https://github.com/astral-sh/ty)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Skyulf](https://img.shields.io/badge/Skyulf-Privacy--First_MLOps_Hub-blueviolet)](#key-features)
+[![Skyulf](https://img.shields.io/badge/Skyulf-MLOps_Hub-blueviolet)](#key-features)
 [![codecov](https://codecov.io/github/flyingriverhorse/Skyulf/graph/badge.svg?token=47ED2R6ZHC)](https://codecov.io/github/flyingriverhorse/Skyulf)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/51e3ad3ce18e41b2922cf62a6dd6ce99)](https://app.codacy.com/gh/flyingriverhorse/Skyulf/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Downloads](https://img.shields.io/pypi/dm/skyulf-core.svg)](https://pypi.org/project/skyulf-core)
