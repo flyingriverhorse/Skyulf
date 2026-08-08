@@ -172,6 +172,45 @@ def test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning
     assert result["feature_names"] == list(X.columns)
 
 
+def test_random_forest_classifier_explanation_is_not_none(classification_data):
+    """Regression test: a fitted RandomForestClassifier must yield a real SHAP
+    explanation, not just avoid raising.
+
+    Guards against the bug where `compute_shap_explanation` silently returned
+    `None` for every RandomForest job because the interventional/masker-based
+    explainer path could raise `shap.utils._exceptions.ExplainerError`
+    ("Additivity check failed") and the broad `except Exception` swallowed it
+    at `debug` level with no way to distinguish "unsupported model" from
+    "broken explainer". `compute_shap_explanation` now builds the exact
+    `tree_path_dependent` `TreeExplainer` for tree ensembles, which needs no
+    background data and isn't susceptible to that failure mode.
+    """
+    X, y = classification_data
+    model = RandomForestClassifier(n_estimators=100, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    assert result["mean_abs_importance"]
+    assert any(v > 0 for v in result["mean_abs_importance"].values())
+    assert result["samples"]
+
+
+def test_random_forest_regressor_explanation_is_not_none(regression_data):
+    """Same regression guard as above, for the regressor side of RandomForest."""
+    from sklearn.ensemble import RandomForestRegressor
+
+    X, y = regression_data
+    model = RandomForestRegressor(n_estimators=100, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    assert result["mean_abs_importance"]
+    assert any(v > 0 for v in result["mean_abs_importance"].values())
+    assert result["samples"]
+
+
 def test_returns_none_on_model_failure(classification_data):
     """Any exception during SHAP computation is swallowed and `None` is returned."""
     X, _ = classification_data
