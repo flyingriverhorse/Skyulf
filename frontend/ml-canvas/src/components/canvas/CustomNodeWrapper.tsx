@@ -516,7 +516,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           className="!w-3 !h-3 !bg-muted-foreground hover:!bg-primary transition-colors"
           style={{ top: `${((index + 1) * 100) / (definition.inputs.length + 1)}%` }}
         >
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80 backdrop-blur-[1px]">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80">
             {input.label}
           </div>
         </Handle>
@@ -532,7 +532,7 @@ function CustomNodeWrapperImpl({ id, data, selected }: NodeProps) {
           className="!w-3 !h-3 !bg-muted-foreground hover:!bg-primary transition-colors"
           style={{ top: `${((index + 1) * 100) / (definition.outputs.length + 1)}%` }}
         >
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80 backdrop-blur-[1px]">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none whitespace-nowrap px-1 rounded bg-card/80">
             {output.label}
           </div>
         </Handle>

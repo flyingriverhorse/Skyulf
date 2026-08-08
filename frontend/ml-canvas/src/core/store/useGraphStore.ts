@@ -24,6 +24,15 @@ import {
   getExecutionMode as readExecutionMode,
 } from '../types/executionMode';
 import { toast } from '../toast';
+import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
+import { findPreprocessingBeforeSplitIssues } from '../utils/pipelineLeakageValidation';
+
+export interface GraphValidationIssue {
+  nodeId: string;
+  nodeLabel: string;
+  category: 'configuration' | 'connection' | 'leakage';
+  message: string;
+}
 
 interface GraphState {
   nodes: Node[];
@@ -54,7 +63,7 @@ interface GraphState {
    * Returns the count of cloned nodes (0 when nothing is selected).
    */
   duplicateSelectedNodes: () => number;
-  validateGraph: () => Promise<boolean>;
+  validateGraph: () => GraphValidationIssue[];
   setGraph: (nodes: Node[], edges: Edge[]) => void;
   /**
    * Rewire a sibling fan-in into a linear chain.
@@ -70,6 +79,10 @@ interface GraphState {
    * the change.
    */
   chainSiblings: (consumerId: string, orderedInputIds: string[]) => boolean;
+
+  /** Stores the latest preview failure message for the Results panel. */
+  lastRunError: string | null;
+  setLastRunError: (error: string | null) => void;
 
   // Execution State
   executionResult: PreviewResponse | null;
@@ -129,14 +142,110 @@ interface GraphState {
   ) => void;
 }
 
+const prettifyDefinitionType = (definitionType: string): string =>
+  definitionType.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+const getNodeLabel = (node: Node): string => {
+  const definition = registry.get(node.data.definitionType as string);
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  return (
+    (typeof data.label === 'string' && data.label) ||
+    (typeof data.title === 'string' && data.title) ||
+    definition?.label ||
+    (typeof node.data.definitionType === 'string'
+      ? prettifyDefinitionType(node.data.definitionType as string)
+      : node.id)
+  );
+};
+
+/** Collects the blocking validation issues for a canvas graph. */
+export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): GraphValidationIssue[] {
+  const previewNodeIds = new Set(
+    nodes.filter((node) => node.data.definitionType === 'data_preview').map((node) => node.id),
+  );
+  const activeNodes = nodes.filter((node) => !previewNodeIds.has(node.id));
+  const activeEdges = edges.filter((edge) => !previewNodeIds.has(edge.source) && !previewNodeIds.has(edge.target));
+
+  const issues: GraphValidationIssue[] = [];
+
+  for (const node of activeNodes) {
+    const definition = registry.get(node.data.definitionType as string);
+    const label = getNodeLabel(node);
+
+    if (!definition) {
+      issues.push({
+        nodeId: node.id,
+        nodeLabel: label,
+        category: 'configuration',
+        message: `Refresh or re-add ${label} so the canvas knows how to validate it.`,
+      });
+      continue;
+    }
+
+    const validation = definition.validate(node.data);
+    if (!validation.isValid) {
+      issues.push({
+        nodeId: node.id,
+        nodeLabel: label,
+        category: 'configuration',
+        message: `Fix the ${label} settings before running preview${validation.message ? `: ${validation.message}` : '.'}`,
+      });
+    }
+
+    if (definition.inputs.length > 0) {
+      const hasInput = activeEdges.some((edge) => edge.target === node.id);
+      if (!hasInput) {
+        issues.push({
+          nodeId: node.id,
+          nodeLabel: label,
+          category: 'connection',
+          message: `Connect an upstream node to ${label} before running preview.`,
+        });
+      }
+    }
+
+    if (node.data.definitionType === 'dataset_node') {
+      const hasDatasetId = typeof (node.data as { datasetId?: unknown }).datasetId === 'string' &&
+        Boolean((node.data as { datasetId?: string }).datasetId);
+      const hasOutput = activeEdges.some((edge) => edge.source === node.id);
+      if (hasDatasetId && !hasOutput) {
+        issues.push({
+          nodeId: node.id,
+          nodeLabel: label,
+          category: 'connection',
+          message: 'Connect a downstream node to this Dataset before running preview.',
+        });
+      }
+    }
+  }
+
+  const pipelineConfig = convertGraphToPipelineConfig(activeNodes, activeEdges);
+  const leakageIssues = findPreprocessingBeforeSplitIssues(pipelineConfig.nodes);
+  for (const issue of leakageIssues) {
+    const node = activeNodes.find((candidate) => candidate.id === issue.nodeId);
+    const splitter = activeNodes.find((candidate) => candidate.id === issue.splitterNodeId);
+    if (!node || !splitter) continue;
+    issues.push({
+      nodeId: node.id,
+      nodeLabel: getNodeLabel(node),
+      category: 'leakage',
+      message: `Move ${getNodeLabel(node)} after ${getNodeLabel(splitter)} so it only fits on training data.`,
+    });
+  }
+
+  return issues;
+}
+
 export const useGraphStore = create<GraphState>()(
   temporal(
     (set, get) => ({
   nodes: [],
   edges: [],
   executionResult: null,
+  lastRunError: null,
 
   setExecutionResult: (result) => set({ executionResult: result }),
+  setLastRunError: (error) => set({ lastRunError: error }),
 
   nodeJobSummaries: {},
   setNodeJobSummaries: (summaries) => set({ nodeJobSummaries: summaries }),
@@ -309,15 +418,22 @@ export const useGraphStore = create<GraphState>()(
         if (!proceed) return;
       } else if (isNewSource && uniqueSourceCount >= 2 && !modelTypes.includes(targetType)) {
         // Pre-flight lint for non-training nodes (audit issue #7).
-        // Direction-A means non-training nodes also auto-merge fan-in via
-        // column union + last-wins. Surface that contract before the user
-        // wires it so silent column overwrites aren't a surprise at run time.
+        // Non-training nodes auto-merge fan-in per column: each column is
+        // supplied by whichever branch actually changed it (see the engine's
+        // `_column_modifiers`). Only a column two branches BOTH rewrote to
+        // different values needs the merge strategy to break the tie, and
+        // that can only be known after a run — so this confirm states the
+        // union contract and defers the conflict report to the Results panel.
         // window.confirm: see note above on sync onConnect contract.
         const proceed = window.confirm(
           `This node will receive ${uniqueSourceCount} inputs.\n\n` +
-          'Inputs are auto-merged via column union with LAST-WINS on overlap ' +
-          '(the last connected input overwrites earlier ones on shared columns).\n\n' +
-          'For sequential transformations, chain the nodes linearly instead.\n\n' +
+          'Inputs are merged into one dataset. Each column keeps the value of ' +
+          'whichever branch changed it, so branches editing different columns ' +
+          'are combined without loss.\n\n' +
+          'If two branches change the SAME column to different values, one of ' +
+          'them is discarded. The run Results panel reports any such conflict ' +
+          'and lets you choose which branch wins.\n\n' +
+          'For strictly sequential transformations, chain the nodes linearly instead.\n\n' +
           'Click OK to connect (merge), or Cancel to abort.'
         );
         if (!proceed) return;
@@ -341,6 +457,12 @@ export const useGraphStore = create<GraphState>()(
       id,
       type: 'custom', // We'll use a generic wrapper component
       position,
+      // Selected on arrival (CAN-001): every insertion path — palette
+      // click, drag-and-drop, and command palette — shares this action,
+      // so a newly added node always opens Properties and is
+      // immediately configurable instead of requiring a second click to
+      // discover it needs a required field filled in.
+      selected: true,
       data: {
         // Store the definition type so we can look it up later
         definitionType: type,
@@ -351,7 +473,12 @@ export const useGraphStore = create<GraphState>()(
       },
     };
 
-    set({ nodes: [...get().nodes, newNode] });
+    set({
+      nodes: [
+        ...get().nodes.map((n) => (n.selected ? { ...n, selected: false } : n)),
+        newNode,
+      ],
+    });
     return id;
   },
 
@@ -450,44 +577,7 @@ export const useGraphStore = create<GraphState>()(
     set({ edges: nextEdges });
     return true;
   },
-
-  validateGraph: async () => {
-    const { nodes, edges } = get();
-
-    // 1. Check if graph is empty
-    if (nodes.length === 0) {
-      return false;
-    }
-
-    // 2. Run individual node validation
-    for (const node of nodes) {
-      const definition = registry.get(node.data.definitionType as string);
-      if (definition) {
-        const validation = definition.validate(node.data);
-        if (!validation.isValid) {
-          // TODO: We could store this error in the node state to show a visual indicator
-          console.warn(`Node ${node.id} validation failed: ${validation.message}`);
-          return false;
-        }
-      }
-    }
-
-    // 3. Check connectivity (Basic check: All nodes except sources must have at least one input)
-    // This is a heuristic; some nodes might be optional or standalone, but in a pipeline, usually everything connects.
-    // We can refine this by checking definition.inputs.length > 0
-    for (const node of nodes) {
-      const definition = registry.get(node.data.definitionType as string);
-      if (definition && definition.inputs.length > 0) {
-        const hasInput = edges.some(e => e.target === node.id);
-        if (!hasInput) {
-          console.warn(`Node ${node.id} (${definition.label}) is disconnected.`);
-          return false;
-        }
-      }
-    }
-
-    return true;
-  },
+  validateGraph: () => collectGraphValidationIssues(get().nodes, get().edges),
     }),
     {
       // Only track structural graph state for undo/redo. Excluding

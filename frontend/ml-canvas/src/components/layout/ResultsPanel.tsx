@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { useGraphStore } from '../../core/store/useGraphStore';
+import { collectGraphValidationIssues, useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
-import { ChevronUp, ChevronDown, Table } from 'lucide-react';
+import { AlertTriangle, ChevronUp, ChevronDown, Maximize2, Minimize2, Table, XCircle } from 'lucide-react';
 import type { PreviewDataRows, PreviewData } from '../../core/api/client';
 import { generateBranchColors } from '../../core/hooks/useBranchColors';
 import { clickableProps } from '../../core/utils/a11y';
@@ -19,15 +19,29 @@ function toDatasetMap(previewData: PreviewData | null | undefined): Record<strin
   return {};
 }
 
+/** Which pane of the results panel is showing. */
+type ResultsPane = 'data' | 'issues' | 'steps';
+
+/** Shows preview results alongside canvas validation and run failure summaries. */
 export const ResultsPanel: React.FC = () => {
   const executionResult = useGraphStore((state) => state.executionResult);
   const canvasNodes = useGraphStore((state) => state.nodes);
+  const canvasEdges = useGraphStore((state) => state.edges);
+  const lastRunError = useGraphStore((state) => state.lastRunError);
+  const onNodesChange = useGraphStore((state) => state.onNodesChange);
   const chainSiblings = useGraphStore((state) => state.chainSiblings);
   const confirm = useConfirm();
   const { isResultsPanelExpanded, setResultsPanelExpanded } = useViewStore();
   const [activeBranch, setActiveBranch] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [mergeWarningsOpen, setMergeWarningsOpen] = useState<boolean>(false);
+  const [pane, setPane] = useState<ResultsPane | null>(null);
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+  const validationHeadingId = React.useId();
+  const validationIssues = useMemo(
+    () => collectGraphValidationIssues(canvasNodes, canvasEdges),
+    [canvasNodes, canvasEdges],
+  );
 
   // Map node id → readable label (falls back to a prettified definitionType
   // so users see "Drop Rows" instead of "drop_rows-04475cca-eef7-4fdb-...").
@@ -156,112 +170,260 @@ export const ResultsPanel: React.FC = () => {
     return counts;
   }, [rawMergeWarnings, branchNodeIdsMemo, branchLabels]);
 
-  if (!executionResult) return null;
+  const selectNode = (nodeId: string): void => {
+    onNodesChange(
+      canvasNodes.map((node) => ({
+        id: node.id,
+        type: 'select',
+        selected: node.id === nodeId,
+      })),
+    );
+  };
 
-  const currentRows = (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
+  const showSummary = validationIssues.length > 0 || lastRunError !== null;
+  if (!executionResult && !showSummary) return null;
+
+  const currentRows = executionResult && (effectiveTab && datasets[effectiveTab]) ? datasets[effectiveTab] : [];
   // Real dataset size for the active tab; falls back to the preview row
   // count when the backend didn't ship a total (older response, or single
   // list payload registered under the synthetic `_total` key).
-  const currentTotal = effectiveTab
+  const currentTotal = executionResult && effectiveTab
     ? (totals[effectiveTab] ?? totals._total ?? currentRows.length)
     : 0;
   const columns = currentRows.length > 0 ? Object.keys(currentRows[0] ?? {}) : [];
   // When viewing a specific branch, restrict the applied-steps pills to nodes
   // that actually ran in that branch (otherwise every tab shows every node).
-  const allNodeIds = executionResult.node_results ? Object.keys(executionResult.node_results) : [];
-  const branchNodeIds = executionResult.branch_node_ids;
+  const allNodeIds = executionResult?.node_results ? Object.keys(executionResult.node_results) : [];
+  const branchNodeIds = executionResult?.branch_node_ids;
   const applied_steps = (branchNodeIds && activeBranch && branchNodeIds[activeBranch])
     ? branchNodeIds[activeBranch]
     : allNodeIds;
 
+  const validationBanner = validationIssues.length > 0 && (
+    <section
+      className="m-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-100"
+      aria-labelledby={validationHeadingId}
+    >
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p id={validationHeadingId} className="font-semibold">Validation issues</p>
+          <p className="mt-0.5 text-xs text-red-700 dark:text-red-200">
+            Fix one of the items below, then run preview again.
+          </p>
+          {/* Only the count is announced: the list recomputes on every graph
+              edit, so a live region around it would re-read every issue on
+              each keystroke. */}
+          <p className="sr-only" role="status" aria-atomic="true">
+            {validationIssues.length === 1
+              ? '1 validation issue blocking preview'
+              : `${validationIssues.length} validation issues blocking preview`}
+          </p>
+          <ul className="mt-3 space-y-2">
+            {validationIssues.map((issue) => (
+              <li key={`${issue.nodeId}-${issue.category}-${issue.message}`}>
+                <button
+                  type="button"
+                  onClick={() => selectNode(issue.nodeId)}
+                  className="w-full rounded-md border border-red-200 bg-white/80 px-3 py-2 text-left transition-colors hover:bg-red-100 dark:border-red-900/40 dark:bg-slate-950/30 dark:hover:bg-red-950/40"
+                >
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-red-700 dark:text-red-300">
+                    <span className="rounded bg-red-100 px-1.5 py-0.5 dark:bg-red-950/50">{issue.category}</span>
+                    <span className="font-semibold normal-case tracking-normal">{issue.nodeLabel}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{issue.message}</p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </section>
+  );
+
+  const runErrorBanner = lastRunError && (
+    <section
+      className="m-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-100"
+      role="alert"
+      aria-atomic="true"
+    >
+      <div className="flex items-start gap-2">
+        <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600 dark:text-red-400" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="font-semibold">Last preview run failed</p>
+          <p className="mt-0.5 text-sm text-slate-800 dark:text-slate-100">{lastRunError}</p>
+        </div>
+      </div>
+    </section>
+  );
+
+  const issueCount =
+    validationIssues.length + (lastRunError ? 1 : 0) + (executionResult ? mergeWarnings.length : 0);
+
+  // Land on whichever pane has something to act on: a failed or blocked run
+  // has no table worth showing, so default to Issues in that case.
+  const defaultPane: ResultsPane =
+    validationIssues.length > 0 || lastRunError ? 'issues' : 'data';
+  const activePane = pane ?? defaultPane;
+
+  const paneTabs: { id: ResultsPane; label: string; count?: number }[] = [
+    { id: 'data', label: 'Data' },
+    { id: 'issues', label: 'Issues', count: issueCount },
+    { id: 'steps', label: 'Steps', count: applied_steps.length },
+  ];
+
   return (
     <div
       className={`absolute bottom-0 left-0 right-0 bg-background border-t shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] transition-all duration-300 z-20 flex flex-col ${
-        isResultsPanelExpanded ? 'h-96' : 'h-10'
+        !isResultsPanelExpanded ? 'h-10' : isMaximized ? 'top-0' : 'h-96'
       }`}
     >
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
+        className="flex items-center justify-between gap-2 px-4 py-2 bg-muted/10 cursor-pointer hover:bg-muted/20 border-b select-none"
         {...clickableProps(() => setResultsPanelExpanded(!isResultsPanelExpanded))}
       >
-        <div className="flex items-center gap-2">
-          <Table className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">Preview Results</span>
-          <span className="text-xs text-muted-foreground ml-2">
-            {currentRows.length === currentTotal
-              ? `${currentTotal} rows`
-              : `${currentRows.length} of ${currentTotal} rows shown`}
-          </span>
-          {branchLabels.length > 0 && (
-            <span className="text-xs text-muted-foreground ml-2">
-              · {branchLabels.length} branches
+        <div className="flex items-center gap-2 min-w-0">
+          <Table className="w-4 h-4 text-primary shrink-0" />
+          <span className="font-semibold text-sm shrink-0">Preview Results</span>
+          {executionResult && (
+            <span className="text-xs text-muted-foreground truncate">
+              {currentRows.length === currentTotal
+                ? `${currentTotal} rows`
+                : `${currentRows.length} of ${currentTotal} rows shown`}
+              {branchLabels.length > 0 ? ` · ${branchLabels.length} branches` : ''}
             </span>
           )}
-          {executionResult.status === 'failed' && (
-            <span className="text-xs text-red-600 font-bold ml-2">
-              (Failed)
+          {executionResult?.status === 'failed' && (
+            <span className="text-xs text-red-600 font-bold shrink-0">(Failed)</span>
+          )}
+          {issueCount > 0 && (
+            <span className="shrink-0 text-[11px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+              {issueCount} {issueCount === 1 ? 'issue' : 'issues'}
             </span>
           )}
         </div>
-        <button className="p-1 hover:bg-muted rounded">
-          {isResultsPanelExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-        </button>
+        <div className="flex items-center gap-1 shrink-0">
+          {isResultsPanelExpanded && (
+            <button
+              type="button"
+              className="p-1 hover:bg-muted rounded"
+              aria-label={isMaximized ? 'Restore results panel' : 'Maximize results panel'}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMaximized((v) => !v);
+              }}
+            >
+              {isMaximized ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
+          <button type="button" className="p-1 hover:bg-muted rounded" aria-label={isResultsPanelExpanded ? 'Collapse results panel' : 'Expand results panel'}>
+            {isResultsPanelExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       {isResultsPanelExpanded && (
         <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Pane tabs keep advisories and step pills from pushing the table
+              off-screen — each lives in its own pane instead of stacking. */}
+          <div className="flex items-center gap-1 px-2 border-b bg-muted/5 shrink-0" role="tablist">
+            {paneTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activePane === tab.id}
+                onClick={() => setPane(tab.id)}
+                className={`px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors ${
+                  activePane === tab.id
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tab.label}
+                {tab.count ? (
+                  <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground">
+                    {tab.count}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </div>
 
-          {/* Branch Tabs (multi-branch parallel runs only) */}
-          {branchLabels.length > 0 && (
-            <BranchTabs
-              branchLabels={branchLabels}
-              activeBranch={activeBranch}
-              setActiveBranch={setActiveBranch}
-              branchColors={branchColors}
-              branchAdvisoryCounts={branchAdvisoryCounts}
-            />
+          {activePane === 'data' && (
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {executionResult && branchLabels.length > 0 && (
+                <BranchTabs
+                  branchLabels={branchLabels}
+                  activeBranch={activeBranch}
+                  setActiveBranch={setActiveBranch}
+                  branchColors={branchColors}
+                  branchAdvisoryCounts={branchAdvisoryCounts}
+                />
+              )}
+              {executionResult && tabNames.length > 1 && (
+                <SplitTabs
+                  tabNames={tabNames}
+                  datasets={datasets}
+                  totals={totals}
+                  effectiveTab={effectiveTab}
+                  setActiveTab={setActiveTab}
+                />
+              )}
+              {executionResult ? (
+                <ResultsTable columns={columns} currentRows={currentRows} effectiveTab={effectiveTab} />
+              ) : (
+                <p className="p-4 text-sm text-muted-foreground">
+                  Run a preview to see the resulting rows here.
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Split Tabs (train / test / X / y …) */}
-          {tabNames.length > 1 && (
-            <SplitTabs
-              tabNames={tabNames}
-              datasets={datasets}
-              totals={totals}
-              effectiveTab={effectiveTab}
-              setActiveTab={setActiveTab}
-            />
+          {activePane === 'issues' && (
+            <div className="flex-1 overflow-y-auto">
+              {validationBanner}
+              {runErrorBanner}
+              {executionResult && mergeWarnings.length > 0 && (
+                <MergeWarningsBanner
+                  mergeWarnings={mergeWarnings}
+                  mergeWarningsOpen={mergeWarningsOpen}
+                  setMergeWarningsOpen={setMergeWarningsOpen}
+                  nodeLabelMap={nodeLabelMap}
+                  confirm={confirm}
+                  chainSiblings={chainSiblings}
+                />
+              )}
+              {issueCount === 0 && (
+                <p className="p-4 text-sm text-muted-foreground">
+                  No validation issues, run errors, or merge advisories.
+                </p>
+              )}
+            </div>
           )}
 
-          {/* Merge advisories (sibling fan-in etc.) — engine-emitted.
-              Collapsed by default to a one-line summary; click to expand
-              full per-warning detail (inputs, overlap columns, winner). */}
-          {mergeWarnings.length > 0 && (
-            <MergeWarningsBanner
-              mergeWarnings={mergeWarnings}
-              mergeWarningsOpen={mergeWarningsOpen}
-              setMergeWarningsOpen={setMergeWarningsOpen}
-              nodeLabelMap={nodeLabelMap}
-              confirm={confirm}
-              chainSiblings={chainSiblings}
-            />
+          {activePane === 'steps' && (
+            <div className="flex-1 overflow-y-auto p-3">
+              {applied_steps.length > 0 && executionResult?.status !== 'failed' ? (
+                <div className="flex flex-wrap gap-2">
+                  {applied_steps.map((step: string) => (
+                    <span
+                      key={step}
+                      className="text-xs text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800"
+                    >
+                      {nodeLabelMap[step] ?? step}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No steps ran. Run a preview to see which nodes executed.
+                </p>
+              )}
+            </div>
           )}
-
-          {/* Signals / Warnings */}
-          {applied_steps.length > 0 && executionResult.status !== 'failed' && (
-             <div className="p-2 bg-blue-50 dark:bg-blue-950/20 border-b dark:border-blue-900/30 flex gap-2 overflow-x-auto">
-                {applied_steps.map((step: string, idx: number) => (
-                  <div key={idx} className="text-xs text-blue-800 dark:text-blue-200 bg-blue-100 dark:bg-blue-900/40 px-2 py-1 rounded border border-blue-200 dark:border-blue-800 whitespace-nowrap">
-                    {nodeLabelMap[step] ?? step}
-                  </div>
-                ))}
-             </div>
-          )}
-
-          {/* Data Table */}
-          <ResultsTable columns={columns} currentRows={currentRows} effectiveTab={effectiveTab} />
         </div>
       )}
     </div>

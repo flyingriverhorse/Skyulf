@@ -48,11 +48,24 @@ interface InputStatus {
     column?: number;
 }
 
+/** Per-row breakdown of which schema fields a specific row omits. */
+interface RowSchemaIssue {
+    rowIndex: number; // 0-based index into the parsed input array
+    missing: string[];
+}
+
 /** Schema-vs-input drift summary surfaced under the editor. */
 interface SchemaCheck {
-    missing: string[]; // schema fields that no row provides
+    missing: string[]; // schema fields that no row provides at all
     extra: string[]; // row fields that the schema does not declare
     rows: number;
+    /** Rows that are individually missing at least one schema field — even
+     * when every field is *somewhere* present across the batch, a single
+     * row silently sent with a hole in it is still the exact request the
+     * backend rejects (or, worse, crashes on). Named per row/field so the
+     * user can see and fix the actual offending rows, not just an
+     * aggregate count. */
+    rowIssues: RowSchemaIssue[];
 }
 
 /** A previous prediction run kept in memory so the user can re-load it. */
@@ -63,6 +76,39 @@ interface RecentRun {
     input: string;
     predictions: unknown[];
 }
+
+/** Fetch and keep the saved threshold record for the currently active job. */
+export const useSavedThresholdInfo = (jobId: string | null): SavedThresholdInfo | null => {
+    const [savedThresholds, setSavedThresholds] = useState<SavedThresholdInfo | null>(null);
+    const requestSeq = useRef(0);
+
+    useEffect(() => {
+        const requestId = ++requestSeq.current;
+        if (!jobId) {
+            setSavedThresholds(null);
+            return;
+        }
+
+        let cancelled = false;
+        setSavedThresholds(null);
+        void thresholdTuningApi.get(jobId)
+            .then(saved => {
+                if (cancelled || requestSeq.current !== requestId) return;
+                setSavedThresholds(saved);
+            })
+            .catch(err => {
+                if (cancelled || requestSeq.current !== requestId) return;
+                console.warn('Failed to fetch saved tuned thresholds', err);
+                setSavedThresholds(null);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [jobId]);
+
+    return savedThresholds;
+};
 
 /** Try to extract a (line, column) tuple from a JSON parse error message. */
 const extractJsonErrorPosition = (
@@ -136,7 +182,19 @@ const checkSchema = (raw: string, schema: { name: string; type: string }[]): Sch
     });
     const missing = [...schemaNames].filter(n => !seen.has(n));
     const extra = [...seen].filter(n => !schemaNames.has(n));
-    return { missing, extra, rows: parsed.length };
+
+    // Per-row detail: a field can be "not missing overall" (some other row
+    // provides it) while this specific row still omits it — that row would
+    // still be sent with a hole in it, so surface it individually.
+    const rowIssues: RowSchemaIssue[] = [];
+    parsed.forEach((row, rowIndex) => {
+        const keys =
+            row && typeof row === 'object' ? new Set(Object.keys(row as Record<string, unknown>)) : new Set<string>();
+        const rowMissing = [...schemaNames].filter(n => !keys.has(n));
+        if (rowMissing.length > 0) rowIssues.push({ rowIndex, missing: rowMissing });
+    });
+
+    return { missing, extra, rows: parsed.length, rowIssues };
 };
 
 /**
@@ -519,7 +577,7 @@ export const InferencePage: React.FC = () => {
     /** Tuned thresholds already saved for the active deployment's job (from the
      * Evaluation tab's Threshold Tuning panel) — these are applied automatically
      * at /predict time whenever `enabled` is true and no ad-hoc override is set. */
-    const [savedThresholds, setSavedThresholds] = useState<SavedThresholdInfo | null>(null);
+    const savedThresholds = useSavedThresholdInfo(activeDeployment?.job_id ?? null);
 
     const [autoFilterInfo, setAutoFilterInfo] = useState<string | null>(null);
     const [bannerDismissed, setBannerDismissed] = useState(false);
@@ -535,6 +593,15 @@ export const InferencePage: React.FC = () => {
     });
     const [isDragging, setIsDragging] = useState(false);
 
+    // EXP-006: missing schema fields block Run Prediction by default — the
+    // backend rejects (or, when a field is also wrong-typed, crashes on)
+    // exactly this request shape, so silently letting it through just moves
+    // the failure one network round-trip later. An explicit, reviewable
+    // override is offered instead of a hard block, since a user may
+    // legitimately want to send a partial row (e.g. relying on a
+    // server-side default) and know what they're doing.
+    const [acknowledgeMissingFields, setAcknowledgeMissingFields] = useState(false);
+
     const inputStatus = useMemo(() => analyseInput(inputData), [inputData]);
 
     const schemaChips = useMemo(
@@ -546,6 +613,26 @@ export const InferencePage: React.FC = () => {
         () => checkSchema(inputData, schemaChips),
         [inputData, schemaChips],
     );
+
+    // Any field the deployment schema can't type (the common case today —
+    // the artifact-derived schema currently reports every field as
+    // `unknown`) never gets a value/type check below; be explicit about
+    // that instead of silently skipping it, per EXP-006's "unknown schema
+    // types are honestly marked unvalidated" requirement.
+    const hasUnknownTypedFields = useMemo(
+        () => schemaChips.some(col => col.type === 'unknown'),
+        [schemaChips],
+    );
+
+    // Re-require acknowledgement whenever the actual set of missing rows/
+    // fields changes (edit, Fix, new sample, etc.) — a stale checkbox
+    // ticked for a previous violation must not silently authorize a new one.
+    const missingSignature = schemaCheck?.rowIssues
+        .map(i => `${i.rowIndex}:${i.missing.join(',')}`)
+        .join('|') ?? '';
+    useEffect(() => {
+        setAcknowledgeMissingFields(false);
+    }, [missingSignature]);
 
     const predictionStats = useMemo(() => {
         if (!predictions || predictions.length === 0) return null;
@@ -603,7 +690,6 @@ export const InferencePage: React.FC = () => {
             if (!deployment) {
                 setDatasetId(null);
                 setExcludedColumns(new Set());
-                setSavedThresholds(null);
                 return;
             }
 
@@ -622,13 +708,6 @@ export const InferencePage: React.FC = () => {
             }
 
             if (deployment.job_id) {
-                thresholdTuningApi.get(deployment.job_id)
-                    .then(setSavedThresholds)
-                    .catch(err => {
-                        console.warn('Failed to fetch saved tuned thresholds', err);
-                        setSavedThresholds(null);
-                    });
-
                 try {
                     const job = await jobsApi.getJob(deployment.job_id);
                     const targetColumn = job.target_column;
@@ -667,10 +746,7 @@ export const InferencePage: React.FC = () => {
                 } catch (err) {
                     console.warn('Failed to fetch dataset sample', err);
                 }
-            } else {
-                setSavedThresholds(null);
             }
-
             setExcludedColumns(excluded);
 
             // Only seed the editor with a fresh sample when there is no
@@ -794,9 +870,38 @@ export const InferencePage: React.FC = () => {
         handleCsvFile(file);
     };
 
-    /** Pad missing schema fields with zero in every row of the input. */
-    const handleFixMissingFields = () => {
-        if (!schemaCheck || schemaCheck.missing.length === 0) return;
+    /** Pad missing schema fields with zero in every row of the input — after
+     * an explicit reviewed preview of exactly which row/field pairs will be
+     * touched, since the previous silent apply made a partial repair look
+     * like a full fix (a field that already existed with a wrong-typed
+     * value was left untouched and only surfaced once the backend crashed
+     * on it — see EXP-006). */
+    const handleFixMissingFields = async () => {
+        if (!schemaCheck || schemaCheck.rowIssues.length === 0) return;
+        const preview = schemaCheck.rowIssues
+            .slice(0, 8)
+            .map(issue => `Row ${issue.rowIndex + 1}: ${issue.missing.join(', ')} → 0`);
+        const more = schemaCheck.rowIssues.length > 8 ? schemaCheck.rowIssues.length - 8 : 0;
+        const ok = await confirm({
+            title: 'Fill missing fields with 0?',
+            message: (
+                <div className="space-y-2">
+                    <p>
+                        This only fills in fields that are absent from a row. Fields that are
+                        already present keep their current value even if it looks wrong for
+                        this model — review those yourself before running.
+                    </p>
+                    <ul className="text-xs font-mono bg-gray-50 dark:bg-gray-900 rounded p-2 space-y-0.5 max-h-32 overflow-auto">
+                        {preview.map(line => (
+                            <li key={line}>{line}</li>
+                        ))}
+                        {more > 0 && <li>…and {more} more row(s)</li>}
+                    </ul>
+                </div>
+            ),
+            confirmLabel: 'Fill with 0',
+        });
+        if (!ok) return;
         try {
             const arr = JSON.parse(inputData) as Record<string, unknown>[];
             const padded = arr.map(row => {
@@ -807,7 +912,7 @@ export const InferencePage: React.FC = () => {
                 return next;
             });
             setInputData(JSON.stringify(padded, null, 2));
-            toast.success(`Added ${schemaCheck.missing.length} missing field(s)`);
+            toast.success(`Filled ${schemaCheck.missing.length} missing field(s) with 0 — verify values before running`);
         } catch {
             toast.error('Cannot pad: invalid JSON');
         }
@@ -837,6 +942,13 @@ export const InferencePage: React.FC = () => {
 
     const handlePredict = useCallback(async () => {
         if (!activeDeployment || isLoading) return;
+        // EXP-006: a row missing a schema field is the same partial request
+        // the backend either rejects or crashes on — require the explicit
+        // acknowledgement checkbox before sending it, even via Ctrl+Enter
+        // (which otherwise bypasses the disabled Run Prediction button).
+        if (schemaCheck && schemaCheck.rowIssues.length > 0 && !acknowledgeMissingFields) {
+            return;
+        }
 
         // Soft warning before sending huge payloads — the network round-trip
         // and JSON serialisation balloon, and it's almost always a mistake.
@@ -899,6 +1011,8 @@ export const InferencePage: React.FC = () => {
         confirm,
         overrideThresholdsEnabled,
         overrideThresholdsValue,
+        schemaCheck,
+        acknowledgeMissingFields,
     ]);
 
     const handleFormatJson = () => {
@@ -1037,23 +1151,74 @@ export const InferencePage: React.FC = () => {
     const showBanner = autoFilterInfo && !bannerDismissed;
     const hasSchemaIssues =
         schemaCheck && (schemaCheck.missing.length > 0 || schemaCheck.extra.length > 0);
+    // Missing fields are the one violation we can determine with certainty
+    // from a nameless "unknown"-typed schema — block the request on those
+    // unless the user has explicitly reviewed and accepted the current set.
+    const hasBlockingMissingFields = Boolean(schemaCheck && schemaCheck.rowIssues.length > 0);
+    const canRunPrediction =
+        !hasBlockingMissingFields || acknowledgeMissingFields;
     const recentLatencies = useMemo(
         () => [...recentRuns].reverse().map(r => r.latencyMs),
         [recentRuns],
     );
 
     return (
-        <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-6 overflow-hidden">
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-6 shrink-0 flex items-center gap-2">
-                <Zap className="w-6 h-6 text-blue-500" />
-                Testing Model Inference
-            </h1>
+        <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 overflow-y-auto lg:overflow-hidden">
+            {/* Deployment status lives in the header rather than a half-height card:
+                it's a one-line fact, and the space it used to occupy is what the
+                results panel needs to stay readable on short/narrow viewports. */}
+            <header className="shrink-0 mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <h1 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                    <Zap className="w-6 h-6 text-blue-500 shrink-0" />
+                    Testing Model Inference
+                </h1>
+                {activeDeployment ? (
+                    <div className="flex items-center gap-2 flex-wrap text-xs min-w-0">
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800 font-medium">
+                            <CheckCircle className="w-3.5 h-3.5 shrink-0" /> Active
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 min-w-0">
+                            <Box className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                            <span className="truncate max-w-[10rem]">{activeDeployment.model_type}</span>
+                        </span>
+                        <span
+                            className="hidden sm:inline-flex items-center px-2 py-1 rounded-full bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 font-mono min-w-0"
+                            title={`Job ${activeDeployment.job_id} · deployed ${new Date(activeDeployment.created_at).toLocaleString()}`}
+                        >
+                            <span className="truncate max-w-[8rem]">{activeDeployment.job_id}</span>
+                        </span>
+                        <button
+                            onClick={() => void handleDeactivate()}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/50 transition-colors"
+                            title="Undeploy model"
+                        >
+                            <Power className="w-3.5 h-3.5" /> Undeploy
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400 italic">
+                            <AlertCircle className="w-4 h-4 shrink-0" />
+                            No model is currently deployed.
+                        </span>
+                        <Link
+                            to="/registry"
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/50 transition-colors"
+                        >
+                            <Box className="w-3.5 h-3.5" /> Browse Model Registry
+                        </Link>
+                    </div>
+                )}
+            </header>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+            {/* Only the desktop two-column layout is height-constrained. Stacked on
+                narrower viewports the panels keep a usable minimum height and the
+                page scrolls instead of compressing both to a few pixels. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:flex-1 lg:min-h-0">
                 {/* Left column: input editor */}
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-full min-h-0">
+                <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col lg:h-full lg:min-h-0">
                     <div className="flex justify-between items-start mb-3 gap-3 flex-wrap">
-                        <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">
+                        <h3 id="inference-input-heading" className="text-lg font-medium text-gray-800 dark:text-gray-100">
                             Input Data (JSON)
                         </h3>
                         <div className="flex items-center gap-1 flex-wrap">
@@ -1167,9 +1332,13 @@ export const InferencePage: React.FC = () => {
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
-                        className="relative flex-1 min-h-0"
+                        className="relative flex-1 min-h-[16rem] lg:min-h-0"
                     >
                         <textarea
+                            id="inference-input-editor"
+                            aria-labelledby="inference-input-heading"
+                            aria-describedby="inference-input-status"
+                            aria-invalid={!inputStatus.valid}
                             className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                             value={inputData}
                             onChange={e => setInputData(e.target.value)}
@@ -1189,42 +1358,90 @@ export const InferencePage: React.FC = () => {
 
                     {/* Schema validation badges + one-click fix. */}
                     {hasSchemaIssues && (
-                        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                            {schemaCheck.missing.length > 0 && (
-                                <>
+                        <div className="mt-2 flex flex-col gap-1.5 text-[11px]">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {schemaCheck.missing.length > 0 && (
+                                    <>
+                                        <span
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                                            title={schemaCheck.missing.join(', ')}
+                                        >
+                                            <AlertCircle className="w-3 h-3" />
+                                            {schemaCheck.missing.length} missing
+                                        </span>
+                                        <button
+                                            onClick={() => void handleFixMissingFields()}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                            title="Review and fill missing fields with value 0"
+                                        >
+                                            <Wand2 className="w-3 h-3" /> Fix
+                                        </button>
+                                    </>
+                                )}
+                                {schemaCheck.extra.length > 0 && (
                                     <span
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                                        title={schemaCheck.missing.join(', ')}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                                        title={schemaCheck.extra.join(', ')}
                                     >
                                         <AlertCircle className="w-3 h-3" />
-                                        {schemaCheck.missing.length} missing
+                                        {schemaCheck.extra.length} extra
                                     </span>
-                                    <button
-                                        onClick={handleFixMissingFields}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-                                        title="Add missing fields with value 0 in every row"
-                                    >
-                                        <Wand2 className="w-3 h-3" /> Fix
-                                    </button>
-                                </>
-                            )}
-                            {schemaCheck.extra.length > 0 && (
-                                <span
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
-                                    title={schemaCheck.extra.join(', ')}
-                                >
-                                    <AlertCircle className="w-3 h-3" />
-                                    {schemaCheck.extra.length} extra
+                                )}
+                                <span className="text-[10px] text-gray-400 italic ml-1">
+                                    Hover badges for field names.
                                 </span>
+                            </div>
+
+                            {/* Per-row detail: which specific rows are still missing
+                                fields, since a field being present "somewhere" in the
+                                batch doesn't help the row that's actually missing it. */}
+                            {schemaCheck.rowIssues.length > 0 && (
+                                <ul
+                                    data-testid="schema-row-issues"
+                                    className="font-mono bg-rose-50/60 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/40 rounded px-2 py-1 space-y-0.5 max-h-20 overflow-auto"
+                                >
+                                    {schemaCheck.rowIssues.slice(0, 5).map(issue => (
+                                        <li key={issue.rowIndex} className="text-rose-700 dark:text-rose-300">
+                                            Row {issue.rowIndex + 1}: missing {issue.missing.join(', ')}
+                                        </li>
+                                    ))}
+                                    {schemaCheck.rowIssues.length > 5 && (
+                                        <li className="text-rose-500 dark:text-rose-400">
+                                            …and {schemaCheck.rowIssues.length - 5} more row(s)
+                                        </li>
+                                    )}
+                                </ul>
                             )}
-                            <span className="text-[10px] text-gray-400 italic ml-1">
-                                Hover badges for field names.
-                            </span>
+
+                            {hasBlockingMissingFields && (
+                                <label className="flex items-start gap-1.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={acknowledgeMissingFields}
+                                        onChange={e => setAcknowledgeMissingFields(e.target.checked)}
+                                        className="mt-0.5"
+                                        data-testid="acknowledge-missing-fields"
+                                    />
+                                    <span>
+                                        I understand some rows are missing schema fields and want to
+                                        run anyway.
+                                    </span>
+                                </label>
+                            )}
+
+                            {hasUnknownTypedFields && (
+                                <p className="text-[10px] text-gray-400 italic">
+                                    This model&apos;s schema doesn&apos;t report field types — values
+                                    are checked for presence only, not type or range, before sending.
+                                </p>
+                            )}
                         </div>
                     )}
 
                     <div className="mt-3 flex justify-between items-center gap-3 flex-wrap">
                         <span
+                            id="inference-input-status"
+                            role="status"
                             className={`text-xs flex items-center gap-1 ${
                                 inputStatus.valid
                                     ? 'text-gray-500 dark:text-gray-400'
@@ -1249,9 +1466,16 @@ export const InferencePage: React.FC = () => {
                             </kbd>
                             <button
                                 onClick={() => void handlePredict()}
-                                disabled={!activeDeployment || isLoading || !inputStatus.valid}
+                                disabled={
+                                    !activeDeployment || isLoading || !inputStatus.valid || !canRunPrediction
+                                }
+                                title={
+                                    !canRunPrediction
+                                        ? 'Some rows are missing schema fields — fix them or check the acknowledgement above to run anyway'
+                                        : undefined
+                                }
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-                                    !activeDeployment || isLoading || !inputStatus.valid
+                                    !activeDeployment || isLoading || !inputStatus.valid || !canRunPrediction
                                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-600'
                                         : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
                                 }`}
@@ -1268,23 +1492,51 @@ export const InferencePage: React.FC = () => {
                     </div>
 
                     {/* Ad-hoc override thresholds — applied only to this prediction, not persisted server-side. */}
-                    <details className="mt-3 rounded-lg border border-gray-200 dark:border-gray-700 group">
+                    <details className="mt-3 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 group overflow-hidden">
                         <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-gray-600 dark:text-gray-300 flex items-center gap-2">
                             <Sparkles className="w-3.5 h-3.5" /> Advanced: override thresholds
                         </summary>
                         <div className="px-3 pb-3 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-700">
-                            {savedThresholds?.enabled && savedThresholds.thresholds && (
-                                <div className="p-2 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 text-[11px] text-blue-700 dark:text-blue-300">
-                                    <p className="mb-1">
-                                        This model already has <strong>tuned thresholds saved and enabled</strong> from
-                                        the Evaluation tab — they&apos;re applied automatically to every real prediction
-                                        unless you turn on an override below:
-                                    </p>
+                            {savedThresholds?.thresholds && activeDeployment && (
+                                <div
+                                    className={`p-2 rounded border text-[11px] ${
+                                        savedThresholds.enabled
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800 text-blue-700 dark:text-blue-300'
+                                            : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+                                    }`}
+                                >
+                                    <div className="flex flex-wrap items-center gap-1 mb-1">
+                                        <strong>
+                                            {savedThresholds.enabled
+                                                ? 'Saved tuned thresholds are enabled'
+                                                : 'Saved tuned thresholds are available but disabled'}
+                                        </strong>
+                                        <span className="font-mono opacity-80">
+                                            · Job {activeDeployment.job_id} · {activeDeployment.model_type}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-0.5 mb-1.5">
+                                        <span>
+                                            Optimized for <strong>{savedThresholds.metric ?? 'unknown metric'}</strong>
+                                        </span>
+                                        <span>
+                                            Computed from <strong>{savedThresholds.split_used ?? 'unknown'}</strong> split
+                                        </span>
+                                        {savedThresholds.computed_at && (
+                                            <span>
+                                                Computed at <strong>{new Date(savedThresholds.computed_at).toLocaleString()}</strong>
+                                            </span>
+                                        )}
+                                    </div>
                                     <div className="flex flex-wrap gap-1 mb-1.5">
                                         {Object.entries(savedThresholds.thresholds).map(([cls, thr]) => (
                                             <span
                                                 key={cls}
-                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 font-mono"
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono ${
+                                                    savedThresholds.enabled
+                                                        ? 'bg-blue-100 dark:bg-blue-900/40'
+                                                        : 'bg-slate-100 dark:bg-slate-700/80'
+                                                }`}
                                             >
                                                 {cls}: {thr}
                                             </span>
@@ -1292,7 +1544,7 @@ export const InferencePage: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handlePrefillFromSavedThresholds}
-                                        className="text-blue-700 dark:text-blue-300 hover:underline font-medium"
+                                        className="text-current hover:underline font-medium"
                                     >
                                         Copy into override editor to tweak
                                     </button>
@@ -1311,7 +1563,7 @@ export const InferencePage: React.FC = () => {
                             {Object.entries(overrideThresholdsValue).length > 0 && (
                                 <div className="space-y-1">
                                     {Object.entries(overrideThresholdsValue).map(([cls, thr]) => (
-                                        <div key={cls} className="flex items-center gap-2">
+                                        <div key={cls} className="flex items-center gap-2 flex-wrap">
                                             <span
                                                 className="font-mono text-xs w-28 truncate text-gray-700 dark:text-gray-200"
                                                 title={cls}
@@ -1341,7 +1593,7 @@ export const InferencePage: React.FC = () => {
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                                 <input
                                     type="text"
                                     value={newOverrideClass}
@@ -1384,70 +1636,10 @@ export const InferencePage: React.FC = () => {
                     </details>
                 </div>
 
-                {/* Right column: deployment status + results */}
-                <div className="flex flex-col gap-6 h-full min-h-0">
-                    {/* Active deployment card */}
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 shrink-0">
-                        <h2 className="text-lg font-medium text-gray-800 dark:text-gray-100 mb-4 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Box className="w-5 h-5 text-blue-500" />
-                                Active Deployment
-                            </div>
-                            {activeDeployment && (
-                                <button
-                                    onClick={() => void handleDeactivate()}
-                                    className="flex items-center gap-1 text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 transition-colors"
-                                    title="Undeploy model"
-                                >
-                                    <Power className="w-3 h-3" /> Undeploy
-                                </button>
-                            )}
-                        </h2>
-                        {activeDeployment ? (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Model Type</div>
-                                    <div className="font-medium text-gray-800 dark:text-gray-200">
-                                        {activeDeployment.model_type}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Job ID</div>
-                                    <div className="font-mono text-sm text-gray-800 dark:text-gray-200 break-all">
-                                        {activeDeployment.job_id}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Deployed At</div>
-                                    <div className="text-sm text-gray-800 dark:text-gray-200">
-                                        {new Date(activeDeployment.created_at).toLocaleDateString()}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">Status</div>
-                                    <div className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium text-sm">
-                                        <CheckCircle className="w-4 h-4" /> Active
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col gap-3">
-                                <div className="text-gray-500 dark:text-gray-400 italic flex items-center gap-2">
-                                    <AlertCircle className="w-4 h-4" />
-                                    No model is currently deployed.
-                                </div>
-                                <Link
-                                    to="/registry"
-                                    className="self-start inline-flex items-center gap-2 text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 transition-colors"
-                                >
-                                    <Box className="w-3 h-3" /> Browse Model Registry
-                                </Link>
-                            </div>
-                        )}
-                    </div>
-
+                {/* Right column: results (deployment status now lives in the page header) */}
+                <div className="flex flex-col lg:h-full lg:min-h-0">
                     {/* Results panel */}
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col flex-1 min-h-0">
+                    <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col flex-1 min-h-[20rem] lg:min-h-0">
                         <div className="flex justify-between items-center mb-4 gap-3 flex-wrap">
                             <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">
                                 Prediction Results

@@ -156,6 +156,30 @@ export const Toolbar: React.FC = () => {
   // and the canvas empty-state CTA (via event) can open it.
   const [showTemplates, setShowTemplates] = useState(false);
 
+  // CAN-005: collapse secondary actions based on the *actual* Flow-pane
+  // width (the toolbar's absolute-positioned containing block), not a
+  // Tailwind viewport breakpoint. `xl:` media queries only track the
+  // browser window, so at a wide viewport (e.g. 1440px) with the
+  // Properties panel open — which narrows this same pane without
+  // changing the window width — the old `hidden xl:flex` buttons stayed
+  // visible and rendered on top of the left cluster (Undo/Clear).
+  // Measuring the real container closes that gap at every panel
+  // combination instead of only at the one viewport width devs tested.
+  const rightClusterRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(Infinity);
+  const COMPACT_WIDTH = 1040;
+  const isCompact = containerWidth < COMPACT_WIDTH;
+  useEffect(() => {
+    const container = rightClusterRef.current?.parentElement;
+    if (!container) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setContainerWidth(entry.contentRect.width);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const legendRef = useRef<HTMLDivElement | null>(null);
   const exportMenuRef = useRef<HTMLDivElement | null>(null);
@@ -265,10 +289,12 @@ export const Toolbar: React.FC = () => {
 
       {/* Right cluster: history / load / save / tidy / export / run.
           max-width keeps the cluster from sliding under the left cluster. */}
-      <div className="absolute top-4 right-4 z-10 flex flex-nowrap justify-end gap-2 max-w-[calc(100%-13rem)]">
-        {/* Compact overflow menu (below xl). Collapses secondary actions so
-            the cluster never wraps on 1024–1280 px screens. */}
-        <div className="relative xl:hidden" ref={moreMenuRef}>
+      <div ref={rightClusterRef} className="absolute top-4 right-4 z-10 flex flex-nowrap justify-end gap-2 max-w-[calc(100%-13rem)]">
+        {/* Compact overflow menu — collapses secondary actions so the
+            cluster never overlaps the left cluster once the live Flow-pane
+            width (not the viewport) drops below COMPACT_WIDTH. */}
+        {isCompact && (
+        <div className="relative" ref={moreMenuRef}>
           <button
             onClick={() => setShowMoreMenu((v) => !v)}
             title="More canvas tools"
@@ -354,28 +380,32 @@ export const Toolbar: React.FC = () => {
             </div>
           )}
         </div>
+        )}
+        {!isCompact && (
         <button
           onClick={() => toggleDrawer()}
           title="Job runs history"
           aria-label="Job runs history"
           data-testid="toolbar-jobs"
-          className="hidden xl:flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+          className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
         >
           <History className="w-4 h-4" />
-          <span className="text-sm font-medium hidden xl:inline">Jobs</span>
+          <span className="text-sm font-medium">Jobs</span>
         </button>
-        {!readOnly && (
+        )}
+        {!isCompact && !readOnly && (
           <button
             onClick={() => setShowTemplates(true)}
             title="Start from a template"
             aria-label="Start from a template"
             data-testid="toolbar-templates"
-            className="hidden xl:flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
           >
             <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium hidden xl:inline">Templates</span>
+            <span className="text-sm font-medium">Templates</span>
           </button>
         )}
+        {!isCompact && (
         <button
           onClick={() => setPerfOverlayEnabled(!perfOverlayEnabled)}
           title={
@@ -386,15 +416,16 @@ export const Toolbar: React.FC = () => {
           aria-label="Toggle performance overlay"
           aria-pressed={perfOverlayEnabled}
           data-testid="toolbar-perf-overlay"
-          className={`hidden xl:flex items-center gap-2 px-3 py-2 border rounded-md shadow-sm transition-colors ${
+          className={`flex items-center gap-2 px-3 py-2 border rounded-md shadow-sm transition-colors ${
             perfOverlayEnabled
               ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/15'
               : 'bg-background hover:bg-accent'
           }`}
         >
           <Gauge className="w-4 h-4" />
-          <span className="text-sm font-medium hidden xl:inline">Perf</span>
+          <span className="text-sm font-medium">Perf</span>
         </button>
+        )}
         {/* Recent pipelines (localStorage fallback) — only shown when no
             server-side versions exist for the current dataset. */}
         {!readOnly && !hasServerVersions && recentPipelines.length > 0 && (
@@ -409,7 +440,7 @@ export const Toolbar: React.FC = () => {
               className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors"
             >
               <Clock className="w-4 h-4" />
-              <span className="text-sm font-medium hidden xl:inline">Recent</span>
+              {!isCompact && <span className="text-sm font-medium">Recent</span>}
               <ChevronDown className="w-3 h-3" />
             </button>
             {showRecentMenu && (
@@ -443,7 +474,7 @@ export const Toolbar: React.FC = () => {
               className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
             >
               <FolderOpen className="w-4 h-4" />
-              <span className="text-sm font-medium hidden xl:inline">Load</span>
+              {!isCompact && <span className="text-sm font-medium">Load</span>}
               <ChevronDown className="w-3 h-3" />
             </button>
             {showLoadMenu && (
@@ -472,12 +503,14 @@ export const Toolbar: React.FC = () => {
             ) : (
               <Save className="w-4 h-4" />
             )}
-            <span className="text-sm font-medium hidden xl:inline">
-              {isSaving ? 'Saving...' : 'Save'}
-            </span>
+            {!isCompact && (
+              <span className="text-sm font-medium">
+                {isSaving ? 'Saving...' : 'Save'}
+              </span>
+            )}
           </button>
         )}
-        {!readOnly && (
+        {!isCompact && !readOnly && (
           <button
             onClick={() => {
               // Tidy: dagre topological layout for multi-branch canvases.
@@ -487,13 +520,14 @@ export const Toolbar: React.FC = () => {
             disabled={isRunning || nodes.length === 0}
             title="Auto-arrange nodes left-to-right by data flow"
             aria-label="Tidy: auto-arrange nodes"
-            className="hidden xl:flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md shadow-sm hover:bg-accent transition-colors disabled:opacity-50"
           >
             <Wand2 className="w-4 h-4" />
-            <span className="text-sm font-medium hidden xl:inline">Tidy</span>
+            <span className="text-sm font-medium">Tidy</span>
           </button>
         )}
-        <div className="relative hidden xl:block" ref={exportMenuRef}>
+        {!isCompact && (
+        <div className="relative" ref={exportMenuRef}>
           <button
             onClick={() => setShowExportMenu((v) => !v)}
             disabled={isExporting || nodes.length === 0}
@@ -508,7 +542,7 @@ export const Toolbar: React.FC = () => {
             ) : (
               <Download className="w-4 h-4" />
             )}
-            <span className="text-sm font-medium hidden xl:inline">Export</span>
+            <span className="text-sm font-medium">Export</span>
             <ChevronDown className="w-3 h-3" />
           </button>
           {showExportMenu && (
@@ -538,6 +572,7 @@ export const Toolbar: React.FC = () => {
             </div>
           )}
         </div>
+        )}
         {!readOnly && hasMultipleBranches && (
           <button
             onClick={() => { void handleRunAll(); }}

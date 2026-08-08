@@ -9,7 +9,8 @@ const reset = () =>
     taskType: '',
     excludedColsDraft: [],
     excludedColsApplied: [],
-    filters: [],
+    filtersDraft: [],
+    filtersApplied: [],
     scatter: { x: '', y: '', z: '', color: '', is3D: false, isPCA3D: false },
   });
 
@@ -82,20 +83,20 @@ describe('useEDAStore — exclude draft/applied workflow', () => {
 describe('useEDAStore — filters', () => {
   beforeEach(reset);
 
-  it('addFilter / removeFilter / clearFilters', () => {
+  it('addFilterDraft / removeFilterDraft / clearFiltersDraft', () => {
     const f1: EDAFilter = { column: 'age', operator: '>=', value: 18 };
     const f2: EDAFilter = { column: 'city', operator: '==', value: 'NY' };
 
-    const { addFilter, removeFilter, clearFilters } = useEDAStore.getState();
-    addFilter(f1);
-    addFilter(f2);
-    expect(useEDAStore.getState().filters).toEqual([f1, f2]);
+    const { addFilterDraft, removeFilterDraft, clearFiltersDraft } = useEDAStore.getState();
+    addFilterDraft(f1);
+    addFilterDraft(f2);
+    expect(useEDAStore.getState().filtersDraft).toEqual([f1, f2]);
 
-    removeFilter(0);
-    expect(useEDAStore.getState().filters).toEqual([f2]);
+    removeFilterDraft(0);
+    expect(useEDAStore.getState().filtersDraft).toEqual([f2]);
 
-    clearFilters();
-    expect(useEDAStore.getState().filters).toEqual([]);
+    clearFiltersDraft();
+    expect(useEDAStore.getState().filtersDraft).toEqual([]);
   });
 });
 
@@ -125,7 +126,7 @@ describe('useEDAStore — resetForDataset', () => {
     s.setTargetCol('y');
     s.toggleExclude('a', true);
     s.applyExcluded();
-    s.addFilter({ column: 'x', operator: '>', value: 0 });
+    s.addFilterDraft({ column: 'x', operator: '>', value: 0 });
     s.setScatter({ x: 'lat', y: 'lon', is3D: true });
     s.setActiveTab('variables');
 
@@ -136,7 +137,8 @@ describe('useEDAStore — resetForDataset', () => {
     expect(next.targetCol).toBe('');
     expect(next.excludedColsDraft).toEqual([]);
     expect(next.excludedColsApplied).toEqual([]);
-    expect(next.filters).toEqual([]);
+    expect(next.filtersDraft).toEqual([]);
+    expect(next.filtersApplied).toEqual([]);
     expect(next.scatter).toEqual({
       x: '',
       y: '',

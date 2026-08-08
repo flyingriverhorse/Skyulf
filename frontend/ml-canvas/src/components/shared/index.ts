@@ -12,3 +12,5 @@ export { ErrorBoundary } from './ErrorBoundary';
 export type { ErrorBoundaryProps } from './ErrorBoundary';
 export { ConfirmProvider, useConfirm } from './ConfirmDialog';
 export type { ConfirmOptions, ConfirmVariant } from './ConfirmDialog';
+export { RecordLink } from './RecordLink';
+export type { RecordLinkProps } from './RecordLink';

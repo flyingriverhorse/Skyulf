@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 import type { EDAProfile } from '../../core/types/edaProfile';
+import { FormField } from '../ui/FormField';
 
 type FilterValue = string | number | boolean | Array<string | number>;
 
@@ -33,18 +34,29 @@ interface FilterItem {
     value: FilterValue;
 }
 
+const filterSignature = (filter: FilterItem): string =>
+    `${filter.column}\u001f${filter.operator}\u001f${JSON.stringify(filter.value)}`;
+
+const areFilterListsEqual = (left: FilterItem[], right: FilterItem[]): boolean => {
+    if (left.length !== right.length) return false;
+    return left.every((filter, index) => filterSignature(filter) === filterSignature(right[index]!));
+};
+
 interface EDASidebarProps {
     activeTab: string;
     setActiveTab: (tab: string) => void;
     profile: EDAProfile;
-    filters: FilterItem[];
+    filtersDraft: FilterItem[];
+    filtersApplied: FilterItem[];
+    filtersDirty: boolean;
     columns: string[];
     excludedCols: string[];
     excludedDirty: boolean;
     analyzing: boolean;
     onAddFilter: (column: string, value: FilterValue, operator: string) => void;
     onRemoveFilter: (index: number) => void;
-    onClearFilters: () => void;
+    onResetFilters: () => void;
+    onApplyFilters: () => void;
     onToggleExclude: (column: string, exclude: boolean) => void;
     onApplyExcluded: () => void;
 }
@@ -53,14 +65,17 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
     activeTab,
     setActiveTab,
     profile,
-    filters,
+    filtersDraft,
+    filtersApplied,
+    filtersDirty,
     columns,
     excludedCols,
     excludedDirty,
     analyzing,
     onAddFilter,
     onRemoveFilter,
-    onClearFilters,
+    onResetFilters,
+    onApplyFilters,
     onToggleExclude,
     onApplyExcluded
 }) => {
@@ -73,21 +88,44 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
     const [newFilterCol, setNewFilterCol] = useState('');
     const [newFilterOp, setNewFilterOp] = useState('==');
     const [newFilterVal, setNewFilterVal] = useState('');
+    const [filterValidationAttempted, setFilterValidationAttempted] = useState(false);
 
     // Exclusion Form State
     const [isAddingExclusion, setIsAddingExclusion] = useState(false);
 
+    const isComparisonOperator = ['>', '<', '>=', '<='].includes(newFilterOp);
+    const parsedFilterValue = Number(newFilterVal);
+    const hasFilterColumn = newFilterCol.trim().length > 0;
+    const hasFilterOperator = newFilterOp.trim().length > 0;
+    const hasFilterValue = newFilterVal.trim().length > 0;
+    const isNumericFilterValue = Number.isFinite(parsedFilterValue);
+
+    const currentFilterValueError = !hasFilterValue
+        ? 'Enter a filter value'
+        : isComparisonOperator && !isNumericFilterValue
+            ? `${newFilterOp === '>' ? 'Greater than' : newFilterOp === '<' ? 'Less than' : newFilterOp === '>=' ? 'Greater than or equal to' : 'Less than or equal to'} needs a numeric value`
+            : '';
+
+    const columnError = filterValidationAttempted && !hasFilterColumn ? 'Choose a filter column' : '';
+    const operatorError = filterValidationAttempted && !hasFilterOperator ? 'Choose a filter operator' : '';
+    const valueError = filterValidationAttempted && currentFilterValueError ? currentFilterValueError : '';
+
+    const draftFiltersDirty = filtersDirty || !areFilterListsEqual(filtersDraft, filtersApplied);
+
     const handleAddFilterSubmit = () => {
-        if (newFilterCol && newFilterVal) {
-            onAddFilter(
-                newFilterCol,
-                isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal),
-                newFilterOp
-            );
-            setIsAddingFilter(false);
-            setNewFilterCol('');
-            setNewFilterVal('');
-        }
+        setFilterValidationAttempted(true);
+        if (!hasFilterColumn || !hasFilterOperator || !hasFilterValue || currentFilterValueError) return;
+
+        onAddFilter(
+            newFilterCol,
+            isComparisonOperator ? Number(newFilterVal) : isNaN(Number(newFilterVal)) ? newFilterVal : Number(newFilterVal),
+            newFilterOp
+        );
+        setIsAddingFilter(false);
+        setFilterValidationAttempted(false);
+        setNewFilterCol('');
+        setNewFilterOp('==');
+        setNewFilterVal('');
     };
 
     const groups = [
@@ -146,69 +184,134 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                             onClick={() => setShowFilters(!showFilters)}
                             className="flex items-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider hover:text-gray-700 dark:hover:text-gray-300"
                         >
-                            <span>Active Filters ({filters.length})</span>
+                            <span>Draft Filters ({filtersDraft.length})</span>
                             {showFilters ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
                         </button>
-                        {filters.length > 0 && (
-                            <button
-                                onClick={onClearFilters}
-                                className="text-[10px] text-red-500 hover:text-red-700 hover:underline"
-                            >
-                                Clear All
-                            </button>
+                        {filtersDirty && (
+                            <span className="text-[10px] font-medium rounded-full bg-amber-100 text-amber-800 px-2 py-0.5">
+                                Pending
+                            </span>
                         )}
                     </div>
 
                     {showFilters && (
                         <div className="space-y-2">
-                            {filters.map((filter, idx) => (
-                                <div key={idx} className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded px-2 py-1 text-xs">
-                                    <div className="truncate max-w-[140px]">
-                                        <span className="font-medium text-blue-700 dark:text-blue-300">{filter.column}</span>
-                                        <span className="mx-1 text-gray-500 dark:text-gray-400">{filter.operator}</span>
-                                        <span className="text-gray-600 dark:text-gray-400">{String(filter.value)}</span>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                Report uses {filtersApplied.length} applied filter{filtersApplied.length === 1 ? '' : 's'} until you apply draft changes.
+                            </p>
+
+                            {filtersDraft.length > 0 ? (
+                                filtersDraft.map((filter, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`flex items-center justify-between rounded px-2 py-1 text-xs border ${
+                                            filtersDirty
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-800'
+                                                : 'bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700'
+                                        }`}
+                                    >
+                                        <div className="truncate max-w-[140px]">
+                                            <span className="font-medium text-blue-700 dark:text-blue-300">{filter.column}</span>
+                                            <span className="mx-1 text-gray-500 dark:text-gray-400">{filter.operator}</span>
+                                            <span className="text-gray-600 dark:text-gray-400">{String(filter.value)}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => onRemoveFilter(idx)}
+                                            className="text-gray-400 dark:text-gray-500 hover:text-red-500"
+                                            aria-label={`Remove filter ${idx + 1}`}
+                                            disabled={analyzing}
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
                                     </div>
-                                    <button onClick={() => onRemoveFilter(idx)} className="text-gray-400 dark:text-gray-500 hover:text-red-500">
-                                        <X className="w-3 h-3" />
-                                    </button>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <p className="text-xs text-gray-400 dark:text-gray-500">No draft filters yet.</p>
+                            )}
 
                             {isAddingFilter ? (
                                 <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 space-y-2 shadow-sm">
-                                    <select
-                                        value={newFilterCol}
-                                        onChange={(e) => setNewFilterCol(e.target.value)}
-                                        className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
+                                    <FormField
+                                        label="Filter column"
+                                        hideLabel
+                                        required
+                                        {...(filterValidationAttempted ? { error: columnError } : {})}
                                     >
-                                        <option value="" disabled>Column</option>
-                                        {columns.map(col => <option key={col} value={col}>{col}</option>)}
-                                    </select>
+                                        {(field) => (
+                                            <select
+                                                {...field}
+                                                value={newFilterCol}
+                                                onChange={(e) => setNewFilterCol(e.target.value)}
+                                                className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
+                                            >
+                                                <option value="" disabled>Column</option>
+                                                {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+                                            </select>
+                                        )}
+                                    </FormField>
                                     <div className="flex gap-1">
-                                        <select
-                                            value={newFilterOp}
-                                            onChange={(e) => setNewFilterOp(e.target.value)}
-                                            className="w-1/3 text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
+                                        <FormField
+                                            label="Filter operator"
+                                            hideLabel
+                                            required
+                                            className="w-1/3"
+                                            {...(filterValidationAttempted ? { error: operatorError } : {})}
                                         >
-                                            <option value="==">==</option>
-                                            <option value="!=">!=</option>
-                                            <option value=">">&gt;</option>
-                                            <option value="<">&lt;</option>
-                                            <option value=">=">&gt;=</option>
-                                            <option value="<=">&lt;=</option>
-                                        </select>
-                                        <input
-                                            type="text"
-                                            value={newFilterVal}
-                                            onChange={(e) => setNewFilterVal(e.target.value)}
-                                            placeholder="Value"
-                                            className="w-2/3 text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddFilterSubmit()}
-                                        />
+                                            {(field) => (
+                                                <select
+                                                    {...field}
+                                                    value={newFilterOp}
+                                                    onChange={(e) => setNewFilterOp(e.target.value)}
+                                                    className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
+                                                >
+                                                    <option value="==">==</option>
+                                                    <option value="!=">!=</option>
+                                                    <option value=">">&gt;</option>
+                                                    <option value="<">&lt;</option>
+                                                    <option value=">=">&gt;=</option>
+                                                    <option value="<=">&lt;=</option>
+                                                </select>
+                                            )}
+                                        </FormField>
+                                        <FormField
+                                            label="Filter value"
+                                            hideLabel
+                                            required
+                                            className="w-2/3"
+                                            {...(filterValidationAttempted ? { error: valueError } : {})}
+                                        >
+                                            {(field) => (
+                                                <input
+                                                    {...field}
+                                                    type="text"
+                                                    value={newFilterVal}
+                                                    onChange={(e) => setNewFilterVal(e.target.value)}
+                                                    placeholder="Value"
+                                                    className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleAddFilterSubmit()}
+                                                />
+                                            )}
+                                        </FormField>
                                     </div>
                                     <div className="flex justify-end gap-2">
-                                        <button onClick={() => setIsAddingFilter(false)} className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">Cancel</button>
-                                        <button onClick={handleAddFilterSubmit} className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700">Add</button>
+                                        <button
+                                            onClick={() => {
+                                                setIsAddingFilter(false);
+                                                setFilterValidationAttempted(false);
+                                                setNewFilterCol('');
+                                                setNewFilterOp('==');
+                                                setNewFilterVal('');
+                                            }}
+                                            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleAddFilterSubmit}
+                                            className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                                        >
+                                            Save draft
+                                        </button>
                                     </div>
                                 </div>
                             ) : (
@@ -219,6 +322,31 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                     <Plus className="w-3 h-3 mr-1" /> Add Filter
                                 </button>
                             )}
+
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    onClick={onResetFilters}
+                                    disabled={!draftFiltersDirty || analyzing}
+                                    className={`flex-1 text-xs px-2 py-1 rounded border transition-colors ${
+                                        !draftFiltersDirty || analyzing
+                                            ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                            : 'bg-white dark:bg-gray-900 text-gray-600 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                    }`}
+                                >
+                                    Reset filters
+                                </button>
+                                <button
+                                    onClick={onApplyFilters}
+                                    disabled={!draftFiltersDirty || analyzing}
+                                    className={`flex-1 text-xs px-2 py-1 rounded border transition-colors ${
+                                        draftFiltersDirty && !analyzing
+                                            ? 'bg-blue-600 text-white border-blue-700 hover:bg-blue-700'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                    }`}
+                                >
+                                    Apply filters
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -264,6 +392,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                             {isAddingExclusion ? (
                                 <div className="bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 space-y-2 shadow-sm">
                                     <select
+                                        aria-label="Column to exclude from analysis"
                                         className="w-full text-xs rounded border-gray-300 dark:border-gray-600 dark:bg-gray-800 p-1"
                                         onChange={(e) => {
                                             if (e.target.value) {

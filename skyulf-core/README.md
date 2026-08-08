@@ -276,14 +276,14 @@ from skyulf import EDAAnalyzer, EDAVisualizer
 
 df = pl.read_csv("data.csv")
 profile = EDAAnalyzer(df).analyze(
-    target_col="target",  # Optional: unlocks target-association analysis
+    target_col="target",   # Optional: unlocks target-association analysis
     date_col="timestamp",  # Optional: unlocks temporal analysis
-    lat_col="latitude",  # Optional: unlocks geospatial analysis
-    lon_col="longitude",  # Optional
+    lat_col="latitude",    # Optional: unlocks geospatial analysis
+    lon_col="longitude",   # Optional
 )
 
 EDAVisualizer(profile, df).summary()  # Rich terminal dashboard (skyulf-core[viz])
-EDAVisualizer(profile, df).plot()  # Matplotlib figures (skyulf-core[viz])
+EDAVisualizer(profile, df).plot()     # Matplotlib figures (skyulf-core[viz])
 ```
 
 Everything the visualizer renders is also available as plain data on

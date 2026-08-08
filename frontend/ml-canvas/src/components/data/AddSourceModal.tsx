@@ -19,14 +19,26 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   const [secretAccessKey, setSecretAccessKey] = useState('');
   const [regionName, setRegionName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Tracks whether the user has attempted a submit, so required-field
+  // errors only appear after a real attempt rather than as the user is
+  // still typing their first character.
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Mutation owns the loading state + invalidates the dataset list cache on success.
   const createMutation = useCreateDataSource();
   const loading = createMutation.isPending;
 
+  const nameMissing = submitAttempted && name.trim() === '';
+  const s3PathMissing = submitAttempted && type === 's3' && s3Path.trim() === '';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSubmitAttempted(true);
+
+    if (name.trim() === '' || (type === 's3' && s3Path.trim() === '')) {
+      return;
+    }
 
     try {
       const config: Record<string, unknown> = {};
@@ -60,9 +72,16 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
   return (
     <ModalShell isOpen={isOpen} onClose={onClose} title="Add Data Source" size="md">
       <div className="p-4">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+            Connects a remote source that Skyulf re-reads on demand. Amazon S3 is the only
+            connected source type today — for a local file, use{' '}
+            <span className="font-medium text-slate-700 dark:text-slate-300">Upload File</span> on
+            the Data Sources page instead.
+          </p>
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setType('s3'); }}
+              aria-pressed={type === 's3'}
               className={`flex-1 py-2 px-4 rounded-md flex items-center justify-center gap-2 border ${
                 type === 's3'
                   ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/20 dark:border-blue-400 dark:text-blue-400'
@@ -73,37 +92,66 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             </button>
           </div>
 
-          <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
+          <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4" noValidate>
             <div>
-              <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</span>
+              <label htmlFor="add-source-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Name
+              </label>
               <input
+                id="add-source-name"
                 type="text"
                 required
                 value={name}
                 onChange={(e) => { setName(e.target.value); }}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                aria-invalid={nameMissing}
+                aria-describedby={nameMissing ? 'add-source-name-error' : undefined}
+                className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 ${
+                  nameMissing
+                    ? 'border-red-400 dark:border-red-600'
+                    : 'border-slate-300 dark:border-slate-600'
+                }`}
                 placeholder="My Dataset"
               />
+              {nameMissing && (
+                <p id="add-source-name-error" role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  Name is required.
+                </p>
+              )}
             </div>
 
             {type === 's3' && (
               <div className="space-y-4">
                 <div>
-                  <span className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">S3 Path</span>
+                  <label htmlFor="add-source-s3-path" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                    S3 Path
+                  </label>
                   <input
+                    id="add-source-s3-path"
                     type="text"
                     required
                     value={s3Path}
                     onChange={(e) => { setS3Path(e.target.value); }}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500"
+                    aria-invalid={s3PathMissing}
+                    aria-describedby={s3PathMissing ? 'add-source-s3-path-error' : undefined}
+                    className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 ${
+                      s3PathMissing
+                        ? 'border-red-400 dark:border-red-600'
+                        : 'border-slate-300 dark:border-slate-600'
+                    }`}
                     placeholder="s3://my-bucket/path/to/data.parquet"
                   />
+                  {s3PathMissing && (
+                    <p id="add-source-s3-path-error" role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                      S3 Path is required.
+                    </p>
+                  )}
                 </div>
 
                 <div className="border border-slate-200 dark:border-slate-700 rounded-md overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setShowCredentials(!showCredentials)}
+                    aria-expanded={showCredentials}
                     className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
                     <div className="flex items-center gap-2">
@@ -121,8 +169,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Access Key ID</span>
+                          <label htmlFor="add-source-access-key" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                            Access Key ID
+                          </label>
                           <input
+                            id="add-source-access-key"
                             type="text"
                             name="aws_access_key_id"
                             value={accessKeyId}
@@ -132,8 +183,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           />
                         </div>
                         <div>
-                          <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Secret Access Key</span>
+                          <label htmlFor="add-source-secret-key" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                            Secret Access Key
+                          </label>
                           <input
+                            id="add-source-secret-key"
                             type="password"
                             name="aws_secret_access_key"
                             value={secretAccessKey}
@@ -143,8 +197,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
                           />
                         </div>
                         <div className="col-span-2">
-                          <span className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Region</span>
+                          <label htmlFor="add-source-region" className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                            Region
+                          </label>
                           <input
+                            id="add-source-region"
                             type="text"
                             name="region_name"
                             value={regionName}
@@ -161,7 +218,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({ isOpen, onClose,
             )}
 
             {error && (
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-md">
+              <div role="alert" className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-md">
                 {error}
               </div>
             )}

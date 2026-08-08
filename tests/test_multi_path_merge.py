@@ -106,7 +106,8 @@ class TestResolveAllInputs:
         assert len(result) == 1
         assert isinstance(result[0], pd.DataFrame)
 
-    def test_multiple_inputs_ordered(self, engine, artifact_store):
+    def test_multiple_inputs_preserve_edge_order(self, engine, artifact_store):
+        """Unrelated sibling inputs keep the user's edge order, which last-wins depends on."""
         df1 = pd.DataFrame({"a": [1, 2]})
         df2 = pd.DataFrame({"b": [3, 4]})
         artifact_store.save("node_a", df1)
@@ -115,13 +116,38 @@ class TestResolveAllInputs:
         node = NodeConfig(
             node_id="test_node",
             step_type=StepType.TRAINING,
-            inputs=["node_b", "node_a"],  # Out of topo order
+            inputs=["node_b", "node_a"],
         )
-        engine._topo_order = {"node_a": 0, "node_b": 1, "test_node": 2}
+        engine._node_configs = {
+            "node_a": NodeConfig(node_id="node_a", step_type=StepType.DATA_LOADER, inputs=[]),
+            "node_b": NodeConfig(node_id="node_b", step_type=StepType.DATA_LOADER, inputs=[]),
+            "test_node": node,
+        }
 
         result = engine._resolve_all_inputs(node)
         assert len(result) == 2
-        # Should be sorted by topo order: node_a first, then node_b
+        assert list(result[0].columns) == ["b"]
+        assert list(result[1].columns) == ["a"]
+
+    def test_ancestor_input_is_applied_before_its_descendant(self, engine, artifact_store):
+        """A redundant ancestor edge must not overwrite its own descendant under last-wins."""
+        artifact_store.save("ancestor", pd.DataFrame({"a": [1, 2]}))
+        artifact_store.save("descendant", pd.DataFrame({"b": [3, 4]}))
+
+        node = NodeConfig(
+            node_id="test_node",
+            step_type=StepType.TRAINING,
+            inputs=["descendant", "ancestor"],
+        )
+        engine._node_configs = {
+            "ancestor": NodeConfig(node_id="ancestor", step_type=StepType.DATA_LOADER, inputs=[]),
+            "descendant": NodeConfig(
+                node_id="descendant", step_type="MinMaxScaler", inputs=["ancestor"]
+            ),
+            "test_node": node,
+        }
+
+        result = engine._resolve_all_inputs(node)
         assert list(result[0].columns) == ["a"]
         assert list(result[1].columns) == ["b"]
 

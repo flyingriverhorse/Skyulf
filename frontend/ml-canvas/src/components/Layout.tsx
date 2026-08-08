@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp, Bug, Timer, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Database, Rocket, GitBranch, Moon, Sun, Archive, BarChart2, Activity, TrendingUp, Bug, Timer, ScrollText, Menu, X } from 'lucide-react';
 import { monitoringApi } from '../core/api/monitoring';
+import { useViewport } from '../core/hooks/useViewport';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
@@ -11,12 +12,51 @@ export const Layout: React.FC = () => {
   });
   const [driftAlert, setDriftAlert] = useState(false);
   const [errorAlert, setErrorAlert] = useState(false);
+  // Below 768 px the fixed 256/64 px sidebar leaves too little room for
+  // page content (FND-001), so it becomes an off-canvas drawer instead of
+  // a persistent column at these widths.
+  const { isMobile } = useViewport();
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     // Inline script in index.html already applied the right class before mount;
     // this effect only keeps state in sync if something else mutated the class.
     setIsDarkMode(document.documentElement.classList.contains('dark'));
   }, []);
+
+  // Close the drawer on route change (a nav click just navigated away, so
+  // there's nothing left to show it for) and whenever the viewport grows
+  // back to a size where the sidebar is a persistent column again.
+  useEffect(() => {
+    setIsDrawerOpen(false);
+  }, [location.pathname]);
+  useEffect(() => {
+    if (!isMobile) setIsDrawerOpen(false);
+  }, [isMobile]);
+
+  // Escape closes the drawer and returns focus to the button that opened
+  // it; focus moves into the drawer's first link on open so keyboard and
+  // screen-reader users land somewhere useful. This is a minimal, self-
+  // contained version of the containment behavior FND-002 will later make
+  // a shared contract across every shell overlay.
+  useEffect(() => {
+    if (!isDrawerOpen) return;
+    const raf = window.requestAnimationFrame(() => {
+      asideRef.current?.querySelector<HTMLAnchorElement>('a[href]')?.focus();
+    });
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const openerButton = menuButtonRef.current;
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('keydown', onKeyDown);
+      openerButton?.focus();
+    };
+  }, [isDrawerOpen]);
 
   useEffect(() => {
     monitoringApi.getDriftStatus()
@@ -58,18 +98,50 @@ export const Layout: React.FC = () => {
   };
 
   const isActive = (path: string) => location.pathname === path;
-  const isCollapsed = location.pathname === '/canvas' || location.pathname === '/eda';
+  // The icon-only rail only makes sense as a desktop space-saving choice on
+  // Canvas/EDA; at mobile widths the sidebar is an off-canvas drawer instead
+  // (see isMobile below), so it always renders at full width when opened.
+  const isCollapsed = !isMobile && (location.pathname === '/canvas' || location.pathname === '/eda');
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-      {/* Sidebar */}
-      <aside className={`${isCollapsed ? 'w-16' : 'w-64'} bg-slate-900 dark:bg-slate-950 text-white flex flex-col shrink-0 transition-all duration-200`}>
-        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-b border-slate-800 dark:border-slate-900 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-lg shrink-0 shadow-lg shadow-blue-900/20">S</div>
-          {!isCollapsed && (
-            <h1 className="text-xl font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-              Skyulf ML
-            </h1>
+      {isMobile && isDrawerOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-30"
+          aria-hidden="true"
+          onClick={() => setIsDrawerOpen(false)}
+        />
+      )}
+      {/* Sidebar: a persistent column at 768 px+, an off-canvas drawer below it (FND-001). */}
+      <aside
+        ref={asideRef}
+        id="app-sidebar"
+        role={isMobile ? 'dialog' : undefined}
+        aria-modal={isMobile ? true : undefined}
+        aria-label={isMobile ? 'Navigation menu' : undefined}
+        className={`${
+          isMobile
+            ? `fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 ${isDrawerOpen ? 'translate-x-0' : '-translate-x-full'}`
+            : `${isCollapsed ? 'w-16' : 'w-64'} shrink-0 transition-all duration-200`
+        } bg-slate-900 dark:bg-slate-950 text-white flex flex-col`}
+      >
+        <div className={`${isCollapsed ? 'p-4' : 'p-6'} border-b border-slate-800 dark:border-slate-900 flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} ${isMobile ? 'justify-between' : ''}`}>
+          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold text-lg shrink-0 shadow-lg shadow-blue-900/20">S</div>
+            {!isCollapsed && (
+              <h1 className="text-xl font-bold tracking-tight whitespace-nowrap bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                Skyulf ML
+              </h1>
+            )}
+          </div>
+          {isMobile && (
+            <button
+              onClick={() => setIsDrawerOpen(false)}
+              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
+              aria-label="Close navigation menu"
+            >
+              <X size={20} />
+            </button>
           )}
         </div>
 
@@ -123,8 +195,29 @@ export const Layout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <Outlet />
+      <main className="flex-1 overflow-auto min-w-0 flex flex-col">
+        {isMobile && (
+          <div className="h-14 shrink-0 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center px-2 sticky top-0 z-20">
+            <button
+              ref={menuButtonRef}
+              onClick={() => setIsDrawerOpen(true)}
+              className="p-3 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
+              aria-label="Open navigation menu"
+              aria-expanded={isDrawerOpen}
+              aria-controls="app-sidebar"
+            >
+              <Menu size={20} />
+            </button>
+            <span className="ml-2 font-semibold text-slate-900 dark:text-slate-100">Skyulf ML</span>
+          </div>
+        )}
+        {/* min-h-0 lets this flex item shrink below its content's natural
+         * height instead of forcing `<main>` to grow past the mobile bar
+         * above it -- without it, Canvas's `h-full` root would compute
+         * against `<main>`'s full height and overflow past the sticky bar. */}
+        <div className="flex-1 min-h-0">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
