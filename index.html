@@ -866,6 +866,46 @@ pipeline.save(<span class="text-amber-300">"tumour.pkl"</span>)</code></pre>
         </div>
     </section>
 
+    <!-- Evidence Section -->
+    <section id="evidence" class="py-16 bg-slate-900/40 border-y border-slate-800 relative overflow-hidden">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-3">Claims are cheap. Here is the evidence.</h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">Every number here comes from the repository, and the counts are yours to re-run.</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover-glow transition">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i data-feather="check-circle" class="w-5 h-5 text-emerald-400"></i>
+                        <h3 class="text-lg font-semibold text-white">Tested where it matters</h3>
+                    </div>
+                    <p class="text-slate-400 text-sm leading-relaxed">2,266 tests in the library, 1,089 in the backend and 661 in the canvas, plus browser tests that include an accessibility pass. Every pull request also runs lint, a type check, a JavaScript bundle-size budget and two Docker builds.</p>
+                </div>
+                <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover-glow transition">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i data-feather="activity" class="w-5 h-5 text-sky-400"></i>
+                        <h3 class="text-lg font-semibold text-white">Drift is measured four ways</h3>
+                    </div>
+                    <p class="text-slate-400 text-sm leading-relaxed">A shifted column is caught with the Kolmogorov-Smirnov test, Population Stability Index, Wasserstein distance and KL divergence, each with its own threshold, instead of one number that either fires or does not.</p>
+                </div>
+                <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover-glow transition">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i data-feather="shield" class="w-5 h-5 text-amber-400"></i>
+                        <h3 class="text-lg font-semibold text-white">Say what your data must look like</h3>
+                    </div>
+                    <p class="text-slate-400 text-sm leading-relaxed"> Available expectations <code class="text-amber-300">expect_columns_exist</code>, <code class="text-amber-300">expect_no_nulls</code>, <code class="text-amber-300">expect_value_range</code> and <code class="text-amber-300">expect_unique</code> stop the run with a clear <code class="text-amber-300">ExpectationError</code> before a bad column reaches a model. There is no second data-quality tool to install.</p>
+                </div>
+                <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 hover-glow transition">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i data-feather="grid" class="w-5 h-5 text-indigo-400"></i>
+                        <h3 class="text-lg font-semibold text-white">Start from a working pipeline</h3>
+                    </div>
+                    <p class="text-slate-400 text-sm leading-relaxed">Examples to give you idea is ready. Five templates drop a wired graph onto the canvas: Tabular Classification, Tabular Regression, Text Classification, Customer Segmentation and Ensemble Classification. You adjust instead of assemble.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- FAQ Section -->
     <section id="faq" class="py-16 relative overflow-hidden">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -945,7 +985,7 @@ pipeline.save(<span class="text-amber-300">"tumour.pkl"</span>)</code></pre>
                     </button>
                     <div class="hidden px-6 pb-4 pt-0">
                         <p class="text-slate-400 leading-relaxed">
-                            Skyulf is currently in <strong>Active Alpha</strong>. It is perfect for internal tools, research, and experimentation.
+                            It is perfect for internal tools, research, and experimentation.
                             We are working towards a stable v1.0 for critical production workloads.
                         </p>
                     </div>
