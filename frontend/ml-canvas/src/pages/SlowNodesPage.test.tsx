@@ -292,4 +292,33 @@ describe('SlowNodesPage — aggregate provenance, drill-down, and return state',
 
     expect(await screen.findByText('network down')).toBeInTheDocument();
   });
+
+  it('renders every step type in the results table, not just the first ones', async () => {
+    // Regression test: the page root previously forced a fixed `h-full` flex
+    // column with `overflow-auto`, which flex-shrunk the results table's
+    // `overflow-hidden` wrapper (its automatic min-height became 0) down to a
+    // couple of rows and clipped the rest instead of letting the page scroll.
+    const stepTypes = [
+      'Classification',
+      'Segmentation',
+      'Label Encoder',
+      'Data Loader',
+      'Missing Indicator',
+      'Train/Test Split',
+      'Feature/Target Split',
+      'Drop Missing Columns',
+      'General Transformation',
+      'Robust Scaler',
+    ];
+    const aggregates = stepTypes.map(step_type => aggregate({ step_type }));
+    vi.mocked(monitoringApi.getSlowNodes).mockResolvedValue(response(aggregates));
+    renderPage();
+
+    await screen.findByText('Classification');
+    const table = screen.getByRole('table');
+    for (const stepType of stepTypes) {
+      expect(within(table).getByText(stepType)).toBeInTheDocument();
+    }
+    expect(within(table).getAllByRole('row')).toHaveLength(stepTypes.length + 1);
+  });
 });

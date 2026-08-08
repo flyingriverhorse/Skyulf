@@ -187,7 +187,7 @@ export const SlowNodesPage: React.FC = () => {
     );
 
     return (
-        <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900 p-6 overflow-auto">
+        <div className="bg-gray-50 dark:bg-gray-900 p-6">
             <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
                 <div>
                     <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
