@@ -175,8 +175,8 @@ export const DropColumnsNode: NodeDefinition<DropColumnsConfig> = {
     return null;
   },
   validate: (config) => ({
-    isValid: config.columns.length > 0 || (config.missing_threshold !== undefined && config.missing_threshold > 0),
-    message: (config.columns.length === 0 && (!config.missing_threshold || config.missing_threshold === 0))
+    isValid: (config.columns?.length ?? 0) > 0 || ((config.missing_threshold ?? 0) > 0),
+    message: ((config.columns?.length ?? 0) === 0 && (!config.missing_threshold || config.missing_threshold === 0))
       ? 'Select columns or set a threshold'
       : undefined
   }),

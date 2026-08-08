@@ -91,7 +91,8 @@ test.describe('Run Preview happy path', () => {
             data: {
               definitionType: 'drop_missing_columns',
               catalogType: 'drop_missing_columns',
-              threshold: 0.5,
+              columns: ['sepal_width'],
+              missing_threshold: 0,
             },
           },
         ],
