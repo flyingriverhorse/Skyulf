@@ -2,6 +2,7 @@ import io
 import logging
 import re
 from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from typing import Any, Literal, cast
 
 import pandas as pd
@@ -25,8 +26,15 @@ from backend.database.models import (
     TrainingJob,
 )
 from backend.dependencies import get_db
-from backend.ml_pipeline._execution.graph_utils import extract_job_details
+from backend.ml_pipeline._execution.graph_utils import (
+    extract_job_details,
+    model_registry_tags,
+    resolve_model_family,
+)
+from backend.ml_pipeline._execution.utils import parse_branch_info, resolve_dataset_name
+from backend.ml_pipeline.constants import StepType
 from skyulf.profiling.drift import DriftCalculator
+from skyulf.registry import NodeRegistry as SkyulfRegistry
 
 router = APIRouter(prefix="/monitoring", tags=["Monitoring"])
 
@@ -1250,6 +1258,91 @@ def _clamp_slow_nodes_params(days: int, limit: int) -> tuple[int, int]:
     return days, limit
 
 
+# ---------------------------------------------------------------------------
+# Training-family resolution — the engine dispatches every canvas
+# Classification/Regression/Text Classification/Segmentation/Ensemble/generic
+# Training node under the single canonical `step_type: 'training'` (see
+# `pipelineConverter.ts`'s `ALL_TRAINING_DISPATCH_TYPES` collapse), which is
+# load-bearing for engine dispatch and must not change. This section resolves
+# the real model family purely for Slow Nodes *display*, mirroring the
+# frontend's `getTaskForModelType` (jobMeta.ts) precedence so both surfaces
+# agree on what each model_type means.
+# ---------------------------------------------------------------------------
+
+_TRAINING_FAMILY_LABELS: dict[str, str] = {
+    "classification": "Classification",
+    "regression": "Regression",
+    "text_classification": "Text Classification",
+    "segmentation": "Segmentation",
+    "ensemble": "Ensemble",
+}
+
+# Grouping key/label used when a legacy `training` run's model family can't
+# be resolved (malformed/missing graph node and no job.model_type) — an
+# honest fallback rather than silently mislabeling it as any other family.
+_UNRESOLVED_TRAINING_KEY = "training_unspecified"
+_UNRESOLVED_TRAINING_LABEL = "Training (unspecified)"
+
+
+@lru_cache(maxsize=1)
+def _step_type_registry_labels() -> dict[str, str]:
+    """Cache `{step_type_id: display_name}` for every known engine step, keyed by every alias.
+
+    Unlike `model_registry_tags()` (deduped via `_build_node_registry()`),
+    this reads `SkyulfRegistry.get_all_metadata()` directly so a
+    backward-compatible alias (e.g. `FeatureMath` for `FeatureGenerationNode`)
+    still resolves to its own registered display name rather than being
+    dropped by the dedup pass.
+    """
+    labels = {
+        node_id: str(meta.get("name") or node_id)
+        for node_id, meta in SkyulfRegistry.get_all_metadata().items()
+    }
+    labels[StepType.DATA_LOADER] = "Data Loader"
+    labels[_UNRESOLVED_TRAINING_KEY] = _UNRESOLVED_TRAINING_LABEL
+    return labels
+
+
+def _display_step_type(step: str) -> str:
+    """Resolve a raw `step_type` id to the human-readable label shown on Slow Nodes.
+
+    Prefers the skyulf-core registry's own display name — the same one the
+    Canvas node palette uses — so a step's label never drifts from what the
+    node is actually called. Falls back to a generic Title Case prettifier
+    only for identifiers with no registered definition (e.g. the internal
+    `feature_target_split` engine step or an already-resolved model family
+    name, for which the prettifier is a no-op).
+    """
+    return _step_type_registry_labels().get(step) or _humanize_step_type(step)
+
+
+def _resolve_training_step_type(job: Any, node_id: str, registry_tags: dict[str, list[str]]) -> str:
+    """Resolve the display step_type for a `training`-step timing entry.
+
+    First tries the node's own stored graph params (`algorithm`/`model_type`
+    on the matching node), falling back to the job row's own `model_type`
+    column when the graph lookup fails — this covers both new runs and
+    historical runs whose `node_timings` were already persisted with the
+    canonical `training` literal.
+    """
+    model_type: str | None = None
+    graph: dict[str, Any] = cast(dict[str, Any], getattr(job, "graph", None) or {})
+    node_map = _build_node_map(graph) if isinstance(graph, dict) else {}
+    entry = node_map.get(node_id)
+    if entry is not None:
+        _, params, _ = entry
+        candidate = params.get("algorithm") or params.get("model_type")
+        model_type = candidate if isinstance(candidate, str) else None
+    if not model_type:
+        job_model_type = getattr(job, "model_type", None)
+        model_type = job_model_type if isinstance(job_model_type, str) else None
+
+    family = resolve_model_family(model_type, registry_tags)
+    if family is None:
+        return _UNRESOLVED_TRAINING_KEY
+    return _TRAINING_FAMILY_LABELS[family]
+
+
 def _accumulate_node_timing(
     entry: Any,
     job: Any,
@@ -1260,7 +1353,13 @@ def _accumulate_node_timing(
 
     `job` supplies the run-level context (job/pipeline/dataset identity, and
     when the run finished) that a `SlowNodeRun` needs to be independently
-    addressable later, rather than only contributing a bare number.
+    addressable later, rather than only contributing a bare number. A raw
+    `training` step_type (the canonical engine dispatch value shared by every
+    training-family node) is resolved to its real model family here, purely
+    for display — see `_resolve_training_step_type`. Every step_type — model
+    families included — is then run through `_display_step_type()` so the
+    grouping key is always a consistent human-readable label rather than a
+    mix of raw PascalCase/snake_case ids and Title Case family names.
 
     Returns True if the entry contributed a run to the aggregates.
     """
@@ -1274,6 +1373,9 @@ def _accumulate_node_timing(
     if secs <= 0:
         return False
     node_id = str(entry.get("node_id") or "")
+    if step == StepType.TRAINING:
+        step = _resolve_training_step_type(job, node_id, model_registry_tags())
+    step = _display_step_type(step)
     by_step.setdefault(step, []).append(
         SlowNodeRun(
             job_id=str(job.id),
@@ -1600,3 +1702,269 @@ async def clear_pipeline_logs(
 
     await db.execute(sa_delete(PipelineRunLog))
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Node inspector — read-only detail from a job's stored graph snapshot
+# ---------------------------------------------------------------------------
+# Every job persists the graph exactly as it executed (`TrainingJob.graph`),
+# so a single node can be investigated from its run record without the
+# ML Canvas: this works even when the source pipeline was since edited or
+# deleted, or was never a saved pipeline at all (a `preview_*`/`*__branch_N`
+# synthetic run). Serves only from already-stored columns — never loads
+# model artifacts.
+
+
+class NodeNeighbor(BaseModel):
+    node_id: str
+    step_type: str
+    label: str
+
+
+class NodeInspectorDetail(BaseModel):
+    node_id: str
+    step_type: str
+    label: str
+    params: dict[str, Any]
+    upstream: list[NodeNeighbor]
+    downstream: list[NodeNeighbor]
+    execution_seconds: float | None = None
+    execution_status: str | None = None
+
+
+class NodeInspectorLogEntry(BaseModel):
+    level: str
+    message: str
+    run_at: str | None = None
+
+
+class NodeInspectorResponse(BaseModel):
+    job_id: str
+    node_id: str
+    node_found: bool
+    node: NodeInspectorDetail | None = None
+    pipeline_id: str
+    dataset_source_id: str
+    dataset_name: str | None = None
+    branch_index: int | None = None
+    run_mode: str
+    model_type: str
+    status: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    # True only for a synthetic run (`preview_*` / `*__branch_N`) that was
+    # never a saved, independently loadable pipeline.
+    is_synthetic_pipeline: bool
+    can_open_in_canvas: bool
+    recent_logs: list[NodeInspectorLogEntry] = []
+
+
+# A graph node entry as (step_type, params, upstream node ids).
+_GraphNodeEntry = tuple[str, dict[str, Any], list[str]]
+
+
+def _parse_inspector_node(node: dict[str, Any]) -> tuple[str, str, dict[str, Any], list[str]]:
+    """Parse one stored graph node into (node_id, step_type, params, upstream_ids).
+
+    Training-job graphs are always persisted in the internal
+    `{"node_id", "step_type", "params", "inputs"}` shape written by
+    `_build_branch_graph`; the legacy React Flow `{"id", "type", "data"}`
+    shape is also tolerated for older/rescued rows.
+    """
+    if "step_type" in node:
+        node_id = str(node.get("node_id") or "")
+        step_type = str(node.get("step_type") or "unknown")
+        params = node.get("params") or {}
+        inputs = node.get("inputs") or []
+    else:
+        node_id = str(node.get("id") or "")
+        step_type = str(node.get("type") or node.get("data", {}).get("catalogType") or "unknown")
+        params = (
+            node.get("data", {}).get("config")
+            or node.get("parameters")
+            or node.get("data", {})
+            or {}
+        )
+        inputs = node.get("inputs") or []
+    return (
+        node_id,
+        step_type,
+        dict(params) if isinstance(params, dict) else {},
+        list(inputs) if isinstance(inputs, list) else [],
+    )
+
+
+def _humanize_step_type(step_type: str) -> str:
+    """Turn a snake_case step type into a human label, e.g. `train_test_split` -> `Train Test Split`."""
+    label = step_type.replace("_", " ").replace("-", " ").strip().title()
+    return label or step_type
+
+
+def _build_node_map(graph: dict[str, Any]) -> dict[str, _GraphNodeEntry]:
+    """Index every node in a stored graph by id, tolerating malformed entries."""
+    nodes = graph.get("nodes") if isinstance(graph, dict) else None
+    node_map: dict[str, _GraphNodeEntry] = {}
+    if not isinstance(nodes, list):
+        return node_map
+    for raw in nodes:
+        if not isinstance(raw, dict):
+            continue
+        node_id, step_type, params, inputs = _parse_inspector_node(raw)
+        if node_id:
+            node_map[node_id] = (step_type, params, inputs)
+    return node_map
+
+
+def _build_node_neighbor(node_id: str, node_map: dict[str, _GraphNodeEntry]) -> NodeNeighbor:
+    """Build a `NodeNeighbor` for `node_id`, tolerating an id absent from the graph."""
+    entry = node_map.get(node_id)
+    step_type = entry[0] if entry else "unknown"
+    return NodeNeighbor(node_id=node_id, step_type=step_type, label=_humanize_step_type(step_type))
+
+
+def _find_downstream_ids(node_id: str, node_map: dict[str, _GraphNodeEntry]) -> list[str]:
+    """Every node whose `inputs` names `node_id` — i.e. `node_id`'s downstream neighbours."""
+    return [nid for nid, (_, _, inputs) in node_map.items() if node_id in inputs]
+
+
+def _is_synthetic_pipeline(pipeline_id: str) -> bool:
+    """True for a `preview_*` run or a `*__branch_N` split of one — never a saved pipeline."""
+    parent, _ = parse_branch_info(pipeline_id)
+    root = parent or pipeline_id
+    return root.startswith("preview_")
+
+
+def _extract_node_execution(
+    metrics: dict[str, Any], node_id: str
+) -> tuple[float | None, str | None]:
+    """Look up `node_id`'s recorded execution time/status from `metrics.node_timings`."""
+    timings = metrics.get("node_timings") if isinstance(metrics, dict) else None
+    if not isinstance(timings, list):
+        return None, None
+    for entry in timings:
+        if not isinstance(entry, dict) or str(entry.get("node_id")) != node_id:
+            continue
+        try:
+            seconds = float(entry.get("execution_time"))
+        except (TypeError, ValueError):
+            seconds = None
+        status = entry.get("status")
+        return seconds, status if isinstance(status, str) else None
+    return None, None
+
+
+async def _build_node_inspector_response(
+    db: AsyncSession, job: TrainingJob, node_id: str
+) -> NodeInspectorResponse:
+    """Build a read-only node-inspector payload from `job`'s stored graph snapshot.
+
+    Sourced entirely from `job.graph`/`job.metrics` — the graph exactly as it
+    executed — never from live canvas/pipeline state, so investigation works
+    even when the source pipeline was edited, deleted, or never saved.
+    """
+    graph: dict[str, Any] = cast(dict[str, Any], job.graph or {})
+    node_map = _build_node_map(graph)
+    entry = node_map.get(node_id)
+
+    node_detail: NodeInspectorDetail | None = None
+    if entry is not None:
+        step_type, params, inputs = entry
+        metrics: dict[str, Any] = cast(dict[str, Any], job.metrics or {})
+        execution_seconds, execution_status = _extract_node_execution(metrics, node_id)
+        node_detail = NodeInspectorDetail(
+            node_id=node_id,
+            step_type=step_type,
+            label=_humanize_step_type(step_type),
+            params=params,
+            upstream=[_build_node_neighbor(nid, node_map) for nid in inputs if nid],
+            downstream=[
+                _build_node_neighbor(nid, node_map)
+                for nid in _find_downstream_ids(node_id, node_map)
+            ],
+            execution_seconds=execution_seconds,
+            execution_status=execution_status,
+        )
+
+    dataset_name = await resolve_dataset_name(db, job.dataset_source_id)
+
+    log_stmt = (
+        select(PipelineRunLog)
+        .where(PipelineRunLog.pipeline_id == job.pipeline_id, PipelineRunLog.node_id == node_id)
+        .order_by(PipelineRunLog.run_at.desc())
+        .limit(10)
+    )
+    log_rows = (await db.execute(log_stmt)).scalars().all()
+    recent_logs = [
+        NodeInspectorLogEntry(
+            level=row.level,
+            message=row.message,
+            run_at=row.run_at.isoformat() if row.run_at else None,
+        )
+        for row in log_rows
+    ]
+
+    job_metadata: dict[str, Any] = cast(dict[str, Any], job.job_metadata or {})
+    branch_index = job_metadata.get("branch_index") if isinstance(job_metadata, dict) else None
+    is_synthetic = _is_synthetic_pipeline(job.pipeline_id)
+
+    return NodeInspectorResponse(
+        job_id=str(job.id),
+        node_id=node_id,
+        node_found=node_detail is not None,
+        node=node_detail,
+        pipeline_id=job.pipeline_id,
+        dataset_source_id=job.dataset_source_id,
+        dataset_name=dataset_name,
+        branch_index=branch_index if isinstance(branch_index, int) else None,
+        run_mode=job.run_mode,
+        model_type=job.model_type,
+        status=job.status,
+        started_at=job.started_at.isoformat() if job.started_at else None,
+        finished_at=job.finished_at.isoformat() if job.finished_at else None,
+        is_synthetic_pipeline=is_synthetic,
+        can_open_in_canvas=not is_synthetic,
+        recent_logs=recent_logs,
+    )
+
+
+@router.get("/jobs/{job_id}/nodes/{node_id}", response_model=NodeInspectorResponse)
+async def get_job_node(
+    job_id: str,
+    node_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> NodeInspectorResponse:
+    """Read-only inspector snapshot for one node from a job's executed graph.
+
+    Serves entirely from the job's stored `graph`/`metrics` columns — never
+    loads model artifacts — so a node can be investigated from any
+    operational surface (Error Log, Slow Nodes, Jobs) without the pipeline
+    being currently open (or even still existing) on the canvas.
+    """
+    stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+    job = (await db.execute(stmt)).scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    return await _build_node_inspector_response(db, job, node_id)
+
+
+@router.get("/pipeline-runs/{pipeline_id}/nodes/{node_id}", response_model=NodeInspectorResponse)
+async def get_pipeline_run_node(
+    pipeline_id: str,
+    node_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> NodeInspectorResponse:
+    """Same as `get_job_node`, resolved from the most recent job for `pipeline_id`.
+
+    Used when the caller only has a `pipeline_id` (e.g. a pipeline-run log
+    entry, which predates any job row) rather than a `job_id` directly.
+    """
+    stmt = (
+        select(TrainingJob)
+        .where(TrainingJob.pipeline_id == pipeline_id)
+        .order_by(TrainingJob.created_at.desc())
+        .limit(1)
+    )
+    job = (await db.execute(stmt)).scalar_one_or_none()
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"No job found for pipeline run {pipeline_id}")
+    return await _build_node_inspector_response(db, job, node_id)

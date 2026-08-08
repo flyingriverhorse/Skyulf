@@ -4,6 +4,20 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { JobDetailsView } from './JobDetailsView';
 import { jobsApi, JobInfo } from '../../../core/api/jobs';
+import { monitoringApi } from '../../../core/api/monitoring';
+
+vi.mock('../../../core/api/monitoring', async () => {
+  const actual = await vi.importActual<typeof import('../../../core/api/monitoring')>(
+    '../../../core/api/monitoring',
+  );
+  return {
+    ...actual,
+    monitoringApi: {
+      ...actual.monitoringApi,
+      getJobNode: vi.fn(),
+    },
+  };
+});
 
 const mocks = vi.hoisted(() => ({
   cancelJob: vi.fn(),
@@ -188,6 +202,38 @@ describe('JobDetailsView', () => {
     const datasetLink = screen.getByRole('link', { name: 'Dataset ds-1' });
     expect(datasetLink.getAttribute('href')).toContain('oc.kind=dataset');
     expect(datasetLink.getAttribute('href')).toContain('oc.origin=%2Fjobs');
+  });
+
+  it('opens a read-only node inspector for the job\'s own node instead of the canvas', async () => {
+    vi.mocked(monitoringApi.getJobNode).mockResolvedValue({
+      job_id: 'job-1234567890',
+      node_id: 'node-1',
+      node_found: true,
+      node: {
+        node_id: 'node-1',
+        step_type: 'training',
+        label: 'Training',
+        params: { algorithm: 'RandomForest' },
+        upstream: [],
+        downstream: [],
+      },
+      pipeline_id: 'pipe-42',
+      dataset_source_id: 'ds-1',
+      run_mode: 'fixed',
+      model_type: 'RandomForest',
+      status: 'completed',
+      is_synthetic_pipeline: false,
+      can_open_in_canvas: true,
+      recent_logs: [],
+    });
+    renderDetails(makeJob({ pipeline_id: 'pipe-42', node_id: 'node-1' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /node node-1/i }));
+
+    expect(await screen.findByText('Training')).toBeInTheDocument();
+    expect(monitoringApi.getJobNode).toHaveBeenCalledWith('job-1234567890', 'node-1');
+    // Confirms this opened an in-place inspector, not a canvas page navigation.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('reveals pipeline run context on activation instead of linking into a dead end', () => {

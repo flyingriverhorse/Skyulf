@@ -254,6 +254,57 @@ export interface PipelineRunLog {
     run_at?: string | null;
 }
 
+/** One upstream/downstream neighbour of an inspected node. */
+export interface NodeNeighbor {
+    node_id: string;
+    step_type: string;
+    label: string;
+}
+
+/** Full detail for a node found in a job's stored graph snapshot. */
+export interface NodeInspectorDetail {
+    node_id: string;
+    step_type: string;
+    label: string;
+    params: Record<string, unknown>;
+    upstream: NodeNeighbor[];
+    downstream: NodeNeighbor[];
+    execution_seconds?: number | null;
+    execution_status?: string | null;
+}
+
+export interface NodeInspectorLogEntry {
+    level: string;
+    message: string;
+    run_at?: string | null;
+}
+
+/**
+ * Read-only node-inspector payload, sourced entirely from a job's stored
+ * `graph`/`metrics` columns — the graph exactly as it executed, not live
+ * canvas state. `node_found: false` means the id isn't present in this run's
+ * graph (deleted/renamed node); the job-level context is still returned.
+ */
+export interface NodeInspectorResponse {
+    job_id: string;
+    node_id: string;
+    node_found: boolean;
+    node?: NodeInspectorDetail | null;
+    pipeline_id: string;
+    dataset_source_id: string;
+    dataset_name?: string | null;
+    branch_index?: number | null;
+    run_mode: string;
+    model_type: string;
+    status: string;
+    started_at?: string | null;
+    finished_at?: string | null;
+    /** True only for a `preview_*`/`*__branch_N` run that was never a saved pipeline. */
+    is_synthetic_pipeline: boolean;
+    can_open_in_canvas: boolean;
+    recent_logs: NodeInspectorLogEntry[];
+}
+
 export const monitoringApi = {
     getJobs: async (): Promise<DriftJobOption[]> => {
         const response = await apiClient.get<DriftJobOption[]>('/monitoring/jobs');
@@ -398,5 +449,23 @@ export const monitoringApi = {
 
     clearPipelineLogs: async (): Promise<void> => {
         await apiClient.delete('/monitoring/pipeline-logs');
+    },
+
+    // ── Node inspector ──────────────────────────────────────────────────
+    getJobNode: async (jobId: string, nodeId: string): Promise<NodeInspectorResponse> => {
+        const response = await apiClient.get<NodeInspectorResponse>(
+            `/monitoring/jobs/${encodeURIComponent(jobId)}/nodes/${encodeURIComponent(nodeId)}`,
+        );
+        return response.data;
+    },
+
+    getPipelineRunNode: async (
+        pipelineId: string,
+        nodeId: string,
+    ): Promise<NodeInspectorResponse> => {
+        const response = await apiClient.get<NodeInspectorResponse>(
+            `/monitoring/pipeline-runs/${encodeURIComponent(pipelineId)}/nodes/${encodeURIComponent(nodeId)}`,
+        );
+        return response.data;
     },
 };

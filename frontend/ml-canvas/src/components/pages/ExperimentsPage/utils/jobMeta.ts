@@ -175,3 +175,42 @@ export function getTaskForModelType(
 export function hasTuningMetadata(job: { job_type?: string; search_strategy?: string }): boolean {
   return job.search_strategy != null || job.job_type === 'tuning';
 }
+
+/** Human-readable label for each resolvable task, used by `getJobTypeLabel`. */
+const TASK_DISPLAY_LABEL: Record<ExperimentsTask, string> = {
+  classification: 'Classification',
+  regression: 'Regression',
+  text_classification: 'Text Classification',
+  segmentation: 'Segmentation',
+  ensemble: 'Ensemble',
+  other: 'Training',
+};
+
+/**
+ * Renders a job's real model family together with its run mode, e.g.
+ * `"Classification (advanced)"` / `"Regression (basic)"`. Replaces raw
+ * `job_type` display ("training"/"tuning"), which names the run *mode*
+ * rather than the model family a user actually wants to see (plan: Jobs
+ * page should show `<Type> (<mode>)`, not the mode alone).
+ *
+ * Prefers the server-resolved `model_family` (computed by the backend's
+ * `graph_utils.resolve_training_model_family` — the same resolver Slow
+ * Nodes uses, reading the node's `algorithm`/`model_type` straight out of
+ * the stored graph) over re-deriving it client-side from `model_type` +
+ * the registry snapshot, so the two surfaces can never disagree. Falls
+ * back to `getTaskForModelType` for payloads from a backend that hasn't
+ * been upgraded yet (missing `model_family`).
+ *
+ * EDA/ingestion jobs have no model family, so their `job_type` is returned
+ * unchanged rather than being forced through the training-family mapping.
+ */
+export function getJobTypeLabel(
+  job: { job_type?: string; model_type?: string; model_family?: string | null; search_strategy?: string },
+  registryItems: { id: string; tags?: string[] }[],
+): string {
+  if (job.job_type === 'eda' || job.job_type === 'ingestion') return job.job_type;
+  const task = (job.model_family as ExperimentsTask | undefined) ?? getTaskForModelType(job.model_type, registryItems);
+  const family = TASK_DISPLAY_LABEL[task] ?? TASK_DISPLAY_LABEL.other;
+  const mode = hasTuningMetadata(job) ? 'advanced' : 'basic';
+  return `${family} (${mode})`;
+}

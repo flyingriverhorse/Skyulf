@@ -14,3 +14,7 @@ export { ConfirmProvider, useConfirm } from './ConfirmDialog';
 export type { ConfirmOptions, ConfirmVariant } from './ConfirmDialog';
 export { RecordLink } from './RecordLink';
 export type { RecordLinkProps } from './RecordLink';
+export { NodeInspectorModal } from './NodeInspectorModal';
+export type { NodeInspectorModalProps, NodeInspectorTarget } from './NodeInspectorModal';
+export { NodeInspectorLink } from './NodeInspectorLink';
+export type { NodeInspectorLinkProps } from './NodeInspectorLink';
