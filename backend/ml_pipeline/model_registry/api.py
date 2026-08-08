@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.exceptions.core import SkyulfException
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,10 @@ async def list_models(
     """
     List all models in the registry.
     """
-    return await ModelRegistryService.list_models(session, skip=skip, limit=limit)
+    models = await ModelRegistryService.list_models(session, skip=skip, limit=limit)
+    if get_settings().DEMO_MODE:
+        models = [m for m in models if m.dataset_id == "iris-demo"]
+    return models
 
 
 @router.get("/models/{model_type}/versions", response_model=list[ModelVersion])

@@ -16,6 +16,7 @@ import {
   useCancelIngestion,
   hasPendingIngestion,
 } from '../core/hooks/useDatasets';
+import { useAppConfig } from '../core/hooks/useAppConfig';
 import { DatasetService } from '../core/api/datasets';
 
 export const DataSources: React.FC = () => {
@@ -33,6 +34,8 @@ export const DataSources: React.FC = () => {
 
   const deleteMutation = useDeleteDataset();
   const cancelMutation = useCancelIngestion();
+  const { data: appConfig } = useAppConfig();
+  const isDemoMode = appConfig?.demo_mode ?? false;
 
   // Track which row's mutation is in flight (for per-row spinner state).
   const deletingId = deleteMutation.isPending ? deleteMutation.variables ?? null : null;
@@ -230,6 +233,7 @@ export const DataSources: React.FC = () => {
             Upload a file or connect an S3 source, then send it to the Canvas pipeline builder or the EDA explorer.
           </p>
         </div>
+        {!isDemoMode && (
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => { setShowIngestionJobs(true); }}
@@ -254,9 +258,10 @@ export const DataSources: React.FC = () => {
             {showUpload ? 'Cancel Upload' : 'Upload File'}
           </button>
         </div>
+        )}
       </div>
 
-      {showUpload && (
+      {!isDemoMode && showUpload && (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-top-4">
           <FileUpload onUploadComplete={handleUploadComplete} onCancel={() => { setShowUpload(false); }} />
         </div>

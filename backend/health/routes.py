@@ -42,6 +42,18 @@ class DetailedHealthResponse(HealthResponse):
     dependencies_healthy: bool
 
 
+class AppConfigResponse(BaseModel):
+    """Public configuration exposed to the frontend."""
+
+    demo_mode: bool
+
+
+@router.get("/api/config", response_model=AppConfigResponse)
+async def app_config(settings: Settings = Depends(get_config)):
+    """Return public app configuration for the frontend."""
+    return AppConfigResponse(demo_mode=settings.DEMO_MODE)
+
+
 @router.get("/health", response_model=HealthResponse)
 async def health_check(settings: Settings = Depends(get_config)):
     """

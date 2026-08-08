@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.config import get_settings
 from backend.data.catalog import FileSystemCatalog
 from backend.data_ingestion.service import DataIngestionService
 from backend.database.engine import get_async_session
@@ -78,12 +79,13 @@ def _build_node_registry() -> list[RegistryItem]:
 @router.get("/stats", response_model=dict[str, int])
 async def get_system_stats(session: AsyncSession = Depends(get_async_session)):
     """Return high-level system statistics for the dashboard."""
-    training_count = await session.scalar(
-        select(func.count(TrainingJob.id)).where(TrainingJob.run_mode == "fixed")
-    )
-    tuning_count = await session.scalar(
-        select(func.count(TrainingJob.id)).where(TrainingJob.run_mode == "tuned")
-    )
+    training_base = select(func.count(TrainingJob.id)).where(TrainingJob.run_mode == "fixed")
+    tuning_base = select(func.count(TrainingJob.id)).where(TrainingJob.run_mode == "tuned")
+    if get_settings().DEMO_MODE:
+        training_base = training_base.where(TrainingJob.dataset_source_id == "iris-demo")
+        tuning_base = tuning_base.where(TrainingJob.dataset_source_id == "iris-demo")
+    training_count = await session.scalar(training_base)
+    tuning_count = await session.scalar(tuning_base)
     deployment_count = await session.scalar(
         select(func.count(Deployment.id)).where(Deployment.is_active)
     )
@@ -184,6 +186,9 @@ async def get_dataset_schema(dataset_id: int, session: AsyncSession = Depends(ge
     if not ds:
         raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
 
+    if get_settings().DEMO_MODE and ds.source_id != "iris-demo":
+        raise HTTPException(status_code=404, detail=f"Dataset {dataset_id} not found")
+
     if ds.source_metadata and "profile" in ds.source_metadata:
         try:
             return _profile_from_cached_metadata(ds.source_metadata["profile"])
@@ -208,6 +213,8 @@ def get_model_default_search_space(model_type: str, strategy: str = "random"):
 @router.get("/datasets/list", response_model=list[dict[str, Any]])
 async def list_datasets(session: AsyncSession = Depends(get_async_session)):
     """Return a simple list of available datasets for filtering."""
+    if get_settings().DEMO_MODE:
+        return [{"id": "iris-demo", "name": "Iris Flower Dataset"}]
     stmt = select(DataSource.source_id, DataSource.name).where(DataSource.is_active)
     result = await session.execute(stmt)
     return [{"id": row.source_id, "name": row.name} for row in result.all()]

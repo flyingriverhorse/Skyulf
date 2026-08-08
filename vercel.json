@@ -1,0 +1,31 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.skyulf.com/api/:path*"
+    },
+    {
+      "source": "/data/api/:path*",
+      "destination": "https://api.skyulf.com/data/api/:path*"
+    },
+    {
+      "source": "/ws/:path*",
+      "destination": "https://api.skyulf.com/ws/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://api.skyulf.com/health"
+    },
+    {
+      "source": "/health/detailed",
+      "destination": "https://api.skyulf.com/health/detailed"
+    },
+    {
+      "source": "/((?!assets).*)",
+      "destination": "/index.html"
+    }
+  ],
+  "buildCommand": "cd frontend/ml-canvas && npm ci && npm run build",
+  "outputDirectory": "static/ml_canvas",
+  "installCommand": "cd frontend/ml-canvas && npm ci"
+}
