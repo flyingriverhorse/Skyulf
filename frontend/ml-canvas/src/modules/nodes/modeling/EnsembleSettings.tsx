@@ -1068,7 +1068,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
                 <Sparkles className="w-2.5 h-2.5" /> Auto-detect
               </button>
             ) : (
-              <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5" title="Inferred from the target column's type">
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-0.5" title="Inferred from the target column's type">
                 <Sparkles className="w-2.5 h-2.5" /> Auto
               </span>
             )}
@@ -1109,7 +1109,7 @@ export function EnsembleSettings({ config, onChange, nodeId }: {
             selected={config.base_estimators ?? []}
             onChange={(vals) => { update({ base_estimators: vals as string[] }); }}
           />
-          <p className="text-[10px] text-gray-400 dark:text-gray-500">
+          <p className="text-[10px] text-gray-500 dark:text-gray-400">
             Tip: wire model nodes into this ensemble&apos;s input to use them as base
             learners automatically — connected models override the selection above.
           </p>

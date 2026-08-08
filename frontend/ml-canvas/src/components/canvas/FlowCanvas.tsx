@@ -258,6 +258,7 @@ const FlowCanvasContent: React.FC = () => {
       const detail = (e as CustomEvent<FocusNodeDetail>).detail;
       if (!detail?.id) return;
       fitView({ nodes: [{ id: detail.id }], duration: 250, padding: 0.4, maxZoom: 1 });
+      if (detail.focusWrapper) reactFlowWrapper.current?.focus();
     };
     window.addEventListener(FOCUS_NODE_EVENT, handler);
     return () => window.removeEventListener(FOCUS_NODE_EVENT, handler);

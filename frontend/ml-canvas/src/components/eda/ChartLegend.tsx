@@ -107,7 +107,7 @@ export const ChartLegend: React.FC<ChartLegendProps> = ({ entries, filterThresho
           </li>
         ))}
         {visibleEntries.length === 0 && (
-          <li className="italic text-gray-400 dark:text-gray-500">No groups match “{query}”.</li>
+          <li className="italic text-gray-500 dark:text-gray-400">No groups match “{query}”.</li>
         )}
       </ul>
     </div>

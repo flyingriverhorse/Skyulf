@@ -116,3 +116,57 @@ async def test_list_deployments_history_includes_lineage_for_each_entry(async_se
     assert by_job["job_hist_1"]["version"] == 1
     assert by_job["job_hist_2"]["version"] == 2
     assert by_job["job_hist_2"]["previous_deployment_id"] == first.id
+
+
+@pytest.mark.asyncio
+async def test_list_deployment_details_does_not_load_artifacts(async_session, tmp_path):
+    """`list_deployment_details` (the /deployment/history path) must never deserialize
+    the deployed artifact — it only needs the cheap dataset/version/target-column
+    lineage, batched from a single TrainingJob query, not one artifact load per row.
+    """
+    for i in range(1, 4):
+        await _insert_training_job(
+            async_session, f"job_page_{i}", "pipe_page", f"dataset_page_{i}", i
+        )
+
+    with patch("os.getcwd", return_value=str(tmp_path)):
+        for i in range(1, 4):
+            await DeploymentService.deploy_model(async_session, f"job_page_{i}")
+
+        with patch(
+            "backend.ml_pipeline.deployment.service.DeploymentService._load_artifact_for_details"
+        ) as mock_load:
+            results = await DeploymentService.list_deployment_details(
+                async_session, limit=10, skip=0
+            )
+
+    mock_load.assert_not_called()
+    assert len(results) == 3
+    by_job = {entry["job_id"]: entry for entry in results}
+    assert by_job["job_page_1"]["dataset_id"] == "dataset_page_1"
+    assert by_job["job_page_2"]["version"] == 2
+    assert all(entry["input_schema"] is None for entry in results)
+
+
+@pytest.mark.asyncio
+async def test_list_deployment_details_batches_job_lookup_in_one_query(async_session, tmp_path):
+    """The job-lineage lookup for a page of N deployments must be a single query,
+    not N per-row lookups (the original N+1 also duplicated this lookup twice
+    per row via separate `_lookup_target_column`/`_get_job_for_deployment` calls).
+    """
+    for i in range(1, 4):
+        await _insert_training_job(
+            async_session, f"job_batch_{i}", "pipe_batch", f"dataset_batch_{i}", i
+        )
+
+    with patch("os.getcwd", return_value=str(tmp_path)):
+        for i in range(1, 4):
+            await DeploymentService.deploy_model(async_session, f"job_batch_{i}")
+
+        with patch(
+            "backend.ml_pipeline.deployment.service.DeploymentService._get_jobs_by_ids",
+            wraps=DeploymentService._get_jobs_by_ids,
+        ) as spy:
+            await DeploymentService.list_deployment_details(async_session, limit=10, skip=0)
+
+    spy.assert_called_once()

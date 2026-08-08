@@ -10,6 +10,7 @@ from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
+from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -153,3 +154,38 @@ async def test_retry_succeeds_for_cancelled_tuning_job(async_session, client):
 
     assert response.status_code == 200
     assert response.json()["job_id"] != "job-tune"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_retries_create_only_one_job(async_session):
+    """Two near-simultaneous retries of the same failed job must dedupe to one new job.
+
+    Exercises `resubmit_job_from_graph` directly (rather than through
+    `TestClient`, which serialises requests) so the two calls genuinely race
+    through the same submit-lock/dedupe path `_submit_or_dedupe_branch_job`
+    already provides for normal `/run` submissions.
+    """
+    import asyncio
+
+    from backend.ml_pipeline._execution.jobs import JobManager
+    from backend.ml_pipeline._internal._routers.run_pipeline import resubmit_job_from_graph
+
+    await _insert_job(async_session, "job-race", status="failed")
+    job = await JobManager.get_job(async_session, "job-race")
+    assert job is not None
+
+    background_tasks_a = BackgroundTasks()
+    background_tasks_b = BackgroundTasks()
+
+    with patch("backend.ml_pipeline._internal._routers.run_pipeline.run_pipeline_task"):
+        job_id_a, job_id_b = await asyncio.gather(
+            resubmit_job_from_graph(async_session, job, background_tasks_a),
+            resubmit_job_from_graph(async_session, job, background_tasks_b),
+        )
+
+    assert job_id_a == job_id_b
+
+    result = await async_session.execute(
+        text("SELECT COUNT(*) FROM training_jobs WHERE node_id = 'node-1' AND id != 'job-race'")
+    )
+    assert result.scalar_one() == 1

@@ -341,7 +341,7 @@ export const JobsPage: React.FC = () => {
               <div className="flex justify-center">
                 <button
                   onClick={handleBackFromDetails}
-                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
                 >
                   Back to Jobs
                 </button>
@@ -512,7 +512,7 @@ export const JobsPage: React.FC = () => {
           <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-center">
             <button
               onClick={handleLoadMore}
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1 px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
             >
               Load More
             </button>

@@ -20,7 +20,7 @@ interface Props {
 const STATUS_META: Record<ArtifactStatus, { label: string; icon: LucideIcon; className: string }> = {
   available: { label: 'Available', icon: CheckCircle2, className: 'text-emerald-600 dark:text-emerald-400' },
   not_computed: { label: 'Not computed', icon: Clock, className: 'text-amber-600 dark:text-amber-400' },
-  unsupported: { label: 'Unsupported', icon: MinusCircle, className: 'text-gray-400 dark:text-gray-500' },
+  unsupported: { label: 'Unsupported', icon: MinusCircle, className: 'text-gray-500 dark:text-gray-400' },
   failed: { label: 'Failed', icon: XCircle, className: 'text-red-600 dark:text-red-400' },
 };
 

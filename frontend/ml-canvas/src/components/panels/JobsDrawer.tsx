@@ -366,7 +366,7 @@ export const JobsDrawer: React.FC = () => {
                 {/* List — virtualized once length crosses the threshold (#15). */}
                 <div className="flex-1 flex flex-col overflow-hidden bg-gray-50/30 dark:bg-gray-900/30">
                 {filteredJobs.length === 0 ? (
-                    <div className="text-center py-10 text-gray-400 dark:text-gray-500 text-sm">
+                    <div className="text-center py-10 text-gray-500 dark:text-gray-400 text-sm">
                     {searchQuery || statusFilter !== 'all' || modelFilter !== 'all'
                       ? 'No jobs match the current filters.'
                       : `No ${TASK_LABELS[activeTab]} jobs found.`

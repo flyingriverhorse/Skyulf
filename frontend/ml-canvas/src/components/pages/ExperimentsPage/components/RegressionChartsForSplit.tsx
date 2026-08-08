@@ -123,7 +123,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
                     <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 shadow-sm rounded text-xs">
                       <p className="font-medium">Actual: {d.x.toFixed(4)}</p>
                       <p className="font-medium">Predicted: {d.y.toFixed(4)}</p>
-                      <p className="text-gray-500">Error: {(d.y - d.x).toFixed(4)}</p>
+                      <p className="text-gray-500 dark:text-gray-400">Error: {(d.y - d.x).toFixed(4)}</p>
                     </div>
                   );
                 }
@@ -179,7 +179,7 @@ export const RegressionChartsForSplit: React.FC<Props> = ({
       {/* Absolute-error percentile chips */}
       {pct && (
         <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">Absolute error percentiles:</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Absolute error percentiles:</span>
           {([
             ['P50 (median)', pct.p50, 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700'],
             ['P90', pct.p90, 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700'],

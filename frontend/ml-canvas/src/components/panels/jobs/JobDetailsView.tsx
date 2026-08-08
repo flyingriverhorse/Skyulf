@@ -1,7 +1,7 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback, useId } from 'react';
 import {
   X, ArrowLeft, Terminal, LayoutDashboard, FileText,
-  AlertCircle, CheckCircle, Square, Database, Copy, WrapText,
+  AlertCircle, CheckCircle, Square, Database, Copy, Check, WrapText,
   ChevronsDown, ChevronsUp, RotateCw, Info,
 } from 'lucide-react';
 import { JobInfo } from '../../../core/api/jobs';
@@ -271,6 +271,114 @@ const FeatureImportancesSection: React.FC<{ result: Record<string, unknown> }> =
   );
 };
 
+/** A job's pipeline_id parsed into its execution-run context. */
+interface PipelineRunContext {
+  /** Id of the run this branch was split from, or null when the id isn't a branch. */
+  parentPipelineId: string | null;
+  /** Zero-based branch index, or null when the id isn't a branch. */
+  branchIndex: number | null;
+  /** True when the run (or its parent) is a synthetic preview execution, not a saved pipeline. */
+  isPreviewRun: boolean;
+}
+
+// Mirrors `backend/ml_pipeline/_execution/utils.py::parse_branch_info` so a
+// branch suffix is recognised identically on both sides of the API boundary.
+const BRANCH_ID_RE = /^(.+?)__branch_(\d+)(?:_(\d+))?$/;
+
+/**
+ * Parses a job's pipeline_id into its branch/preview run context.
+ *
+ * Never invents a navigable target: ids that don't match a recognised shape
+ * are treated as an opaque single run rather than guessed at.
+ */
+function parsePipelineRunContext(pipelineId: string): PipelineRunContext {
+  const match = BRANCH_ID_RE.exec(pipelineId);
+  const parentPipelineId = match ? match[1]! : null;
+  const branchIndex = match ? Number(match[2]) : null;
+  const previewSource = parentPipelineId ?? pipelineId;
+  return { parentPipelineId, branchIndex, isPreviewRun: previewSource.startsWith('preview_') };
+}
+
+/**
+ * Expandable "Related" entry for a job's pipeline execution id.
+ *
+ * Saved pipeline configurations are only ever keyed by dataset id (see
+ * `backend/ml_pipeline/_internal/_routers/pipelines_io.py`), so a job's
+ * `pipeline_id` — including synthetic `preview_*` and `*__branch_N` runtime
+ * ids — never resolves to a separately viewable saved pipeline. Rather than
+ * rendering a link into that dead end, this reveals the actual run context
+ * (branch/preview status, node count, full id) inline on activation.
+ */
+const RelatedPipelineEntry: React.FC<{ job: JobInfo }> = ({ job }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const panelId = useId();
+  const pipelineId = job.pipeline_id;
+  const context = useMemo(() => parsePipelineRunContext(pipelineId), [pipelineId]);
+  const nodeCount = (job.graph as { nodes?: unknown[] } | undefined)?.nodes?.length;
+
+  const handleCopy = useCallback(() => {
+    void navigator.clipboard.writeText(pipelineId).then(() => {
+      setCopied(true);
+      setTimeout(() => { setCopied(false); }, 1500);
+    });
+  }, [pipelineId]);
+
+  const summaryLabel = context.isPreviewRun
+    ? 'Preview run'
+    : context.parentPipelineId
+      ? `Branch ${context.branchIndex}`
+      : 'Pipeline run';
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => { setExpanded(v => !v); }}
+        title={pipelineId}
+        className="flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+      >
+        {expanded ? <ChevronsUp className="w-3 h-3" /> : <ChevronsDown className="w-3 h-3" />}
+        {summaryLabel}
+      </button>
+      {expanded && (
+        <div id={panelId} className="ml-1 p-2 space-y-1 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 dark:text-gray-400">Run id:</span>
+            <span className="font-mono break-all text-gray-700 dark:text-gray-300">{pipelineId}</span>
+            <button
+              type="button"
+              onClick={handleCopy}
+              aria-label={copied ? 'Run id copied' : 'Copy run id'}
+              className="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+            >
+              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+            </button>
+          </div>
+          {context.parentPipelineId && (
+            <div className="text-gray-600 dark:text-gray-300">
+              <span className="text-gray-500 dark:text-gray-400">Parent run:</span>{' '}
+              <span className="font-mono">{context.parentPipelineId}</span> (branch {context.branchIndex})
+            </div>
+          )}
+          {nodeCount !== undefined && (
+            <div className="text-gray-600 dark:text-gray-300">
+              <span className="text-gray-500 dark:text-gray-400">Nodes executed:</span> {nodeCount}
+            </div>
+          )}
+          <div className="text-gray-500 dark:text-gray-400 italic">
+            {context.isPreviewRun
+              ? "Preview run — not a saved pipeline. This id only identifies this job's execution and can't be reopened in the pipeline canvas."
+              : "This is the execution run id for this job, not a separately saved pipeline. Use the Dataset link above to reopen the pipeline that produced it."}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 interface JobDetailsViewProps {
   job: JobInfo;
   onBack: () => void;
@@ -406,7 +514,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             </button>
                         ) : (
                             <span
-                                className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-400 dark:text-gray-500"
+                                className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400"
                                 title={retryAvailability.reason}
                             >
                                 <Info className="w-3 h-3" />
@@ -516,15 +624,10 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
 
                         {/* Related Records Section */}
                         {(job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion') || job.promoted_at ? (
-                            <div className="flex flex-wrap items-center gap-4 text-xs p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                                <span className="text-gray-500 dark:text-gray-400 font-medium">Related:</span>
+                            <div className="flex flex-wrap items-start gap-4 text-xs p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <span className="text-gray-500 dark:text-gray-400 font-medium pt-1">Related:</span>
                                 {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && (
-                                    <RecordLink
-                                        recordRef={{ kind: 'pipeline', pipelineId: job.pipeline_id }}
-                                        label={`Pipeline ${job.pipeline_id}`}
-                                        {...(origin !== undefined ? { origin } : {})}
-                                        {...(filters !== undefined ? { filters } : {})}
-                                    />
+                                    <RelatedPipelineEntry job={job} />
                                 )}
                                 {job.promoted_at && job.version !== undefined && (
                                     <RecordLink

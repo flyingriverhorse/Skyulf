@@ -170,7 +170,7 @@ export const ShapBeeswarmView: React.FC<Props> = ({
             </ScatterChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 text-center">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 text-center">
           Top {topFeatures.length} features by mean |SHAP value| · colour: <span className="text-blue-500">low</span> → <span className="text-red-500">high</span> feature value
         </p>
       </div>

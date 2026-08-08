@@ -675,14 +675,29 @@ class DeploymentService:
         return DeploymentService._input_schema_entries(input_features, feature_dtypes)
 
     @staticmethod
-    async def _lookup_target_column(session: AsyncSession, job_id: Any) -> str | None:
-        """Looks up the job graph for a deployment's job and extracts its target column, if any."""
-        from backend.ml_pipeline._execution.jobs import JobManager
+    async def _get_jobs_by_ids(
+        session: AsyncSession, job_ids: Sequence[str] | set[str]
+    ) -> dict[str, TrainingJob]:
+        """Batch-fetches the TrainingJob rows for the given ids in a single query."""
+        if not job_ids:
+            return {}
+        result = await session.execute(select(TrainingJob).where(TrainingJob.id.in_(job_ids)))
+        return {job.id: job for job in result.scalars().all()}
 
-        job = await JobManager.get_job(session, str(job_id))
-        if job and job.graph:
-            return DeploymentService._extract_target_column_from_graph(job.graph)
-        return None
+    @staticmethod
+    def _lineage_fields_from_job(job: TrainingJob | None) -> dict[str, Any]:
+        """Builds the cheap dataset/version/target-column lineage fields from an
+        already-fetched TrainingJob, without touching the deployed artifact."""
+        if job is None:
+            return {"dataset_id": None, "version": None, "target_column": None}
+        target_column = (
+            DeploymentService._extract_target_column_from_graph(job.graph) if job.graph else None
+        )
+        return {
+            "dataset_id": job.dataset_source_id,
+            "version": job.version,
+            "target_column": target_column,
+        }
 
     @staticmethod
     async def get_deployment_details(
@@ -703,21 +718,43 @@ class DeploymentService:
             if input_schema:
                 info["input_schema"] = input_schema
 
-            target_column = await DeploymentService._lookup_target_column(
-                session, deployment.job_id
-            )
-            if target_column is not None:
-                info["target_column"] = target_column
-
-            # The backing TrainingJob carries the dataset/version identity so the
-            # frontend can render a `modelVersion`/`dataset` RecordLink back to the
-            # Registry entry this deployment came from, not just a bare job id.
+            # The backing TrainingJob carries the dataset/version identity and the
+            # target column, so a single fetch backs both instead of one query per
+            # concern (this used to be two separate job lookups).
             source_job = await DeploymentService._get_job_for_deployment(session, deployment.job_id)
-            if source_job is not None:
-                info["dataset_id"] = source_job.dataset_source_id
-                info["version"] = source_job.version
+            lineage = DeploymentService._lineage_fields_from_job(source_job)
+            if lineage["target_column"] is not None:
+                info["target_column"] = lineage["target_column"]
+            info["dataset_id"] = lineage["dataset_id"]
+            info["version"] = lineage["version"]
 
         except Exception as e:
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")
 
         return cast(dict[str, Any], info)
+
+    @staticmethod
+    async def list_deployment_details(
+        session: AsyncSession, limit: int | None = None, skip: int = 0
+    ) -> list[dict[str, Any]]:
+        """Lists deployment history enriched with cheap lineage fields only.
+
+        Unlike `get_deployment_details`, this never loads the deployed artifact:
+        it batches a single TrainingJob query across the whole page instead of
+        fetching one job (and deserializing one artifact) per row, so paging
+        through history stays O(1) artifact loads regardless of page size.
+        """
+        deployments = await DeploymentService.list_deployments(session, limit, skip)
+        job_ids = {d.job_id for d in deployments}
+        jobs_by_id = await DeploymentService._get_jobs_by_ids(session, job_ids)
+
+        results = []
+        for deployment in deployments:
+            info = deployment.to_dict()
+            info["input_schema"] = None
+            info["output_schema"] = None
+            info.update(
+                DeploymentService._lineage_fields_from_job(jobs_by_id.get(deployment.job_id))
+            )
+            results.append(info)
+        return results

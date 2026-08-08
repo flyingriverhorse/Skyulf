@@ -231,7 +231,7 @@ export const Dashboard: React.FC = () => {
         <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Recent Jobs</h2>
-            <Link to="/jobs" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+            <Link to="/jobs" className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1">
               View All <ExternalLink size={14} />
             </Link>
           </div>
@@ -318,7 +318,7 @@ const StatCard = ({ title, value, icon, subtext, color = "text-slate-900 dark:te
       </div>
       {icon && <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-full">{icon}</div>}
     </div>
-    {subtext && <div className="mt-2 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
+    {subtext && <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
       <Activity size={12} /> {subtext}
     </div>}
   </div>

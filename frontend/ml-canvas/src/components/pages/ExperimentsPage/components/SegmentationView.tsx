@@ -169,7 +169,7 @@ export const SegmentationView: React.FC<Props> = ({
           {/* Split tabs */}
           {splitTabs.length > 1 && (
             <div className="flex items-center gap-0.5">
-              <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mr-1">Split:</span>
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mr-1">Split:</span>
               {splitTabs.map((tab) => (
                 <button
                   key={tab}

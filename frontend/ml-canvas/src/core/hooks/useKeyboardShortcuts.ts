@@ -58,6 +58,14 @@ export const FOCUS_NODE_EVENT = 'skyulf:focus-node';
 
 export interface FocusNodeDetail {
   id: string;
+  /**
+   * Moves DOM focus onto the canvas wrapper after fitting the node into
+   * view. Off by default since the Sidebar's palette-click origin already
+   * has its own focus (the clicked button); deep-link node navigation
+   * (OPS-007) opts in so keyboard/screen-reader users land on the canvas
+   * instead of a link that no longer exists in the DOM.
+   */
+  focusWrapper?: boolean;
 }
 
 /**

@@ -178,7 +178,7 @@ export const ShapSummaryView: React.FC<Props> = ({
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 text-center">
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 text-center">
             {topFeatures.length < allFeatures.size
               ? `Showing top ${topFeatures.length} of ${allFeatures.size} features · `
               : ''}
