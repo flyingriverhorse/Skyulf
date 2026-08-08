@@ -2,10 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import {
   AlertTriangle, Bug, RefreshCw, Search, Trash2,
-  ChevronDown, ChevronRight, X, Clock, Route, Server, Download,
+  ChevronDown, ChevronRight, X, Clock, Route, Server, Download, Copy, Check,
 } from 'lucide-react';
-import { monitoringApi, ErrorEvent, GroupedIssue, PipelineRunLog } from '../core/api/monitoring';
-import { LoadingState, EmptyState, useConfirm } from '../components/shared';
+import {
+  monitoringApi, ErrorEvent, ErrorSeverity, GroupedIssue, PipelineRunLog,
+} from '../core/api/monitoring';
+import { LoadingState, EmptyState, RecordLink, useConfirm } from '../components/shared';
+import type { OperationalTimeRange } from '../core/utils/operationalContext';
 import { toast } from '../core/toast';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -26,11 +29,30 @@ function sinceIso(range: TimeRange): string | undefined {
   return new Date(Date.now() - ms).toISOString();
 }
 
+/** Maps the unified severity facet to the pipeline log's own `error`/`warning`/`info` taxonomy. */
+const SEVERITY_TO_PIPELINE_LEVEL: Record<ErrorSeverity, string> = {
+  critical: 'error',
+  warning: 'warning',
+  info: 'info',
+};
+
+const SEVERITY_LABELS: Record<ErrorSeverity, string> = {
+  critical: 'Critical',
+  warning: 'Warning',
+  info: 'Info',
+};
+
+function severityBadgeClass(severity: ErrorSeverity): string {
+  if (severity === 'critical') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+  if (severity === 'warning') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+  return 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300';
+}
+
 function exportCsv(rows: ErrorEvent[]): void {
-  const header = ['id', 'status_code', 'error_type', 'message', 'route', 'job_id', 'created_at'];
+  const header = ['id', 'severity', 'status_code', 'error_type', 'message', 'route', 'job_id', 'created_at'];
   const escape = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const lines = [header.join(','), ...rows.map(r =>
-    [r.id, r.status_code, r.error_type, r.message, r.route, r.job_id ?? '', r.created_at].map(escape).join(',')
+    [r.id, r.severity, r.status_code, r.error_type, r.message, r.route, r.job_id ?? '', r.created_at].map(escape).join(',')
   )];
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');
@@ -68,9 +90,85 @@ function localHourPrefix(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}`;
 }
 
+// ─── Copyable diagnostic ID ─────────────────────────────────────────────────
+
+/** Copies a stable diagnostic identifier so an investigator can paste it into a ticket. */
+const CopyDiagnosticId: React.FC<{ id: string | number; label: string }> = ({ id, label }) => {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(String(id));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard denied or unavailable — the id remains visible/selectable.
+    }
+  }, [id]);
+  return (
+    <button
+      type="button"
+      onClick={() => void handleCopy()}
+      className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+      aria-label={copied ? 'Diagnostic ID copied' : `Copy ${label}`}
+      title={copied ? 'Copied' : `Copy ${label}`}
+    >
+      {copied ? <Check size={12} /> : <Copy size={12} />}
+      <span className="font-mono">{id}</span>
+    </button>
+  );
+};
+
+/** Contextual View action for the resource an error/pipeline event identifies, or an explicit "no target" note. */
+const ErrorResourceLink: React.FC<{
+  jobId?: string | null | undefined;
+  nodeId?: string | null | undefined;
+  pipelineId?: string | null | undefined;
+  origin: string;
+  timeRange: OperationalTimeRange;
+  filters: Record<string, string>;
+}> = ({ jobId, nodeId, pipelineId, origin, timeRange, filters }) => {
+  if (jobId) {
+    return (
+      <RecordLink
+        recordRef={{ kind: 'job', jobId }}
+        origin={origin}
+        timeRange={timeRange}
+        filters={filters}
+      />
+    );
+  }
+  if (nodeId) {
+    return (
+      <RecordLink
+        recordRef={{ kind: 'node', nodeId, ...(pipelineId ? { pipelineId } : {}) }}
+        origin={origin}
+        timeRange={timeRange}
+        filters={filters}
+      />
+    );
+  }
+  if (pipelineId) {
+    return (
+      <RecordLink
+        recordRef={{ kind: 'pipeline', pipelineId }}
+        origin={origin}
+        timeRange={timeRange}
+        filters={filters}
+      />
+    );
+  }
+  return <span className="text-xs text-slate-400 italic">No target available</span>;
+};
+
 // ─── Traceback modal ─────────────────────────────────────────────────────────
 
-const TracebackModal: React.FC<{ event: ErrorEvent; onClose: () => void }> = ({ event, onClose }) => (
+const TracebackModal: React.FC<{
+  event: ErrorEvent;
+  onClose: () => void;
+  origin: string;
+  timeRange: OperationalTimeRange;
+  filters: Record<string, string>;
+}> = ({ event, onClose, origin, timeRange, filters }) => (
   <>
     {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- backdrop dismiss zone */}
     <div
@@ -90,6 +188,9 @@ const TracebackModal: React.FC<{ event: ErrorEvent; onClose: () => void }> = ({ 
           <span className={`text-xs px-2 py-0.5 rounded font-mono ${statusColor(event.status_code)}`}>
             {event.status_code}
           </span>
+          <span className={`text-xs px-2 py-0.5 rounded font-semibold ${severityBadgeClass(event.severity)}`}>
+            {SEVERITY_LABELS[event.severity]}
+          </span>
         </div>
         <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
           <X size={18} />
@@ -97,10 +198,12 @@ const TracebackModal: React.FC<{ event: ErrorEvent; onClose: () => void }> = ({ 
       </div>
 
       {/* meta */}
-      <div className="flex flex-wrap gap-4 px-5 py-3 border-b border-slate-700 text-xs text-slate-400">
+      <div className="flex flex-wrap items-center gap-4 px-5 py-3 border-b border-slate-700 text-xs text-slate-400">
         <span className="flex items-center gap-1"><Route size={12} />{event.route || '—'}</span>
         <span className="flex items-center gap-1"><Clock size={12} />{new Date(event.created_at).toLocaleString()}</span>
         {event.job_id && <span className="flex items-center gap-1"><Server size={12} />job: {event.job_id}</span>}
+        <CopyDiagnosticId id={event.id} label="diagnostic ID" />
+        <ErrorResourceLink jobId={event.job_id} origin={origin} timeRange={timeRange} filters={filters} />
       </div>
 
       {/* message */}
@@ -129,7 +232,10 @@ const ErrorRow: React.FC<{
   event: ErrorEvent;
   onExpand: (e: ErrorEvent) => void;
   onResolve: (e: ErrorEvent) => void;
-}> = ({ event, onExpand, onResolve }) => {
+  origin: string;
+  timeRange: OperationalTimeRange;
+  filters: Record<string, string>;
+}> = ({ event, onExpand, onResolve, origin, timeRange, filters }) => {
   const [expanded, setExpanded] = useState(false);
   const isResolved = !!event.resolved_at;
 
@@ -143,6 +249,11 @@ const ErrorRow: React.FC<{
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </td>
         <td className="px-4 py-3">
+          <span className={`text-xs px-2 py-0.5 rounded font-semibold whitespace-nowrap ${severityBadgeClass(event.severity)}`}>
+            {SEVERITY_LABELS[event.severity]}
+          </span>
+        </td>
+        <td className="px-4 py-3">
           <span className={`text-xs font-mono px-2 py-0.5 rounded font-semibold ${statusColor(event.status_code)}`}>
             {event.status_code}
           </span>
@@ -150,11 +261,11 @@ const ErrorRow: React.FC<{
         <td className={`px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate ${isResolved ? 'line-through' : ''}`}>
           {event.error_type}
         </td>
-        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-[340px] truncate">
+        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-[300px] truncate">
           {event.message}
         </td>
-        <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 font-mono max-w-[180px] truncate">
-          {event.route || '—'}
+        <td className="px-4 py-3 text-xs" onClick={e => e.stopPropagation()}>
+          <ErrorResourceLink jobId={event.job_id} origin={origin} timeRange={timeRange} filters={filters} />
         </td>
         <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
           {relativeTime(event.created_at)}
@@ -183,10 +294,19 @@ const ErrorRow: React.FC<{
       </tr>
       {expanded && (
         <tr className="bg-slate-50 dark:bg-slate-800/40">
-          <td colSpan={7} className="px-6 py-4">
+          <td colSpan={8} className="px-6 py-4">
             <div className="grid grid-cols-2 gap-4 text-xs mb-3 text-slate-500 dark:text-slate-400">
-              {event.job_id && <span><strong>Job ID:</strong> {event.job_id}</span>}
+              <span className="flex items-center gap-2">
+                <strong>Route:</strong> {event.route || '—'}
+              </span>
               <span><strong>Time:</strong> {new Date(event.created_at).toLocaleString()}</span>
+              <span className="flex items-center gap-2">
+                <strong>Diagnostic ID:</strong> <CopyDiagnosticId id={event.id} label="diagnostic ID" />
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>Target:</strong>{' '}
+                <ErrorResourceLink jobId={event.job_id} origin={origin} timeRange={timeRange} filters={filters} />
+              </span>
               {isResolved && event.resolved_at && (
                 <span className="text-green-600 dark:text-green-400"><strong>Resolved:</strong> {new Date(event.resolved_at).toLocaleString()}</span>
               )}
@@ -207,9 +327,22 @@ const ErrorRow: React.FC<{
 
 // ─── Pipeline event row ─────────────────────────────────────────────────────
 
-const PipelineRow: React.FC<{ log: PipelineRunLog }> = ({ log }) => {
+/** Maps the pipeline log's own `error`/`warning`/`info` taxonomy to the unified severity. */
+const PIPELINE_LEVEL_TO_SEVERITY: Record<string, ErrorSeverity> = {
+  error: 'critical',
+  warning: 'warning',
+  info: 'info',
+};
+
+const PipelineRow: React.FC<{
+  log: PipelineRunLog;
+  origin: string;
+  timeRange: OperationalTimeRange;
+  filters: Record<string, string>;
+}> = ({ log, origin, timeRange, filters }) => {
   const [expanded, setExpanded] = useState(false);
   const isError = log.level === 'error';
+  const severity = PIPELINE_LEVEL_TO_SEVERITY[log.level] ?? 'info';
   return (
     <>
       <tr
@@ -218,6 +351,11 @@ const PipelineRow: React.FC<{ log: PipelineRunLog }> = ({ log }) => {
       >
         <td className="px-4 py-3 w-8 text-slate-400">
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </td>
+        <td className="px-4 py-3">
+          <span className={`text-xs px-2 py-0.5 rounded font-semibold whitespace-nowrap ${severityBadgeClass(severity)}`}>
+            {SEVERITY_LABELS[severity]}
+          </span>
         </td>
         <td className="px-4 py-3">
           <span className={`text-xs font-mono px-2 py-0.5 rounded font-semibold ${
@@ -231,11 +369,17 @@ const PipelineRow: React.FC<{ log: PipelineRunLog }> = ({ log }) => {
         <td className="px-4 py-3 font-mono text-sm text-slate-700 dark:text-slate-300 max-w-[200px] truncate">
           {log.node_type ?? 'pipeline'}
         </td>
-        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-[340px] truncate">
+        <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 max-w-[300px] truncate">
           {log.message}
         </td>
-        <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 font-mono max-w-[180px] truncate">
-          {log.node_id ?? '—'}
+        <td className="px-4 py-3 text-xs" onClick={e => e.stopPropagation()}>
+          <ErrorResourceLink
+            nodeId={log.node_id}
+            pipelineId={log.pipeline_id}
+            origin={origin}
+            timeRange={timeRange}
+            filters={filters}
+          />
         </td>
         <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
           {log.run_at ? (
@@ -250,11 +394,24 @@ const PipelineRow: React.FC<{ log: PipelineRunLog }> = ({ log }) => {
       </tr>
       {expanded && (
         <tr className="bg-slate-50 dark:bg-slate-800/40">
-          <td colSpan={7} className="px-6 py-4">
+          <td colSpan={8} className="px-6 py-4">
             <div className="grid grid-cols-2 gap-4 text-xs mb-3 text-slate-500 dark:text-slate-400">
               {log.node_id && <span><strong>Node ID:</strong> {log.node_id}</span>}
               {log.pipeline_id && <span><strong>Pipeline:</strong> {log.pipeline_id}</span>}
               {log.run_at && <span><strong>Time:</strong> {new Date(log.run_at).toLocaleString()}</span>}
+              <span className="flex items-center gap-2">
+                <strong>Diagnostic ID:</strong> <CopyDiagnosticId id={log.id} label="diagnostic ID" />
+              </span>
+              <span className="flex items-center gap-2">
+                <strong>Target:</strong>{' '}
+                <ErrorResourceLink
+                  nodeId={log.node_id}
+                  pipelineId={log.pipeline_id}
+                  origin={origin}
+                  timeRange={timeRange}
+                  filters={filters}
+                />
+              </span>
             </div>
             <pre className="text-xs font-mono bg-slate-900 text-slate-200 rounded-lg p-4 overflow-auto max-h-48 whitespace-pre-wrap leading-relaxed">
               {log.message}
@@ -330,14 +487,49 @@ const PipelineIssueRow: React.FC<{ issue: PipelineIssue }> = ({ issue }) => (
   </tr>
 );
 
+// ─── Facet select ───────────────────────────────────────────────────────────
+
+const FacetSelect: React.FC<{
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  optionLabel?: (v: string) => string;
+}> = ({ id, label, value, onChange, options, optionLabel }) => (
+  <div className="flex flex-col gap-1">
+    <label htmlFor={id} className="sr-only">{label}</label>
+    <select
+      id={id}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+    >
+      <option value="">{label}</option>
+      {options.map(o => (
+        <option key={o} value={o}>{optionLabel ? optionLabel(o) : o}</option>
+      ))}
+    </select>
+  </div>
+);
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export const ErrorLogPage: React.FC = () => {
   const [events, setEvents] = useState<ErrorEvent[]>([]);
+  const [eventsTotal, setEventsTotal] = useState(0);
+  const [eventsTotalUnfiltered, setEventsTotalUnfiltered] = useState(0);
+  const [errorFacets, setErrorFacets] = useState<{ severities: ErrorSeverity[]; error_types: string[]; job_ids: string[] }>(
+    { severities: [], error_types: [], job_ids: [] },
+  );
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [timeRange, setTimeRange] = useState<TimeRange>('24h');
   const [showResolved, setShowResolved] = useState(false);
+  const [severityFilter, setSeverityFilter] = useState<'' | ErrorSeverity>('');
+  const [errorTypeFilter, setErrorTypeFilter] = useState('');
+  const [jobIdFilter, setJobIdFilter] = useState('');
+  const [nodeIdFilter, setNodeIdFilter] = useState('');
   const [modal, setModal] = useState<ErrorEvent | null>(null);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -347,16 +539,38 @@ export const ErrorLogPage: React.FC = () => {
 
   // --- Backend-persisted pipeline run log ---
   const [pipelineLogs, setPipelineLogs] = useState<PipelineRunLog[]>([]);
+  const [pipelineFacets, setPipelineFacets] = useState<{ node_types: string[]; node_ids: string[] }>(
+    { node_types: [], node_ids: [] },
+  );
+
+  // Operational context this view hands to every contextual RecordLink, so a
+  // followed link and its return preserve the active time/facet scope.
+  const operationalTimeRange = (timeRange === 'all' ? 'all' : timeRange) as OperationalTimeRange;
+  const linkFilters = useMemo(() => {
+    const f: Record<string, string> = {};
+    if (showResolved) f.showResolved = 'true';
+    if (severityFilter) f.severity = severityFilter;
+    if (errorTypeFilter) f.errorType = errorTypeFilter;
+    if (jobIdFilter) f.jobId = jobIdFilter;
+    if (nodeIdFilter) f.nodeId = nodeIdFilter;
+    if (search) f.q = search;
+    return f;
+  }, [showResolved, severityFilter, errorTypeFilter, jobIdFilter, nodeIdFilter, search]);
 
   const fetchPipelineLogs = useCallback(async () => {
     try {
-      const logs = await monitoringApi.getPipelineLogs(200);
-      setPipelineLogs(logs);
+      const resp = await monitoringApi.getPipelineLogs(200, sinceIso(timeRange), undefined, {
+        ...(search ? { q: search } : {}),
+        ...(severityFilter ? { level: SEVERITY_TO_PIPELINE_LEVEL[severityFilter] } : {}),
+        ...(nodeIdFilter ? { nodeId: nodeIdFilter } : {}),
+      });
+      setPipelineLogs(resp.entries);
+      setPipelineFacets({ node_types: resp.facets.node_types, node_ids: resp.facets.node_ids });
     } catch (err) {
       // backend may be unavailable; log for diagnostics but don't block the page
       console.debug('[error-log] failed to fetch pipeline logs', err);
     }
-  }, []);
+  }, [timeRange, search, severityFilter, nodeIdFilter]);
 
   const handleClearPipelineLogs = useCallback(async () => {
     try {
@@ -373,11 +587,19 @@ export const ErrorLogPage: React.FC = () => {
     setError(null);
     try {
       const [data, tl, grp] = await Promise.all([
-        monitoringApi.getErrors(500, sinceIso(timeRange), showResolved),
+        monitoringApi.getErrors(500, sinceIso(timeRange), showResolved, {
+          ...(search ? { q: search } : {}),
+          ...(severityFilter ? { severity: severityFilter } : {}),
+          ...(errorTypeFilter ? { errorType: errorTypeFilter } : {}),
+          ...(jobIdFilter ? { jobId: jobIdFilter } : {}),
+        }),
         monitoringApi.getTimeline(24),
         monitoringApi.getGrouped(),
       ]);
-      setEvents(data);
+      setEvents(data.entries);
+      setEventsTotal(data.total);
+      setEventsTotalUnfiltered(data.total_unfiltered);
+      setErrorFacets(data.facets);
       setTimeline(tl);
       setGrouped(grp);
       // also refresh pipeline logs so they appear in Events tab
@@ -387,7 +609,7 @@ export const ErrorLogPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [timeRange, showResolved, fetchPipelineLogs]);
+  }, [timeRange, showResolved, severityFilter, errorTypeFilter, jobIdFilter, search, fetchPipelineLogs]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -427,20 +649,14 @@ export const ErrorLogPage: React.FC = () => {
     setEvents(prev => prev.map(e => e.id === updated.id ? updated : e));
   };
 
-  const filtered = events.filter(e =>
-    !search ||
-    e.error_type.toLowerCase().includes(search.toLowerCase()) ||
-    e.message.toLowerCase().includes(search.toLowerCase()) ||
-    e.route.toLowerCase().includes(search.toLowerCase()) ||
-    (e.job_id ?? '').toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredPipeline = pipelineLogs.filter(l =>
-    !search ||
-    l.message.toLowerCase().includes(search.toLowerCase()) ||
-    (l.node_type ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (l.node_id ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  // Filters (time range, resolved state, severity, error type, job/node id, and
+  // the generic search box) are all applied server-side across the full stored
+  // history — see `monitoringApi.getErrors`/`getPipelineLogs` — so these lists
+  // are already the matching set, not a client-side narrowing of one page.
+  const filtered = events;
+  const filteredPipeline = pipelineLogs;
+  const hasActiveFilters =
+    !!search || !!severityFilter || !!errorTypeFilter || !!jobIdFilter || !!nodeIdFilter;
 
   // summary stats
   const total500 = events.filter(e => e.status_code >= 500).length;
@@ -609,49 +825,85 @@ export const ErrorLogPage: React.FC = () => {
 
       {/* ── HTTP Events / Issues tabs ──────────────────────────────────── */}
       {/* Toolbar */}
-      <div className={`flex items-center gap-3 mb-4 ${view === 'issues' ? 'hidden' : ''}`}>
-        <div className="relative flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search errors…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-200"
+      <div className={`flex flex-col gap-3 mb-4 ${view === 'issues' ? 'hidden' : ''}`}>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search errors, job id, node id…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-slate-200"
+            />
+          </div>
+          {/* Time-range pills */}
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+            {TIME_RANGES.map(r => (
+              <button
+                key={r.value}
+                onClick={() => setTimeRange(r.value)}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
+                  timeRange === r.value
+                    ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          {/* Show resolved toggle */}
+          <button
+            onClick={() => setShowResolved(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium border transition-colors ${
+              showResolved
+                ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200'
+                : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
+            }`}
+          >
+            {showResolved ? '✓ Showing resolved' : 'Show resolved'}
+          </button>
+          {hasActiveFilters && (
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {eventsTotalUnfiltered === 0
+                ? 'No history recorded yet'
+                : `${eventsTotal} of ${eventsTotalUnfiltered} HTTP events match`}
+            </span>
+          )}
+        </div>
+        {/* Typed facets — composable, exact-match filters distinct from the generic search above */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <FacetSelect
+            id="facet-severity"
+            label="All severities"
+            value={severityFilter}
+            onChange={v => setSeverityFilter(v as '' | ErrorSeverity)}
+            options={errorFacets.severities}
+            optionLabel={s => SEVERITY_LABELS[s as ErrorSeverity] ?? s}
+          />
+          <FacetSelect
+            id="facet-error-type"
+            label="All error types"
+            value={errorTypeFilter}
+            onChange={setErrorTypeFilter}
+            options={errorFacets.error_types}
+          />
+          <FacetSelect
+            id="facet-job-id"
+            label="All job IDs"
+            value={jobIdFilter}
+            onChange={setJobIdFilter}
+            options={errorFacets.job_ids}
+          />
+          <FacetSelect
+            id="facet-node-id"
+            label="All node IDs"
+            value={nodeIdFilter}
+            onChange={setNodeIdFilter}
+            options={pipelineFacets.node_ids}
           />
         </div>
-        {/* Time-range pills */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-          {TIME_RANGES.map(r => (
-            <button
-              key={r.value}
-              onClick={() => setTimeRange(r.value)}
-              className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${
-                timeRange === r.value
-                  ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        {/* Show resolved toggle */}
-        <button
-          onClick={() => setShowResolved(v => !v)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg font-medium border transition-colors ${
-            showResolved
-              ? 'bg-slate-200 dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200'
-              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-700'
-          }`}
-        >
-          {showResolved ? '✓ Showing resolved' : 'Show resolved'}
-        </button>
-        {search && (
-          <span className="text-xs text-slate-500 dark:text-slate-400">
-            {filtered.length + filteredPipeline.length} / {events.length + pipelineLogs.length} shown
-          </span>
-        )}
       </div>
 
       {/* Table */}
@@ -696,8 +948,14 @@ export const ErrorLogPage: React.FC = () => {
       ) : filtered.length === 0 && filteredPipeline.length === 0 ? (
         <EmptyState
           icon={<Bug size={40} className="text-slate-300" />}
-          title={search ? 'No matching errors' : 'No errors recorded'}
-          description={search ? 'Try a different search term.' : 'Any unhandled 5xx or failed pipeline will appear here automatically.'}
+          title={hasActiveFilters ? 'No matching errors' : 'No errors recorded'}
+          description={
+            hasActiveFilters
+              ? eventsTotalUnfiltered === 0
+                ? 'No error events have been recorded yet — nothing to search or filter.'
+                : `No events match the current search/facets out of ${eventsTotalUnfiltered} recorded. Try widening the time range or clearing a facet.`
+              : 'Any unhandled 5xx or failed pipeline will appear here automatically.'
+          }
         />
       ) : (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -705,26 +963,49 @@ export const ErrorLogPage: React.FC = () => {
             <thead>
               <tr className="text-left text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                 <th className="px-4 py-3 w-8" />
+                <th className="px-4 py-3">Severity</th>
                 <th className="px-4 py-3">Code</th>
                 <th className="px-4 py-3">Type</th>
                 <th className="px-4 py-3">Message</th>
-                <th className="px-4 py-3">Node / Route</th>
+                <th className="px-4 py-3">Target</th>
                 <th className="px-4 py-3">When</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {filteredPipeline.map(l => (
-                <PipelineRow key={`pl-${l.id}`} log={l} />
+                <PipelineRow
+                  key={`pl-${l.id}`}
+                  log={l}
+                  origin="/errors"
+                  timeRange={operationalTimeRange}
+                  filters={linkFilters}
+                />
               ))}
               {filtered.map(e => (
-                <ErrorRow key={e.id} event={e} onExpand={setModal} onResolve={handleResolve} />
+                <ErrorRow
+                  key={e.id}
+                  event={e}
+                  onExpand={setModal}
+                  onResolve={handleResolve}
+                  origin="/errors"
+                  timeRange={operationalTimeRange}
+                  filters={linkFilters}
+                />
               ))}
             </tbody>
           </table>
         </div>
       )}
-      {modal && <TracebackModal event={modal} onClose={() => setModal(null)} />}
+      {modal && (
+        <TracebackModal
+          event={modal}
+          onClose={() => setModal(null)}
+          origin="/errors"
+          timeRange={operationalTimeRange}
+          filters={linkFilters}
+        />
+      )}
     </div>
   );
 };

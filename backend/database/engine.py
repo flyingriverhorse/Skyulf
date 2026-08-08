@@ -213,6 +213,34 @@ async def _run_migrations() -> None:
             "0.6.0",
             "ALTER TABLE training_jobs ADD COLUMN tuned_thresholds_enabled BOOLEAN NOT NULL DEFAULT 0",
         ),
+        # v0.7.6 — OPS-002 model-to-deployment lineage
+        ("0.7.6", "ALTER TABLE deployments ADD COLUMN previous_deployment_id INTEGER"),
+        # v0.7.6 — OPS-003 durable drift alert lifecycle
+        (
+            "0.7.6",
+            "ALTER TABLE drift_check_results ADD COLUMN severity VARCHAR(20) NOT NULL DEFAULT 'none'",
+        ),
+        (
+            "0.7.6",
+            "ALTER TABLE drift_check_results ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'new'",
+        ),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN owner VARCHAR(255)"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN acknowledged_at DATETIME"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN resolved_at DATETIME"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN disposition_history JSON"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_version INTEGER"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_psi FLOAT"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_ks FLOAT"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_wasserstein FLOAT"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN threshold_kl FLOAT"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN deployment_id INTEGER"),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN model_version VARCHAR(50)"),
+        (
+            "0.7.6",
+            "ALTER TABLE drift_check_results ADD COLUMN evaluation_status VARCHAR(20) "
+            "NOT NULL DEFAULT 'completed'",
+        ),
+        ("0.7.6", "ALTER TABLE drift_check_results ADD COLUMN error_message TEXT"),
     ]
 
     applied = 0

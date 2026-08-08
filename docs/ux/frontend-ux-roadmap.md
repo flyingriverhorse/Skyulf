@@ -4319,19 +4319,39 @@ not been repeated end-to-end since the fixes landed. Treat the entries above as
 "fix implemented and unit-verified", not "acceptance criteria fully
 re-validated".
 
-### Still open (9)
+### Resolved in v0.7.6
 
-Rank order, per `### Normalized ranking` above:
+The last 9 open findings. Same caveat as above: validated by unit/component and
+backend tests plus `lint`, `ty`, `tsc`, and `build`, not by re-running each
+finding's full `## Validation Matrix` row — no Playwright, responsive, or
+screen-reader pass was repeated end-to-end.
 
-- **19–24:** `EXP-007`, `OPS-001`, `OPS-004`, `DAT-007`, `EXP-003`
-- **25–30:** `OPS-002`, `OPS-003`
-- **31–37:** `OPS-005`, `CAN-003`
+| Finding | Rank | What changed |
+|---------|------|--------------|
+| EXP-007 | 19 | Named prediction runs with pending/cancel/timeout/failure/retry states, 24h persisted history, reload rehydration, and per-run provenance. **Partial:** latency is client-observed only — the backend `PredictionResponse` carries no server-side timing. `shortRunId` was not reused because it keys on training-job identifiers a prediction run does not have. |
+| OPS-001 | 20 | Unified Jobs investigation view (timeline, input, error, logs, related `RecordLink`s), `POST /jobs/{id}/retry`, scoped cancel/retry guard, explained unavailable actions, and URL-persisted list-state restoration. **Partial:** deep-link retry for EDA/ingestion job types is limited to cached entries, which are synthesized client-side with no `/pipeline/jobs/{id}` backing. |
+| OPS-004 | 21 | Server-side Error Log facets (`severity`/`error_type`/`job_id`/`node_id`) with `facets` + `total_unfiltered`, derived severity classification, and per-error `RecordLink`s. **Partial:** no dataset/model-version links — the `ErrorEvent`/`PipelineRunLog` schema carries no such ids; no traceback redaction, because no shared redaction primitive exists to apply. |
+| DAT-007 | 22 | Shared `ChartLegend` (color **and** marker shape) and `ChartDataTable` (table + CSV) primitives across EDA chart families; persistent heatmap gradient legend and always-visible axis labels; 3D scatter theming. **Partial:** export context is carried by the adjacent table/CSV controls rather than embedded in the PNG itself. |
+| EXP-003 | 23 | Per-run artifact coverage (`available`/`unsupported`/`not_computed`/`failed` with a reason), explicit normalization scale, hatched not-reported bars, cluster metric direction, and data-table alternatives. **Partial:** Segmentation cannot yet distinguish "not computed for this exact run" per run, because clustering evaluation is fetched only for the active job. |
+| OPS-002 | 24 | `previous_deployment_id` lineage, dataset/version enrichment on every history row, `RecordLink` chains with explicit "no target available", scoped mutation errors that retry in place, and removal of a `localStorage` manual-deploy shim. **Partial:** evaluation provenance linking to `EXP-005` threshold data was not included. |
+| OPS-003 | 25 | Durable drift alerts: severity, immutable `DriftThresholdVersion` pinning, disposition state machine with audit trail, per-outcome persistence (`completed`/`no_baseline`/`failed`), evidence table, and deployment/model/job links. Also fixed double-nested evidence storage. |
+| OPS-005 | 26 | Slow-node aggregates state unit, window, run count, single-run and unrepresentative-sample flags, outliers, and contributing runs, with URL-synced list state and job/Canvas drill-downs. **Partial:** the Canvas link carries node context correctly, but `CanvasPage` does not yet consume it to select the node on arrival. |
+| CAN-003 | 27 | `loadCanvasSnapshotDiagnostic()` distinguishes available/empty/corrupt/version-mismatch/storage-error; labelled recovery sources, re-probing restore prompt, non-blocking failure explanation, and fit-and-focus on restore. **Partial:** server versions remain in the Toolbar's Load menu rather than a single unified widget — an empty canvas has no dataset context to query them from. |
 
-Three of the resolved entries above (`DAT-006`, `EXP-004`, `OPS-006`) shipped a
-scoped slice rather than the finding's full proposed behavior; each names its
-remaining gap in the table. Those gaps are deliberately *not* tracked as
-separate open findings — a future audit rerun should re-evaluate them against
-live evidence and decide whether the residue still constitutes a user problem.
+Rank numbers in this table are sequential within the v0.7.6 batch and are not
+the `### Normalized ranking` positions used by the v0.7.5 table.
+
+### Still open (0)
+
+All 37 findings from the `2026-08-07` audit rerun now have an implemented fix.
+The final 9 shipped in `v0.7.6` — see `### Resolved in v0.7.6` above.
+
+Several resolved entries (`DAT-006`, `EXP-004`, `OPS-006`, plus the rows marked
+**Partial** in the `v0.7.6` table) shipped a scoped slice rather than the
+finding's full proposed behavior; each names its remaining gap in its table row.
+Those gaps are deliberately *not* tracked as separate open findings — a future
+audit rerun should re-evaluate them against live evidence and decide whether the
+residue still constitutes a user problem.
 
 ## Validation Matrix
 

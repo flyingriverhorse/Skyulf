@@ -9,6 +9,12 @@ export interface DeploymentInfo {
   created_at: string;
   input_schema?: { name: string; type: string }[];
   target_column?: string;
+  /** Dataset backing the deployed job, when the source training job is still resolvable. */
+  dataset_id?: string | null;
+  /** Shared version sequence for this model_type/dataset, matching the Registry entry. */
+  version?: number | string | null;
+  /** The deployment this one replaced, so History can render a replacement chain. */
+  previous_deployment_id?: number | null;
 }
 
 export interface PredictionRequest {
@@ -50,11 +56,19 @@ export const deploymentApi = {
     await apiClient.post('/deployment/deactivate');
   },
 
-  predict: async (data: unknown[], overrideThresholds?: Record<string, number> | null): Promise<PredictionResponse> => {
-    const response = await apiClient.post<PredictionResponse>('/deployment/predict', {
-      data,
-      override_thresholds: overrideThresholds,
-    });
+  predict: async (
+    data: unknown[],
+    overrideThresholds?: Record<string, number> | null,
+    options?: { signal?: AbortSignal },
+  ): Promise<PredictionResponse> => {
+    const response = await apiClient.post<PredictionResponse>(
+      '/deployment/predict',
+      {
+        data,
+        override_thresholds: overrideThresholds,
+      },
+      options?.signal ? { signal: options.signal } : undefined,
+    );
     return response.data;
   }
 };

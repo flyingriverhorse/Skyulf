@@ -2,14 +2,14 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import {
   X, ArrowLeft, Terminal, LayoutDashboard, FileText,
   AlertCircle, CheckCircle, Square, Database, Copy, WrapText,
-  ChevronsDown, ChevronsUp,
+  ChevronsDown, ChevronsUp, RotateCw, Info,
 } from 'lucide-react';
 import { JobInfo } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
 import { formatMetricName, getMetricDescription, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { InfoTooltip } from '../../ui/InfoTooltip';
-import { useConfirm } from '../../shared';
+import { useConfirm, RecordLink } from '../../shared';
 import { toast } from '../../../core/toast';
 
 /** Parse a log line into its level and message parts. */
@@ -214,6 +214,33 @@ const getScoringMetric = (job: JobInfo): string | undefined => {
   return tuning?.metric as string | undefined;
 };
 
+/** Whether recovery (retry) is currently supported for a job, and why not when it isn't. */
+interface RetryAvailability {
+  available: boolean;
+  reason?: string;
+}
+
+const RETRYABLE_JOB_TYPES: ReadonlySet<JobInfo['job_type']> = new Set(['training', 'tuning']);
+const RETRYABLE_STATUSES: ReadonlySet<JobInfo['status']> = new Set(['failed', 'cancelled']);
+
+/**
+ * Determines whether the Retry action is available for a job and, when it
+ * isn't, why — so the UI can always state availability instead of silently
+ * hiding the control (OPS-001 acceptance: "unavailable retry is not implied").
+ */
+function getRetryAvailability(job: JobInfo): RetryAvailability {
+  if (!RETRYABLE_JOB_TYPES.has(job.job_type)) {
+    return { available: false, reason: `Retry isn't available for ${job.job_type} jobs.` };
+  }
+  if (RETRYABLE_STATUSES.has(job.status)) {
+    return { available: true };
+  }
+  if (job.status === 'completed' || job.status === 'succeeded') {
+    return { available: false, reason: 'Retry is not needed — this job completed successfully.' };
+  }
+  return { available: false, reason: 'Retry becomes available once this job fails or is cancelled.' };
+}
+
 const FeatureImportancesSection: React.FC<{ result: Record<string, unknown> }> = ({ result }) => {
   const metrics = result.metrics as Record<string, unknown> | undefined;
   const raw = (metrics?.feature_importances ?? result.feature_importances) as Record<string, number> | undefined;
@@ -248,13 +275,18 @@ interface JobDetailsViewProps {
   job: JobInfo;
   onBack: () => void;
   onClose: () => void;
+  /** Route the caller is presenting this view from, carried into related-record links. */
+  origin?: string;
+  /** List filters to preserve on related-record links (mirrors OPS-007 `OperationalContext.filters`). */
+  filters?: Record<string, string>;
 }
 
-export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob, onBack, onClose }) => {
-    const { cancelJob } = useJobStore();
+export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob, onBack, onClose, origin, filters }) => {
+    const { cancelJob, retryJob } = useJobStore();
     const confirm = useConfirm();
     const [activeTab, setActiveTab] = useState<'overview' | 'logs'>('overview');
     const [isCancelling, setIsCancelling] = useState(false);
+    const [isRetrying, setIsRetrying] = useState(false);
     const [autoScroll, setAutoScroll] = useState(true);
     const [wrapLines, setWrapLines] = useState(true);
     const [copied, setCopied] = useState(false);
@@ -269,6 +301,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
     );
     const { jobs: polledJobs } = useJobPolling(pollIds, { intervalMs: 2000 });
     const job: JobInfo = polledJobs[initialJob.job_id] ?? initialJob;
+    const retryAvailability = useMemo(() => getRetryAvailability(job), [job]);
 
     // Auto-scroll logs
     useEffect(() => {
@@ -303,6 +336,26 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
         }
     };
 
+    const handleRetry = async () => {
+        if (isRetrying) return; // Guard against a double-click firing two retry submissions.
+        const ok = await confirm({
+            title: 'Retry job?',
+            message: 'This resubmits the same pipeline configuration as a new job.',
+            confirmLabel: 'Retry',
+        });
+        if (!ok) return;
+        setIsRetrying(true);
+        try {
+            const newJobId = await retryJob(job.job_id);
+            toast.success(`Retry submitted as job ${newJobId.slice(0, 8)}`);
+            onBack();
+        } catch (e) {
+            toast.error('Failed to retry job');
+        } finally {
+            setIsRetrying(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
@@ -314,8 +367,13 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                     <div>
                         <h2 className="font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
                             Job Details
-                            <span className="text-xs font-normal text-gray-500 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                            <span
+                                className="text-xs font-normal text-gray-500 font-mono bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded"
+                                title={job.job_id}
+                            >
+                                <span className="sr-only">Job ID </span>
                                 {job.job_id.slice(0, 8)}
+                                <span className="sr-only">{job.job_id.slice(8)}</span>
                             </span>
                             {isEnsembleModelType(job.model_type) && (
                                 <span className="text-xs font-normal px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 whitespace-nowrap">
@@ -335,6 +393,26 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                             <Square className="w-3 h-3 fill-current" />
                             {isCancelling ? 'Stopping...' : 'Stop Job'}
                         </button>
+                    )}
+                    {isTerminalStatus(job.status) && (
+                        retryAvailability.available ? (
+                            <button
+                                onClick={() => { void handleRetry(); }}
+                                disabled={isRetrying}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded text-xs font-medium transition-colors border border-blue-200 dark:border-blue-800"
+                            >
+                                <RotateCw className={`w-3 h-3 ${isRetrying ? 'animate-spin' : ''}`} />
+                                {isRetrying ? 'Retrying...' : 'Retry'}
+                            </button>
+                        ) : (
+                            <span
+                                className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-400 dark:text-gray-500"
+                                title={retryAvailability.reason}
+                            >
+                                <Info className="w-3 h-3" />
+                                Retry unavailable
+                            </span>
+                        )
                     )}
                     <button onClick={onClose} className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
                         <X className="w-4 h-4" />
@@ -373,7 +451,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                 {activeTab === 'overview' ? (
                     <div className="space-y-6">
                         {/* Status Section */}
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
                                 <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
@@ -384,7 +462,16 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Dataset</div>
                                 <div className="font-medium text-gray-800 dark:text-gray-200 flex items-center gap-2">
                                     <Database className="w-3 h-3 text-gray-400" />
-                                    {job.dataset_name || job.dataset_id || 'Unknown'}
+                                    {job.dataset_id ? (
+                                        <RecordLink
+                                            recordRef={{ kind: 'dataset', datasetId: job.dataset_id }}
+                                            label={job.dataset_name || job.dataset_id}
+                                            {...(origin !== undefined ? { origin } : {})}
+                                            {...(filters !== undefined ? { filters } : {})}
+                                        />
+                                    ) : (
+                                        job.dataset_name || 'Unknown'
+                                    )}
                                 </div>
                             </div>
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
@@ -395,7 +482,60 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                         : '-'}
                                 </div>
                             </div>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Progress</div>
+                                <div className="font-medium text-gray-800 dark:text-gray-200">
+                                    {/* The job payload carries no numeric progress field, so a running/queued
+                                        job states that honestly instead of implying a bar we can't back. */}
+                                    {isTerminalStatus(job.status) ? '—' : 'Not reported'}
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Timeline Section */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                            <div>
+                                <span className="text-gray-500 dark:text-gray-400">Created:</span>
+                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                    {job.created_at ? new Date(job.created_at).toLocaleString() : '—'}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 dark:text-gray-400">Started:</span>
+                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                    {job.start_time ? new Date(job.start_time).toLocaleString() : 'Not started'}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-gray-500 dark:text-gray-400">Ended:</span>
+                                <span className="ml-2 font-mono text-gray-700 dark:text-gray-300">
+                                    {job.end_time ? new Date(job.end_time).toLocaleString() : 'Not finished'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Related Records Section */}
+                        {(job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion') || job.promoted_at ? (
+                            <div className="flex flex-wrap items-center gap-4 text-xs p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <span className="text-gray-500 dark:text-gray-400 font-medium">Related:</span>
+                                {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && (
+                                    <RecordLink
+                                        recordRef={{ kind: 'pipeline', pipelineId: job.pipeline_id }}
+                                        label={`Pipeline ${job.pipeline_id}`}
+                                        {...(origin !== undefined ? { origin } : {})}
+                                        {...(filters !== undefined ? { filters } : {})}
+                                    />
+                                )}
+                                {job.promoted_at && job.version !== undefined && (
+                                    <RecordLink
+                                        recordRef={{ kind: 'modelVersion', jobId: job.job_id, version: String(job.version) }}
+                                        label={`Model version ${job.version}`}
+                                        {...(origin !== undefined ? { origin } : {})}
+                                        {...(filters !== undefined ? { filters } : {})}
+                                    />
+                                )}
+                            </div>
+                        ) : null}
 
                         {/* Error Section */}
                         {job.error && (

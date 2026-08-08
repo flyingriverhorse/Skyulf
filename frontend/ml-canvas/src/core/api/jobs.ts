@@ -78,6 +78,13 @@ export const jobsApi = {
     await apiClient.post(`/pipeline/jobs/${jobId}/cancel`);
   },
 
+  retryJob: async (jobId: string): Promise<{ job_id: string; message: string }> => {
+    const response = await apiClient.post<{ job_id: string; message: string }>(
+      `/pipeline/jobs/${jobId}/retry`,
+    );
+    return response.data;
+  },
+
   getJobs: async (limit: number = 10, skip: number = 0, type?: 'training' | 'tuning'): Promise<JobInfo[]> => {
     const params: Record<string, unknown> = { limit, skip };
     if (type) {

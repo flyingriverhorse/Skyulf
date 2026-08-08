@@ -1,18 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { History, X } from 'lucide-react';
+import { History, X, AlertTriangle } from 'lucide-react';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import {
   clearCanvasSnapshot,
-  loadCanvasSnapshot,
+  loadCanvasSnapshotDiagnostic,
   type CanvasSnapshot,
 } from '../../core/utils/canvasPersistence';
+import {
+  describeAutosaveUnavailable,
+  RECOVERY_KIND_LABEL,
+  type AutosaveUnavailable,
+} from '../../core/utils/canvasRecovery';
+import { FIT_VIEW_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { clickableProps } from '../../core/utils/a11y';
 
 /**
- * One-shot prompt that surfaces a previously auto-saved canvas when
- * the user reopens the app with an empty graph. Restores `nodes` /
- * `edges` from `localStorage` on confirmation, or wipes the snapshot
- * on dismiss. Stays hidden the rest of the session.
+ * Recovery entry point that surfaces the autosaved canvas — or explains why
+ * it can't be restored — whenever the user reopens the app with an empty
+ * graph. Restores `nodes`/`edges` from `localStorage` on confirmation, or
+ * wipes the snapshot on dismiss. Re-probes any time the canvas becomes
+ * empty (e.g. after "Clear canvas"), not just on first mount, so clearing
+ * the graph doesn't permanently suppress the prompt for the session.
  *
  * Pairs with `useCanvasAutoSave`.
  */
@@ -21,27 +29,37 @@ export const RestoreSessionBanner: React.FC = () => {
   const hasNodes = useGraphStore((s) => s.nodes.length > 0);
 
   const [snapshot, setSnapshot] = useState<CanvasSnapshot | null>(null);
+  const [unavailable, setUnavailable] = useState<AutosaveUnavailable | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Only probe localStorage once on mount, and only show the banner
-    // when the canvas is currently empty (otherwise the user already
-    // started fresh — don't second-guess them).
-    if (hasNodes) return;
-    const snap = loadCanvasSnapshot();
-    if (snap && (snap.nodes.length > 0 || snap.edges.length > 0)) {
-      setSnapshot(snap);
+    // Only show the banner while the canvas is currently empty (otherwise
+    // the user already started fresh — never second-guess a nonempty
+    // graph). Re-runs whenever the graph transitions to empty so a
+    // mid-session "Clear canvas" gets a fresh chance to offer recovery.
+    if (hasNodes) {
+      setDismissed(false);
+      return;
     }
-    // Intentionally only run once: subsequent edits shouldn't
-    // re-trigger the prompt.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const diagnostic = loadCanvasSnapshotDiagnostic();
+    if (diagnostic.status === 'available' && diagnostic.snapshot.nodes.length + diagnostic.snapshot.edges.length > 0) {
+      setSnapshot(diagnostic.snapshot);
+      setUnavailable(null);
+    } else {
+      setSnapshot(null);
+      setUnavailable(describeAutosaveUnavailable(diagnostic));
+    }
+  }, [hasNodes]);
 
-  if (dismissed || !snapshot || hasNodes) return null;
+  if (dismissed || hasNodes || (!snapshot && !unavailable)) return null;
 
   const handleRestore = (): void => {
+    if (!snapshot) return;
     setGraph(snapshot.nodes, snapshot.edges);
     setDismissed(true);
+    // CAN-003: restoring a source must focus the result, not leave the
+    // user staring at wherever the viewport happened to be.
+    window.dispatchEvent(new CustomEvent(FIT_VIEW_EVENT));
   };
 
   const handleDiscard = (): void => {
@@ -49,6 +67,28 @@ export const RestoreSessionBanner: React.FC = () => {
     setSnapshot(null);
     setDismissed(true);
   };
+
+  if (unavailable) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="absolute bottom-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-3 px-4 py-2 rounded-md border bg-background/95 backdrop-blur shadow-lg text-sm animate-in fade-in slide-in-from-bottom-2 max-w-lg"
+      >
+        <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" aria-hidden="true" />
+        <span className="text-muted-foreground">{unavailable.message}</span>
+        <span
+          {...clickableProps(() => setDismissed(true))}
+          className="ml-1 p-1 rounded hover:bg-accent text-muted-foreground cursor-pointer focus-ring flex-shrink-0"
+          aria-label="Dismiss autosave notice"
+        >
+          <X className="w-3.5 h-3.5" />
+        </span>
+      </div>
+    );
+  }
+
+  if (!snapshot) return null;
 
   // Format "5 minutes ago" without pulling in date-fns; coarse buckets
   // are plenty for an autosave hint.
@@ -76,6 +116,9 @@ export const RestoreSessionBanner: React.FC = () => {
     >
       <History className="w-4 h-4 text-primary" aria-hidden="true" />
       <span>
+        <span className="px-1.5 py-0.5 mr-1.5 rounded bg-primary/10 text-primary text-xs font-medium">
+          {RECOVERY_KIND_LABEL.autosave}
+        </span>
         Restore previous session?{' '}
         <span className="text-muted-foreground">
           {snapshot.nodes.length} node{snapshot.nodes.length === 1 ? '' : 's'} · saved {relative}
