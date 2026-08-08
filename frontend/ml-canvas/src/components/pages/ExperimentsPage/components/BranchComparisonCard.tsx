@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { GitBranch, Trophy } from 'lucide-react';
 import type { JobInfo } from '../../../../core/api/jobs';
 import { formatMetricName } from '../../../../core/utils/format';
+import { getMetricDirection, pickBestIndex, type MetricDirection } from '../../../../core/utils/metricMeta';
+import { MetricDirectionBadge } from '../../../ui/MetricDirectionBadge';
 import { getJobScoringMetric } from '../utils/jobMeta';
 
 interface Props {
@@ -12,7 +14,8 @@ interface Props {
 interface MetricRow {
   key: string;
   values: (number | undefined)[];
-  bestVal: number | null;
+  bestIndex: number | null;
+  direction: MetricDirection;
 }
 
 interface GroupRow {
@@ -48,21 +51,12 @@ export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuratio
     return rawMultiGroups.map(([parentId, groupJobsRaw]) => {
       const groupJobs = [...groupJobsRaw].sort((a, b) => (a.branch_index ?? 0) - (b.branch_index ?? 0));
       const metricRows = allBranchMetricKeys.map(key => {
-        // Find best value for highlighting
         const values = groupJobs.map(j => {
           const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
           return m[key];
         });
-        const isLowerBetter = key.includes('loss') || key.includes('error') || key.includes('mse') || key.includes('mae');
-        const filtered = values.filter((v): v is number => v != null);
-        // If every branch is missing this metric, there's nothing to compare.
-        // Math.min/max on an empty array silently returns Infinity/-Infinity,
-        // which never `=== val` for any real value, so no "best" would ever
-        // be highlighted anyway — guard explicitly instead of relying on that.
-        const bestVal = filtered.length > 0
-          ? (isLowerBetter ? Math.min(...filtered) : Math.max(...filtered))
-          : null;
-        return { key, values, bestVal };
+        const direction = getMetricDirection(key);
+        return { key, values, bestIndex: pickBestIndex(values, direction), direction };
       });
       return { parentId, groupJobs, metricRows };
     });
@@ -100,19 +94,24 @@ export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuratio
                 </tr>
               </thead>
               <tbody>
-                {metricRows.map(({ key, values, bestVal }) => (
+                {metricRows.map(({ key, values, bestIndex, direction }) => (
                   <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
                     <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
-                      {key === 'best_score'
-                        ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0] ?? {} as JobInfo)) || 'CV'})`
-                        : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                      <span className="inline-flex items-center gap-1">
+                        {key === 'best_score'
+                          ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0] ?? {} as JobInfo)) || 'CV'})`
+                          : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        <MetricDirectionBadge direction={direction} />
+                      </span>
                     </td>
                     {groupJobs.map((j, i) => {
                       const val = values[i];
-                      const isBest = val != null && bestVal != null && val === bestVal;
+                      const isBest = bestIndex === i;
                       return (
                         <td key={j.job_id} className={`px-3 py-1.5 font-mono ${isBest ? 'text-green-600 dark:text-green-400 font-bold' : 'text-gray-600 dark:text-gray-300'}`}>
-                          {val != null ? val.toFixed(4) : '-'}
+                          {val != null
+                            ? val.toFixed(4)
+                            : <span className="text-gray-400" title="Not reported by this run">—</span>}
                           {isBest && ' ★'}
                         </td>
                       );

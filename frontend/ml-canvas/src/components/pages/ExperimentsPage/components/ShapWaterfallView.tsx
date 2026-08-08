@@ -13,10 +13,13 @@ import {
 } from 'recharts';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import { useChartTheme } from '../../../../core/hooks/useChartTheme';
+import { shortRunId } from '../utils/jobMeta';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
   jobId: string;
+  pipeline_id: string;
+  parent_pipeline_id?: string | null;
   modelType: string;
   shapExplanation: ShapExplanationData;
   handleDownload: (elementId: string, fileName: string) => void | Promise<void>;
@@ -38,6 +41,8 @@ interface WaterfallRow {
 
 export const ShapWaterfallView: React.FC<Props> = ({
   jobId,
+  pipeline_id,
+  parent_pipeline_id,
   modelType,
   shapExplanation,
   handleDownload,
@@ -46,6 +51,7 @@ export const ShapWaterfallView: React.FC<Props> = ({
 }) => {
   const chartId = `shap-waterfall-chart-${jobId}`;
   const chartTheme = useChartTheme();
+  const runId = shortRunId({ pipeline_id, parent_pipeline_id: parent_pipeline_id ?? null });
   const { samples } = shapExplanation;
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -95,7 +101,7 @@ export const ShapWaterfallView: React.FC<Props> = ({
     <div className="space-y-6">
       <div className="flex items-center gap-2 flex-wrap">
         <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">
-          SHAP Waterfall — {modelType !== 'unknown' ? modelType : jobId.slice(0, 8)}
+          SHAP Waterfall — {modelType !== 'unknown' ? modelType : runId}
         </h3>
         <InfoTooltip
           text="Breaks down one sampled prediction: starting from the model's base value (average output), each feature pushes the prediction up (red) or down (blue) until reaching the final predicted output for that row."
@@ -117,7 +123,7 @@ export const ShapWaterfallView: React.FC<Props> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 relative group" id={chartId}>
         <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
           <button
-            onClick={() => void handleDownload(chartId, `shap_waterfall_row${activeIndex + 1}_${jobId.slice(0, 8)}`)}
+            onClick={() => void handleDownload(chartId, `shap_waterfall_row${activeIndex + 1}_${runId}`)}
             disabled={downloadingChart === chartId}
             className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
             title="Download Graph"

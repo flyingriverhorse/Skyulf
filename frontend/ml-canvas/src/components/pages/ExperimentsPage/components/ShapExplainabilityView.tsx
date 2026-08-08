@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { shortRunId } from '../utils/jobMeta';
 import { ShapSummaryView } from './ShapSummaryView';
 import { ShapBeeswarmView } from './ShapBeeswarmView';
 import { ShapDependenceView } from './ShapDependenceView';
@@ -9,6 +10,8 @@ import type { ShapExplanationData } from '../types';
 
 export interface ShapExplanationEntry {
   jobId: string;
+  pipeline_id: string;
+  parent_pipeline_id?: string | null;
   modelType: string;
   shapExplanation: ShapExplanationData | null;
 }
@@ -84,7 +87,7 @@ export const ShapExplainabilityView: React.FC<Props> = ({
           >
             {jobsWithData.map(j => (
               <option key={j.jobId} value={j.jobId}>
-                {j.modelType !== 'unknown' ? j.modelType : 'model'} ({j.jobId.slice(0, 8)})
+                {j.modelType !== 'unknown' ? j.modelType : 'model'} ({shortRunId(j)})
               </option>
             ))}
           </select>
@@ -95,6 +98,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
         <ShapSummaryView
           shapSummaryByJob={jobsWithData.map(j => ({
             jobId: j.jobId,
+            pipeline_id: j.pipeline_id,
+            parent_pipeline_id: j.parent_pipeline_id ?? null,
             modelType: j.modelType,
             shapSummary: j.shapExplanation.mean_abs_importance,
           }))}
@@ -107,6 +112,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
       {subView === 'beeswarm' && activeJob && (
         <ShapBeeswarmView
           jobId={activeJob.jobId}
+          pipeline_id={activeJob.pipeline_id}
+          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
           modelType={activeJob.modelType}
           shapExplanation={activeJob.shapExplanation}
           handleDownload={handleDownload}
@@ -118,6 +125,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
       {subView === 'dependence' && activeJob && (
         <ShapDependenceView
           jobId={activeJob.jobId}
+          pipeline_id={activeJob.pipeline_id}
+          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
           modelType={activeJob.modelType}
           shapExplanation={activeJob.shapExplanation}
           handleDownload={handleDownload}
@@ -129,6 +138,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
       {subView === 'waterfall' && activeJob && (
         <ShapWaterfallView
           jobId={activeJob.jobId}
+          pipeline_id={activeJob.pipeline_id}
+          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
           modelType={activeJob.modelType}
           shapExplanation={activeJob.shapExplanation}
           handleDownload={handleDownload}
@@ -140,6 +151,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
       {subView === 'force' && activeJob && (
         <ShapForceView
           jobId={activeJob.jobId}
+          pipeline_id={activeJob.pipeline_id}
+          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
           modelType={activeJob.modelType}
           shapExplanation={activeJob.shapExplanation}
           handleDownload={handleDownload}
@@ -151,6 +164,8 @@ export const ShapExplainabilityView: React.FC<Props> = ({
       {subView === 'interaction' && activeJob && (
         <ShapInteractionView
           jobId={activeJob.jobId}
+          pipeline_id={activeJob.pipeline_id}
+          parent_pipeline_id={activeJob.parent_pipeline_id ?? null}
           modelType={activeJob.modelType}
           shapExplanation={activeJob.shapExplanation}
           handleDownload={handleDownload}

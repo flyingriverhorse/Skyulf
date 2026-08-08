@@ -43,6 +43,11 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
         return <EmptyState icon={<ScatterIcon className="w-12 h-12 text-slate-300 dark:text-slate-600" />} title="No Data Available" description="Sample data is required for bivariate analysis." />;
     }
 
+    const canDownload = Boolean(scatterX && scatterY && profile.sample_data.length > 0);
+    const downloadHint = canDownload
+        ? 'Download Chart'
+        : 'Select X and Y variables to enable download';
+
     return (
         <div className="mt-4 bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
             <div className="flex justify-between items-center mb-4">
@@ -52,10 +57,11 @@ export const BivariateTab: React.FC<BivariateTabProps> = ({
                     <InfoTooltip text="Visualize the relationship between two numeric variables." />
                 </h3>
                 <button
+                    disabled={!canDownload}
                     onClick={() => downloadChart('bivariate-chart', 'bivariate-analysis', 'Bivariate Analysis', `${scatterX} vs ${scatterY}`)}
-                    className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
-                    title="Download Chart"
-                    aria-label="Download Chart"
+                    className="p-2 rounded-md border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 disabled:opacity-50"
+                    title={downloadHint}
+                    aria-label={downloadHint}
                 >
                     <Download className="w-4 h-4" />
                 </button>

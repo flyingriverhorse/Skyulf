@@ -9,7 +9,7 @@
 [![Core License](https://img.shields.io/badge/skyulf--core-Apache--2.0-green)](skyulf-core/LICENSE)
 [![Commercial](https://img.shields.io/badge/enterprise-support-blueviolet)](COMMERCIAL-LICENSE.md)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](#quick-start)
-[![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/ci.yml)
+[![CI](https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/pr_check.yml)
 [![Docs](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml/badge.svg)](https://github.com/flyingriverhorse/Skyulf/actions/workflows/docs.yml)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](.pre-commit-config.yaml)
 [![Code style: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/format.json)](https://github.com/astral-sh/ruff)
@@ -29,16 +29,6 @@ Skyulf is a self-hosted, privacy-first MLOps platform. It is designed to be the 
 ## What is the meaning of Skyulf?
 
 I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and helpful to community.
-
-## Star History
-
-<a href="https://www.star-history.com/?repos=flyingriverhorse%2FSkyulf&type=timeline&legend=bottom-right">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=flyingriverhorse/Skyulf&type=timeline&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=flyingriverhorse/Skyulf&type=timeline&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=flyingriverhorse/Skyulf&type=timeline&legend=bottom-right" />
- </picture>
-</a>
 
 ## Table of Contents
 

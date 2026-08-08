@@ -74,6 +74,31 @@ export const MergeWarningsBanner: React.FC<MergeWarningsBannerProps> = ({
               </div>
             );
           }
+          // An upstream Drop Columns step is authoritative for the whole
+          // subgraph, so a sibling branch cannot resurrect what it removed.
+          // The backend `message` embeds the raw node_id, so the sentence is
+          // composed here from the friendly label instead.
+          if (w.kind === 'upstream_drop_reapplied') {
+            const dropped = w.dropped_columns ?? [];
+            return (
+              <div key={idx} className="flex items-start gap-2 text-xs text-amber-900 dark:text-amber-200 pl-5">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <span className="font-medium">
+                    {nodeLabelMap[w.node_id] ?? w.node_id}
+                  </span>{' '}
+                  merged a branch that reintroduced {dropped.length} column
+                  {dropped.length === 1 ? '' : 's'} removed by an upstream Drop Columns step:{' '}
+                  <span className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">
+                    {dropped.slice(0, 6).join(', ')}
+                    {dropped.length > 6 ? `, +${dropped.length - 6} more` : ''}
+                  </span>
+                  . They were dropped again, so any transform applied to them on that
+                  branch is discarded. Move the Drop Columns step after the merge to keep them.
+                </div>
+              </div>
+            );
+          }
           const inputs = w.inputs ?? [];
           const inputLabels = inputs.map((i) => nodeLabelMap[i] ?? i);
           const winner = w.winner_input

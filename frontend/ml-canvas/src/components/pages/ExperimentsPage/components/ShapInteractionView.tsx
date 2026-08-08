@@ -10,10 +10,13 @@ import React, { useMemo } from 'react';
 import { Loader2, Check, Download } from 'lucide-react';
 import { InfoTooltip } from '../../../ui/InfoTooltip';
 import { useChartTheme } from '../../../../core/hooks/useChartTheme';
+import { shortRunId } from '../utils/jobMeta';
 import type { ShapExplanationData } from '../types';
 
 interface Props {
   jobId: string;
+  pipeline_id: string;
+  parent_pipeline_id?: string | null;
   modelType: string;
   shapExplanation: ShapExplanationData;
   handleDownload: (elementId: string, fileName: string) => void | Promise<void>;
@@ -23,6 +26,8 @@ interface Props {
 
 export const ShapInteractionView: React.FC<Props> = ({
   jobId,
+  pipeline_id,
+  parent_pipeline_id,
   modelType,
   shapExplanation,
   handleDownload,
@@ -31,6 +36,7 @@ export const ShapInteractionView: React.FC<Props> = ({
 }) => {
   const chartId = `shap-interaction-chart-${jobId}`;
   const chartTheme = useChartTheme();
+  const runId = shortRunId({ pipeline_id, parent_pipeline_id: parent_pipeline_id ?? null });
   const interactions = shapExplanation.interactions;
 
   const maxValue = useMemo(() => {
@@ -42,7 +48,7 @@ export const ShapInteractionView: React.FC<Props> = ({
     <div className="space-y-6">
       <div className="flex items-center gap-2 flex-wrap">
         <h3 className="text-lg font-medium text-gray-800 dark:text-gray-100">
-          SHAP Interaction Plot — {modelType !== 'unknown' ? modelType : jobId.slice(0, 8)}
+          SHAP Interaction Plot — {modelType !== 'unknown' ? modelType : runId}
         </h3>
         <InfoTooltip
           text="How much each pair of features jointly drives predictions, beyond their individual effects (mean |SHAP interaction value|, averaged across sampled rows). Darker cells = stronger interaction. Only available for tree-based models (Random Forest, Gradient Boosting, XGBoost, etc.)."
@@ -53,7 +59,7 @@ export const ShapInteractionView: React.FC<Props> = ({
         {interactions && interactions.feature_names.length > 0 && (
           <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity" data-export-ignore="true">
             <button
-              onClick={() => void handleDownload(chartId, `shap_interaction_${jobId.slice(0, 8)}`)}
+              onClick={() => void handleDownload(chartId, `shap_interaction_${runId}`)}
               disabled={downloadingChart === chartId}
               className="p-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded shadow-sm text-gray-500 hover:text-blue-600 disabled:opacity-50"
               title="Download Graph"

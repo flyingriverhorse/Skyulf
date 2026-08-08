@@ -168,17 +168,36 @@ export const pipelineVersionsApi = {
 
   /** G4 audit trail. Walks the same append-only history this API
    *  already manages and returns each save augmented with a per-node
-   *  diff against its predecessor (newest first, capped by `limit`). */
+   *  diff against its predecessor (newest first, capped by `limit`).
+   *  Filters are applied server-side across the whole history, so a
+   *  match outside the first `limit` records is still found. */
   async audit(
     datasetId: string,
     limit = 50,
+    filters: AuditLogFilters = {},
   ): Promise<AuditLogResponse> {
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (filters.actor) params.set('actor', filters.actor);
+    if (filters.kind) params.set('kind', filters.kind);
+    if (filters.createdAfter) params.set('created_after', filters.createdAfter);
+    if (filters.createdBefore) params.set('created_before', filters.createdBefore);
     const response = await apiClient.get<AuditLogResponse>(
-      `/pipeline/versions/${encodeURIComponent(datasetId)}/audit?limit=${limit}`,
+      `/pipeline/versions/${encodeURIComponent(datasetId)}/audit?${params.toString()}`,
     );
     return response.data;
   },
 };
+
+/** Sentinel the `actor` filter uses to select saves that have no user id. */
+export const ANONYMOUS_ACTOR = '__anonymous__';
+
+/** Server-side audit filters. Omitted or empty fields are not sent. */
+export interface AuditLogFilters {
+  actor?: string;
+  kind?: string;
+  createdAfter?: string;
+  createdBefore?: string;
+}
 
 /** One row in the audit response. Mirrors the backend `entries[]` shape. */
 export interface AuditLogEntry {
@@ -202,5 +221,20 @@ export interface AuditLogEntry {
 export interface AuditLogResponse {
   dataset_source_id: string;
   total: number;
+  /** History size before filters — lets the UI say "3 of 120". */
+  total_unfiltered: number;
+  /** Every actor/kind in the full history, so dropdowns stay complete
+   *  even when the active filter hides most rows. */
+  facets: {
+    actors: string[];
+    kinds: string[];
+    has_anonymous_actor: boolean;
+  };
+  filters: {
+    actor: string | null;
+    kind: string | null;
+    created_after: string | null;
+    created_before: string | null;
+  };
   entries: AuditLogEntry[];
 }
