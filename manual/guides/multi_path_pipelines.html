@@ -3204,7 +3204,13 @@ Dataset → Encoding   ──┘
 </table>
 <ul>
 <li>Duplicate columns are automatically deduplicated after merging.</li>
-<li>Inputs are merged in deterministic <strong>topological order</strong> based on the pipeline graph.</li>
+<li>Inputs are merged in the order their edges enter the node, except that an input which is an
+  ancestor of another input is always applied first. This is the same order the merge advisory
+  banner reports as the <code>last_wins</code> winner.</li>
+<li><strong>Per-column ownership:</strong> for column-wise merges the engine compares each branch against the
+  nearest shared ancestor. A column changed by only one branch keeps that branch's value no matter
+  the edge order. The merge strategy is consulted — and the advisory banner shown — only for columns
+  that two or more branches both modified.</li>
 </ul>
 <h3 id="merge-badge">Merge Badge</h3>
 <p>Nodes with 2+ incoming edges display a blue <strong>⊕ Merge</strong> badge in the header showing the input count. Hover over it for a tooltip: <em>"Merge: combining data from N upstream sources"</em>.</p>

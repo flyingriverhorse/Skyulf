@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/superpowers/plans/2026-08-07-frontend-version-sync.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/superpowers/specs/2026-08-07-frontend-ux-roadmap-rerun-design.html">
       
       
       
@@ -21,7 +21,7 @@
     
     
       
-        <title>Frontend Version Sync Implementation Plan - Skyulf</title>
+        <title>Frontend UX Roadmap Rerun Design - Skyulf</title>
       
     
     
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#frontend-version-sync-implementation-plan" class="md-skip">
+        <a href="#frontend-ux-roadmap-rerun-design" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Frontend Version Sync Implementation Plan
+              Frontend UX Roadmap Rerun Design
             
           </span>
         </div>
@@ -2964,98 +2964,92 @@
   
 
 
-<h1 id="frontend-version-sync-implementation-plan">Frontend Version Sync Implementation Plan</h1>
-<blockquote>
-<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
-</blockquote>
-<p><strong>Goal:</strong> Synchronize the frontend package version with the root Skyulf application version <code>0.7.4</code>.</p>
-<p><strong>Architecture:</strong> Keep the root <code>pyproject.toml</code> as the single source of truth and use the existing Node.js synchronization script. The script updates both frontend package manifests atomically without changing dependencies or runtime behavior.</p>
-<p><strong>Tech Stack:</strong> Node.js, npm, JSON package manifests, TypeScript, ESLint, Vite, Vitest</p>
-<h2 id="global-constraints">Global Constraints</h2>
+<h1 id="frontend-ux-roadmap-rerun-design">Frontend UX Roadmap Rerun Design</h1>
+<h2 id="purpose">Purpose</h2>
+<p>Rerun the complete frontend UX audit against the current Skyulf frontend while
+preserving the existing roadmap as the canonical deliverable. The rerun will
+refresh measurements and observations, identify changes since the original
+audit, and keep prior evidence available for comparison.</p>
+<h2 id="scope">Scope</h2>
+<p>The rerun covers the same four journeys and shared foundations as
+<code>.superpowers/plans/2026-08-06-frontend-ux-roadmap.md</code>:</p>
 <ul>
-<li>The frontend version must follow the root application version <code>0.7.4</code>.</li>
-<li>The independent <code>skyulf-core</code> version <code>0.5.5</code> must not be copied to the frontend.</li>
-<li>Only frontend version fields may change; dependency versions and application behavior must remain unchanged.</li>
+<li>Shared navigation, feedback states, forms, accessibility, responsive
+  behavior, terminology, hierarchy, and perceived performance.</li>
+<li>Canvas.</li>
+<li>Data and EDA.</li>
+<li>Experiments and Inference.</li>
+<li>Operations.</li>
 </ul>
-<hr />
-<h3 id="task-1-synchronize-and-validate-the-frontend-version">Task 1: Synchronize and Validate the Frontend Version</h3>
-<p><strong>Files:</strong>
-- Modify: <code>frontend/ml-canvas/package.json:4</code>
-- Modify: <code>frontend/ml-canvas/package-lock.json</code>
-- Use: <code>frontend/ml-canvas/scripts/sync-version.mjs</code>
-- Use: <code>pyproject.toml:5</code></p>
-<p><strong>Interfaces:</strong>
-- Consumes: root <code>[project].version = "0.7.4"</code> from <code>pyproject.toml</code>
-- Produces: frontend manifest versions equal to <code>0.7.4</code></p>
+<p>No product source code, backend behavior, visual styling, or dependencies will
+be changed during the audit. Failures discovered during baseline checks or
+walkthroughs will be documented as evidence rather than fixed.</p>
+<h2 id="canonical-output">Canonical Output</h2>
+<p>Update <code>docs/ux/frontend-ux-roadmap.md</code> in place. Add a dated rerun section that
+explains the comparison method and summarizes the audit delta. Existing
+findings remain available unless current evidence proves that they are
+resolved, superseded, or no longer applicable.</p>
+<p>Each reviewed finding receives one rerun status:</p>
 <ul>
-<li>[ ] <strong>Step 1: Confirm the version check currently detects drift</strong></li>
+<li><strong>New:</strong> Not present in the previous roadmap.</li>
+<li><strong>Changed:</strong> The user impact, evidence, scope, priority, or proposed behavior
+  materially changed.</li>
+<li><strong>Confirmed:</strong> Current evidence still supports the existing finding without a
+  material change.</li>
+<li><strong>Resolved:</strong> Current evidence demonstrates that the prior user problem no
+  longer occurs.</li>
 </ul>
-<p>Run:</p>
-<pre><code class="language-bash">cd frontend/ml-canvas
-npm run check-version
-</code></pre>
-<p>Expected: exit code <code>1</code> with a message stating that <code>pyproject.toml</code> is
-<code>0.7.4</code> and the frontend manifests are out of sync.</p>
+<p>The existing <code>Observed</code>, <code>Measured</code>, and <code>Inferred</code> evidence labels remain
+separate from rerun status.</p>
+<h2 id="evidence-collection">Evidence Collection</h2>
+<p>Repeat the complete engineering baseline:</p>
 <ul>
-<li>[ ] <strong>Step 2: Synchronize both frontend manifests</strong></li>
+<li>ESLint.</li>
+<li>TypeScript type checking.</li>
+<li>Production build.</li>
+<li>Unit tests.</li>
+<li>Chromium end-to-end tests.</li>
+<li>Bundle-size checks.</li>
 </ul>
-<p>Run:</p>
-<pre><code class="language-bash">cd frontend/ml-canvas
-npm run sync-version
-</code></pre>
-<p>Expected: <code>Synced version to 0.7.4 (from pyproject.toml).</code></p>
+<p>Repeat live walkthroughs for every required route at widths <code>1440</code>, <code>1024</code>,
+<code>768</code>, and <code>390</code>. Exercise the workflows, failure states, keyboard behavior,
+focus management, accessibility checks, responsive layouts, and recovery paths
+specified by the original plan.</p>
+<p>Record command results and direct UI observations from the rerun. Historical
+results remain clearly identified as previous evidence and are not presented as
+current measurements.</p>
+<h2 id="roadmap-reconciliation">Roadmap Reconciliation</h2>
+<p>After refreshing all journey evidence:</p>
+<ol>
+<li>Reconcile every existing finding against current evidence.</li>
+<li>Add new findings with the next available journey-specific ID.</li>
+<li>Preserve resolved findings in a compact historical section instead of
+   silently deleting them.</li>
+<li>Recalculate normalized ranking and dependencies.</li>
+<li>Rebuild the Now/Next/Later milestones.</li>
+<li>Refresh component-boundary recommendations only when current user-facing
+   evidence supports them.</li>
+<li>Refresh the validation matrix for every current Now and Next item.</li>
+</ol>
+<h2 id="execution">Execution</h2>
+<p>Follow the eight tasks in the original implementation plan in order. Use a
+fresh implementer and independent task review for each task. Each task may
+commit only <code>docs/ux/frontend-ux-roadmap.md</code> and audit-only artifacts explicitly
+required for evidence collection.</p>
+<p>The existing unrelated modification to
+<code>.github/workflows/dependency-review.yml</code> must remain outside all audit commits.</p>
+<h2 id="completion-criteria">Completion Criteria</h2>
+<p>The rerun is complete when:</p>
 <ul>
-<li>[ ] <strong>Step 3: Inspect the generated manifest diff</strong></li>
+<li>Every original audit task has fresh evidence.</li>
+<li>All four journeys have equal current coverage.</li>
+<li>Every existing finding has a rerun status.</li>
+<li>New and resolved findings are explicitly represented.</li>
+<li>Rankings, milestones, dependencies, component recommendations, and the
+  validation matrix agree with the refreshed evidence.</li>
+<li>The final document contains no placeholders or ambiguous future language.</li>
+<li>The full frontend quality baseline has been rerun and recorded.</li>
 </ul>
-<p>Run:</p>
-<pre><code class="language-bash">git --no-pager diff -- frontend/ml-canvas/package.json frontend/ml-canvas/package-lock.json
-</code></pre>
-<p>Expected: only these values change from <code>0.7.3</code> to <code>0.7.4</code>:</p>
-<pre><code class="language-json">{
-  &quot;version&quot;: &quot;0.7.4&quot;,
-  &quot;packages&quot;: {
-    &quot;&quot;: {
-      &quot;version&quot;: &quot;0.7.4&quot;
-    }
-  }
-}
-</code></pre>
-<ul>
-<li>[ ] <strong>Step 4: Confirm the version drift is resolved</strong></li>
-</ul>
-<p>Run:</p>
-<pre><code class="language-bash">cd frontend/ml-canvas
-npm run check-version
-</code></pre>
-<p>Expected: exit code <code>0</code> with
-<code>OK — package.json/package-lock.json already match pyproject.toml (0.7.4).</code></p>
-<ul>
-<li>[ ] <strong>Step 5: Run the frontend static and production checks</strong></li>
-</ul>
-<p>Run:</p>
-<pre><code class="language-bash">cd frontend/ml-canvas
-npm run lint
-npx tsc --project tsconfig.json --noEmit
-npm run build
-</code></pre>
-<p>Expected: all commands exit with code <code>0</code>.</p>
-<ul>
-<li>[ ] <strong>Step 6: Run the frontend test suite</strong></li>
-</ul>
-<p>Run:</p>
-<pre><code class="language-bash">cd frontend/ml-canvas
-npm test
-</code></pre>
-<p>Expected: Vitest exits with code <code>0</code>.</p>
-<ul>
-<li>[ ] <strong>Step 7: Commit only the synchronized frontend manifests</strong></li>
-</ul>
-<p>Run:</p>
-<pre><code class="language-bash">git add frontend/ml-canvas/package.json frontend/ml-canvas/package-lock.json
-git commit -m &quot;chore: sync frontend version to 0.7.4&quot; \
-  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
-</code></pre>
-<p>Expected: a commit containing only the two frontend manifest changes.</p>
 
 
 

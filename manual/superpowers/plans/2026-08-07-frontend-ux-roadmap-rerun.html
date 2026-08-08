@@ -8,7 +8,7 @@
       
       
       
-        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/superpowers/specs/2026-08-07-frontend-version-sync-design.html">
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/superpowers/plans/2026-08-07-frontend-ux-roadmap-rerun.html">
       
       
       
@@ -21,7 +21,7 @@
     
     
       
-        <title>Frontend Version Sync Design - Skyulf</title>
+        <title>Frontend UX Roadmap Rerun Implementation Plan - Skyulf</title>
       
     
     
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#frontend-version-sync-design" class="md-skip">
+        <a href="#frontend-ux-roadmap-rerun-implementation-plan" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Frontend Version Sync Design
+              Frontend UX Roadmap Rerun Implementation Plan
             
           </span>
         </div>
@@ -2964,30 +2964,463 @@
   
 
 
-<h1 id="frontend-version-sync-design">Frontend Version Sync Design</h1>
-<h2 id="goal">Goal</h2>
-<p>Synchronize the frontend application version with the root Skyulf application
-version so the current branch is merge-ready.</p>
-<h2 id="source-of-truth">Source of Truth</h2>
-<p>The root <code>pyproject.toml</code> project version is authoritative for the frontend.
-The independently versioned <code>skyulf-core</code> package does not determine the
-frontend version.</p>
-<h2 id="change">Change</h2>
-<p>Run the existing <code>frontend/ml-canvas</code> version synchronization script. It reads
-the root application version and updates:</p>
+<h1 id="frontend-ux-roadmap-rerun-implementation-plan">Frontend UX Roadmap Rerun Implementation Plan</h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Refresh the complete Skyulf frontend UX audit and reconcile the existing roadmap with current measured, observed, and inferred evidence.</p>
+<p><strong>Architecture:</strong> Keep <code>docs/ux/frontend-ux-roadmap.md</code> as the canonical roadmap. Add a dated rerun delta, refresh each audit area in sequence, assign every existing finding a rerun status, then rebuild prioritization and validation from the refreshed evidence without changing product code.</p>
+<p><strong>Tech Stack:</strong> React 18, TypeScript, Vite, Tailwind CSS, Zustand, TanStack Query, React Router, Vitest, Testing Library, Playwright, axe-core.</p>
+<h2 id="global-constraints">Global Constraints</h2>
 <ul>
-<li><code>frontend/ml-canvas/package.json</code></li>
-<li>the top-level version in <code>frontend/ml-canvas/package-lock.json</code></li>
-<li>the root package version in the lockfile's <code>packages</code> map</li>
+<li>Modify only <code>docs/ux/frontend-ux-roadmap.md</code> during audit tasks.</li>
+<li>Do not modify frontend product code, backend code, visual styling, or dependencies.</li>
+<li>Cover Shared Foundations, Canvas, Data/EDA, Experiments/Inference, and Operations with fresh evidence.</li>
+<li>Repeat live checks at widths <code>1440</code>, <code>1024</code>, <code>768</code>, and <code>390</code>.</li>
+<li>Keep <code>Observed</code>, <code>Measured</code>, and <code>Inferred</code> evidence labels separate from rerun status.</li>
+<li>Assign each existing finding exactly one rerun status: <code>New</code>, <code>Changed</code>, <code>Confirmed</code>, or <code>Resolved</code>.</li>
+<li>Preserve resolved findings in a historical section; do not silently delete them.</li>
+<li>Record baseline failures as evidence instead of fixing them.</li>
+<li>Keep <code>.github/workflows/dependency-review.yml</code> and all unrelated changes outside audit commits.</li>
+<li>Do not add dependencies.</li>
+<li>Every commit must include <code>Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;</code>.</li>
 </ul>
-<p>For this release, all three frontend values will change from <code>0.7.3</code> to
-<code>0.7.4</code>. No dependency versions or application behavior will change.</p>
-<h2 id="error-handling">Error Handling</h2>
-<p>Use the existing script's failures for missing or invalid root version data.
-Its check mode must report no drift after synchronization.</p>
-<h2 id="validation">Validation</h2>
-<p>Run the frontend version drift check, lint, TypeScript type check, production
-build, and test suite.</p>
+<hr />
+<h3 id="task-1-establish-the-rerun-baseline">Task 1: Establish the Rerun Baseline</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>docs/superpowers/specs/2026-08-07-frontend-ux-roadmap-rerun-design.md</code>
+- Read: <code>frontend/ml-canvas/package.json</code>
+- Read: <code>frontend/ml-canvas/src/App.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/Layout.tsx</code>
+- Read: <code>frontend/ml-canvas/playwright.config.ts</code>
+- Read: <code>frontend/ml-canvas/e2e/routes.spec.ts</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Existing roadmap structure and historical baseline.
+- Produces: A dated rerun section, current engineering baseline, route inventory, and status vocabulary used by Tasks 2-8.</p>
+<ul>
+<li>[ ] <strong>Step 1: Add the rerun scaffold</strong></li>
+</ul>
+<p>Add this section immediately after <code>## Executive Summary</code>:</p>
+<pre><code class="language-markdown">## 2026-08-07 Audit Rerun
+
+### Delta Summary
+
+### Current Engineering Baseline
+
+### Current Route and Navigation Baseline
+
+### Finding Status Summary
+
+| Status | Count | Meaning |
+|--------|-------|---------|
+| New | 0 | Not present in the previous roadmap. |
+| Changed | 0 | Evidence, scope, priority, or proposed behavior materially changed. |
+| Confirmed | 0 | Current evidence still supports the finding without material change. |
+| Resolved | 0 | Current evidence demonstrates that the prior user problem no longer occurs. |
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Run the complete current frontend baseline</strong></li>
+</ul>
+<p>Run from <code>frontend/ml-canvas/</code>:</p>
+<pre><code class="language-bash">npm run lint
+npx tsc --project tsconfig.json --noEmit
+npm run build
+npm run test -- --reporter=dot
+npm run test:e2e -- --project=chromium
+npm run size-check
+</code></pre>
+<p>Record exit status, test counts, build chunk sizes, bundle-size results, warnings,
+and failures under <code>### Current Engineering Baseline</code>. Do not alter source code
+when a command fails.</p>
+<ul>
+<li>[ ] <strong>Step 3: Refresh route and navigation metadata</strong></li>
+</ul>
+<p>Record the current route, lazy-loading, sidebar, alert-badge, and E2E coverage
+state for:</p>
+<pre><code class="language-text">/
+/jobs
+/data
+/eda
+/drift
+/canvas
+/registry
+/deployments
+/errors
+/slow-nodes
+/audit
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 4: Verify the rerun scaffold</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">grep -n &quot;^## 2026-08-07 Audit Rerun$&quot; docs/ux/frontend-ux-roadmap.md
+grep -n &quot;^### Current Engineering Baseline$&quot; docs/ux/frontend-ux-roadmap.md
+grep -n &quot;^### Finding Status Summary$&quot; docs/ux/frontend-ux-roadmap.md
+git diff --check
+</code></pre>
+<p>Expected: each heading appears once and <code>git diff --check</code> exits <code>0</code>.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit the baseline</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: refresh frontend UX audit baseline&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-2-refresh-shared-foundations">Task 2: Refresh Shared Foundations</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>frontend/ml-canvas/src/components/Layout.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/shared/</code>
+- Read: <code>frontend/ml-canvas/src/components/ui/</code>
+- Read: <code>frontend/ml-canvas/src/components/layout/CommandPalette.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/layout/NotificationCenter.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/layout/ShortcutsOverlay.tsx</code>
+- Read: <code>frontend/ml-canvas/src/core/toast.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/utils/a11y.ts</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Current baseline and existing <code>FND-*</code> findings.
+- Produces: Current shared-foundation evidence and rerun statuses for every <code>FND-*</code> finding.</p>
+<ul>
+<li>[ ] <strong>Step 1: Reinspect shared-state usage</strong></li>
+</ul>
+<p>Run from <code>frontend/ml-canvas/</code>:</p>
+<pre><code class="language-bash">grep -RInE &quot;LoadingState|EmptyState|ErrorState|PageSkeleton|toast\\.|disabled=&quot; src \
+  --include=&quot;*.ts&quot; --include=&quot;*.tsx&quot;
+</code></pre>
+<p>Compare first-load, empty, failure, retry, success, warning, and unavailable
+action behavior across all journeys.</p>
+<ul>
+<li>[ ] <strong>Step 2: Repeat live shared-foundation walkthroughs</strong></li>
+</ul>
+<p>At <code>1440</code>, <code>1024</code>, <code>768</code>, and <code>390</code>, verify current page orientation, collapsed
+navigation naming, target size, browser history, overlay focus, keyboard
+operation, form labels, validation timing, responsive overflow, terminology,
+and perceived delays.</p>
+<ul>
+<li>[ ] <strong>Step 3: Repeat accessibility automation</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">cd frontend/ml-canvas
+npm run test:e2e -- e2e/a11y.spec.ts --project=chromium
+</code></pre>
+<p>Record current failures and non-blocking findings exactly.</p>
+<ul>
+<li>[ ] <strong>Step 4: Reconcile every <code>FND-*</code> finding</strong></li>
+</ul>
+<p>For each existing finding, add a dated rerun note with:</p>
+<pre><code class="language-markdown">- **2026-08-07 status:** Confirmed
+- **Current evidence:** Observed, Measured, or Inferred evidence.
+- **Delta:** Exact change from the previous audit, or `No material change`.
+</code></pre>
+<p>Use <code>Changed</code> or <code>Resolved</code> only when current evidence demonstrates it. Add new
+findings using the next available <code>FND-*</code> ID.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit shared-foundation evidence</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: refresh shared frontend UX evidence&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-3-refresh-the-canvas-journey">Task 3: Refresh the Canvas Journey</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>frontend/ml-canvas/src/pages/CanvasPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/layout/</code>
+- Read: <code>frontend/ml-canvas/src/components/canvas/</code>
+- Read: <code>frontend/ml-canvas/src/core/store/useGraphStore.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/hooks/useKeyboardShortcuts.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/hooks/useCanvasAutoSave.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/utils/pipelineLeakageValidation.ts</code>
+- Read: <code>frontend/ml-canvas/src/modules/nodes/</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Refreshed shared-foundation evidence and existing <code>CAN-*</code> findings.
+- Produces: Current Canvas evidence and rerun statuses for every <code>CAN-*</code> finding.</p>
+<ul>
+<li>[ ] <strong>Step 1: Repeat pipeline creation</strong></li>
+</ul>
+<p>Walk through:</p>
+<pre><code class="language-text">Open Canvas → add dataset → add preprocessing node → configure node →
+connect nodes → add split → add training node → validate → save → run
+</code></pre>
+<p>Record discoverability, selection, connection, validation, action availability,
+and recovery behavior at all four target widths.</p>
+<ul>
+<li>[ ] <strong>Step 2: Repeat diagnosis and recovery checks</strong></li>
+</ul>
+<p>Exercise invalid connections, missing configuration, leakage validation, run
+failure, restore/version loading, undo/redo, autosave recovery, results
+navigation, node warnings, keyboard shortcuts, and narrow pane behavior.</p>
+<ul>
+<li>[ ] <strong>Step 3: Recompare node configuration forms</strong></li>
+</ul>
+<p>Inspect current Dataset, Encoding, Feature Generation, Feature Selection,
+Training, Ensemble, Segmentation, and Data Preview forms. Record only
+user-visible consistency or regression evidence.</p>
+<ul>
+<li>[ ] <strong>Step 4: Reconcile every <code>CAN-*</code> finding</strong></li>
+</ul>
+<p>Add the dated status/evidence/delta block from Task 2 to every <code>CAN-*</code> finding.
+Add new Canvas findings using the next available ID and reference shared <code>FND-*</code>
+dependencies where applicable.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit Canvas evidence</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: refresh canvas UX evidence&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-4-refresh-data-and-eda-journeys">Task 4: Refresh Data and EDA Journeys</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>frontend/ml-canvas/src/pages/DataSources.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/data/</code>
+- Read: <code>frontend/ml-canvas/src/pages/EDAPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/eda/</code>
+- Read: <code>frontend/ml-canvas/src/core/store/useEDAStore.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/hooks/useEdaJobs.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/api/datasets.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/api/eda.ts</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Refreshed shared evidence and existing <code>DAT-*</code> findings.
+- Produces: Current Data/EDA evidence and rerun statuses for every <code>DAT-*</code> finding.</p>
+<ul>
+<li>[ ] <strong>Step 1: Repeat data-source onboarding</strong></li>
+</ul>
+<p>Exercise source creation, validation failure, connection failure, ingestion
+progress, preview, empty datasets, and navigation to Canvas at all target widths.</p>
+<ul>
+<li>[ ] <strong>Step 2: Repeat EDA workflows</strong></li>
+</ul>
+<p>Exercise dataset selection, job creation, progress, failure, empty results, tabs,
+filters, charts, tables, downloads, and return navigation. Verify source,
+analysis, variable, and target context remain distinguishable.</p>
+<ul>
+<li>[ ] <strong>Step 3: Recheck visualization usability</strong></li>
+</ul>
+<p>Inspect legends, axes, tooltips, color meaning, dark mode, overflow, chart
+alternatives, no-data states, and explanatory copy on desktop and narrow widths.</p>
+<ul>
+<li>[ ] <strong>Step 4: Reconcile every <code>DAT-*</code> finding</strong></li>
+</ul>
+<p>Add dated status/evidence/delta blocks, add new IDs sequentially, and preserve
+resolved findings in the historical section.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit Data/EDA evidence</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: refresh data and EDA UX evidence&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-5-refresh-experiments-and-inference">Task 5: Refresh Experiments and Inference</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>frontend/ml-canvas/src/components/pages/ExperimentsPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/pages/ExperimentsPage/components/</code>
+- Read: <code>frontend/ml-canvas/src/components/pages/experiments/</code>
+- Read: <code>frontend/ml-canvas/src/components/pages/InferencePage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/core/hooks/useJobPolling.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/hooks/useNodeJobSummaries.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/api/jobs.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/api/thresholdTuning.ts</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Refreshed shared evidence and existing <code>EXP-*</code> findings.
+- Produces: Current Experiments/Inference evidence and statuses for every <code>EXP-*</code> finding.</p>
+<ul>
+<li>[ ] <strong>Step 1: Repeat experiment comparison</strong></li>
+</ul>
+<p>Exercise job selection, filters, task type, split, metric comparison, pipeline
+diff, feature importance, confusion matrices, regression charts, segmentation,
+SHAP, and threshold tuning.</p>
+<ul>
+<li>[ ] <strong>Step 2: Repeat inference</strong></li>
+</ul>
+<p>Exercise model/job selection, schema display, input methods, invalid input,
+execution, results, export, reset, retry, and long-running/failure states.</p>
+<ul>
+<li>[ ] <strong>Step 3: Reassess component-boundary evidence</strong></li>
+</ul>
+<p>Review <code>InferencePage.tsx</code>, <code>ExperimentsPage.tsx</code>,
+<code>ClassificationChartsForSplit.tsx</code>, and <code>EvaluationView.tsx</code>. Retain a boundary
+recommendation only when current user-facing risk supports it.</p>
+<ul>
+<li>[ ] <strong>Step 4: Reconcile every <code>EXP-*</code> finding</strong></li>
+</ul>
+<p>Add dated status/evidence/delta blocks and sequential new IDs.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit Experiments/Inference evidence</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: refresh experiments and inference UX evidence&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-6-refresh-operations-journeys">Task 6: Refresh Operations Journeys</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>frontend/ml-canvas/src/pages/Jobs.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/panels/</code>
+- Read: <code>frontend/ml-canvas/src/pages/ModelRegistry.tsx</code>
+- Read: <code>frontend/ml-canvas/src/components/pages/DeploymentsPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/pages/DataDriftPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/pages/ErrorLogPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/pages/SlowNodesPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/pages/AuditLogPage.tsx</code>
+- Read: <code>frontend/ml-canvas/src/core/api/monitoring.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/api/deployment.ts</code>
+- Read: <code>frontend/ml-canvas/src/core/api/registry.ts</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Refreshed shared evidence and existing <code>OPS-*</code> findings.
+- Produces: Current Operations evidence and statuses for every <code>OPS-*</code> finding.</p>
+<ul>
+<li>[ ] <strong>Step 1: Repeat jobs and job-detail workflows</strong></li>
+</ul>
+<p>Exercise filters, statuses, pagination/history, selection, details, cancellation
+or retry where available, failures, progress, and navigation to origin context.</p>
+<ul>
+<li>[ ] <strong>Step 2: Repeat registry and deployment workflows</strong></li>
+</ul>
+<p>Exercise list, search, details, deployment actions, confirmation, feedback,
+active state, and history. Verify training-job, model, and deployment lineage.</p>
+<ul>
+<li>[ ] <strong>Step 3: Repeat monitoring investigations</strong></li>
+</ul>
+<p>Exercise drift, errors, slow nodes, and audit logs. Verify severity, time range,
+affected resource, next action, filters, details, and supported deep links.</p>
+<ul>
+<li>[ ] <strong>Step 4: Reconcile every <code>OPS-*</code> finding</strong></li>
+</ul>
+<p>Add dated status/evidence/delta blocks and sequential new IDs. Do not infer
+cross-page links that current APIs cannot support.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit Operations evidence</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: refresh operations UX evidence&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-7-reconcile-and-reprioritize-the-roadmap">Task 7: Reconcile and Reprioritize the Roadmap</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: All refreshed <code>FND-*</code>, <code>CAN-*</code>, <code>DAT-*</code>, <code>EXP-*</code>, and <code>OPS-*</code> evidence.
+- Produces: Current status summary, inventory, ranking, milestones, component recommendations, and validation matrix.</p>
+<ul>
+<li>[ ] <strong>Step 1: Count and summarize rerun statuses</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">for status in New Changed Confirmed Resolved; do
+  printf &quot;%s &quot; &quot;$status&quot;
+  grep -c &quot;\\*\\*2026-08-07 status:\\*\\* $status&quot; docs/ux/frontend-ux-roadmap.md
+done
+</code></pre>
+<p>Update <code>### Finding Status Summary</code> with the exact counts.</p>
+<ul>
+<li>[ ] <strong>Step 2: Rebuild normalized ranking</strong></li>
+</ul>
+<p>Rank current findings by impact, frequency, journeys improved, accessibility or
+data-loss risk, effort, then regression risk/dependencies. Use only:</p>
+<pre><code class="language-text">Impact: High | Medium | Low
+Frequency: Frequent | Occasional | Rare
+Effort: S | M | L
+Risk: Low | Medium | High
+Milestone: Now | Next | Later
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 3: Rebuild milestones and dependencies</strong></li>
+</ul>
+<p>Keep the smallest dependency-complete high-impact set in <code>Now</code>, broader
+journey-level work in <code>Next</code>, and lower-frequency enhancements in <code>Later</code>.
+Never place a dependency after its consumer.</p>
+<ul>
+<li>[ ] <strong>Step 4: Refresh recommendations and validation</strong></li>
+</ul>
+<p>Update the executive summary, component-boundary recommendations, inventory,
+and validation matrix. Every current Now and Next item must have measurable
+acceptance criteria plus automated/manual, responsive, keyboard, and
+screen-reader validation where relevant.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit reconciled priorities</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: reprioritize refreshed frontend UX roadmap&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
+<hr />
+<h3 id="task-8-validate-the-rerun">Task 8: Validate the Rerun</h3>
+<p><strong>Files:</strong>
+- Modify: <code>docs/ux/frontend-ux-roadmap.md</code>
+- Read: <code>docs/superpowers/specs/2026-08-07-frontend-ux-roadmap-rerun-design.md</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: Completed refreshed roadmap.
+- Produces: A self-consistent, implementation-ready audit delta.</p>
+<ul>
+<li>[ ] <strong>Step 1: Scan for placeholders and vague language</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">python3 - &lt;&lt;'PY'
+from pathlib import Path
+
+text = Path(&quot;docs/ux/frontend-ux-roadmap.md&quot;).read_text()
+patterns = [
+    &quot;TB&quot; + &quot;D&quot;,
+    &quot;TO&quot; + &quot;DO&quot;,
+    &quot;FIX&quot; + &quot;ME&quot;,
+    &quot;implement &quot; + &quot;later&quot;,
+    &quot;appropriate error &quot; + &quot;handling&quot;,
+    &quot;similar &quot; + &quot;to&quot;,
+    &quot;may&quot; + &quot;be&quot;,
+    &quot;poss&quot; + &quot;ibly&quot;,
+]
+matches = [pattern for pattern in patterns if pattern.lower() in text.lower()]
+if matches:
+    raise SystemExit(f&quot;Incomplete language found: {matches}&quot;)
+PY
+</code></pre>
+<ul>
+<li>[ ] <strong>Step 2: Verify finding coverage</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">grep -oE &quot;FND-[0-9]{3}|CAN-[0-9]{3}|DAT-[0-9]{3}|EXP-[0-9]{3}|OPS-[0-9]{3}&quot; \
+  docs/ux/frontend-ux-roadmap.md | sort | uniq -c
+</code></pre>
+<p>Investigate every current finding lacking detail, inventory, roadmap/exclusion,
+or rerun-status coverage.</p>
+<ul>
+<li>[ ] <strong>Step 3: Re-run the complete frontend baseline</strong></li>
+</ul>
+<p>Run from <code>frontend/ml-canvas/</code>:</p>
+<pre><code class="language-bash">npm run lint
+npx tsc --project tsconfig.json --noEmit
+npm run build
+npm run test -- --reporter=dot
+npm run test:e2e -- --project=chromium
+npm run size-check
+</code></pre>
+<p>Record final results and explain any difference from Task 1 without modifying
+product code.</p>
+<ul>
+<li>[ ] <strong>Step 4: Verify repository scope</strong></li>
+</ul>
+<p>Run:</p>
+<pre><code class="language-bash">git diff --check
+git status --short
+git --no-pager diff &quot;$(git merge-base myfork/075 HEAD)&quot;..HEAD --stat
+</code></pre>
+<p>Expected: audit commits modify only <code>docs/ux/frontend-ux-roadmap.md</code>; the design
+and plan commits modify only their corresponding documents.</p>
+<ul>
+<li>[ ] <strong>Step 5: Commit final corrections</strong></li>
+</ul>
+<pre><code class="language-bash">git add docs/ux/frontend-ux-roadmap.md
+git commit -m &quot;docs: finalize frontend UX audit rerun&quot; \
+  -m &quot;Co-authored-by: Copilot &lt;223556219+Copilot@users.noreply.github.com&gt;&quot;
+</code></pre>
 
 
 
