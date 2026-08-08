@@ -70,7 +70,10 @@ async def list_deployments(
     it stays null here and is only populated by the per-row endpoints.
     """
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
-    return await DeploymentService.list_deployment_details(session, effective_limit, skip)
+    deployments = await DeploymentService.list_deployment_details(session, effective_limit, skip)
+    if get_settings().DEMO_MODE:
+        deployments = [d for d in deployments if d.get("dataset_id") == "iris-demo"]
+    return deployments
 
 
 @router.post("/deactivate")

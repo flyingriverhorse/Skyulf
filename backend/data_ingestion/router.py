@@ -28,6 +28,30 @@ from .service import DataIngestionService
 router = APIRouter(prefix="/api/ingestion", tags=["Data Ingestion"])
 sources_router = APIRouter(prefix="/data/api", tags=["Data Sources"])
 
+IRIS_SOURCE_ID = "iris-demo"
+
+
+def _block_in_demo_mode() -> None:
+    """Raise 403 if the app is running in demo mode."""
+    if get_settings().DEMO_MODE:
+        raise HTTPException(
+            status_code=403,
+            detail="Uploads are disabled in demo mode. The Iris dataset is pre-loaded.",
+        )
+
+
+def _guard_demo_source(source_id: str) -> None:
+    """Raise 404 for non-Iris source access in demo mode (hides existence)."""
+    if get_settings().DEMO_MODE and source_id != IRIS_SOURCE_ID:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+
+def _filter_iris_only(sources):
+    """In demo mode, return only the Iris dataset source."""
+    if not get_settings().DEMO_MODE:
+        return sources
+    return [s for s in sources if getattr(s, "source_id", None) == IRIS_SOURCE_ID]
+
 
 @sources_router.get("/sources", response_model=DataSourceListResponse)
 async def list_sources(
@@ -42,6 +66,7 @@ async def list_sources(
     # TODO(auth): Replace None with real user ID from auth dependency.
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
     sources = await service.list_sources(user_id=None, limit=effective_limit, skip=skip)
+    sources = _filter_iris_only(sources)
     return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
 
@@ -53,6 +78,7 @@ async def list_usable_sources(
     List only successfully ingested data sources.
     """
     sources = await service.list_usable_sources(user_id=None)
+    sources = _filter_iris_only(sources)
     return DataSourceListResponse(sources=[DataSourceRead.model_validate(s) for s in sources])
 
 
@@ -63,6 +89,8 @@ async def get_source(source_id: str, service: DataIngestionService = Depends(get
     """
     source = await service.get_source(source_id)
     if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if get_settings().DEMO_MODE and source.source_id != IRIS_SOURCE_ID:
         raise HTTPException(status_code=404, detail="Source not found")
     return DataSourceResponse(source=source)
 
@@ -76,6 +104,11 @@ async def get_source_sample(
     """
     Get a sample of data from the source.
     """
+    source = await service.get_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if get_settings().DEMO_MODE and source.source_id != IRIS_SOURCE_ID:
+        raise HTTPException(status_code=404, detail="Source not found")
     effective_limit = limit if limit is not None else get_settings().DEFAULT_SAMPLE_ROWS
     data = await service.get_sample(source_id, effective_limit)
     return DataSourceSampleResponse(data=data)
@@ -86,6 +119,11 @@ async def delete_source(source_id: str, service: DataIngestionService = Depends(
     """
     Delete a data source.
     """
+    source = await service.get_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if get_settings().DEMO_MODE and source.source_id != IRIS_SOURCE_ID:
+        raise HTTPException(status_code=404, detail="Source not found")
     success = await service.delete_source(source_id)
     if not success:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -102,6 +140,11 @@ async def export_source_data(
     """
     Export data from a source as CSV or Parquet.
     """
+    source = await service.get_source(source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    if get_settings().DEMO_MODE and source.source_id != IRIS_SOURCE_ID:
+        raise HTTPException(status_code=404, detail="Source not found")
     data = await service.get_sample(source_id, limit=limit)
     if not data:
         raise HTTPException(status_code=404, detail="No data found for this source")
@@ -145,6 +188,7 @@ async def upload_file(
     """
     Upload a file and start ingestion process.
     """
+    _block_in_demo_mode()
     # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
     # TODO(auth): Replace with real user ID from auth dependency.
     user_id = 1
@@ -167,6 +211,7 @@ async def create_source(
     `DataIngestionService._INLINE_SOURCE_TYPES`). "file" sources go through
     `/upload` instead.
     """
+    _block_in_demo_mode()
     # KNOWN-GAP: Auth not implemented yet — hardcoded user_id=1.
     # TODO(auth): Replace with real user ID from auth dependency.
     user_id = 1

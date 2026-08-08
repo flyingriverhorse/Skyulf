@@ -66,13 +66,12 @@ async def list_all_jobs(
     """
     Returns a list of all EDA jobs across all datasets.
     """
-    query = (
-        select(EDAReport, DataSource.name.label("dataset_name"))
-        .join(DataSource, EDAReport.data_source_id == DataSource.id)
-        .order_by(desc(EDAReport.created_at))
-        .offset(skip)
-        .limit(limit)
+    query = select(EDAReport, DataSource.name.label("dataset_name")).join(
+        DataSource, EDAReport.data_source_id == DataSource.id
     )
+    if get_settings().DEMO_MODE:
+        query = query.where(DataSource.source_id == "iris-demo")
+    query = query.order_by(desc(EDAReport.created_at)).offset(skip).limit(limit)
     result = await session.execute(query)
     rows = result.all()
 

@@ -34,6 +34,10 @@ class CoreMixin:
     PORT: int = 8000
     WORKERS: int = 1
 
+    # Demo mode — locks the app to Iris-only, blocks all uploads.
+    # Set DEMO_MODE=true for the free-tier public deployment.
+    DEMO_MODE: bool = False
+
     # Observability — opt-in; no-op when not set
     SENTRY_DSN: str | None = None
 

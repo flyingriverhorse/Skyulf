@@ -223,6 +223,93 @@ def _reset_stale_jobs() -> None:
         logger.warning("Could not reset stale jobs on startup: %s", exc)
 
 
+async def _seed_demo_iris() -> None:
+    """Seed the Iris dataset into the database on first startup in demo mode.
+
+    Loads Iris from sklearn, writes it to the uploads directory, and creates
+    a DataSource record so the frontend DatasetNode finds it immediately.
+    """
+    import shutil
+
+    import pandas as pd
+    from sklearn.datasets import load_iris
+    from sqlalchemy import select
+
+    from backend.database.engine import async_session_factory
+    from backend.database.models import DataSource
+
+    source_id = "iris-demo"
+
+    # Load Iris from sklearn and write to uploads so FileSystemCatalog can serve it.
+    iris = load_iris()
+    df = pd.DataFrame(iris.data, columns=iris.feature_names)
+    df["target"] = iris.target
+    df["species"] = df["target"].map(
+        dict(enumerate(iris.target_names))  # type: ignore[arg-type]
+    )
+
+    iris_dest = Path(get_settings().UPLOAD_DIR) / f"{source_id}.csv"
+    iris_dest.parent.mkdir(parents=True, exist_ok=True)
+
+    if not iris_dest.exists():
+        df.to_csv(iris_dest, index=False)
+        logger.info("Wrote Iris dataset (%d rows) to %s", len(df), iris_dest)
+
+    session_factory = async_session_factory
+    if session_factory is None:
+        logger.error("Database not initialised — cannot seed Iris")
+        return
+
+    async with session_factory() as session:
+        result = await session.execute(select(DataSource).where(DataSource.source_id == source_id))
+        existing = result.scalar_one_or_none()
+        if existing is not None:
+            # Ensure config has file_path (may be missing from older seeds).
+            config = dict(existing.config or {})
+            if not config.get("file_path"):
+                config["file_path"] = str(iris_dest.absolute())
+                existing.config = config
+                await session.commit()
+                logger.info(
+                    "Updated Iris DataSource (id=%s) with file_path=%s",
+                    existing.id,
+                    config["file_path"],
+                )
+            else:
+                logger.info("Iris DataSource already exists (id=%s), skipping seed", existing.id)
+            return
+
+        columns = [{"name": col, "dtype": str(df[col].dtype)} for col in df.columns]
+
+        iris_source = DataSource(
+            source_id=source_id,
+            name="Iris Flower Dataset",
+            type="file",
+            config={
+                "file_path": str(iris_dest.absolute()),
+                "filename": f"{source_id}.csv",
+                "format": "csv",
+                "delimiter": ",",
+            },
+            test_status="success",
+            description=(
+                "The classic Iris flower dataset (150 samples, 3 species). "
+                "Pre-loaded for demo mode."
+            ),
+            source_metadata={
+                "ingestion_status": "completed",
+                "row_count": len(df),
+                "column_count": len(df.columns),
+                "columns": columns,
+                "sample_rows": df.head(5).to_dict(orient="records"),
+            },
+        )
+        session.add(iris_source)
+        await session.commit()
+        await session.refresh(iris_source)
+        logger.info("Seeded Iris DataSource (id=%s, rows=%d)", iris_source.id, len(df))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
@@ -244,6 +331,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Reset any jobs left in 'running'/'queued' from a previous crashed process.
     _reset_stale_jobs()
     logger.info("✅ Stale job reset complete")
+
+    # Seed the Iris dataset in demo mode so the app works out of the box.
+    if settings.DEMO_MODE:
+        await _seed_demo_iris()
+        logger.info("✅ Demo Iris dataset seeded")
 
     # Start the realtime job-event subscriber. Failures are non-fatal:
     # the frontend has a polling safety net.

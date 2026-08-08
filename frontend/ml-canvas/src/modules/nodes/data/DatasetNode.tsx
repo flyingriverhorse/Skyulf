@@ -5,6 +5,7 @@ import { DatasetService } from '../../../core/api/datasets';
 import { Dataset } from '../../../core/types/api';
 import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUsableDatasets } from '../../../core/hooks/useDatasets';
+import { useAppConfig } from '../../../core/hooks/useAppConfig';
 import { FileUpload } from './FileUpload';
 
 interface DatasetNodeConfig {
@@ -25,6 +26,8 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
   const datasetsQuery = useUsableDatasets();
   const datasets: Dataset[] = datasetsQuery.data ?? [];
   const loading = datasetsQuery.isLoading;
+  const { data: appConfig } = useAppConfig();
+  const isDemoMode = appConfig?.demo_mode ?? false;
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = e.target.value;
@@ -56,13 +59,15 @@ const DatasetSettings: React.FC<{ config: DatasetNodeConfig; onChange: (c: Datas
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <span className="block text-sm font-medium">Select Dataset</span>
-          <button
-            onClick={() => { setShowUpload(true); }}
-            className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
-          >
-            <Plus size={14} />
-            New Upload
-          </button>
+          {!isDemoMode && (
+            <button
+              onClick={() => { setShowUpload(true); }}
+              className="text-xs flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
+            >
+              <Plus size={14} />
+              New Upload
+            </button>
+          )}
         </div>
 
         {loading ? (

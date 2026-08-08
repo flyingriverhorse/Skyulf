@@ -293,7 +293,10 @@ async def list_jobs(
 ):
     """List recent jobs."""
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
-    return await JobManager.list_jobs(session, effective_limit, skip, job_type)
+    jobs = await JobManager.list_jobs(session, effective_limit, skip, job_type)
+    if get_settings().DEMO_MODE:
+        jobs = [j for j in jobs if j.dataset_id == "iris-demo"]
+    return jobs
 
 
 @router.get("/jobs/tuning/latest/{node_id}", response_model=JobInfo | None)
