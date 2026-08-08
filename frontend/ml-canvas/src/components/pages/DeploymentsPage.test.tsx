@@ -126,8 +126,8 @@ describe('DeploymentsPage lineage (OPS-002)', () => {
 
     // The button must disable while the mutation is in flight so a second
     // click cannot fire a duplicate deactivate request.
-    const deactivateButton = await screen.findByRole('button', { name: /deactivate/i });
-    expect(deactivateButton).toBeDisabled();
+    const deactivateButton = screen.getByRole('button', { name: /deactivate/i });
+    await waitFor(() => expect(deactivateButton).toBeDisabled());
 
     await waitFor(() => expect(deploymentApi.deactivate).toHaveBeenCalledTimes(1));
   });
