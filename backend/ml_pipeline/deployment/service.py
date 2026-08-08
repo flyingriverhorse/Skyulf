@@ -606,6 +606,54 @@ class DeploymentService:
         return None
 
     @staticmethod
+    def _pretty_dtype(raw: Any) -> str:
+        """Map a pandas/numpy dtype string to a short label users can act on.
+
+        Nullable extension dtypes ("Int32", "Float32", "boolean") normalise to the
+        same label as their numpy counterparts — the distinction is an
+        implementation detail no one filling in a prediction form cares about.
+        """
+        if not raw:
+            return "unknown"
+
+        name = str(raw).lower()
+        if name.startswith(("datetime", "period")):
+            return "datetime"
+        if name.startswith("timedelta"):
+            return "duration"
+        if name.startswith("category"):
+            return "category"
+        if name in {"bool", "boolean"}:
+            return "boolean"
+        if name.startswith(("int", "uint")):
+            return "integer"
+        if name.startswith("float"):
+            return "float"
+        if name in {"object", "string", "str"}:
+            return "text"
+        return "unknown"
+
+    @staticmethod
+    def _input_schema_entries(
+        feature_names: Any, feature_dtypes: dict[str, Any] | None
+    ) -> list[dict[str, str]]:
+        """Build the API's input-schema list, preserving the model's column order.
+
+        ``feature_dtypes`` is absent on artifacts bundled before dtype capture
+        existed, so every column there degrades to "unknown" rather than failing.
+        """
+        dtypes = feature_dtypes or {}
+        return [
+            {"name": str(f), "type": DeploymentService._pretty_dtype(dtypes.get(str(f)))}
+            for f in feature_names
+        ]
+
+    @staticmethod
+    def _dtypes_for_columns(df: pd.DataFrame, columns: Any) -> dict[str, str]:
+        """Record each requested column's dtype as a string, skipping absent columns."""
+        return {str(c): str(df[c].dtype) for c in columns if c in df.columns}
+
+    @staticmethod
     def _build_input_schema_from_artifact(artifact_uri: str) -> list[dict[str, str]] | None:
         """Loads the artifact and extracts its input schema, unwrapping tuple artifacts first."""
         artifact = DeploymentService._load_artifact_for_details(artifact_uri)
@@ -619,7 +667,8 @@ class DeploymentService:
         if not input_features:
             return None
 
-        return [{"name": str(f), "type": "unknown"} for f in input_features]
+        feature_dtypes = artifact.get("feature_dtypes") if isinstance(artifact, dict) else None
+        return DeploymentService._input_schema_entries(input_features, feature_dtypes)
 
     @staticmethod
     async def _lookup_target_column(session: AsyncSession, job_id: Any) -> str | None:

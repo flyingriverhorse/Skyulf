@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Activity, CheckCircle, XCircle, Clock, Search,
   RefreshCw, Database, BarChart2, Filter, Tags, TrendingUp, FileText, Boxes, Layers
@@ -43,8 +43,15 @@ export const JobsPage: React.FC = () => {
   // task via getTaskForModelType \u2014 the same pattern useJobStore/JobsDrawer
   // use for the Job History drawer.
   const [pool, setPool] = useState<JobInfo[]>([]);
-  const [poolSkip, setPoolSkip] = useState(0);
   const [poolHasMore, setPoolHasMore] = useState(true);
+  // Tracks the pool pagination offset synchronously (instead of via React
+  // state) so overlapping fetchPool calls \u2014 e.g. React 18 StrictMode's
+  // dev-mode double-invoke of effects \u2014 read the up-to-date offset rather
+  // than a stale closure value. poolFetchInFlightRef prevents two fetches
+  // from running concurrently in the first place. Together these stop
+  // OPS-008's duplicate-row/colliding-key defect at its root cause.
+  const poolSkipRef = useRef(0);
+  const poolFetchInFlightRef = useRef(false);
 
   // EDA and Ingestion tabs are unrelated to task filtering and keep their
   // original per-tab cached pagination untouched.
@@ -67,27 +74,43 @@ export const JobsPage: React.FC = () => {
   }, []);
 
   const fetchPool = async (reset: boolean = false) => {
+    // Guard against overlapping fetches (e.g. StrictMode's double-invoke or
+    // the auto-load-more effect re-firing before a prior fetch settles).
+    // Without this, two calls can both read the same poolSkip and append
+    // the same page twice, producing duplicate job_id rows and colliding
+    // React keys.
+    if (poolFetchInFlightRef.current) return;
+    poolFetchInFlightRef.current = true;
+
     if (reset) {
       setLoading(true);
       setPool([]);
-      setPoolSkip(0);
+      poolSkipRef.current = 0;
       setPoolHasMore(true);
     }
 
     try {
-      const currentSkip = reset ? 0 : poolSkip;
+      const currentSkip = reset ? 0 : poolSkipRef.current;
       // job_type omitted \u2192 backend merges & sorts training + tuning jobs together.
       const fetchedJobs = await jobsApi.getJobs(LIMIT, currentSkip);
       fetchedJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       const isMore = fetchedJobs.length >= LIMIT;
       setPoolHasMore(isMore);
-      setPool(prev => reset ? fetchedJobs : [...prev, ...fetchedJobs]);
-      setPoolSkip(currentSkip + LIMIT);
+      setPool(prev => {
+        if (reset) return fetchedJobs;
+        // Defense-in-depth: even if two fetches somehow both land, never
+        // let the same job_id appear twice in the rendered pool.
+        const seen = new Set(prev.map(j => j.job_id));
+        const deduped = fetchedJobs.filter(j => !seen.has(j.job_id));
+        return [...prev, ...deduped];
+      });
+      poolSkipRef.current = currentSkip + LIMIT;
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
     } finally {
       setLoading(false);
+      poolFetchInFlightRef.current = false;
     }
   };
 

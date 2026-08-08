@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { registry } from '../../core/registry/NodeRegistry';
 import { useGraphStore } from '../../core/store/useGraphStore';
 import { useViewStore } from '../../core/store/useViewStore';
+import { FOCUS_NODE_EVENT } from '../../core/hooks/useKeyboardShortcuts';
 import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -20,11 +21,29 @@ export const Sidebar: React.FC = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  // CAN-001: the previous 30 px diagonal step was smaller than a node
+  // card's `min-w-[200px]`, so consecutive click-adds landed mostly on
+  // top of each other and the older card intercepted clicks meant for
+  // the new one. 260/220 px steps clear a card's width/typical height;
+  // wrapping into a new column every 5 nodes and a new "sheet" every 4
+  // rows keeps the cascade from drifting arbitrarily far off-screen
+  // before FlowCanvas pans/zooms the latest node into view below.
+  const COLUMNS = 5;
+  const ROWS = 4;
+  const STEP_X = 260;
+  const STEP_Y = 220;
+
   const handleAddNodeClick = (nodeType: string) => {
-    const step = placementCounterRef.current % 8;
+    const step = placementCounterRef.current % (COLUMNS * ROWS);
     placementCounterRef.current += 1;
-    addNode(nodeType, { x: 100 + step * 30, y: 100 + step * 30 });
+    const col = step % COLUMNS;
+    const row = Math.floor(step / COLUMNS);
+    const id = addNode(nodeType, { x: 100 + col * STEP_X, y: 100 + row * STEP_Y });
+    if (id) {
+      window.dispatchEvent(new CustomEvent(FOCUS_NODE_EVENT, { detail: { id } }));
+    }
   };
+
 
   if (!isSidebarOpen) {
     return (

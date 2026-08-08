@@ -342,7 +342,7 @@ def test_scenario_04_split_then_scaler_keeps_xy(tmp_path: Path) -> None:
 
 
 def test_scenario_05_sibling_fanin_warning(tmp_path: Path) -> None:
-    """Bug 9j: 3 sibling preprocessors fanned into one node should warn."""
+    """Bug 9j: siblings editing different columns are not a conflict — no winner is reported."""
     csv = _make_iris(tmp_path)
     engine, store = _new_engine(tmp_path)
 
@@ -382,16 +382,25 @@ def test_scenario_05_sibling_fanin_warning(tmp_path: Path) -> None:
     payload = _record_run("05_sibling_fanin_warning", cfg, store, result)
 
     warnings = payload["merge_warnings"]
-    assert any(w["kind"] == "sibling_fan_in" and w["node_id"] == "merge_consumer" for w in warnings)
-    advisory = next(w for w in warnings if w["node_id"] == "merge_consumer")
-    assert "drop_id" in advisory["common_ancestors"]
-    # New fields: winner is always the last input; overlap_columns lists
-    # only columns present in 2+ inputs.
-    assert advisory["winner_input"] == "sib_b"
-    assert "overlap_columns" in advisory
-    # sib_a and sib_b both produce all 4 numeric columns, so all overlap
-    assert "SepalLengthCm" in advisory["overlap_columns"]
-    assert "SepalWidthCm" in advisory["overlap_columns"]
+    # sib_a scales SepalLengthCm, sib_b scales SepalWidthCm. Every other column
+    # is carried through untouched by both, so no column has two authors and
+    # nothing is discarded — reporting a "winner" here would be noise.
+    assert not [
+        w for w in warnings if w["kind"] == "sibling_fan_in" and w["node_id"] == "merge_consumer"
+    ]
+
+    merged = store.load("merge_consumer")
+    scaled_a = store.load("sib_a")
+    scaled_b = store.load("sib_b")
+    # Each branch's own edit survives the merge.
+    pd.testing.assert_series_equal(
+        merged["SepalLengthCm"].reset_index(drop=True),
+        scaled_a["SepalLengthCm"].reset_index(drop=True),
+    )
+    pd.testing.assert_series_equal(
+        merged["SepalWidthCm"].reset_index(drop=True),
+        scaled_b["SepalWidthCm"].reset_index(drop=True),
+    )
 
 
 def test_scenario_06_training_with_multiple_preprocessor_branches(tmp_path: Path) -> None:

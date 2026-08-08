@@ -15,6 +15,15 @@ export class DatasetApiError extends Error {
   }
 }
 
+const readErrorMessage = async (response: Response, fallback: string): Promise<string> => {
+  try {
+    const body = await response.json() as { message?: string; detail?: string; error?: string } | null;
+    return body?.message || body?.detail || body?.error || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export const DatasetService = {
   getAll: async (): Promise<Dataset[]> => {
     const response = await fetch(`${API_BASE}/sources`);
@@ -143,7 +152,7 @@ export const DatasetService = {
     const params = new URLSearchParams({ limit: limit.toString() });
     const response = await fetch(`${API_BASE}/sources/${encodeURIComponent(id)}/sample?${params.toString()}`);
     if (!response.ok) {
-      throw new DatasetApiError('Failed to fetch dataset sample', response.status);
+      throw new DatasetApiError(await readErrorMessage(response, 'Failed to fetch dataset sample'), response.status);
     }
     const data = await response.json();
     return data.data;
@@ -153,7 +162,7 @@ export const DatasetService = {
   getProfile: async (id: string): Promise<DatasetProfile> => {
     const response = await fetch(`/api/pipeline/datasets/${encodeURIComponent(id)}/schema`);
     if (!response.ok) {
-      throw new DatasetApiError('Failed to fetch dataset profile', response.status);
+      throw new DatasetApiError(await readErrorMessage(response, 'Failed to fetch dataset profile'), response.status);
     }
     const data = await response.json();
 

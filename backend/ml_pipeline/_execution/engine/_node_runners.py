@@ -55,6 +55,7 @@ class NodeRunnersMixin:
     _build_composite_feature_engineer: Any
     _resolve_feature_engineer_artifact_key: Any
     _bundle_transformers_with_model: Any
+    _upstream_dropped_columns: Any
     _extract_feature_importances: Any
     _extract_shap_explanation: Any
     _pipeline_has_training_node: Any
@@ -246,6 +247,23 @@ class NodeRunnersMixin:
             columns = [c for c in columns if c not in exclude_columns]
         return columns
 
+    def _resolve_train_feature_dtypes(
+        self, data: Any, feature_columns: list[str] | None
+    ) -> dict[str, str] | None:
+        """Dtypes of the exact columns the model was fit on, or ``None`` if unavailable.
+
+        Captured here rather than derived from the raw dataset because the training
+        frame is the only place engineered columns (e.g. ``*_was_missing``) exist.
+        Persisted alongside the artifact so the deployment API can describe each
+        expected input instead of reporting every column as "unknown".
+        """
+        if not feature_columns:
+            return None
+        train_frame = self._resolve_train_frame(data)
+        if not hasattr(train_frame, "dtypes") or not hasattr(train_frame, "columns"):
+            return None
+        return {c: str(train_frame[c].dtype) for c in feature_columns if c in train_frame.columns}
+
     def _bundle_model_with_transformers(
         self,
         node: NodeConfig,
@@ -269,13 +287,17 @@ class NodeRunnersMixin:
             else None
         )
 
+        feature_dtypes = self._resolve_train_feature_dtypes(data, feature_columns)
+
         self._bundle_transformers_with_model(
             node.node_id,
             job_id=job_id,
             feature_engineer_artifact_key=feature_engineer_key,
             feature_engineer_override=composite_feature_engineer,
             target_column=target_col,
+            dropped_columns=self._upstream_dropped_columns(node),
             feature_columns=feature_columns,
+            feature_dtypes=feature_dtypes,
         )
 
     def _flatten_split_metrics(self, splits: dict[str, Any], metrics: dict[str, Any]) -> None:

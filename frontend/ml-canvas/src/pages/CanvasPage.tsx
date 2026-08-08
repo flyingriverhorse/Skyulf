@@ -2,9 +2,15 @@ import React, { useEffect, useRef } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout/MainLayout';
 import { useGraphStore } from '../core/store/useGraphStore';
+import { useViewStore } from '../core/store/useViewStore';
 import type { PipelineVersionEntry } from '../core/api/pipelineVersions';
 import { toast } from '../core/toast';
 import type { Node, Edge } from '@xyflow/react';
+
+const SHELL_VIEWS = ['canvas', 'experiments', 'inference'] as const;
+type ShellView = (typeof SHELL_VIEWS)[number];
+const isShellView = (value: string | null): value is ShellView =>
+  value !== null && (SHELL_VIEWS as readonly string[]).includes(value);
 
 export const CanvasPage: React.FC = () => {
   const addNode = useGraphStore((state) => state.addNode);
@@ -15,6 +21,65 @@ export const CanvasPage: React.FC = () => {
   const navigate = useNavigate();
   const processedRef = useRef(false);
   const restoreProcessedRef = useRef(false);
+  const activeView = useViewStore((state) => state.activeView);
+  const setView = useViewStore((state) => state.setView);
+  // Tracks whether we've already written the initial `view` param once,
+  // so the very first sync (populating a fresh /canvas URL with the
+  // default view) replaces rather than pushing an extra history entry
+  // the user never asked for.
+  const hasSyncedUrlRef = useRef(false);
+  // Set right before the URL->store effect applies a param, so the
+  // store->URL effect below can tell "this activeView change came from
+  // the URL itself" and skip re-writing it. Without this, the two
+  // effects each read a stale copy of the other's state and ping-pong
+  // the URL between values forever (they run in the same commit, before
+  // either has seen the other's update).
+  const appliedFromUrlRef = useRef(false);
+
+  // FND-006: make the selected shell view (Canvas/Experiments/Inference)
+  // restorable via Back/Forward instead of living only in memory. The
+  // `view` query param is the source of truth for navigation history.
+  // This effect only reacts to the URL changing (initial load, deep
+  // link, Back/Forward) — it intentionally does not depend on
+  // `activeView` so that store-originated changes (Navbar clicks) don't
+  // re-trigger it.
+  useEffect(() => {
+    const paramView = searchParams.get('view');
+    if (isShellView(paramView) && paramView !== useViewStore.getState().activeView) {
+      appliedFromUrlRef.current = true;
+      setView(paramView);
+    }
+  }, [searchParams, setView]);
+
+  // Mirror image of the effect above: only reacts to the store's
+  // `activeView` changing, so it doesn't re-fire from its own URL
+  // writes. Skips the one change that the effect above just applied
+  // from the URL, since that's already reflected there. Reads the
+  // store directly via getState() rather than the closed-over
+  // `activeView` — React 18 StrictMode replays this effect body a
+  // second time against the *same* stale render closure, and using
+  // that stale value here was pushing the pre-update view back into
+  // the URL right after the URL->store effect had just changed it.
+  useEffect(() => {
+    if (appliedFromUrlRef.current) {
+      appliedFromUrlRef.current = false;
+      return;
+    }
+    const currentView = useViewStore.getState().activeView;
+    if (searchParams.get('view') === currentView) {
+      hasSyncedUrlRef.current = true;
+      return;
+    }
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('view', currentView);
+    // A view switch is a new place in the shell's history, not a detail
+    // of the current one — push so Back actually restores the prior
+    // view, except for the very first sync which just fills in the
+    // default and shouldn't itself become a Back target.
+    setSearchParams(newParams, { replace: !hasSyncedUrlRef.current });
+    hasSyncedUrlRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView]);
 
   // L7: when DataSources -> Versions -> Restore navigates here with a
   // version payload in router state, apply it to the canvas. Runs

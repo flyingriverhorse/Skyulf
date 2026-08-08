@@ -27,7 +27,13 @@ The training node collects **all** upstream branch outputs via `_resolve_all_inp
 | No common columns, different shapes | **Error** | Incompatible inputs |
 
 - Duplicate columns are automatically deduplicated after merging.
-- Inputs are merged in deterministic **topological order** based on the pipeline graph.
+- Inputs are merged in the order their edges enter the node, except that an input which is an
+  ancestor of another input is always applied first. This is the same order the merge advisory
+  banner reports as the `last_wins` winner.
+- **Per-column ownership:** for column-wise merges the engine compares each branch against the
+  nearest shared ancestor. A column changed by only one branch keeps that branch's value no matter
+  the edge order. The merge strategy is consulted — and the advisory banner shown — only for columns
+  that two or more branches both modified.
 
 ### Merge Badge
 

@@ -428,14 +428,19 @@ class DataIngestionService:
 
     @staticmethod
     async def _save_uploaded_file(file: UploadFile, file_path: Path, settings: Any) -> None:
-        """Stream `file` to `file_path` in chunks, enforcing MAX_UPLOAD_SIZE."""
+        """Stream `file` to `file_path` in chunks, enforcing MAX_UPLOAD_SIZE.
+
+        The partial file is removed only after the write handle has closed:
+        Windows refuses to unlink a file that is still open, which turned an
+        over-limit upload into a ``PermissionError`` instead of a 413 and left
+        the truncated upload on disk.
+        """
         bytes_written = 0
         try:
             async with aiofiles.open(file_path, "wb") as out_file:
                 while content := await file.read(1024 * 1024):  # 1MB chunks
                     bytes_written += len(content)
                     if bytes_written > settings.MAX_UPLOAD_SIZE:
-                        file_path.unlink(missing_ok=True)
                         raise HTTPException(
                             status_code=413,
                             detail=(
@@ -446,8 +451,10 @@ class DataIngestionService:
                         )
                     await out_file.write(content)
         except HTTPException:
+            file_path.unlink(missing_ok=True)
             raise
         except Exception as e:
+            file_path.unlink(missing_ok=True)
             logger.error(f"Failed to save file: {e}")
             raise SkyulfException(message="Failed to save file") from e
 
