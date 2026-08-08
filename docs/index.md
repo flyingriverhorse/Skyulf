@@ -73,7 +73,7 @@ See [Architecture](architecture.md) and [Data Architecture](data_architecture.md
 **Frontend development:**
 ```bash
 # Terminal 1 — backend
-cd /path/to/Skyulf && .venv/bin/python3 run_fastapi.py
+cd /path/to/Skyulf && .venv/bin/python3 run_skyulf.py
 
 # Terminal 2 — frontend dev server (proxies /api/* to localhost:8000)
 cd frontend/ml-canvas && npm run dev

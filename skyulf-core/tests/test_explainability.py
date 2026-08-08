@@ -172,6 +172,45 @@ def test_numpy_fitted_multiclass_tree_explainability_has_no_feature_name_warning
     assert result["feature_names"] == list(X.columns)
 
 
+def test_random_forest_classifier_explanation_is_not_none(classification_data):
+    """Regression test: a fitted RandomForestClassifier must yield a real SHAP
+    explanation, not just avoid raising.
+
+    Guards against the bug where `compute_shap_explanation` silently returned
+    `None` for every RandomForest job because the interventional/masker-based
+    explainer path could raise `shap.utils._exceptions.ExplainerError`
+    ("Additivity check failed") and the broad `except Exception` swallowed it
+    at `debug` level with no way to distinguish "unsupported model" from
+    "broken explainer". `compute_shap_explanation` now builds the exact
+    `tree_path_dependent` `TreeExplainer` for tree ensembles, which needs no
+    background data and isn't susceptible to that failure mode.
+    """
+    X, y = classification_data
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    assert result["mean_abs_importance"]
+    assert any(v > 0 for v in result["mean_abs_importance"].values())
+    assert result["samples"]
+
+
+def test_random_forest_regressor_explanation_is_not_none(regression_data):
+    """Same regression guard as above, for the regressor side of RandomForest."""
+    from sklearn.ensemble import RandomForestRegressor
+
+    X, y = regression_data
+    model = RandomForestRegressor(n_estimators=100, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is not None
+    assert result["mean_abs_importance"]
+    assert any(v > 0 for v in result["mean_abs_importance"].values())
+    assert result["samples"]
+
+
 def test_returns_none_on_model_failure(classification_data):
     """Any exception during SHAP computation is swallowed and `None` is returned."""
     X, _ = classification_data
@@ -301,3 +340,69 @@ def test_multiclass_tree_model_includes_interaction_matrix(multiclass_data):
     assert interactions is not None
     assert interactions["feature_names"] == ["a", "b", "c"]
     assert len(interactions["matrix"]) == 3
+
+
+def test_explainability_works_when_shap_exceptions_module_missing(
+    classification_data,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """`shap.utils._exceptions` may not exist in all SHAP versions, but explainability
+    should still work — the import fallback must not silently return `None`."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _fail_exceptions_only(name, *args, **kwargs):
+        if name == "shap.utils._exceptions":
+            raise ImportError("no _exceptions")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fail_exceptions_only)
+
+    X, y = classification_data
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X, max_display_samples=5)
+
+    assert result is not None
+    assert set(result["feature_names"]) == {"a", "b", "c"}
+    assert result["mean_abs_importance"]
+    assert len(result["samples"]) == 5
+
+
+def test_non_additivity_exception_propagates_when_exceptions_module_missing(
+    classification_data,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """When `_shap_exceptions` is None and the explainer raises a non-additivity
+    exception, it must propagate (caught by the outer handler → `None`), not be
+    silently retried as if it were an additivity failure."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _fail_exceptions_only(name, *args, **kwargs):
+        if name == "shap.utils._exceptions":
+            raise ImportError("no _exceptions")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _fail_exceptions_only)
+
+    from skyulf.modeling._explainability import shap_explanation as _mod
+
+    class _RaisingExplainer:
+        def __call__(self, sample, **kwargs):
+            raise ValueError("model is not fitted")
+
+    monkeypatch.setattr(
+        _mod,
+        "_build_explainer",
+        lambda shap, model, sample: (_RaisingExplainer(), True),
+    )
+
+    X, y = classification_data
+    model = RandomForestClassifier(n_estimators=20, random_state=0).fit(X, y)
+
+    result = compute_shap_explanation(model, X)
+
+    assert result is None
