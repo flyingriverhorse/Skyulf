@@ -4,7 +4,8 @@ import {
   Background,
   Controls,
   ReactFlowProvider,
-  useReactFlow
+  useReactFlow,
+  type Node
 } from '@xyflow/react';
 import { useShallow } from 'zustand/react/shallow';
 import '@xyflow/react/dist/style.css';
@@ -20,7 +21,7 @@ import { CustomNodeWrapper } from './CustomNodeWrapper';
 import { CustomEdge } from './CustomEdge';
 import { useConfirm } from '../shared';
 import { Sparkles } from 'lucide-react';
-import { SHOW_TEMPLATES_EVENT } from '../../core/hooks/useKeyboardShortcuts';
+import { SHOW_TEMPLATES_EVENT, FOCUS_NODE_EVENT, type FocusNodeDetail } from '../../core/hooks/useKeyboardShortcuts';
 import { PerfOverlayLegend } from './PerfOverlayLegend';
 
 const nodeTypes = {
@@ -30,6 +31,31 @@ const nodeTypes = {
 const edgeTypes = {
   custom: CustomEdge
 };
+
+/**
+ * Branch-color assignment (`useBranchColors`) only depends on node
+ * topology — id, type, model metadata — never on position. React Flow
+ * gives every dragged node a new `nodes` array reference on each
+ * pointer-move frame, which used to force `useBranchColors`'s full BFS
+ * graph traversal (and the edge re-coloring/re-render that follows it)
+ * to rerun dozens of times per second while dragging, causing visible
+ * stutter on graphs with ~15+ nodes. Returning the previous `nodes`
+ * reference whenever only positions/selection/dragging flags changed
+ * keeps that downstream memoization a no-op during drags and pans.
+ */
+function useBranchStableNodes(nodes: Node[]): Node[] {
+  const signature = nodes
+    .map((n) => {
+      const data = n.data as Record<string, unknown>;
+      return `${n.id}:${data.definitionType as string}:${(data.model_type as string) ?? ''}:${(data.label as string) ?? ''}:${(data.title as string) ?? ''}`;
+    })
+    .join('|');
+  const ref = useRef<{ signature: string; nodes: Node[] }>({ signature: '', nodes });
+  if (ref.current.signature !== signature) {
+    ref.current = { signature, nodes };
+  }
+  return ref.current.nodes;
+}
 
 const FlowCanvasContent: React.FC = () => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -94,7 +120,8 @@ const FlowCanvasContent: React.FC = () => {
   // badge and red-border-on-broken-refs in `CustomNodeWrapper`.
   useSchemaPreview();
 
-  const branchColorMap = useBranchColors(nodes, edges);
+  const branchStableNodes = useBranchStableNodes(nodes);
+  const branchColorMap = useBranchColors(branchStableNodes, edges);
 
   // Mirror the per-edge Path label and the per-label color into the global
   // store so trainer cards and ResultsPanel can use the exact same letters
@@ -215,6 +242,21 @@ const FlowCanvasContent: React.FC = () => {
     window.addEventListener('skyulf:add-node-at-center', handler);
     return () => window.removeEventListener('skyulf:add-node-at-center', handler);
   }, [screenToFlowPosition, addNode]);
+
+  // CAN-001: pan/zoom the just-added node into view. Fired by the
+  // Sidebar after a palette click, since it sits outside
+  // <ReactFlowProvider> and can't call fitView itself. Drag-and-drop
+  // and the command-palette insertion above already place nodes at a
+  // point the user is already looking at, so they don't need this.
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const detail = (e as CustomEvent<FocusNodeDetail>).detail;
+      if (!detail?.id) return;
+      fitView({ nodes: [{ id: detail.id }], duration: 250, padding: 0.4, maxZoom: 1 });
+    };
+    window.addEventListener(FOCUS_NODE_EVENT, handler);
+    return () => window.removeEventListener(FOCUS_NODE_EVENT, handler);
+  }, [fitView]);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {

@@ -3,7 +3,7 @@ import { FileText, Database, Columns, AlignJustify } from 'lucide-react';
 import { DatasetService, DatasetApiError } from '../../core/api/datasets';
 import { Dataset } from '../../core/types/api';
 import { formatBytes } from '../../core/utils/format';
-import { ModalShell } from '../shared';
+import { EmptyState, ErrorState, LoadingState, ModalShell } from '../shared';
 
 interface DatasetPreviewModalProps {
   dataset: Dataset | null;
@@ -35,11 +35,13 @@ interface DatasetProfile {
   columns: ColumnProfile[];
 }
 
+/** Shows a dataset preview with independent sample/profile recovery states. */
 export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ dataset, isOpen, onClose }) => {
   const [sampleData, setSampleData] = useState<unknown[]>([]);
   const [profile, setProfile] = useState<DatasetProfile | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [sampleError, setSampleError] = useState<string | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'sample' | 'stats'>('sample');
   const [sampleSize, setSampleSize] = useState(100);
 
@@ -53,7 +55,8 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
     } else {
       setSampleData([]);
       setProfile(null);
-      setError(null);
+      setSampleError(null);
+      setProfileError(null);
       setActiveTab('sample');
       setSampleSize(100);
     }
@@ -64,24 +67,30 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
     if (!dataset) return;
     const myRequestId = ++requestIdRef.current;
     setLoading(true);
-    setError(null);
+    setSampleError(null);
+    setProfileError(null);
     try {
-      const [sample, profileData] = await Promise.all([
+      const [sampleResult, profileResult] = await Promise.allSettled([
         DatasetService.getSample(dataset.id, limit),
         DatasetService.getProfile(dataset.id)
       ]);
       if (myRequestId !== requestIdRef.current) return;
-      setSampleData(sample);
-      setProfile(profileData);
+      if (sampleResult.status === 'fulfilled') {
+        setSampleData(Array.isArray(sampleResult.value) ? sampleResult.value : []);
+      } else {
+        console.error('Failed to fetch sample preview:', sampleResult.reason);
+        setSampleData([]);
+        setSampleError(formatPreviewError('sample', dataset.name, sampleResult.reason));
+      }
+      if (profileResult.status === 'fulfilled') {
+        setProfile(profileResult.value);
+      } else {
+        console.error('Failed to fetch dataset profile:', profileResult.reason);
+        setProfile(null);
+        setProfileError(formatPreviewError('statistics', dataset.name, profileResult.reason));
+      }
     } catch (err) {
       console.error('Failed to fetch data:', err);
-      if (myRequestId === requestIdRef.current) {
-        if (err instanceof DatasetApiError && err.status === 404) {
-          setError('This dataset is no longer available. It may have been deleted — try re-uploading it or removing this reference.');
-        } else {
-          setError('Failed to load dataset preview.');
-        }
-      }
     } finally {
       if (myRequestId === requestIdRef.current) {
         setLoading(false);
@@ -97,10 +106,15 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
 
   if (!dataset) return null;
 
+  const sampleLoaded = sampleError === null && sampleData.length > 0;
+  const profileLoaded = profileError === null && profile !== null;
   const columns = sampleData.length > 0 ? Object.keys(sampleData[0] as object) : [];
-  const rowCount = profile?.metrics.row_count ?? dataset.rows ?? 0;
-  const colCount = profile?.metrics.column_count ?? dataset.columns ?? 0;
-  const sizeBytes = dataset.size_bytes ?? 0;
+  // Backend JSON can send an explicit null, which `?? undefined` normalizes so
+  // "unknown" and a real 0 stay distinguishable without a crash on toLocaleString.
+  const rowCount = profile?.metrics.row_count ?? dataset.rows ?? undefined;
+  const colCount = profile?.metrics.column_count ?? dataset.columns ?? undefined;
+  const sizeBytes = dataset.size_bytes ?? undefined;
+  const unknownMetric = <span aria-label="Unknown">—</span>;
 
   const titleNode = (
     <div className="flex items-center gap-3">
@@ -115,14 +129,14 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
           </span>
           <span>•</span>
           <span className="flex items-center gap-1">
-            <AlignJustify size={14} /> {rowCount.toLocaleString()} rows
+            <AlignJustify size={14} /> {rowCount !== undefined ? rowCount.toLocaleString() : unknownMetric} rows
           </span>
           <span>•</span>
           <span className="flex items-center gap-1">
-            <Columns size={14} /> {colCount} columns
+            <Columns size={14} /> {colCount !== undefined ? colCount : unknownMetric} columns
           </span>
           <span>•</span>
-          <span>{formatBytes(sizeBytes)}</span>
+          <span>{sizeBytes !== undefined ? formatBytes(sizeBytes) : unknownMetric}</span>
         </div>
       </div>
     </div>
@@ -175,30 +189,11 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
           {loading ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-              <p>Loading preview data...</p>
-            </div>
-          ) : error ? (
-            <div className="flex flex-col items-center justify-center h-64 text-red-500 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20">
-              <p>{error}</p>
-              <button
-                onClick={() => { void fetchData(sampleSize); }}
-                className="mt-4 px-4 py-2 bg-white dark:bg-slate-800 border border-red-200 dark:border-red-800 rounded-md text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                Retry
-              </button>
-            </div>
+            <LoadingState message={`Loading preview data for ${dataset.name}...`} />
           ) : activeTab === 'sample' ? (
-            sampleData.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                No data available to preview.
-              </div>
-            ) : columns.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                Data loaded but no columns found.
-              </div>
-            ) : (
+            sampleError ? (
+              <ErrorState error={sampleError} onRetry={() => { void fetchData(sampleSize); }} />
+            ) : sampleLoaded ? (
               <div className="space-y-4">
                 <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                   <div className="overflow-x-auto max-h-[60vh]">
@@ -238,58 +233,68 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
                   </span>
                 </div>
               </div>
+            ) : columns.length === 0 ? (
+              <EmptyState title="No data available to preview." description={`"${dataset.name}" did not return any columns.`} />
+            ) : (
+              <EmptyState title={`No preview data for "${dataset.name}".`} description="The sample request returned no rows." />
             )
           ) : (
             <div className="space-y-6">
-              {/* Overall Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatCard label="Total Rows" value={profile?.metrics.row_count.toLocaleString()} />
-                <StatCard label="Total Columns" value={profile?.metrics.column_count} />
-                <StatCard label="Missing Cells" value={profile?.metrics.missing_cells.toLocaleString()} />
-                <StatCard label="Missing %" value={`${profile?.metrics.missing_percentage}%`} />
-              </div>
+              {profileError ? (
+                <ErrorState error={profileError} onRetry={() => { void fetchData(sampleSize); }} />
+              ) : profileLoaded ? (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatCard label="Total Rows" value={profile?.metrics.row_count !== undefined ? profile.metrics.row_count.toLocaleString() : undefined} />
+                    <StatCard label="Total Columns" value={profile?.metrics.column_count} />
+                    <StatCard label="Missing Cells" value={profile?.metrics.missing_cells !== undefined ? profile.metrics.missing_cells.toLocaleString() : undefined} />
+                    <StatCard label="Missing %" value={profile?.metrics.missing_percentage !== undefined ? `${profile.metrics.missing_percentage}%` : undefined} />
+                  </div>
 
-              {/* Column Statistics Table */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                    <tr>
-                      <th className="px-4 py-3 font-semibold">Column</th>
-                      <th className="px-4 py-3 font-semibold">Type</th>
-                      <th className="px-4 py-3 font-semibold">Missing</th>
-                      <th className="px-4 py-3 font-semibold">Unique</th>
-                      <th className="px-4 py-3 font-semibold">Min</th>
-                      <th className="px-4 py-3 font-semibold">Max</th>
-                      <th className="px-4 py-3 font-semibold">Mean</th>
-                      <th className="px-4 py-3 font-semibold">Std Dev</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
-                    {profile?.columns.map((col) => (
-                      <tr key={col.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{col.name}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{col.dtype}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                          {col.missing_count} <span className="text-xs text-slate-400">({col.missing_percentage}%)</span>
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{col.distinct_count}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.minimum.toFixed(2) ?? '-'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.maximum.toFixed(2) ?? '-'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.mean.toFixed(2) ?? '-'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
-                          {col.numeric_summary?.std.toFixed(2) ?? '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <th className="px-4 py-3 font-semibold">Column</th>
+                          <th className="px-4 py-3 font-semibold">Type</th>
+                          <th className="px-4 py-3 font-semibold">Missing</th>
+                          <th className="px-4 py-3 font-semibold">Unique</th>
+                          <th className="px-4 py-3 font-semibold">Min</th>
+                          <th className="px-4 py-3 font-semibold">Max</th>
+                          <th className="px-4 py-3 font-semibold">Mean</th>
+                          <th className="px-4 py-3 font-semibold">Std Dev</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-700 bg-white dark:bg-slate-900">
+                        {profile.columns.map((col) => (
+                          <tr key={col.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{col.name}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-slate-500">{col.dtype}</td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                              {col.missing_count} <span className="text-xs text-slate-400">({col.missing_percentage}%)</span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{col.distinct_count}</td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                              {col.numeric_summary?.minimum.toFixed(2) ?? '-'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                              {col.numeric_summary?.maximum.toFixed(2) ?? '-'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                              {col.numeric_summary?.mean.toFixed(2) ?? '-'}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300 font-mono text-xs">
+                              {col.numeric_summary?.std.toFixed(2) ?? '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <EmptyState title={`No statistics for "${dataset.name}".`} description="The profile request returned no metrics." />
+              )}
             </div>
           )}
         </div>
@@ -298,9 +303,22 @@ export const DatasetPreviewModal: React.FC<DatasetPreviewModalProps> = ({ datase
   );
 };
 
-const StatCard = ({ label, value }: { label: string; value: string | number | undefined }) => (
+const StatCard = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-200 dark:border-slate-700">
     <div className="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">{label}</div>
-    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{value ?? '-'}</div>
+    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">{value ?? <span aria-label="Unknown">—</span>}</div>
   </div>
 );
+
+const formatPreviewError = (part: 'sample' | 'statistics', datasetName: string, error: unknown): string => {
+  const datasetPart = part === 'sample' ? 'Sample preview' : 'Statistics';
+  if (error instanceof DatasetApiError) {
+    if (error.status === 404) {
+      return `${datasetPart} for "${datasetName}" is unavailable because the source was deleted or moved.${error.message ? ` ${error.message}` : ''}`;
+    }
+    if (error.message) {
+      return `${datasetPart} for "${datasetName}" could not be loaded: ${error.message}`;
+    }
+  }
+  return `${datasetPart} for "${datasetName}" could not be loaded. Please try again.`;
+};

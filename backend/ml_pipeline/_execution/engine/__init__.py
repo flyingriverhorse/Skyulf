@@ -98,7 +98,6 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         start_time = datetime.now(UTC)
         self.executed_transformers = []  # Reset for new run
         self._node_configs = {n.node_id: n for n in config.nodes}
-        self._topo_order = {n.node_id: i for i, n in enumerate(config.nodes)}
         # Per-run merge advisories surfaced to API/UI so the user understands
         # what fan-in semantics were applied (column union, last-wins, etc.).
         self.merge_warnings = []
@@ -339,15 +338,15 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         input_node_id = node.inputs[index]
         return self.artifact_store.load(input_node_id)
 
-    def _resolve_all_inputs(self, node: NodeConfig) -> list[Any]:
-        """Load artifacts from ALL upstream nodes, ordered by topology.
+    def _merge_input_order(self, node: NodeConfig) -> list[str]:
+        """Return this node's unique input IDs in the order the merge applies them.
 
-        Duplicate edges from the same source node (which the frontend can emit
-        when a connection is wired multiple times) are collapsed to a single
-        load to avoid spurious multi-input merging.
+        Ancestors are guaranteed to come before their descendants, so a
+        redundant "ancestor + its descendant" edge pair still lets the
+        descendant win under last-wins. Genuine siblings keep the user's edge
+        order, which is what the fan-in advisory reports — the two must agree or
+        the banner credits a branch whose values were discarded.
         """
-        if not node.inputs:
-            raise ValueError(f"Node {node.node_id} has no inputs")
         deduped_ids: list[str] = []
         seen: set[str] = set()
         for nid in node.inputs:
@@ -355,11 +354,30 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
                 continue
             seen.add(nid)
             deduped_ids.append(nid)
-        sorted_ids = sorted(
-            deduped_ids,
-            key=lambda nid: self._topo_order.get(nid, 0),
-        )
-        return [self.artifact_store.load(nid) for nid in sorted_ids]
+
+        ancestors = {nid: self._ancestors_of(nid) for nid in deduped_ids}
+        remaining = list(deduped_ids)
+        ordered: list[str] = []
+        while remaining:
+            for i, nid in enumerate(remaining):
+                if not any(other in ancestors[nid] for other in remaining if other != nid):
+                    ordered.append(remaining.pop(i))
+                    break
+            else:
+                ordered.extend(remaining)
+                break
+        return ordered
+
+    def _resolve_all_inputs(self, node: NodeConfig) -> list[Any]:
+        """Load artifacts from ALL upstream nodes, in merge-application order.
+
+        Duplicate edges from the same source node (which the frontend can emit
+        when a connection is wired multiple times) are collapsed to a single
+        load to avoid spurious multi-input merging.
+        """
+        if not node.inputs:
+            raise ValueError(f"Node {node.node_id} has no inputs")
+        return [self.artifact_store.load(nid) for nid in self._merge_input_order(node)]
 
     def _ancestors_of(self, node_id: str) -> set[str]:
         """Return the set of all ancestor node IDs (transitive parents)."""

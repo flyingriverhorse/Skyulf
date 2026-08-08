@@ -7,6 +7,7 @@ import {
   SHOW_PALETTE_EVENT,
   type AddNodeAtCenterDetail,
 } from '../../core/hooks/useKeyboardShortcuts';
+import { useModalFocus } from '../shared/useModalFocus';
 
 /**
  * Quick command palette (Ctrl/Cmd+K). Fuzzy filter the registry by
@@ -21,6 +22,7 @@ export const CommandPalette: React.FC = () => {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // All registered node defs are stable for the lifetime of the app
   // (registry is initialised once at boot), so we can compute once. Legacy
@@ -37,14 +39,6 @@ export const CommandPalette: React.FC = () => {
     window.addEventListener(SHOW_PALETTE_EVENT, onOpen);
     return () => window.removeEventListener(SHOW_PALETTE_EVENT, onOpen);
   }, []);
-
-  // Focus the input on open. requestAnimationFrame so it lands after
-  // the modal mounts and the focus-trap-less input becomes selectable.
-  useEffect(() => {
-    if (!open) return;
-    const id = requestAnimationFrame(() => inputRef.current?.focus());
-    return () => cancelAnimationFrame(id);
-  }, [open]);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -118,6 +112,12 @@ export const CommandPalette: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onKeyDown reads latest state via closures captured each render is fine; we re-bind on every open toggle
   }, [open, matches, activeIndex]);
 
+  useModalFocus({
+    isOpen: open,
+    containerRef: dialogRef,
+    initialFocusRef: inputRef,
+  });
+
   // Keep the active row in view as the user arrows through the list.
   useEffect(() => {
     if (!open || !listRef.current) return;
@@ -130,20 +130,22 @@ export const CommandPalette: React.FC = () => {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[15vh]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Command palette"
-    >
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[15vh]">
       {/* Backdrop click closes; using a button so a11y rules accept it. */}
       <button
         type="button"
         aria-label="Close palette"
+        tabIndex={-1}
         className="absolute inset-0 cursor-default"
         onClick={() => setOpen(false)}
       />
-      <div className="relative w-full max-w-xl mx-4 rounded-xl border border-border bg-background shadow-2xl overflow-hidden">
+      <div
+        ref={dialogRef}
+        className="relative w-full max-w-xl mx-4 rounded-xl border border-border bg-background shadow-2xl overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
+      >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <Search className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
           <input

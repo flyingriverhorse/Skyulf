@@ -41,6 +41,7 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
   onChange,
   nodeId,
 }) => {
+  const id = React.useId();
   const upstreamData = useUpstreamData(nodeId || '');
   const datasetId = upstreamData.find(d => d.datasetId)?.datasetId as string | undefined;
   const { data: schema, isLoading } = useDatasetSchema(datasetId);
@@ -88,8 +89,9 @@ const EncodingSettings: React.FC<{ config: EncodingConfig; onChange: (c: Encodin
       <div className={`grid gap-4 ${isWide ? 'grid-cols-2' : 'grid-cols-1'}`}>
         {/* Method Selection */}
         <div className="space-y-2">
-          <span className="block text-sm font-medium">Encoding Method</span>
+          <label htmlFor={`${id}-encoding-method`} className="block text-sm font-medium">Encoding Method</label>
           <select
+            id={`${id}-encoding-method`}
             className="w-full p-2 border rounded bg-background focus:ring-1 focus:ring-primary outline-none"
             value={config.method}
             onChange={(e) => onChange({ ...config, method: e.target.value as EncodingConfig['method'] })}

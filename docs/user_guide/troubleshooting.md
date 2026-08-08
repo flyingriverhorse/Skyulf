@@ -72,14 +72,28 @@ You see an amber banner in the Results panel like:
 
 ### What it means
 
-A node has **two or more incoming edges** that trace back to a common ancestor (sibling fan-in). The engine merges them with two rules:
+A node has **two or more incoming edges** that trace back to a common ancestor (sibling fan-in). The
+engine merges them per column, using the nearest shared ancestor as a baseline to decide **which
+branch actually changed each column**:
 
-1. **Union of columns** — any column unique to one branch is kept as-is.
-2. **Last-wins on overlap** — for columns present in two or more branches, the **last input** in the node's input list overwrites the earlier ones. Earlier branches' modifications to those columns are silently dropped.
+1. **Nobody changed it** — the value is identical everywhere; any branch can supply it.
+2. **Exactly one branch changed it** — that branch owns the column. Its value always survives,
+   regardless of edge order or merge strategy. This is the common case, and it produces **no banner**.
+3. **Two or more branches changed it to different values** — a genuine conflict. The merge strategy
+   (`last_wins` by default, i.e. the last input edge) picks the winner, the losing branch's edits to
+   that column are discarded, and this banner appears naming the contested columns.
+
+Branches that changed a column but **agree** on the result (e.g. two MissingIndicator steps emitting
+the same `*_missing` flags) fall under case 2, not case 3: nothing is discarded, so no banner.
+
+The **Merge Strategy** dropdown in the Properties panel is only shown after a run has detected case 3
+for that node — there is nothing to choose when nothing is contested. It names the node it applies to
+and both contesting branches.
 
 ### Why it's usually a bug
 
-If both branches modify the same columns (e.g. `TransformationNode` rescales `SepalLengthCm` and `MissingIndicator` outputs the original `SepalLengthCm` plus `*_missing` flags), only the last branch's values survive. You lose the work the other branch did.
+If both branches modify the same columns (e.g. both rescale `SepalLengthCm`), only the winning
+branch's values survive. You lose the work the other branch did on that column.
 
 ### How to entirely fix it
 
@@ -120,6 +134,24 @@ In the canvas:
 | Cycles | Engine rejects |
 
 **Rule of thumb:** if two branches touch the same columns, chain them; if they touch different columns, fanning in is fine.
+
+---
+
+## "…reintroduced N columns removed by an upstream Drop Columns step"
+
+A second, different advisory can appear alongside the fan-in banner:
+
+> *MissingIndicator merged a branch that reintroduced 1 column removed by an upstream Drop Columns step: `Id`. They were dropped again, so any transform applied to them on that branch is discarded.*
+
+### What it means
+
+A Drop Columns / Drop Missing Columns node is treated as authoritative for its **entire** subgraph, not just its own branch. When a sibling branch that bypassed it feeds the same merge, the union would resurrect the dropped columns — so the engine removes them again after merging.
+
+The consequence is easy to miss: if the *other* branch applied a transformation to one of those columns, that work is thrown away with the column.
+
+### Fix
+
+Move the Drop Columns node **after** the merge if you want the columns to survive, or route the transforming branch through the Drop Columns node so both branches agree on which columns exist.
 
 ---
 

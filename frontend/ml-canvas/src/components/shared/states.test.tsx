@@ -1,14 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { EmptyState } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { LoadingState } from './LoadingState';
 
 describe('EmptyState', () => {
-  it('renders the title', () => {
+  it('announces the empty-state message once', () => {
     render(<EmptyState title="Nothing here yet" />);
-    expect(screen.getByText('Nothing here yet')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing here yet');
   });
 
   it('renders the optional description and action', () => {
@@ -19,26 +18,29 @@ describe('EmptyState', () => {
         action={<button>Upload</button>}
       />,
     );
+    expect(screen.getByRole('status')).toHaveTextContent('Empty');
     expect(screen.getByText('Try uploading a dataset')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload' })).toBeInTheDocument();
   });
 
-  it('renders the default Inbox icon when no custom icon is supplied', () => {
+  it('hides the decorative icon from assistive technology', () => {
     const { container } = render(<EmptyState title="Empty" />);
-    // Default icon is an SVG from lucide-react.
-    expect(container.querySelector('svg')).not.toBeNull();
+    const icon = container.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('uses the custom icon when supplied', () => {
     render(<EmptyState title="Empty" icon={<span data-testid="custom-icon" />} />);
     expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-icon').parentElement).toHaveAttribute('aria-hidden', 'true');
   });
 });
 
 describe('ErrorState', () => {
-  it('renders the error message', () => {
+  it('announces failures as an alert', () => {
     render(<ErrorState error="Network unreachable" />);
-    expect(screen.getByText('Network unreachable')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Network unreachable');
   });
 
   it('does NOT render the retry button when onRetry is omitted', () => {
@@ -46,29 +48,62 @@ describe('ErrorState', () => {
     expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
   });
 
-  it('renders and wires the retry button when onRetry is supplied', async () => {
+  it('links the retry action to the error message', () => {
     const onRetry = vi.fn();
-    const user = userEvent.setup();
     render(<ErrorState error="boom" onRetry={onRetry} />);
     const btn = screen.getByRole('button', { name: /retry/i });
-    await user.click(btn);
+    expect(btn).toHaveAccessibleDescription('boom');
+    fireEvent.click(btn);
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables retry while an async retry is pending', async () => {
+    let resolveRetry: (() => void) | undefined;
+    const onRetry = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRetry = () => resolve();
+        }),
+    );
+
+    render(<ErrorState error="boom" onRetry={onRetry} />);
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+
+    expect(screen.getByRole('button', { name: /retry/i })).toBeDisabled();
+
+    if (resolveRetry) {
+      resolveRetry();
+    }
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /retry/i })).not.toBeDisabled();
+    });
+  });
+
+  it('hides every decorative icon inside the alert', () => {
+    const { container } = render(<ErrorState error="boom" onRetry={vi.fn()} />);
+    const exposedIcons = Array.from(container.querySelectorAll('svg')).filter(
+      (icon) => icon.closest('[aria-hidden="true"]') === null,
+    );
+    expect(exposedIcons).toHaveLength(0);
   });
 });
 
 describe('LoadingState', () => {
-  it('renders the default "Loading..." message when none provided', () => {
+  it('announces loading as a polite status', () => {
     render(<LoadingState />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading...');
   });
 
   it('renders the custom message when provided', () => {
     render(<LoadingState message="Crunching numbers" />);
-    expect(screen.getByText('Crunching numbers')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Crunching numbers');
   });
 
-  it('renders a spinner SVG', () => {
+  it('hides the spinner from assistive technology', () => {
     const { container } = render(<LoadingState />);
-    expect(container.querySelector('svg')).not.toBeNull();
+    const spinner = container.querySelector('svg');
+    expect(spinner).not.toBeNull();
+    expect(spinner).toHaveAttribute('aria-hidden', 'true');
   });
 });

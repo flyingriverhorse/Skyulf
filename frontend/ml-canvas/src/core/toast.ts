@@ -3,7 +3,9 @@
  * project path, not a third-party dep. Lets us swap the underlying
  * library (or stub it in tests) without touching ~40 call sites.
  *
- * The `<Toaster />` component is mounted once in `main.tsx`.
+ * The `<Toaster />` component is mounted once in `main.tsx`. It renders its own
+ * `aria-live="polite"` region, so toasts are already announced; adding a second
+ * live region here would make screen readers read every toast twice.
  */
 
 import { toast as sonner } from 'sonner';

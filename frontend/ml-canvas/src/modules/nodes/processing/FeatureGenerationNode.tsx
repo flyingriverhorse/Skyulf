@@ -6,7 +6,6 @@ import { useDatasetSchema } from '../../../core/hooks/useDatasetSchema';
 import { useUpstreamDroppedColumns } from '../../../core/hooks/useUpstreamDroppedColumns';
 import { useRecommendations } from '../../../core/hooks/useRecommendations';
 import { RecommendationsPanel } from '../../../components/panels/RecommendationsPanel';
-import { Recommendation } from '../../../core/api/client';
 import { useGraphStore } from '../../../core/store/useGraphStore';
 import { clickableProps } from '../../../core/utils/a11y';
 import { getNodeMetricDetails } from '../../../core/utils/preprocessingMetrics';
@@ -114,8 +113,6 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
     scope: 'column'
   });
 
-  const handleApplyRecommendation = (_rec: Recommendation) => {};
-
   const addOperation = (type: MathOperation['operation_type']) => {
     const newOp: MathOperation = {
       operation_type: type,
@@ -214,7 +211,6 @@ const FeatureGenerationSettings: React.FC<{ config: FeatureGenerationConfig; onC
             <div className="p-4 bg-muted/5 border-t">
               <RecommendationsPanel
                 recommendations={recommendations}
-                onApply={handleApplyRecommendation}
                 className="mb-0"
               />
             </div>

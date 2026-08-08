@@ -155,7 +155,7 @@ export const ModelRegistry: React.FC = () => {
 
   if (error) return (
     <div className="p-8">
-      <ErrorState error={error} />
+      <ErrorState error={error} onRetry={() => modelsQuery.refetch()} />
     </div>
   );
 

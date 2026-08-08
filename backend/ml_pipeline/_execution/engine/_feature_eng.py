@@ -154,6 +154,7 @@ class FeatureEngMixin:
         target_column: str | None,
         dropped_columns: list[str] | None,
         feature_columns: list[str] | None = None,
+        feature_dtypes: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Fallback bundle assembled from ``self.executed_transformers`` (manual steps).
 
@@ -193,6 +194,7 @@ class FeatureEngMixin:
             "target_column": target_column,
             "dropped_columns": dropped_columns or [],
             "feature_columns": feature_columns,
+            "feature_dtypes": feature_dtypes,
         }
 
     def _bundle_transformers_with_model(
@@ -204,6 +206,7 @@ class FeatureEngMixin:
         target_column: str | None = None,
         dropped_columns: list[str] | None = None,
         feature_columns: list[str] | None = None,
+        feature_dtypes: dict[str, str] | None = None,
     ):
         """Bundles fitted transformers with the model artifact for inference.
 
@@ -236,11 +239,17 @@ class FeatureEngMixin:
                     "target_column": target_column,
                     "dropped_columns": dropped_columns or [],
                     "feature_columns": feature_columns,
+                    "feature_dtypes": feature_dtypes,
                 }
             else:
                 # Fallback to old logic if no FeatureEngineer found (e.g. manual steps)
                 full_artifact = self._build_legacy_transformer_bundle(
-                    model_artifact, job_id, target_column, dropped_columns, feature_columns
+                    model_artifact,
+                    job_id,
+                    target_column,
+                    dropped_columns,
+                    feature_columns,
+                    feature_dtypes,
                 )
 
             # Save to job_id key if available - this is the final artifact for the job
