@@ -10,7 +10,7 @@ from backend.middleware.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 
-from backend.database.models import get_database_session
+from backend.database.models import DataSource, get_database_session
 
 from .schemas import DeploymentInfo, PredictionRequest, PredictionResponse
 from .service import DeploymentService, OverrideThresholdMismatch
@@ -72,7 +72,8 @@ async def list_deployments(
     effective_limit = limit if limit is not None else get_settings().DEFAULT_PAGE_SIZE
     deployments = await DeploymentService.list_deployment_details(session, effective_limit, skip)
     if get_settings().DEMO_MODE:
-        deployments = [d for d in deployments if d.get("dataset_id") == "iris-demo"]
+        iris_ids = await _get_iris_dataset_ids(session)
+        deployments = [d for d in deployments if d.get("dataset_id") in iris_ids]
     return deployments
 
 
@@ -134,3 +135,16 @@ async def predict(
     except Exception:
         logger.exception("Prediction failed")
         raise HTTPException(status_code=500, detail="Prediction failed") from None
+
+
+async def _get_iris_dataset_ids(session: AsyncSession) -> set[str]:
+    """Return all identifiers (PK and source_id) that map to the Iris dataset."""
+    from sqlalchemy import select
+
+    result = await session.execute(
+        select(DataSource.id, DataSource.source_id).where(DataSource.source_id == "iris-demo")
+    )
+    row = result.one_or_none()
+    if row is None:
+        return {"iris-demo"}
+    return {"iris-demo", str(row.id)}

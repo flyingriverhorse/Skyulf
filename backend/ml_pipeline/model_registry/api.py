@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.config import get_settings
+from backend.database.engine import get_async_session
+from backend.database.models import DataSource
 from backend.exceptions.core import SkyulfException
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,8 @@ async def list_models(
     """
     models = await ModelRegistryService.list_models(session, skip=skip, limit=limit)
     if get_settings().DEMO_MODE:
-        models = [m for m in models if m.dataset_id == "iris-demo"]
+        iris_ids = await _get_iris_dataset_ids(session)
+        models = [m for m in models if m.dataset_id in iris_ids]
     return models
 
 
@@ -60,3 +63,16 @@ async def list_job_artifacts(job_id: str, session: AsyncSession = Depends(get_as
     except Exception:
         logger.exception("Failed to list artifacts for job %s", job_id)
         raise SkyulfException(message="Failed to retrieve job artifacts") from None
+
+
+async def _get_iris_dataset_ids(session: AsyncSession) -> set[str]:
+    """Return all identifiers (PK and source_id) that map to the Iris dataset."""
+    from sqlalchemy import select
+
+    result = await session.execute(
+        select(DataSource.id, DataSource.source_id).where(DataSource.source_id == "iris-demo")
+    )
+    row = result.one_or_none()
+    if row is None:
+        return {"iris-demo"}
+    return {"iris-demo", str(row.id)}
