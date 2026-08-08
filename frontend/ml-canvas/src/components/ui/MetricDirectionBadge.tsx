@@ -10,7 +10,7 @@ interface Props {
 const COPY: Record<MetricDirection, { label: string; className: string }> = {
   higher: { label: 'Higher is better', className: 'text-emerald-600 dark:text-emerald-400' },
   lower: { label: 'Lower is better', className: 'text-sky-600 dark:text-sky-400' },
-  unknown: { label: 'Direction unknown — not ranked', className: 'text-gray-400 dark:text-gray-500' },
+  unknown: { label: 'Direction unknown — not ranked', className: 'text-gray-500 dark:text-gray-400' },
 };
 
 /**

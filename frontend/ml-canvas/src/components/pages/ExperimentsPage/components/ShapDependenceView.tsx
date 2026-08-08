@@ -118,7 +118,7 @@ export const ShapDependenceView: React.FC<Props> = ({
             </ScatterChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 text-center">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 text-center">
           Each point is one sampled row · x = {activeFeature} value, y = its SHAP contribution
         </p>
       </div>

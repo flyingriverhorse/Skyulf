@@ -282,7 +282,7 @@ export const DriftTable: React.FC<DriftTableProps> = ({
                         <tr>
                             <td
                                 colSpan={colSpan}
-                                className="px-6 py-8 text-center text-gray-400 dark:text-slate-500 text-sm"
+                                className="px-6 py-8 text-center text-gray-500 dark:text-slate-400 text-sm"
                             >
                                 <CheckCircle size={20} className="inline mr-2 text-green-500" />
                                 No drifted columns found — all features are stable.

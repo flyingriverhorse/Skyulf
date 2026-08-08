@@ -164,7 +164,7 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                         ) : (
                             groupedJobs.map(([date, dateJobs]) => (
                                 <div key={date}>
-                                    <div className="sticky top-0 px-3 py-1.5 text-[11px] font-semibold text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-900/80 uppercase tracking-wider border-b border-gray-100 dark:border-slate-700">
+                                    <div className="sticky top-0 px-3 py-1.5 text-[11px] font-semibold text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-900/80 uppercase tracking-wider border-b border-gray-100 dark:border-slate-700">
                                         {date}
                                     </div>
                                     {dateJobs.map(job => (
@@ -203,7 +203,7 @@ export const JobSelector: React.FC<JobSelectorProps> = ({ jobs, selectedJob, onS
                                                 )}
                                             </div>
                                             {(job.target_column || job.description) && (
-                                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400 dark:text-slate-500">
+                                                <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-500 dark:text-slate-400">
                                                     {job.target_column && <span>target: {job.target_column}</span>}
                                                     {job.description && (
                                                         <span className="truncate italic">— {job.description}</span>

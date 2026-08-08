@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Activity, CheckCircle, XCircle, Clock, Search,
   RefreshCw, Database, BarChart2, Filter, Tags, TrendingUp, FileText, Boxes, Layers
 } from 'lucide-react';
 import { jobsApi, JobInfo } from '../core/api/jobs';
 import { registryApi, RegistryItem } from '../core/api/registry';
-import { getTaskForModelType } from '../components/pages/ExperimentsPage/utils/jobMeta';
+import { getTaskForModelType, getJobTypeLabel } from '../components/pages/ExperimentsPage/utils/jobMeta';
 import { getEnsembleSubTask } from '../core/utils/format';
 import type { TaskType } from '../core/types/taskType';
-import { LoadingState, EmptyState } from '../components/shared';
+import { LoadingState, EmptyState, ErrorState, RecordLink } from '../components/shared';
+import { parseOperationalContext } from '../core/utils/operationalContext';
 import { formatDuration } from '../core/utils/format';
+import { JobDetailsView } from '../components/panels/jobs/JobDetailsView';
 
 type NonTaskTab = 'eda' | 'ingestion';
 type TabType = TaskType | NonTaskTab;
@@ -27,6 +30,8 @@ const TASK_TYPES: TaskType[] = TASK_TABS.map(t => t.task);
 const isTaskTab = (tab: TabType): tab is TaskType => (TASK_TYPES as string[]).includes(tab);
 
 export const JobsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('classification');
   const [registryItems, setRegistryItems] = useState<RegistryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +67,77 @@ export const JobsPage: React.FC = () => {
     eda: { data: [], skip: 0, hasMore: true },
     ingestion: { data: [], skip: 0, hasMore: true }
   });
+
+  // --- OPS-001: Details investigation view -----------------------------
+  //
+  // The selected job is read from the OPS-007 operational-context query
+  // params rather than local-only state, so a Details link is a durable,
+  // shareable URL and the list's own filters/tab/page travel with it as
+  // `filters` — restored below on load so returning from Details (or a
+  // reload while Details is open) never loses the caller's search/status/
+  // page context.
+  const jobContext = useMemo(() => parseOperationalContext(searchParams), [searchParams]);
+  const selectedJobId = jobContext?.ref.kind === 'job' ? jobContext.ref.jobId : null;
+
+  // Filters are only applied once on mount (or when a new job context
+  // arrives via navigation) — typing in the search box afterwards must not
+  // be fought by a stale URL snapshot on every render.
+  const appliedContextRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!jobContext?.filters || appliedContextRef.current === selectedJobId) return;
+    appliedContextRef.current = selectedJobId;
+    const f = jobContext.filters;
+    if (f.tab) setActiveTab(f.tab as TabType);
+    if (f.q !== undefined) setSearchTerm(f.q);
+    if (f.status) setStatusFilter(f.status);
+    if (f.ensemble) setEnsembleSubFilter(f.ensemble as 'all' | 'classification' | 'regression');
+  }, [jobContext, selectedJobId]);
+
+  // Fallback lookup for a job not present in any already-fetched page
+  // (e.g. a deep link opened directly, or a job from a tab/page not yet
+  // loaded this session). Training/tuning jobs resolve via the jobs API;
+  // EDA/ingestion jobs only resolve if already cached from a prior fetch.
+  const [fallbackJob, setFallbackJob] = useState<JobInfo | null>(null);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
+  const [fallbackError, setFallbackError] = useState<string | null>(null);
+
+  const knownJob = selectedJobId
+    ? [...pool, ...jobs, ...cache.eda.data, ...cache.ingestion.data].find(j => j.job_id === selectedJobId)
+    : undefined;
+
+  useEffect(() => {
+    if (!selectedJobId || knownJob) {
+      setFallbackJob(null);
+      setFallbackError(null);
+      return;
+    }
+    let cancelled = false;
+    setFallbackLoading(true);
+    setFallbackError(null);
+    jobsApi.getJob(selectedJobId)
+      .then(job => { if (!cancelled) setFallbackJob(job); })
+      .catch(() => { if (!cancelled) setFallbackError('This job could not be found. It may have been removed.'); })
+      .finally(() => { if (!cancelled) setFallbackLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJobId, !!knownJob]);
+
+  const selectedJob = knownJob ?? fallbackJob ?? null;
+
+  /** List-state snapshot carried on every job Details link so returning restores it. */
+  const listFilterSnapshot = (): Record<string, string> => ({
+    tab: activeTab,
+    q: searchTerm,
+    status: statusFilter,
+    ...(activeTab === 'ensemble' ? { ensemble: ensembleSubFilter } : {}),
+  });
+
+  const handleBackFromDetails = (): void => {
+    // The list's own state was never reset (Details renders inline on the
+    // same page instance), so clearing the query params is enough to
+    // restore the exact tab/search/status/page the user left.
+    navigate('/jobs', { replace: true });
+  };
 
   // One-time fetch of the node registry so job task types can be resolved
   // from each job's model_type (mirrors ExperimentsPage.tsx/JobsDrawer.tsx).
@@ -242,6 +318,41 @@ export const JobsPage: React.FC = () => {
 
   const activeFilterCount = (statusFilter !== 'all' ? 1 : 0);
 
+  // OPS-001: a selected job takes over the page as a full investigation
+  // view (details/logs/recovery), instead of the previous drawer-only
+  // experience. The list underneath is left mounted with its state intact.
+  if (selectedJobId) {
+    return (
+      <div className="p-8 animate-in fade-in duration-500">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm h-[calc(100vh-8rem)] overflow-hidden">
+          {selectedJob ? (
+            <JobDetailsView
+              job={selectedJob}
+              onBack={handleBackFromDetails}
+              onClose={handleBackFromDetails}
+              origin="/jobs"
+              filters={listFilterSnapshot()}
+            />
+          ) : fallbackLoading ? (
+            <LoadingState message="Loading job details..." />
+          ) : (
+            <div className="p-6 space-y-4">
+              <ErrorState error={fallbackError ?? 'This job could not be found.'} />
+              <div className="flex justify-center">
+                <button
+                  onClick={handleBackFromDetails}
+                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+                >
+                  Back to Jobs
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 space-y-6 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -355,6 +466,7 @@ export const JobsPage: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Details</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Duration</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Created At</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
@@ -364,12 +476,12 @@ export const JobsPage: React.FC = () => {
                       <StatusBadge status={job.status} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">
-                      <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                      <span className="font-mono text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded" title={job.job_id}>
                         {job.job_id.substring(0, 8)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 capitalize">
-                      {job.job_type}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                      {getJobTypeLabel(job, registryItems)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                       {job.model_type || job.dataset_name || job.target_column || '-'}
@@ -379,6 +491,14 @@ export const JobsPage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                       {new Date(job.created_at).toLocaleDateString()} <span className="text-xs opacity-70">{new Date(job.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <RecordLink
+                        recordRef={{ kind: 'job', jobId: job.job_id }}
+                        origin="/jobs"
+                        filters={listFilterSnapshot()}
+                        label="View details"
+                      />
                     </td>
                   </tr>
                 ))}
@@ -392,7 +512,7 @@ export const JobsPage: React.FC = () => {
           <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-center">
             <button
               onClick={handleLoadMore}
-              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1 px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
+              className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium flex items-center gap-1 px-4 py-2 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors"
             >
               Load More
             </button>

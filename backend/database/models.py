@@ -384,6 +384,13 @@ class Deployment(Base, TimestampMixin):
     artifact_uri: Mapped[str] = mapped_column(String(500), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     deployed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    # The deployment this one replaced (the previously active row at the moment
+    # this deployment was created), so the UI can render an unbroken
+    # replacement chain instead of a bare, unrelated Job ID. Null for the very
+    # first deployment or a deploy that happened with nothing active.
+    previous_deployment_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("deployments.id"), nullable=True
+    )
 
     def to_dict(self):
         return {
@@ -393,6 +400,7 @@ class Deployment(Base, TimestampMixin):
             "artifact_uri": self.artifact_uri,
             "is_active": self.is_active,
             "deployed_by": self.deployed_by,
+            "previous_deployment_id": self.previous_deployment_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -449,8 +457,48 @@ class EDAReport(Base, TimestampMixin):
         }
 
 
+class DriftThresholdVersion(Base):
+    """Immutable snapshot of a drift threshold set, versioned sequentially.
+
+    A new row is created only when the effective PSI/KS/Wasserstein/KL values
+    actually change from the previous version, so re-running an unchanged
+    threshold set does not fork history. Alerts pin `threshold_version` (see
+    `DriftCheckResult`) so editing thresholds later never rewrites which
+    version a past alert was evaluated against.
+    """
+
+    __tablename__ = "drift_threshold_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, unique=True, index=True)
+    psi: Mapped[float] = mapped_column(Float, nullable=False)
+    ks: Mapped[float] = mapped_column(Float, nullable=False)
+    wasserstein: Mapped[float] = mapped_column(Float, nullable=False)
+    kl_divergence: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "version": self.version,
+            "psi": self.psi,
+            "ks": self.ks,
+            "wasserstein": self.wasserstein,
+            "kl_divergence": self.kl_divergence,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 class DriftCheckResult(Base):
-    """Stores the result of each drift analysis run for history tracking."""
+    """A single drift check, durably tracked as an alert-to-resolution record.
+
+    Every check pins the threshold version it was evaluated against
+    (`threshold_version`/`threshold_*`), a derived `severity`, and a
+    disposition lifecycle (`status`/`owner`/`disposition_history`) so a drift
+    signal can be triaged without losing its original evaluation context —
+    including when the reference/baseline was missing or the calculation
+    itself failed (`evaluation_status`).
+    """
 
     __tablename__ = "drift_check_results"
 
@@ -464,6 +512,37 @@ class DriftCheckResult(Base):
     summary: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     column_drifts: Mapped[Any | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now(), nullable=False)
+
+    # -- OPS-003: alert lifecycle -----------------------------------------
+    # "none" | "warning" | "critical" — derived at evaluation time from the
+    # report/schema drift, never recomputed retroactively.
+    severity: Mapped[str] = mapped_column(String(20), nullable=False, default="none")
+    # "new" | "acknowledged" | "resolved" | "reopened"
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="new")
+    owner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Append-only list of {status, actor, note, at} — the full paper trail
+    # behind the current `status`/`owner`.
+    disposition_history: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+
+    # -- OPS-003: threshold versioning (denormalized for durability) ------
+    threshold_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    threshold_psi: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_ks: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_wasserstein: Mapped[float | None] = mapped_column(Float, nullable=True)
+    threshold_kl: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # -- OPS-003: related-record links ------------------------------------
+    deployment_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("deployments.id"), nullable=True, index=True
+    )
+    model_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # -- OPS-003: explicit no-baseline / evaluation-failed handling -------
+    # "completed" | "no_baseline" | "failed"
+    evaluation_status: Mapped[str] = mapped_column(String(20), nullable=False, default="completed")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ErrorEvent(Base):

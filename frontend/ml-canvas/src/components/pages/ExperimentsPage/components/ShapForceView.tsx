@@ -194,7 +194,7 @@ export const ShapForceView: React.FC<Props> = ({
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-2 text-center">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-2 text-center">
           Base value {baseValue.toFixed(3)} → prediction {outputValue.toFixed(3)} ·
           <span className="text-red-500"> red</span> increases, <span className="text-blue-500">blue</span> decreases
         </p>

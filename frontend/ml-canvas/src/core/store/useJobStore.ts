@@ -9,6 +9,9 @@ interface ActiveParallelRun {
   completedAt?: string;
 }
 
+/** In-flight recovery action per job, so a row can disable its own button without blocking others. */
+export type JobActionKind = 'cancel' | 'retry';
+
 interface JobState {
   jobs: JobInfo[];
   isLoading: boolean;
@@ -17,12 +20,16 @@ interface JobState {
   hasMore: boolean;
   skip: number;
   activeParallelRun: ActiveParallelRun | null;
+  /** job_id -> action currently in flight. Guards cancel/retry against double-submission. */
+  pendingJobActions: Record<string, JobActionKind>;
 
   // Actions
   fetchJobs: () => Promise<void>;
   loadMoreJobs: () => Promise<void>;
   submitJob: (payload: RunPipelineRequest) => Promise<string>;
   cancelJob: (jobId: string) => Promise<void>;
+  /** Resubmits a failed/cancelled training or tuning job from its stored graph. Returns the new job id. */
+  retryJob: (jobId: string) => Promise<string>;
   toggleDrawer: (isOpen?: boolean) => void;
   setTab: (tab: TaskType) => void;
   setActiveParallelRun: (run: ActiveParallelRun | null) => void;
@@ -133,6 +140,7 @@ export const useJobStore = create<JobState>((set, get) => {
     hasMore: true,
     skip: 0,
     activeParallelRun: null,
+    pendingJobActions: {},
 
     fetchJobs: async () => {
       set({ isLoading: true, skip: 0 });
@@ -180,12 +188,44 @@ export const useJobStore = create<JobState>((set, get) => {
     },
 
     cancelJob: async (jobId: string) => {
+      // Guard against a double-click firing two overlapping cancel requests
+      // for the same job; other jobs' actions are unaffected.
+      if (get().pendingJobActions[jobId]) return;
+      set(state => ({ pendingJobActions: { ...state.pendingJobActions, [jobId]: 'cancel' } }));
       try {
         await jobsApi.cancelJob(jobId);
         await get().fetchJobs();
       } catch (error) {
         console.error('Failed to cancel job:', error);
         throw error;
+      } finally {
+        set(state => {
+          const next = { ...state.pendingJobActions };
+          delete next[jobId];
+          return { pendingJobActions: next };
+        });
+      }
+    },
+
+    retryJob: async (jobId: string) => {
+      if (get().pendingJobActions[jobId]) {
+        throw new Error('An action is already in progress for this job');
+      }
+      set(state => ({ pendingJobActions: { ...state.pendingJobActions, [jobId]: 'retry' } }));
+      try {
+        const response = await jobsApi.retryJob(jobId);
+        await get().fetchJobs();
+        get().startPolling();
+        return response.job_id;
+      } catch (error) {
+        console.error('Failed to retry job:', error);
+        throw error;
+      } finally {
+        set(state => {
+          const next = { ...state.pendingJobActions };
+          delete next[jobId];
+          return { pendingJobActions: next };
+        });
       }
     },
 

@@ -19,6 +19,8 @@ export interface JobInfo {
 
   // Extended fields
   model_type?: string;
+  /** Server-resolved model family (e.g. "classification", "ensemble"); `null`/absent when unresolvable. */
+  model_family?: string | null;
   hyperparameters?: Record<string, unknown>;
   created_at: string;
   metrics?: Record<string, number>;
@@ -76,6 +78,13 @@ export const jobsApi = {
 
   cancelJob: async (jobId: string): Promise<void> => {
     await apiClient.post(`/pipeline/jobs/${jobId}/cancel`);
+  },
+
+  retryJob: async (jobId: string): Promise<{ job_id: string; message: string }> => {
+    const response = await apiClient.post<{ job_id: string; message: string }>(
+      `/pipeline/jobs/${jobId}/retry`,
+    );
+    return response.data;
   },
 
   getJobs: async (limit: number = 10, skip: number = 0, type?: 'training' | 'tuning'): Promise<JobInfo[]> => {

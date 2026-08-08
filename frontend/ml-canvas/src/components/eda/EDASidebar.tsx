@@ -217,7 +217,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                         </div>
                                         <button
                                             onClick={() => onRemoveFilter(idx)}
-                                            className="text-gray-400 dark:text-gray-500 hover:text-red-500"
+                                            className="text-gray-500 dark:text-gray-400 hover:text-red-500"
                                             aria-label={`Remove filter ${idx + 1}`}
                                             disabled={analyzing}
                                         >
@@ -226,7 +226,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-xs text-gray-400 dark:text-gray-500">No draft filters yet.</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">No draft filters yet.</p>
                             )}
 
                             {isAddingFilter ? (
@@ -368,7 +368,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
                                     <span className="font-medium text-gray-500 dark:text-gray-400 line-through truncate max-w-[140px]">{col}</span>
                                     <button
                                         onClick={() => onToggleExclude(col, false)}
-                                        className="text-gray-400 dark:text-gray-500 hover:text-green-500"
+                                        className="text-gray-500 dark:text-gray-400 hover:text-green-500"
                                         title="Include back"
                                     >
                                         <Plus className="w-3 h-3" />
@@ -426,7 +426,7 @@ export const EDASidebar: React.FC<EDASidebarProps> = ({
             <div className={`flex-1 overflow-y-auto ${isCollapsed ? 'p-2' : 'p-3'}`}>
                 <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'} mb-3`}>
                     {!isCollapsed && (
-                    <h2 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                    <h2 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Analysis Modules
                     </h2>
                     )}

@@ -11,6 +11,8 @@ import {
 import { Scatter } from 'react-chartjs-2';
 import { COLORS } from './constants';
 import { useChartTheme } from '../../core/hooks/useChartTheme';
+import { groupScatterPoints } from './scatterGrouping';
+import { markerShapeForIndex, toChartJsPointStyle } from './chartMarkerShapes';
 import type { ScatterPoint } from './ThreeDScatterPlot';
 
 ChartJS.register(LinearScale, PointElement, LineElement, Tooltip, Legend);
@@ -35,6 +37,7 @@ interface ChartDataset {
   label: string;
   data: ChartPoint[];
   backgroundColor: string;
+  pointStyle: string;
   pointRadius: number;
   pointHoverRadius: number;
 }
@@ -49,40 +52,19 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
   height = 500
 }) => {
 
-  // Prepare datasets
+  // Prepare datasets. Groups are colored AND shaped (see `chartMarkerShapes`)
+  // so group identity survives grayscale/color-vision-deficiency contexts.
   const datasets: ChartDataset[] = useMemo(() => {
-    const result: ChartDataset[] = [];
+    const groups = groupScatterPoints(data, labelKey);
 
-    if (labelKey) {
-      // Group by label
-      const groups: { [key: string]: ChartPoint[] } = {};
-      data.forEach((d) => {
-        const label = String(d[labelKey] ?? 'Other');
-        if (!groups[label]) groups[label] = [];
-        groups[label].push({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d });
-      });
-
-      Object.keys(groups).forEach((label, idx) => {
-        result.push({
-          label: label,
-          data: groups[label]!,
-          backgroundColor: COLORS[idx % COLORS.length]!,
-          pointRadius: 3,
-          pointHoverRadius: 5
-        });
-      });
-    } else {
-      // Single dataset
-      result.push({
-        label: 'Data Points',
-        data: data.map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d })),
-        backgroundColor: '#8884d8',
-        pointRadius: 3,
-        pointHoverRadius: 5
-      });
-    }
-
-    return result;
+    return Object.keys(groups).map((label, idx) => ({
+      label,
+      data: (groups[label] ?? []).map((d) => ({ x: Number(d[xKey]), y: Number(d[yKey]), raw: d as ScatterPoint })),
+      backgroundColor: COLORS[idx % COLORS.length]!,
+      pointStyle: toChartJsPointStyle(markerShapeForIndex(idx)),
+      pointRadius: 3,
+      pointHoverRadius: 5,
+    }));
   }, [data, xKey, yKey, labelKey]);
 
   const theme = useChartTheme();
@@ -140,7 +122,10 @@ export const CanvasScatterPlot: React.FC<CanvasScatterPlotProps> = ({
         }
       },
       legend: {
-        display: !!labelKey && datasets.length < 20 // Hide legend if too many groups
+        // The scrollable/filterable `ChartLegend` rendered alongside this
+        // chart is the persistent legend; Chart.js's own legend is disabled
+        // here so groups are never silently hidden past a group-count cutoff.
+        display: false
       }
     }
   };

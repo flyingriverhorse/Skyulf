@@ -1,18 +1,28 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, Box, CheckCircle, ChevronRight, X, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
-import { LoadingState, ErrorState, EmptyState, useConfirm } from '../components/shared';
+import { useSearchParams } from 'react-router-dom';
+import { Archive, Box, CheckCircle, ChevronRight, Play, Folder, FileText, Cloud, HardDrive } from 'lucide-react';
+import { LoadingState, ErrorState, EmptyState, ModalShell, RecordLink, useConfirm } from '../components/shared';
 import { toast } from '../core/toast';
-import { useEscapeKey } from '../core/hooks/useEscapeKey';
+import { parseOperationalContext } from '../core/utils/operationalContext';
 import {
   useRegistryStats,
   useRegistryModels,
   useArtifacts,
   useDeployModel,
   type ModelRegistryEntry,
+  type ModelVersion,
 } from '../core/hooks/useModelRegistry';
+
+/** A dataset/model_type identity the backend could not resolve (see OPS-002 evidence). */
+const isUnknownIdentity = (value: string | null | undefined): boolean =>
+  !value || value.toLowerCase() === 'unknown';
+
+/** Bound on how many extra pages Registry deep-link resolution will fetch before giving up. */
+const MAX_DEEP_LINK_FETCH_PAGES = 20;
 
 export const ModelRegistry: React.FC = () => {
   const confirm = useConfirm();
+  const [searchParams] = useSearchParams();
   // Server state -> React Query. Cache invalidation lives in the hook module.
   const statsQuery = useRegistryStats();
   const modelsQuery = useRegistryModels();
@@ -37,7 +47,35 @@ export const ModelRegistry: React.FC = () => {
   );
   const deployingId = deployMutation.isPending ? deployMutation.variables ?? null : null;
 
-  useEscapeKey(() => setSelectedModelKey(null), !!selectedModel);
+  // Deep link support: a `modelVersion` context (e.g. followed from Deployments
+  // or Jobs) opens the matching version's dialog directly on load/refresh
+  // rather than dropping the operator back at the bare list.
+  const versionContext = useMemo(() => parseOperationalContext(searchParams), [searchParams]);
+  const deepLinkJobId = versionContext?.ref.kind === 'modelVersion' ? versionContext.ref.jobId : null;
+  const deepLinkAttemptedRef = useRef<string | null>(null);
+  const [deepLinkNotFound, setDeepLinkNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!deepLinkJobId || deepLinkAttemptedRef.current === deepLinkJobId) return;
+    const match = models.find((m) => m.versions.some((v) => v.job_id === deepLinkJobId));
+    if (match) {
+      deepLinkAttemptedRef.current = deepLinkJobId;
+      setSelectedModelKey(`${match.model_type}-${match.dataset_id}`);
+      setDeepLinkNotFound(false);
+      return;
+    }
+    if (hasMore && !modelsQuery.isFetchingNextPage) {
+      const pagesFetched = modelsQuery.data?.pages.length ?? 0;
+      if (pagesFetched < MAX_DEEP_LINK_FETCH_PAGES) {
+        void modelsQuery.fetchNextPage();
+        return;
+      }
+    }
+    if (!hasMore) {
+      deepLinkAttemptedRef.current = deepLinkJobId;
+      setDeepLinkNotFound(true);
+    }
+  }, [deepLinkJobId, models, hasMore, modelsQuery]);
 
   // Artifacts: fetched lazily once a row is expanded.
   const [viewingArtifacts, setViewingArtifacts] = useState<string | null>(null);
@@ -49,23 +87,9 @@ export const ModelRegistry: React.FC = () => {
   const [datasetFilter, setDatasetFilter] = useState('');
   const [modelTypeFilter, setModelTypeFilter] = useState('');
 
-  // Manual deployment tracking (Local Storage)
-  const [manualDeployments, setManualDeployments] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = localStorage.getItem('skyulf_manual_deployments');
-      return saved ? JSON.parse(saved) : {};
-    } catch (e) {
-      return {};
-    }
-  });
-
-  const toggleManualDeployment = (key: string) => {
-    setManualDeployments(prev => {
-      const next = { ...prev, [key]: !prev[key] };
-      localStorage.setItem('skyulf_manual_deployments', JSON.stringify(next));
-      return next;
-    });
-  };
+  // Scoped to the version whose deploy is in flight/failed, so a failure on
+  // one version never blocks or misattributes to another row's action.
+  const [deployError, setDeployError] = useState<{ jobId: string; version: number | string; message: string } | null>(null);
 
   const handleViewArtifacts = (jobId: string) => {
     setViewingArtifacts(jobId);
@@ -88,23 +112,34 @@ export const ModelRegistry: React.FC = () => {
     return () => { observer.disconnect(); };
   }, [modelsQuery, hasMore]);
 
-  const handleDeploy = async (jobId: string) => {
+  /** Deploys `version`, naming the exact before/after model in the confirmation and any failure. */
+  const requestDeploy = async (version: ModelVersion, activeVersion: ModelVersion | null) => {
+    const replaces = activeVersion && activeVersion.job_id !== version.job_id
+      ? ` This replaces the currently active version ${activeVersion.version} (job ${activeVersion.job_id}).`
+      : '';
     const ok = await confirm({
       title: 'Deploy model version?',
-      message: 'Are you sure you want to deploy this model version? This will replace the currently active deployment.',
+      message: `Deploy version ${version.version} (job ${version.job_id}) of ${version.model_type}?${replaces}`,
       confirmLabel: 'Deploy',
       variant: 'danger',
     });
     if (!ok) return;
+    await runDeploy(version);
+  };
 
+  /** Runs the deploy mutation without re-confirming, used for both the initial attempt and retry-in-place. */
+  const runDeploy = async (version: ModelVersion) => {
+    setDeployError(null);
     try {
-      await deployMutation.mutateAsync(jobId);
+      await deployMutation.mutateAsync(version.job_id);
       // Cache invalidation in the hook will refetch models+stats; the
       // selected-model panel is derived from `models`, so it updates
       // automatically once the new data arrives.
-      toast.success('Model deployed', 'Open the Deployments page to manage it.');
+      toast.success('Model deployed', `Version ${version.version} (job ${version.job_id}) is now active.`);
     } catch (err: unknown) {
-      toast.error('Error deploying model', (err as Error).message);
+      const message = (err as Error).message || 'Deploy failed.';
+      setDeployError({ jobId: version.job_id, version: version.version, message });
+      toast.error(`Failed to deploy version ${version.version}`, message);
     }
   };
 
@@ -198,6 +233,12 @@ export const ModelRegistry: React.FC = () => {
         />
       </div>
 
+      {deepLinkNotFound && (
+        <div className="mb-6">
+          <ErrorState error="The linked model version could not be found in the registry. It may have been removed, or is on a page not yet loaded." />
+        </div>
+      )}
+
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="flex-1">
@@ -263,9 +304,8 @@ export const ModelRegistry: React.FC = () => {
                   if (!latest) return null;
 
                   const rowKey = `${model.model_type}-${model.dataset_id}`;
-                  const isSystemDeployed = model.deployment_count > 0;
-                  const isManuallyDeployed = manualDeployments[rowKey] || false;
-                  const isDeployed = isSystemDeployed || isManuallyDeployed;
+                  const deployedVersion = model.versions.find((v) => v.is_deployed) ?? null;
+                  const datasetLinkable = !isUnknownIdentity(model.dataset_id);
 
                   return (
                     <tr key={rowKey} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
@@ -275,7 +315,17 @@ export const ModelRegistry: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                         <div className="flex flex-col">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-700 dark:text-slate-300">{model.dataset_name}</span>
+                            {datasetLinkable ? (
+                              <RecordLink
+                                recordRef={{ kind: 'dataset', datasetId: model.dataset_id }}
+                                label={model.dataset_name}
+                                className="font-medium"
+                              />
+                            ) : (
+                              <span className="font-medium text-slate-700 dark:text-slate-300" title="No target available">
+                                {model.dataset_name || 'Unknown dataset'}
+                              </span>
+                            )}
                             {model.dataset_type && (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 uppercase">
                                 {model.dataset_type}
@@ -299,23 +349,26 @@ export const ModelRegistry: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- inline checkbox-cell stopPropagation */}
-                        <div className="flex items-center gap-2" onClick={(e) => { e.stopPropagation(); }}>
-                          <input
-                            type="checkbox"
-                            checked={isDeployed}
-                            onChange={() => { toggleManualDeployment(rowKey); }}
-                            disabled={isSystemDeployed}
-                            className={`w-4 h-4 rounded border-gray-300 focus:ring-green-500 ${isSystemDeployed ? 'text-green-600 opacity-50 cursor-not-allowed' : 'text-blue-600 cursor-pointer'}`}
-                          />
-                          {isDeployed ? (
+                        {deployedVersion ? (
+                          <div className="flex items-center gap-2">
                             <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 font-medium bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-full text-xs">
-                              <CheckCircle size={12} /> {isSystemDeployed ? 'Active' : 'Manual'}
+                              <CheckCircle size={12} /> Active
                             </span>
-                          ) : (
-                            <span className="text-slate-400 dark:text-slate-600 text-xs">None</span>
-                          )}
-                        </div>
+                            {deployedVersion.deployment_id !== undefined ? (
+                              <RecordLink
+                                recordRef={{ kind: 'deployment', deploymentId: deployedVersion.deployment_id }}
+                                label={`v${deployedVersion.version}`}
+                                origin="/registry"
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-400 italic" title="No target available">
+                                v{deployedVersion.version}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-600 text-xs">None</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
@@ -346,34 +399,54 @@ export const ModelRegistry: React.FC = () => {
       )}
 
       {/* Versions Modal/Drawer */}
-      {selectedModel && (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal backdrop dismiss zone
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setSelectedModelKey(null); }}>
-          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal panel stopPropagation */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">{selectedModel.model_type}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Version History</p>
-              </div>
-              <button onClick={() => { setSelectedModelKey(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                <X size={24} />
-              </button>
-            </div>
+      <ModalShell
+        isOpen={!!selectedModel}
+        onClose={() => { setSelectedModelKey(null); setDeployError(null); }}
+        title={selectedModel?.model_type}
+        size="4xl"
+        footer={
+          <div className="flex justify-end">
+            <button
+              onClick={() => { setSelectedModelKey(null); setDeployError(null); }}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        {selectedModel && (
+          <div className="p-6">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Version History</p>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Version</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Date</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Metrics</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Status</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                  {selectedModel.versions.map((version) => (
+            {deployError && (
+              <div className="mb-4">
+                <ErrorState
+                  error={`Failed to deploy version ${deployError.version} (job ${deployError.jobId}): ${deployError.message}`}
+                  onRetry={() => {
+                    const failedVersion = selectedModel.versions.find((v) => v.job_id === deployError.jobId);
+                    return failedVersion ? runDeploy(failedVersion) : undefined;
+                  }}
+                />
+              </div>
+            )}
+
+            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Version</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Job</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Date</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Metrics</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Status</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                {selectedModel.versions.map((version) => {
+                  const activeVersion = selectedModel.versions.find((v) => v.is_deployed) ?? null;
+                  const isDeploying = deployingId === version.job_id;
+                  return (
                     <tr key={version.job_id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 ${version.is_deployed ? 'bg-green-50/50 dark:bg-green-900/10' : ''}`}>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
                         <div className="flex items-center gap-2">
@@ -384,6 +457,13 @@ export const ModelRegistry: React.FC = () => {
                             </span>
                           )}
                         </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <RecordLink
+                          recordRef={{ kind: 'job', jobId: version.job_id }}
+                          label={version.job_id.slice(0, 8)}
+                          origin="/registry"
+                        />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                         {new Date(version.created_at).toLocaleString()}
@@ -408,11 +488,12 @@ export const ModelRegistry: React.FC = () => {
 
                           {version.status === 'completed' && !version.is_deployed && (
                             <button
-                              onClick={() => { void handleDeploy(version.job_id); }}
-                              disabled={deployingId === version.job_id}
+                              onClick={() => { void requestDeploy(version, activeVersion); }}
+                              disabled={isDeploying}
+                              aria-label={`Deploy version ${version.version} (job ${version.job_id})`}
                               className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 disabled:opacity-50 flex items-center gap-1"
                             >
-                              {deployingId === version.job_id ? (
+                              {isDeploying ? (
                                 <span className="animate-spin h-3 w-3 border-b-2 border-current rounded-full"></span>
                               ) : (
                                 <Play size={14} />
@@ -421,48 +502,49 @@ export const ModelRegistry: React.FC = () => {
                             </button>
                           )}
                           {version.is_deployed && (
-                            <span className="text-green-600 dark:text-green-400 text-xs flex items-center gap-1">
-                              <CheckCircle size={14} /> Active
-                            </span>
+                            version.deployment_id !== undefined ? (
+                              <RecordLink
+                                recordRef={{ kind: 'deployment', deploymentId: version.deployment_id }}
+                                label={<span className="inline-flex items-center gap-1"><CheckCircle size={14} /> Active</span>}
+                                origin="/registry"
+                                className="text-xs"
+                              />
+                            ) : (
+                              <span className="text-green-600 dark:text-green-400 text-xs flex items-center gap-1">
+                                <CheckCircle size={14} /> Active
+                              </span>
+                            )
                           )}
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
-              <button
-                onClick={() => { setSelectedModelKey(null); }}
-                className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-      )}
+        )}
+      </ModalShell>
 
       {/* Artifacts Modal */}
-      {viewingArtifacts && (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal backdrop dismiss zone
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => { setViewingArtifacts(null); }}>
-          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events,jsx-a11y/no-static-element-interactions -- modal panel stopPropagation */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden border border-slate-200 dark:border-slate-700" onClick={e => { e.stopPropagation(); }}>
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <Folder size={20} className="text-blue-500" />
-                Artifacts
-              </h3>
-              <button onClick={() => { setViewingArtifacts(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              {loadingArtifacts ? (
+      <ModalShell
+        isOpen={!!viewingArtifacts}
+        onClose={() => { setViewingArtifacts(null); }}
+        title="Artifacts"
+        size="2xl"
+        zIndex="z-[60]"
+        footer={
+          <div className="flex justify-end">
+            <button
+              onClick={() => { setViewingArtifacts(null); }}
+              className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        }
+      >
+        <div className="p-6">              {loadingArtifacts ? (
                 <div className="flex justify-center py-8 text-slate-500 dark:text-slate-400">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
                   Loading artifacts...
@@ -501,19 +583,8 @@ export const ModelRegistry: React.FC = () => {
                   </ul>
                 </div>
               )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end">
-              <button
-                onClick={() => { setViewingArtifacts(null); }}
-                className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </ModalShell>
     </div>
   );
 };

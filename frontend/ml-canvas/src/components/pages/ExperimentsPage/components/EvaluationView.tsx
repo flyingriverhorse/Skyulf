@@ -303,7 +303,7 @@ export const EvaluationView: React.FC<Props> = ({
             {/* Regression: split tabs inline in the control bar */}
             {evaluationData.problem_type === 'regression' && (
               <div className="flex items-center gap-0.5">
-                <span className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mr-1">Split:</span>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mr-1">Split:</span>
                 {regressionSplitTabs.map(tab => (
                   <button
                     key={tab}
@@ -339,7 +339,7 @@ export const EvaluationView: React.FC<Props> = ({
             )}
             {/* Split visibility toggles — classification only, shared by both tabs */}
             {evaluationData.problem_type !== 'regression' && (<>
-              <div className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">Splits:</div>
+              <div className="flex items-center gap-1 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Splits:</div>
               {hasTrainSplit && (
               <label className="flex items-center gap-1.5 cursor-pointer text-sm">
                 <input type="checkbox" checked={showTrainMetrics} onChange={e => { setShowTrainMetrics(e.target.checked); }} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700" />
@@ -439,7 +439,7 @@ export const EvaluationView: React.FC<Props> = ({
                     )}
                   </div>
                   {proba.labels && proba.labels.length === proba.classes.length && (
-                    <div className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                       ({proba.classes.map((c, idx) => `${String(c)}→${String(proba.labels?.[idx] ?? c)}`).join(', ')})
                     </div>
                   )}
@@ -460,7 +460,7 @@ export const EvaluationView: React.FC<Props> = ({
 
           {/* Tab-level one-line description of what's driving the charts below */}
           {evaluationData.problem_type === 'classification' && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 italic px-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 italic px-1">
               {activeTab === 'slider'
                 ? 'Manually explore how a single threshold changes predictions — nothing here is saved or used for real predictions.'
                 : "Let the optimizer find the best per-class threshold(s) for a metric you choose, preview its effect, then save it to actually change how this model predicts."}
@@ -654,7 +654,7 @@ export const EvaluationView: React.FC<Props> = ({
                 useTunedThresholds
               />
             ) : (
-              <div className="text-xs text-gray-400 dark:text-gray-500 italic text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="text-xs text-gray-500 dark:text-gray-400 italic text-center py-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 Click Preview above to see tuned thresholds applied to your confusion matrix.
               </div>
             )

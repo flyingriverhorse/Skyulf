@@ -1,11 +1,22 @@
 import logging
 import uuid
 from collections import defaultdict
+from functools import lru_cache
 from typing import Any, cast
 
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 
 logger = logging.getLogger(__name__)
+
+# Model families for the training-node model dropdowns that combine several
+# underlying classifier/regressor models into one prediction (voting/stacking).
+# These always resolve to "ensemble" regardless of the underlying model's own
+# classification/regression tags — kept here (rather than duplicated in both
+# `monitoring/router.py`'s Slow Nodes display and the training job managers)
+# so there is exactly one place model-family resolution happens.
+ENSEMBLE_MODEL_TYPES = frozenset(
+    {"voting_classifier", "stacking_classifier", "voting_regressor", "stacking_regressor"}
+)
 
 TERMINAL_STEP_TYPES = {"training"}
 # Step types that should be treated as terminal sinks when splitting a graph
@@ -556,3 +567,82 @@ def extract_job_details(
         dropped_columns.extend(_extract_columns(ntype, params))
 
     return hyperparameters, target_column, dropped_columns
+
+
+@lru_cache(maxsize=1)
+def model_registry_tags() -> dict[str, list[str]]:
+    """Cache `{model_type_id: tags}` for every skyulf-core registered model node.
+
+    Imported lazily to avoid a module-load cycle with the meta router.
+    """
+    from backend.ml_pipeline._internal._routers.meta import _build_node_registry
+
+    return {item.id: item.tags for item in _build_node_registry()}
+
+
+def resolve_model_family(
+    model_type: str | None, registry_tags: dict[str, list[str]] | None = None
+) -> str | None:
+    """Resolve a `model_type` id to its display family (single source of truth).
+
+    Mirrors the frontend's `getTaskForModelType` (jobMeta.ts) precedence, so
+    Slow Nodes, the Jobs list, and any other surface resolving a model's
+    family always agree. Returns `None` when `model_type` is missing or not
+    resolvable via the registry's tags (e.g. an unregistered/unknown id).
+    """
+    if not model_type:
+        return None
+    if model_type in ENSEMBLE_MODEL_TYPES:
+        return "ensemble"
+    tags = (registry_tags if registry_tags is not None else model_registry_tags()).get(
+        model_type, []
+    )
+    if "clustering" in tags:
+        return "segmentation"
+    if model_type == "logistic_regression":
+        return "classification"
+    if "text" in tags or "nlp" in tags:
+        return "text_classification"
+    if "classification" in tags:
+        return "classification"
+    if "regression" in tags:
+        return "regression"
+    return None
+
+
+def resolve_training_model_type(
+    graph: dict[str, Any] | None, node_id: str, fallback_model_type: str | None
+) -> str | None:
+    """Resolve the `algorithm`/`model_type` actually used by `node_id` in a stored graph.
+
+    Prefers the matching node's own params (the graph reflects exactly what
+    ran), falling back to `fallback_model_type` (typically the job row's own
+    `model_type` column) when the node can't be found or carries no such
+    param — covering both new runs and historical rows.
+    """
+    if isinstance(graph, dict):
+        for node in graph.get("nodes") or []:
+            if not isinstance(node, dict):
+                continue
+            nid, _, params = _parse_node_info(node)
+            if nid != node_id:
+                continue
+            candidate = params.get("algorithm") or params.get("model_type")
+            if isinstance(candidate, str) and candidate:
+                return candidate
+            break
+    return fallback_model_type if isinstance(fallback_model_type, str) else None
+
+
+def resolve_training_model_family(
+    graph: dict[str, Any] | None, node_id: str, fallback_model_type: str | None
+) -> str | None:
+    """Resolve a training job's real model family from its stored graph + fallback model_type.
+
+    Combines `resolve_training_model_type` (which `model_type` actually
+    ran) with `resolve_model_family` (which family that `model_type` belongs
+    to) — the single code path every surface (Slow Nodes, Jobs list) should
+    use so they can never disagree on a job's family.
+    """
+    model_type = resolve_training_model_type(graph, node_id, fallback_model_type)
+    return resolve_model_family(model_type)

@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScatterChart as ScatterIcon, Download, Box, Info } from 'lucide-react';
 import { InfoTooltip } from '../../ui/InfoTooltip';
 import { ThreeDScatterPlot, type ScatterPoint } from '../ThreeDScatterPlot';
 import { CanvasScatterPlot } from '../CanvasScatterPlot';
+import { ChartLegend } from '../ChartLegend';
+import { ChartDataTable } from '../ChartDataTable';
+import { buildScatterLegendEntries, groupScatterPoints } from '../scatterGrouping';
 import { ClusteringTab } from './ClusteringTab';
 
 interface PCAComponent {
@@ -23,6 +26,23 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
     const downloadHint = canDownload
         ? 'Download Chart'
         : 'Not enough numeric data for PCA';
+
+    const pcaData = useMemo(() => profile.pca_data ?? [], [profile.pca_data]);
+
+    const legendEntries = useMemo(
+        () => buildScatterLegendEntries(groupScatterPoints(pcaData, 'label')),
+        [pcaData]
+    );
+
+    const tableColumns = useMemo(() => {
+        const cols = [
+            { key: 'x', label: 'PC1' },
+            { key: 'y', label: 'PC2' },
+        ];
+        if (isPCA3D) cols.push({ key: 'z', label: 'PC3' });
+        cols.push({ key: 'label', label: 'Group' });
+        return cols;
+    }, [isPCA3D]);
 
     return (
         <>
@@ -86,6 +106,15 @@ export const PCATab: React.FC<PCATabProps> = ({ profile, isPCA3D, setIsPCA3D, do
                     </div>
                 )}
                 </div>
+
+                {legendEntries.length > 1 && <ChartLegend entries={legendEntries} />}
+
+                <ChartDataTable
+                    caption="PCA projection data"
+                    filename="pca-analysis"
+                    columns={tableColumns}
+                    rows={pcaData as Array<Record<string, string | number | null | undefined>>}
+                />
 
                 <div className="mt-6 flex items-start gap-2 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-md border border-blue-100 dark:border-blue-800">
                     <Info className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />

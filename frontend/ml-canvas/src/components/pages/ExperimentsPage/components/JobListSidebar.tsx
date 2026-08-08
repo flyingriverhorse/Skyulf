@@ -53,7 +53,7 @@ export const JobListSidebar: React.FC<Props> = ({
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {filteredJobs.length === 0 && !isLoading && !isSidebarCollapsed && (
-          <div className="p-4 text-center text-xs text-gray-400 dark:text-gray-500">
+          <div className="p-4 text-center text-xs text-gray-500 dark:text-gray-400">
             No runs match the current filters.
           </div>
         )}
@@ -85,7 +85,7 @@ export const JobListSidebar: React.FC<Props> = ({
                           className={`p-1 rounded transition-colors ${
                             job.promoted_at
                               ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
-                              : 'hover:bg-amber-100 dark:hover:bg-amber-900/20 text-gray-400 dark:text-gray-500'
+                              : 'hover:bg-amber-100 dark:hover:bg-amber-900/20 text-gray-500 dark:text-gray-400'
                           }`}
                           title={job.promoted_at ? 'Unpromote' : 'Promote as Winner'}
                         >

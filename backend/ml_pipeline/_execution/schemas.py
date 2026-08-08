@@ -33,6 +33,12 @@ class JobInfo(BaseModel):
 
     # Extended fields for Experiments Page
     model_type: str | None = None
+    # Server-resolved model family (e.g. "classification", "regression",
+    # "ensemble") — the single source of truth for the Jobs list's task
+    # label, computed the same way Slow Nodes resolves it (see
+    # `graph_utils.resolve_training_model_family`) so the two surfaces can
+    # never disagree. `None` when unresolvable (e.g. legacy/unknown model_type).
+    model_family: str | None = None
     hyperparameters: dict[str, Any] | None = None
     created_at: datetime | None = None
     metrics: dict[str, Any] | None = None

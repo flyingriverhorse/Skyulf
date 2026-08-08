@@ -12,7 +12,7 @@ is a pure HTTP veneer.
 import logging
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,12 +20,19 @@ from backend.config import get_settings
 from backend.database.engine import get_async_session
 from backend.exceptions.core import SkyulfException
 from backend.ml_pipeline._execution.jobs import JobInfo, JobManager
+from backend.ml_pipeline._internal._routers.run_pipeline import resubmit_job_from_graph
 from backend.ml_pipeline._services.evaluation_service import EvaluationService
 from backend.ml_pipeline._services.threshold_tuning_service import (
     ThresholdTuningError,
     ThresholdTuningService,
 )
 from backend.realtime.events import JobEvent, publish_job_event
+
+# Retry (OPS-001) only makes sense for jobs that persisted a resubmittable
+# pipeline graph snapshot and have reached a state that will never mutate
+# again on its own.
+RETRIABLE_JOB_TYPES = {"training", "tuning"}
+RETRIABLE_STATUSES = {"failed", "cancelled"}
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +122,52 @@ async def cancel_job(job_id: str, session: AsyncSession = Depends(get_async_sess
         )
     publish_job_event(JobEvent(event="status", job_id=job_id, status="cancelled"))
     return {"message": "Job cancelled successfully"}
+
+
+class RetryJobResponse(BaseModel):
+    """Response body for a successful job retry submission."""
+
+    job_id: str
+    message: str
+
+
+@router.post("/jobs/{job_id}/retry", response_model=RetryJobResponse)
+async def retry_job(
+    job_id: str,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_async_session),
+):
+    """Resubmit a failed or cancelled training/tuning job from its stored graph.
+
+    Only training/tuning jobs that reached a terminal, non-successful state
+    and still have a stored pipeline graph snapshot can be retried; EDA and
+    ingestion jobs, and jobs missing a graph snapshot, return 400 so the
+    frontend can explain why retry isn't offered instead of silently no-oping.
+    """
+    job = await JobManager.get_job(session, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.job_type not in RETRIABLE_JOB_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Retry is not supported for {job.job_type} jobs",
+        )
+    if job.status not in RETRIABLE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail="Only failed or cancelled jobs can be retried",
+        )
+    if not job.graph or not job.graph.get("nodes"):
+        raise HTTPException(
+            status_code=400,
+            detail="Job has no stored pipeline graph to retry",
+        )
+
+    try:
+        new_job_id = await resubmit_job_from_graph(session, job, background_tasks)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return RetryJobResponse(job_id=new_job_id, message="Retry submitted")
 
 
 @router.post("/jobs/{job_id}/promote")

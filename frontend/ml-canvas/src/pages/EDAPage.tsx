@@ -276,7 +276,7 @@ export const EDAPage: React.FC = () => {
 
     if (!report) {
       return (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
           <BarChart2 className="w-16 h-16 mb-4 opacity-20" />
           <p className="mb-4">No analysis found for this dataset.</p>
 
@@ -339,7 +339,7 @@ export const EDAPage: React.FC = () => {
 
     if (report.status === 'PENDING') {
       return (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+        <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
           <Loader2 className="w-16 h-16 mb-4 animate-spin text-blue-500" />
           <p>Analysis in progress...</p>
           <p className="text-sm text-gray-400">This may take a few moments.</p>
@@ -510,7 +510,7 @@ export const EDAPage: React.FC = () => {
             <div>
                 <h1 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">Exploratory Analysis</h1>
                 {report && report.created_at && (
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
                         Last analyzed: {new Date(report.created_at).toLocaleString()}
                     </p>
                 )}
@@ -519,7 +519,7 @@ export const EDAPage: React.FC = () => {
             <div className="h-8 w-px bg-gray-200 dark:bg-gray-700 mx-2"></div>
 
             <div className="flex flex-col">
-                <label htmlFor="eda-toolbar-dataset" className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Dataset</label>
+                <label htmlFor="eda-toolbar-dataset" className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dataset</label>
                 <select
                     id="eda-toolbar-dataset"
                     value={selectionUnavailable ? '' : selectedDataset || ''}

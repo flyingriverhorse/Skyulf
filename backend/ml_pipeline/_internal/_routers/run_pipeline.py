@@ -20,6 +20,7 @@ from backend.database.engine import get_async_session
 from backend.middleware.rate_limiter import limiter
 from backend.ml_pipeline._execution.jobs import JobManager
 from backend.ml_pipeline._execution.schemas import (
+    JobInfo,
     NodeConfig,
     PipelineConfig,
     coerce_step_type,
@@ -290,6 +291,80 @@ async def _dispatch_branch_tasks(
         )
 
 
+async def resubmit_job_from_graph(
+    db: AsyncSession,
+    job: JobInfo,
+    background_tasks: BackgroundTasks,
+) -> str:
+    """Resubmit a terminal job using its persisted single-branch graph snapshot.
+
+    Used by ``POST /jobs/{job_id}/retry`` (OPS-001). ``job.graph`` already
+    holds one resolved branch (see `_build_branch_graph`), so this creates one
+    new Job row and dispatches it the same way `run_pipeline` dispatches a
+    single branch, instead of re-running the full partitioner. Goes through
+    the same submit-lock/dedupe check as a normal run submission, so two
+    concurrent retries of the same job return the same new job id rather than
+    both creating one.
+
+    Raises:
+        ValueError: if the job has no usable stored graph to resubmit.
+    """
+    graph = job.graph or {}
+    nodes_raw = graph.get("nodes") or []
+    if not nodes_raw:
+        raise ValueError("Job has no stored pipeline graph to retry")
+
+    internal_nodes = [
+        NodeConfig(
+            node_id=n["node_id"],
+            step_type=coerce_step_type(n["step_type"]),
+            params=n.get("params", {}),
+            inputs=n.get("inputs", []),
+        )
+        for n in nodes_raw
+    ]
+    sub = PipelineConfig(
+        pipeline_id=graph.get("pipeline_id", job.pipeline_id),
+        nodes=internal_nodes,
+        metadata=graph.get("metadata", {}),
+    )
+    branch_graph = _build_branch_graph(sub)
+    dataset_id = job.dataset_id or "unknown"
+    branch_index = job.branch_index or 0
+
+    # Reuse the same submit-lock/dedupe check `run_pipeline` uses for double
+    # submissions, keyed on (dataset_id, node_id, branch_index) — two
+    # concurrent retries of the same failed job resolve to a single new job
+    # instead of racing into two duplicate training jobs.
+    new_job_id, was_existing = await _submit_or_dedupe_branch_job(
+        db,
+        dataset_id,
+        job.node_id,
+        branch_index,
+        sub,
+        cast(Literal["training", "tuning"], job.job_type),
+        job.model_type or "unknown",
+        branch_graph,
+    )
+    if was_existing:
+        return new_job_id
+
+    publish_job_event(JobEvent(event="created", job_id=new_job_id, status="queued", progress=0))
+
+    settings = get_settings()
+    payload: dict[str, Any] = dict(branch_graph)
+    if settings.USE_CELERY:
+        task = run_pipeline_batch_task.delay([(new_job_id, payload)])
+        try:
+            await JobManager.attach_celery_task_id(db, new_job_id, task.id)
+        except Exception:
+            logger.warning("Failed to attach celery task id for retried job %s", new_job_id)
+    else:
+        background_tasks.add_task(run_pipeline_task, new_job_id, payload)
+
+    return new_job_id
+
+
 @router.post("/run", response_model=RunPipelineResponse)
 @limiter.limit("20/minute")
 async def run_pipeline(
@@ -358,4 +433,4 @@ async def run_pipeline(
     )
 
 
-__all__ = ["router"]
+__all__ = ["router", "resubmit_job_from_graph"]

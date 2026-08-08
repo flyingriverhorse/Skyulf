@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { InfoTooltip } from '../ui/InfoTooltip';
 import { useChartTheme } from '../../core/hooks/useChartTheme';
+import { ChartDataTable } from './ChartDataTable';
 import type { ColumnProfile, HistogramBin } from '../../core/types/edaProfile';
 
 /**
@@ -87,7 +88,8 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
   const type = profile.dtype;
 
   return (
-    <div className="h-full w-full min-h-[250px] relative">
+    <div className="w-full h-full flex flex-col">
+    <div className="flex-1 w-full min-h-[250px] relative">
       {profile.normality_test && (
         <div className="absolute top-0 right-0 bg-white/90 dark:bg-gray-800/90 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs z-10 shadow-sm">
             <div className="font-semibold text-gray-700 dark:text-gray-300 mb-1 flex items-center">
@@ -151,6 +153,16 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({ profile, o
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+    <ChartDataTable
+      caption={`Distribution data table for ${profile.name}`}
+      filename={`${profile.name}-distribution`}
+      columns={[
+        { key: 'fullName', label: 'Bin / Value' },
+        { key: 'count', label: 'Count' },
+      ]}
+      rows={data.map((d) => ({ fullName: d.fullName, count: d.count }))}
+    />
     </div>
   );
 };

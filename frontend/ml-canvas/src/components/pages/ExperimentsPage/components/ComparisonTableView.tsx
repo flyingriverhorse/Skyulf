@@ -411,7 +411,7 @@ export const ComparisonTableView: React.FC<Props> = ({
             {isParamsExpanded && (
               paramsAllKeys.length === 0 ? (
                 <tr className="bg-white dark:bg-gray-800">
-                  <td className="px-4 py-1.5 text-gray-400 dark:text-gray-500 pl-8 italic" colSpan={selectedJobs.length + 1}>
+                  <td className="px-4 py-1.5 text-gray-500 dark:text-gray-400 pl-8 italic" colSpan={selectedJobs.length + 1}>
                     Default parameters (none customized)
                   </td>
                 </tr>

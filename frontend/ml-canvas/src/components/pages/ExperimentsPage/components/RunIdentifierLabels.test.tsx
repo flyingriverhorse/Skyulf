@@ -156,6 +156,15 @@ describe('run identifier labels', () => {
           importances: { feature_one: 0.8, feature_two: 0.2 },
         },
       ],
+      coverageInputs: [
+        {
+          jobId: jobA.job_id,
+          label: shortRunId(jobA),
+          task: 'classification',
+          status: 'completed',
+          hasArtifact: true,
+        },
+      ],
       handleDownload: noop,
       downloadingChart: null,
       doneChart: null,
@@ -164,7 +173,7 @@ describe('run identifier labels', () => {
       <FeatureImportanceView {...featureImportanceProps} />,
     );
 
-    expect(screen.getByText(shortRunId(jobA))).toBeInTheDocument();
+    expect(screen.getAllByText(shortRunId(jobA)).length).toBeGreaterThan(0);
     expect(screen.queryByText(jobA.job_id.slice(0, 8))).not.toBeInTheDocument();
   });
 
@@ -179,6 +188,15 @@ describe('run identifier labels', () => {
           shapSummary: { feature_one: 0.8, feature_two: 0.2 },
         },
       ],
+      coverageInputs: [
+        {
+          jobId: jobA.job_id,
+          label: shortRunId(jobA),
+          task: 'classification',
+          status: 'completed',
+          hasArtifact: true,
+        },
+      ],
       handleDownload: noop,
       downloadingChart: null,
       doneChart: null,
@@ -187,7 +205,7 @@ describe('run identifier labels', () => {
       <ShapSummaryView {...shapSummaryProps} />,
     );
 
-    expect(screen.getByText(shortRunId(jobA))).toBeInTheDocument();
+    expect(screen.getAllByText(shortRunId(jobA)).length).toBeGreaterThan(0);
     expect(screen.queryByText(jobA.job_id.slice(0, 8))).not.toBeInTheDocument();
   });
 
