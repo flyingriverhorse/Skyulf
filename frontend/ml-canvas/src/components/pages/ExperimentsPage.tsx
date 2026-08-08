@@ -10,6 +10,7 @@ import { formatDuration } from '../../core/utils/format';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 import type { EvaluationData, ShapExplanationData } from './ExperimentsPage/types';
 import { getJobScoringMetric, getTaskForModelType, mapJobMetricToDropdown, shortRunId, type ThresholdMetric } from './ExperimentsPage/utils/jobMeta';
+import { getArtifactCoverage } from './ExperimentsPage/utils/artifactCoverage';
 import { partitionSelection, resolveEvaluationTarget, selectRunsForView, type SelectableRun } from './ExperimentsPage/utils/runSelection';
 import { registryApi, type RegistryItem } from '../../core/api/registry';
 import { findBestThreshold } from './ExperimentsPage/utils/classificationCharts';
@@ -494,6 +495,23 @@ export const ExperimentsPage: React.FC = () => {
     () => featureImportancesByJob.some(j => j.importances !== null),
     [featureImportancesByJob]
   );
+  // Per-run availability context for the Feature Importance coverage list
+  // (EXP-003): names, for every selected run, whether it supports the
+  // artifact and whether it's available/pending/failed/unsupported.
+  const featureImportanceCoverageInputs = useMemo(
+    () => featureImportancesByJob.map((entry, i) => {
+      const job = selectedJobs[i]!;
+      return {
+        jobId: entry.jobId,
+        label: entry.modelType !== 'unknown' ? `${entry.modelType} (${shortRunId(entry)})` : shortRunId(entry),
+        task: getTaskForModelType(job.model_type, registryItems),
+        status: job.status,
+        error: job.error,
+        hasArtifact: entry.importances !== null,
+      };
+    }),
+    [featureImportancesByJob, selectedJobs, registryItems]
+  );
 
   // SHAP explanations across selected jobs (summary + per-sample data)
   const shapExplanationByJob = useMemo(() => selectedJobs.map(job => {
@@ -512,12 +530,48 @@ export const ExperimentsPage: React.FC = () => {
     () => shapExplanationByJob.some(j => j.shapExplanation !== null),
     [shapExplanationByJob]
   );
+  // Mirrors featureImportanceCoverageInputs above, for the SHAP surfaces.
+  const shapCoverageInputs = useMemo(
+    () => shapExplanationByJob.map((entry, i) => {
+      const job = selectedJobs[i]!;
+      return {
+        jobId: entry.jobId,
+        label: entry.modelType !== 'unknown' ? `${entry.modelType} (${shortRunId(entry)})` : shortRunId(entry),
+        task: getTaskForModelType(job.model_type, registryItems),
+        status: job.status,
+        error: job.error,
+        hasArtifact: entry.shapExplanation !== null,
+      };
+    }),
+    [shapExplanationByJob, selectedJobs, registryItems]
+  );
 
   // Segmentation (clustering) jobs — detected from job.model_type via the
   // same tag-based task lookup used for the filterType tabs, rather than
   // fetching evaluation data for every selected job.
   const hasSegmentation = useMemo(
     () => selectedJobs.some(j => getTaskForModelType(j.model_type, registryItems) === 'segmentation'),
+    [selectedJobs, registryItems]
+  );
+  // Per-run availability for the Segmentation tab (EXP-003): we don't fetch
+  // clustering results eagerly for every selected run, so `hasArtifact` is
+  // conservatively true whenever the run's task supports clustering — the
+  // "not yet computed" case for the specific run being viewed is still
+  // surfaced inline by SegmentationView's own empty state.
+  const segmentationCoverageEntries = useMemo(
+    () => selectedJobs.map(job => {
+      const task = getTaskForModelType(job.model_type, registryItems);
+      return {
+        jobId: job.job_id,
+        label: job.model_type ? `${job.model_type} (${shortRunId(job)})` : shortRunId(job),
+        ...getArtifactCoverage('segmentation', {
+          task,
+          status: job.status,
+          error: job.error,
+          hasArtifact: true,
+        }),
+      };
+    }),
     [selectedJobs, registryItems]
   );
 
@@ -682,6 +736,7 @@ export const ExperimentsPage: React.FC = () => {
               {activeView === 'importance' && hasFeatureImportances && (
                 <FeatureImportanceView
                   featureImportancesByJob={featureImportancesByJob}
+                  coverageInputs={featureImportanceCoverageInputs}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
@@ -691,6 +746,7 @@ export const ExperimentsPage: React.FC = () => {
               {activeView === 'shap' && hasShapSummary && (
                 <ShapExplainabilityView
                   shapExplanationByJob={shapExplanationByJob}
+                  coverageInputs={shapCoverageInputs}
                   handleDownload={handleDownload}
                   downloadingChart={downloadingChart}
                   doneChart={doneChart}
@@ -700,6 +756,7 @@ export const ExperimentsPage: React.FC = () => {
               {activeView === 'segmentation' && hasSegmentation && (
                 <SegmentationView
                   selectedJobIds={selectedJobIds}
+                  coverageEntries={segmentationCoverageEntries}
                   evalJobId={evalJobId}
                   fetchEvaluationData={fetchEvaluationData}
                   isEvalLoading={isEvalLoading}

@@ -15,6 +15,7 @@ from fastapi import HTTPException
 
 from backend.monitoring.router import (
     DriftJobOption,
+    SlowNodeRun,
     _accumulate_node_timing,
     _build_drift_column_summary,
     _build_drift_metric_summary,
@@ -31,7 +32,7 @@ from backend.monitoring.router import (
     _load_feature_importances,
     _load_reference_dataframe,
     _percentile,
-    _save_drift_check_result,
+    _save_drift_alert,
     _scan_slow_node_jobs,
     list_drift_jobs,
     list_slow_nodes,
@@ -386,11 +387,15 @@ async def test_save_drift_check_result_persists():
         current_rows=12,
         drifted_columns_count=1,
         column_drifts={},
+        missing_columns=[],
+        new_columns=[],
     )
-    report.model_dump.return_value = {}
 
-    await _save_drift_check_result(db, report, "job-1", "ds")
+    result = await _save_drift_alert(
+        db, job_id="job-1", dataset_name="ds", evaluation_status="completed", report=report
+    )
 
+    assert result is not None
     db.add.assert_called_once()
     db.commit.assert_awaited_once()
 
@@ -400,12 +405,19 @@ async def test_save_drift_check_result_swallows_errors():
     db = AsyncMock()
     db.add = MagicMock(side_effect=RuntimeError("boom"))
     report = MagicMock(
-        reference_rows=10, current_rows=12, drifted_columns_count=0, column_drifts={}
+        reference_rows=10,
+        current_rows=12,
+        drifted_columns_count=0,
+        column_drifts={},
+        missing_columns=[],
+        new_columns=[],
     )
-    report.model_dump.return_value = {}
 
     # Should not raise.
-    await _save_drift_check_result(db, report, "job-1", "ds")
+    result = await _save_drift_alert(
+        db, job_id="job-1", dataset_name="ds", evaluation_status="completed", report=report
+    )
+    assert result is None
 
 
 # ---------------------------------------------------------------------------
@@ -532,15 +544,33 @@ def test_clamp_slow_nodes_params_clamped_to_caps():
 # ---------------------------------------------------------------------------
 
 
+def _make_timing_job(**kwargs):
+    """Build a lightweight mock standing in for the job passed to `_accumulate_node_timing`."""
+    job = MagicMock()
+    job.id = kwargs.get("id", "job-1")
+    job.pipeline_id = kwargs.get("pipeline_id", "pipeline-1")
+    job.dataset_source_id = kwargs.get("dataset_source_id", "dataset-1")
+    job.finished_at = kwargs.get("finished_at", datetime(2026, 1, 1, 12, 0, 0))
+    return job
+
+
 def test_accumulate_node_timing_valid_entry():
-    """A valid dict entry with positive execution_time contributes to the aggregates."""
+    """A valid dict entry with positive execution_time contributes a SlowNodeRun."""
     by_step: dict = {}
     sample_node: dict = {}
+    job = _make_timing_job(id="job-1")
     contributed = _accumulate_node_timing(
-        {"step_type": "impute", "execution_time": 1.5, "node_id": "n1"}, by_step, sample_node
+        {"step_type": "impute", "execution_time": 1.5, "node_id": "n1"}, job, by_step, sample_node
     )
     assert contributed is True
-    assert by_step["impute"] == [1.5]
+    assert len(by_step["impute"]) == 1
+    run = by_step["impute"][0]
+    assert run.execution_seconds == 1.5
+    assert run.node_id == "n1"
+    assert run.job_id == "job-1"
+    assert run.pipeline_id == "pipeline-1"
+    assert run.dataset_source_id == "dataset-1"
+    assert run.finished_at == "2026-01-01T12:00:00"
     assert sample_node["impute"] == "n1"
 
 
@@ -548,7 +578,7 @@ def test_accumulate_node_timing_non_dict_entry_ignored():
     """Non-dict entries are ignored."""
     by_step: dict = {}
     sample_node: dict = {}
-    assert _accumulate_node_timing("not-a-dict", by_step, sample_node) is False
+    assert _accumulate_node_timing("not-a-dict", _make_timing_job(), by_step, sample_node) is False
     assert by_step == {}
 
 
@@ -557,7 +587,9 @@ def test_accumulate_node_timing_zero_or_negative_time_ignored():
     by_step: dict = {}
     sample_node: dict = {}
     assert (
-        _accumulate_node_timing({"step_type": "x", "execution_time": 0}, by_step, sample_node)
+        _accumulate_node_timing(
+            {"step_type": "x", "execution_time": 0}, _make_timing_job(), by_step, sample_node
+        )
         is False
     )
     assert by_step == {}
@@ -568,7 +600,7 @@ def test_accumulate_node_timing_invalid_time_type_ignored():
     by_step: dict = {}
     sample_node: dict = {}
     result = _accumulate_node_timing(
-        {"step_type": "x", "execution_time": "bad"}, by_step, sample_node
+        {"step_type": "x", "execution_time": "bad"}, _make_timing_job(), by_step, sample_node
     )
     assert result is False
     assert by_step == {}
@@ -578,7 +610,7 @@ def test_accumulate_node_timing_missing_step_type_defaults_unknown():
     """A missing step_type defaults to 'unknown' rather than raising a KeyError."""
     by_step: dict = {}
     sample_node: dict = {}
-    _accumulate_node_timing({"execution_time": 2.0}, by_step, sample_node)
+    _accumulate_node_timing({"execution_time": 2.0}, _make_timing_job(), by_step, sample_node)
     assert "unknown" in by_step
 
 
@@ -590,8 +622,20 @@ def test_accumulate_node_timing_missing_step_type_defaults_unknown():
 async def test_scan_slow_node_jobs_aggregates_across_tables():
     """Completed jobs from the unified table are scanned and their node_timings aggregated."""
     db = AsyncMock()
-    job1 = MagicMock(metrics={"node_timings": [{"step_type": "impute", "execution_time": 1.0}]})
-    job2 = MagicMock(metrics={"node_timings": [{"step_type": "impute", "execution_time": 2.0}]})
+    job1 = MagicMock(
+        id="job-1",
+        pipeline_id="pipeline-1",
+        dataset_source_id="dataset-1",
+        finished_at=datetime(2026, 1, 1),
+        metrics={"node_timings": [{"step_type": "impute", "execution_time": 1.0}]},
+    )
+    job2 = MagicMock(
+        id="job-2",
+        pipeline_id="pipeline-1",
+        dataset_source_id="dataset-1",
+        finished_at=datetime(2026, 1, 2),
+        metrics={"node_timings": [{"step_type": "impute", "execution_time": 2.0}]},
+    )
     db.execute.return_value = _make_db_execute_result([job1, job2])
 
     cutoff = datetime.now(UTC) - timedelta(days=7)
@@ -599,7 +643,8 @@ async def test_scan_slow_node_jobs_aggregates_across_tables():
 
     assert jobs_scanned == 2
     assert runs_seen == 2
-    assert by_step["impute"] == [1.0, 2.0]
+    assert [run.execution_seconds for run in by_step["impute"]] == [1.0, 2.0]
+    assert [run.job_id for run in by_step["impute"]] == ["job-1", "job-2"]
 
 
 async def test_scan_slow_node_jobs_skips_jobs_without_node_timings():
@@ -622,9 +667,27 @@ async def test_scan_slow_node_jobs_skips_jobs_without_node_timings():
 # ---------------------------------------------------------------------------
 
 
+def _run(step_type="impute", **kwargs):
+    """Build a `SlowNodeRun` with sane defaults for aggregate-builder tests."""
+    return SlowNodeRun(
+        job_id=kwargs.get("job_id", "job-1"),
+        pipeline_id=kwargs.get("pipeline_id", "pipeline-1"),
+        node_id=kwargs.get("node_id", "n1"),
+        dataset_source_id=kwargs.get("dataset_source_id", "dataset-1"),
+        execution_seconds=kwargs["execution_seconds"],
+        finished_at=kwargs.get("finished_at"),
+    )
+
+
 def test_build_slow_node_aggregates_sorted_by_total_desc():
     """Aggregates are computed per step and sorted by total_seconds descending."""
-    by_step = {"impute": [1.0, 2.0], "scale": [10.0]}
+    by_step = {
+        "impute": [
+            _run(node_id="n1", execution_seconds=1.0),
+            _run(node_id="n1", execution_seconds=2.0),
+        ],
+        "scale": [_run(node_id="n2", execution_seconds=10.0)],
+    }
     sample_node = {"impute": "n1", "scale": "n2"}
 
     aggregates = _build_slow_node_aggregates(by_step, sample_node)
@@ -632,6 +695,47 @@ def test_build_slow_node_aggregates_sorted_by_total_desc():
     assert aggregates[1].count == 2
     assert aggregates[1].avg_seconds == 1.5
     assert aggregates[0].sample_node_id == "n2"
+
+
+def test_build_slow_node_aggregates_single_run_is_flagged():
+    """A step with exactly one run is marked `is_single_run` rather than implying a trend."""
+    by_step = {"scale": [_run(node_id="n2", execution_seconds=10.0)]}
+    sample_node = {"scale": "n2"}
+
+    aggregates = _build_slow_node_aggregates(by_step, sample_node)
+    assert aggregates[0].is_single_run is True
+    assert aggregates[0].sample_is_representative is True
+
+
+def test_build_slow_node_aggregates_flags_outlier_runs():
+    """Runs materially slower than the group average are flagged as outliers."""
+    by_step = {
+        "impute": [
+            _run(node_id="n1", execution_seconds=1.0),
+            _run(node_id="n2", execution_seconds=1.1),
+            _run(node_id="n3", execution_seconds=20.0),
+        ],
+    }
+    sample_node = {"impute": "n3"}
+
+    aggregates = _build_slow_node_aggregates(by_step, sample_node)
+    agg = aggregates[0]
+    outlier_ids = {run.node_id for run in agg.contributing_runs if run.is_outlier}
+    assert outlier_ids == {"n3"}
+    # The sample happened to be the outlier run, so it is not representative.
+    assert agg.sample_is_representative is False
+
+
+def test_build_slow_node_aggregates_contributing_runs_capped_and_sorted():
+    """Contributing runs are capped at the configured limit, slowest first."""
+    runs = [_run(node_id=f"n{i}", execution_seconds=float(i)) for i in range(8)]
+    by_step = {"impute": runs}
+    sample_node = {"impute": "n0"}
+
+    aggregates = _build_slow_node_aggregates(by_step, sample_node)
+    contributing = aggregates[0].contributing_runs
+    assert len(contributing) == 5
+    assert [run.execution_seconds for run in contributing] == [7.0, 6.0, 5.0, 4.0, 3.0]
 
 
 # ---------------------------------------------------------------------------
@@ -643,6 +747,10 @@ async def test_list_slow_nodes_end_to_end():
     """The endpoint clamps params, scans jobs, aggregates, and truncates to `limit`."""
     db = AsyncMock()
     job = MagicMock(
+        id="job-1",
+        pipeline_id="pipeline-1",
+        dataset_source_id="dataset-1",
+        finished_at=datetime(2026, 1, 1),
         status="completed",
         metrics={
             "node_timings": [
@@ -664,11 +772,17 @@ async def test_list_slow_nodes_end_to_end():
         response = await list_slow_nodes(days=7, limit=1, db=db)
 
     assert response.days == 7
+    assert response.unit == "seconds"
     assert response.total_jobs_scanned == 1
     assert response.total_node_runs == 2
     # Truncated to `limit=1`, and the highest total_seconds entry ("scale") wins.
     assert len(response.aggregates) == 1
-    assert response.aggregates[0].step_type == "scale"
+    agg = response.aggregates[0]
+    assert agg.step_type == "scale"
+    assert agg.is_single_run is True
+    assert len(agg.contributing_runs) == 1
+    assert agg.contributing_runs[0].job_id == "job-1"
+    assert agg.contributing_runs[0].pipeline_id == "pipeline-1"
 
 
 # ---------------------------------------------------------------------------

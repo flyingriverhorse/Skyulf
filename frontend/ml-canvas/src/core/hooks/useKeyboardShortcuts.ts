@@ -60,6 +60,15 @@ export interface FocusNodeDetail {
   id: string;
 }
 
+/**
+ * Custom event fired after a graph is restored from any recovery source
+ * (autosave, local recent, or a server version — CAN-003). `FlowCanvas`
+ * listens and fits the whole restored graph into view, then moves DOM
+ * focus onto the canvas so keyboard users land on the result instead of a
+ * dismissed banner/menu button.
+ */
+export const FIT_VIEW_EVENT = 'skyulf:fit-view';
+
 interface ShortcutOptions {
   /** Toggles the `?` shortcuts cheatsheet overlay. */
   onToggleHelp: () => void;

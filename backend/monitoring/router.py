@@ -2,7 +2,7 @@ import io
 import logging
 import re
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pandas as pd
 import polars as pl
@@ -17,7 +17,9 @@ from backend.ml_pipeline.artifacts.factory import ArtifactFactory
 
 logger = logging.getLogger(__name__)
 from backend.database.models import (
+    Deployment,
     DriftCheckResult,
+    DriftThresholdVersion,
     ErrorEvent,
     PipelineRunLog,
     TrainingJob,
@@ -167,7 +169,13 @@ async def update_job_description(
 
 
 class EnrichedDriftReport(BaseModel):
-    """DriftReport with optional feature importance overlay."""
+    """DriftReport with optional feature importance overlay plus alert identity.
+
+    `alert_id`/`severity`/`threshold_version`/`deployment_id`/`model_version`
+    let the UI immediately deep-link the freshly-created alert to its
+    evidence, threshold snapshot, and related deployment without a second
+    round trip.
+    """
 
     reference_rows: int
     current_rows: int
@@ -176,6 +184,11 @@ class EnrichedDriftReport(BaseModel):
     missing_columns: list[str] = []
     new_columns: list[str] = []
     feature_importances: dict[str, float] | None = None
+    alert_id: int | None = None
+    severity: str = "none"
+    threshold_version: int | None = None
+    deployment_id: int | None = None
+    model_version: str | None = None
 
 
 def _find_reference_key(artifact_store, dataset_name: str | None, job_id: str) -> str | None:
@@ -238,6 +251,29 @@ async def _load_current_dataframe(file: UploadFile) -> pl.DataFrame:
         raise HTTPException(status_code=400, detail="Failed to parse uploaded file") from e
 
 
+# Mirrors `DriftCalculator._merge_thresholds`'s defaults (skyulf-core keeps
+# that method private) so the backend can record the *effective* threshold
+# set — including values the caller didn't override — in the durable
+# threshold-version snapshot.
+_DEFAULT_DRIFT_THRESHOLDS: dict[str, float] = {
+    "psi": 0.2,
+    "ks": 0.05,
+    "wasserstein": 0.1,
+    "kl_divergence": 0.1,
+}
+
+DriftDispositionAction = Literal["acknowledge", "resolve", "reopen"]
+
+# Valid disposition transitions: {action: {allowed current statuses}}. Kept
+# explicit so an invalid transition (e.g. resolving a check that was never
+# acknowledged) is rejected with a clear error instead of silently applied.
+_ALLOWED_DISPOSITION_TRANSITIONS: dict[str, set[str]] = {
+    "acknowledge": {"new", "reopened"},
+    "resolve": {"acknowledged"},
+    "reopen": {"acknowledged", "resolved"},
+}
+
+
 def _build_drift_thresholds(
     threshold_psi: float | None,
     threshold_ks: float | None,
@@ -257,6 +293,67 @@ def _build_drift_thresholds(
     return custom_thresholds
 
 
+def _effective_drift_thresholds(custom_thresholds: dict[str, float]) -> dict[str, float]:
+    """Merge user overrides over the calculator's defaults for durable recording."""
+    return {**_DEFAULT_DRIFT_THRESHOLDS, **custom_thresholds}
+
+
+async def _get_or_create_threshold_version(
+    db: AsyncSession, effective_thresholds: dict[str, float]
+) -> DriftThresholdVersion:
+    """Return the threshold version matching `effective_thresholds`, creating one if needed.
+
+    Comparison rounds to 6 decimals to avoid spurious new versions from
+    float noise. A changed threshold set always gets a *new* version number
+    rather than mutating the latest row, so alerts already pinned to an
+    older version keep pointing at the values they were actually evaluated
+    against.
+    """
+    stmt = select(DriftThresholdVersion).order_by(DriftThresholdVersion.version.desc()).limit(1)
+    result = await db.execute(stmt)
+    latest = result.scalar_one_or_none()
+
+    def _matches(row: DriftThresholdVersion) -> bool:
+        return (
+            round(row.psi, 6) == round(effective_thresholds["psi"], 6)
+            and round(row.ks, 6) == round(effective_thresholds["ks"], 6)
+            and round(row.wasserstein, 6) == round(effective_thresholds["wasserstein"], 6)
+            and round(row.kl_divergence, 6) == round(effective_thresholds["kl_divergence"], 6)
+        )
+
+    if latest is not None and _matches(latest):
+        return latest
+
+    next_version = (latest.version + 1) if latest is not None else 1
+    new_version = DriftThresholdVersion(
+        version=next_version,
+        psi=effective_thresholds["psi"],
+        ks=effective_thresholds["ks"],
+        wasserstein=effective_thresholds["wasserstein"],
+        kl_divergence=effective_thresholds["kl_divergence"],
+    )
+    db.add(new_version)
+    await db.flush()
+    return new_version
+
+
+def _classify_drift_severity(report) -> str:
+    """Derive a triage severity from the report — schema drift is always critical.
+
+    A structural change (columns appearing/disappearing) breaks downstream
+    assumptions regardless of how many value distributions also drifted, so
+    it always classifies as critical. Otherwise severity scales with the
+    fraction of drifted feature columns.
+    """
+    if report.missing_columns or report.new_columns:
+        return "critical"
+    total = len(report.column_drifts)
+    if total == 0 or report.drifted_columns_count == 0:
+        return "none"
+    ratio = report.drifted_columns_count / total
+    return "critical" if ratio > 0.3 else "warning"
+
+
 def _build_drift_column_summary(report) -> dict[str, Any]:
     """Build a compact per-column drift summary (drifted flag + PSI/Wasserstein/KS p-value)."""
     col_summary: dict[str, Any] = {}
@@ -273,35 +370,90 @@ def _build_drift_column_summary(report) -> dict[str, Any]:
     return col_summary
 
 
-async def _save_drift_check_result(
-    db: AsyncSession, report, job_id: str, dataset_name: str | None
-) -> None:
-    """Persist a DriftCheckResult row for history; failures are logged but non-fatal."""
-    try:
-        col_summary = _build_drift_column_summary(report)
+async def _find_deployment_context(db: AsyncSession, job_id: str) -> tuple[int | None, str | None]:
+    """Resolve the active deployment id and model-version label for a job, if any.
 
+    Returns `(None, None)` when the job has never been deployed — the drift
+    alert still records its evidence, just without a deployment link.
+    """
+    try:
+        stmt = select(Deployment).where(Deployment.job_id == job_id, Deployment.is_active)
+        result = await db.execute(stmt)
+        deployment = result.scalar_one_or_none()
+
+        job_stmt = select(TrainingJob).where(TrainingJob.id == job_id)
+        job_result = await db.execute(job_stmt)
+        job_row = job_result.scalar_one_or_none()
+        model_version = f"v{job_row.version}" if job_row is not None else None
+
+        return (deployment.id if deployment is not None else None), model_version
+    except Exception:
+        logger.warning("Could not resolve deployment context for job %s", job_id, exc_info=True)
+        return None, None
+
+
+async def _save_drift_alert(
+    db: AsyncSession,
+    *,
+    job_id: str,
+    dataset_name: str | None,
+    evaluation_status: str,
+    report=None,
+    effective_thresholds: dict[str, float] | None = None,
+    threshold_version: DriftThresholdVersion | None = None,
+    deployment_id: int | None = None,
+    model_version: str | None = None,
+    error_message: str | None = None,
+) -> DriftCheckResult | None:
+    """Persist a durable drift alert row and return it; failures are logged but non-fatal.
+
+    Covers every evaluation outcome explicitly: a completed report (with its
+    evidence and severity), a missing reference baseline
+    (`evaluation_status="no_baseline"`), and a calculation failure
+    (`evaluation_status="failed"`, with `error_message`) all get a row so
+    the history never conflates "nothing to show" with "we don't know".
+    """
+    try:
         check = DriftCheckResult(
             job_id=job_id,
             dataset_name=dataset_name,
-            reference_rows=report.reference_rows,
-            current_rows=report.current_rows,
-            drifted_columns_count=report.drifted_columns_count,
-            total_columns=len(report.column_drifts),
-            summary=col_summary,
-            column_drifts=report.model_dump(
-                exclude={
-                    "reference_rows",
-                    "current_rows",
-                    "drifted_columns_count",
-                    "missing_columns",
-                    "new_columns",
-                }
-            ),
+            evaluation_status=evaluation_status,
+            error_message=error_message,
+            deployment_id=deployment_id,
+            model_version=model_version,
+            status="new",
+            severity="none",
         )
+
+        if report is not None:
+            col_summary = _build_drift_column_summary(report)
+            check.reference_rows = report.reference_rows
+            check.current_rows = report.current_rows
+            check.drifted_columns_count = report.drifted_columns_count
+            check.total_columns = len(report.column_drifts)
+            check.summary = col_summary
+            # Flat `{column: ColumnDrift-dump}` — matches the shape returned by
+            # `EnrichedDriftReport.column_drifts` so the alert-detail endpoint's
+            # evidence exactly mirrors what the user saw at evaluation time.
+            check.column_drifts = {k: v.model_dump() for k, v in report.column_drifts.items()}
+            check.severity = _classify_drift_severity(report)
+
+        if effective_thresholds is not None:
+            check.threshold_psi = effective_thresholds["psi"]
+            check.threshold_ks = effective_thresholds["ks"]
+            check.threshold_wasserstein = effective_thresholds["wasserstein"]
+            check.threshold_kl = effective_thresholds["kl_divergence"]
+        if threshold_version is not None:
+            check.threshold_version = threshold_version.version
+
         db.add(check)
         await db.commit()
+        await db.refresh(check)
+        return check
     except Exception:
-        logger.warning("Failed to save drift check result", exc_info=True)
+        logger.warning("Failed to save drift alert", exc_info=True)
+        await db.rollback()
+        return None
 
 
 async def _load_feature_importances(db: AsyncSession, job_id: str) -> dict[str, float] | None:
@@ -336,9 +488,22 @@ async def calculate_drift(
     # 1. Find the job folder (via the storage seam) and its artifact store.
     artifact_store = ArtifactFactory.get_discovery().get_store_for_job(job_id)
 
-    # 2. Find Reference Data
+    deployment_id, model_version = await _find_deployment_context(db, job_id)
+
+    # 2. Find Reference Data — no baseline is an explicit, recorded outcome
+    # (not a silent 404), so the alert history can distinguish "never
+    # checked" from "checked, but there was nothing to compare against".
     reference_key = _find_reference_key(artifact_store, dataset_name, job_id)
     if not reference_key:
+        await _save_drift_alert(
+            db,
+            job_id=job_id,
+            dataset_name=dataset_name,
+            evaluation_status="no_baseline",
+            deployment_id=deployment_id,
+            model_version=model_version,
+            error_message=f"Reference data not found for job {job_id}",
+        )
         raise HTTPException(status_code=404, detail=f"Reference data not found for job {job_id}")
 
     # 3. Load Reference Data
@@ -348,18 +513,40 @@ async def calculate_drift(
     curr_df = await _load_current_dataframe(file)
 
     # 4. Calculate Drift
+    custom_thresholds = _build_drift_thresholds(
+        threshold_psi, threshold_ks, threshold_wasserstein, threshold_kl
+    )
+    effective_thresholds = _effective_drift_thresholds(custom_thresholds)
     try:
-        custom_thresholds = _build_drift_thresholds(
-            threshold_psi, threshold_ks, threshold_wasserstein, threshold_kl
-        )
         calculator = DriftCalculator(ref_df, curr_df)
         report = calculator.calculate_drift(thresholds=custom_thresholds or None)
-    except Exception:
+    except Exception as exc:
         logger.exception("Drift calculation failed for job %s", job_id)
+        await _save_drift_alert(
+            db,
+            job_id=job_id,
+            dataset_name=dataset_name,
+            evaluation_status="failed",
+            deployment_id=deployment_id,
+            model_version=model_version,
+            error_message=str(exc),
+        )
         raise SkyulfException(message="Drift calculation failed") from None
 
-    # 5. Save drift check result to DB for history
-    await _save_drift_check_result(db, report, job_id, dataset_name)
+    # 5. Pin the threshold version this check was evaluated against, then
+    # save the durable alert row for history/lifecycle tracking.
+    threshold_version = await _get_or_create_threshold_version(db, effective_thresholds)
+    alert = await _save_drift_alert(
+        db,
+        job_id=job_id,
+        dataset_name=dataset_name,
+        evaluation_status="completed",
+        report=report,
+        effective_thresholds=effective_thresholds,
+        threshold_version=threshold_version,
+        deployment_id=deployment_id,
+        model_version=model_version,
+    )
 
     # 6. Load feature importances from training job
     feature_importances = await _load_feature_importances(db, job_id)
@@ -372,10 +559,17 @@ async def calculate_drift(
         missing_columns=report.missing_columns,
         new_columns=report.new_columns,
         feature_importances=feature_importances,
+        alert_id=alert.id if alert is not None else None,
+        severity=alert.severity if alert is not None else _classify_drift_severity(report),
+        threshold_version=threshold_version.version,
+        deployment_id=deployment_id,
+        model_version=model_version,
     )
 
 
 class DriftHistoryEntry(BaseModel):
+    """One row in a job's drift history — an alert's identity, evidence summary, and lifecycle."""
+
     id: int
     job_id: str
     dataset_name: str | None = None
@@ -385,6 +579,49 @@ class DriftHistoryEntry(BaseModel):
     total_columns: int | None = None
     summary: dict[str, Any] | None = None
     created_at: str | None = None
+    severity: str = "none"
+    status: str = "new"
+    owner: str | None = None
+    acknowledged_at: str | None = None
+    resolved_at: str | None = None
+    threshold_version: int | None = None
+    threshold_psi: float | None = None
+    threshold_ks: float | None = None
+    threshold_wasserstein: float | None = None
+    threshold_kl: float | None = None
+    deployment_id: int | None = None
+    model_version: str | None = None
+    evaluation_status: str = "completed"
+    error_message: str | None = None
+
+
+def _to_drift_history_entry(r: DriftCheckResult) -> DriftHistoryEntry:
+    """Map a `DriftCheckResult` row to its API representation."""
+    return DriftHistoryEntry(
+        id=r.id,
+        job_id=r.job_id,
+        dataset_name=r.dataset_name,
+        reference_rows=r.reference_rows,
+        current_rows=r.current_rows,
+        drifted_columns_count=r.drifted_columns_count,
+        total_columns=r.total_columns,
+        summary=cast(dict[str, Any] | None, r.summary),
+        created_at=r.created_at.isoformat() if r.created_at else None,
+        severity=r.severity,
+        status=r.status,
+        owner=r.owner,
+        acknowledged_at=r.acknowledged_at.isoformat() if r.acknowledged_at else None,
+        resolved_at=r.resolved_at.isoformat() if r.resolved_at else None,
+        threshold_version=r.threshold_version,
+        threshold_psi=r.threshold_psi,
+        threshold_ks=r.threshold_ks,
+        threshold_wasserstein=r.threshold_wasserstein,
+        threshold_kl=r.threshold_kl,
+        deployment_id=r.deployment_id,
+        model_version=r.model_version,
+        evaluation_status=r.evaluation_status,
+        error_message=r.error_message,
+    )
 
 
 @router.get("/drift/history/{job_id}", response_model=list[DriftHistoryEntry])
@@ -400,26 +637,110 @@ async def get_drift_history(
     )
     result = await db.execute(stmt)
     rows = result.scalars().all()
-    return [
-        DriftHistoryEntry(
-            id=r.id,
-            job_id=r.job_id,
-            dataset_name=r.dataset_name,
-            reference_rows=r.reference_rows,
-            current_rows=r.current_rows,
-            drifted_columns_count=r.drifted_columns_count,
-            total_columns=r.total_columns,
-            summary=cast(dict[str, Any] | None, r.summary),
-            created_at=r.created_at.isoformat() if r.created_at else None,
+    return [_to_drift_history_entry(r) for r in rows]
+
+
+class DriftAlertDetail(DriftHistoryEntry):
+    """Full alert detail, including the per-feature drift evidence."""
+
+    column_drifts: dict[str, Any] | None = None
+    disposition_history: list[dict[str, Any]] = []
+
+
+@router.get("/drift/alerts/{alert_id}", response_model=DriftAlertDetail)
+async def get_drift_alert(
+    alert_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> DriftAlertDetail:
+    """Return full detail for one drift alert, including per-feature evidence."""
+    stmt = select(DriftCheckResult).where(DriftCheckResult.id == alert_id)
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Drift alert {alert_id} not found")
+    base = _to_drift_history_entry(row)
+    return DriftAlertDetail(
+        **base.model_dump(),
+        column_drifts=cast(dict[str, Any] | None, row.column_drifts),
+        disposition_history=cast(list[dict[str, Any]] | None, row.disposition_history) or [],
+    )
+
+
+class DriftDispositionUpdate(BaseModel):
+    """Request body to acknowledge, resolve, or reopen a drift alert."""
+
+    action: DriftDispositionAction
+    actor: str
+    note: str | None = None
+
+
+@router.patch("/drift/alerts/{alert_id}/disposition", response_model=DriftAlertDetail)
+async def update_drift_alert_disposition(
+    alert_id: int,
+    body: DriftDispositionUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> DriftAlertDetail:
+    """Record an explicit acknowledge/resolve/reopen disposition, with actor and timestamp.
+
+    Only the transitions in `_ALLOWED_DISPOSITION_TRANSITIONS` are accepted —
+    e.g. an alert cannot be resolved before it has been acknowledged — so the
+    lifecycle can't silently skip a step.
+    """
+    stmt = select(DriftCheckResult).where(DriftCheckResult.id == alert_id)
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Drift alert {alert_id} not found")
+
+    allowed_from = _ALLOWED_DISPOSITION_TRANSITIONS[body.action]
+    if row.status not in allowed_from:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot {body.action} a drift alert with status '{row.status}'; "
+                f"expected one of {sorted(allowed_from)}"
+            ),
         )
-        for r in rows
+
+    now = datetime.now(UTC)
+    new_status = {"acknowledge": "acknowledged", "resolve": "resolved", "reopen": "reopened"}[
+        body.action
     ]
+    row.status = new_status
+    row.owner = body.actor
+    if body.action == "acknowledge":
+        row.acknowledged_at = now
+    elif body.action == "resolve":
+        row.resolved_at = now
+    elif body.action == "reopen":
+        row.resolved_at = None
+
+    history = cast(list[dict[str, Any]] | None, row.disposition_history) or []
+    history = [
+        *history,
+        {"status": new_status, "actor": body.actor, "note": body.note, "at": now.isoformat()},
+    ]
+    row.disposition_history = cast(Any, history)
+
+    await db.commit()
+    await db.refresh(row)
+
+    base = _to_drift_history_entry(row)
+    return DriftAlertDetail(
+        **base.model_dump(),
+        column_drifts=cast(dict[str, Any] | None, row.column_drifts),
+        disposition_history=history,
+    )
 
 
 class DriftStatusSummary(BaseModel):
     has_drift: bool
     drifted_jobs: int
     latest_check: str | None = None
+    # Unacknowledged critical alerts — drives the sidebar badge's urgency,
+    # distinct from `has_drift`/`drifted_jobs` which only look at the latest
+    # check per job regardless of whether anyone has triaged it yet.
+    unacknowledged_critical: int = 0
 
 
 @router.get("/drift/status", response_model=DriftStatusSummary)
@@ -442,6 +763,7 @@ async def get_drift_status(
     seen_jobs: set[str] = set()
     drifted_count = 0
     latest_check: str | None = None
+    unacknowledged_critical = 0
     for r in rows:
         job_id = r.job_id
         if job_id in seen_jobs:
@@ -451,11 +773,14 @@ async def get_drift_status(
             latest_check = r.created_at.isoformat()
         if cast(int, r.drifted_columns_count or 0) > 0:
             drifted_count += 1
+        if r.severity == "critical" and r.status in ("new", "reopened"):
+            unacknowledged_critical += 1
 
     return DriftStatusSummary(
         has_drift=drifted_count > 0,
         drifted_jobs=drifted_count,
         latest_check=latest_check,
+        unacknowledged_critical=unacknowledged_critical,
     )
 
 
@@ -474,6 +799,8 @@ class ErrorEventResponse(BaseModel):
     status_code: int
     created_at: str | None = None
     resolved_at: str | None = None
+    # Derived, not stored — see `_classify_error_severity`.
+    severity: str
 
 
 class ErrorCountResponse(BaseModel):
@@ -498,40 +825,135 @@ class ErrorTimelineEntry(BaseModel):
     count: int
 
 
-@router.get("/errors", response_model=list[ErrorEventResponse])
+class ErrorFacets(BaseModel):
+    """Every typed facet value present across the full unfiltered history.
+
+    Computed before any filter is applied so the client's dropdowns list
+    every value available, not only the ones visible on the current page.
+    """
+
+    severities: list[str]
+    error_types: list[str]
+    job_ids: list[str]
+
+
+class ErrorEventFiltersEcho(BaseModel):
+    since: str | None = None
+    show_resolved: bool = False
+    severity: str | None = None
+    error_type: str | None = None
+    job_id: str | None = None
+    q: str | None = None
+
+
+class ErrorEventSearchResponse(BaseModel):
+    total: int
+    total_unfiltered: int
+    facets: ErrorFacets
+    filters: ErrorEventFiltersEcho
+    entries: list[ErrorEventResponse]
+
+
+def _classify_error_severity(status_code: int) -> str:
+    """Map an HTTP status code to one of the typed Error Log severities.
+
+    5xx are the unhandled server failures the tracker exists to surface,
+    4xx are client-caused but still worth triaging, everything else (the
+    background-task sentinel `0`) is informational.
+    """
+    if status_code >= 500:
+        return "critical"
+    if status_code >= 400:
+        return "warning"
+    return "info"
+
+
+@router.get("/errors", response_model=ErrorEventSearchResponse)
 async def list_error_events(
     limit: int = 100,
     since: str | None = None,
     show_resolved: bool = False,
+    severity: str | None = None,
+    error_type: str | None = None,
+    job_id: str | None = None,
+    q: str | None = None,
     db: AsyncSession = Depends(get_db),
-) -> list[ErrorEventResponse]:
-    """Return the most recent error events (newest first, max 500).
+) -> ErrorEventSearchResponse:
+    """Return error events matching the given filters (newest first, max 500).
 
     By default only unresolved events are returned. Pass ``show_resolved=true``
-    to include resolved/dismissed events. Pass ``since`` as an ISO-8601 datetime
-    string to filter to events after that point.
+    to include resolved/dismissed events. ``since`` is an ISO-8601 datetime
+    string. ``severity`` (critical/warning/info), ``error_type``, and
+    ``job_id`` are exact-match typed facets; ``q`` is the generic free-text
+    search, matched case-insensitively against message, route, error type,
+    and job id (so an exact HTTP `job_id` is still found by generic search).
+    All filters are applied server-side across the full stored history, not
+    only the capped page returned in ``entries``.
     """
-    from sqlalchemy import and_
-
     limit = min(max(1, limit), 500)
-    filters = []
-    if not show_resolved:
-        filters.append(ErrorEvent.resolved_at.is_(None))
+
+    since_dt: datetime | None = None
     if since:
         try:
             since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-            filters.append(ErrorEvent.created_at >= since_dt)
         except ValueError:
-            pass  # ignore malformed since param
+            since_dt = None  # ignore malformed since param
 
-    stmt = (
-        select(ErrorEvent)
-        .where(and_(*filters) if filters else True)  # ty: ignore[invalid-argument-type]
-        .order_by(ErrorEvent.created_at.desc())
-        .limit(limit)
-    )
+    stmt = select(ErrorEvent).order_by(ErrorEvent.created_at.desc())
     result = await db.execute(stmt)
-    return [ErrorEventResponse(**e.to_dict()) for e in result.scalars().all()]
+    all_events = list(result.scalars().all())
+
+    total_unfiltered = len(all_events)
+    facet_severities = sorted({_classify_error_severity(e.status_code) for e in all_events})
+    facet_error_types = sorted({e.error_type for e in all_events})
+    facet_job_ids = sorted({e.job_id for e in all_events if e.job_id})
+
+    def _matches(e: ErrorEvent) -> bool:
+        if not show_resolved and e.resolved_at is not None:
+            return False
+        if since_dt is not None:
+            created = e.created_at
+            if created.tzinfo is None and since_dt.tzinfo is not None:
+                created = created.replace(tzinfo=UTC)
+            elif created.tzinfo is not None and since_dt.tzinfo is None:
+                created = created.replace(tzinfo=None)
+            if created < since_dt:
+                return False
+        if severity is not None and _classify_error_severity(e.status_code) != severity:
+            return False
+        if error_type is not None and e.error_type != error_type:
+            return False
+        if job_id is not None and (e.job_id or "") != job_id:
+            return False
+        if q:
+            haystack = f"{e.message} {e.route} {e.error_type} {e.job_id or ''}".lower()
+            if q.lower() not in haystack:
+                return False
+        return True
+
+    filtered = [e for e in all_events if _matches(e)]
+    entries = [
+        ErrorEventResponse(**e.to_dict(), severity=_classify_error_severity(e.status_code))
+        for e in filtered[:limit]
+    ]
+    return ErrorEventSearchResponse(
+        total=len(filtered),
+        total_unfiltered=total_unfiltered,
+        facets=ErrorFacets(
+            severities=facet_severities,
+            error_types=facet_error_types,
+            job_ids=facet_job_ids,
+        ),
+        filters=ErrorEventFiltersEcho(
+            since=since,
+            show_resolved=show_resolved,
+            severity=severity,
+            error_type=error_type,
+            job_id=job_id,
+            q=q,
+        ),
+        entries=entries,
+    )
 
 
 @router.get("/errors/count", response_model=ErrorCountResponse)
@@ -660,7 +1082,9 @@ async def resolve_error_event(
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
     event.resolved_at = datetime.now(UTC)
     await db.commit()
-    return ErrorEventResponse(**event.to_dict())
+    return ErrorEventResponse(
+        **event.to_dict(), severity=_classify_error_severity(event.status_code)
+    )
 
 
 @router.patch("/errors/{error_id}/unresolve", response_model=ErrorEventResponse)
@@ -676,7 +1100,9 @@ async def unresolve_error_event(
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
     event.resolved_at = None
     await db.commit()
-    return ErrorEventResponse(**event.to_dict())
+    return ErrorEventResponse(
+        **event.to_dict(), severity=_classify_error_severity(event.status_code)
+    )
 
 
 @router.get("/errors/{error_id}", response_model=ErrorEventResponse)
@@ -690,7 +1116,9 @@ async def get_error_event(
     event = result.scalar_one_or_none()
     if event is None:
         raise HTTPException(status_code=404, detail=f"ErrorEvent {error_id} not found")
-    return ErrorEventResponse(**event.to_dict())
+    return ErrorEventResponse(
+        **event.to_dict(), severity=_classify_error_severity(event.status_code)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -703,6 +1131,29 @@ async def get_error_event(
 # skipped — the page just shows fewer entries until enough new runs land.
 
 
+class SlowNodeRun(BaseModel):
+    """A single contributing run behind a `SlowNodeAggregate` row.
+
+    Carries enough job/node/dataset identity for a `RecordLink` to open the
+    measured job and Canvas node directly, rather than leaving an operator to
+    guess which run produced the aggregate.
+    """
+
+    job_id: str
+    pipeline_id: str
+    node_id: str
+    dataset_source_id: str
+    execution_seconds: float
+    finished_at: str | None = None
+    is_outlier: bool = False
+
+
+# Cap on how many contributing runs are echoed per aggregate — enough to show
+# the slowest handful (including any outliers) without inflating the payload
+# with every run behind a high-volume step type.
+_CONTRIBUTING_RUNS_LIMIT = 5
+
+
 class SlowNodeAggregate(BaseModel):
     step_type: str
     count: int
@@ -711,10 +1162,18 @@ class SlowNodeAggregate(BaseModel):
     p95_seconds: float
     max_seconds: float
     sample_node_id: str | None = None
+    # True when `count == 1` — the aggregate is one run's measurement, not a
+    # statistical summary, and the UI must say so rather than implying a trend.
+    is_single_run: bool = False
+    # True when the sample node's run is not itself an outlier, so a caller
+    # can trust it as roughly representative of the group.
+    sample_is_representative: bool = True
+    contributing_runs: list[SlowNodeRun] = []
 
 
 class SlowNodesResponse(BaseModel):
     days: int
+    unit: str = "seconds"
     total_jobs_scanned: int
     total_node_runs: int
     aggregates: list[SlowNodeAggregate]
@@ -743,10 +1202,15 @@ def _clamp_slow_nodes_params(days: int, limit: int) -> tuple[int, int]:
 
 def _accumulate_node_timing(
     entry: Any,
-    by_step: dict[str, list[float]],
+    job: Any,
+    by_step: dict[str, list[SlowNodeRun]],
     sample_node: dict[str, str],
 ) -> bool:
     """Fold a single node-timing entry into the running per-step aggregates.
+
+    `job` supplies the run-level context (job/pipeline/dataset identity, and
+    when the run finished) that a `SlowNodeRun` needs to be independently
+    addressable later, rather than only contributing a bare number.
 
     Returns True if the entry contributed a run to the aggregates.
     """
@@ -759,17 +1223,27 @@ def _accumulate_node_timing(
         return False
     if secs <= 0:
         return False
-    by_step.setdefault(step, []).append(secs)
-    sample_node.setdefault(step, str(entry.get("node_id") or ""))
+    node_id = str(entry.get("node_id") or "")
+    by_step.setdefault(step, []).append(
+        SlowNodeRun(
+            job_id=str(job.id),
+            pipeline_id=str(job.pipeline_id),
+            node_id=node_id,
+            dataset_source_id=str(job.dataset_source_id),
+            execution_seconds=round(secs, 4),
+            finished_at=job.finished_at.isoformat() if job.finished_at else None,
+        )
+    )
+    sample_node.setdefault(step, node_id)
     return True
 
 
 async def _scan_slow_node_jobs(
     db: AsyncSession,
     cutoff: datetime,
-) -> tuple[dict[str, list[float]], dict[str, str], int, int]:
+) -> tuple[dict[str, list[SlowNodeRun]], dict[str, str], int, int]:
     """Scan completed jobs since `cutoff` and aggregate per-step node timings."""
-    by_step: dict[str, list[float]] = {}
+    by_step: dict[str, list[SlowNodeRun]] = {}
     sample_node: dict[str, str] = {}
     jobs_scanned = 0
     runs_seen = 0
@@ -788,29 +1262,54 @@ async def _scan_slow_node_jobs(
         if not isinstance(timings, list):
             continue
         for entry in timings:
-            if _accumulate_node_timing(entry, by_step, sample_node):
+            if _accumulate_node_timing(entry, job, by_step, sample_node):
                 runs_seen += 1
 
     return by_step, sample_node, jobs_scanned, runs_seen
 
 
+def _mark_outlier_runs(runs: list[SlowNodeRun], avg_seconds: float) -> None:
+    """Flag runs materially slower than the group's average.
+
+    Uses 1.5x average as a simple, explainable threshold rather than a formal
+    statistical test — good enough to point an operator at the runs worth
+    investigating first without over-claiming precision.
+    """
+    threshold = avg_seconds * 1.5
+    for run in runs:
+        run.is_outlier = run.execution_seconds > threshold
+
+
 def _build_slow_node_aggregates(
-    by_step: dict[str, list[float]],
+    by_step: dict[str, list[SlowNodeRun]],
     sample_node: dict[str, str],
 ) -> list[SlowNodeAggregate]:
-    """Turn per-step timing lists into sorted `SlowNodeAggregate` rows."""
+    """Turn per-step run lists into sorted `SlowNodeAggregate` rows."""
     aggregates: list[SlowNodeAggregate] = []
-    for step, values in by_step.items():
+    for step, runs in by_step.items():
+        values = [run.execution_seconds for run in runs]
         total = sum(values)
+        avg = total / len(values)
+        _mark_outlier_runs(runs, avg)
+
+        sample_id = sample_node.get(step) or None
+        sample_run = next((run for run in runs if run.node_id == sample_id), None)
+        contributing_runs = sorted(runs, key=lambda run: run.execution_seconds, reverse=True)[
+            :_CONTRIBUTING_RUNS_LIMIT
+        ]
+
         aggregates.append(
             SlowNodeAggregate(
                 step_type=step,
                 count=len(values),
                 total_seconds=round(total, 4),
-                avg_seconds=round(total / len(values), 4),
+                avg_seconds=round(avg, 4),
                 p95_seconds=round(_percentile(values, 95), 4),
                 max_seconds=round(max(values), 4),
-                sample_node_id=sample_node.get(step) or None,
+                sample_node_id=sample_id,
+                is_single_run=len(values) == 1,
+                sample_is_representative=sample_run is None or not sample_run.is_outlier,
+                contributing_runs=contributing_runs,
             )
         )
     aggregates.sort(key=lambda a: a.total_seconds, reverse=True)
@@ -871,6 +1370,32 @@ class PipelineRunLogResponse(BaseModel):
     run_at: str | None = None
 
 
+class PipelineLogFacets(BaseModel):
+    """Every typed facet value present across the full unfiltered history."""
+
+    levels: list[str]
+    node_types: list[str]
+    pipeline_ids: list[str]
+    node_ids: list[str]
+
+
+class PipelineLogFiltersEcho(BaseModel):
+    since: str | None = None
+    pipeline_id: str | None = None
+    level: str | None = None
+    node_type: str | None = None
+    node_id: str | None = None
+    q: str | None = None
+
+
+class PipelineLogSearchResponse(BaseModel):
+    total: int
+    total_unfiltered: int
+    facets: PipelineLogFacets
+    filters: PipelineLogFiltersEcho
+    entries: list[PipelineRunLogResponse]
+
+
 @router.post("/pipeline-logs", response_model=list[PipelineRunLogResponse], status_code=201)
 async def create_pipeline_logs(
     batch: PipelineLogBatch,
@@ -897,35 +1422,87 @@ async def create_pipeline_logs(
     return [PipelineRunLogResponse(**r.to_dict()) for r in rows]
 
 
-@router.get("/pipeline-logs", response_model=list[PipelineRunLogResponse])
+@router.get("/pipeline-logs", response_model=PipelineLogSearchResponse)
 async def list_pipeline_logs(
     limit: int = 200,
     since: str | None = None,
     pipeline_id: str | None = None,
+    level: str | None = None,
+    node_type: str | None = None,
+    node_id: str | None = None,
+    q: str | None = None,
     db: AsyncSession = Depends(get_db),
-) -> list[PipelineRunLogResponse]:
-    """Return persisted pipeline run logs (newest first, max 500)."""
-    from sqlalchemy import and_
+) -> PipelineLogSearchResponse:
+    """Return pipeline run logs matching the given filters (newest first, max 500).
 
-    limit = min(max(1, limit), 500)
-    filters = []
+    ``level`` (error/warning/info), ``node_type``, and ``node_id`` are exact-match
+    typed facets; ``q`` is the generic free-text search, matched case-insensitively
+    against message, node type, and node id (so an exact pipeline `node_id` is
+    still found by generic search). All filters are applied server-side across the
+    full stored history, not only the capped page returned in ``entries``.
+    """
+    since_dt: datetime | None = None
     if since:
         try:
             since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
-            filters.append(PipelineRunLog.run_at >= since_dt)
         except ValueError:
-            pass
-    if pipeline_id:
-        filters.append(PipelineRunLog.pipeline_id == pipeline_id)
+            since_dt = None  # ignore malformed since param
 
-    stmt = (
-        select(PipelineRunLog)
-        .where(and_(*filters) if filters else True)  # ty: ignore[invalid-argument-type]
-        .order_by(PipelineRunLog.run_at.desc())
-        .limit(limit)
-    )
+    limit = min(max(1, limit), 500)
+    stmt = select(PipelineRunLog).order_by(PipelineRunLog.run_at.desc())
     result = await db.execute(stmt)
-    return [PipelineRunLogResponse(**r.to_dict()) for r in result.scalars().all()]
+    all_logs = list(result.scalars().all())
+
+    total_unfiltered = len(all_logs)
+    facet_levels = sorted({log.level for log in all_logs if log.level})
+    facet_node_types = sorted({log.node_type for log in all_logs if log.node_type})
+    facet_pipeline_ids = sorted({log.pipeline_id for log in all_logs if log.pipeline_id})
+    facet_node_ids = sorted({log.node_id for log in all_logs if log.node_id})
+
+    def _matches(log: PipelineRunLog) -> bool:
+        if since_dt is not None:
+            run_at = log.run_at
+            if run_at.tzinfo is None and since_dt.tzinfo is not None:
+                run_at = run_at.replace(tzinfo=UTC)
+            elif run_at.tzinfo is not None and since_dt.tzinfo is None:
+                run_at = run_at.replace(tzinfo=None)
+            if run_at < since_dt:
+                return False
+        if pipeline_id is not None and log.pipeline_id != pipeline_id:
+            return False
+        if level is not None and log.level != level:
+            return False
+        if node_type is not None and log.node_type != node_type:
+            return False
+        if node_id is not None and (log.node_id or "") != node_id:
+            return False
+        if q:
+            haystack = f"{log.message} {log.node_type or ''} {log.node_id or ''}".lower()
+            if q.lower() not in haystack:
+                return False
+        return True
+
+    filtered = [log for log in all_logs if _matches(log)]
+    entries = [PipelineRunLogResponse(**log.to_dict()) for log in filtered[:limit]]
+    return PipelineLogSearchResponse(
+        total=len(filtered),
+        total_unfiltered=total_unfiltered,
+        facets=PipelineLogFacets(
+            levels=facet_levels,
+            node_types=facet_node_types,
+            pipeline_ids=facet_pipeline_ids,
+            node_ids=facet_node_ids,
+        ),
+        filters=PipelineLogFiltersEcho(
+            since=since,
+            pipeline_id=pipeline_id,
+            level=level,
+            node_type=node_type,
+            node_id=node_id,
+            q=q,
+        ),
+        entries=entries,
+    )
 
 
 @router.delete("/pipeline-logs", status_code=204)

@@ -118,7 +118,10 @@ class DeploymentService:
                 f"No artifact URI found for job {job_id}, falling back to node_id: {artifact_uri}"
             )
 
-        # 3. Deactivate current active deployment
+        # 3. Record the currently active deployment (if any) as the one this
+        # new deployment replaces, then deactivate it. Capturing the id before
+        # the UPDATE keeps the replacement chain traceable across the deploy.
+        previous_deployment = await DeploymentService.get_active_deployment(session)
         await session.execute(
             update(Deployment).where(Deployment.is_active).values(is_active=False)
         )
@@ -135,6 +138,7 @@ class DeploymentService:
             artifact_uri=final_uri,
             is_active=True,
             deployed_by=user_id,
+            previous_deployment_id=previous_deployment.id if previous_deployment else None,
         )
         session.add(deployment)
         await session.commit()
@@ -690,6 +694,8 @@ class DeploymentService:
         info = deployment.to_dict()
         info["input_schema"] = None
         info["output_schema"] = None
+        info["dataset_id"] = None
+        info["version"] = None
 
         try:
             artifact_uri = str(deployment.artifact_uri)
@@ -702,6 +708,14 @@ class DeploymentService:
             )
             if target_column is not None:
                 info["target_column"] = target_column
+
+            # The backing TrainingJob carries the dataset/version identity so the
+            # frontend can render a `modelVersion`/`dataset` RecordLink back to the
+            # Registry entry this deployment came from, not just a bare job id.
+            source_job = await DeploymentService._get_job_for_deployment(session, deployment.job_id)
+            if source_job is not None:
+                info["dataset_id"] = source_job.dataset_source_id
+                info["version"] = source_job.version
 
         except Exception as e:
             logger.warning(f"Failed to extract schema for deployment {deployment.id}: {e}")

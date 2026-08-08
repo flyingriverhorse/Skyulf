@@ -1,6 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, BarChart2, Loader2, RefreshCw, Settings } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import type { DriftThresholds } from '../core/api/monitoring';
+import { ErrorState } from '../components/shared';
+import { DriftAlertModal } from './drift/DriftAlertModal';
+import { DriftAlertsHistoryTable } from './drift/DriftAlertsHistoryTable';
 import { DriftFiltersBar } from './drift/DriftFiltersBar';
 import { DriftHistoryChart } from './drift/DriftHistoryChart';
 import { DriftTable } from './drift/DriftTable';
@@ -11,6 +15,7 @@ import { SchemaDriftPanel } from './drift/SchemaDriftPanel';
 import { SelectedJobMeta } from './drift/SelectedJobMeta';
 import { SummaryCards } from './drift/SummaryCards';
 import { ThresholdsPanel } from './drift/ThresholdsPanel';
+import { useDriftAlertDetail } from './drift/_hooks/useDriftAlertDetail';
 import { useDriftHistory } from './drift/_hooks/useDriftHistory';
 import { useDriftJobs } from './drift/_hooks/useDriftJobs';
 import { useDriftReport } from './drift/_hooks/useDriftReport';
@@ -26,6 +31,9 @@ const DEFAULT_THRESHOLDS: DriftThresholds = { psi: 0.2, ks: 0.05, wasserstein: 0
  * `pages/drift/`.
  */
 export const DataDriftPage: React.FC = () => {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialInvestigate = Number(searchParams.get('investigate'));
+
     // User selections
     const [selectedJob, setSelectedJob] = useState<string>('');
     const [file, setFile] = useState<File | null>(null);
@@ -36,12 +44,28 @@ export const DataDriftPage: React.FC = () => {
     // fields, so JobSelector/FileUploader can highlight which one(s) are
     // the actual blocker instead of a single generic banner.
     const [submitAttempted, setSubmitAttempted] = useState(false);
+    // The alert whose investigation modal is open, mirrored into the URL
+    // (OPS-005 precedent) so a returning operator — or a followed
+    // RecordLink — lands back on the same alert rather than a reset page.
+    const [investigateAlertId, setInvestigateAlertId] = useState<number | null>(
+        Number.isFinite(initialInvestigate) && initialInvestigate > 0 ? initialInvestigate : null,
+    );
 
     // Data sources
     const { jobs, refreshing, refresh, updateJobDescription } = useDriftJobs();
-    const { evaluatedReport, loading, error, setError, calculate } = useDriftReport(thresholds);
+    const { evaluatedReport, loading, error, errorKind, setError, calculate } =
+        useDriftReport(thresholds);
     const { driftHistory, columnSparklines, refreshHistory } = useDriftHistory(selectedJob);
     const { sortConfig, handleSort, clearSort } = useSortConfig();
+    const alertDetail = useDriftAlertDetail(investigateAlertId);
+
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams);
+        if (investigateAlertId != null) params.set('investigate', String(investigateAlertId));
+        else params.delete('investigate');
+        setSearchParams(params, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [investigateAlertId]);
 
     const selectedJobData = useMemo(
         () => jobs.find(j => j.job_id === selectedJob),
@@ -62,6 +86,11 @@ export const DataDriftPage: React.FC = () => {
     const handleExport = () => {
         if (evaluatedReport) exportDriftReportCSV(evaluatedReport, selectedJobData?.dataset_name);
     };
+
+    const investigateFilters = useMemo<Record<string, string>>(
+        () => (selectedJob ? { job: selectedJob } : {}),
+        [selectedJob],
+    );
 
     return (
         <div className="p-6 w-full text-slate-900 dark:text-slate-100">
@@ -111,7 +140,19 @@ export const DataDriftPage: React.FC = () => {
                     />
                 )}
 
-                {error && (
+                {error && errorKind && (
+                    <div className="mx-4 mb-4">
+                        <ErrorState
+                            error={
+                                errorKind === 'no_baseline'
+                                    ? `No baseline reference is available for this job yet. ${error}`
+                                    : error
+                            }
+                            onRetry={() => void handleCalculate()}
+                        />
+                    </div>
+                )}
+                {error && !errorKind && (
                     <div className="mx-4 mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-200 rounded-md flex items-center gap-2 border border-red-200 dark:border-red-800 text-sm">
                         <AlertTriangle size={16} className="shrink-0" />
                         {error}
@@ -119,7 +160,7 @@ export const DataDriftPage: React.FC = () => {
                 )}
             </div>
 
-            {!evaluatedReport && !loading && <EmptyState />}
+            {!evaluatedReport && !loading && !error && <EmptyState />}
 
             {evaluatedReport && (
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-lg shadow border dark:border-slate-700">
@@ -146,6 +187,19 @@ export const DataDriftPage: React.FC = () => {
             )}
 
             <DriftHistoryChart history={driftHistory} />
+            <DriftAlertsHistoryTable history={driftHistory} onInvestigate={setInvestigateAlertId} />
+
+            <DriftAlertModal
+                alertId={investigateAlertId}
+                detail={alertDetail.detail}
+                loading={alertDetail.loading}
+                error={alertDetail.error}
+                actionPending={alertDetail.actionPending}
+                onApplyDisposition={alertDetail.applyDisposition}
+                onRetry={() => void alertDetail.refresh()}
+                onClose={() => setInvestigateAlertId(null)}
+                filters={investigateFilters}
+            />
         </div>
     );
 };

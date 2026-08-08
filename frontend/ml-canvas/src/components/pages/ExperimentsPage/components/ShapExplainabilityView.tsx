@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { shortRunId } from '../utils/jobMeta';
-import { ShapSummaryView } from './ShapSummaryView';
+import { ShapSummaryView, type ShapSummaryCoverageInput } from './ShapSummaryView';
 import { ShapBeeswarmView } from './ShapBeeswarmView';
 import { ShapDependenceView } from './ShapDependenceView';
 import { ShapWaterfallView } from './ShapWaterfallView';
@@ -18,6 +18,7 @@ export interface ShapExplanationEntry {
 
 interface Props {
   shapExplanationByJob: ShapExplanationEntry[];
+  coverageInputs: ShapSummaryCoverageInput[];
   handleDownload: (elementId: string, fileName: string) => void | Promise<void>;
   downloadingChart: string | null;
   doneChart: string | null;
@@ -47,6 +48,7 @@ const subTabClass = (active: boolean) => `${SUB_TAB_BASE} ${
 // across every selected run, mirroring Feature Importance.
 export const ShapExplainabilityView: React.FC<Props> = ({
   shapExplanationByJob,
+  coverageInputs,
   handleDownload,
   downloadingChart,
   doneChart,
@@ -96,13 +98,14 @@ export const ShapExplainabilityView: React.FC<Props> = ({
 
       {subView === 'summary' && (
         <ShapSummaryView
-          shapSummaryByJob={jobsWithData.map(j => ({
+          shapSummaryByJob={shapExplanationByJob.map(j => ({
             jobId: j.jobId,
             pipeline_id: j.pipeline_id,
             parent_pipeline_id: j.parent_pipeline_id ?? null,
             modelType: j.modelType,
-            shapSummary: j.shapExplanation.mean_abs_importance,
+            shapSummary: j.shapExplanation?.mean_abs_importance ?? null,
           }))}
+          coverageInputs={coverageInputs}
           handleDownload={handleDownload}
           downloadingChart={downloadingChart}
           doneChart={doneChart}

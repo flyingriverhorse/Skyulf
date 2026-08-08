@@ -60,7 +60,9 @@ export const Layout: React.FC = () => {
 
   useEffect(() => {
     monitoringApi.getDriftStatus()
-      .then(s => setDriftAlert(s.has_drift))
+      // OPS-003: the badge reflects alerts still needing triage (new/reopened
+      // criticals), not just "some drift happened somewhere, ever".
+      .then(s => setDriftAlert(s.unacknowledged_critical > 0 || s.has_drift))
       .catch(() => {});
   }, []);
 
