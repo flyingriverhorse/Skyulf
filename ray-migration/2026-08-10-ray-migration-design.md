@@ -1,7 +1,7 @@
 # Celery to Ray Migration Design
 
 **Date:** 2026-08-10  
-**Status:** Approved design, pending written-spec review  
+**Status:** Approved and reviewed
 **Scope:** Replace Celery as Skyulf's background execution backend while
 preserving the existing API, job history, progress reporting, cancellation
 guards, pipeline behavior, and artifact contracts.
@@ -471,7 +471,9 @@ Measure:
 
 ## 16. Acceptance Criteria
 
-1. Existing public API and frontend job behavior remain compatible.
+1. Existing public API paths and response shapes remain compatible. Manual
+   retry intentionally reuses the logical job ID and appends a new physical
+   attempt, so clients must not assume retry always returns a different ID.
 2. A cancelled job cannot later become completed.
 3. Worker or cluster loss cannot leave a job indefinitely running.
 4. Duplicate submissions cannot create duplicate final models or artifacts.
