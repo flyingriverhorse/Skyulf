@@ -50,6 +50,8 @@ usage, API keys) needed once multi-tenancy lands.
 | [2026-08-11-technical-debt-deep-dive.md](2026-08-11-technical-debt-deep-dive.md) | Round 2. Deeper backend/core + frontend audit beyond round 1's scope: error handling/resilience, testing quality, maintainability hotspots, dependency hygiene, concurrency/races, input validation, pipeline schema versioning, performance, plus frontend state management, perf, **accessibility** (most severe finding), error feedback, testing, code duplication, mobile, design-system consistency. Includes a full rubber-duck validation of every claim in the round-1 docs (one factual correction made) plus new independently-confirmed findings. |
 | [2026-08-11-redesign-existing-pages.md](2026-08-11-redesign-existing-pages.md) | Round 2. Enterprise-grade UX redesign brief for the Pipeline Canvas, Experiments, Jobs, Datasets, Drift Monitoring, and Model Registry/Deployments pages, plus cross-page design-system recommendations. |
 | [2026-08-11-new-enterprise-pages.md](2026-08-11-new-enterprise-pages.md) | Round 2. UX design for pages that don't exist yet: Login/SSO, Org & Workspace Settings, RBAC, Audit Log (**correction: this page already exists**, see doc), Usage/Billing/Quota, API Keys — plus a unified app-shell design tying old and new pages together. |
+| [2026-08-11-smooth-experience-fixes.md](2026-08-11-smooth-experience-fixes.md) | Round 3. Concrete, verified first-run-friction and janky-UX findings: no reachable sample dataset, generic error messages, missing trust signals (WS live indicator), inconsistent success toasts, undo-history eviction, unused `Skeleton` component. Top 3 prioritized fixes. |
+| [2026-08-11-differentiation-strategy.md](2026-08-11-differentiation-strategy.md) | Round 3. Evidence-backed competitive positioning: what makes DataRobot/H2O/Databricks/KNIME/RapidMiner/Dataiku/Modal/Baseten win or lose users (cited), 5 ranked differentiation bets for Skyulf, and a concrete list of what's missing specifically in `skyulf-core` today (AutoML layer, enforced leakage guardrails, forecasting models, partitionable calculator contract, artifact versioning). |
 
 ## Investigation rounds
 
@@ -78,22 +80,45 @@ that `AuditLogPage.tsx` already exists — noted as a correction in
 new-enterprise-pages.md rather than silently fixed, so the reasoning is
 visible.
 
+**Round 3** (smooth-experience-fixes.md, differentiation-strategy.md): six
+more subagents — two `general-purpose` agents auditing `skyulf-core`
+itself (feature completeness vs. the ecosystem, and internal architecture
+depth); one agent simulating a brand-new user's first 10 minutes; one
+`rubber-duck` agent hunting specifically for janky/untrustworthy-feeling
+issues not already documented; one `research` agent gathering
+cited, verifiable evidence on what differentiates leading AutoML/no-code
+ML platforms (and what their own users complain about); and one
+`general-purpose` agent auditing post-training MLOps lifecycle gaps
+(monitoring, serving, feature stores, cost visibility, code-export). Two
+independent agents (the first-run-UX one and the smooth-experience
+rubber-duck) converged on the identical root-cause finding from different
+angles — no sample dataset is reachable anywhere in the UI despite example
+data already existing in the repo — which is treated as high-confidence
+and prioritized accordingly.
+
 ## Suggested sequencing
 
 See [2026-08-11-master-fix-list.md](2026-08-11-master-fix-list.md) for the
-full phased plan (Phase 0 through Phase 7). Short version: identity +
+full phased plan (Phase 0 through Phase 9). Short version: identity +
 multi-tenancy + production data/storage plane first (nothing else is safe
 to build on top of it); accessibility fixes as their own priority tier, not
 folded into general polish; shared frontend infrastructure (`DataTable`,
 `StatusBadge`, design tokens) before any individual page redesign, so pages
-aren't redone twice; new enterprise pages can be built as mocked UI in
-parallel with backend work but shouldn't be considered done until wired to
-real endpoints.
+aren't redone twice; a set of unusually cheap, high-leverage quick wins
+(Phase 8 — sample dataset, WS live indicator, missing toasts) that reuse
+existing plumbing and should be done early/in parallel; and the
+competitive-differentiation bets (Phase 9) that make Skyulf different, not
+just at parity, with two `skyulf-core` foundational items (partitionable
+calculator contract, versioned artifacts) that should land before more
+node types (including deep learning) get added.
 
 **Relationship to the deep-learning plan:** [../deep-learning/](../deep-learning/README.md)
-is largely orthogonal but has two real sequencing dependencies surfaced in
-this round: the tuning engine's size/complexity (technical-debt-deep-dive.md
-§A3) and the lack of pipeline schema versioning (§A7) should ideally be
-addressed before or alongside the DL node additions, since DL adds exactly
-the kind of new node types/schema changes that break old saved pipelines
-without a migration path.
+is largely orthogonal but has real sequencing dependencies surfaced across
+rounds 2 and 3: the tuning engine's size/complexity and the lack of
+pipeline schema versioning (round 2), plus the lack of a
+partitionable/stateless calculator contract and versioned artifact schema
+in `skyulf-core` itself (round 3) — should ideally be addressed before or
+alongside the DL node additions, since DL adds exactly the kind of new
+node types/schema changes that make all four gaps more costly to fix
+later, and the round-3 architecture audit found these same gaps directly
+threaten the planned Ray migration working smoothly.

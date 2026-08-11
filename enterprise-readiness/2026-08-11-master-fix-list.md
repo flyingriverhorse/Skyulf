@@ -128,6 +128,41 @@ Already documented in [2026-08-11-node-flexibility.md](2026-08-11-node-flexibili
 6. Plugin system for custom nodes (two-tier: metadata-only vs sandboxed code plugins)
 7. ONNX/MLflow export
 
+## Phase 8 — Quick, High-Leverage Wins (do these early/in-parallel — cheap, evidence-backed, and reused by multiple other phases)
+
+New from Round 3 (differentiation-strategy.md + smooth-experience-fixes.md).
+These are called out separately because they're unusually cheap relative
+to their impact — the underlying data/code/plumbing for each already
+exists, only the missing piece is small.
+
+| Item | Doc | Effort | Why it's high-leverage |
+|---|---|---|---|
+| Surface a "Load sample dataset" option + bind one starter template to it | smooth-experience-fixes.md Top 3 #1 | Small | Example CSVs already ship in the repo (`skyulf-core/examples/data/`) and templates already exist — only the UI entry point and one binding are missing |
+| Show a "Live / Reconnecting" WebSocket indicator | smooth-experience-fixes.md §C | Small | The connection-state plumbing (`jobEventsSocket.onStatus`) already exists and is unused by any UI |
+| Add missing success toasts (delete dataset, create data source) | smooth-experience-fixes.md §G | Small | One-line additions, closes an inconsistency users will notice fast |
+| Debounce the Inference page's 3x-per-keystroke JSON parsing | smooth-experience-fixes.md §B | Small | Isolated, contained fix |
+| Port `BestParamsModal` onto the shared `ModalShell` | smooth-experience-fixes.md §D | Small | Removes a keyboard-nav dead spot |
+| Adopt or delete the unused `Skeleton` component | smooth-experience-fixes.md §H | Small | Overlaps with Phase 4's shared-state-component work — do together |
+| Coalesce per-keystroke node-config undo entries | smooth-experience-fixes.md §E | Small-Medium | Prevents silent eviction of structural undo history |
+
+## Phase 9 — Differentiation & Core Investment (the "why choose us" work)
+
+New from Round 3 (differentiation-strategy.md). These are the bets that
+make Skyulf competitively different, not just "at parity." Ranked by the
+strategy doc; sequencing notes below reflect real dependencies.
+
+| Item | Doc | Effort | Sequencing note |
+|---|---|---|---|
+| **Foundational, do first:** partitionable/stateless calculator contract in `skyulf-core` | differentiation-strategy.md Part 3, technical-debt-deep-dive.md §A3 | XL | Blocks the planned Ray migration from working smoothly; also blocks safe parallel execution generally — do before piling on more node types (including DL) |
+| **Foundational, do first:** versioned artifact schema/migration path in `skyulf-core` | differentiation-strategy.md Part 3 | Large | Every new node type today creates artifacts that can silently break on a future core upgrade — same urgency as pipeline schema versioning (Phase 2) |
+| Post-upload pipeline recommendation ("point at data, get a baseline") | differentiation-strategy.md Bet #2 | Medium | Reuses the existing `EDAAnalyzer`/`profiling/recommendations.py` almost entirely as-is — build alongside Phase 8's sample-dataset work |
+| Enforced (not just heuristic) leakage/data-quality guardrails | differentiation-strategy.md Bet #1 | Large (incremental) | Start by surfacing the *already-computed* server-side leakage/correlation checks as real-time canvas warnings, then add new checks (train/test overlap, temporal leakage) |
+| Two-way notebook export/import loop ("graduate to code, don't leave") | differentiation-strategy.md Bet #3 | Medium-Large | Builds on the already-shipped one-way notebook export |
+| Deployment/serving DX overhaul (telemetry, performance-decay monitoring, canary/champion-challenger) | differentiation-strategy.md Bet #4 | Large | Overlaps with the MLOps-lifecycle gaps found — sequence after Phase 0 (multi-tenancy) since production monitoring needs a real org/workspace model to attach to |
+| Forecasting model family (ARIMA/Prophet-style) | differentiation-strategy.md Bet #5 | Large | Named, verifiable gap vs. a specific competitor capability (Databricks AutoML ships this) |
+| Declarative per-node config validation (replace 246 ad-hoc `config.get` call sites) | differentiation-strategy.md Part 3 | Large | Improves error-message quality across the board — ties to the "generic error messages" finding in smooth-experience-fixes.md |
+| Universal calculator contract tests (every registered node, not a curated subset) | differentiation-strategy.md Part 3 | Medium | Cheap insurance once the artifact-versioning/partitionable-contract work above lands — do together |
+
 ## What NOT to do
 
 - Don't build Phase 5/6 UI against real backend endpoints before Phase 0
@@ -151,4 +186,6 @@ Already documented in [2026-08-11-node-flexibility.md](2026-08-11-node-flexibili
 - [2026-08-11-redesign-existing-pages.md](2026-08-11-redesign-existing-pages.md) — Phase 5 detail
 - [2026-08-11-new-enterprise-pages.md](2026-08-11-new-enterprise-pages.md) — Phase 6 detail
 - [2026-08-11-node-flexibility.md](2026-08-11-node-flexibility.md) — Phase 7 detail
-- [../deep-learning/README.md](../deep-learning/README.md) — orthogonal, in-flight plan; note the sequencing interactions called out in technical-debt-deep-dive.md (tuning-engine size, pipeline schema versioning) before starting DL implementation
+- [2026-08-11-smooth-experience-fixes.md](2026-08-11-smooth-experience-fixes.md) — Phase 8 detail
+- [2026-08-11-differentiation-strategy.md](2026-08-11-differentiation-strategy.md) — Phase 9 detail, plus the competitive-positioning rationale behind it
+- [../deep-learning/README.md](../deep-learning/README.md) — orthogonal, in-flight plan; note the sequencing interactions called out in technical-debt-deep-dive.md (tuning-engine size, pipeline schema versioning) AND Phase 9's `skyulf-core` foundational items (partitionable calculators, artifact versioning) before starting DL implementation — DL adds exactly the kind of new node types that make both gaps more costly to fix later
