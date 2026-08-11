@@ -127,7 +127,21 @@ class LabelEncoderApplier(BaseApplier):
 
 
 def _y_to_str_array(y: Any) -> Any:
-    """Best-effort conversion of ``y`` to a 1-D string numpy array."""
+    """Best-effort conversion of ``y`` to a 1-D string numpy array.
+
+    For Polars Series, casts to Utf8 and fills nulls with the literal "nan"
+    string *before* calling ``.to_numpy()``, mirroring the apply path
+    (``_label_apply_polars``). Polars' native ``.to_numpy()`` casts integer
+    columns containing nulls to float (NaN), which flips the string
+    representation of every value (e.g. "1" -> "1.0") depending on whether
+    nulls happen to be present in a given batch. Doing the string cast in
+    Polars first keeps fit and apply representations identical regardless of
+    null presence.
+    """
+    if hasattr(y, "fill_null"):  # polars Series
+        import polars as pl
+
+        return y.cast(pl.Utf8).fill_null("nan").to_numpy()
     if hasattr(y, "to_numpy"):
         return y.to_numpy().astype(str)
     return np.array(y).astype(str)
@@ -142,7 +156,10 @@ def _fit_le_on_array(arr: Any) -> LabelEncoder:
 def _polars_col_to_str_array(X: Any, col: str) -> Any:
     import polars as pl
 
-    return X.select(pl.col(col).cast(pl.Utf8)).to_series().to_numpy()
+    # `fill_null("nan")` before `.to_numpy()` matches `_build_polars_feature_exprs`'s
+    # apply-time representation exactly, so fit and apply agree regardless of
+    # whether nulls are present in a given batch.
+    return X.select(pl.col(col).cast(pl.Utf8).fill_null("nan")).to_series().to_numpy()
 
 
 def _maybe_pull_y_polars(X: Any, y: Any, target_col: str | None) -> Any:
