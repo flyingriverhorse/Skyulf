@@ -238,6 +238,23 @@ directly to the branch, so every promotion is a manual rebuild-and-commit.
 - **Install the backend package in the deployed image** so `/health` reports
   a real version instead of the `0.0.0-dev` fallback (Stage 0 item T4).
 
+**Two live-demo issues found during the audit that belong here:**
+
+- **Every visitor's uploads are visible to every other visitor.**
+  `data_ingestion/router.py:41-42` — `list_sources(user_id=None)` with
+  `# KNOWN-GAP: Auth not implemented yet — all sources are visible`. On a
+  public, no-signup demo this directly contradicts the "privacy-first"
+  claim in `README.md:35`. Demo mode disables *upload*, which mitigates it
+  today — but that mitigation lives only on the unversioned demo branch,
+  which is precisely the fragility this stage exists to remove.
+- **The first request to a cold instance hangs over 60 seconds.** Measured:
+  `GET /` returned nothing after ~90s, and `/health` immediately afterwards
+  reported `uptime_seconds: 138` — a just-booted instance. Warm, it serves
+  in 0.21s. A "no signup required" badge that leads to a minute of white
+  screen loses the visitor before anything else in this plan can matter.
+  *(Cold start is the likely cause; the hang and the uptime are measured,
+  the causal link is inferred.)*
+
 **Why this is Stage 1 and not later:** every subsequent item — the trust
 fixes, the analytics, the sample datasets — is worthless while it cannot
 reach a visitor. This is the release pipeline, and it is currently the
@@ -305,29 +322,106 @@ Prior research reached a compatible conclusion independently
 to `AddSourceModal`. The data exists; only the entry point is missing.
 
 Since demo uploads are disabled, this sample library *is* the demo's entire
-data story — which makes it the highest-leverage item in the plan after the
-trust floor.
+data story. It pairs directly with A2.2: sample data with no working
+template is a dead end, and a working template with only Iris demonstrates
+nothing. Ship the two together as one path.
 
 *Audiences: analysts, students, ML engineers evaluating.*
 
-### A2.2 — Bind one starter template to one sample dataset
+### A2.2 — Fix the shipped templates (they are currently blocked)
 
-Templates exist but "require manual dataset binding + target setup even
-after selection" (`TemplatesGalleryModal.tsx:14-18`,
-`pipelineTemplates.ts:104-127`). One template, pre-bound, so the path is
-*load → run → trained model* with no configuration.
+**This item changed completely after audit.** It was "bind one template to a
+dataset." The truth is that **4 of the 5 shipped templates cannot run at
+all** — they are blocked by Skyulf's own leakage guard.
 
-*Audiences: all four.*
+Verified by executing the product's own converter and validator against its
+own templates:
 
-### A2.3 — `skyulf-core` README leads with a runnable snippet
+```
+tabular_classification    ds → DropMissingColumns → SimpleImputer → OneHotEncoder → StandardScaler → TrainTestSplitter → training   LEAKAGE_ISSUES=3
+tabular_regression        ds → SimpleImputer → IQR → StandardScaler → TrainTestSplitter → training                                  LEAKAGE_ISSUES=3
+text_classification       ds → TextCleaning → tfidf_vectorizer → TrainTestSplitter → training                                       LEAKAGE_ISSUES=1
+customer_segmentation     ds → SimpleImputer → StandardScaler → training                                                            LEAKAGE_ISSUES=0
+ensemble_classification   ds → DropMissingColumns → SimpleImputer → OneHotEncoder → StandardScaler → TrainTestSplitter → training   LEAKAGE_ISSUES=3
+```
 
-The README opens with ~13 lines of prose and 12 badges; installation is at
-line 26. PyPI is the highest-volume channel there is (1,222/month). The
-first screen should be code that runs.
+Confirmed independently: `pipelineTemplates.ts:112-127` places
+`imputation_node`, `encoding` and `scale_numeric_features` upstream of
+`TrainTestSplitter`, and `pipelineLeakageValidation.ts:23-27` blocks exactly
+those. It **blocks**, it does not warn — `useRunControls.ts:65-72`:
+`toast.error('Fix validation issues before running experiments')`. The
+backend hard-blocks too (`_leakage_validation.py:212`).
+
+`customer_segmentation` passes only because it has no splitter at all
+(`pipelineLeakageValidation.ts:128`: `if (splitterIds.size === 0) return []`).
+
+**So the guided happy path is:** empty canvas tells the user to start from a
+template (`FlowCanvas.tsx:371-384`) → they pick "Tabular Classification" →
+bind data → Run All → **blocked by an error they did not cause and cannot
+interpret.**
+
+**The guard is right; the templates are wrong.** They also contradict
+`skyulf-core/README.md:192-196` ("Put `TrainTestSplitter` first"). Fix the
+templates by moving the splitter upstream — do not weaken the guard.
+
+There is a real lesson here worth stating plainly: leakage-safety is the
+positioning asset this project has chosen, and it is genuinely working — it
+caught its own authors. That is evidence the feature is valuable, not
+evidence it is too strict.
+
+*Audiences: all four. Catastrophic for analysts and students, who cannot
+diagnose it.*
+
+### A2.3 — Fix the first-run entry points
+
+Three separate confirmed blockers, all cheap:
+
+- **`start.sh` is not executable.** `git ls-files -s start.sh` → `100644` on
+  both `078` and `080`. `README.md:59` tells macOS/Linux users to run
+  `./start.sh`; it fails **100% of the time** with `Permission denied`
+  (exit 126). The literal first command in the README. Fix with
+  `git update-index --chmod=+x start.sh`.
+- **`/` is a dashboard of zeros.** `App.tsx:37-38` routes `/` to
+  `<Dashboard />`; the canvas is at `/canvas`. Live: `/api/pipeline/stats` →
+  `{"total_jobs":0,...}` plus "No recent jobs found." A "Visual MLOps
+  Builder" whose front page is four zeros and an empty table.
+- **The install is not "3-5 minutes."** `start.sh:295` claims 3-5 min;
+  `requirements-fastapi.txt:67` pulls `sentence-transformers`, which drags
+  in torch — measured **2.2 GB venv, 529 MB torch alone**. Realistically
+  15-40 minutes. Users will assume it hung. Either make the heavy extras
+  optional or state the real number.
+
+*Audiences: ML engineers evaluating, students.*
+
+### A2.4 — `skyulf-core` distribution polish
+
+**Corrected premise, and it is good news.** I assumed the README examples
+might be broken. They are not: on a clean venv with `skyulf-core==0.5.7`
+from PyPI, **every documented example ran verbatim** — quickstart,
+`get_fitted_split`, `validate_leakage_safety`, the full EDA attribute set,
+and both docs walkthroughs. The missing-extra errors are exemplary
+(`Please install 'rich' ... pip install skyulf-core[viz]`).
+
+This is the strongest part of the entire product's first-run story, and
+nothing in this plan should disturb it. The remaining issues are narrow:
+
+- **The very first copy-paste fails.** `skyulf-core/README.md:77` opens with
+  `pl.read_csv("customers.csv")` — a file the reader does not have →
+  `FileNotFoundError`. The `docs/` examples build a DataFrame inline and are
+  strictly better. Use that pattern in the README.
+- **17 relative links are dead on PyPI**, including the entire Examples
+  table (`README.md:254-264`), which is the reader's intended next step.
+  `MANIFEST.in` ships no examples either, so `pip install` provides nothing
+  to click. 3 mermaid diagrams render as raw code.
+- **The docs site is effectively undiscoverable.** `docs.yml:69` deploys
+  mkdocs to `deploy/manual`, but links were written for the root:
+  `.../Skyulf/user_guide/threshold_tuning.html` → **404**, while
+  `www.skyulf.com/manual/user_guide/threshold_tuning.html` → 200. The Docs
+  badge lands on the marketing page with no visible path to `/manual/`.
 
 *Audiences: data scientists, students.*
 
-### A2.4 — Say that pipelines export to Python
+### A2.5 — Say that pipelines export to Python
 
 Complaint rank #1 across the external research — with a detailed founder
 testimonial behind it — is **vendor lock-in / no usable code export**.
@@ -339,12 +433,15 @@ The cheapest item in this plan and the best-evidenced.
 
 *Audiences: data scientists, ML engineers.*
 
-### A2.5 — Fix the upload size message
+### A2.6 — Fix the upload size message
 
 `FileUpload.tsx:52-54` hardcodes a 500MB limit *and* the "500MB" text, while
-the server accepts 10GB (`config/mixins/files.py:18`) and `MAX_UPLOAD_SIZE`
-has zero `.ts`/`.tsx` hits. Wrong for every non-demo deployment, and it
-rejects a first upload that would have succeeded.
+the server accepts 10GB (`config/mixins/files.py:18`) — a 20× discrepancy —
+and `MAX_UPLOAD_SIZE` has zero `.ts`/`.tsx` hits. The limit is never stated
+up front; it surfaces only as a failure. The file picker also hides three
+formats the backend accepts: `accept=".csv,.xlsx,.parquet,.json"`
+(`FileUpload.tsx:113`) vs `.xls`/`.txt`/`.feather` also allowed
+(`files.py:27-34`).
 
 *Audiences: analysts, ML engineers (self-hosted paths).*
 
@@ -374,6 +471,32 @@ organisation adopts a tool its people already use. The auth/tenancy work in
 before there are users to belong to an organisation is inventory, not
 progress.
 
+## What is already good (do not break these)
+
+An audit that only lists faults produces a distorted plan. These were
+verified working and are load-bearing:
+
+- **Every documented `skyulf-core` example runs verbatim** on a clean PyPI
+  install — quickstart, `get_fitted_split`, `validate_leakage_safety`, the
+  EDA attributes, and both docs walkthroughs. Missing-extra errors name the
+  exact fix.
+- **The leakage guard works.** It caught the project's own templates. That
+  is the differentiator functioning correctly.
+- **Zero-dependency local boot.** A clean clone runs with no `.env`, no
+  Postgres/Redis/MinIO, no Node — SQLite default, frontend prebuilt and
+  committed, DB auto-created. Verified: `HEALTH 200`, `ROOT 200`.
+- **The empty canvas is not a void.** It offers "Browse templates" and
+  "Drag a node from the sidebar" (`FlowCanvas.tsx:363-386`), and it *is*
+  deployed. 35 node types in 5 searchable groups. Undo/redo, auto-layout,
+  autosave with a restore banner.
+- **Validation messages are written for humans:** `Move ${node} after
+  ${splitter} so it only fits on training data.` (`useGraphStore.ts:235`).
+- **No signup, exactly as advertised.**
+
+The implication for sequencing: the product's *substance* is in better
+shape than its *entry points*. That is a much cheaper problem to have, and
+it is why this plan concentrates on first-run rather than features.
+
 ## Explicitly not doing now
 
 Ray migration, deep learning, i18n/RTL, the six page redesigns, and the
@@ -395,6 +518,16 @@ Honest limits, stated so they are not mistaken for coverage:
   activation — is the real constraint and this plan changes.
 - Bug #1 (duplicate job creation) was verified by static analysis only; it
   needs Postgres and two API processes to reproduce properly.
+- The demo cold-start cause (A3) is inferred, not proven — the >60s hang
+  and the 138s uptime are measured; "Render cold start" is the hypothesis.
+- `QUICKSTART.md` is substantially stale (references a non-existent
+  `backend/config.py`, `admin`/`admin123` credentials that exist nowhere,
+  and a `data/` directory that does not exist) and is orphaned — linked
+  from neither `README.md`, `docs/index.md`, nor `mkdocs.yml`. Not
+  scheduled: decide whether to fix or delete it during Stage 2.
+- `docs/index.md:33-38` tells users to `pip install` into system Python
+  with no venv, which fails with PEP 668 on Homebrew Python. Fold into
+  A2.3 if cheap.
 - This plan lives on `080` while the code lives on `078`. That is the same
   drift it warns about, and it is resolved by the decision recorded below
   rather than by ignoring it.
@@ -405,3 +538,23 @@ Honest limits, stated so they are not mistaken for coverage:
 on `078`, this folder should be merged there — or `080` merged into `078` —
 before Stage 0 begins. A plan on a branch nobody builds from is exactly the
 failure this folder was created to stop.
+
+Verified safe: `git diff --name-only 078...080` returns **50 files, all
+under `initiatives/`, zero code**. The merge cannot conflict with code.
+
+## Execution order (decided)
+
+Derived from the dependency graph, not from preference:
+
+1. **Stage 0 `skyulf-core` fixes → ship to PyPI.** T1, T2, T3, T6 and the
+   T5 contract test are all `skyulf-core`, which releases on its own
+   `core-v*` tag and **never touches the demo branch**. This path is
+   unblocked today, and it is the one actively corrupting results for 1,222
+   downloads/month.
+2. **Stage 1a — reconcile the demo branch.** Everything user-facing is
+   stuck behind it.
+3. **Stage 1b + Stage 2 — measurement and first-run**, which now have a
+   working delivery path.
+
+The cheap, isolated items (`start.sh` chmod, upload-size text) can ride
+along with any of the above; they depend on nothing.
