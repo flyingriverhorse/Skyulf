@@ -1,0 +1,551 @@
+# Enterprise Readiness — Master Fix List
+
+**Date:** 2026-08-11
+**Status:** Consolidated, prioritized action list synthesized from 5
+investigation docs in this folder, cross-validated by an independent
+rubber-duck review. This is the single document to work from when planning
+implementation; the other docs are the detailed evidence/design behind
+each item.
+
+## How to read this list
+
+Each item has: **Doc** (source), **Severity**, **Effort**, and whether it's
+a **hard blocker** (must fix before any multi-customer/enterprise
+deployment), a **quality/resilience** issue (should fix, real risk today),
+or a **flexibility/UX** improvement (makes the product better, not a
+safety issue). Items are grouped into phases reflecting real dependencies
+between them — not arbitrary priority buckets.
+
+---
+
+## Phase 0 — Foundation (nothing else is safe to build on top of this)
+
+These three must land together; auth without tenancy just adds a login
+screen in front of one shared workspace, and neither is safe on today's
+DB/storage defaults.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Real authentication (JWT/OIDC, replace hardcoded `user_id=1`, wire up the already-declared but uninstalled `passlib`/`bcrypt`/`python-jose` deps) | backend-blockers §1 | Blocker | Large |
+| Multi-tenant/organization data model (`Organization`/`Membership`/`Workspace`, `workspace_id` on every table) | backend-blockers §2 | Blocker | Large |
+| PostgreSQL mandatory + Alembic migrations (replace SQLite default + exception-swallowing `ALTER` statements) | backend-blockers §3 | Blocker | Large |
+| Encrypted, managed object storage (SSE-KMS, per-tenant prefixes) | backend-blockers §9 | Blocker | Medium |
+| Fix `DataSource.has_permission()` placeholder as part of the real auth work (corrected attribution — not `User`, see technical-debt-deep-dive.md intro) | backend-blockers §1 | Blocker | (included above) |
+| **New:** pair per-tenant artifact storage with signed/verified artifacts or non-pickle serialization for cross-trust-boundary loads — `joblib`/`pickle.load` becomes a real cross-tenant RCE vector the moment artifact storage is tenant-scoped | technical-debt-deep-dive.md, rubber-duck finding N3 | Blocker (for Phase 0 work specifically) | Medium |
+
+## Phase 1 — Production Operating Model (parallel with Phase 0)
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Secrets-manager integration (Vault/AWS Secrets Manager), IAM-role S3 access instead of static keys | backend-blockers §4 | High | Medium |
+| Remove `--reload` from production Dockerfile; ship real Compose/Helm reference deployment with health probes, HPA | backend-blockers §8 | High | Large |
+| Structured JSON logging, Prometheus metrics, OpenTelemetry tracing; fix readiness probe to actually check DB/Redis | backend-blockers §6 | Medium | Medium |
+| API versioning (`/v1`), Redis-backed rate limiting keyed on principal/org not just IP, actually mount security-headers middleware | backend-blockers §7 | Medium | Medium |
+| Append-only audit-event table + data-retention/deletion workflows with DSAR support | backend-blockers §5 | High | Large |
+| Usage-metering/entitlement service tied to the commercial license tier | backend-blockers §10 | Medium | Medium |
+
+## Phase 2 — Resilience & Correctness Fixes (independent of Phase 0/1, fix any time)
+
+These are real bugs/gaps found in the deeper technical audit — not
+enterprise-specific, but they affect every deployment today.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Fix job-cancellation race (queued job can be resurrected and trained anyway by the worker) | technical-debt-deep-dive.md §A1 | High | Medium |
+| Fix pipeline-version-number collision race (no uniqueness constraint on `version_int`) | technical-debt-deep-dive.md §A5 | High | Medium |
+| Add decompression-bomb/resource-limit protection to XLSX/JSON upload parsing | technical-debt-deep-dive.md §A6 | High | Medium |
+| Add `pipeline_schema_version` + migration registry for saved pipeline graphs — **do this before or alongside the deep-learning node additions**, since new node types are exactly the kind of change that breaks old saved pipelines without it | technical-debt-deep-dive.md §A7 | High | Large |
+| Add heartbeat/lease-based job reaper independent of API restarts; Celery time limits; S3/Redis retry with backoff (never silently coerce a storage failure into "no artifacts") | technical-debt-deep-dive.md §A1 | Medium | Medium |
+| Add optimistic locking/row revision to `TrainingJob` | technical-debt-deep-dive.md §A5 | Medium | Medium |
+| Add composite DB indexes for job/log query patterns actually used | technical-debt-deep-dive.md §A8 | Medium | Small |
+| Move blocking dataframe I/O (Polars/Pandas reads) out of async request handlers | technical-debt-deep-dive.md §A8 | Medium | Medium |
+| Split `monitoring/router.py` (1,970 lines/21 endpoints) into focused routers | technical-debt-deep-dive.md §A3 | Medium | Large |
+| Add Docker-Compose-backed integration tests (real Postgres/Redis/worker/MinIO) covering worker-death, duplicate-delivery, cancellation races | technical-debt-deep-dive.md §A2 | Medium | Large |
+
+## Phase 3 — Accessibility (treat as its own priority tier, not folded into general polish)
+
+Called out separately because it's the most consistently severe, concrete,
+and license-blocking category found (many enterprise procurement processes
+require WCAG 2.1 AA/VPAT compliance) — and today the core "build a
+pipeline" flow is **provably impossible via keyboard alone**.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Convert node-palette entries from inert `<div>`s to real focusable/keyboard-activatable buttons (drag becomes an enhancement, not the only path) | technical-debt-deep-dive.md §B3 | High | Medium |
+| Add keyboard-driven node-connection flow (select source port → select target port) with labelled ports | technical-debt-deep-dive.md §B3 | High | Medium |
+| Add `aria-label`s to icon-only controls; proper `role="progressbar"` semantics on upload progress | technical-debt-deep-dive.md §B3 | Medium | Small |
+| Promote axe `serious` violations to blocking in CI (currently only `critical` fails the build) | technical-debt-deep-dive.md §B3 | Medium | Small |
+
+## Phase 4 — Shared Frontend Infrastructure (build once, unblocks every page redesign)
+
+Every page redesign in Phase 5 depends on these; build them first so pages
+aren't redone twice.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| One shared `DataTable` (sticky header, sort, density, skeleton rows, empty/filter state, row-action overflow, detail drawer) replacing divergent table implementations | redesign-existing-pages.md, new-enterprise-pages.md | Medium | Medium |
+| Consolidate on the *existing* shared `StatusBadge`; delete page-local reimplementations (confirmed duplicate in `pages/Jobs.tsx`) | redesign-existing-pages.md, technical-debt-deep-dive.md §B8 | Medium | Small |
+| One semantic design-token source (currently two parallel token systems: `index.css` semantic vars + legacy `styles/variables.css`, with pages also bypassing both via raw Tailwind colors) | technical-debt-deep-dive.md §B8, redesign-existing-pages.md | Medium | Medium |
+| Standardize `EmptyState`/`LoadingState`/`ErrorState` variants (first-use, filtered-empty, permission-error, recoverable-failure) | redesign-existing-pages.md | Medium | Small |
+| Split the "god" `useGraphStore` into execution/schema/derived-canvas slices; add explicit dirty/synced/conflict indicator for autosave-vs-server-save divergence | technical-debt-deep-dive.md §B1 | Medium | Medium |
+| Reuse existing `VirtualList` for the Dataset table (currently renders every row unvirtualized) | technical-debt-deep-dive.md §B2, redesign-existing-pages.md §4 | Medium | Small |
+| Build a schema-driven node settings-form renderer (currently 135–1,171 LOC per node, repeated boilerplate) — this also directly de-risks the plugin-system idea in node-flexibility.md §1 and the upcoming DL settings panel | technical-debt-deep-dive.md §B6, node-flexibility.md §1 | Medium | Large |
+
+## Phase 5 — Page Redesigns (existing pages)
+
+| Page | Doc | Effort |
+|---|---|---|
+| Pipeline Canvas (health strip, command bar, inspector tabs) | redesign-existing-pages.md §1 | Large |
+| Experiments/Run Comparison (ranked table, decision rail) | redesign-existing-pages.md §2 | Large |
+| Jobs Monitoring (unify drawer + routed page, one source of truth) | redesign-existing-pages.md §3 | Medium |
+| Dataset/Data Management (catalog + asset detail view) | redesign-existing-pages.md §4 | Large |
+| Drift Monitoring (Overview + Analysis split, triage table) | redesign-existing-pages.md §5 | Large |
+| Model Registry & Deployments (unified lifecycle shell, preflight checks) | redesign-existing-pages.md §6 | Large |
+| **Follow-up, not yet designed:** Dashboard, routed Jobs page, EDA, Error Log, Slow Nodes pages — enumerated but not covered by the redesign doc; do this as a fast follow-up using the same method | redesign-existing-pages.md (correction note) | TBD |
+
+## Phase 6 — New Enterprise Pages (build in parallel as mocked UI, wire up once Phase 0 lands)
+
+| Page | Doc | Effort | Note |
+|---|---|---|---|
+| Login/SSO | new-enterprise-pages.md §1 | Medium | Genuinely new |
+| Organization & Workspace Settings | new-enterprise-pages.md §2 | Medium | Genuinely new |
+| Member/Role Management (RBAC) | new-enterprise-pages.md §3 | Medium | Genuinely new |
+| Audit Log Viewer — **redesign/extend, not build from scratch** | new-enterprise-pages.md §4 | Small (audit current page first) | `pages/AuditLogPage.tsx` already exists — confirmed via frontend audit |
+| Usage/Billing/Quota Dashboard | new-enterprise-pages.md §5 | Medium | Genuinely new |
+| API Keys/Service Accounts | new-enterprise-pages.md §6 | Medium | Genuinely new |
+| Unified app shell (org switcher, settings nav, Build/Operate/Observe/Settings grouping) | new-enterprise-pages.md, redesign-existing-pages.md | Medium | Ties everything together |
+
+## Phase 7 — Flexibility & Extensibility (from the earlier node-flexibility audit, unaffected by anything new found this round)
+
+Already documented in [2026-08-11-node-flexibility.md](2026-08-11-node-flexibility.md)
+— restated here only for completeness of the master list, not re-audited:
+
+1. Fix `ManualBounds` outlier node missing from frontend UI (fast, isolated win)
+2. Fix `one_hot.py`'s `prefix_separator`/`drop_original` allow-list gap (new, smaller instance of the same pattern — technical-debt-deep-dive.md rubber-duck finding N2)
+3. Enterprise SQL data connectors (medium effort given existing `BaseConnector` abstraction)
+4. Reusable parameterized templates/subflows with versioning
+5. Persistent node-level result caching (highest day-to-day usability lever, not enterprise-specific)
+6. Plugin system for custom nodes (two-tier: metadata-only vs sandboxed code plugins)
+7. ONNX/MLflow export
+
+## Phase 8 — Quick, High-Leverage Wins (do these early/in-parallel — cheap, evidence-backed, and reused by multiple other phases)
+
+New from Round 3 (differentiation-strategy.md + smooth-experience-fixes.md).
+These are called out separately because they're unusually cheap relative
+to their impact — the underlying data/code/plumbing for each already
+exists, only the missing piece is small.
+
+| Item | Doc | Effort | Why it's high-leverage |
+|---|---|---|---|
+| Surface a "Load sample dataset" option + bind one starter template to it | smooth-experience-fixes.md Top 3 #1 | Small | Example CSVs already ship in the repo (`skyulf-core/examples/data/`) and templates already exist — only the UI entry point and one binding are missing |
+| Show a "Live / Reconnecting" WebSocket indicator | smooth-experience-fixes.md §C | Small | The connection-state plumbing (`jobEventsSocket.onStatus`) already exists and is unused by any UI |
+| Add missing success toasts (delete dataset, create data source) | smooth-experience-fixes.md §G | Small | One-line additions, closes an inconsistency users will notice fast |
+| Debounce the Inference page's 3x-per-keystroke JSON parsing | smooth-experience-fixes.md §B | Small | Isolated, contained fix |
+| Port `BestParamsModal` onto the shared `ModalShell` | smooth-experience-fixes.md §D | Small | Removes a keyboard-nav dead spot |
+| Adopt or delete the unused `Skeleton` component | smooth-experience-fixes.md §H | Small | Overlaps with Phase 4's shared-state-component work — do together |
+| Coalesce per-keystroke node-config undo entries | smooth-experience-fixes.md §E | Small-Medium | Prevents silent eviction of structural undo history |
+
+## Phase 9 — Differentiation & Core Investment (the "why choose us" work)
+
+New from Round 3 (differentiation-strategy.md). These are the bets that
+make Skyulf competitively different, not just "at parity." Ranked by the
+strategy doc; sequencing notes below reflect real dependencies.
+
+| Item | Doc | Effort | Sequencing note |
+|---|---|---|---|
+| **Foundational, do first:** partitionable/stateless calculator contract in `skyulf-core` | differentiation-strategy.md Part 3, technical-debt-deep-dive.md §A3 | XL | Blocks the planned Ray migration from working smoothly; also blocks safe parallel execution generally — do before piling on more node types (including DL) |
+| **Foundational, do first:** versioned artifact schema/migration path in `skyulf-core` | differentiation-strategy.md Part 3 | Large | Every new node type today creates artifacts that can silently break on a future core upgrade — same urgency as pipeline schema versioning (Phase 2) |
+| Post-upload pipeline recommendation ("point at data, get a baseline") | differentiation-strategy.md Bet #2 | Medium | Reuses the existing `EDAAnalyzer`/`profiling/recommendations.py` almost entirely as-is — build alongside Phase 8's sample-dataset work |
+| Enforced (not just heuristic) leakage/data-quality guardrails | differentiation-strategy.md Bet #1 | Large (incremental) | Start by surfacing the *already-computed* server-side leakage/correlation checks as real-time canvas warnings, then add new checks (train/test overlap, temporal leakage) |
+| Two-way notebook export/import loop ("graduate to code, don't leave") | differentiation-strategy.md Bet #3 | Medium-Large | Builds on the already-shipped one-way notebook export |
+| Deployment/serving DX overhaul (telemetry, performance-decay monitoring, canary/champion-challenger) | differentiation-strategy.md Bet #4 | Large | Overlaps with the MLOps-lifecycle gaps found — sequence after Phase 0 (multi-tenancy) since production monitoring needs a real org/workspace model to attach to |
+| Forecasting model family (ARIMA/Prophet-style) | differentiation-strategy.md Bet #5 | Large | Named, verifiable gap vs. a specific competitor capability (Databricks AutoML ships this) |
+| Declarative per-node config validation (replace 246 ad-hoc `config.get` call sites) | differentiation-strategy.md Part 3 | Large | Improves error-message quality across the board — ties to the "generic error messages" finding in smooth-experience-fixes.md |
+| Universal calculator contract tests (every registered node, not a curated subset) | differentiation-strategy.md Part 3 | Medium | Cheap insurance once the artifact-versioning/partitionable-contract work above lands — do together |
+| **New from Round 4:** per-node/per-step data preview ("click any node, see the data there, no full run required") | round4-synthesis.md, user-complaints-research.md #4 | Medium-Large | The single most externally-validated UX gap found this session — a real competitor tool was built by an ex-user of an incumbent specifically to solve this exact problem. Directly reinforces Bets #1 and #3 above; pairs naturally with the existing canvas node-config UI |
+| **New from Round 5:** unify job logs, per-node execution ledger, and data-quality warnings into one canonical per-run diagnostic timeline (the pieces already exist — job logs, preview-node failure cards, notification history — they're just fragmented across disconnected UI surfaces) | round5-synthesis.md, user-observability-audit.md | Medium-Large | Reinforces Bet #1 (transparency/anti-black-box) directly; unlike most Phase 9 items this is largely UI/wiring work reusing existing backend data, not new capability |
+
+## Phase 10 — Security & Scale Hardening (Round 4)
+
+New from Round 4 (security-review.md, scale-load-audit.md). Unlike Phases
+0/1 (foundational identity/tenancy work), these are scoped, mostly cheap
+fixes that should not wait for the bigger foundational phases.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Fix SSRF via EDA's unsanitized S3 `endpoint_url` (SEC-01) | security-review.md | Medium, high confidence | Small |
+| Fix SSRF via pipeline resolution's nested `client_kwargs.endpoint_url` (SEC-02) | security-review.md | Medium, high confidence | Small — same shared fix as SEC-01 |
+| Add per-user/per-org resource quotas (queued/running jobs, stored bytes, CPU/GPU time) — the IP-only rate limiter is not a substitute | scale-load-audit.md, backend-blockers.md (rate-limiter finding) | Critical | Medium |
+| Require explicit, documented concurrent Celery worker deployment (not default `solo`) with separate queues | scale-load-audit.md | Critical | Medium |
+| Enforce input/RSS memory budgets or move to streaming/chunked processing for large datasets | scale-load-audit.md | Critical | Large |
+| Migrate production deployments off SQLite + local disk to PostgreSQL + object storage (ties to Phase 0) | scale-load-audit.md, backend-blockers.md | High | Medium |
+| Virtualize/paginate large result tables and dataset previews (10,000+ rows currently render every `<tr>`) | scale-load-audit.md | High | Small-Medium |
+| Address the two data-governance Critical items: retention/DSAR workflow and encryption at rest | data-governance-audit.md | Critical (procurement blocker) | Large |
+| Broaden PII detection beyond email/phone and add a masking/tokenization workflow, not just an advisory alert | data-governance-audit.md DG-01 | High | Medium |
+
+## Phase 11 — Testing/CI Foundations (Round 4)
+
+New from Round 4 (testing-ci-audit.md). These should land before or
+alongside the DL/Ray work specifically, since that work will plug into
+exactly the areas found weakest here.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Replace the skipped, machine-specific full-inference test with a required API → DB → broker/worker → artifact → inference integration test | testing-ci-audit.md | High | High |
+| Add real canvas drag/connect Playwright E2E (current spec seeds graph state via a dev hook, bypassing the actual drag-and-drop interaction entirely) | testing-ci-audit.md | High | Medium-High |
+| Add coverage gates/ratchets for backend and frontend (none exist today beyond core's 45% floor) | testing-ci-audit.md | High | Medium |
+| Add direct tests for `job_service.py` and `pipeline_versions_service.py` (retry/cancel/ownership/failure-state), plus an auth/authz endpoint matrix | testing-ci-audit.md | High | Medium |
+| Build a Ray-local failure/retry/serialization/artifact test suite and one real node-contract E2E **before** enabling DL/Ray nodes | testing-ci-audit.md, deep-learning/README.md | High | Medium |
+
+## Phase 12 — Confirmed Bugs (Round 5 — fix independent of any other phase, ASAP)
+
+New from Round 5 (bug-hunt.md). Unlike every other phase, these are not
+architecture/design decisions — they are **verified, reproducible logic
+errors** with exact repro steps already written down. Treat items 1-3 as
+release-blocking regardless of what else is being worked on; they can
+silently corrupt model training results.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Fix cross-process duplicate pipeline-job creation (idempotency guard doesn't hold across processes/workers) | bug-hunt.md #1 | High | Medium |
+| **Fix Lag Features node: `X` is sorted/dropped but `y` is returned unsorted/unfiltered** — silent train/label misalignment on any unsorted input | bug-hunt.md #2 | High | Small-Medium |
+| **Fix Rolling Aggregate node: identical `X`/`y` misalignment bug as Lag Features** — fix the shared root cause once, reuse for both nodes | bug-hunt.md #3 | High | Small-Medium |
+| Fix out-of-order job-list API responses reverting newer job state in the UI (add request sequencing/abort to the polling client) | bug-hunt.md #4 | Medium | Small |
+| Reject cyclic pipeline graphs at validation time instead of failing confusingly at execution time | bug-hunt.md #5 | Medium | Small-Medium |
+| Fix upload UI's incorrect 500MB rejection message when the server default is 10GB | bug-hunt.md #6 | Medium | Small |
+| Fix Feature Selection node: advertised/documented default method silently no-ops instead of executing | bug-hunt.md #7 | Medium | Small |
+| Fix General Binning node: `uniform` metadata default emitted but the calculator can't execute it, silently no-ops | bug-hunt.md #8 | Medium | Small |
+| Fix FeatureMath silent no-op on mixed-timezone datetime extraction (normalize to UTC or raise an actionable error) | bug-hunt.md #9 | Medium | Small |
+
+## Phase 13 — API Contract Hardening (Round 5)
+
+New from Round 5 (api-contract-drift-audit.md). Addresses drift risk
+beyond the already-documented node-param duplication pattern (see the
+repo-wide Backend/Core ↔ Frontend Sync Rule) — this is about the general
+API layer, not individual node configs.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Generate frontend TypeScript types/clients from the backend's OpenAPI spec in CI; fail CI on schema/generated-type drift | api-contract-drift-audit.md | High | Medium |
+| Fix confirmed `JobInfo` drift (`created_at` nullability, missing `preview`, `output_artifact_id` vs `output` naming) | api-contract-drift-audit.md | Medium | Small |
+| Type and normalize EDA job-status values instead of force-casting (`as JobStatus`); add exhaustive status-mapping tests | api-contract-drift-audit.md | High | Small-Medium |
+| Runtime-validate WebSocket message envelopes on the frontend using the already-installed Zod dependency, with versioned fixture tests | api-contract-drift-audit.md | Medium | Small-Medium |
+| Introduce `/api/v1` (or equivalent) versioning and a breaking-change/deprecation policy before any public API or independent frontend deployment | api-contract-drift-audit.md | High | Medium |
+
+## Phase 14 — Internationalization, Mobile & Cross-Browser Reach (Round 5)
+
+New from Round 5 (i18n-mobile-crossbrowser-audit.md). Distinct from Phase
+3 (Accessibility) — these gaps don't block any current customer but
+become hard blockers the moment there's a non-English enterprise
+customer, a Middle-East expansion, or a sales demo on a tablet.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Adopt an i18n architecture (message catalog/provider, locale persistence, `Intl`-based date/number formatting, string-extraction workflow) before any international sales push | i18n-mobile-crossbrowser-audit.md | High (conditional on international GTM) | Large |
+| Make an explicit, documented device-support decision for the canvas (desktop-only + tested tablet *inspection* mode, or fund real touch/pointer authoring) | i18n-mobile-crossbrowser-audit.md | Medium-High | Small (decision) to Large (implementation) |
+| Add RTL as a deliberate workstream once i18n lands (logical CSS properties, real RTL visual testing) | i18n-mobile-crossbrowser-audit.md | High (conditional on Middle-East expansion) | Large |
+| Declare and enforce a browser support matrix; add Firefox/WebKit Playwright projects and a tablet viewport to E2E | i18n-mobile-crossbrowser-audit.md | High | Medium |
+| Centralize numeric/metric rendering (consistent significant-digit and p-value/scientific-notation rules, `Intl.NumberFormat` for counts) | i18n-mobile-crossbrowser-audit.md | Medium | Medium |
+
+## Phase 15 — Code Escape Hatch & Training Visualization (user-requested feasibility studies)
+
+New initiatives requested directly by the user, each investigated by a
+dedicated feasibility/security study before being scheduled. Both verdicts
+are phased — do not treat either as a single monolithic feature.
+
+### 15a — Per-node code visibility & editing (see [../code-escape-hatch/2026-08-11-feasibility-and-security.md](../code-escape-hatch/2026-08-11-feasibility-and-security.md))
+
+**Verdict: feasible in phases; arbitrary code execution must wait for
+Phase 0's tenancy/auth foundations plus a dedicated hardened executor —
+do not attempt to build this on the current shared Celery workers.**
+
+| Item | Phase | Severity/Priority | Effort | Note |
+|---|---|---|---|---|
+| Phase A: read-only per-node generated-code view + extend the existing notebook export to cover every node type (loaders/splitters/models/resampling, not just preprocessing) | A | High priority, zero new security risk | Medium | Ship first — directly answers the top "vendor lock-in" complaint from user-complaints-research.md with no execution-model change |
+| Phase B: constrained "advanced parameter editor" — a small allow-listed expression grammar compiled back to canonical params, not arbitrary Python | B | Medium priority | Medium-Large | Must be threat-modeled with property tests proving rejected imports/statements/attribute-escapes before shipping |
+| Phase C: full arbitrary custom-Python node, one-way "convert to code" door, dedicated isolated executor (separate image/credentials/network default-deny, no shared DB/Redis/AWS access) | C | **Blocked** — do not schedule until Phase 0 (tenancy/auth) lands and a dedicated executor is built and adversarially tested | XL | This is a new execution model, not an extension of existing code — treat it as its own security-reviewed initiative when it's time, not a checkbox on this list |
+
+### 15b — Training visualization graphs (see [../training-visualization/2026-08-11-feasibility-and-plan.md](../training-visualization/2026-08-11-feasibility-and-plan.md))
+
+**Verdict: ship post-fit diagnostics first by reusing components that
+already exist; only add genuinely live per-epoch curves once the DL
+direct-fit path (already planned) lands — do not promise "live" curves
+for ordinary sklearn `.fit()` calls, which are not iterative.**
+
+| Item | Tier | Severity/Priority | Effort | Note |
+|---|---|---|---|---|
+| Surface existing post-fit diagnostics (confusion matrix, ROC/PR, regression residuals, feature importance) prominently in the job-completion view | (a) cheap, ship first | High priority | Small-Medium | Reuses `ClassificationChartsForSplit`/`RegressionChartsForSplit` and existing evaluator output — almost entirely wiring, not new ML computation |
+| Add an opt-in final PCA class-separation plot (2D, sampled) after basic diagnostics, reusing the existing Plotly scatter component | (a) cheap, ship first | Medium | Small-Medium | Label honestly as input-space projection for classic ML vs. a true learned-embedding view for DL |
+| DL live loss/metric/LR curves via epoch-end telemetry callbacks in the DL direct-fit branch, streamed over the existing WebSocket job-events channel | (b) needs new plumbing | High priority, sequenced with DL rollout | Medium-Large | Depends on the DL initiative landing first; define a versioned `TrainingMetricSnapshot` schema and cadence/size limits before building |
+| DL gradient-norm/LR series and bounded validation-set confusion snapshots at a fixed epoch cadence | (b) needs new plumbing | Medium | Medium | Start with global gradient norm only; per-layer activation stats are an advanced debug mode, not default UI |
+| DL embedding-separation view (PCA of penultimate-layer embeddings on a bounded sample) | (b) needs new plumbing | Medium | Medium | Meaningfully more valuable for DL than classic ML since a true learned representation exists |
+| sklearn learning curves / validation curves as separate, explicitly-requested diagnostic jobs (never inline — each retrains the estimator N times) | (c) expensive, opt-in | Low-Medium | Medium | Show an estimated fit-count/runtime before the user commits to running one |
+| Sampled t-SNE/UMAP as an opt-in post-fit job only if PCA proves insufficient in user research | (c) expensive, opt-in | Low | Medium | Never stream evolving t-SNE/UMAP; cache the artifact |
+
+## Phase 16 — Round 6: Final Gap Check & skyulf-core Improvement Research
+
+A closing investigation round: (a) one meta gap-audit cross-checking Rounds
+1-5 plus both feasibility studies against the live codebase for genuinely
+untouched enterprise-readiness areas, and (b) three focused studies on
+`skyulf-core` itself (the standalone preprocessing/modeling library) — DX/
+ergonomics, algorithm/feature coverage vs. the wider ecosystem, and docs/
+onboarding — since making the *library*, not just the canvas, easier to use
+is a distinct lever for adoption.
+
+### 16a — Meta gap-audit (see [2026-08-11-round6-gap-audit.md](2026-08-11-round6-gap-audit.md))
+
+| Item | Severity | Effort | Note |
+|---|---|---|---|
+| Model registry allows only one globally-"live" deployment platform-wide (no `pipeline_id`/environment scoping) — deploying any model un-deploys every other one | High | Medium-Large | Architectural; blocks running more than one model in production simultaneously, a baseline enterprise expectation |
+| Zero licensing/billing/entitlement enforcement code exists anywhere (no plan/tier/seat/usage-event models) | Medium-High | Large | Confirmed at the implementation level — differentiation-strategy.md covered pricing *strategy*, not that literally no enforcement code exists |
+| No cost/FinOps visibility — no tenant can see what a pipeline run cost; no cost data computed or stored anywhere (including in Ray-migration design) | Medium-High | Medium | Should be designed alongside the Ray migration's per-job resource accounting, not bolted on after |
+| `.env.example` omits entire configuration classes the app actually reads (all AWS/S3 vars from `backend/config/mixins/aws.py`) | Medium | Small | Simple, high-value quick fix — a real self-hosting trap today |
+| Notebook export has never been checked for standalone execution correctness (only security/faithfulness studied) — no `nbclient`/`papermill` execution tests, no correct `skyulf-core[extras]` install line emitted | Medium | Small-Medium | Sits directly behind Phase 15a's Phase A (read-only code view + export) — fix before shipping that phase, not after |
+| No backup/disaster-recovery/multi-region story anywhere beyond one-line mentions — no tooling, runbook, or RPO/RTO targets | Medium-High | Large | Procurement blocker for regulated/enterprise buyers; needs its own dedicated design doc |
+
+**Already adequately covered, not duplicated:** deployment/packaging (Docker
+Compose story exists and was implicitly covered by backend-blockers.md and
+scale-load-audit.md), data-connector breadth, plugin/extension SDK
+(NodeRegistry already supports this — see node-flexibility.md), and
+onboarding/first-run UX (covered by smooth-experience-fixes.md and
+user-complaints-research.md).
+
+### 16b — skyulf-core DX/ergonomics (see [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md))
+
+| Item | Severity | Effort | Note |
+|---|---|---|---|
+| Calculators/Appliers silently no-op (`{}` artifact) on bad config instead of raising an actionable error | High friction | Small-Medium | Same "silent no-op" bug class as Phase 12 findings #6/#7 — fix should share the same validation helper |
+| No sklearn `BaseEstimator`/`TransformerMixin` protocol — cannot drop a Calculator into `sklearn.pipeline.Pipeline` (confirmed: raises a confusing `TypeError`) | High (adoption blocker for notebook-first users) | Medium | Directly serves the "avoid vendor lock-in" complaint theme from user-complaints-research.md |
+| `config`/`params` are bare `dict[str, Any]` everywhere — no IDE autocomplete or typo protection at call time (only output artifacts use TypedDicts today) | Medium | Small-Medium | Incrementally add `TypedDict` input schemas per node family, reusing the existing artifact-TypedDict pattern |
+| Registration via `@NodeRegistry.register`/`@node_meta` is a decorator side-effect, not a constructor requirement — standalone (non-canvas) usage genuinely works today, but this isn't documented anywhere | Medium (pure documentation gap) | Small | Cheapest, highest-leverage fix in this batch — just needs a README section |
+| No per-node generated API reference despite `node_meta` already holding structured metadata that could drive one | Low | Medium | Natural companion to Phase 15a's code-visibility work |
+| Test-only sample-dataset loader (`tests/utils/dataset_loader.py`) is a good "quickstart" utility not exposed to users (e.g. `skyulf.datasets.load_sample()`) | Low | Small | Cheap adoption-friction reducer for first-5-minutes experience |
+
+### 16c — skyulf-core algorithm/feature coverage (see [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md))
+
+| Item | Effort | Note |
+|---|---|---|
+| No classical forecasting models (ARIMA/SARIMAX/Prophet) despite a dedicated `time_series/` preprocessing folder already existing | Medium-Large | Natural adjacent win alongside the DL initiative's time-series node types |
+| No CatBoost, despite XGBoost and LightGBM both already supported as optional deps | Small | Cheap, high-signal parity fix — CatBoost is a top-3 boosting library ask |
+| No leave-one-out/James-Stein/rare-label encoders (Target/WOE/Hash encoders already exist) | Medium | `category_encoders`-parity gap |
+| No `QuantileTransformer` (PowerTransformer already exists) | Small | Cheap sklearn-parity fix |
+| No cyclical (sin/cos) calendar encoding in `DateFeatures` | Small | Common time-series feature-engineering ask |
+| No VIF/multicollinearity node; correlation stops at Pearson/Spearman (no Kendall) in the pipeline-composable node | Small-Medium | Statistical-rigor gap for regulated/statistics-heavy users |
+| Hypothesis tests (Shapiro/KS/ANOVA) exist only in profiling reports, not as `NodeRegistry` pipeline nodes; no chi-square-of-independence at all | Medium | Would let users gate pipeline branches on statistical tests, not just eyeball a report |
+| No `GroupKFold`/`StratifiedGroupKFold` cross-validation (only `TimeSeriesSplit` exists) | Small-Medium | Needed for any grouped/leakage-sensitive CV scenario |
+
+**Already strong, confirmed not a gap:** imbalanced-learn coverage
+(SMOTE variants, ADASYN, NearMiss, Tomek all present), no stubbed/
+`NotImplementedError` nodes anywhere in the registry, calibration exists
+(`calibrated_classifier`), and NLP coverage (TF-IDF/count/hashing
+vectorizers + sentence-transformers embeddings) is solid.
+
+### 16d — skyulf-core docs/onboarding (see [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md))
+
+| Item | Severity | Effort | Note |
+|---|---|---|---|
+| A genuinely good "add a new node" guide exists (`docs/user_guide/extending_custom_nodes.md`) but lives outside `skyulf-core/` and isn't linked from its README | Medium | Small | Pure discoverability fix — the content problem is already solved |
+| Docstring coverage on node source files is inconsistent (0% on `imputation/simple.py`, `knn.py`, `iterative.py`, `outliers/iqr.py`, `zscore.py`; ~80-100% on shared infra files) | Medium | Medium | Doesn't block usage today but undermines the mkdocs+mkdocstrings site's value on exactly the files users look up most |
+| `pyproject.toml` is nearly empty (9 lines, all dynamic); real packaging metadata lives in `setup.py` with only 3 thin classifiers | Medium (OSS/PyPI credibility) | Small | Would look unfinished to an external reviewer evaluating a standalone `pip install skyulf-core` |
+| Changelog is well-organized but lives at the monorepo root, mixing core/platform entries; `setup.py`'s Changelog URL points to GitHub Releases instead of the actual file | Low | Small | Minor consistency fix |
+
+**Already strong, confirmed not a gap:** `skyulf-core/README.md` (438 lines:
+install, quickstart, calculator/applier mental model, leakage-safety notes),
+9 comprehensive example notebooks, and a published mkdocs+mkdocstrings API
+site.
+
+## Phase 17 — Round 7: skyulf-core Differentiation & Quick-Win Tech Research
+
+A closing web-research round answering the user's explicit question: "we are
+not trying to be scikit-learn, we're trying to use their work into ours to
+make things better — how can we be different and better, without stealing
+ideas?" Two parallel web research passes: (a) genuine external whitespace —
+what does `skyulf-core` already structurally have that the wider ecosystem
+is independently converging toward wanting, and (b) concrete, cheap
+technology additions with strong 2024-2025 adoption signals.
+
+### 17a — Quick-win technology additions (see [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md))
+
+| Item | Effort | Note |
+|---|---|---|
+| MLflow-skinny one-line fit-hook (`skyulf.integrations.mlflow`, optional) | Small | 42.5M downloads/month; purely additive callback on `BaseModelCalculator.fit()`, no return-contract changes |
+| CatBoost classifier/regressor nodes | Small-Medium | Direct copy of the proven `LGBMClassifierCalculator` lazy-optional-dep pattern (`classification.py:548-608`); corroborated as still heavily used (6M+ downloads/month) |
+| Pandera-backed fit-time-schema-capture / apply-time-drift node (`SchemaContract`) | Small-Medium | Reuses the exact JSON-artifact fit/apply skeleton every node already follows; Pandera's own "Schema Inference and Persistence" feature does most of the work |
+| Narwhals as an additive third `EngineRegistry` backend | Small | Unlocks DuckDB/PyArrow/Dask/Modin as lazy inputs without hand-building per-engine adapters; do NOT replace the existing pandas/polars dispatch layer |
+| StatsForecast-backed classical forecasting node family (`auto_arima_forecaster`, `auto_ets_forecaster`) | Medium | Cheapest/lowest-maintenance-risk of the 3 forecasting options evaluated (statsmodels SARIMAX, Prophet, StatsForecast) — sklearn-style `.fit()`/`.predict()` maps directly onto `SklearnCalculator`/`SklearnApplier`; no Stan/PyStan install fragility like Prophet |
+| DuckDB as an ingestion/materialization convenience (not a full lazy execution path) | Small | Full lazy DuckDB execution (Effort L) is gated on the same "partitionable calculator contract" prerequisite as Phase 9 — don't build it early |
+
+**Sequencing note:** do Narwhals-as-engine before the Pandera schema-contract
+node — Pandera 0.32's own validation engine is now Narwhals-powered, so
+adopting Narwhals first makes the later Pandera integration strictly easier.
+
+### 17b — External differentiation whitespace (see [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md))
+
+| Item | Effort | Note |
+|---|---|---|
+| Package the existing leakage-safe calculator/applier split as a headline, marketable feature (not just an internal implementation detail) | Small (messaging/docs only) | HN/practitioner sentiment shows real, recurring pain around silent train/test leakage in ad-hoc sklearn pipelines; `skyulf-core` already structurally prevents this class of bug and isn't claiming credit for it anywhere public-facing |
+| Auto-derived fit/apply-native schema-drift detection from every fitted artifact's implied output schema (no hand-written schema required) | Medium (builds on 17a's Pandera node) | Positions against the "bolt-on, separately wired" pattern common to Pandera/Great Expectations/OpenDQV — narrower, more mechanically verifiable, and free given the existing artifact structure |
+| Auditable/versionable JSON artifacts as an explicit alternative to opaque pickles | Small (messaging) | Directly addresses reproducibility/audit complaints found in web research; already true today, just not marketed |
+| Adopt Narwhals as the internal expression-layer abstraction underneath calculator/applier (same item as 17a, listed here for its external significance) | Medium-Large | The most strategically significant item: the only path that combines genuine engine-agnosticism with a leakage-safe fit/apply artifact contract — a combination no competitor (Narwhals, skrub, feature-engine, sklearn) offers today |
+| "Too many parameters / complexity fatigue" narrative | — | **Deliberately excluded** — GitHub issue search was blocked in the research environment and no HN corroboration was found; treat as unverified until a follow-up pass has direct GitHub-issue-search or Reddit/G2 access |
+
+**Already independently corroborated, not a new finding:** the sklearn
+`Pipeline`/`BaseEstimator` compatibility gap (Phase 16b) — this round's
+Narwhals findings reinforce that the cost of *not* shipping this wrapper is
+rising as sklearn's own ecosystem gets more dataframe-agnostic and
+third-party-transformer-friendly, not a static cost.
+
+## Phase 18 — Round 8: Scientific-Literature Scan
+
+Four parallel research agents scanned arXiv/conference-proceedings papers —
+both recent (2023-2025) and older-but-overlooked — for concrete, citable
+ideas across preprocessing, AutoML/tuning, DL training/visualization, and
+MLOps/drift, in direct response to the user's ask for "scientific articles
+that could give us ideas... maybe no one cared but actually could be
+useful." Each finding cites a real paper URL and a maintained OSS package to
+wrap where one exists, so nothing here requires reimplementing published
+algorithms from scratch unless explicitly noted.
+
+### 18a — Preprocessing/feature-engineering (see [2026-08-11-papers-preprocessing-research.md](2026-08-11-papers-preprocessing-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Optimal/monotonic binning node | Navas-Palencia 2020/2022, arXiv:2001.08025 | Small-Medium | Wraps maintained `optbinning`; JSON-serializable bin edges fit the Calculator/Applier pattern almost perfectly; complements the existing WOE encoder for credit-risk/scorecard use cases — best effort-to-benefit ratio found |
+| Mutual-information / distance-correlation feature selection | Schellhas et al. 2020, arXiv:2006.12919 | Small | `sklearn.feature_selection.mutual_info_*` already implements the core method; `dcor` covers distance correlation; catches nonlinear relationships Pearson/Spearman miss |
+| PyOD-backed outlier detection (HBOS/COPOD/ECOD/Isolation Forest/LOF) | Zhao et al. 2019 (arXiv:1901.01588), PyOD 2 2024 (arXiv:2412.12154) | Small-Medium | Wraps maintained `pyod` package; meaningfully broader than existing IQR/zscore outlier nodes |
+
+### 18b — AutoML/hyperparameter tuning (see [2026-08-11-papers-automl-tuning-research.md](2026-08-11-papers-automl-tuning-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Multi-objective tuning (accuracy vs. latency/model-size) via Optuna's existing multi-objective API | Ozaki et al., GECCO 2020 / JAIR 2022 (MOTPE) | Medium | Zero new dependencies (Optuna already pinned); reuses the objective-function pattern the DL-tuning work is already building; real enterprise gap (deployment-aware tuning) public AutoML tools don't expose well |
+| ASHA async successive-halving scheduler for the Ray migration | Li et al., MLSys 2020, arXiv:1810.05934 | Medium | Directly relevant to the planned Ray integration — current halving strategies are synchronous and will bottleneck under real distributed parallelism; Ray Tune ships the maintained scheduler |
+| Cross-run warm-starting via Optuna's `enqueue_trial` using Skyulf's own historical tuning data | Feurer et al., AAAI 2015 / arXiv:1802.02219 | Medium | Directly answers the "AutoML/pipeline-suggestion layer" gap from differentiation-strategy.md; reuses data already persisted (`TrainingJob.best_params`/`best_score`/`model_type`) — a multi-tenant platform can do this in a way a stateless OSS library cannot |
+| OBOE-style cheap-probe model recommendation ("suggest a starting model") | Yang et al., KDD 2019, arXiv:1808.03233 | Medium-Large | Same differentiation gap as warm-starting, complementary approach; no maintained library to wrap, do after warm-starting lands |
+| TabPFN as a zero-tuning baseline node for small tabular datasets | Hollmann et al., ICLR 2023, arXiv:2207.01848 | Small-Medium | Official maintained `tabpfn` PyPI package, sklearn-compatible API fits `SklearnCalculator` directly; scope-limited to small datasets — fast "instant baseline" UX win |
+
+**Positioning note (no code):** Grinsztajn et al. (arXiv:2207.08815) — trees
+still beat DL on typical tabular sizes; scope the DL module's marketing at
+genuinely DL-favorable regimes (large data, embeddings, multi-modal), not as
+a blanket accuracy upgrade over the existing XGBoost/LightGBM stack.
+
+### 18c — DL training diagnostics & visualization (see [2026-08-11-papers-dl-training-research.md](2026-08-11-papers-dl-training-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Integrated Gradients "Explain Prediction" node via Captum | Sundararajan et al. 2017, arXiv:1703.01365 | Small | Wraps maintained Captum library; gives the DL canvas explainability parity with whatever SHAP-based nodes classical ML already has |
+| LR Range Finder pre-flight node | Smith 2017, arXiv:1506.01186 | Small | Cheap, well-documented recipe with existing OSS implementations; prevents wasted training runs rather than just diagnosing them after the fact |
+| Confident Learning "Label Quality Report" via `cleanlab` | Northcutt et al. 2021, arXiv:1911.00068 | Small | Lowest-effort item — wraps an existing library and only needs final predicted probabilities, so it's reusable across BOTH classical-ML and DL canvases |
+
+**Higher-effort, v2-roadmap candidates:** TracIn per-example influence
+debugging and loss-landscape visualization — genuinely novel but Medium/Large
+effort; defer past initial DL module release.
+
+### 18d — MLOps/drift/monitoring/reproducibility (see [2026-08-11-papers-mlops-drift-research.md](2026-08-11-papers-mlops-drift-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Multivariate/joint drift + "typifying exemplar" surfacing, reusing existing fitted scaler/PCA-like artifacts | Rabanser, Günnemann, Lipton, NeurIPS 2018, arXiv:1810.11953 | Medium | Wrap/reference `alibi-detect` for the MMD/classifier-based two-sample test rather than reimplementing |
+| Multi-seed variance reporting as a first-class reproducibility feature ("Reproducibility Score") | Pineau et al., JMLR 2020, arXiv:2003.12206 | Medium | Operationalizes the most commonly-violated item on the peer-reviewed NeurIPS reproducibility checklist — a citable metric, not an arbitrary in-house one |
+
+**Important validation, not a new finding:** TFDV's own production evidence
+(Breck et al., MLSys 2019) that schema-level anomalies (missing/new
+columns, type changes) catch more real production incidents than
+statistical-distance drift tests — this is external confirmation to **not
+deprioritize** the already-planned Pandera-style fit-time schema capture
+(Phase 17a) in favor of fancier statistical drift metrics.
+
+## What NOT to do
+
+- Don't build Phase 5/6 UI against real backend endpoints before Phase 0
+  lands — build as mocked/static UI in parallel, wire up once auth +
+  tenancy are real, per new-enterprise-pages.md's explicit dependency note.
+- Don't treat the orphaned-dataset-file behavior (backend-blockers §5) as a
+  bug to "fix" by changing its logic — it's a deliberate, log-visible
+  tradeoff; only add an automated reconciliation sweep on top of it.
+- Don't skip Phase 4 (shared frontend infra) and jump straight to Phase 5
+  page-by-page — every redesign proposal explicitly depends on the shared
+  `DataTable`/`StatusBadge`/token work landing first.
+- Don't assume all frontend/backend node param mismatches are as isolated
+  as the sample suggests — the rubber-duck's 3-node spot-check came back
+  clean plus the one new `one_hot.py` gap found, so the "ManualBounds is
+  isolated" read is provisional, not proven across all ~15+ nodes.
+- Don't build Phase 15a's Phase C (arbitrary custom-Python node execution)
+  on the current shared Celery workers under any circumstances — the
+  feasibility study confirmed today's workers share DB/Redis/AWS
+  credentials with the API process; this is only safe after Phase 0
+  (tenancy/auth) lands and a dedicated, network-isolated executor has been
+  built and adversarially tested. Do not let scope-creep turn Phase A
+  (read-only code view, zero risk) into an accidental Phase C shortcut.
+- Don't promise "live" training curves for ordinary sklearn `.fit()` calls
+  (Phase 15b) — they are not iterative, so there is nothing to stream;
+  ship fast post-fit diagnostics for classic ML and reserve genuinely live
+  telemetry for the DL direct-fit path once it exists.
+- Don't fix skyulf-core's "silent no-op on bad config" (Phase 16b) as a
+  one-off patch on whichever calculator you happen to be touching — it's
+  the same bug class as Phase 12 findings #6/#7 (Feature Selection, General
+  Binning); add one shared validation helper both phases can use, not two
+  divergent fixes.
+- Don't add sklearn `BaseEstimator`/`TransformerMixin` support (Phase 16b)
+  by subclassing every existing Calculator individually — investigate a
+  thin adapter/wrapper class first so ~50+ calculators don't need
+  per-class changes.
+- Don't treat Phase 16a's licensing/billing and cost/FinOps gaps as
+  something to bolt onto the Ray migration after the fact — both should be
+  designed alongside Ray's per-job resource accounting from the start,
+  since retrofitting usage metering onto an already-built scheduler is
+  materially more expensive.
+- Don't build a full lazy DuckDB execution path or a full internal Narwhals
+  engine replacement (Phase 17a) as "quick wins" — both are genuinely
+  valuable but L-effort architectural changes gated on the same
+  "partitionable calculator contract" prerequisite as Phase 9; only the
+  additive/lazy-backend-only versions of each belong in a quick-win batch.
+- Don't treat Phase 17b's "complexity fatigue" narrative as evidence-backed
+  — it was explicitly excluded from the research's findings due to blocked
+  GitHub/Reddit/G2 search access; verify with a follow-up pass before
+  acting on it.
+- Don't reimplement published algorithms from Phase 18 findings from
+  scratch where a maintained OSS package already exists to wrap
+  (`optbinning`, `pyod`, `alibi-detect`, `captum`, `cleanlab`, `tabpfn`) —
+  every recommendation in Phase 18 was deliberately chosen because a
+  maintained wrapper target exists; check the cited paper's doc for the
+  reference implementation before writing new math.
+- Don't chase Phase 18d's statistical drift metrics ahead of the
+  already-planned Pandera-style fit-time schema capture (Phase 17a) —
+  TFDV's own production evidence says schema-level anomalies catch more
+  real incidents than distribution-distance tests; schema capture is the
+  higher-priority foundation.
+
+## Cross-References
+
+- [2026-08-11-backend-blockers.md](2026-08-11-backend-blockers.md) — Phase 0/1 detail
+- [2026-08-11-technical-debt-deep-dive.md](2026-08-11-technical-debt-deep-dive.md) — Phase 2/3/4 detail
+- [2026-08-11-redesign-existing-pages.md](2026-08-11-redesign-existing-pages.md) — Phase 5 detail
+- [2026-08-11-new-enterprise-pages.md](2026-08-11-new-enterprise-pages.md) — Phase 6 detail
+- [2026-08-11-node-flexibility.md](2026-08-11-node-flexibility.md) — Phase 7 detail
+- [2026-08-11-smooth-experience-fixes.md](2026-08-11-smooth-experience-fixes.md) — Phase 8 detail
+- [2026-08-11-differentiation-strategy.md](2026-08-11-differentiation-strategy.md) — Phase 9 detail, plus the competitive-positioning rationale behind it
+- [../deep-learning/README.md](../deep-learning/README.md) — orthogonal, in-flight plan; note the sequencing interactions called out in technical-debt-deep-dive.md (tuning-engine size, pipeline schema versioning) AND Phase 9's `skyulf-core` foundational items (partitionable calculators, artifact versioning) before starting DL implementation — DL adds exactly the kind of new node types that make both gaps more costly to fix later
+- [2026-08-11-round4-synthesis.md](2026-08-11-round4-synthesis.md) — Round 4 overview and cross-links; Phase 10/11 detail
+- [2026-08-11-security-review.md](2026-08-11-security-review.md) — Phase 10 SSRF findings detail
+- [2026-08-11-scale-load-audit.md](2026-08-11-scale-load-audit.md) — Phase 10 scale/load findings detail
+- [2026-08-11-data-governance-audit.md](2026-08-11-data-governance-audit.md) — Phase 10 compliance findings detail
+- [2026-08-11-testing-ci-audit.md](2026-08-11-testing-ci-audit.md) — Phase 11 detail
+- [2026-08-11-user-complaints-research.md](2026-08-11-user-complaints-research.md) — evidence behind the Phase 9 per-node-preview addition and cross-validation of Bets #1/#3
+- [2026-08-11-round5-synthesis.md](2026-08-11-round5-synthesis.md) — Round 5 overview and cross-links; Phase 12/13/14 detail
+- [2026-08-11-bug-hunt.md](2026-08-11-bug-hunt.md) — Phase 12 detail; 9 confirmed, reproducible bugs
+- [2026-08-11-api-contract-drift-audit.md](2026-08-11-api-contract-drift-audit.md) — Phase 13 detail
+- [2026-08-11-i18n-mobile-crossbrowser-audit.md](2026-08-11-i18n-mobile-crossbrowser-audit.md) — Phase 14 detail
+- [2026-08-11-user-observability-audit.md](2026-08-11-user-observability-audit.md) — evidence behind the Phase 9 diagnostic-timeline addition
+- [../code-escape-hatch/2026-08-11-feasibility-and-security.md](../code-escape-hatch/2026-08-11-feasibility-and-security.md) — Phase 15a detail; full security analysis and phased executor design
+- [../training-visualization/2026-08-11-feasibility-and-plan.md](../training-visualization/2026-08-11-feasibility-and-plan.md) — Phase 15b detail; graph-type inventory and market precedent
+- [2026-08-11-round6-gap-audit.md](2026-08-11-round6-gap-audit.md) — Phase 16a detail; model registry, licensing, FinOps, env-config, notebook-export-correctness, and backup/DR findings
+- [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md) — Phase 16b detail; skyulf-core ergonomics with before/after code snippets
+- [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md) — Phase 16c detail; full node-registry inventory plus algorithm-coverage gaps vs. sklearn/feature-engine/category_encoders/imbalanced-learn
+- [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) — Phase 16d detail; skyulf-core README/docstring/packaging-metadata audit
+- [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md) — Phase 17a detail; MLflow-skinny, CatBoost, Pandera, Narwhals, StatsForecast, DuckDB web research with live download-count evidence
+- [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md) — Phase 17b detail; external evidence for skyulf-core's leakage-safe-artifact whitespace vs. the wider ecosystem
+- [2026-08-11-papers-preprocessing-research.md](2026-08-11-papers-preprocessing-research.md) — Phase 18a detail; optimal binning, mutual-information selection, PyOD outlier detection, all with cited papers
+- [2026-08-11-papers-automl-tuning-research.md](2026-08-11-papers-automl-tuning-research.md) — Phase 18b detail; multi-objective tuning, ASHA scheduler, warm-starting, OBOE-style recommendation, TabPFN baseline
+- [2026-08-11-papers-dl-training-research.md](2026-08-11-papers-dl-training-research.md) — Phase 18c detail; Captum explainability, LR range finder, cleanlab label-quality, plus v2-roadmap TracIn/loss-landscape candidates
+- [2026-08-11-papers-mlops-drift-research.md](2026-08-11-papers-mlops-drift-research.md) — Phase 18d detail; multivariate drift detection, multi-seed reproducibility scoring, TFDV schema-anomaly validation
