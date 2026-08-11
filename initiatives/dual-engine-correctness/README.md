@@ -12,6 +12,7 @@ genuinely required? And can we honestly claim leakage-proof?*
 |---|---|
 | [2026-08-11-audit-findings.md](2026-08-11-audit-findings.md) | All 49 findings (4 CRITICAL, 18 HIGH, 17 MED, 10 LOW) with executable reproductions, an explicit list of what is **proven correct**, and a tiered fix order with target versions. |
 | [2026-08-11-leakage-enforcement-plan.md](2026-08-11-leakage-enforcement-plan.md) | Plan to strengthen leakage enforcement so the documented claim becomes true, rather than softening the docs. Includes the required documentation changes. |
+| [2026-08-11-backend-polars-migration-plan.md](2026-08-11-backend-polars-migration-plan.md) | **Skyulf is presented as Polars-backed, but the backend is 100% pandas** (`backend/data/catalog.py` reads only via `pd.read_csv`/`pd.read_parquet`). Phased plan to close that gap, plus a categorised inventory of every `.to_pandas()` site in `skyulf-core` and which are worth converting. |
 
 ## Method
 
