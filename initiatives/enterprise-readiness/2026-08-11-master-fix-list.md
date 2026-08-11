@@ -247,6 +247,41 @@ customer, a Middle-East expansion, or a sales demo on a tablet.
 | Declare and enforce a browser support matrix; add Firefox/WebKit Playwright projects and a tablet viewport to E2E | i18n-mobile-crossbrowser-audit.md | High | Medium |
 | Centralize numeric/metric rendering (consistent significant-digit and p-value/scientific-notation rules, `Intl.NumberFormat` for counts) | i18n-mobile-crossbrowser-audit.md | Medium | Medium |
 
+## Phase 15 — Code Escape Hatch & Training Visualization (user-requested feasibility studies)
+
+New initiatives requested directly by the user, each investigated by a
+dedicated feasibility/security study before being scheduled. Both verdicts
+are phased — do not treat either as a single monolithic feature.
+
+### 15a — Per-node code visibility & editing (see [../code-escape-hatch/2026-08-11-feasibility-and-security.md](../code-escape-hatch/2026-08-11-feasibility-and-security.md))
+
+**Verdict: feasible in phases; arbitrary code execution must wait for
+Phase 0's tenancy/auth foundations plus a dedicated hardened executor —
+do not attempt to build this on the current shared Celery workers.**
+
+| Item | Phase | Severity/Priority | Effort | Note |
+|---|---|---|---|---|
+| Phase A: read-only per-node generated-code view + extend the existing notebook export to cover every node type (loaders/splitters/models/resampling, not just preprocessing) | A | High priority, zero new security risk | Medium | Ship first — directly answers the top "vendor lock-in" complaint from user-complaints-research.md with no execution-model change |
+| Phase B: constrained "advanced parameter editor" — a small allow-listed expression grammar compiled back to canonical params, not arbitrary Python | B | Medium priority | Medium-Large | Must be threat-modeled with property tests proving rejected imports/statements/attribute-escapes before shipping |
+| Phase C: full arbitrary custom-Python node, one-way "convert to code" door, dedicated isolated executor (separate image/credentials/network default-deny, no shared DB/Redis/AWS access) | C | **Blocked** — do not schedule until Phase 0 (tenancy/auth) lands and a dedicated executor is built and adversarially tested | XL | This is a new execution model, not an extension of existing code — treat it as its own security-reviewed initiative when it's time, not a checkbox on this list |
+
+### 15b — Training visualization graphs (see [../training-visualization/2026-08-11-feasibility-and-plan.md](../training-visualization/2026-08-11-feasibility-and-plan.md))
+
+**Verdict: ship post-fit diagnostics first by reusing components that
+already exist; only add genuinely live per-epoch curves once the DL
+direct-fit path (already planned) lands — do not promise "live" curves
+for ordinary sklearn `.fit()` calls, which are not iterative.**
+
+| Item | Tier | Severity/Priority | Effort | Note |
+|---|---|---|---|---|
+| Surface existing post-fit diagnostics (confusion matrix, ROC/PR, regression residuals, feature importance) prominently in the job-completion view | (a) cheap, ship first | High priority | Small-Medium | Reuses `ClassificationChartsForSplit`/`RegressionChartsForSplit` and existing evaluator output — almost entirely wiring, not new ML computation |
+| Add an opt-in final PCA class-separation plot (2D, sampled) after basic diagnostics, reusing the existing Plotly scatter component | (a) cheap, ship first | Medium | Small-Medium | Label honestly as input-space projection for classic ML vs. a true learned-embedding view for DL |
+| DL live loss/metric/LR curves via epoch-end telemetry callbacks in the DL direct-fit branch, streamed over the existing WebSocket job-events channel | (b) needs new plumbing | High priority, sequenced with DL rollout | Medium-Large | Depends on the DL initiative landing first; define a versioned `TrainingMetricSnapshot` schema and cadence/size limits before building |
+| DL gradient-norm/LR series and bounded validation-set confusion snapshots at a fixed epoch cadence | (b) needs new plumbing | Medium | Medium | Start with global gradient norm only; per-layer activation stats are an advanced debug mode, not default UI |
+| DL embedding-separation view (PCA of penultimate-layer embeddings on a bounded sample) | (b) needs new plumbing | Medium | Medium | Meaningfully more valuable for DL than classic ML since a true learned representation exists |
+| sklearn learning curves / validation curves as separate, explicitly-requested diagnostic jobs (never inline — each retrains the estimator N times) | (c) expensive, opt-in | Low-Medium | Medium | Show an estimated fit-count/runtime before the user commits to running one |
+| Sampled t-SNE/UMAP as an opt-in post-fit job only if PCA proves insufficient in user research | (c) expensive, opt-in | Low | Medium | Never stream evolving t-SNE/UMAP; cache the artifact |
+
 ## What NOT to do
 
 - Don't build Phase 5/6 UI against real backend endpoints before Phase 0
@@ -262,6 +297,17 @@ customer, a Middle-East expansion, or a sales demo on a tablet.
   as the sample suggests — the rubber-duck's 3-node spot-check came back
   clean plus the one new `one_hot.py` gap found, so the "ManualBounds is
   isolated" read is provisional, not proven across all ~15+ nodes.
+- Don't build Phase 15a's Phase C (arbitrary custom-Python node execution)
+  on the current shared Celery workers under any circumstances — the
+  feasibility study confirmed today's workers share DB/Redis/AWS
+  credentials with the API process; this is only safe after Phase 0
+  (tenancy/auth) lands and a dedicated, network-isolated executor has been
+  built and adversarially tested. Do not let scope-creep turn Phase A
+  (read-only code view, zero risk) into an accidental Phase C shortcut.
+- Don't promise "live" training curves for ordinary sklearn `.fit()` calls
+  (Phase 15b) — they are not iterative, so there is nothing to stream;
+  ship fast post-fit diagnostics for classic ML and reserve genuinely live
+  telemetry for the DL direct-fit path once it exists.
 
 ## Cross-References
 
@@ -284,3 +330,5 @@ customer, a Middle-East expansion, or a sales demo on a tablet.
 - [2026-08-11-api-contract-drift-audit.md](2026-08-11-api-contract-drift-audit.md) — Phase 13 detail
 - [2026-08-11-i18n-mobile-crossbrowser-audit.md](2026-08-11-i18n-mobile-crossbrowser-audit.md) — Phase 14 detail
 - [2026-08-11-user-observability-audit.md](2026-08-11-user-observability-audit.md) — evidence behind the Phase 9 diagnostic-timeline addition
+- [../code-escape-hatch/2026-08-11-feasibility-and-security.md](../code-escape-hatch/2026-08-11-feasibility-and-security.md) — Phase 15a detail; full security analysis and phased executor design
+- [../training-visualization/2026-08-11-feasibility-and-plan.md](../training-visualization/2026-08-11-feasibility-and-plan.md) — Phase 15b detail; graph-type inventory and market precedent
