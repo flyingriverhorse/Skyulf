@@ -395,6 +395,66 @@ Narwhals findings reinforce that the cost of *not* shipping this wrapper is
 rising as sklearn's own ecosystem gets more dataframe-agnostic and
 third-party-transformer-friendly, not a static cost.
 
+## Phase 18 — Round 8: Scientific-Literature Scan
+
+Four parallel research agents scanned arXiv/conference-proceedings papers —
+both recent (2023-2025) and older-but-overlooked — for concrete, citable
+ideas across preprocessing, AutoML/tuning, DL training/visualization, and
+MLOps/drift, in direct response to the user's ask for "scientific articles
+that could give us ideas... maybe no one cared but actually could be
+useful." Each finding cites a real paper URL and a maintained OSS package to
+wrap where one exists, so nothing here requires reimplementing published
+algorithms from scratch unless explicitly noted.
+
+### 18a — Preprocessing/feature-engineering (see [2026-08-11-papers-preprocessing-research.md](2026-08-11-papers-preprocessing-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Optimal/monotonic binning node | Navas-Palencia 2020/2022, arXiv:2001.08025 | Small-Medium | Wraps maintained `optbinning`; JSON-serializable bin edges fit the Calculator/Applier pattern almost perfectly; complements the existing WOE encoder for credit-risk/scorecard use cases — best effort-to-benefit ratio found |
+| Mutual-information / distance-correlation feature selection | Schellhas et al. 2020, arXiv:2006.12919 | Small | `sklearn.feature_selection.mutual_info_*` already implements the core method; `dcor` covers distance correlation; catches nonlinear relationships Pearson/Spearman miss |
+| PyOD-backed outlier detection (HBOS/COPOD/ECOD/Isolation Forest/LOF) | Zhao et al. 2019 (arXiv:1901.01588), PyOD 2 2024 (arXiv:2412.12154) | Small-Medium | Wraps maintained `pyod` package; meaningfully broader than existing IQR/zscore outlier nodes |
+
+### 18b — AutoML/hyperparameter tuning (see [2026-08-11-papers-automl-tuning-research.md](2026-08-11-papers-automl-tuning-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Multi-objective tuning (accuracy vs. latency/model-size) via Optuna's existing multi-objective API | Ozaki et al., GECCO 2020 / JAIR 2022 (MOTPE) | Medium | Zero new dependencies (Optuna already pinned); reuses the objective-function pattern the DL-tuning work is already building; real enterprise gap (deployment-aware tuning) public AutoML tools don't expose well |
+| ASHA async successive-halving scheduler for the Ray migration | Li et al., MLSys 2020, arXiv:1810.05934 | Medium | Directly relevant to the planned Ray integration — current halving strategies are synchronous and will bottleneck under real distributed parallelism; Ray Tune ships the maintained scheduler |
+| Cross-run warm-starting via Optuna's `enqueue_trial` using Skyulf's own historical tuning data | Feurer et al., AAAI 2015 / arXiv:1802.02219 | Medium | Directly answers the "AutoML/pipeline-suggestion layer" gap from differentiation-strategy.md; reuses data already persisted (`TrainingJob.best_params`/`best_score`/`model_type`) — a multi-tenant platform can do this in a way a stateless OSS library cannot |
+| OBOE-style cheap-probe model recommendation ("suggest a starting model") | Yang et al., KDD 2019, arXiv:1808.03233 | Medium-Large | Same differentiation gap as warm-starting, complementary approach; no maintained library to wrap, do after warm-starting lands |
+| TabPFN as a zero-tuning baseline node for small tabular datasets | Hollmann et al., ICLR 2023, arXiv:2207.01848 | Small-Medium | Official maintained `tabpfn` PyPI package, sklearn-compatible API fits `SklearnCalculator` directly; scope-limited to small datasets — fast "instant baseline" UX win |
+
+**Positioning note (no code):** Grinsztajn et al. (arXiv:2207.08815) — trees
+still beat DL on typical tabular sizes; scope the DL module's marketing at
+genuinely DL-favorable regimes (large data, embeddings, multi-modal), not as
+a blanket accuracy upgrade over the existing XGBoost/LightGBM stack.
+
+### 18c — DL training diagnostics & visualization (see [2026-08-11-papers-dl-training-research.md](2026-08-11-papers-dl-training-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Integrated Gradients "Explain Prediction" node via Captum | Sundararajan et al. 2017, arXiv:1703.01365 | Small | Wraps maintained Captum library; gives the DL canvas explainability parity with whatever SHAP-based nodes classical ML already has |
+| LR Range Finder pre-flight node | Smith 2017, arXiv:1506.01186 | Small | Cheap, well-documented recipe with existing OSS implementations; prevents wasted training runs rather than just diagnosing them after the fact |
+| Confident Learning "Label Quality Report" via `cleanlab` | Northcutt et al. 2021, arXiv:1911.00068 | Small | Lowest-effort item — wraps an existing library and only needs final predicted probabilities, so it's reusable across BOTH classical-ML and DL canvases |
+
+**Higher-effort, v2-roadmap candidates:** TracIn per-example influence
+debugging and loss-landscape visualization — genuinely novel but Medium/Large
+effort; defer past initial DL module release.
+
+### 18d — MLOps/drift/monitoring/reproducibility (see [2026-08-11-papers-mlops-drift-research.md](2026-08-11-papers-mlops-drift-research.md))
+
+| Item | Paper | Effort | Note |
+|---|---|---|---|
+| Multivariate/joint drift + "typifying exemplar" surfacing, reusing existing fitted scaler/PCA-like artifacts | Rabanser, Günnemann, Lipton, NeurIPS 2018, arXiv:1810.11953 | Medium | Wrap/reference `alibi-detect` for the MMD/classifier-based two-sample test rather than reimplementing |
+| Multi-seed variance reporting as a first-class reproducibility feature ("Reproducibility Score") | Pineau et al., JMLR 2020, arXiv:2003.12206 | Medium | Operationalizes the most commonly-violated item on the peer-reviewed NeurIPS reproducibility checklist — a citable metric, not an arbitrary in-house one |
+
+**Important validation, not a new finding:** TFDV's own production evidence
+(Breck et al., MLSys 2019) that schema-level anomalies (missing/new
+columns, type changes) catch more real production incidents than
+statistical-distance drift tests — this is external confirmation to **not
+deprioritize** the already-planned Pandera-style fit-time schema capture
+(Phase 17a) in favor of fancier statistical drift metrics.
+
 ## What NOT to do
 
 - Don't build Phase 5/6 UI against real backend endpoints before Phase 0
@@ -444,6 +504,17 @@ third-party-transformer-friendly, not a static cost.
   — it was explicitly excluded from the research's findings due to blocked
   GitHub/Reddit/G2 search access; verify with a follow-up pass before
   acting on it.
+- Don't reimplement published algorithms from Phase 18 findings from
+  scratch where a maintained OSS package already exists to wrap
+  (`optbinning`, `pyod`, `alibi-detect`, `captum`, `cleanlab`, `tabpfn`) —
+  every recommendation in Phase 18 was deliberately chosen because a
+  maintained wrapper target exists; check the cited paper's doc for the
+  reference implementation before writing new math.
+- Don't chase Phase 18d's statistical drift metrics ahead of the
+  already-planned Pandera-style fit-time schema capture (Phase 17a) —
+  TFDV's own production evidence says schema-level anomalies catch more
+  real incidents than distribution-distance tests; schema capture is the
+  higher-priority foundation.
 
 ## Cross-References
 
@@ -474,3 +545,7 @@ third-party-transformer-friendly, not a static cost.
 - [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) — Phase 16d detail; skyulf-core README/docstring/packaging-metadata audit
 - [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md) — Phase 17a detail; MLflow-skinny, CatBoost, Pandera, Narwhals, StatsForecast, DuckDB web research with live download-count evidence
 - [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md) — Phase 17b detail; external evidence for skyulf-core's leakage-safe-artifact whitespace vs. the wider ecosystem
+- [2026-08-11-papers-preprocessing-research.md](2026-08-11-papers-preprocessing-research.md) — Phase 18a detail; optimal binning, mutual-information selection, PyOD outlier detection, all with cited papers
+- [2026-08-11-papers-automl-tuning-research.md](2026-08-11-papers-automl-tuning-research.md) — Phase 18b detail; multi-objective tuning, ASHA scheduler, warm-starting, OBOE-style recommendation, TabPFN baseline
+- [2026-08-11-papers-dl-training-research.md](2026-08-11-papers-dl-training-research.md) — Phase 18c detail; Captum explainability, LR range finder, cleanlab label-quality, plus v2-roadmap TracIn/loss-landscape candidates
+- [2026-08-11-papers-mlops-drift-research.md](2026-08-11-papers-mlops-drift-research.md) — Phase 18d detail; multivariate drift detection, multi-seed reproducibility scoring, TFDV schema-anomaly validation
