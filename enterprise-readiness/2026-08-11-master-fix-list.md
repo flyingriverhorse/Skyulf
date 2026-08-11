@@ -162,6 +162,39 @@ strategy doc; sequencing notes below reflect real dependencies.
 | Forecasting model family (ARIMA/Prophet-style) | differentiation-strategy.md Bet #5 | Large | Named, verifiable gap vs. a specific competitor capability (Databricks AutoML ships this) |
 | Declarative per-node config validation (replace 246 ad-hoc `config.get` call sites) | differentiation-strategy.md Part 3 | Large | Improves error-message quality across the board — ties to the "generic error messages" finding in smooth-experience-fixes.md |
 | Universal calculator contract tests (every registered node, not a curated subset) | differentiation-strategy.md Part 3 | Medium | Cheap insurance once the artifact-versioning/partitionable-contract work above lands — do together |
+| **New from Round 4:** per-node/per-step data preview ("click any node, see the data there, no full run required") | round4-synthesis.md, user-complaints-research.md #4 | Medium-Large | The single most externally-validated UX gap found this session — a real competitor tool was built by an ex-user of an incumbent specifically to solve this exact problem. Directly reinforces Bets #1 and #3 above; pairs naturally with the existing canvas node-config UI |
+
+## Phase 10 — Security & Scale Hardening (Round 4)
+
+New from Round 4 (security-review.md, scale-load-audit.md). Unlike Phases
+0/1 (foundational identity/tenancy work), these are scoped, mostly cheap
+fixes that should not wait for the bigger foundational phases.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Fix SSRF via EDA's unsanitized S3 `endpoint_url` (SEC-01) | security-review.md | Medium, high confidence | Small |
+| Fix SSRF via pipeline resolution's nested `client_kwargs.endpoint_url` (SEC-02) | security-review.md | Medium, high confidence | Small — same shared fix as SEC-01 |
+| Add per-user/per-org resource quotas (queued/running jobs, stored bytes, CPU/GPU time) — the IP-only rate limiter is not a substitute | scale-load-audit.md, backend-blockers.md (rate-limiter finding) | Critical | Medium |
+| Require explicit, documented concurrent Celery worker deployment (not default `solo`) with separate queues | scale-load-audit.md | Critical | Medium |
+| Enforce input/RSS memory budgets or move to streaming/chunked processing for large datasets | scale-load-audit.md | Critical | Large |
+| Migrate production deployments off SQLite + local disk to PostgreSQL + object storage (ties to Phase 0) | scale-load-audit.md, backend-blockers.md | High | Medium |
+| Virtualize/paginate large result tables and dataset previews (10,000+ rows currently render every `<tr>`) | scale-load-audit.md | High | Small-Medium |
+| Address the two data-governance Critical items: retention/DSAR workflow and encryption at rest | data-governance-audit.md | Critical (procurement blocker) | Large |
+| Broaden PII detection beyond email/phone and add a masking/tokenization workflow, not just an advisory alert | data-governance-audit.md DG-01 | High | Medium |
+
+## Phase 11 — Testing/CI Foundations (Round 4)
+
+New from Round 4 (testing-ci-audit.md). These should land before or
+alongside the DL/Ray work specifically, since that work will plug into
+exactly the areas found weakest here.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Replace the skipped, machine-specific full-inference test with a required API → DB → broker/worker → artifact → inference integration test | testing-ci-audit.md | High | High |
+| Add real canvas drag/connect Playwright E2E (current spec seeds graph state via a dev hook, bypassing the actual drag-and-drop interaction entirely) | testing-ci-audit.md | High | Medium-High |
+| Add coverage gates/ratchets for backend and frontend (none exist today beyond core's 45% floor) | testing-ci-audit.md | High | Medium |
+| Add direct tests for `job_service.py` and `pipeline_versions_service.py` (retry/cancel/ownership/failure-state), plus an auth/authz endpoint matrix | testing-ci-audit.md | High | Medium |
+| Build a Ray-local failure/retry/serialization/artifact test suite and one real node-contract E2E **before** enabling DL/Ray nodes | testing-ci-audit.md, deep-learning/README.md | High | Medium |
 
 ## What NOT to do
 
@@ -189,3 +222,9 @@ strategy doc; sequencing notes below reflect real dependencies.
 - [2026-08-11-smooth-experience-fixes.md](2026-08-11-smooth-experience-fixes.md) — Phase 8 detail
 - [2026-08-11-differentiation-strategy.md](2026-08-11-differentiation-strategy.md) — Phase 9 detail, plus the competitive-positioning rationale behind it
 - [../deep-learning/README.md](../deep-learning/README.md) — orthogonal, in-flight plan; note the sequencing interactions called out in technical-debt-deep-dive.md (tuning-engine size, pipeline schema versioning) AND Phase 9's `skyulf-core` foundational items (partitionable calculators, artifact versioning) before starting DL implementation — DL adds exactly the kind of new node types that make both gaps more costly to fix later
+- [2026-08-11-round4-synthesis.md](2026-08-11-round4-synthesis.md) — Round 4 overview and cross-links; Phase 10/11 detail
+- [2026-08-11-security-review.md](2026-08-11-security-review.md) — Phase 10 SSRF findings detail
+- [2026-08-11-scale-load-audit.md](2026-08-11-scale-load-audit.md) — Phase 10 scale/load findings detail
+- [2026-08-11-data-governance-audit.md](2026-08-11-data-governance-audit.md) — Phase 10 compliance findings detail
+- [2026-08-11-testing-ci-audit.md](2026-08-11-testing-ci-audit.md) — Phase 11 detail
+- [2026-08-11-user-complaints-research.md](2026-08-11-user-complaints-research.md) — evidence behind the Phase 9 per-node-preview addition and cross-validation of Bets #1/#3

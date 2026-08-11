@@ -1,6 +1,6 @@
 # Enterprise Readiness Investigation
 
-**Date:** 2026-08-11 (two rounds — see "Investigation rounds" below)
+**Date:** 2026-08-11 (four rounds — see "Investigation rounds" below)
 **Question this answers:** *Is there any blocker that needs backend code
 changes for Skyulf to become an enterprise app; what can be improved
 (including existing nodes) to give consumers more flexibility; what other
@@ -52,6 +52,12 @@ usage, API keys) needed once multi-tenancy lands.
 | [2026-08-11-new-enterprise-pages.md](2026-08-11-new-enterprise-pages.md) | Round 2. UX design for pages that don't exist yet: Login/SSO, Org & Workspace Settings, RBAC, Audit Log (**correction: this page already exists**, see doc), Usage/Billing/Quota, API Keys — plus a unified app-shell design tying old and new pages together. |
 | [2026-08-11-smooth-experience-fixes.md](2026-08-11-smooth-experience-fixes.md) | Round 3. Concrete, verified first-run-friction and janky-UX findings: no reachable sample dataset, generic error messages, missing trust signals (WS live indicator), inconsistent success toasts, undo-history eviction, unused `Skeleton` component. Top 3 prioritized fixes. |
 | [2026-08-11-differentiation-strategy.md](2026-08-11-differentiation-strategy.md) | Round 3. Evidence-backed competitive positioning: what makes DataRobot/H2O/Databricks/KNIME/RapidMiner/Dataiku/Modal/Baseten win or lose users (cited), 5 ranked differentiation bets for Skyulf, and a concrete list of what's missing specifically in `skyulf-core` today (AutoML layer, enforced leakage guardrails, forecasting models, partitionable calculator contract, artifact versioning). |
+| [2026-08-11-security-review.md](2026-08-11-security-review.md) | Round 4. Dedicated security-specialist pass: 2 confirmed Medium-severity SSRF findings (datasource-controlled S3 endpoint routing bypasses the existing connector guard via EDA and pipeline-resolution paths); no SQLi/command-injection/XSS/unsafe-deserialization/committed-secrets confirmed. |
+| [2026-08-11-scale-load-audit.md](2026-08-11-scale-load-audit.md) | Round 4. Production scale/load readiness: no per-tenant resource quotas (only an IP-keyed rate limiter), full-dataset in-memory processing risks OOM, undefined Celery worker concurrency, SQLite/local-disk won't survive multi-instance deployment, non-virtualized 10,000+ row result tables. |
+| [2026-08-11-data-governance-audit.md](2026-08-11-data-governance-audit.md) | Round 4. PII/compliance/SOC2/GDPR readiness: narrow, advisory-only PII detection with no masking workflow; no retention/DSAR program; no encryption at rest; biggest procurement blocker is the lack of a comprehensive, immutable audit trail. |
+| [2026-08-11-testing-ci-audit.md](2026-08-11-testing-ci-audit.md) | Round 4. Test/CI depth audit: solid gates exist (Ruff/Ty/ESLint/tsc, coverage floors, OSV+CodeQL scanning) but the one full-inference test is skipped on CI, canvas drag-and-drop has zero real-gesture E2E coverage, and the planned DL/Ray work has no safety net at its exact integration boundary. |
+| [2026-08-11-user-complaints-research.md](2026-08-11-user-complaints-research.md) | Round 4. Cited, sourced research (TrustRadius/HN/Ars Technica) on what real users of comparable AutoML/no-code tools complain about: vendor lock-in/no code export (strongest signal), pricing opacity, black-box automation, and — a novel, highly actionable finding — no per-node data preview ("the schema guessing game"), directly analogous to Skyulf's own canvas architecture. |
+| [2026-08-11-round4-synthesis.md](2026-08-11-round4-synthesis.md) | Round 4 overview: how the 5 round-4 docs cross-validate each other and rounds 1-3, and what net-new items were added to the master fix list (Phase 10, 11, and a Phase 9 addition). |
 
 ## Investigation rounds
 
@@ -95,6 +101,28 @@ rubber-duck) converged on the identical root-cause finding from different
 angles — no sample dataset is reachable anywhere in the UI despite example
 data already existing in the repo — which is treated as high-confidence
 and prioritized accordingly.
+
+**Round 4** (security-review.md, scale-load-audit.md,
+data-governance-audit.md, testing-ci-audit.md,
+user-complaints-research.md): five subagents ran in parallel to close the
+remaining investigation gaps identified after round 3 — a dedicated
+`security-review` specialist (SSRF, injection, secrets, deserialization,
+XSS), a `general-purpose` scale/load audit (DB queries, memory, worker
+concurrency, quotas, frontend rendering at scale), a `general-purpose`
+data-governance audit (PII, retention, SOC2/GDPR readiness), a `research`
+agent gathering cited external evidence of real user complaints about
+comparable AutoML/no-code platforms (explicitly requested, since internal
+audits are blind to what actually drives user churn), and a
+`general-purpose` testing/CI depth audit. All five completed with
+file:line-cited, high-confidence findings; unlike rounds 1-2, no
+cross-agent factual errors were found this round, though the
+user-complaints research **independently corroborated** two existing
+differentiation bets (black-box automation, code lock-in/export) and
+surfaced one genuinely new, highly actionable finding — no per-node data
+preview exists in the canvas, which a real competitor tool was built
+specifically to solve. See
+[2026-08-11-round4-synthesis.md](2026-08-11-round4-synthesis.md) for the
+full cross-validation writeup.
 
 ## Suggested sequencing
 
