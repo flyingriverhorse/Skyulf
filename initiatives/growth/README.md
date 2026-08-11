@@ -1,0 +1,89 @@
+# Growth
+
+**Status:** Active. This is the plan we are actually executing.
+
+This folder answers one question in one order:
+
+1. **What brings people in?**
+2. **What makes them keep using it?**
+3. **What makes an enterprise start using it?**
+
+Everything else in `initiatives/` is *research*. This folder is the only
+place that says what we do next.
+
+## Entry point
+
+[`2026-08-11-growth-plan.md`](2026-08-11-growth-plan.md) — the plan.
+
+## Operating rules
+
+These exist because the previous planning effort produced 19,172 lines of
+documentation and zero shipped fixes, then began contradicting itself. Each
+rule below is a direct countermeasure to an observed failure, not a
+preference.
+
+### 1. Nothing enters this plan without a verified repro or a measured number
+
+Every item cites either a command that was run and its output, or a metric
+with its source. "An audit says X" is not evidence; "I ran X and got Y" is.
+
+*Why:* the research in `enterprise-readiness/` is unusually good, but it was
+never re-checked against the code. Re-verification found real bugs that were
+**worse** than documented (see plan item T1) and claimed bugs whose stated
+root cause was wrong.
+
+### 2. No version numbers in this plan
+
+Versions live in `pyproject.toml`, `frontend/ml-canvas/package.json`, and
+`skyulf-core/setup.py`. This plan says "next patch" or "next minor".
+
+*Why:* `initiatives/roadmap/` hardcoded a 19-release version ledger. Two
+commits were then spent renumbering prose, and the numbers still did not
+match the repository afterwards. A plan that must be maintained in lockstep
+with three version files will lose that race every time.
+
+### 3. Horizon is three stages, roughly six to eight weeks
+
+We do not write down what happens after that. When a stage completes, we
+rewrite the plan from what we learned.
+
+*Why:* the previous roadmap sequenced R1–R19 plus an enterprise track — well
+over two years of work at the actual available budget of 2–3 days per week.
+Everything past the first few months was speculation formatted to look like
+commitment.
+
+### 4. Every item must serve at least two audiences
+
+The four audiences are: data scientists who already write Python, non-coder
+analysts, ML engineers evaluating the tool, and students. Trust-floor items
+(correctness) are exempt — they serve everyone by definition.
+
+*Why:* the target is "a bit of all of them," which is only coherent if we
+refuse work that serves exactly one.
+
+### 5. We measure before we prioritise past Stage 1
+
+*Why:* there is currently no product analytics of any kind, so nobody can
+tell whether the funnel leaks at acquisition, activation, or retention.
+Every priority call made without that number is a guess.
+
+### 6. Verify on the branch the work will land on
+
+Findings are re-reproduced on the branch that will carry the fix, not merely
+on the branch where they were noticed.
+
+*Why:* three branches are live and none contains the others — `078` (code,
+`0.7.8`), `080` (docs, `0.7.7`), and `deploy/demo-mode` (what the public
+uses, `0.7.6`, 26 commits behind). Stage 0's bugs were first found on `080`
+and had to be re-verified on `078`, which had meanwhile rewritten the very
+same functions for Polars/Pandas parity without touching the bug. A finding
+verified on the wrong branch is not a finding.
+
+## Relationship to the other initiative folders
+
+| Folder | How we use it |
+|---|---|
+| `enterprise-readiness/` | **Mined, not executed.** Its research is the raw material for this plan. Items are promoted into the plan only after re-verification. Its `master-fix-list.md` phases are *not* a schedule. |
+| `roadmap/` | **Not maintained.** Superseded by this folder. Kept for reference; its version ledger is known to be inaccurate. |
+| `ray-migration/`, `deep-learning/` | **Parked.** Both are downstream of having users. Revisit when Stage 3 data justifies them. |
+| `code-escape-hatch/`, `training-visualization/` | **Parked, partially promoted.** Their cheap first phases (read-only code view; post-fit diagnostics) are Stage 3 candidates. |

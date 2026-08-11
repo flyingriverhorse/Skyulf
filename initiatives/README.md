@@ -6,6 +6,8 @@ investigation-and-plan with its own README as the entry point.
 
 | Folder | What it covers | Status |
 |---|---|---|
+| [growth/](growth/README.md) | **The active plan.** Funnel-ordered: bring people in → keep them → earn enterprise. Three stages only (trust floor → measurement → first-run activation), every item backed by a re-run repro or a measured number. Supersedes `roadmap/`. | **Active — start here** |
+| [roadmap/](roadmap/2026-08-11-dual-track-versioned-roadmap.md) | Dual-track R1–R19 versioned release ladder. Superseded by `growth/`; version ledger known inaccurate. Task breakdowns, positioning and pricing sections still useful as reference. | Superseded, not maintained |
 | [ray-migration/](ray-migration/README.md) | Migrating pipeline job execution from Celery to Ray for distributed compute. Docs-only, unmerged design + phased implementation plans. | Design complete, not yet implemented |
 | [deep-learning/](deep-learning/README.md) | Adding deep learning (tabular/text/image/time-series) node types to the canvas, config-driven (not a layer-builder), routed through Ray for GPU scheduling. Corrected after rubber-duck validation found 2 blocking design errors in the original plan. | Design complete, validated, not yet implemented |
 | [enterprise-readiness/](enterprise-readiness/README.md) | The largest initiative: 8 rounds of subagent-driven investigation (28+ subagents total) covering backend/auth/tenancy blockers, node flexibility, technical debt, page redesigns, new enterprise pages, competitive differentiation strategy, smooth-experience UX fixes, security, scale/load, data governance, testing/CI depth, concrete bug hunting, i18n/mobile/cross-browser, user observability, API contract drift, a final meta gap-check plus dedicated `skyulf-core` DX/coverage/docs research, real external user-complaints research, web-research-backed `skyulf-core` differentiation/quick-win-tech recommendations, and a scientific-literature scan (arXiv/conference papers) across preprocessing, AutoML/tuning, DL training diagnostics, and MLOps/drift. Consolidated into a single phased master fix list (Phase 0-18). | Investigation complete, see [master fix list](enterprise-readiness/2026-08-11-master-fix-list.md) for what's next |
@@ -28,14 +30,15 @@ document (see the Scope Check rule in `writing-plans`).
 
 ## Reading order if you're new to this branch
 
-1. Start with **enterprise-readiness/2026-08-11-master-fix-list.md** — the
-   single consolidated, prioritized, phased plan. It cross-references
-   every other document, including the other two initiatives.
-2. **deep-learning/README.md** and **ray-migration/README.md** are
-   orthogonal but interact with the master fix list's `skyulf-core`
-   foundational items (see the master fix list's Phase 9 and Cross-References
-   sections) — both should be sequenced with those in mind, not built in
-   isolation.
+1. Start with **[growth/README.md](growth/README.md)** — the active plan and
+   the operating rules that govern what may enter it. Everything else in
+   this folder is research feeding into it.
+2. Then **enterprise-readiness/2026-08-11-master-fix-list.md** — the
+   consolidated findings. Read it as an evidence index, **not** as a
+   schedule; its phase numbers are groupings, not an execution order.
+3. **deep-learning/README.md** and **ray-migration/README.md** are parked.
+   Both are downstream of having users; revisit when the growth plan's
+   Stage 3 data justifies them.
 
 ## Why this folder exists
 

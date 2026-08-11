@@ -1,5 +1,21 @@
 # Skyulf Dual-Track Versioned Roadmap Implementation Plan
 
+> **⚠️ SUPERSEDED — NOT MAINTAINED (2026-08-11).** The active plan is
+> [`../growth/2026-08-11-growth-plan.md`](../growth/2026-08-11-growth-plan.md).
+>
+> Do not execute this document and do not update it. Two known defects:
+> (1) its Version Ledger states the starting versions were "verified in-repo"
+> as `0.7.9/0.7.9/0.5.8`, which did not match the repository; (2) the ledger
+> and the R1 section disagree with each other on the `skyulf-core` number.
+> More broadly, R1–R19 plus the enterprise track is well over two years of
+> work at the actual budget of 2–3 days/week, so its later ordering is
+> speculation rather than commitment.
+>
+> Kept for reference: the per-release *task breakdowns* still contain useful
+> detail, and the Positioning and Pricing sections at the end are worth
+> reading. Take content from here only after re-verifying it against the
+> code — see the growth folder's operating rules.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Sequence every finding from the `initiatives/` research (enterprise-readiness Phases 0–18, deep-learning, ray-migration, training-visualization, code-escape-hatch) into an ordered ladder of releases, each with an exact, independently-derived semver bump for `backend`, `frontend`, and `skyulf-core`, split into a mandatory **Core/OSS track** and an explicitly optional, trigger-gated **Enterprise track**.
