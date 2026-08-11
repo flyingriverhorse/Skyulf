@@ -354,6 +354,47 @@ install, quickstart, calculator/applier mental model, leakage-safety notes),
 9 comprehensive example notebooks, and a published mkdocs+mkdocstrings API
 site.
 
+## Phase 17 — Round 7: skyulf-core Differentiation & Quick-Win Tech Research
+
+A closing web-research round answering the user's explicit question: "we are
+not trying to be scikit-learn, we're trying to use their work into ours to
+make things better — how can we be different and better, without stealing
+ideas?" Two parallel web research passes: (a) genuine external whitespace —
+what does `skyulf-core` already structurally have that the wider ecosystem
+is independently converging toward wanting, and (b) concrete, cheap
+technology additions with strong 2024-2025 adoption signals.
+
+### 17a — Quick-win technology additions (see [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md))
+
+| Item | Effort | Note |
+|---|---|---|
+| MLflow-skinny one-line fit-hook (`skyulf.integrations.mlflow`, optional) | Small | 42.5M downloads/month; purely additive callback on `BaseModelCalculator.fit()`, no return-contract changes |
+| CatBoost classifier/regressor nodes | Small-Medium | Direct copy of the proven `LGBMClassifierCalculator` lazy-optional-dep pattern (`classification.py:548-608`); corroborated as still heavily used (6M+ downloads/month) |
+| Pandera-backed fit-time-schema-capture / apply-time-drift node (`SchemaContract`) | Small-Medium | Reuses the exact JSON-artifact fit/apply skeleton every node already follows; Pandera's own "Schema Inference and Persistence" feature does most of the work |
+| Narwhals as an additive third `EngineRegistry` backend | Small | Unlocks DuckDB/PyArrow/Dask/Modin as lazy inputs without hand-building per-engine adapters; do NOT replace the existing pandas/polars dispatch layer |
+| StatsForecast-backed classical forecasting node family (`auto_arima_forecaster`, `auto_ets_forecaster`) | Medium | Cheapest/lowest-maintenance-risk of the 3 forecasting options evaluated (statsmodels SARIMAX, Prophet, StatsForecast) — sklearn-style `.fit()`/`.predict()` maps directly onto `SklearnCalculator`/`SklearnApplier`; no Stan/PyStan install fragility like Prophet |
+| DuckDB as an ingestion/materialization convenience (not a full lazy execution path) | Small | Full lazy DuckDB execution (Effort L) is gated on the same "partitionable calculator contract" prerequisite as Phase 9 — don't build it early |
+
+**Sequencing note:** do Narwhals-as-engine before the Pandera schema-contract
+node — Pandera 0.32's own validation engine is now Narwhals-powered, so
+adopting Narwhals first makes the later Pandera integration strictly easier.
+
+### 17b — External differentiation whitespace (see [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md))
+
+| Item | Effort | Note |
+|---|---|---|
+| Package the existing leakage-safe calculator/applier split as a headline, marketable feature (not just an internal implementation detail) | Small (messaging/docs only) | HN/practitioner sentiment shows real, recurring pain around silent train/test leakage in ad-hoc sklearn pipelines; `skyulf-core` already structurally prevents this class of bug and isn't claiming credit for it anywhere public-facing |
+| Auto-derived fit/apply-native schema-drift detection from every fitted artifact's implied output schema (no hand-written schema required) | Medium (builds on 17a's Pandera node) | Positions against the "bolt-on, separately wired" pattern common to Pandera/Great Expectations/OpenDQV — narrower, more mechanically verifiable, and free given the existing artifact structure |
+| Auditable/versionable JSON artifacts as an explicit alternative to opaque pickles | Small (messaging) | Directly addresses reproducibility/audit complaints found in web research; already true today, just not marketed |
+| Adopt Narwhals as the internal expression-layer abstraction underneath calculator/applier (same item as 17a, listed here for its external significance) | Medium-Large | The most strategically significant item: the only path that combines genuine engine-agnosticism with a leakage-safe fit/apply artifact contract — a combination no competitor (Narwhals, skrub, feature-engine, sklearn) offers today |
+| "Too many parameters / complexity fatigue" narrative | — | **Deliberately excluded** — GitHub issue search was blocked in the research environment and no HN corroboration was found; treat as unverified until a follow-up pass has direct GitHub-issue-search or Reddit/G2 access |
+
+**Already independently corroborated, not a new finding:** the sklearn
+`Pipeline`/`BaseEstimator` compatibility gap (Phase 16b) — this round's
+Narwhals findings reinforce that the cost of *not* shipping this wrapper is
+rising as sklearn's own ecosystem gets more dataframe-agnostic and
+third-party-transformer-friendly, not a static cost.
+
 ## What NOT to do
 
 - Don't build Phase 5/6 UI against real backend endpoints before Phase 0
@@ -394,6 +435,15 @@ site.
   designed alongside Ray's per-job resource accounting from the start,
   since retrofitting usage metering onto an already-built scheduler is
   materially more expensive.
+- Don't build a full lazy DuckDB execution path or a full internal Narwhals
+  engine replacement (Phase 17a) as "quick wins" — both are genuinely
+  valuable but L-effort architectural changes gated on the same
+  "partitionable calculator contract" prerequisite as Phase 9; only the
+  additive/lazy-backend-only versions of each belong in a quick-win batch.
+- Don't treat Phase 17b's "complexity fatigue" narrative as evidence-backed
+  — it was explicitly excluded from the research's findings due to blocked
+  GitHub/Reddit/G2 search access; verify with a follow-up pass before
+  acting on it.
 
 ## Cross-References
 
@@ -422,3 +472,5 @@ site.
 - [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md) — Phase 16b detail; skyulf-core ergonomics with before/after code snippets
 - [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md) — Phase 16c detail; full node-registry inventory plus algorithm-coverage gaps vs. sklearn/feature-engine/category_encoders/imbalanced-learn
 - [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) — Phase 16d detail; skyulf-core README/docstring/packaging-metadata audit
+- [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md) — Phase 17a detail; MLflow-skinny, CatBoost, Pandera, Narwhals, StatsForecast, DuckDB web research with live download-count evidence
+- [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md) — Phase 17b detail; external evidence for skyulf-core's leakage-safe-artifact whitespace vs. the wider ecosystem

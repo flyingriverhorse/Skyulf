@@ -1,6 +1,6 @@
 # Enterprise Readiness Investigation
 
-**Date:** 2026-08-11 (six rounds — see "Investigation rounds" below)
+**Date:** 2026-08-11 (seven rounds — see "Investigation rounds" below)
 **Question this answers:** *Is there any blocker that needs backend code
 changes for Skyulf to become an enterprise app; what can be improved
 (including existing nodes) to give consumers more flexibility; what other
@@ -67,6 +67,8 @@ usage, API keys) needed once multi-tenancy lands.
 | [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md) | Round 6. `skyulf-core` developer-experience audit (hands-on usage, not just reading): calculators silently no-op on bad config instead of raising; no sklearn `BaseEstimator`/`TransformerMixin` protocol (confirmed `Pipeline` incompatibility); bare untyped `dict` configs; standalone (non-canvas) usage genuinely works today but is undocumented. |
 | [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md) | Round 6. Full `NodeRegistry` inventory plus algorithm-coverage diff vs. sklearn/feature-engine/category_encoders/imbalanced-learn: no forecasting models (ARIMA/Prophet), no CatBoost, no cyclical calendar encoding, no VIF/multicollinearity node, no group-aware CV — imbalanced-learn and NLP coverage confirmed already strong. |
 | [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) | Round 6. `skyulf-core`'s own README/docstrings/packaging-metadata: a strong 438-line README and 9 example notebooks already exist; the "add a new node" guide is good but lives outside `skyulf-core/`; docstring coverage is inconsistent on node source files; `pyproject.toml` is nearly empty with real metadata stuck in `setup.py`. |
+| [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md) | Round 7. Web research into concrete quick-win tech additions: MLflow-skinny one-line fit-hook (42.5M downloads/month), CatBoost nodes (direct copy of the existing LightGBM lazy-dep pattern), Pandera-backed schema-capture/drift node, Narwhals as an additive third engine backend, StatsForecast for classical forecasting, DuckDB scoped to ingestion convenience only. Ranked top-5 cheapest/highest-value list included. |
+| [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md) | Round 7. External web evidence for genuine `skyulf-core` whitespace: the existing leakage-safe calculator/applier split and JSON-artifact model are structural advantages the wider ecosystem is independently converging toward wanting, but aren't marketed anywhere; also identifies Narwhals-as-engine-abstraction as the single most strategically significant, uniquely-combinable differentiator. |
 
 ## Investigation rounds
 
@@ -174,6 +176,25 @@ alongside concrete, cheap-to-fix gaps (bad-config silent no-ops, no
 sklearn Pipeline interop, missing CatBoost/forecasting models, docstring
 coverage holes on the actual node files). Folded into the master fix list
 as Phase 16 (16a-16d).
+
+**Round 7** (core-quickwin-tech-research.md, core-differentiation-research.md):
+two `research` agents ran in parallel answering the user's direct question
+of how `skyulf-core` can differentiate itself from (not clone) the wider
+ecosystem — one focused on concrete, cheap technology additions with strong
+2024-2025 adoption evidence (live PyPI download-count queries, official docs),
+the other on genuine external whitespace grounded in real HN/practitioner
+pain points. Both independently converged on the same two headline findings:
+(1) the library's existing leakage-safe calculator/applier split and
+JSON-artifact model are already a structural advantage that just isn't
+marketed anywhere, and (2) adopting Narwhals as an additive internal
+expression-layer/engine-backend is the single most strategically significant
+move available — it's the only path that combines genuine dataframe-engine
+agnosticism with skyulf-core's leakage-safe fit/apply contract, a
+combination no competitor (Narwhals, skrub, feature-engine, sklearn) offers
+today. Concrete quick wins ranked cheapest-to-highest-value: MLflow-skinny
+fit-hook, CatBoost nodes, Pandera schema-drift node, Narwhals-as-engine,
+StatsForecast forecasting nodes. Folded into the master fix list as Phase 17
+(17a-17b).
 
 ## Suggested sequencing
 
