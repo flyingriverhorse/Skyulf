@@ -204,6 +204,39 @@ def test_apply_engine_parity_pandas_vs_polars(df: pd.DataFrame) -> None:
     )
 
 
+def test_polars_fit_integer_column_with_nulls_matches_apply_representation() -> None:
+    """Fit-time string keys for a Polars integer column must match apply-time rendering.
+
+    Regression test: pandas' ``.to_pandas()`` upcasts an int column containing
+    nulls to float, so a naive ``frame[col].astype(str)`` fit-time key would be
+    "1.0" while the Polars apply path (``.cast(pl.Utf8)``) renders "1" -- every
+    known category would then silently miss the mapping and fall back to
+    ``default`` at apply time.
+    """
+    X_fit = pl.DataFrame({"cat": [1, 2, 1, 2, 1, None, 2, 1]})
+    y_fit = pl.Series("y", [1, 0, 1, 0, 1, 0, 0, 1])
+    params = WOEEncoderCalculator().fit((X_fit, y_fit), {"columns": ["cat"]})
+
+    mappings = params["mappings"]["cat"]
+    assert set(mappings.keys()) == {"1", "2", "nan"}
+
+    X_apply = pl.DataFrame({"cat": [1, 2, 1, None]})
+    y_apply = pl.Series("y", [1, 0, 1, 0])
+    out, _ = WOEEncoderApplier().apply((X_apply, y_apply), dict(params))
+
+    expected = [mappings["1"], mappings["2"], mappings["1"], mappings["nan"]]
+    np.testing.assert_allclose(out["cat"].to_numpy(), expected, rtol=1e-9, atol=1e-9)
+
+
+def test_polars_fit_integer_column_without_nulls_uses_bare_string_keys() -> None:
+    """A Polars integer column with no nulls should key the WOE map as plain ints-as-strings."""
+    X_fit = pl.DataFrame({"cat": [1, 2, 1, 2, 1, 2, 2, 1]})
+    y_fit = pl.Series("y", [1, 0, 1, 0, 1, 0, 0, 1])
+    params = WOEEncoderCalculator().fit((X_fit, y_fit), {"columns": ["cat"]})
+
+    assert set(params["mappings"]["cat"].keys()) == {"1", "2"}
+
+
 def test_polars_apply_no_valid_columns_is_noop() -> None:
     """Polars apply returns X, y unchanged when configured columns/mappings aren't available."""
     X = pd.DataFrame({"city": ["a", "b"]})
