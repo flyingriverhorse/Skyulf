@@ -47,6 +47,110 @@ So the problem is not "nobody can find it." The problem is what happens in
 the five minutes after they do, that we cannot measure it, and that we have
 no reliable way to ship them a fix.
 
+**And underneath that, a correctness problem that outranks all of it.** Two
+independent audits — this one and `dual-engine-correctness/` — found
+different bugs in the same files without overlapping. A deployed model
+currently returns different predictions depending on the JSON key order of
+the request. Growth work that succeeds before those are fixed is worse than
+growth work that fails.
+
+## Salvage ledger — what came from where
+
+Every other `initiatives/` folder was read and explicitly dispositioned. The
+verdict matters as much as the promotion: recording "nothing here" prevents
+the same 6,000 lines being re-mined every quarter.
+
+| Folder | Lines | Verdict | Promoted into this plan |
+|---|---|---|---|
+| `dual-engine-correctness/` | 543 | **Promote Tier 1 wholesale** | Stage 0 — see below. Highest-quality doc in the repo. |
+| `enterprise-readiness/` | ~5,000 | **Mined** | Stage 0 (T1–T6 origin), Stage 2 (A2.1, A2.6), all seven Stage 3 candidates |
+| `training-visualization/` | 318 | **One cheap slice** | Stage 3 — post-fit diagnostics |
+| `code-escape-hatch/` | 108 | **One cheap slice + one honesty fix** | Stage 3 — read-only code view |
+| `deep-learning/` | 1,363 | **Findings only, nothing actionable now** | Nothing. Two rules recorded below for if/when DL starts. |
+| `ray-migration/` | 6,241 | **Nothing** | Nothing. |
+| `roadmap/` | 2,227 | **Superseded** | Nothing; known-inaccurate version ledger. |
+
+**`ray-migration/` — nothing salvageable, and that is the correct answer.**
+Seven files, 6,241 lines, six sequential plans each gated on the last. No
+phase is independently cheap: even Plan 1 (a backend-neutral submission
+contract) is a multi-week foundation. Its own execution rule is the reason
+to leave it alone: *"if Ray does not provide a measurable benefit… keep the
+backend abstraction and do not remove Celery."* **No benefit has been
+measured.** This is a scaling solution waiting for a scaling problem, and
+the demo's traffic is currently unknown.
+
+**`deep-learning/` — findings only.** A whole new subsystem (PyTorch loop,
+new modality, new artifact format); no days-scale slice exists. Two items
+recorded so they are not rediscovered later:
+
+- `torch.load` carries the same arbitrary-code-execution risk as
+  `joblib.load` — requires `weights_only=True`. *(Claimed; applies only
+  once DL work starts.)*
+- New frontend node types must be added to `RUN_MODE_TRAINING_TYPES`
+  (`pipelineConverter.ts:29-34`) or they silently fail to serialise as
+  training steps. A generic gotcha that has caused shipped bugs before.
+
+**`code-escape-hatch/` — one honesty fix worth taking early.** Its Phase A
+is a Stage 3 candidate, but it also contains a labelling correction that
+costs nothing: the existing notebook export is *"templated registry glue
+plus substituted config, not a decompilation"* (`:46`, confirmed against
+`_notebook_builders.py:353-364`). So A2.5's copy must say "export a runnable
+notebook," **not** "see the exact code behind each node." Marketing the
+stronger claim would be false.
+
+## The dual-engine audit changes Stage 0
+
+`dual-engine-correctness/` (added 2026-08-11) is the one prior document that
+meets this folder's evidence bar unaided: every finding reproduced with an
+executable probe, and an adversarial pass that **disproved one of its own
+accepted HIGH findings** and downgraded two more as unreachable in
+production. A planning document that argues itself *down* is trustworthy in
+a way that the rest of `initiatives/` is not.
+
+**Spot-checked two of its claims before promoting anything:**
+
+- **F-06 confirmed.** It reports that a previously-announced fix was never
+  actually applied. `grep -rn is_nan skyulf/` returns only `drop_rows.py`,
+  `missing_indicator.py`, `profiling/expect.py` — `iqr.py` and `zscore.py`
+  are absent, exactly as the doc says.
+- **F-04 confirmed, and worse than documented.** Full fit→apply cycle:
+
+  ```
+  pandas: fill={'n': 2.5}, missing_counts={'n': 1} -> [1.0, 2.0, 3.0, 4.0, 2.5]
+  polars: fill={'n': nan}, missing_counts={'n': 0} -> [1.0, 2.0, 3.0, 4.0, nan]
+  ```
+
+  Polars does not merely fail to impute. It computes a **NaN mean**, reports
+  **zero missing values**, and writes that count into the artifact. The doc
+  describes the no-op; the false "0 missing" report is worse, because it is
+  what a user would check to confirm the imputation worked.
+
+**Its Tier 1 is adopted into Stage 0 as-is:**
+
+| ID | Defect | Why it outranks most of T1–T6 |
+|---|---|---|
+| F-01 | `DummyEncoder` emits null dummies on Polars → training hard-fails | Breaks a documented engine |
+| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression |
+| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form |
+
+**F-02 is the most severe defect found anywhere in this repo.** Two
+identical requests differing only in JSON key order return different
+predictions, and sklearn's warning about it is swallowed to stderr.
+
+**The two audits are disjoint — which is the argument for T5.** Both
+examined `lag.py`. This plan found a stale, misaligned `y`; the dual-engine
+audit found `drop_nulls()` vs `dropna()` row-count divergence (F-21, `:54`).
+**Neither found the other's bug in the same file.** Two thorough,
+independent passes, each with real findings, each blind to the other's. No
+amount of further auditing closes that gap — only an executable contract
+run against every node in the registry does. T5 stops being a nice-to-have.
+
+**Deferred from that audit, deliberately:** F-15 (CV does not re-fit
+preprocessing per fold, so every reported CV score is systematically
+optimistic). It is real, but fixing it moves every number Skyulf has ever
+reported *downwards* and needs a design note, a migration story and probably
+an opt-in flag first. Its own doc says the same. Not Stage 0.
+
 ## Stage 0 — Trust floor
 
 **Why first.** Acquisition work on a platform that silently mislabels
@@ -54,8 +158,20 @@ training data buys users who get wrong answers and leave permanently. In an
 ML tool, "it gave me garbage" is the one first impression you cannot
 recover from, and it is the kind of thing users write about publicly.
 
-**Every item below was re-reproduced on branch `078` on 2026-08-11** (via a
-throwaway worktree), not merely on the branch where it was first found.
+**Order within Stage 0** (revised after the dual-engine audit):
+
+1. **F-02, F-03** — deployment-blocking, engine-independent, affect every
+   user regardless of engine choice.
+2. **T1** — silent target misalignment; corrupts results rather than
+   blocking them, which is worse but affects fewer pipelines.
+3. **F-01, F-04, F-05, F-06** — silent corruption on the Polars path.
+4. **T2, T3, T6** — self-inflicted defaults that no-op. Cheap; can ride
+   with any of the above.
+5. **T5** — the contract test. Last to write, first in value.
+
+**Every T-item below was re-reproduced on branch `078` on 2026-08-11** via a
+throwaway worktree. F-items were reproduced by the dual-engine audit; F-04
+and F-06 were additionally re-verified here.
 
 ### T1 — Lag and Rolling nodes return a stale, misaligned `y` (critical)
 
@@ -157,9 +273,26 @@ parametrised test over `NodeRegistry` asserting, for every registered node:
 2. Any node that changes row count or row order returns a `y` whose length
    and order match `X`.
 
-This test fails on T1, T2, and T3 today. Three bug fixes are worth a week; a
-test that makes the whole class impossible is worth considerably more, and
-it is the single highest-value artifact in this stage.
+3. **Engine parity on float `NaN`, not only nulls**, and on **wrapped**
+   frames, not only raw ones. This clause comes from the dual-engine audit's
+   cross-cutting finding, and it is the load-bearing one: the existing
+   195-test parity suite passes clean against *every bug in both audits*
+   because it never exercises those two cases.
+
+This test fails on T1, T2, and T3 today, and clause 3 fails on F-01 and
+F-04 through F-06.
+
+**Why this is the deliverable and not a nice-to-have.** Two thorough,
+independent audits both examined `lag.py`. One found a stale, misaligned
+`y`; the other found `drop_nulls()`/`dropna()` row-count divergence. Neither
+found the other's bug. Auditing harder does not close that gap — 33 findings
+plus 6 findings, same files, no overlap, is evidence that human and agent
+review both miss whatever they were not looking for. An executable contract
+run against all 100 registered nodes does close it.
+
+Three bug fixes are worth a week. A test that makes the whole class
+impossible is worth considerably more, and it is the single highest-value
+artifact in this plan.
 
 ### T6 — FeatureMath silently drops datetime features on mixed-offset input
 
@@ -467,6 +600,15 @@ leaving it buried.
 
 The cheapest item in this plan and the best-evidenced.
 
+**Word it accurately.** Per `code-escape-hatch/2026-08-11-feasibility-and-security.md:46`,
+the exporter emits *"templated registry glue plus substituted config, not a
+decompilation"* — confirmed against `_notebook_builders.py:353-364`. So the
+claim is **"export a runnable notebook you own and can run without Skyulf."**
+It is **not** "see the exact code behind each node." The first is true and
+answers the lock-in complaint completely; the second is false, and getting
+caught overstating it on the one axis where trust is the product would cost
+more than the feature earns.
+
 *Audiences: data scientists, ML engineers.*
 
 ### A2.6 — Fix the upload size message
@@ -498,8 +640,18 @@ Stage 1 data:
 | Inspectable trace for auto/tuning nodes | Strong (H2O, SageMaker Canvas, DataRobot all criticised for opacity) | user-complaints-research #3 |
 | Post-upload pipeline recommendation | `profiling/recommendations.py` already computes the heuristics; only assembly is missing | smooth-experience-fixes Top 3 #2 |
 | "Live / Reconnecting" indicator | `jobEventsSocket.ts:44-90` plumbing exists with zero rendered consumers | smooth-experience-fixes §C |
-| Post-fit diagnostics surfaced on job completion | Reuses existing chart components | training-visualization 15b tier (a) |
-| Read-only per-node generated code | Zero new security risk per its own study | code-escape-hatch Phase A |
+| Post-fit diagnostics surfaced on job completion | The metrics are **already computed** — `_evaluation/classification.py:8,94,117` produces confusion matrix, ROC and PR via sklearn — and `ClassificationChartsForSplit.tsx` / `RegressionChartsForSplit.tsx` already render them. Pure wiring. | training-visualization tier (a)1-2 |
+| Read-only per-node generated code | No new execution path; display and export only | code-escape-hatch Phase A |
+
+**Two limits recorded now, so they are not promised by accident:**
+
+- **No live training curves.** The training-visualization doc's own line —
+  *"do not promise live curves for ordinary sklearn `fit()` calls"* — is
+  correct: sklearn's `fit()` offers no callback to stream from. Live curves
+  need the deep-learning direct-fit branch, which is parked.
+- **`learning_curve` / `validation_curve` cost `n_sizes × n_folds` refits**
+  and must be an opt-in separate job, never inline in a run. *(Reasoned in
+  the doc, not measured.)*
 
 Enterprise (stage 3 of the funnel) is downstream of all of the above: an
 organisation adopts a tool its people already use. The auth/tenancy work in
@@ -581,23 +733,47 @@ is no longer a risk here.
 
 ## Execution order (decided)
 
-Derived from the dependency graph, not from preference:
+Derived from the dependency graph, not from preference. Revised after the
+dual-engine audit landed.
 
-1. **Stage 0 `skyulf-core` fixes → ship to PyPI.** T1, T2, T3, T6 and the
-   T5 contract test are all `skyulf-core`, which releases on its own
-   `core-v*` tag and **never touches the demo branch**. This path is
-   unblocked today, and it is the one actively corrupting results for 1,222
-   downloads/month.
-2. **Check the GitHub traffic panel** (Stage 1b, first half). Free, no code,
-   and it decides whether the rest of the funnel work is justified at all.
-   Do this *before* Stage 2, not after.
-3. **A2.2 — fix the templates on `078`**, then **1a** — cherry-pick them to
-   the demo branch and redeploy. A2.2 must land first; 1a is a follow-on of
-   an hour, not a stage.
-4. **The rest of Stage 2**, weighted by whatever step 2 revealed.
+1. **F-02 + F-03 — the deployment blockers.** These live in `backend/`
+   (`deployment/service.py`, `_node_runners.py`), are engine-independent,
+   and mean that today a deployed model can return different predictions
+   for the same data depending on JSON key order. Nothing else in this plan
+   competes with that. **F-03 requires a frontend check** — it drives the
+   UI input schema, so per repo policy the node components must be verified
+   against the corrected contract.
+2. **The `skyulf-core` fixes → ship to PyPI.** F-01, F-04, F-05, F-06 plus
+   T1, T2, T3, T6. `skyulf-core` releases on its own `core-v*` tag and
+   **never touches the demo branch**, so this path is unblocked today. It
+   is also the one actively corrupting results for 1,222 downloads/month.
+3. **T5 — the contract test**, together with the audit's cross-cutting test
+   debt: parity tests that use **float NaN** (not only nulls) and **wrapped**
+   frames. The existing 195-test parity suite passes clean against *every
+   bug in both audits*, which is the real finding. Without this, the suite
+   keeps going green while the product stays broken.
+4. **Check the GitHub traffic panel** (Stage 1b, first half). Free, no code,
+   and it decides whether the funnel work below is justified at all. Do this
+   *before* Stage 2, not after.
+5. **A2.2 — fix the templates on `078`**, then **1a** — cherry-pick to the
+   demo branch and redeploy. A2.2 must land first; 1a is an hour, not a
+   stage.
+6. **The rest of Stage 2**, weighted by whatever step 4 revealed.
 
 The cheap, isolated items (`start.sh` chmod, upload-size text) can ride
 along with any of the above; they depend on nothing.
 
 Stage 1b's event instrumentation is deliberately **not** in this list. It is
-conditional on step 2 showing traffic worth measuring.
+conditional on step 4 showing traffic worth measuring.
+
+**Versioning.** The dual-engine audit proposes its own ledger (T1 → core
+`0.5.9`; T2 → core `0.6.0` as a minor, since fixes change behaviour: rows
+previously dropped are now kept, imputers that previously no-opped now
+impute, HashEncoder buckets change and old artifacts stop reproducing).
+That ledger is sound — **use it rather than inventing a second one here.**
+This plan sequences the work; `dual-engine-correctness/` owns the version
+and release-note detail.
+
+**Every fix in steps 1–3 is written red-green:** failing test first, confirm
+it fails, then fix. Not negotiable — the entire reason these bugs survived
+is a test suite that was green throughout.

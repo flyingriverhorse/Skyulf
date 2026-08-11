@@ -85,9 +85,16 @@ is still behind by design — see the plan's Stage 1 scope decision.
 
 ## Relationship to the other initiative folders
 
-| Folder | How we use it |
+| Folder | Disposition |
 |---|---|
-| `enterprise-readiness/` | **Mined, not executed.** Its research is the raw material for this plan. Items are promoted into the plan only after re-verification. Its `master-fix-list.md` phases are *not* a schedule. |
-| `roadmap/` | **Not maintained.** Superseded by this folder. Kept for reference; its version ledger is known to be inaccurate. |
-| `ray-migration/`, `deep-learning/` | **Parked.** Both are downstream of having users. Revisit when Stage 3 data justifies them. |
-| `code-escape-hatch/`, `training-visualization/` | **Parked, partially promoted.** Their cheap first phases (read-only code view; post-fit diagnostics) are Stage 3 candidates. |
+| `dual-engine-correctness/` | **Promoted.** Its Tier 1 (F-01/F-02/F-03) is part of Stage 0, and it keeps ownership of the version ledger and release notes for those fixes. The only prior doc that met this folder's evidence bar unaided. |
+| `enterprise-readiness/` | **Mined, not executed.** Raw material for this plan; items promoted only after re-verification. Its `master-fix-list.md` phases are *not* a schedule. |
+| `training-visualization/` | **One slice promoted** (post-fit diagnostics, Stage 3). Rest parked behind the deep-learning work. |
+| `code-escape-hatch/` | **One slice promoted** (read-only code view, Stage 3), plus a labelling correction applied to A2.5. Phase C blocked on auth/tenancy. |
+| `deep-learning/` | **Nothing actionable.** Two findings recorded in the salvage ledger for if/when it starts. |
+| `ray-migration/` | **Nothing.** 6,241 lines, six gated plans, no independently cheap phase. Its own rule blocks it: no measurable benefit has been measured. |
+| `roadmap/` | **Not maintained.** Superseded by this folder; its version ledger is known inaccurate. |
+
+Every folder above was read and explicitly dispositioned on 2026-08-11.
+Recording "nothing here" is a deliverable: it stops the same 6,000 lines
+being re-mined next quarter.
