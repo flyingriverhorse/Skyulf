@@ -95,10 +95,13 @@ class PandasEngine(BaseEngine):
 
     @classmethod
     def to_numpy(cls, df: Any) -> Any:
+        # `SkyulfPandasWrapper` delegates unknown attributes to its wrapped
+        # `pd.DataFrame` via `__getattr__`, so `hasattr(df, "to_numpy")` is
+        # already `True` for it (and for any pandas/Polars object, both of
+        # which expose `.to_numpy()` natively) -- an `isinstance(df,
+        # SkyulfPandasWrapper)` branch here would be unreachable dead code.
         if hasattr(df, "to_numpy"):
             return df.to_numpy()
-        if isinstance(df, SkyulfPandasWrapper):
-            return df.to_pandas().to_numpy()
         return np.array(df)
 
     @classmethod

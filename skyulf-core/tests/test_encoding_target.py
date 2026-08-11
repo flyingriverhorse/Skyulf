@@ -679,16 +679,18 @@ def test_extract_target_returns_none_when_target_col_missing_from_x() -> None:
     assert _extract_target(X, None, "missing_col") is None
 
 
-def test_y_to_numpy_uses_to_pandas_fallback() -> None:
-    """_y_to_numpy converts via `.to_pandas().to_numpy()` for objects lacking `.to_numpy`."""
+def test_y_to_numpy_converts_pandas_and_polars_series() -> None:
+    """_y_to_numpy uses native `.to_numpy()` for both pandas and Polars Series.
+
+    Both engines' Series/DataFrame types expose `.to_numpy()` natively, so a
+    `.to_pandas()` fallback is never reached for any real input in this
+    codebase; this test locks in the real conversion path instead of a
+    synthetic object shape that cannot occur in practice.
+    """
     from skyulf.preprocessing.encoding.target import _y_to_numpy
 
-    class _ToPandasOnly:
-        def to_pandas(self) -> pd.Series:
-            return pd.Series([1, 2, 3])
-
-    result = _y_to_numpy(_ToPandasOnly())
-    np.testing.assert_array_equal(result, np.array([1, 2, 3]))
+    np.testing.assert_array_equal(_y_to_numpy(pd.Series([1, 2, 3])), np.array([1, 2, 3]))
+    np.testing.assert_array_equal(_y_to_numpy(pl.Series([1, 2, 3])), np.array([1, 2, 3]))
 
 
 def test_fit_target_encoder_reraises_unrelated_value_error() -> None:
