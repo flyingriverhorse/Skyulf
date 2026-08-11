@@ -1,6 +1,6 @@
 # Enterprise Readiness Investigation
 
-**Date:** 2026-08-11 (five rounds — see "Investigation rounds" below)
+**Date:** 2026-08-11 (six rounds — see "Investigation rounds" below)
 **Question this answers:** *Is there any blocker that needs backend code
 changes for Skyulf to become an enterprise app; what can be improved
 (including existing nodes) to give consumers more flexibility; what other
@@ -63,6 +63,10 @@ usage, API keys) needed once multi-tenancy lands.
 | [2026-08-11-user-observability-audit.md](2026-08-11-user-observability-audit.md) | Round 5. Strong diagnostic pieces already exist (job logs, preview-node failure cards, SHAP diagnostics) but are fragmented across disconnected UI surfaces instead of one canonical per-run timeline. |
 | [2026-08-11-api-contract-drift-audit.md](2026-08-11-api-contract-drift-audit.md) | Round 5. OpenAPI spec exists but isn't consumed for frontend codegen; confirmed `JobInfo` field drift, force-cast EDA status strings, and WebSocket frames validated on the backend but not the frontend despite Zod already being installed. |
 | [2026-08-11-round5-synthesis.md](2026-08-11-round5-synthesis.md) | Round 5 overview: cross-validation against rounds 1-4 and the net-new master-fix-list additions (Phase 12 confirmed bugs, Phase 13 API contract hardening, Phase 14 i18n/mobile/cross-browser, plus a Phase 9 addition). |
+| [2026-08-11-round6-gap-audit.md](2026-08-11-round6-gap-audit.md) | Round 6. Final meta gap-check against rounds 1-5 plus both feasibility studies: model registry only supports one globally-"live" deployment (no per-pipeline/environment scoping); zero licensing/billing/entitlement enforcement code exists anywhere; no cost/FinOps visibility; `.env.example` omits all AWS/S3 vars the app actually reads; notebook export was never checked for standalone execution correctness; no backup/DR/multi-region story anywhere. |
+| [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md) | Round 6. `skyulf-core` developer-experience audit (hands-on usage, not just reading): calculators silently no-op on bad config instead of raising; no sklearn `BaseEstimator`/`TransformerMixin` protocol (confirmed `Pipeline` incompatibility); bare untyped `dict` configs; standalone (non-canvas) usage genuinely works today but is undocumented. |
+| [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md) | Round 6. Full `NodeRegistry` inventory plus algorithm-coverage diff vs. sklearn/feature-engine/category_encoders/imbalanced-learn: no forecasting models (ARIMA/Prophet), no CatBoost, no cyclical calendar encoding, no VIF/multicollinearity node, no group-aware CV — imbalanced-learn and NLP coverage confirmed already strong. |
+| [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) | Round 6. `skyulf-core`'s own README/docstrings/packaging-metadata: a strong 438-line README and 9 example notebooks already exist; the "add a new node" guide is good but lives outside `skyulf-core/`; docstring coverage is inconsistent on node source files; `pyproject.toml` is nearly empty with real metadata stuck in `setup.py`. |
 
 ## Investigation rounds
 
@@ -147,6 +151,29 @@ ops-facing observability already covered in backend-blockers.md), and API
 contract drift beyond the already-documented node-parameter duplication
 pattern. See [2026-08-11-round5-synthesis.md](2026-08-11-round5-synthesis.md)
 for the full writeup.
+
+**Round 6** (round6-gap-audit.md, core-dx-improvements.md,
+core-coverage-gaps.md, core-docs-onboarding.md): four final subagents ran
+in parallel — one `explore` agent doing a pure meta gap-check (reading
+every prior round's docs plus both feasibility studies in full, then
+verifying against the live codebase only the areas not yet covered:
+deployment/packaging, licensing/billing, cost/FinOps, model registry
+depth, backup/DR, notebook-export correctness) and three `explore` agents
+specifically researching `skyulf-core` improvements as its own product
+surface (requested directly, distinct from the canvas/platform lens every
+prior round used) — hands-on DX/ergonomics, algorithm/feature coverage vs.
+the wider ML ecosystem, and docs/onboarding. The gap-audit explicitly
+cross-checked its 10-item candidate list against all prior docs first and
+confirmed 4 of 10 areas (deployment/packaging, data connectors, plugin
+SDK, onboarding) were already adequately covered, reporting only the 6
+genuinely new findings. All three `skyulf-core` agents independently
+confirmed the library already has real strengths (a working standalone
+usage path with no canvas/registry ceremony required, a strong 438-line
+README, 9 example notebooks, comprehensive imbalanced-learn/NLP coverage)
+alongside concrete, cheap-to-fix gaps (bad-config silent no-ops, no
+sklearn Pipeline interop, missing CatBoost/forecasting models, docstring
+coverage holes on the actual node files). Folded into the master fix list
+as Phase 16 (16a-16d).
 
 ## Suggested sequencing
 

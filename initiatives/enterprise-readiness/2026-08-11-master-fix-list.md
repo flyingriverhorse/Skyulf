@@ -282,6 +282,78 @@ for ordinary sklearn `.fit()` calls, which are not iterative.**
 | sklearn learning curves / validation curves as separate, explicitly-requested diagnostic jobs (never inline — each retrains the estimator N times) | (c) expensive, opt-in | Low-Medium | Medium | Show an estimated fit-count/runtime before the user commits to running one |
 | Sampled t-SNE/UMAP as an opt-in post-fit job only if PCA proves insufficient in user research | (c) expensive, opt-in | Low | Medium | Never stream evolving t-SNE/UMAP; cache the artifact |
 
+## Phase 16 — Round 6: Final Gap Check & skyulf-core Improvement Research
+
+A closing investigation round: (a) one meta gap-audit cross-checking Rounds
+1-5 plus both feasibility studies against the live codebase for genuinely
+untouched enterprise-readiness areas, and (b) three focused studies on
+`skyulf-core` itself (the standalone preprocessing/modeling library) — DX/
+ergonomics, algorithm/feature coverage vs. the wider ecosystem, and docs/
+onboarding — since making the *library*, not just the canvas, easier to use
+is a distinct lever for adoption.
+
+### 16a — Meta gap-audit (see [2026-08-11-round6-gap-audit.md](2026-08-11-round6-gap-audit.md))
+
+| Item | Severity | Effort | Note |
+|---|---|---|---|
+| Model registry allows only one globally-"live" deployment platform-wide (no `pipeline_id`/environment scoping) — deploying any model un-deploys every other one | High | Medium-Large | Architectural; blocks running more than one model in production simultaneously, a baseline enterprise expectation |
+| Zero licensing/billing/entitlement enforcement code exists anywhere (no plan/tier/seat/usage-event models) | Medium-High | Large | Confirmed at the implementation level — differentiation-strategy.md covered pricing *strategy*, not that literally no enforcement code exists |
+| No cost/FinOps visibility — no tenant can see what a pipeline run cost; no cost data computed or stored anywhere (including in Ray-migration design) | Medium-High | Medium | Should be designed alongside the Ray migration's per-job resource accounting, not bolted on after |
+| `.env.example` omits entire configuration classes the app actually reads (all AWS/S3 vars from `backend/config/mixins/aws.py`) | Medium | Small | Simple, high-value quick fix — a real self-hosting trap today |
+| Notebook export has never been checked for standalone execution correctness (only security/faithfulness studied) — no `nbclient`/`papermill` execution tests, no correct `skyulf-core[extras]` install line emitted | Medium | Small-Medium | Sits directly behind Phase 15a's Phase A (read-only code view + export) — fix before shipping that phase, not after |
+| No backup/disaster-recovery/multi-region story anywhere beyond one-line mentions — no tooling, runbook, or RPO/RTO targets | Medium-High | Large | Procurement blocker for regulated/enterprise buyers; needs its own dedicated design doc |
+
+**Already adequately covered, not duplicated:** deployment/packaging (Docker
+Compose story exists and was implicitly covered by backend-blockers.md and
+scale-load-audit.md), data-connector breadth, plugin/extension SDK
+(NodeRegistry already supports this — see node-flexibility.md), and
+onboarding/first-run UX (covered by smooth-experience-fixes.md and
+user-complaints-research.md).
+
+### 16b — skyulf-core DX/ergonomics (see [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md))
+
+| Item | Severity | Effort | Note |
+|---|---|---|---|
+| Calculators/Appliers silently no-op (`{}` artifact) on bad config instead of raising an actionable error | High friction | Small-Medium | Same "silent no-op" bug class as Phase 12 findings #6/#7 — fix should share the same validation helper |
+| No sklearn `BaseEstimator`/`TransformerMixin` protocol — cannot drop a Calculator into `sklearn.pipeline.Pipeline` (confirmed: raises a confusing `TypeError`) | High (adoption blocker for notebook-first users) | Medium | Directly serves the "avoid vendor lock-in" complaint theme from user-complaints-research.md |
+| `config`/`params` are bare `dict[str, Any]` everywhere — no IDE autocomplete or typo protection at call time (only output artifacts use TypedDicts today) | Medium | Small-Medium | Incrementally add `TypedDict` input schemas per node family, reusing the existing artifact-TypedDict pattern |
+| Registration via `@NodeRegistry.register`/`@node_meta` is a decorator side-effect, not a constructor requirement — standalone (non-canvas) usage genuinely works today, but this isn't documented anywhere | Medium (pure documentation gap) | Small | Cheapest, highest-leverage fix in this batch — just needs a README section |
+| No per-node generated API reference despite `node_meta` already holding structured metadata that could drive one | Low | Medium | Natural companion to Phase 15a's code-visibility work |
+| Test-only sample-dataset loader (`tests/utils/dataset_loader.py`) is a good "quickstart" utility not exposed to users (e.g. `skyulf.datasets.load_sample()`) | Low | Small | Cheap adoption-friction reducer for first-5-minutes experience |
+
+### 16c — skyulf-core algorithm/feature coverage (see [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md))
+
+| Item | Effort | Note |
+|---|---|---|
+| No classical forecasting models (ARIMA/SARIMAX/Prophet) despite a dedicated `time_series/` preprocessing folder already existing | Medium-Large | Natural adjacent win alongside the DL initiative's time-series node types |
+| No CatBoost, despite XGBoost and LightGBM both already supported as optional deps | Small | Cheap, high-signal parity fix — CatBoost is a top-3 boosting library ask |
+| No leave-one-out/James-Stein/rare-label encoders (Target/WOE/Hash encoders already exist) | Medium | `category_encoders`-parity gap |
+| No `QuantileTransformer` (PowerTransformer already exists) | Small | Cheap sklearn-parity fix |
+| No cyclical (sin/cos) calendar encoding in `DateFeatures` | Small | Common time-series feature-engineering ask |
+| No VIF/multicollinearity node; correlation stops at Pearson/Spearman (no Kendall) in the pipeline-composable node | Small-Medium | Statistical-rigor gap for regulated/statistics-heavy users |
+| Hypothesis tests (Shapiro/KS/ANOVA) exist only in profiling reports, not as `NodeRegistry` pipeline nodes; no chi-square-of-independence at all | Medium | Would let users gate pipeline branches on statistical tests, not just eyeball a report |
+| No `GroupKFold`/`StratifiedGroupKFold` cross-validation (only `TimeSeriesSplit` exists) | Small-Medium | Needed for any grouped/leakage-sensitive CV scenario |
+
+**Already strong, confirmed not a gap:** imbalanced-learn coverage
+(SMOTE variants, ADASYN, NearMiss, Tomek all present), no stubbed/
+`NotImplementedError` nodes anywhere in the registry, calibration exists
+(`calibrated_classifier`), and NLP coverage (TF-IDF/count/hashing
+vectorizers + sentence-transformers embeddings) is solid.
+
+### 16d — skyulf-core docs/onboarding (see [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md))
+
+| Item | Severity | Effort | Note |
+|---|---|---|---|
+| A genuinely good "add a new node" guide exists (`docs/user_guide/extending_custom_nodes.md`) but lives outside `skyulf-core/` and isn't linked from its README | Medium | Small | Pure discoverability fix — the content problem is already solved |
+| Docstring coverage on node source files is inconsistent (0% on `imputation/simple.py`, `knn.py`, `iterative.py`, `outliers/iqr.py`, `zscore.py`; ~80-100% on shared infra files) | Medium | Medium | Doesn't block usage today but undermines the mkdocs+mkdocstrings site's value on exactly the files users look up most |
+| `pyproject.toml` is nearly empty (9 lines, all dynamic); real packaging metadata lives in `setup.py` with only 3 thin classifiers | Medium (OSS/PyPI credibility) | Small | Would look unfinished to an external reviewer evaluating a standalone `pip install skyulf-core` |
+| Changelog is well-organized but lives at the monorepo root, mixing core/platform entries; `setup.py`'s Changelog URL points to GitHub Releases instead of the actual file | Low | Small | Minor consistency fix |
+
+**Already strong, confirmed not a gap:** `skyulf-core/README.md` (438 lines:
+install, quickstart, calculator/applier mental model, leakage-safety notes),
+9 comprehensive example notebooks, and a published mkdocs+mkdocstrings API
+site.
+
 ## What NOT to do
 
 - Don't build Phase 5/6 UI against real backend endpoints before Phase 0
@@ -308,6 +380,20 @@ for ordinary sklearn `.fit()` calls, which are not iterative.**
   (Phase 15b) — they are not iterative, so there is nothing to stream;
   ship fast post-fit diagnostics for classic ML and reserve genuinely live
   telemetry for the DL direct-fit path once it exists.
+- Don't fix skyulf-core's "silent no-op on bad config" (Phase 16b) as a
+  one-off patch on whichever calculator you happen to be touching — it's
+  the same bug class as Phase 12 findings #6/#7 (Feature Selection, General
+  Binning); add one shared validation helper both phases can use, not two
+  divergent fixes.
+- Don't add sklearn `BaseEstimator`/`TransformerMixin` support (Phase 16b)
+  by subclassing every existing Calculator individually — investigate a
+  thin adapter/wrapper class first so ~50+ calculators don't need
+  per-class changes.
+- Don't treat Phase 16a's licensing/billing and cost/FinOps gaps as
+  something to bolt onto the Ray migration after the fact — both should be
+  designed alongside Ray's per-job resource accounting from the start,
+  since retrofitting usage metering onto an already-built scheduler is
+  materially more expensive.
 
 ## Cross-References
 
@@ -332,3 +418,7 @@ for ordinary sklearn `.fit()` calls, which are not iterative.**
 - [2026-08-11-user-observability-audit.md](2026-08-11-user-observability-audit.md) — evidence behind the Phase 9 diagnostic-timeline addition
 - [../code-escape-hatch/2026-08-11-feasibility-and-security.md](../code-escape-hatch/2026-08-11-feasibility-and-security.md) — Phase 15a detail; full security analysis and phased executor design
 - [../training-visualization/2026-08-11-feasibility-and-plan.md](../training-visualization/2026-08-11-feasibility-and-plan.md) — Phase 15b detail; graph-type inventory and market precedent
+- [2026-08-11-round6-gap-audit.md](2026-08-11-round6-gap-audit.md) — Phase 16a detail; model registry, licensing, FinOps, env-config, notebook-export-correctness, and backup/DR findings
+- [2026-08-11-core-dx-improvements.md](2026-08-11-core-dx-improvements.md) — Phase 16b detail; skyulf-core ergonomics with before/after code snippets
+- [2026-08-11-core-coverage-gaps.md](2026-08-11-core-coverage-gaps.md) — Phase 16c detail; full node-registry inventory plus algorithm-coverage gaps vs. sklearn/feature-engine/category_encoders/imbalanced-learn
+- [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) — Phase 16d detail; skyulf-core README/docstring/packaging-metadata audit
