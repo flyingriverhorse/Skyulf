@@ -16,6 +16,18 @@ scikit-learn/XGBoost/LightGBM model family.
 - [Implementation roadmap](2026-08-11-implementation-roadmap.md) — phased
   delivery plan (Phase 0 shared infra → tabular → text → time-series → image
   → GPU/Ray wiring), with file-level scope, dependencies, and gates per phase.
+- [Frontend design](2026-08-11-frontend-design.md) — code-grounded UI/UX
+  proposal for the DL nodes: settings panel layout, live training-curve
+  telemetry, image upload UX, and the exact converter/registry changes
+  required, cited against real `frontend/ml-canvas/` files and line numbers.
+
+All documents were independently validated: a rubber-duck review verified
+every load-bearing architectural claim against the live codebase and caught
+two blocking errors in the original training-execution design (now
+corrected throughout — see the "Correction" notes in the findings and
+architecture docs), and a separate agent explored the actual frontend
+codebase to ground the frontend design in real, cited precedent rather than
+generic React patterns.
 
 ## Decision Summary
 
@@ -24,11 +36,14 @@ with the existing `NodeRegistry`/`@node_meta` mechanism and appear as new
 node types in the same ml-canvas pipeline (config-driven presets, not a
 layer-by-layer architecture builder). PyTorch is the DL framework. Each data
 modality (tabular, text, time-series, image) gets an isolated ingestion path
-so formats never tangle. Training execution is written against a
-backend-neutral interface so it runs on today's Celery worker (CPU) and
-transparently gains GPU scheduling once the Ray migration (branch `080`)
-lands, reusing Ray's `ResourceSpec`/`entrypoint_num_gpus` mechanism instead of
-inventing a second GPU queue.
+so formats never tangle. Training runs through a new **direct-fit dispatch
+branch** in the pipeline engine (`_run_training`'s `is_deep_learning` check,
+parallel to the existing clustering branch) — not a new job manager — since
+every non-clustering node is normally routed through the sklearn-oriented
+`TuningCalculator`, which cannot invoke a DL calculator's epoch loop. GPU
+scheduling is deferred to the Ray migration (branch `080`), which requires
+real (if modest) extension work to `resource_spec_for_job` for per-job-type
+GPU differentiation — not automatic reuse.
 
 Delivery order: **Phase 0 (shared infra) → Phase 1 (tabular DL) → Phase 2
 (text DL) → Phase 3 (time-series DL) → Phase 4 (image DL) → Phase 5 (GPU
