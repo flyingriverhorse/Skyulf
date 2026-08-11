@@ -15,6 +15,74 @@ investigation-and-plan with its own README as the entry point.
 | [code-escape-hatch/](code-escape-hatch/2026-08-11-feasibility-and-security.md) | Feasibility/security study for showing and editing per-node generated code, with faithful export. Verdict: read-only code view is safe now; constrained editing is safe after normal auth; arbitrary Python execution requires tenancy foundations plus a dedicated hardened executor — explicitly not safe on the current shared workers. Folded into the master fix list as Phase 15a. | Feasibility study complete, phased (A/B/C), Phase C blocked pending Phase 0 |
 | [training-visualization/](training-visualization/2026-08-11-feasibility-and-plan.md) | Feasibility/plan for live training visualization graphs (classic ML + deep learning). Verdict: ship post-fit diagnostics first by reusing existing chart components; add genuinely live per-epoch curves only once the DL direct-fit path lands. Folded into the master fix list as Phase 15b. | Feasibility study complete, phased plan ready |
 
+## Effort comparison
+
+**Read the caveat first.** None of these initiatives carry an effort
+estimate of their own. The only folder that ever gave numbers is
+`roadmap/`, which is superseded and whose version ledger is known to be
+inaccurate. The "estimated effort" column below is therefore a
+**judgement call, not a quotation** — derived from countable scope (task
+counts, checkbox steps, finding counts) and calibrated against the
+`roadmap/` figures. Treat it as an order-of-magnitude comparison for
+sequencing decisions, not as a commitment.
+
+| Initiative | Countable scope | Status | Estimated effort* | New infrastructure | Dependency |
+|---|---|---|---|---|---|
+| [growth/](growth/README.md) | 3 stages, **14 scheduled items** (+8 Stage 3 candidates) | **Active plan** | Stated in the doc: **6–8 weeks at 2–3 days/week, paired** (≈4–5 weeks full-time equivalent) | None | Already absorbs dual-engine Tier 1 |
+| [dual-engine-correctness/](dual-engine-correctness/README.md) | **49 findings**, 5 tiers + 2 additional plans | Investigation done, **0 fixes applied** | ~**10–12 weeks** (Tier 1 alone ~1–1.5 weeks) | None | None — can start immediately |
+| [code-escape-hatch/](code-escape-hatch/2026-08-11-feasibility-and-security.md) | 3 phases (A/B/C) | Feasibility done | Phase A ~**1–2 weeks**, Phase B ~**3–4 weeks**, Phase C **blocked** | Phase C: hardened isolated executor | Phase B/C → auth + multi-tenancy |
+| [deep-learning/](deep-learning/README.md) | **6 phases** (0–5), 4 modalities, new core subpackage + frontend nodes | Design done, **no code** | ~**12–20 weeks** | PyTorch, GPU | Phase 5 → ray-migration plans 01 + 04 |
+| [ray-migration/](ray-migration/README.md) | **6 plans, 43 tasks, 291 checkbox steps** (~8,000 lines) | Design approved, **no code** | ~**16–24 weeks** | **Ray cluster + PostgreSQL + S3/MinIO + Redis + new Compose stack** | Strict ordering gate: 01→02→…→06 |
+
+*\*Estimates are the author's judgement; they appear in no source document.*
+
+Naive total: roughly **45–60 weeks** of single-person full-time work.
+
+### But most of it is deliberately parked
+
+That is not an outside opinion — the `growth/` plan already triaged every
+other initiative for near-term actionability, and recorded the verdicts:
+
+| Initiative | `growth/` plan's verdict |
+|---|---|
+| dual-engine-correctness | **"Promoted."** Tier 1 (F-01/F-02/F-03) is part of Stage 0. *"The only prior doc that met this folder's evidence bar unaided."* Separately, on F-02: *"the most severe defect found anywhere in this repo."* |
+| code-escape-hatch | **"One slice promoted"** — read-only code view (Stage 3), plus a labelling correction to A2.5 |
+| training-visualization | **"One slice promoted"** — post-fit diagnostics (Stage 3) |
+| enterprise-readiness | **"Mined, not executed."** Raw material only; its `master-fix-list.md` phases are *not* a schedule |
+| deep-learning | **"Nothing actionable."** Two findings recorded in the salvage ledger for if/when it starts |
+| ray-migration | **"Nothing."** Six gated plans, no independently cheap phase. *"Its own rule blocks it: no measurable benefit has been measured."* |
+
+So the genuinely near-term body of work is **growth + dual-engine
+≈ 12–16 weeks**; the remaining ~35–45 weeks is parked behind either
+user-demand evidence or a measured benefit case.
+
+### Three things worth knowing before sequencing
+
+1. **Ray's real cost is not the 24 weeks.** It makes PostgreSQL, S3 and a
+   Ray cluster *mandatory* for production — a permanent operational
+   burden, not a one-off spend. The plan's own exit criterion is the
+   right one: *"if Ray shows no benefit, stop after Task 4 and keep the
+   backend abstraction with Celery intact."* Do not start it before the
+   benefit is measured.
+2. **The highest-value single item is a test, not a fix.** The `growth/`
+   plan says of T5 (the registry-wide contract test): *"Three bug fixes
+   are worth a week. A test that makes the whole class impossible is
+   worth considerably more, and it is the single highest-value artifact
+   in this plan."* The evidence backs it: two independent audits both
+   examined `lag.py`, each found a **different** bug, and neither found
+   the other's. All 49 dual-engine findings pass the existing suites
+   cleanly. Without closing that coverage debt the same class of bug
+   simply regenerates.
+3. **The ordering gates are real and cannot be parallelised away.** The
+   backend Polars migration must follow dual-engine Tier 1+2 (migrating
+   first would activate every Polars bug for every user at once);
+   deep-learning Phase 5 follows Ray; escape-hatch Phase B/C follows
+   auth/tenancy.
+
+**Recommended entry point:** dual-engine **Tier 1 — 7 fixes, ~1–1.5
+weeks**. It clears every CRITICAL, it is already inside `growth/` Stage 0,
+and it depends on nothing.
+
 ## Implementation plans
 
 Bite-sized, TDD-structured implementation plans (written via the
