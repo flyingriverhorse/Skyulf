@@ -10,7 +10,7 @@ genuinely required? And can we honestly claim leakage-proof?*
 
 | Document | What it covers |
 |---|---|
-| [2026-08-11-audit-findings.md](2026-08-11-audit-findings.md) | All 33 findings (3 CRITICAL, 12 HIGH, 12 MED, 6 LOW) with executable reproductions, an explicit list of what is **proven correct**, and a tiered fix order with target versions. |
+| [2026-08-11-audit-findings.md](2026-08-11-audit-findings.md) | All 49 findings (4 CRITICAL, 18 HIGH, 17 MED, 10 LOW) with executable reproductions, an explicit list of what is **proven correct**, and a tiered fix order with target versions. |
 | [2026-08-11-leakage-enforcement-plan.md](2026-08-11-leakage-enforcement-plan.md) | Plan to strengthen leakage enforcement so the documented claim becomes true, rather than softening the docs. Includes the required documentation changes. |
 
 ## Method
@@ -58,11 +58,13 @@ as if they were.
 
 ## Status
 
-Investigation complete for engine, nodes, modeling, persistence, inference and monitoring.
+Investigation complete across engine, nodes, modeling, persistence, inference, monitoring and
+experiments.
 **No fixes applied yet** — see the tier table at the end of the findings document for the
 recommended order and target versions. Start with Tier 1 (3 CRITICAL, engine-independent, blocks
 deployment).
 
-⏳ **The experiments subsystem audit is still open.** It was initially mis-reported as
-"nothing to audit" (an agent grepped for MLflow/W&B, found none, and stopped there — Skyulf has a
-native job-based experiments subsystem instead). See §6 of the findings document.
+The **experiments subsystem** audit is now complete too (§6 of the findings). It was initially
+mis-reported as "nothing to audit" — an agent grepped for MLflow/W&B, found none, and stopped.
+It turned out to be the **worst-affected layer**: 16 findings, **12 LIVE today**, and mostly not
+engine bugs at all but metric-semantics and UI-state defects that make users read the wrong number.

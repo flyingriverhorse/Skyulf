@@ -40,7 +40,7 @@ column-ordering bug that must be fixed before anyone deploys.*
 | **Persistence** | ✅ joblib round-trip clean. Artifacts are plain `list`/`dict`/`str`/`bool` — no engine-specific objects. 40/41 transformers replay safely cross-engine (HashEncoder is the exception). |
 | **Inference / deployment** | 🔴 **3 CRITICAL bugs, 2 of them engine-independent.** This is the weakest layer. |
 | **Monitoring / drift** | ⚠️ One live bug (NaN → silently reports "no drift"). |
-| **Experiments** | ⏳ **Audit in progress — previously mis-reported.** An agent grepped for MLflow/W&B, found none, and wrongly concluded "no experiment tracker exists". Skyulf has a substantial **native, job-based** experiments subsystem (`ExperimentsPage.tsx` + `ExperimentsPage/`: comparison table, metrics chart, evaluation, SHAP, feature importance, segmentation, threshold tuning, branch comparison, pipeline diff, registry promote/unpromote). See §6. |
+| **Experiments** | 🔴 **Worst-affected layer. 16 findings, 12 LIVE today.** Mostly *not* engine bugs — metric-semantics and UI-state defects that make users read the wrong number and act on it. Includes a CRITICAL race showing another job's evaluation, and "Recall" tuning that is literally accuracy and *reduces* recall. See §6. |
 | **Leakage** | ⚠️ The per-node fit/apply discipline is **genuinely solid** — the core claim is true. But enforcement covers only one graph pattern in one execution path, WOE lacks cross-fitting, and CV does not re-fit preprocessing per fold. |
 
 **Answering the specific questions asked:**
@@ -49,9 +49,11 @@ column-ordering bug that must be fixed before anyone deploys.*
   Polars→numpy→sklearn handoff produces bit-identical predictions to the pandas path.
 - *Does inference work?* Only if your pipeline has no column-adding transformer, and only if
   callers happen to send JSON keys in training order. Both are unacceptable — see F-02, F-03.
-- *Do experiments work?* **Unknown — this was mis-reported and is now being audited.** There is a
-  real native experiments subsystem; see §6. Note that two of its views (SHAP, Feature Importance)
-  render artifacts that F-31/F-32 say are `None` under Polars.
+- *Do experiments work?* **This is the weakest layer, and it was nearly missed.** 16 findings, 12
+  LIVE today without any Polars involvement: the evaluation panel can show another job's data,
+  "Recall" threshold tuning is accuracy in disguise and *worsens* recall, "Best Score" compares
+  incomparable metrics, and SHAP/feature importance are permanently blank for 6 of 11 classifier
+  families while the UI blames a stale run. See §6.
 - *Is everything else in place?* The 58-file diff on this branch (31 source, 20 test, 7
   version/changelog) is legitimate and reviewed. The bugs below are **pre-existing**, not
   regressions from that work.
@@ -354,10 +356,11 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 
 | Tier | Contents | Version | Release type |
 |---|---|---|---|
-| **T1** | F-01, F-02, F-03 | core **0.5.9** · backend/frontend **0.7.9** | **Patch — ship first, alone.** F-02 and F-03 are engine-independent and block real deployments. |
+| **T1** | F-01, F-02, F-03, **F-33, F-34, F-35, F-37** | core **0.5.9** · backend/frontend **0.7.9** | **Patch — ship first, alone.** All engine-independent and LIVE. F-02/F-03 block deployments; F-33 shows the wrong job's evaluation; F-35 makes "Recall" tuning actively harmful; F-37 is a ~2-line SHAP fix restoring 6 model families. |
 | **T2** | F-04 … F-14 (excl. F-15) | core **0.6.0** · backend/frontend **0.8.0** | **Minor.** Behaviour changes: rows previously dropped are now kept (F-06), imputers that previously no-opped now impute (F-04), HashEncoder buckets change (F-11 — artifacts fitted before this release will not reproduce, needs a release note). |
+| **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend **0.8.0** | Ships with T2. Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — call it out in the changelog. |
 | **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | Patch/minor. F-22 changes a param name users may rely on. |
-| **T4** | F-27 … F-32 + dead-code cleanup (F-26 fallback) | core **0.6.2** · backend/frontend **0.8.2** | Patch. Cosmetic and latent-only. |
+| **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.2** · backend/frontend **0.8.2** | Patch. Cosmetic and latent-only. |
 | **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. Design note first. |
 
 **Cross-cutting, do in T1:** add engine-parity tests that use **float NaN** (not only nulls) and
@@ -378,42 +381,187 @@ mirrored in `frontend/ml-canvas/src/modules/nodes/`.
 
 ---
 
-## 6. Experiments subsystem — a gap in this audit
+## 6. Experiments subsystem
 
-**What went wrong.** The inference/experiments agent was asked to cover "experiments". It grepped
-for MLflow and Weights & Biases, found neither, and concluded *"No experiment tracker exists —
-nothing to audit."* That conclusion was relayed as fact. It is wrong: the agent judged the area by
-which third-party library was absent rather than by what the codebase actually implements.
+Initially mis-reported. An agent grepped for MLflow and Weights & Biases, found neither, and
+concluded *"No experiment tracker exists — nothing to audit."* That was wrong: Skyulf has a
+substantial **native, job-based** experiments subsystem. A dedicated Opus-5 audit was run to close
+the gap; findings F-33 … F-48 below.
 
-**What actually exists.** A substantial native, job-based experiments subsystem:
+**Process lesson:** an agent reporting "this subsystem does not exist" must be checked against the
+frontend routes and API surface before the claim is accepted. Absence of a well-known third-party
+integration is not evidence of absence of the capability.
 
-- `frontend/ml-canvas/src/components/pages/ExperimentsPage.tsx` and the `ExperimentsPage/` module
-  (`components/`, `utils/`, `types.ts`)
-- `frontend/ml-canvas/src/components/pages/experiments/` — `PipelineDiffView`, `DiffNode`,
-  `pipelineDiffLayout`, `StatusDot`
-- Views: Comparison Table, Metrics Comparison Chart, Evaluation, SHAP Explainability, Feature
-  Importance, Segmentation, Branch Comparison, Pipeline Diff, Job List
-- Backend: `/pipeline/jobs/{job_id}/evaluation` (`_routers/jobs.py:194` →
-  `_services/evaluation_service.py`), `/jobs/{job_id}/thresholds{,/preview,/save}`
-  (`ThresholdTuningService`), `model_registry/`, job promote/unpromote
+**What exists:** `ExperimentsPage.tsx` + `ExperimentsPage/` (comparison table, metrics chart,
+evaluation, SHAP, feature importance, segmentation, threshold tuning, branch comparison, job list)
+and `experiments/` (pipeline diff). Backend: `/pipeline/jobs/{job_id}/evaluation`
+(`_routers/jobs.py:194` → `_services/evaluation_service.py`), `/jobs/{job_id}/thresholds{,/preview,/save}`
+(`ThresholdTuningService`), `model_registry/`, promote/unpromote.
 
-**Why it matters for this audit specifically.** The SHAP and Feature Importance views render
-exactly the artifacts that **F-31** and **F-32** report as `None` under Polars. Those two findings
-were rated LOW on reachability grounds (the backend catalog is pandas-only), and that reasoning
-still holds — but they were filed as "latent" without anyone knowing there is a **user-facing page
-whose entire purpose is to display them**. If a Polars fast-path is ever added to the catalog,
-these become immediately user-visible as silently empty panels.
+**Headline:** this subsystem is in worse shape than the engine. Of 16 findings, **12 are LIVE
+today** — reachable by ordinary use, no Polars required. Most are not engine bugs at all; they are
+metric-semantics and UI-state bugs that cause users to **read the wrong number and act on it**.
 
-**Verified so far (spot-check, before the dedicated audit):**
-`evaluation_service.py` (249 lines) contains **zero** pandas or polars references — it reads
-persisted `y_true`/`y_pred` as plain lists and is genuinely engine-agnostic. The original
-conclusion happened to be right for this one file, but for a reason nobody had checked.
+### F-33 🔴 CRITICAL · LIVE — Evaluation panel silently shows another job's data
+`frontend/ml-canvas/src/components/pages/ExperimentsPage.tsx:227-255`
 
-**Status:** a dedicated Opus-5 audit of the subsystem is in progress, covering threshold tuning,
-the SHAP/feature-importance artifact path, segmentation, comparison-table and metric-selection
-logic, pipeline diff, branch comparison and registry integration — for both engine divergence and
-plain correctness bugs. Findings will be folded into §2 with `F-` numbers continuing from F-32.
+`fetchEvaluationData` sets `evalJobId` synchronously, then `await`s the fetch and applies the
+response **unconditionally** — no request-id or `AbortController` guard. Verified at source: there
+is no staleness check between the `await` and `setEvaluationData(res.data)`.
 
-**Process lesson for future audits:** an agent reporting "this subsystem does not exist" must be
-verified against the frontend routes and the API surface before the claim is accepted. Absence of a
-well-known third-party integration is not evidence of absence of the capability.
+```
+Click job A (slow), then job B (fast)
+FINAL STATE: evalJobId="B", evaluationData="evaluation-data-for-A"
+```
+
+Clicking between runs is the *normal* way to use the page. The header says B while the confusion
+matrix, ROC/PR curves, per-class metrics and threshold tuner are all A's. No error, no spinner.
+Fix: capture a monotonic request id before the `await`, discard if it is no longer current.
+
+### F-34 🟠 HIGH · LIVE — "ROC AUC" threshold tuning 500s on string class labels
+`backend/ml_pipeline/_services/threshold_tuning_service.py:46`; router `_routers/jobs.py:228-240`
+catches only `ThresholdTuningError`
+
+Train on a CSV with a `yes`/`no` target (the engine never requires label encoding), open
+Evaluation → Threshold Tuning → "ROC AUC":
+
+```
+accuracy, f1, precision, recall, balanced_accuracy  -> HTTP 200
+roc_auc                                             -> HTTP 500 "Internal server error"
+  ValueError: dtype='numeric' is not compatible with arrays of bytes/strings.
+```
+
+5 of 6 options work, so it reads as a server fault rather than a data-shape limit.
+Fix: validate before selecting the scorer and raise `ThresholdTuningError` (→400), or use
+`LabelBinarizer`.
+
+### F-35 🟠 HIGH · LIVE — "Recall" tuning is literally Accuracy, and makes recall *worse*
+`backend/ml_pipeline/_services/threshold_tuning_service.py:36-47`
+
+Every scorer in `_METRIC_SCORERS` uses `average="weighted"`. Weighted-average recall is
+**identical to accuracy by definition** — independently reproduced:
+
+```
+acc=0.5200000000  weighted-recall=0.5200000000  equal=True
+acc=0.5133333333  weighted-recall=0.5133333333  equal=True
+```
+
+Effect on a real binary problem (class balance 491/109):
+
+```
+option              thr(pos)  pos-recall  pos-precision  accuracy
+(no tuning, 0.5)      0.5000      0.4587         0.6667    0.8600
+recall                0.5980      0.4037         0.8000    0.8733   <- identical to accuracy
+f1                    0.3529      0.6422         0.6306    0.8667
+balanced_accuracy     0.1961      0.8257         0.5056    0.8217
+```
+
+The entire point of threshold tuning is "catch more positives". A user selecting **Recall** gets
+positive-class recall **0.4587 → 0.4037 — worse than not tuning at all**, reported as success.
+Precision and F1 are mislabelled the same way.
+Fix: for 2-class problems use `average="binary"` with `pos_label=classes[1]`; otherwise rename the
+options "Recall (weighted)" etc. and add explicit binary variants.
+
+### F-36 🟠 HIGH · LIVE — "Best Score" compares different metrics under one label
+`ComparisonTableView.tsx:370-371`, `MetricsComparisonChart.tsx:39,141`, `BranchComparisonCard.tsx:101-102`
+
+```
+basic run (run_mode=fixed) : best_score=0.9   scoring_metric=accuracy
+tuned run (run_mode=tuned) : best_score=0.92  scoring_metric=f1_weighted
+
+Row rendered: "Best Score (accuracy)"   values compared: [0.9, 0.92]
+Reversing the selection order relabels it "Best Score (f1_weighted)" — same numbers.
+```
+
+The label comes from `selectedJobs[0]`. A regression case showed `Best Score (rmse)` comparing
+`[-2.5, 0.42]` and starring the R² job as "best". A **Basic Training** run silently carries
+`scoring_metric=accuracy` — an internal default the user never chose and never sees — so mixing a
+basic and a tuned run is the *default* experience.
+Note: the sign handling is **correct** (`_tuning/engine.py:506-522` sign-corrects via `neg_*`
+scorers); the bug is magnitude incomparability plus the label source.
+Fix: group `best_score` by each job's own `scoring_metric`, one row per metric; never star across
+metrics.
+
+### F-37 🟠 HIGH · LIVE — SHAP/feature importance impossible for 6 of 11 classifier families
+`_execution/engine/_artifacts.py:60-70` (reads only `feature_importances_`/`coef_`);
+`skyulf-core/skyulf/modeling/_explainability/shap_explanation.py:37-78` (passes the **estimator
+object** to `shap.Explainer`); message from `utils/artifactCoverage.ts:35-36,80-84`
+
+```
+random_forest, decision_tree, gradient_boosting, logistic_regression, ridge_classifier -> FI YES, shap ok
+svc_rbf, knn, gaussian_nb, mlp, voting(soft), stacking                                 -> FI None, shap none
+  TypeError: The passed model is not callable and cannot be analyzed directly...
+  shap.Explainer(model.predict_proba, masker) -> WORKS, shape=(5, 3, 2)
+```
+
+All six are user-selectable. Their Explainability and Feature Importance tabs are permanently
+blank, and the UI text blames *"an older run, or the trainer skipped it"* — sending users to
+re-train something that can never work. SHAP is recoverable in roughly two lines.
+Fix: fall back to `predict_proba` (then `predict`) when the estimator isn't callable; add
+permutation importance; change the UI text to *"not supported for this model type"*.
+
+### F-38 🟠 HIGH · LIVE — `f1_macro` conflated with binary/weighted F1
+`ExperimentsPage/utils/jobMeta.ts:41`
+
+```
+f1_macro    = 0.7957   <- what the job was tuned on
+f1_weighted = 0.9232
+f1(binary)  = 0.6364
+TS computes = 0.6364 (or 0.9232 after normalizeThresholdMetric)
+```
+
+Up to **0.29 absolute** away from the metric the run actually optimised. The user compares runs on
+a number that does not exist in the job.
+
+### F-39 🟠 HIGH · LIVE — Pipeline diff duplicates every renamed-and-modified node
+`experiments/PipelineDiffView.tsx:224`; `core/utils/graphDiff.ts:210-227` — `registerPair` stores
+the same `NodeDiff` object under both `left.id` and `right.id`. Node-id drift between runs is the
+**normal** case, so nearly every real diff double-lists every change, plus a React duplicate-key
+warning that can mis-reconcile rows. Fix: dedupe by object identity before rendering.
+
+### F-40 … F-48
+
+| ID | Sev | Live? | Finding | Location |
+|---|---|---|---|---|
+| F-40 | 🟡 | LIVE | `thresholds/save` validates nothing; garbage persists and is silently discarded at predict time | `threshold_tuning_service.py:169-190`, `deployment/service.py:304-328` |
+| F-41 | 🟡 | LIVE | "Show CV metrics" checkbox does not hide `best_score` | `ExperimentsPage.tsx` |
+| F-42 | 🟡 | LIVE | Task `'other'` always reports "unsupported" even when the artifact exists | `utils/artifactCoverage.ts` |
+| F-43 | 🟡 | **LIVE in the published `skyulf-core` SDK**, latent in the app | Polars reference crosstab invents a `"nan"` segment — `is_not_null()` misses float NaN, inflating segment counts. Docstring wrongly claims pandas parity. Same root cause as §1. | `skyulf-core/skyulf/modeling/_evaluation/clustering.py` |
+| F-44 | 🟡 | LATENT | `changeDescriptions` renders `"v: 5 → 5"` for a real int/str coercion, so users dismiss a genuine config change. Detection is correct; only the rendering is wrong. | `graphDiff.ts:93-99` |
+| F-45 | ⚪ | LATENT | `stableStringify` collapses `NaN` and `null` → false "unchanged" | `graphDiff.ts` |
+| F-46 | ⚪ | LATENT | Numeric class labels sort lexicographically when `y_proba` is absent | experiments |
+| F-47 | ⚪ | info | `shortRunId` 8-char collisions | `utils/jobMeta.ts` |
+| F-48 | ⚪ | — | `StatefulEstimator.refit()` is **dead code** — zero callers. Notable because it is the only code that would have trained on train+validation, so that concern is moot. | `skyulf-core/skyulf/modeling/base.py:368-399` |
+
+### Proven correct in this subsystem
+
+- `EvaluationService` has **zero** pandas/polars/numpy references — genuinely engine-agnostic.
+- The execution engine is pandas-only **by assertion**, not merely convention:
+  `_node_runners.py:154-160` raises `TypeError` at the single data-entry point (probe confirmed it
+  firing). This is what keeps F-31/F-32/F-43 latent rather than live.
+- **Binary threshold preview ↔ inference parity is exact** — 0 disagreements on 400 real rows;
+  1 of 999 grid points differs, and only at the exact `>=`/`>` tie. Preview and inference
+  weighted-F1 matched to 6 dp.
+- Multiclass Nelder–Mead tuning genuinely improves its objective (weighted-F1 0.3506 → 0.4094).
+- `best_score` **sign handling is correct** — the "regression sign is flipped" hypothesis was
+  explicitly disproved.
+- `_refit_best_model` refits on **train only** (`_tuning/engine.py:355`); validation is used solely
+  for hyperparameter selection via `PredefinedSplit`. No train-on-eval contamination.
+- Clustering evaluation has full pandas/polars parity on well-formed data — identical silhouette,
+  Calinski-Harabasz, Davies-Bouldin, centroids, profiles and crosstab. F-43 (float NaN) is the only
+  divergence reproducible.
+- `graphDiff` core matching yields **no false negatives**; F-39/F-44/F-45 are presentational.
+- `pipelineDiffLayout` is cycle-safe; `findBestThreshold` handles degenerate inputs;
+  `runSelection.ts` is correct; registry and threshold API shapes agree with their routers.
+
+### Not audited in this subsystem
+
+Model-registry HTTP endpoints (promote/unpromote traced but not exercised); SHAP chart rendering
+math for the families where data *is* present; `ClassificationChartsForSplit` /
+`PerClassConfusionMatrix` prop paths; `ExperimentsPage` effect-dependency exhaustiveness beyond
+F-33; job-list polling against in-flight mutations.
+
+**Unverified, needs a decision:** `promote_job` (`_execution/jobs.py:373`) accepts only
+`status == "completed"`, while `JobStatus.SUCCEEDED = "succeeded"` is treated as terminal in four
+other modules. No site was found that *writes* `"succeeded"`. This is either harmless dead enum
+drift or a latent "cannot promote" bug; proving which needs a state-changing probe.
