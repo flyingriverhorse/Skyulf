@@ -90,7 +90,12 @@ def _pandas_roll_column(
     numeric = pd.to_numeric(df[col], errors="coerce")
     for agg in aggs:
         if group_by:
-            grouped = numeric.groupby([df[g] for g in group_by])
+            # `dropna=False` matches Polars' `.over(group_by)` semantics,
+            # where a null group key is a normal (self-equal) group rather
+            # than excluded. Pandas' `groupby` defaults to `dropna=True`,
+            # which would otherwise force every null-group row's rolling
+            # value to NaN, diverging from the Polars apply path.
+            grouped = numeric.groupby([df[g] for g in group_by], dropna=False)
             rolled = grouped.transform(
                 lambda s, agg=agg: _pandas_rolling(s, agg, window, min_periods)
             )
