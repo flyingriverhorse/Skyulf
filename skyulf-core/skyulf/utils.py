@@ -5,6 +5,7 @@ from typing import Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from skyulf.engines import EngineName
 
@@ -63,7 +64,7 @@ def _data_stats_from_split_dataset(data: SplitDataset) -> tuple[int, set[str]]:
 
 
 def get_data_stats(
-    data: pd.DataFrame | SkyulfDataFrame | tuple[Any, Any] | SplitDataset,
+    data: pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple[Any, Any] | SplitDataset,
 ) -> tuple[int, set[str]]:
     """
     Calculates row count and column set for various data structures.

@@ -102,6 +102,34 @@ def test_prepare_matrix_sample_handles_non_finite_values() -> None:
     assert np.isfinite(X_scaled).all()
 
 
+def test_pca_points_none_label_renders_as_none_not_string() -> None:
+    """Regression test: `str(labels[i])` previously rendered a `None` label
+    as the literal string "None", indistinguishable from a genuine category
+    of that name. A per-row null label must stay `None` (JSON null).
+    """
+    X_pca = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+    points = multivariate_mod.MultivariateMixin._pca_points(X_pca, [None, "a"])
+    assert points[0].label is None
+    assert points[1].label == "a"
+
+
+def test_pca_points_no_labels_arg_is_none_for_all() -> None:
+    """When `labels` itself is falsy (e.g. `None`/empty), every point's label is `None`."""
+    X_pca = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+    points = multivariate_mod.MultivariateMixin._pca_points(X_pca, None)
+    assert all(p.label is None for p in points)
+
+
+def test_cluster_pca_points_none_label_renders_as_none_not_string() -> None:
+    """Same regression as `_pca_points`, but for the clustering variant's
+    `original_labels` parameter.
+    """
+    X_pca = np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]])
+    points = multivariate_mod.MultivariateMixin._cluster_pca_points(X_pca, [0, 1], [None, "b"])
+    assert points[0].label is None
+    assert points[1].label == "b"
+
+
 def test_calculate_pca_happy_path() -> None:
     """3+ numeric columns should produce 3D PCA points and component loadings."""
     analyzer = EDAAnalyzer(_multivariate_df())

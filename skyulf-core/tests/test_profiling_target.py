@@ -181,6 +181,33 @@ def test_calculate_target_interactions_outer_exception(monkeypatch) -> None:
     assert interactions == []
 
 
+def test_calculate_eta_for_column_ignores_null_target_group() -> None:
+    """A null ``target_col`` group must not form a phantom group in the eta calculation.
+
+    Regression test: `_calculate_eta_for_column` previously grouped by
+    `target_col` without filtering out nulls, so Polars' `group_by` treated
+    null as a legitimate group. If the feature column's null-target rows
+    have an outlier mean, that phantom group inflates/distorts eta even
+    though those rows carry no real target label.
+    """
+    df = pl.DataFrame(
+        {
+            "t": ["a", "a", "b", "b", None, None],
+            "x": [1.0, 1.0, 2.0, 2.0, 1000.0, 1000.0],
+        }
+    )
+    analyzer = EDAAnalyzer(df)
+    eta = analyzer._calculate_eta_for_column("t", "x")
+
+    # With null rows excluded, "a" and "b" groups are perfectly separated
+    # from the (excluded) global mean of only the non-null rows, giving a
+    # well-defined eta in [0, 1]; without the fix, the extreme outlier
+    # null-target group would dominate ss_total/ss_between in a way that
+    # doesn't reflect the real x~t relationship.
+    assert eta is not None
+    assert 0.0 <= eta <= 1.0
+
+
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample,
     which has missing ``age``/``income`` rows — closer to production data than

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
 # Use relative imports assuming the structure is preserved
 from .._validation import raise_invalid_choice
@@ -255,15 +256,23 @@ class StatefulEstimator:
         self,
         dataset: SplitDataset
         | pd.DataFrame
+        | pl.DataFrame
+        | SkyulfDataFrame
         | tuple[pd.DataFrame, pd.Series]
         | tuple[pd.DataFrame, pd.DataFrame],
         target_column: str,
         log_callback: Callable[[str], None] | None,
     ) -> SplitDataset:
-        """Wrap raw DataFrame/tuple ``fit_predict`` input into a SplitDataset."""
-        if isinstance(dataset, pd.DataFrame):
-            return SplitDataset(train=dataset, test=pd.DataFrame(), validation=None)
+        """Wrap raw DataFrame/tuple ``fit_predict`` input into a SplitDataset.
 
+        Handles pandas, raw (unwrapped) Polars, and wrapped ``SkyulfDataFrame``
+        input alike -- checking only ``isinstance(dataset, pd.DataFrame)``
+        would silently misroute a raw ``pl.DataFrame`` (e.g. the no-splitter
+        fallback in ``pipeline.py``'s ``fit()``, which hands the modeling
+        layer a bare frame of whatever engine produced it) into the
+        ``SplitDataset``-shaped branch below, crashing with
+        ``AttributeError: 'DataFrame' object has no attribute 'train'``.
+        """
         if isinstance(dataset, tuple):
             # Check if it's (train_df, test_df) or (X, y)
             elem0 = dataset[0]
@@ -287,12 +296,21 @@ class StatefulEstimator:
 
             return SplitDataset(train=cast(Any, dataset), test=pd.DataFrame(), validation=None)
 
+        if hasattr(dataset, "shape") and hasattr(dataset, "columns"):
+            # A single frame-like object (pandas, raw Polars, or wrapper) --
+            # build the empty "test" placeholder with a same-engine empty
+            # frame rather than always defaulting to pandas.
+            empty_test = get_engine(dataset).create_dataframe({})
+            return SplitDataset(train=cast(Any, dataset), test=empty_test, validation=None)
+
         return dataset
 
     def fit_predict(
         self,
         dataset: SplitDataset
         | pd.DataFrame
+        | pl.DataFrame
+        | SkyulfDataFrame
         | tuple[pd.DataFrame, pd.Series]
         | tuple[pd.DataFrame, pd.DataFrame],
         target_column: str,

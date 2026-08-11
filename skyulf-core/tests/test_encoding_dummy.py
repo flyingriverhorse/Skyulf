@@ -67,6 +67,49 @@ def test_unseen_category_at_apply_time_yields_all_zero_row() -> None:
     assert out.loc[0, "color_red"] == 1
 
 
+def test_fit_apply_int_column_with_nulls_does_not_lose_all_rows() -> None:
+    """Regression test for a severe silent-data-loss bug.
+
+    A pandas integer column containing nulls is silently upcast by pandas
+    to `float64` (there's no native nullable-int numpy dtype), so a naive
+    `.astype(str)` on the *fit* dataframe (with no nulls, categories
+    "1"/"2"/"3") vs. the *apply* dataframe (with a null present, so pandas
+    stringifies as "1.0"/"2.0"/"3.0") produced a string-key mismatch. Every
+    row's category lookup against the "1"/"2"/"3" fit-time categories then
+    missed, and every dummy column came out all zero for every row —
+    100% silent data loss despite no error being raised.
+    """
+    train = pd.DataFrame({"code": [1, 2, 3]})  # no nulls -> plain int64 at fit time
+    test = pd.DataFrame({"code": [1, 2, None]})  # null present -> upcasts to float64
+
+    params = DummyEncoderCalculator().fit(train, {"columns": ["code"]})
+    assert params["categories"]["code"] == ["1", "2", "3"]
+
+    out = DummyEncoderApplier().apply(test, dict(params))
+    indicator_cols = [c for c in out.columns if c.startswith("code_")]
+    assert set(indicator_cols) == {"code_1", "code_2", "code_3"}
+
+    row_sums = out[indicator_cols].sum(axis=1)
+    # Rows 0 and 1 have known categories and must each set exactly one
+    # indicator; row 2 (null) legitimately encodes to all-zero.
+    assert row_sums.tolist() == [1, 1, 0]
+    assert out.loc[0, "code_1"] == 1
+    assert out.loc[1, "code_2"] == 1
+
+
+def test_fit_apply_int_column_cross_engine_null_mismatch_does_not_lose_all_rows() -> None:
+    """Same bug as above, but fit on Polars (no nulls) and apply on pandas (with nulls)."""
+    train_pl = pl.DataFrame({"code": [1, 2, 3]})
+    test_pd = pd.DataFrame({"code": [1, 2, None]})
+
+    params = DummyEncoderCalculator().fit(train_pl, {"columns": ["code"]})
+    out = DummyEncoderApplier().apply(test_pd, dict(params))
+
+    indicator_cols = [c for c in out.columns if c.startswith("code_")]
+    row_sums = out[indicator_cols].sum(axis=1)
+    assert row_sums.tolist() == [1, 1, 0]
+
+
 def test_empty_dataframe_returns_empty_categories() -> None:
     """Fitting on a zero-row DataFrame yields an empty category list, no crash."""
     df = pd.DataFrame({"color": pd.Series([], dtype="object")})

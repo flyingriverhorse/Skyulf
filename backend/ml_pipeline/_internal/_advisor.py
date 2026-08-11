@@ -38,6 +38,22 @@ class AnalysisProfile(BaseModel):
 
 class DataProfiler:
     @staticmethod
+    def _safe_float(value: Any) -> float | None:
+        """Convert a pandas scalar aggregate to ``float``, or ``None`` if missing.
+
+        Nullable pandas dtypes (``Int64``/``Float64``/``boolean``, produced
+        e.g. by the Casting node for integer columns with missing values)
+        return the ``pd.NA`` sentinel from ``.min()``/``.max()``/``.mean()``/
+        ``.std()``/``.skew()`` when a column is entirely null. ``float(pd.NA)``
+        raises ``TypeError`` (``NAType`` has no ``__float__``), which would
+        otherwise abort the whole profile for one bad column instead of just
+        reporting that column's stats as unavailable.
+        """
+        if value is None or pd.isna(value):
+            return None
+        return float(cast(float | int, value))
+
+    @staticmethod
     def generate_profile(df: pd.DataFrame) -> AnalysisProfile:
         columns = {}
         for col in df.columns:
@@ -49,11 +65,11 @@ class DataProfiler:
                 "missing_count": int(df[col].isnull().sum()),
                 "missing_ratio": float(df[col].isnull().mean()),
                 "unique_count": int(df[col].nunique()),
-                "min_value": (float(cast(float | int, df[col].min())) if is_numeric else None),
-                "max_value": (float(cast(float | int, df[col].max())) if is_numeric else None),
-                "mean_value": (float(cast(float | int, df[col].mean())) if is_numeric else None),
-                "std_value": (float(cast(float | int, df[col].std())) if is_numeric else None),
-                "skewness": (float(cast(float | int, df[col].skew())) if is_numeric else None),
+                "min_value": (DataProfiler._safe_float(df[col].min()) if is_numeric else None),
+                "max_value": (DataProfiler._safe_float(df[col].max()) if is_numeric else None),
+                "mean_value": (DataProfiler._safe_float(df[col].mean()) if is_numeric else None),
+                "std_value": (DataProfiler._safe_float(df[col].std()) if is_numeric else None),
+                "skewness": (DataProfiler._safe_float(df[col].skew()) if is_numeric else None),
             }
         return AnalysisProfile(
             row_count=len(df),

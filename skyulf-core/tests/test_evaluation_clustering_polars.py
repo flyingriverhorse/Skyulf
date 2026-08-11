@@ -8,6 +8,7 @@ conversion.
 """
 
 import math
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -135,6 +136,34 @@ def test_evaluate_clustering_model_no_numeric_columns_raises_like_sklearn(engine
     df = pd.DataFrame(fixture) if engine == "pandas" else pl.DataFrame(fixture)
     with pytest.raises(ValueError, match="0 feature"):
         evaluate_clustering_model(None, df, [0, 1, 1], dataset_name="empty", reference_column="ref")
+
+
+def test_evaluate_clustering_model_reference_crosstab_null_value_matches_pandas() -> None:
+    """Regression test: pandas' `pd.crosstab` silently drops rows whose
+    reference-column value is NaN, but the Polars-native crosstab path's
+    `group_by` previously treated a null reference value as a legitimate
+    group, producing a bogus `"None"` category not present in the pandas
+    output. Both engines must now agree.
+    """
+    fixture: dict[str, list[Any]] = dict(_FIXTURE)
+    fixture["species"] = ["setosa", "setosa", "versicolor", "versicolor", None, "virginica"]
+
+    pdf = pd.DataFrame(fixture)
+    pldf = pl.DataFrame(fixture)
+
+    pandas_report = evaluate_clustering_model(
+        None, pdf, _LABELS, dataset_name="fixture", reference_column="species"
+    )
+    polars_report = evaluate_clustering_model(
+        None, pldf, _LABELS, dataset_name="fixture", reference_column="species"
+    )
+
+    assert pandas_report.clustering is not None
+    assert polars_report.clustering is not None
+    polars_crosstab = polars_report.clustering.reference_crosstab
+    assert polars_crosstab == pandas_report.clustering.reference_crosstab
+    assert polars_crosstab is not None
+    assert all("None" not in row for row in polars_crosstab.values())
 
 
 def test_evaluate_clustering_model_polars_reference_dtype_preserved() -> None:
