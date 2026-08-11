@@ -127,7 +127,7 @@ class LabelEncoderApplier(BaseApplier):
 
 
 def _y_to_str_array(y: Any) -> Any:
-    """Best-effort conversion of ``y`` to a 1-D string numpy array.
+    """Best-effort conversion of ``y`` to a 1-D string numpy array (shape ``(n,)``).
 
     For Polars Series, casts to Utf8 and fills nulls with the literal "nan"
     string *before* calling ``.to_numpy()``, mirroring the apply path
@@ -137,10 +137,22 @@ def _y_to_str_array(y: Any) -> Any:
     nulls happen to be present in a given batch. Doing the string cast in
     Polars first keeps fit and apply representations identical regardless of
     null presence.
-    """
-    if hasattr(y, "fill_null"):  # polars Series
-        import polars as pl
 
+    Note: this returns a flat 1-D array (unlike
+    ``ordinal.py``'s ``_target_to_str_array``, which returns shape ``(n, 1)``
+    for direct use with sklearn's ``OrdinalEncoder``) because sklearn's
+    ``LabelEncoder.fit`` expects a 1-D array of labels.
+    """
+    # Polars is a hard runtime dependency of this package (see setup.py) and is
+    # already imported at process startup via `engines/polars_engine.py`'s
+    # module-level import, so importing it here is not a lazy/optional-import
+    # pattern -- it's just kept local to this function (matching the sibling
+    # helpers in this module) to use `isinstance(y, pl.Series)` rather than
+    # duck-typing on `hasattr(y, "fill_null")`, which could misroute any
+    # unrelated object that happens to expose a `fill_null` method.
+    import polars as pl
+
+    if isinstance(y, pl.Series):
         return y.cast(pl.Utf8).fill_null("nan").to_numpy()
     if hasattr(y, "to_numpy"):
         return y.to_numpy().astype(str)
