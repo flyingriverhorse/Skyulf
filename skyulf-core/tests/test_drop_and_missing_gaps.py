@@ -109,7 +109,7 @@ def test_missing_indicator_infer_output_schema_explicit_columns() -> None:
     out = MissingIndicatorCalculator().infer_output_schema(schema, {"columns": ["a"]})
     assert out is not None
     assert "a_missing" in out
-    assert out.dtypes["a_missing"] == "bool"
+    assert out.dtypes["a_missing"] == "int64"
 
 
 def test_missing_indicator_infer_output_schema_none_without_explicit_columns() -> None:
@@ -331,12 +331,14 @@ def test_polars_filter_y_by_kept_indices_series_y_gathers_rows() -> None:
     assert out.to_list() == [20, 40]
 
 
-def test_polars_filter_y_by_kept_indices_non_polars_y_passthrough() -> None:
-    """A non-Polars, non-None ``y`` (e.g. a pandas Series) must pass through unchanged."""
+def test_polars_filter_y_by_kept_indices_non_polars_y_raises() -> None:
+    """A non-Polars, non-None ``y`` (e.g. a pandas Series) must raise instead of silently
+    passing through un-filtered and desynchronized from the filtered ``X``.
+    """
     y = pd.Series([10, 20, 30])
     kept = pl.Series([0, 1])
-    out = _polars_filter_y_by_kept_indices(y, kept)
-    assert out is y
+    with pytest.raises(TypeError):
+        _polars_filter_y_by_kept_indices(y, kept)
 
 
 # ---------------------------------------------------------------------------

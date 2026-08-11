@@ -104,8 +104,6 @@ def unpack_pipeline_input(
 
 def _pack_polars_output(X: Any, y: Any) -> Any:
     """Re-attach y to a Polars-backed X (wrapped or raw), returning the same wrapper shape as X."""
-    import polars as pl
-
     engine = get_engine(X)
 
     y_series = y
@@ -230,8 +228,6 @@ def _polars_numeric_dtype_cols(frame: Any) -> list[str]:
 
 def _polars_column_excluded(series: Any, exclude_binary: bool, exclude_constant: bool) -> bool:
     """Check whether a Polars numeric series should be excluded (boolean/empty/binary/constant)."""
-    import polars as pl
-
     if series.dtype == pl.Boolean:
         return True
 

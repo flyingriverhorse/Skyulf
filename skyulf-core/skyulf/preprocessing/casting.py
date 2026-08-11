@@ -149,6 +149,37 @@ def _build_polars_cast_exprs(
             exprs.append(_bool_expr_from_string_col_polars(col))
             string_bool_cols.append(col)
             continue
+        pl_int_dtypes = (
+            pl.Int8,
+            pl.Int16,
+            pl.Int32,
+            pl.Int64,
+            pl.UInt8,
+            pl.UInt16,
+            pl.UInt32,
+            pl.UInt64,
+        )
+        if pl_dtype in pl_int_dtypes and X.schema[col].is_float():
+            src = pl.col(col)
+            fractional = src.is_not_null() & ((src - src.round(0)).abs() >= 1e-9)
+            if coerce_on_error:
+                exprs.append(
+                    pl.when(fractional)
+                    .then(None)
+                    .otherwise(src)
+                    .cast(pl_dtype, strict=False)
+                    .alias(col)
+                )
+            else:
+                # `cast(strict=True)` truncates fractional floats instead of
+                # raising (unlike pandas' `_drop_fractional_or_raise`), so
+                # detect and raise explicitly to keep engine parity.
+                if X.select(fractional.any()).item():
+                    raise ValueError(
+                        f"Column '{col}' contains fractional values, cannot cast to integer."
+                    )
+                exprs.append(src.cast(pl_dtype, strict=True).alias(col))
+            continue
         exprs.append(pl.col(col).cast(pl_dtype, strict=not coerce_on_error).alias(col))
 
     return exprs, string_bool_cols
