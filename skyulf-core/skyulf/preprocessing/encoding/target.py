@@ -114,11 +114,15 @@ class TargetEncoderApplier(BaseApplier):
 
 
 def _y_to_numpy(y: Any) -> Any:
-    """Best-effort conversion of ``y`` into a 1-D numpy array."""
+    """Best-effort conversion of ``y`` into a 1-D numpy array.
+
+    Both pandas and Polars Series/DataFrames expose `.to_numpy()` natively,
+    so a `.to_pandas().to_numpy()` fallback would never be reached in
+    practice -- pandas has always had `.to_numpy()`, and Polars has too
+    since well before this codebase's minimum supported version.
+    """
     if hasattr(y, "to_numpy"):
         return y.to_numpy()
-    if hasattr(y, "to_pandas"):
-        return y.to_pandas().to_numpy()
     return y
 
 
