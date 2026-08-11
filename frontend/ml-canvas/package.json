@@ -38,7 +38,7 @@
     "@tanstack/react-virtual": "^3.13.24",
     "@types/dagre": "^0.7.53",
     "@types/leaflet": "^1.9.21",
-    "@xyflow/react": "^12.0.0",
+    "@xyflow/react": "^12.11.2",
     "axios": "^1.16.0",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.0",
