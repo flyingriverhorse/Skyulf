@@ -4,11 +4,13 @@ import logging
 from typing import Any
 
 import pandas as pd
+import polars as pl
 from sklearn.cluster import Birch, KMeans, MiniBatchKMeans
 from sklearn.mixture import GaussianMixture
 
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
+from ..engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
@@ -23,13 +25,26 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
     upstream node isn't automatically encoded/dropped, and would otherwise
     fail (or, worse, silently corrupt distances) once converted to a numpy
     array. Returns ``(numeric_only_X, dropped_column_names)``.
-    """
-    if not isinstance(X, pd.DataFrame):
-        return X, []
 
-    numeric = X.select_dtypes(include=["number", "bool"])
-    dropped = [c for c in X.columns if c not in numeric.columns]
-    return numeric, dropped
+    Handles both pandas ``DataFrame``s and Polars ``DataFrame``/``SkyulfPolarsWrapper``
+    objects: ``extract_xy`` (``modeling/base.py``) hands back a raw, unwrapped
+    ``pl.DataFrame`` when the pipeline has no target column configured (the
+    "no target" sentinel used throughout clustering), so this must not assume
+    pandas is the only non-trivial branch.
+    """
+    if isinstance(X, pd.DataFrame):
+        numeric = X.select_dtypes(include=["number", "bool"])
+        dropped = [c for c in X.columns if c not in numeric.columns]
+        return numeric, dropped
+    if hasattr(X, "dtypes") and hasattr(X, "columns"):  # polars DataFrame or wrapper
+        numeric_cols = [
+            col
+            for col, dtype in zip(X.columns, X.dtypes, strict=True)
+            if dtype in POLARS_NUMERIC_BOOL_DTYPES
+        ]
+        dropped = [c for c in X.columns if c not in numeric_cols]
+        return X.select(numeric_cols), dropped
+    return X, []
 
 
 def _drop_reference_column(X: Any, reference_column: str) -> Any:
@@ -39,7 +54,11 @@ def _drop_reference_column(X: Any, reference_column: str) -> Any:
     silently riding along into the distance calculation.
     """
     if reference_column and hasattr(X, "columns") and reference_column in X.columns:
-        return X.drop(columns=[reference_column])
+        if isinstance(X, pd.DataFrame):
+            return X.drop(columns=[reference_column])
+        # Polars' `DataFrame.drop` (and the SkyulfPolarsWrapper mirroring it)
+        # takes column names as *args, not a `columns=` keyword like pandas.
+        return X.drop(reference_column)
     return X
 
 

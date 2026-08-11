@@ -100,3 +100,72 @@ def test_refit_with_empty_target_column_does_not_crash_on_y_concat(blobs_split_d
     estimator.fit_predict(dataset, "", {"params": {"n_clusters": 3}})
     estimator.refit(dataset, "", {"params": {"n_clusters": 3}})
     assert estimator.model is not None
+
+
+# ---------------------------------------------------------------------------
+# Polars-engine helper regressions: `_select_numeric_features` used to no-op
+# for raw (unwrapped) `pl.DataFrame`/`SkyulfPolarsWrapper` input (only ever
+# checked `isinstance(X, pd.DataFrame)`), silently letting text/id columns
+# reach sklearn's distance calculations under the Polars engine.
+# `_drop_reference_column` used pandas' `.drop(columns=[...])` kwarg form
+# unconditionally, which raises `TypeError` on Polars (positional-only API).
+# ---------------------------------------------------------------------------
+
+
+def test_select_numeric_features_drops_non_numeric_polars_columns():
+    """Raw polars.DataFrame input must have non-numeric columns filtered out."""
+    import polars as pl
+
+    from skyulf.modeling.clustering import _select_numeric_features
+
+    X = pl.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "city": ["x", "y", "z"]})
+    out, dropped = _select_numeric_features(X)
+    assert dropped == ["city"]
+    assert out.columns == ["a", "b"]
+
+
+def test_select_numeric_features_drops_non_numeric_wrapped_polars_columns():
+    """SkyulfPolarsWrapper input must be handled the same as a raw polars.DataFrame."""
+    import polars as pl
+
+    from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+    from skyulf.modeling.clustering import _select_numeric_features
+
+    X = SkyulfPolarsWrapper(
+        pl.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "city": ["x", "y", "z"]})
+    )
+    out, dropped = _select_numeric_features(X)
+    assert dropped == ["city"]
+    assert list(out.columns) == ["a", "b"]
+
+
+def test_drop_reference_column_works_on_polars_dataframe():
+    """Polars' positional-only `.drop()` API must not raise a `columns=` TypeError."""
+    import polars as pl
+
+    from skyulf.modeling.clustering import _drop_reference_column
+
+    X = pl.DataFrame({"a": [1, 2], "species": ["x", "y"]})
+    out = _drop_reference_column(X, "species")
+    assert out.columns == ["a"]
+
+
+def test_drop_reference_column_works_on_wrapped_polars_dataframe():
+    """SkyulfPolarsWrapper must also use the positional `.drop()` form."""
+    import polars as pl
+
+    from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+    from skyulf.modeling.clustering import _drop_reference_column
+
+    X = SkyulfPolarsWrapper(pl.DataFrame({"a": [1, 2], "species": ["x", "y"]}))
+    out = _drop_reference_column(X, "species")
+    assert list(out.columns) == ["a"]
+
+
+def test_drop_reference_column_still_works_on_pandas_dataframe():
+    """Pandas' `columns=` kwarg form must still be used for pandas input."""
+    from skyulf.modeling.clustering import _drop_reference_column
+
+    X = pd.DataFrame({"a": [1, 2], "species": ["x", "y"]})
+    out = _drop_reference_column(X, "species")
+    assert out.columns.tolist() == ["a"]

@@ -243,6 +243,54 @@ def test_rolling_aggregate_polars_group_by_computed_within_groups() -> None:
     assert out["v_roll_sum_2"].to_list() == [1.0, 4.0, 100.0, 300.0]
 
 
+def test_lag_features_pandas_null_group_matches_polars() -> None:
+    """A null ``group_by`` key must be treated as its own group on both engines.
+
+    Pandas' ``DataFrame.groupby`` defaults to ``dropna=True``, which used to
+    force every null-group row's lag to NaN regardless of its history. The
+    Polars ``.over(group_by)`` path has always treated null as a normal,
+    self-consistent group key, so the two engines diverged on identical
+    input. This regression pins pandas to the Polars behavior.
+    """
+    df = pd.DataFrame({"g": [None, "a", "a", None, "b"], "v": [1, 2, 3, 4, 5]})
+    art = LagFeaturesCalculator().fit(df, {"columns": ["v"], "lags": [1], "group_by": ["g"]})
+    out_pd = LagFeaturesApplier().apply(df.copy(), art)
+    out_pl = LagFeaturesApplier().apply(pl.from_pandas(df), art)
+    assert out_pd["v_lag_1"].tolist() == pytest.approx(
+        [float(v) if v is not None else float("nan") for v in out_pl["v_lag_1"].to_list()],
+        nan_ok=True,
+    )
+    # Row index 3 (second null-group row) must recover the prior null-group
+    # value (1) rather than NaN.
+    assert out_pd["v_lag_1"].iloc[3] == 1
+
+
+def test_rolling_aggregate_pandas_null_group_matches_polars() -> None:
+    """A null ``group_by`` key must be treated as its own group on both engines.
+
+    Mirrors ``test_lag_features_pandas_null_group_matches_polars`` for the
+    rolling aggregate node, which had the same ``groupby(dropna=True)``
+    divergence.
+    """
+    df = pd.DataFrame({"g": [None, "a", "a", None, "b"], "v": [1, 2, 3, 4, 5]})
+    art = RollingAggregateCalculator().fit(
+        df,
+        {
+            "columns": ["v"],
+            "window": 2,
+            "aggregations": ["mean"],
+            "min_periods": 1,
+            "group_by": ["g"],
+        },
+    )
+    out_pd = RollingAggregateApplier().apply(df.copy(), art)
+    out_pl = RollingAggregateApplier().apply(pl.from_pandas(df), art)
+    assert out_pd["v_roll_mean_2"].tolist() == out_pl["v_roll_mean_2"].to_list()
+    # Row index 3 (second null-group row) must average with row 0 (value 1),
+    # not restart as an isolated single-value group.
+    assert out_pd["v_roll_mean_2"].iloc[3] == 2.5
+
+
 # ---------------------------------------------------------------------------
 # DateFeatures edge cases
 # ---------------------------------------------------------------------------
