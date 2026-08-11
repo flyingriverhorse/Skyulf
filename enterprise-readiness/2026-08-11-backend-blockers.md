@@ -20,8 +20,13 @@ self-documented `KNOWN-GAP` comment** acknowledging the issue.
 
 ## 1. Authentication & Authorization — **BLOCKER, Critical, Large effort**
 
-- `User.has_permission()` unconditionally returns `True` —
+- `DataSource.has_permission()` unconditionally returns `True` —
   `backend/database/models.py:156-160`, literally commented `# Placeholder`.
+  (Corrected via rubber-duck review: this method and the adjacent
+  `is_admin` placeholder belong to `DataSource`, not `User` — `User` has no
+  `has_permission` method at all, and separately has a real, persisted
+  `is_admin` boolean column at `models.py:57` that this placeholder does
+  not affect.)
 - Data-ingestion endpoints operate with **no real user context**: list
   endpoints pass `user_id=None` (`backend/data_ingestion/router.py:44,55`)
   and upload/create endpoints hardcode `user_id = 1` with an explicit
@@ -40,7 +45,7 @@ self-documented `KNOWN-GAP` comment** acknowledging the issue.
 middleware, a `CurrentPrincipal` FastAPI dependency required on every
 customer-data route, real password hashing (wire up the already-declared
 `passlib`/`bcrypt` deps), and role/permission checks replacing the
-`has_permission()` placeholder. For enterprise specifically, add
+`DataSource.has_permission()` placeholder. For enterprise specifically, add
 OIDC/SAML federation (Okta/Azure AD/Google Workspace) since large orgs
 require SSO, not username/password.
 
@@ -120,18 +125,23 @@ add JWT signing-key rotation/versioning once real auth (§1) exists.
 - Request logging middleware records IP/URL but not an authenticated actor,
   and isn't tamper-resistant/durable (`backend/middleware/logging.py:
   41-87`).
-- Dataset deletion can remove the DB row even when physical file deletion
-  fails, **explicitly leaving an orphaned file** — a real data-hygiene bug
-  independent of enterprise concerns (`backend/data_ingestion/service.py:
-  83-120`). Only error events get a 30-day cleanup job
-  (`backend/monitoring/tasks.py:14-38`); no equivalent retention/deletion
-  policy exists for user data.
+- Dataset deletion is a deliberate, documented tradeoff rather than a bug:
+  the code intentionally removes the file first, and if that fails it still
+  deletes the DB row while emitting an operator-visible `ERROR` log
+  flagging the orphaned file for manual cleanup (`backend/data_ingestion/
+  service.py:83-120`, docstring at 87-93, error log at 109-116) —
+  reasonable today, but there's still no automated reconciliation job, so
+  it depends on someone watching logs. Only error events get a 30-day
+  cleanup job (`backend/monitoring/tasks.py:14-38`); no equivalent
+  retention/deletion policy exists for user data, and no reconciliation
+  sweep exists for the orphaned-file case either.
 
 **Recommendation:** Add an append-only audit-event table (actor, org,
 request id, resource, action, outcome, timestamp) written on every
 data-touching action; build data-retention and deletion workflows with
-verifiable storage erasure (fix the orphan-file bug as part of this); add
-DSAR (data subject access request) export/delete support for GDPR/CCPA.
+verifiable storage erasure (add an automated reconciliation sweep for the
+orphaned-file case above); add DSAR (data subject access request)
+export/delete support for GDPR/CCPA.
 
 ## 6. Observability — **Significant gap, Medium severity, Medium effort**
 

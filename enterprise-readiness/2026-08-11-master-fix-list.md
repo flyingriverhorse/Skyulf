@@ -1,0 +1,154 @@
+# Enterprise Readiness — Master Fix List
+
+**Date:** 2026-08-11
+**Status:** Consolidated, prioritized action list synthesized from 5
+investigation docs in this folder, cross-validated by an independent
+rubber-duck review. This is the single document to work from when planning
+implementation; the other docs are the detailed evidence/design behind
+each item.
+
+## How to read this list
+
+Each item has: **Doc** (source), **Severity**, **Effort**, and whether it's
+a **hard blocker** (must fix before any multi-customer/enterprise
+deployment), a **quality/resilience** issue (should fix, real risk today),
+or a **flexibility/UX** improvement (makes the product better, not a
+safety issue). Items are grouped into phases reflecting real dependencies
+between them — not arbitrary priority buckets.
+
+---
+
+## Phase 0 — Foundation (nothing else is safe to build on top of this)
+
+These three must land together; auth without tenancy just adds a login
+screen in front of one shared workspace, and neither is safe on today's
+DB/storage defaults.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Real authentication (JWT/OIDC, replace hardcoded `user_id=1`, wire up the already-declared but uninstalled `passlib`/`bcrypt`/`python-jose` deps) | backend-blockers §1 | Blocker | Large |
+| Multi-tenant/organization data model (`Organization`/`Membership`/`Workspace`, `workspace_id` on every table) | backend-blockers §2 | Blocker | Large |
+| PostgreSQL mandatory + Alembic migrations (replace SQLite default + exception-swallowing `ALTER` statements) | backend-blockers §3 | Blocker | Large |
+| Encrypted, managed object storage (SSE-KMS, per-tenant prefixes) | backend-blockers §9 | Blocker | Medium |
+| Fix `DataSource.has_permission()` placeholder as part of the real auth work (corrected attribution — not `User`, see technical-debt-deep-dive.md intro) | backend-blockers §1 | Blocker | (included above) |
+| **New:** pair per-tenant artifact storage with signed/verified artifacts or non-pickle serialization for cross-trust-boundary loads — `joblib`/`pickle.load` becomes a real cross-tenant RCE vector the moment artifact storage is tenant-scoped | technical-debt-deep-dive.md, rubber-duck finding N3 | Blocker (for Phase 0 work specifically) | Medium |
+
+## Phase 1 — Production Operating Model (parallel with Phase 0)
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Secrets-manager integration (Vault/AWS Secrets Manager), IAM-role S3 access instead of static keys | backend-blockers §4 | High | Medium |
+| Remove `--reload` from production Dockerfile; ship real Compose/Helm reference deployment with health probes, HPA | backend-blockers §8 | High | Large |
+| Structured JSON logging, Prometheus metrics, OpenTelemetry tracing; fix readiness probe to actually check DB/Redis | backend-blockers §6 | Medium | Medium |
+| API versioning (`/v1`), Redis-backed rate limiting keyed on principal/org not just IP, actually mount security-headers middleware | backend-blockers §7 | Medium | Medium |
+| Append-only audit-event table + data-retention/deletion workflows with DSAR support | backend-blockers §5 | High | Large |
+| Usage-metering/entitlement service tied to the commercial license tier | backend-blockers §10 | Medium | Medium |
+
+## Phase 2 — Resilience & Correctness Fixes (independent of Phase 0/1, fix any time)
+
+These are real bugs/gaps found in the deeper technical audit — not
+enterprise-specific, but they affect every deployment today.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Fix job-cancellation race (queued job can be resurrected and trained anyway by the worker) | technical-debt-deep-dive.md §A1 | High | Medium |
+| Fix pipeline-version-number collision race (no uniqueness constraint on `version_int`) | technical-debt-deep-dive.md §A5 | High | Medium |
+| Add decompression-bomb/resource-limit protection to XLSX/JSON upload parsing | technical-debt-deep-dive.md §A6 | High | Medium |
+| Add `pipeline_schema_version` + migration registry for saved pipeline graphs — **do this before or alongside the deep-learning node additions**, since new node types are exactly the kind of change that breaks old saved pipelines without it | technical-debt-deep-dive.md §A7 | High | Large |
+| Add heartbeat/lease-based job reaper independent of API restarts; Celery time limits; S3/Redis retry with backoff (never silently coerce a storage failure into "no artifacts") | technical-debt-deep-dive.md §A1 | Medium | Medium |
+| Add optimistic locking/row revision to `TrainingJob` | technical-debt-deep-dive.md §A5 | Medium | Medium |
+| Add composite DB indexes for job/log query patterns actually used | technical-debt-deep-dive.md §A8 | Medium | Small |
+| Move blocking dataframe I/O (Polars/Pandas reads) out of async request handlers | technical-debt-deep-dive.md §A8 | Medium | Medium |
+| Split `monitoring/router.py` (1,970 lines/21 endpoints) into focused routers | technical-debt-deep-dive.md §A3 | Medium | Large |
+| Add Docker-Compose-backed integration tests (real Postgres/Redis/worker/MinIO) covering worker-death, duplicate-delivery, cancellation races | technical-debt-deep-dive.md §A2 | Medium | Large |
+
+## Phase 3 — Accessibility (treat as its own priority tier, not folded into general polish)
+
+Called out separately because it's the most consistently severe, concrete,
+and license-blocking category found (many enterprise procurement processes
+require WCAG 2.1 AA/VPAT compliance) — and today the core "build a
+pipeline" flow is **provably impossible via keyboard alone**.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Convert node-palette entries from inert `<div>`s to real focusable/keyboard-activatable buttons (drag becomes an enhancement, not the only path) | technical-debt-deep-dive.md §B3 | High | Medium |
+| Add keyboard-driven node-connection flow (select source port → select target port) with labelled ports | technical-debt-deep-dive.md §B3 | High | Medium |
+| Add `aria-label`s to icon-only controls; proper `role="progressbar"` semantics on upload progress | technical-debt-deep-dive.md §B3 | Medium | Small |
+| Promote axe `serious` violations to blocking in CI (currently only `critical` fails the build) | technical-debt-deep-dive.md §B3 | Medium | Small |
+
+## Phase 4 — Shared Frontend Infrastructure (build once, unblocks every page redesign)
+
+Every page redesign in Phase 5 depends on these; build them first so pages
+aren't redone twice.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| One shared `DataTable` (sticky header, sort, density, skeleton rows, empty/filter state, row-action overflow, detail drawer) replacing divergent table implementations | redesign-existing-pages.md, new-enterprise-pages.md | Medium | Medium |
+| Consolidate on the *existing* shared `StatusBadge`; delete page-local reimplementations (confirmed duplicate in `pages/Jobs.tsx`) | redesign-existing-pages.md, technical-debt-deep-dive.md §B8 | Medium | Small |
+| One semantic design-token source (currently two parallel token systems: `index.css` semantic vars + legacy `styles/variables.css`, with pages also bypassing both via raw Tailwind colors) | technical-debt-deep-dive.md §B8, redesign-existing-pages.md | Medium | Medium |
+| Standardize `EmptyState`/`LoadingState`/`ErrorState` variants (first-use, filtered-empty, permission-error, recoverable-failure) | redesign-existing-pages.md | Medium | Small |
+| Split the "god" `useGraphStore` into execution/schema/derived-canvas slices; add explicit dirty/synced/conflict indicator for autosave-vs-server-save divergence | technical-debt-deep-dive.md §B1 | Medium | Medium |
+| Reuse existing `VirtualList` for the Dataset table (currently renders every row unvirtualized) | technical-debt-deep-dive.md §B2, redesign-existing-pages.md §4 | Medium | Small |
+| Build a schema-driven node settings-form renderer (currently 135–1,171 LOC per node, repeated boilerplate) — this also directly de-risks the plugin-system idea in node-flexibility.md §1 and the upcoming DL settings panel | technical-debt-deep-dive.md §B6, node-flexibility.md §1 | Medium | Large |
+
+## Phase 5 — Page Redesigns (existing pages)
+
+| Page | Doc | Effort |
+|---|---|---|
+| Pipeline Canvas (health strip, command bar, inspector tabs) | redesign-existing-pages.md §1 | Large |
+| Experiments/Run Comparison (ranked table, decision rail) | redesign-existing-pages.md §2 | Large |
+| Jobs Monitoring (unify drawer + routed page, one source of truth) | redesign-existing-pages.md §3 | Medium |
+| Dataset/Data Management (catalog + asset detail view) | redesign-existing-pages.md §4 | Large |
+| Drift Monitoring (Overview + Analysis split, triage table) | redesign-existing-pages.md §5 | Large |
+| Model Registry & Deployments (unified lifecycle shell, preflight checks) | redesign-existing-pages.md §6 | Large |
+| **Follow-up, not yet designed:** Dashboard, routed Jobs page, EDA, Error Log, Slow Nodes pages — enumerated but not covered by the redesign doc; do this as a fast follow-up using the same method | redesign-existing-pages.md (correction note) | TBD |
+
+## Phase 6 — New Enterprise Pages (build in parallel as mocked UI, wire up once Phase 0 lands)
+
+| Page | Doc | Effort | Note |
+|---|---|---|---|
+| Login/SSO | new-enterprise-pages.md §1 | Medium | Genuinely new |
+| Organization & Workspace Settings | new-enterprise-pages.md §2 | Medium | Genuinely new |
+| Member/Role Management (RBAC) | new-enterprise-pages.md §3 | Medium | Genuinely new |
+| Audit Log Viewer — **redesign/extend, not build from scratch** | new-enterprise-pages.md §4 | Small (audit current page first) | `pages/AuditLogPage.tsx` already exists — confirmed via frontend audit |
+| Usage/Billing/Quota Dashboard | new-enterprise-pages.md §5 | Medium | Genuinely new |
+| API Keys/Service Accounts | new-enterprise-pages.md §6 | Medium | Genuinely new |
+| Unified app shell (org switcher, settings nav, Build/Operate/Observe/Settings grouping) | new-enterprise-pages.md, redesign-existing-pages.md | Medium | Ties everything together |
+
+## Phase 7 — Flexibility & Extensibility (from the earlier node-flexibility audit, unaffected by anything new found this round)
+
+Already documented in [2026-08-11-node-flexibility.md](2026-08-11-node-flexibility.md)
+— restated here only for completeness of the master list, not re-audited:
+
+1. Fix `ManualBounds` outlier node missing from frontend UI (fast, isolated win)
+2. Fix `one_hot.py`'s `prefix_separator`/`drop_original` allow-list gap (new, smaller instance of the same pattern — technical-debt-deep-dive.md rubber-duck finding N2)
+3. Enterprise SQL data connectors (medium effort given existing `BaseConnector` abstraction)
+4. Reusable parameterized templates/subflows with versioning
+5. Persistent node-level result caching (highest day-to-day usability lever, not enterprise-specific)
+6. Plugin system for custom nodes (two-tier: metadata-only vs sandboxed code plugins)
+7. ONNX/MLflow export
+
+## What NOT to do
+
+- Don't build Phase 5/6 UI against real backend endpoints before Phase 0
+  lands — build as mocked/static UI in parallel, wire up once auth +
+  tenancy are real, per new-enterprise-pages.md's explicit dependency note.
+- Don't treat the orphaned-dataset-file behavior (backend-blockers §5) as a
+  bug to "fix" by changing its logic — it's a deliberate, log-visible
+  tradeoff; only add an automated reconciliation sweep on top of it.
+- Don't skip Phase 4 (shared frontend infra) and jump straight to Phase 5
+  page-by-page — every redesign proposal explicitly depends on the shared
+  `DataTable`/`StatusBadge`/token work landing first.
+- Don't assume all frontend/backend node param mismatches are as isolated
+  as the sample suggests — the rubber-duck's 3-node spot-check came back
+  clean plus the one new `one_hot.py` gap found, so the "ManualBounds is
+  isolated" read is provisional, not proven across all ~15+ nodes.
+
+## Cross-References
+
+- [2026-08-11-backend-blockers.md](2026-08-11-backend-blockers.md) — Phase 0/1 detail
+- [2026-08-11-technical-debt-deep-dive.md](2026-08-11-technical-debt-deep-dive.md) — Phase 2/3/4 detail
+- [2026-08-11-redesign-existing-pages.md](2026-08-11-redesign-existing-pages.md) — Phase 5 detail
+- [2026-08-11-new-enterprise-pages.md](2026-08-11-new-enterprise-pages.md) — Phase 6 detail
+- [2026-08-11-node-flexibility.md](2026-08-11-node-flexibility.md) — Phase 7 detail
+- [../deep-learning/README.md](../deep-learning/README.md) — orthogonal, in-flight plan; note the sequencing interactions called out in technical-debt-deep-dive.md (tuning-engine size, pipeline schema versioning) before starting DL implementation
