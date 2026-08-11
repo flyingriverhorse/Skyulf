@@ -70,6 +70,45 @@ column-ordering bug that must be fixed before anyone deploys.*
 
 ---
 
+## 0.5 Triage — 49 findings is not 49 emergencies
+
+49 is a large number and it invites panic. It shouldn't. The findings split cleanly by **who is
+affected today**, and that split changes the priority order completely.
+
+**The key fact:** the hosted backend runs **pandas only** (`backend/data/catalog.py` reads
+exclusively via `pd.read_csv`/`pd.read_parquet`; `_node_runners.py:154` rejects anything else).
+So the Polars parity bugs — the largest single group — **do not affect canvas users today**.
+
+| Who | Count | What it means |
+|---|---|---|
+| **LIVE for canvas users** (pandas, today) | **~24** | Experiments (14), inference (F-02/F-03), leakage (4), drift NaN, the pandas nullable-`Int64` crashes. **Fix these first.** |
+| **LIVE only for `skyulf-core` SDK users running Polars** | **~17** | Every engine-parity finding (F-01, F-04…F-11, F-43). Real, but a narrower audience. Also the **blocking prerequisite** for the backend Polars migration. |
+| **Latent / minor** | **~8** | F-31, F-32 (unreachable while the catalog is pandas-only), dead code, dtype cosmetics, packaging. |
+
+**Three practical consequences:**
+
+1. **The scariest-sounding group is the least urgent right now.** "DummyEncoder breaks Polars
+   training" is severe *in isolation*, but no canvas user can hit it today. It becomes urgent the
+   moment the backend Polars migration starts — which is exactly why that migration is gated on
+   fixing it first (see the migration plan).
+2. **The most urgent group is the one nobody was looking at.** The experiments subsystem was
+   initially reported as "nothing to audit". It turned out to hold **12 LIVE bugs**, mostly not
+   engine-related at all — they make users read the wrong number and act on it. A user who trusts
+   a wrong evaluation panel is worse off than one who hits a crash.
+3. **Nothing here is a regression.** Every finding is pre-existing and passes the current
+   195-test parity suite plus 226 deploy/predict tests. This is **test coverage debt**, not
+   recently-broken code. The suite never exercised float `NaN` (only nulls) or wrapped frames.
+
+**Suggested first commit — 7 fixes, all engine-independent, all LIVE:**
+F-02, F-03 (deployment is broken for most real pipelines), F-33 (evaluation panel shows another
+job's data), F-34, F-35 ("Recall" tuning is accuracy and *worsens* recall), F-37 (~2 lines restores
+SHAP for 6 model families), plus F-01 to unblock the migration track.
+
+That single tier removes every CRITICAL and the highest-impact HIGHs. The remaining ~40 are then a
+normal, schedulable backlog rather than an emergency.
+
+---
+
 ## 1. The single highest-yield bug pattern
 
 **Polars `is_null()` does not match float `NaN`; pandas `isna()` matches both.** Polars stores

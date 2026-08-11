@@ -57,10 +57,17 @@ all 100. Other figures quoted in the findings — 61 transformers, 38 models,
 41 replay tests — are **probed subsets**, not full coverage. Don't quote them
 as if they were.
 
+## Where to start
+
+**Read §0.5 (Triage) of the findings first.** 49 findings is not 49 emergencies: ~24 are live for
+canvas users today, ~17 affect only `skyulf-core` SDK users running Polars, ~8 are latent. The
+suggested first commit is 7 engine-independent fixes that clear every CRITICAL.
+
 ## Status
 
 Investigation complete across engine, nodes, modeling, persistence, inference, monitoring and
-experiments.
+experiments. A **product gap** was also found and planned for: Skyulf is presented as
+Polars-backed, but the backend runs 100% pandas.
 **No fixes applied yet** — see the tier table at the end of the findings document for the
 recommended order and target versions. Start with Tier 1 (3 CRITICAL, engine-independent, blocks
 deployment).
