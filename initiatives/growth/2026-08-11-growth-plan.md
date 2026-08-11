@@ -7,27 +7,27 @@
 
 ## Branch reality (read this first)
 
-Three branches are live, none contains the others:
+Two branches matter, and they are not the same:
 
-| Branch | Role | Versions | Divergence |
+| Branch | Role | Versions | State |
 |---|---|---|---|
-| `078` | **Code.** Bug fixes land here | `0.7.8 / 0.7.8 / 0.5.8` | 11 commits not on `080` |
-| `080` | **Docs.** All `initiatives/` research, including this plan | `0.7.7 / 0.7.7 / 0.5.7` | 18 commits not on `078` |
-| `deploy/demo-mode` | **What the public actually uses** | `0.7.6 / 0.7.6 / 0.5.6` | 5 commits not on `080`; 26 behind |
+| `078` | **Code and docs.** Everything lands here, including this plan | `0.7.8 / 0.7.8 / 0.5.8` | `080` merged in on 2026-08-11 (50 files, all `initiatives/`, zero code) |
+| `origin/deploy/demo-mode` | **What the public actually uses** | `0.7.6 / 0.7.6 / 0.5.6` | 26 commits behind, and staying there by decision |
 
-Verified: `git rev-list --left-right --count 078...080` → `11 18`;
-`... origin/deploy/demo-mode...080` → `5 26`.
+Verified before merging: `git diff --name-only 078...080` → 50 files, all
+under `initiatives/`. `git rev-list --left-right --count origin/deploy/demo-mode...080`
+→ `5 26`.
 
 Two consequences that shape everything below:
 
-1. **Fixes do not reach users.** Anything fixed on `078` is invisible to
-   every real visitor until it is promoted through `deploy/demo-mode`, which
-   has diverged, carries committed build artifacts, and holds features that
-   exist nowhere else. See Stage 1.
-2. **Findings must be verified on `078`, not `080`.** All Stage 0 items
-   below were re-reproduced on `078` after initially being found on `080`.
-   This mattered: `078`'s 11 commits include Polars/Pandas parity fixes that
-   rewrote the *same functions* as T1 without touching the bug.
+1. **Findings must be verified on `078`.** All Stage 0 items were
+   re-reproduced there after initially being found on `080`. This mattered:
+   `078`'s 11 commits included Polars/Pandas parity fixes that rewrote the
+   *same functions* as T1 without touching the bug.
+2. **Fixes do not reach demo visitors automatically.** The demo branch has
+   diverged, carries committed build artifacts, and holds features that
+   exist nowhere else. Stage 1 decides deliberately how much of that to care
+   about — the answer is "less than first proposed."
 
 ## The situation
 
@@ -139,10 +139,11 @@ means **the backend is running from source without being installed** in the
 deployed image.
 
 So the visible symptom is cosmetic, but what it reveals is not: the
-production deployment does not match the packaging the project assumes. Fix
-it as part of Stage 1a (deployment reconciliation) rather than as a code
-change here — it is listed under Stage 0 only because it is how the problem
-was discovered.
+production deployment does not match the packaging the project assumes.
+**Descoped** — moved to the demo backlog under Stage 1. It is recorded here
+only because it is how the packaging gap was discovered, and because the
+same gap would mislead a self-hoster filing a bug report against the wrong
+version.
 
 ### T5 — The actual deliverable: a registry-wide contract test
 
@@ -195,72 +196,86 @@ not re-investigated a third time.
 Two of these were documented at a higher severity than re-verification
 supports. That is the operating rules working as intended.
 
-## Stage 1 — Make the demo shippable, then measure
+## Stage 1 — Demo triage, then measure
 
-Stage 1 was originally just "add measurement." Investigating the demo branch
-showed that is not possible yet: instrumentation has to be *deployed* to
-produce data, and there is currently no dependable path from a fix to a
-visitor. So this stage has two parts, in order.
+**Scope decision (2026-08-11, owner).** This stage originally proposed
+reconciling `deploy/demo-mode` with the main line: porting `demo_mode` into
+the tested codebase, recovering the demo-only features, and ending the
+committed-bundle deploy process. That was rejected as over-scoped, and the
+rejection was correct — the demo is a shop window, not production, and a
+2–3 day/week budget should not be spent on release engineering for it.
 
-### 1a — Reconcile `deploy/demo-mode` with the main line
+What survives is one item, not a stage.
 
-The public demo runs code that **does not exist in the main line at all**:
+### 1a — Make the demo stop demonstrating failure
+
+The demo is the first clickable element in `README.md` — above every badge,
+above the description:
+
+```html
+README.md:8-12
+<a href="https://api.skyulf.com">…Try Live Demo…</a>
+<sub>🟢 no signup required</sub>
+```
+
+And the live demo ships the **same blocked templates** as the main line.
+Verified directly against the deployed branch:
 
 ```
-$ grep -rn "demo_mode" --include=*.py --include=*.ts --include=*.tsx backend/ frontend/ml-canvas/src/   # on 080
-0
-$ git grep -n "demo_mode" origin/deploy/demo-mode -- '*.py'
-backend/data_ingestion/router.py:34:  def _block_in_demo_mode() -> None:
-backend/health/routes.py:54:          return AppConfigResponse(demo_mode=settings.DEMO_MODE)
+$ git show origin/deploy/demo-mode:frontend/ml-canvas/src/core/templates/pipelineTemplates.ts
+105:  id: 'tabular_classification',
+112:    { localId: 'imp',   type: 'imputation_node',        … }
+113:    { localId: 'enc',   type: 'encoding',               … }
+114:    { localId: 'scl',   type: 'scale_numeric_features', … }
+115:    { localId: 'split', type: 'TrainTestSplitter',      … }
+
+$ git ls-tree -r origin/deploy/demo-mode --name-only | grep leakage
+frontend/ml-canvas/src/core/utils/pipelineLeakageValidation.ts   ← the blocker, present
 ```
 
-The demo-mode feature — which gates uploads, filters datasets to Iris, and
-serves `/api/config` — is unversioned, untested by CI, and reviewed by
-nobody, despite being the only thing standing between the public and the
-product. Alongside it, `deploy/demo-mode` carries genuine work that exists
-nowhere else: a **Slow Nodes page**, **SHAP runtime dependencies**
-(matplotlib, seaborn, plotly, shapely, sentence-transformers), and a
-`shap_explanation.py` with 110 changed lines.
+So the current visitor path is: click the badge → wait out a cold start →
+pick "Tabular Classification" → **Run All → hard-blocked by an error they
+did not cause.** Four of the five templates. If the demo exists to show
+capability, it presently shows the opposite.
 
-It also commits **9 built frontend bundles** (`static/ml_canvas/assets/*.js`)
-directly to the branch, so every promotion is a manual rebuild-and-commit.
+**Work:** cherry-pick the A2.2 template fix onto `deploy/demo-mode` and
+redeploy. The templates file is 238 lines and the change is node ordering.
 
-**Work:**
+**Explicitly not doing:** branch reconciliation, porting `demo_mode` into
+the main line, recovering the Slow Nodes page and SHAP deps, removing the
+9 committed bundles, or adding CI coverage for the demo. All real, none
+worth the budget. Recorded in the backlog below so the findings are not
+lost.
 
-- Port `demo_mode` into the main line behind a setting, defaulting to off,
-  so it is tested and reviewable.
-- Port the demo-only features back (Slow Nodes page, SHAP deps, iris
-  filter). These are 5 commits at risk of being lost the moment the demo
-  branch is ever recreated.
-- Stop committing built assets; build during deploy.
-- Reduce `deploy/demo-mode` to deployment configuration only (`vercel.json`,
-  env), so promotion becomes routine rather than a merge negotiation.
-- **Install the backend package in the deployed image** so `/health` reports
-  a real version instead of the `0.0.0-dev` fallback (Stage 0 item T4).
+**Depends on:** A2.2 landing on `078` first. Nothing else in the plan
+depends on *this*.
 
-**Two live-demo issues found during the audit that belong here:**
+*Audiences: anyone arriving from the README badge.*
 
-- **Every visitor's uploads are visible to every other visitor.**
-  `data_ingestion/router.py:41-42` — `list_sources(user_id=None)` with
-  `# KNOWN-GAP: Auth not implemented yet — all sources are visible`. On a
-  public, no-signup demo this directly contradicts the "privacy-first"
-  claim in `README.md:35`. Demo mode disables *upload*, which mitigates it
-  today — but that mitigation lives only on the unversioned demo branch,
-  which is precisely the fragility this stage exists to remove.
-- **The first request to a cold instance hangs over 60 seconds.** Measured:
-  `GET /` returned nothing after ~90s, and `/health` immediately afterwards
-  reported `uptime_seconds: 138` — a just-booted instance. Warm, it serves
-  in 0.21s. A "no signup required" badge that leads to a minute of white
-  screen loses the visitor before anything else in this plan can matter.
-  *(Cold start is the likely cause; the hang and the uptime are measured,
-  the causal link is inferred.)*
+### Demo backlog (found, deliberately not scheduled)
 
-**Why this is Stage 1 and not later:** every subsequent item — the trust
-fixes, the analytics, the sample datasets — is worthless while it cannot
-reach a visitor. This is the release pipeline, and it is currently the
-narrowest part of the funnel.
-
-*Audiences: all four (nothing ships to anyone without it).*
+- `demo_mode` exists **only** on `deploy/demo-mode` — `grep -rn "demo_mode"`
+  returns 0 on the main line. It gates uploads, filters datasets to Iris,
+  and serves `/api/config`, and it is untested by CI. A liability, but a
+  dormant one.
+- The branch carries unmerged work that exists nowhere else: a Slow Nodes
+  page, SHAP runtime deps, and ~110 changed lines in
+  `shap_explanation.py`. **At risk if the branch is ever recreated** — the
+  one backlog item with a real loss scenario.
+- 9 built frontend bundles are committed to the branch, so each promotion
+  is a manual rebuild-and-commit.
+- `/health` reports `0.0.0-dev` — the `PackageNotFoundError` fallback at
+  `core.py:9`, meaning the backend is not pip-installed in the deployed
+  image. Cosmetic.
+- **Every visitor's uploads are visible to every other visitor**
+  (`data_ingestion/router.py:41-42`, `list_sources(user_id=None)`, marked
+  `# KNOWN-GAP: Auth not implemented yet`). Contradicts the "privacy-first"
+  claim at `README.md:35`. Demo mode disables uploads, which neutralises it
+  *on the demo* — but the same code path is what a self-hosting user runs.
+  **Reconsider promoting this if self-hosted multi-user is ever claimed.**
+- First request to a cold instance hung >60s; `/health` then reported
+  `uptime_seconds: 138`. Warm, it serves in 0.21s. Cold start is the
+  hypothesis; the hang and the uptime are measured.
 
 ### 1b — Measurement
 
@@ -268,31 +283,52 @@ narrowest part of the funnel.
 the specific defect that made the previous roadmap speculative: it had to
 invent an ordering because no data existed to derive one.
 
+**The first question is smaller than "activation rate."** Asked directly,
+the owner does not know whether the demo gets any traffic at all. That makes
+the cheapest possible measurement the right one to start with, because it
+decides whether anything else here is worth doing:
+
+- **Does anyone click the README badge?** GitHub's repo traffic panel
+  (Insights → Traffic) already records referring paths and clone/view counts
+  with **zero code**, and it is available today. Look before building.
+- If the answer is "essentially nobody," then the constraint is acquisition,
+  not activation — and Stage 2 is the wrong next move regardless of how
+  well-evidenced its individual items are. Say so out loud rather than
+  proceeding on momentum.
+
+**Only if there is traffic, add event instrumentation.**
+
 **The privacy tension, resolved explicitly.** Skyulf's positioning is
 "self-hosted, privacy-first." Bolting analytics onto that would be
 self-defeating, so:
 
 - **Demo instance only** (`api.skyulf.com`), which is already a distinct
-  deployment with its own config — so this rides on 1a rather than adding
-  new machinery. Self-hosted installations send **nothing, ever**, and we
-  say so plainly in the README. That converts the constraint into a
-  differentiator instead of an apology, and answers complaint rank #2
-  (pricing/vendor opacity) in `../enterprise-readiness/2026-08-11-user-complaints-research.md`.
+  deployment with its own config. Self-hosted installations send **nothing,
+  ever**, and we say so plainly in the README. That converts the constraint
+  into a differentiator instead of an apology, and answers complaint rank #2
+  (pricing/vendor opacity) in
+  `../enterprise-readiness/2026-08-11-user-complaints-research.md`.
 - **Aggregate events only:** page view, dataset selected, node added, run
   started, run succeeded, run failed. No dataset contents, no column names,
   no file names, no PII.
 
-**The one number that matters:** *activation rate* — the share of demo
-visitors who reach a successful pipeline run.
+**The one number that matters** (once traffic is confirmed): *activation
+rate* — the share of demo visitors who reach a successful pipeline run.
 
-It disambiguates the whole funnel:
+It disambiguates the rest of the funnel:
 
 - Near-zero → the problem is Stage 2 (first-run), fix that next.
 - Healthy but no repeat use → the problem is retention, and Stage 3's
   candidate list is the right menu.
 
-**Exit criteria:** a fix merged on `078` is running on `api.skyulf.com`
-without hand-editing bundles; activation rate visible for a full week.
+**Note on cost.** Instrumenting the demo means deploying to the demo branch,
+which is exactly the manual rebuild-and-commit process 1a declined to fix.
+That is an accepted cost, not an oversight: one awkward deploy is cheaper
+than reworking the release pipeline. If it turns out to need more than one,
+revisit the backlog item.
+
+**Exit criteria:** either a recorded answer to "does the badge get clicked"
+that is low enough to stop here, or a week of visible activation rate.
 
 ## Stage 2 — First-run activation
 
@@ -528,19 +564,20 @@ Honest limits, stated so they are not mistaken for coverage:
 - `docs/index.md:33-38` tells users to `pip install` into system Python
   with no venv, which fails with PEP 668 on Homebrew Python. Fold into
   A2.3 if cheap.
-- This plan lives on `080` while the code lives on `078`. That is the same
-  drift it warns about, and it is resolved by the decision recorded below
-  rather than by ignoring it.
+- **Demo traffic is unmeasured and unknown.** Asked directly, the owner
+  does not know whether anyone clicks the README badge. This is the single
+  largest gap in the plan: if traffic is near zero, the constraint is
+  acquisition rather than activation, and most of Stage 2 is well-evidenced
+  work aimed at the wrong problem. Stage 1b's first step exists to close
+  this before Stage 2 consumes any budget.
 
-## Branch decision for this folder
+## Branch decision for this folder — done
 
-`initiatives/growth/` must live wherever the work happens. Since fixes land
-on `078`, this folder should be merged there — or `080` merged into `078` —
-before Stage 0 begins. A plan on a branch nobody builds from is exactly the
-failure this folder was created to stop.
-
-Verified safe: `git diff --name-only 078...080` returns **50 files, all
-under `initiatives/`, zero code**. The merge cannot conflict with code.
+`initiatives/growth/` had to live wherever the work happens. Resolved
+2026-08-11: `080` was merged into `078` (`0093b15d`), verified as 50 files
+all under `initiatives/` with zero code touched. A plan on a branch nobody
+builds from is exactly the failure this folder was created to stop, and it
+is no longer a risk here.
 
 ## Execution order (decided)
 
@@ -551,10 +588,16 @@ Derived from the dependency graph, not from preference:
    `core-v*` tag and **never touches the demo branch**. This path is
    unblocked today, and it is the one actively corrupting results for 1,222
    downloads/month.
-2. **Stage 1a — reconcile the demo branch.** Everything user-facing is
-   stuck behind it.
-3. **Stage 1b + Stage 2 — measurement and first-run**, which now have a
-   working delivery path.
+2. **Check the GitHub traffic panel** (Stage 1b, first half). Free, no code,
+   and it decides whether the rest of the funnel work is justified at all.
+   Do this *before* Stage 2, not after.
+3. **A2.2 — fix the templates on `078`**, then **1a** — cherry-pick them to
+   the demo branch and redeploy. A2.2 must land first; 1a is a follow-on of
+   an hour, not a stage.
+4. **The rest of Stage 2**, weighted by whatever step 2 revealed.
 
 The cheap, isolated items (`start.sh` chmod, upload-size text) can ride
 along with any of the above; they depend on nothing.
+
+Stage 1b's event instrumentation is deliberately **not** in this list. It is
+conditional on step 2 showing traffic worth measuring.

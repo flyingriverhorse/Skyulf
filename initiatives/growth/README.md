@@ -72,12 +72,16 @@ Every priority call made without that number is a guess.
 Findings are re-reproduced on the branch that will carry the fix, not merely
 on the branch where they were noticed.
 
-*Why:* three branches are live and none contains the others — `078` (code,
+*Why:* three branches are live and none contained the others — `078` (code,
 `0.7.8`), `080` (docs, `0.7.7`), and `deploy/demo-mode` (what the public
 uses, `0.7.6`, 26 commits behind). Stage 0's bugs were first found on `080`
 and had to be re-verified on `078`, which had meanwhile rewritten the very
 same functions for Polars/Pandas parity without touching the bug. A finding
 verified on the wrong branch is not a finding.
+
+*Resolved for this folder:* `080` was merged into `078` on 2026-08-11, so
+the plan now lives on the branch that carries the work. `deploy/demo-mode`
+is still behind by design — see the plan's Stage 1 scope decision.
 
 ## Relationship to the other initiative folders
 
