@@ -8,6 +8,20 @@
 plus an adversarial rubber-duck pass. All findings below were **reproduced with executable probes**,
 not inferred from reading code. Probes ran against throwaway worktrees; repo source untouched.
 
+> **Coverage denominators — read before quoting any number from this document.**
+> The registry contains **100 nodes** (verified live: appliers, calculators and metadata all
+> return 100). Different agents probed different **subsets**, and those subset figures must not be
+> read as full coverage:
+>
+> | Figure | What it actually means |
+> |---|---|
+> | **100** | Total registered nodes. Engine-capability and pandas-purity checks covered all 100. |
+> | **61** | Non-modeling transformers probed for cross-engine output parity. |
+> | **38** | Models probed for cross-engine training/prediction parity. |
+> | **41** | Transformers probed for cross-engine *artifact replay* (fit on one engine, apply on the other). |
+>
+> An earlier draft of this document said "99 nodes". That was an error; the correct total is 100.
+
 ---
 
 ## 0. Executive summary
@@ -20,13 +34,13 @@ column-ordering bug that must be fixed before anyone deploys.*
 
 | Layer | Verdict |
 |---|---|
-| **Engine / data path** | ✅ Sound. 0 nodes are Polars-incapable. 0 nodes silently downgrade Polars→pandas. Pandas users stay 100% pandas (100/100 nodes verified). |
-| **Preprocessing nodes** | ⚠️ 54/61 transformers match across engines. **7 diverge**, 1 hard-breaks Polars training. |
-| **Modeling / numpy handoff** | ✅ **Provably correct.** Column order and values identical across engines; predictions bit-identical; CV/tuning/evaluation JSON identical (one 1-ULP `log_loss` float-summation difference). 37/38 models match. |
+| **Engine / data path** | ✅ Sound. Of **100 registered nodes**, 0 are Polars-incapable and 0 silently downgrade Polars→pandas. Pandas users stay 100% pandas (all 100 verified). |
+| **Preprocessing nodes** | ⚠️ 54 of **61 transformers probed** match across engines. **7 diverge**, 1 hard-breaks Polars training. |
+| **Modeling / numpy handoff** | ✅ **Provably correct.** Column order and values identical across engines; predictions bit-identical; CV/tuning/evaluation JSON identical (one 1-ULP `log_loss` float-summation difference). 37 of **38 models probed** match. |
 | **Persistence** | ✅ joblib round-trip clean. Artifacts are plain `list`/`dict`/`str`/`bool` — no engine-specific objects. 40/41 transformers replay safely cross-engine (HashEncoder is the exception). |
 | **Inference / deployment** | 🔴 **3 CRITICAL bugs, 2 of them engine-independent.** This is the weakest layer. |
 | **Monitoring / drift** | ⚠️ One live bug (NaN → silently reports "no drift"). |
-| **Experiments** | ➖ No experiment tracker exists (no MLflow/W&B). `model_registry` is DB metadata only — no dataframes, so no engine risk. Nothing to fix; nothing to claim either. |
+| **Experiments** | ⏳ **Audit in progress — previously mis-reported.** An agent grepped for MLflow/W&B, found none, and wrongly concluded "no experiment tracker exists". Skyulf has a substantial **native, job-based** experiments subsystem (`ExperimentsPage.tsx` + `ExperimentsPage/`: comparison table, metrics chart, evaluation, SHAP, feature importance, segmentation, threshold tuning, branch comparison, pipeline diff, registry promote/unpromote). See §6. |
 | **Leakage** | ⚠️ The per-node fit/apply discipline is **genuinely solid** — the core claim is true. But enforcement covers only one graph pattern in one execution path, WOE lacks cross-fitting, and CV does not re-fit preprocessing per fold. |
 
 **Answering the specific questions asked:**
@@ -35,7 +49,9 @@ column-ordering bug that must be fixed before anyone deploys.*
   Polars→numpy→sklearn handoff produces bit-identical predictions to the pandas path.
 - *Does inference work?* Only if your pipeline has no column-adding transformer, and only if
   callers happen to send JSON keys in training order. Both are unacceptable — see F-02, F-03.
-- *Do experiments work?* There is no experiment-tracking subsystem to break.
+- *Do experiments work?* **Unknown — this was mis-reported and is now being audited.** There is a
+  real native experiments subsystem; see §6. Note that two of its views (SHAP, Feature Importance)
+  render artifacts that F-31/F-32 say are `None` under Polars.
 - *Is everything else in place?* The 58-file diff on this branch (31 source, 20 test, 7
   version/changelog) is legitimate and reviewed. The bugs below are **pre-existing**, not
   regressions from that work.
@@ -275,9 +291,11 @@ imputation means, scaler statistics and encodings. **This is architectural**, no
 
 Stated explicitly because it is as important as the bug list, and because these were *measured*:
 
-- **Polars runs end-to-end.** All 99 registered nodes accept a raw `pl.DataFrame`. **Zero** nodes
-  are Polars-incapable. **Zero** nodes silently downgrade Polars → pandas.
-- **Pandas users stay on pandas.** 100/100 nodes verified — no silent Polars conversion anywhere.
+- **Polars runs end-to-end.** Of the **100 registered nodes**, **zero** are Polars-incapable and
+  **zero** silently downgrade Polars → pandas. (Registry composition: 34 Modeling, 30
+  Preprocessing, 9 Feature Engineering, 6 Cleaning, 5 Data Operations, 5 Feature Selection,
+  5 Text, 4 Ensemble, 2 Inspection.)
+- **Pandas users stay on pandas.** All 100 nodes verified — no silent Polars conversion anywhere.
 - **The numpy handoff is correct.** Column order and values identical across engines. Predictions
   bit-identical. CV, tuning and evaluation JSON identical, apart from a 1-ULP `log_loss` difference
   caused by float summation order (`0.0406001434` on both to 10 s.f.). 37/38 models match.
@@ -297,8 +315,10 @@ Stated explicitly because it is as important as the bug list, and because these 
   file-by-file and is legitimate.
 
 **Explicitly not verified:** `S3ArtifactStore` (no credentials; delegates to joblib so it should
-mirror local). There is **no batch-prediction path** and **no experiment tracker** in the codebase
-— nothing to audit, and nothing to claim.
+mirror local). There is **no batch-prediction path** in the codebase (`grep batch` finds only Celery
+pipeline batching) — nothing to audit there.
+
+**Previously mis-reported as "nothing to audit":** the **experiments subsystem**. See §6.
 
 ---
 
@@ -355,3 +375,45 @@ mirrored in `frontend/ml-canvas/src/modules/nodes/`.
 - `changelog/0.7.x.md` and `docs/` engine-parity notes — record the T2 behaviour changes,
   especially the HashEncoder artifact break.
 - Any doc asserting Polars/pandas parity should not make that claim until T2 ships.
+
+---
+
+## 6. Experiments subsystem — a gap in this audit
+
+**What went wrong.** The inference/experiments agent was asked to cover "experiments". It grepped
+for MLflow and Weights & Biases, found neither, and concluded *"No experiment tracker exists —
+nothing to audit."* That conclusion was relayed as fact. It is wrong: the agent judged the area by
+which third-party library was absent rather than by what the codebase actually implements.
+
+**What actually exists.** A substantial native, job-based experiments subsystem:
+
+- `frontend/ml-canvas/src/components/pages/ExperimentsPage.tsx` and the `ExperimentsPage/` module
+  (`components/`, `utils/`, `types.ts`)
+- `frontend/ml-canvas/src/components/pages/experiments/` — `PipelineDiffView`, `DiffNode`,
+  `pipelineDiffLayout`, `StatusDot`
+- Views: Comparison Table, Metrics Comparison Chart, Evaluation, SHAP Explainability, Feature
+  Importance, Segmentation, Branch Comparison, Pipeline Diff, Job List
+- Backend: `/pipeline/jobs/{job_id}/evaluation` (`_routers/jobs.py:194` →
+  `_services/evaluation_service.py`), `/jobs/{job_id}/thresholds{,/preview,/save}`
+  (`ThresholdTuningService`), `model_registry/`, job promote/unpromote
+
+**Why it matters for this audit specifically.** The SHAP and Feature Importance views render
+exactly the artifacts that **F-31** and **F-32** report as `None` under Polars. Those two findings
+were rated LOW on reachability grounds (the backend catalog is pandas-only), and that reasoning
+still holds — but they were filed as "latent" without anyone knowing there is a **user-facing page
+whose entire purpose is to display them**. If a Polars fast-path is ever added to the catalog,
+these become immediately user-visible as silently empty panels.
+
+**Verified so far (spot-check, before the dedicated audit):**
+`evaluation_service.py` (249 lines) contains **zero** pandas or polars references — it reads
+persisted `y_true`/`y_pred` as plain lists and is genuinely engine-agnostic. The original
+conclusion happened to be right for this one file, but for a reason nobody had checked.
+
+**Status:** a dedicated Opus-5 audit of the subsystem is in progress, covering threshold tuning,
+the SHAP/feature-importance artifact path, segmentation, comparison-table and metric-selection
+logic, pipeline diff, branch comparison and registry integration — for both engine divergence and
+plain correctness bugs. Findings will be folded into §2 with `F-` numbers continuing from F-32.
+
+**Process lesson for future audits:** an agent reporting "this subsystem does not exist" must be
+verified against the frontend routes and the API surface before the claim is accepted. Absence of a
+well-known third-party integration is not evidence of absence of the capability.
