@@ -12,6 +12,20 @@ investigation-and-plan with its own README as the entry point.
 | [code-escape-hatch/](code-escape-hatch/2026-08-11-feasibility-and-security.md) | Feasibility/security study for showing and editing per-node generated code, with faithful export. Verdict: read-only code view is safe now; constrained editing is safe after normal auth; arbitrary Python execution requires tenancy foundations plus a dedicated hardened executor — explicitly not safe on the current shared workers. Folded into the master fix list as Phase 15a. | Feasibility study complete, phased (A/B/C), Phase C blocked pending Phase 0 |
 | [training-visualization/](training-visualization/2026-08-11-feasibility-and-plan.md) | Feasibility/plan for live training visualization graphs (classic ML + deep learning). Verdict: ship post-fit diagnostics first by reusing existing chart components; add genuinely live per-epoch curves only once the DL direct-fit path lands. Folded into the master fix list as Phase 15b. | Feasibility study complete, phased plan ready |
 
+## Implementation plans
+
+Bite-sized, TDD-structured implementation plans (written via the
+`writing-plans` skill, one plan per architecturally-independent subsystem)
+live under `docs/superpowers/plans/`:
+
+| Plan | Scope |
+|---|---|
+| [`docs/superpowers/plans/2026-08-11-phase12-confirmed-bugs.md`](../docs/superpowers/plans/2026-08-11-phase12-confirmed-bugs.md) | Phase 12 of the master fix list — all 9 concrete bugs from `enterprise-readiness/2026-08-11-bug-hunt.md`, each as an independent task with a failing-first test, exact fix, and commit. |
+
+Further phases (0–11, 13–15) each need their own dedicated plan before
+execution — do not squeeze multiple independent phases into one plan
+document (see the Scope Check rule in `writing-plans`).
+
 ## Reading order if you're new to this branch
 
 1. Start with **enterprise-readiness/2026-08-11-master-fix-list.md** — the
