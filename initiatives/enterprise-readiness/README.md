@@ -1,5 +1,16 @@
 # Enterprise Readiness Investigation
 
+> **How this folder is used now (2026-08-11):** as **research to mine, not a
+> schedule to execute.** The active plan is
+> [`../growth/2026-08-11-growth-plan.md`](../growth/2026-08-11-growth-plan.md).
+> `master-fix-list.md`'s Phase 0–18 numbering is a grouping of findings, not
+> an execution order. Items are promoted into the growth plan only after
+> being re-verified against the code — re-verification has already found
+> both under-stated severity (see `2026-08-11-bug-hunt.md`) and at least one
+> finding that is a positioning gap rather than a build task (code export
+> already ships). The work in here is good; treat its *conclusions* as
+> evidence and its *sequencing* as unvalidated.
+
 **Date:** 2026-08-11 (eight rounds — see "Investigation rounds" below)
 **Question this answers:** *Is there any blocker that needs backend code
 changes for Skyulf to become an enterprise app; what can be improved
