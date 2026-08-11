@@ -37,7 +37,7 @@ Track A, in release order. `—` means the component is not touched in that rele
 | # | Release theme | backend | frontend | skyulf-core |
 |---|---|---|---|---|
 | — | **starting point (branch `080` today)** | 0.7.9 | 0.7.9 | 0.5.9 |
-| R1 | Correctness & Honest Positioning | **0.7.10** | **0.7.10** | **0.5.9** |
+| R1 | Correctness & Honest Positioning | **0.7.10** | **0.7.10** | **0.5.10** |
 | R2 | Five-Minute First Run | **0.8.0** | **0.8.0** | **0.6.0** |
 | R3 | skyulf-core Stands Alone | **0.8.1** | — (0.8.0) | **0.7.0** |
 | R4 | Leakage-Safe by Construction | **0.9.0** | **0.9.0** | **0.8.0** |
