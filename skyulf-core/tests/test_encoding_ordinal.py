@@ -284,6 +284,47 @@ def test_apply_target_polars_encodes_y_correctly() -> None:
     assert list(X_out["category"]) == [0.0, 1.0]
 
 
+def test_target_to_str_array_polars_series_fills_nulls_with_nan_string() -> None:
+    """_target_to_str_array casts a Polars Series to Utf8 and fills nulls as "nan"
+    natively, instead of relying on `.to_numpy()`'s int->float->"1.0" null-driven cast.
+    """
+    from skyulf.preprocessing.encoding.ordinal import _target_to_str_array
+
+    result = _target_to_str_array(pl.Series("target", [1, 2, None]))
+    np.testing.assert_array_equal(result, np.array([["1"], ["2"], ["nan"]]))
+
+
+def test_target_to_str_array_polars_series_without_nulls_matches_apply_representation() -> None:
+    """A null-free Polars target still goes through the Utf8 cast path, so fit and
+    apply agree even when null presence differs between batches."""
+    from skyulf.preprocessing.encoding.ordinal import _target_to_str_array
+
+    result = _target_to_str_array(pl.Series("target", [1, 2, 1]))
+    np.testing.assert_array_equal(result, np.array([["1"], ["2"], ["1"]]))
+
+
+def test_ordinal_encoder_polars_target_fit_apply_stable_across_null_presence() -> None:
+    """Regression test: fitting on a batch with null targets and applying on a batch
+    without nulls must not treat every known value as unknown.
+
+    Before the fix, `_fit_target_encoder` and `_apply_target_polars` both used
+    `.to_numpy().astype(str)` directly on a Polars Series, so an integer target's
+    string representation flips ("1" -> "1.0") depending on whether nulls happen to
+    be present in that particular batch, silently desynchronizing fit and apply.
+    """
+    X_fit = pl.DataFrame({"category": ["a", "b", "a"]})
+    y_fit = pl.Series("target", [1, 2, None])
+    config = {"columns": ["category", "target"], "target_column": "target"}
+    params = dict(OrdinalEncoderCalculator().fit((X_fit, y_fit), config))
+
+    y_apply = pl.Series("target", [1, 2, 1])
+    X_apply = pl.DataFrame({"category": ["a", "b", "a"]})
+    _, y_out = OrdinalEncoderApplier().apply((X_apply, y_apply), dict(params))
+
+    unknown_value = config.get("unknown_value", -1)
+    assert unknown_value not in y_out.to_list()
+
+
 class TestApplyTargetExceptionPropagates:
     """A transform-time target input error propagates and is logged without a traceback.
 
