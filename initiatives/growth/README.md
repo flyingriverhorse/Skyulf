@@ -83,6 +83,28 @@ verified on the wrong branch is not a finding.
 the plan now lives on the branch that carries the work. `deploy/demo-mode`
 is still behind by design — see the plan's Stage 1 scope decision.
 
+### 7. A claim that something *does not exist* needs stronger proof than a grep
+
+Absence is the hardest thing to verify and the easiest to assert. Before
+accepting "there is no X," check the frontend routes, the API surface and
+the rendered components — not just whether a well-known library is imported.
+
+*Why:* three separate absence-claims in this repo's planning docs were
+false, and each was reached by grepping for the wrong token.
+
+- An agent grepped for MLflow and Weights & Biases, found neither, and
+  concluded *"no experiment tracker exists — nothing to audit."* Skyulf has
+  a **9,473-line** native experiments subsystem with SHAP, pipeline diff and
+  branch comparison. It was missed because it isn't a third-party
+  integration.
+- A fix to `iqr.py`/`zscore.py` was reported as applied. It was never
+  applied (dual-engine F-06, re-verified here).
+- The claim that a defect "cannot happen because the guard catches it" held
+  for the guard but not for the templates *shipped alongside it*.
+
+The inverse rule also holds: a **positive** claim that something is fixed
+requires running it, not reading the commit that says so.
+
 ## Relationship to the other initiative folders
 
 | Folder | Disposition |

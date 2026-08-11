@@ -145,6 +145,18 @@ independent passes, each with real findings, each blind to the other's. No
 amount of further auditing closes that gap — only an executable contract
 run against every node in the registry does. T5 stops being a nice-to-have.
 
+**One correction to that audit, made by its own authors after publication**
+(commit `0d6b5e03`) — worth recording because it changes a severity, not
+just a fact. F-31/F-32 (SHAP and feature-importance artifacts come back
+`None` under Polars) were rated LOW as "latent, not reachable in
+production," on the grounds that the backend catalog is pandas-only. That
+reasoning still holds *today*. But they were filed as latent without anyone
+knowing there is a **user-facing page whose entire purpose is to render
+those artifacts** — nine SHAP views plus feature importance. The moment a
+Polars fast-path is added to the catalog, LOW becomes "several panels are
+silently empty." Treat the LOW rating as conditional on a fact that is
+likely to change.
+
 **Deferred from that audit, deliberately:** F-15 (CV does not re-fit
 preprocessing per fold, so every reported CV score is systematically
 optimistic). It is real, but fixing it moves every number Skyulf has ever
@@ -640,8 +652,39 @@ Stage 1 data:
 | Inspectable trace for auto/tuning nodes | Strong (H2O, SageMaker Canvas, DataRobot all criticised for opacity) | user-complaints-research #3 |
 | Post-upload pipeline recommendation | `profiling/recommendations.py` already computes the heuristics; only assembly is missing | smooth-experience-fixes Top 3 #2 |
 | "Live / Reconnecting" indicator | `jobEventsSocket.ts:44-90` plumbing exists with zero rendered consumers | smooth-experience-fixes §C |
-| Post-fit diagnostics surfaced on job completion | The metrics are **already computed** — `_evaluation/classification.py:8,94,117` produces confusion matrix, ROC and PR via sklearn — and `ClassificationChartsForSplit.tsx` / `RegressionChartsForSplit.tsx` already render them. Pure wiring. | training-visualization tier (a)1-2 |
+| Post-fit diagnostics **at job completion** | Narrower than first written: the metrics are computed (`_evaluation/classification.py:8,94,117`) *and* already rendered — but only inside Experiments. The gap is placement, not capability. | training-visualization tier (a)1-2 |
+| **Give the Experiments view a URL** | 9,473 lines of comparison, SHAP, diff and threshold-tuning UI that **cannot be linked to**. See below. | found 2026-08-11 |
 | Read-only per-node generated code | No new execution path; display and export only | code-escape-hatch Phase A |
+
+**The retention surface already exists and has no address.**
+
+Correcting the dual-engine audit's retracted "no experiment tracker exists"
+claim led somewhere useful. Skyulf has a large native experiments subsystem
+— comparison table, metrics chart, evaluation, SHAP (beeswarm, waterfall,
+force, dependence, interaction), feature importance, segmentation, branch
+comparison, pipeline diff, threshold tuning:
+
+```
+$ find src -path "*xperiment*" -name "*.ts*" | xargs wc -l
+9473 total
+```
+
+But `App.tsx:36-84` has **no `experiments` route.** It renders as view state
+inside `MainLayout` (`:104-105`, gated on `visitedViews`), reached only by a
+navbar click (`Navbar.tsx:53`). Consequences:
+
+- **You cannot send anyone a link to a result.** Not a colleague, not a
+  reviewer, not a hiring manager, not a conference talk. Sharing a result is
+  how a tool spreads inside an organisation, and it is currently impossible.
+- No deep link, no bookmark, no browser back, no restore after refresh.
+
+The work is a route plus URL-synced view state — small, and it converts an
+existing 9,473-line asset into something that can travel. It serves
+retention *and* enterprise (stage 3 of the funnel) at once, which is the bar
+this plan set for anything it schedules.
+
+*Unverified:* whether view state survives a refresh at all. Check before
+scheduling.
 
 **Two limits recorded now, so they are not promised by accident:**
 
