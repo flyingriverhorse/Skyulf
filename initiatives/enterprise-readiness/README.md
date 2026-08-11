@@ -1,6 +1,6 @@
 # Enterprise Readiness Investigation
 
-**Date:** 2026-08-11 (four rounds — see "Investigation rounds" below)
+**Date:** 2026-08-11 (five rounds — see "Investigation rounds" below)
 **Question this answers:** *Is there any blocker that needs backend code
 changes for Skyulf to become an enterprise app; what can be improved
 (including existing nodes) to give consumers more flexibility; what other
@@ -58,6 +58,11 @@ usage, API keys) needed once multi-tenancy lands.
 | [2026-08-11-testing-ci-audit.md](2026-08-11-testing-ci-audit.md) | Round 4. Test/CI depth audit: solid gates exist (Ruff/Ty/ESLint/tsc, coverage floors, OSV+CodeQL scanning) but the one full-inference test is skipped on CI, canvas drag-and-drop has zero real-gesture E2E coverage, and the planned DL/Ray work has no safety net at its exact integration boundary. |
 | [2026-08-11-user-complaints-research.md](2026-08-11-user-complaints-research.md) | Round 4. Cited, sourced research (TrustRadius/HN/Ars Technica) on what real users of comparable AutoML/no-code tools complain about: vendor lock-in/no code export (strongest signal), pricing opacity, black-box automation, and — a novel, highly actionable finding — no per-node data preview ("the schema guessing game"), directly analogous to Skyulf's own canvas architecture. |
 | [2026-08-11-round4-synthesis.md](2026-08-11-round4-synthesis.md) | Round 4 overview: how the 5 round-4 docs cross-validate each other and rounds 1-3, and what net-new items were added to the master fix list (Phase 10, 11, and a Phase 9 addition). |
+| [2026-08-11-bug-hunt.md](2026-08-11-bug-hunt.md) | Round 5. 9 confirmed, reproducible bugs (not opinions) with exact repro steps: a cross-process duplicate-job race, and — most severe — two feature-engineering nodes (Lag Features, Rolling Aggregate) that silently misalign `X`/`y` on unsorted input, a real train/label-corruption risk shipping today. |
+| [2026-08-11-i18n-mobile-crossbrowser-audit.md](2026-08-11-i18n-mobile-crossbrowser-audit.md) | Round 5. No i18n framework exists (fully hardcoded English, no RTL); canvas mobile/tablet support has no explicit policy; browser testing is Chromium-only; metric/p-value formatting is inconsistent across the app. |
+| [2026-08-11-user-observability-audit.md](2026-08-11-user-observability-audit.md) | Round 5. Strong diagnostic pieces already exist (job logs, preview-node failure cards, SHAP diagnostics) but are fragmented across disconnected UI surfaces instead of one canonical per-run timeline. |
+| [2026-08-11-api-contract-drift-audit.md](2026-08-11-api-contract-drift-audit.md) | Round 5. OpenAPI spec exists but isn't consumed for frontend codegen; confirmed `JobInfo` field drift, force-cast EDA status strings, and WebSocket frames validated on the backend but not the frontend despite Zod already being installed. |
+| [2026-08-11-round5-synthesis.md](2026-08-11-round5-synthesis.md) | Round 5 overview: cross-validation against rounds 1-4 and the net-new master-fix-list additions (Phase 12 confirmed bugs, Phase 13 API contract hardening, Phase 14 i18n/mobile/cross-browser, plus a Phase 9 addition). |
 
 ## Investigation rounds
 
@@ -123,6 +128,25 @@ preview exists in the canvas, which a real competitor tool was built
 specifically to solve. See
 [2026-08-11-round4-synthesis.md](2026-08-11-round4-synthesis.md) for the
 full cross-validation writeup.
+
+**Round 5** (bug-hunt.md, i18n-mobile-crossbrowser-audit.md,
+user-observability-audit.md, api-contract-drift-audit.md): four more
+subagents ran in parallel in direct response to "is there anything left
+to investigate — code, UI, user, or bug related?" Each was explicitly
+scoped to ground not covered by the prior 14 subagents, and instructed to
+cross-check against those docs rather than duplicate them — no overlap
+was reported back. The bug-hunt agent moved past architecture/design
+opinions entirely and found 9 concrete, reproducible bugs with exact
+repro steps, the most severe being a train/label misalignment bug shared
+by two shipped feature-engineering nodes (Lag Features, Rolling
+Aggregate) that silently corrupts model training on unsorted input — this
+is treated as release-blocking, independent of any other phase. The other
+three agents closed out i18n/mobile/cross-browser (previously entirely
+uninvestigated), end-user-facing debuggability (distinct from the
+ops-facing observability already covered in backend-blockers.md), and API
+contract drift beyond the already-documented node-parameter duplication
+pattern. See [2026-08-11-round5-synthesis.md](2026-08-11-round5-synthesis.md)
+for the full writeup.
 
 ## Suggested sequencing
 
