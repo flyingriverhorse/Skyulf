@@ -1,6 +1,6 @@
 # Enterprise Readiness Investigation
 
-**Date:** 2026-08-11 (seven rounds — see "Investigation rounds" below)
+**Date:** 2026-08-11 (eight rounds — see "Investigation rounds" below)
 **Question this answers:** *Is there any blocker that needs backend code
 changes for Skyulf to become an enterprise app; what can be improved
 (including existing nodes) to give consumers more flexibility; what other
@@ -69,6 +69,10 @@ usage, API keys) needed once multi-tenancy lands.
 | [2026-08-11-core-docs-onboarding.md](2026-08-11-core-docs-onboarding.md) | Round 6. `skyulf-core`'s own README/docstrings/packaging-metadata: a strong 438-line README and 9 example notebooks already exist; the "add a new node" guide is good but lives outside `skyulf-core/`; docstring coverage is inconsistent on node source files; `pyproject.toml` is nearly empty with real metadata stuck in `setup.py`. |
 | [2026-08-11-core-quickwin-tech-research.md](2026-08-11-core-quickwin-tech-research.md) | Round 7. Web research into concrete quick-win tech additions: MLflow-skinny one-line fit-hook (42.5M downloads/month), CatBoost nodes (direct copy of the existing LightGBM lazy-dep pattern), Pandera-backed schema-capture/drift node, Narwhals as an additive third engine backend, StatsForecast for classical forecasting, DuckDB scoped to ingestion convenience only. Ranked top-5 cheapest/highest-value list included. |
 | [2026-08-11-core-differentiation-research.md](2026-08-11-core-differentiation-research.md) | Round 7. External web evidence for genuine `skyulf-core` whitespace: the existing leakage-safe calculator/applier split and JSON-artifact model are structural advantages the wider ecosystem is independently converging toward wanting, but aren't marketed anywhere; also identifies Narwhals-as-engine-abstraction as the single most strategically significant, uniquely-combinable differentiator. |
+| [2026-08-11-papers-preprocessing-research.md](2026-08-11-papers-preprocessing-research.md) | Round 8. Scientific-literature scan for preprocessing/feature-engineering: optimal/monotonic binning (`optbinning`), mutual-information/distance-correlation feature selection, PyOD-backed outlier detection — all citing real papers with maintained OSS packages to wrap. |
+| [2026-08-11-papers-automl-tuning-research.md](2026-08-11-papers-automl-tuning-research.md) | Round 8. Scientific-literature scan for AutoML/tuning: multi-objective tuning via Optuna, ASHA scheduler for the Ray migration, cross-run warm-starting from Skyulf's own historical tuning data, OBOE-style model recommendation, TabPFN zero-tuning baseline node. |
+| [2026-08-11-papers-dl-training-research.md](2026-08-11-papers-dl-training-research.md) | Round 8. Scientific-literature scan beyond basic loss curves for the DL module: Captum integrated-gradients explainability node, LR range finder pre-flight check, `cleanlab` confident-learning label-quality report (reusable across classical-ML and DL canvases). |
+| [2026-08-11-papers-mlops-drift-research.md](2026-08-11-papers-mlops-drift-research.md) | Round 8. Scientific-literature scan for drift/monitoring/reproducibility: multivariate drift detection via `alibi-detect`, multi-seed reproducibility scoring grounded in the NeurIPS reproducibility checklist, and TFDV production evidence validating the already-planned schema-capture priority. |
 
 ## Investigation rounds
 
@@ -195,6 +199,25 @@ today. Concrete quick wins ranked cheapest-to-highest-value: MLflow-skinny
 fit-hook, CatBoost nodes, Pandera schema-drift node, Narwhals-as-engine,
 StatsForecast forecasting nodes. Folded into the master fix list as Phase 17
 (17a-17b).
+
+**Round 8** (papers-preprocessing-research.md, papers-automl-tuning-research.md,
+papers-dl-training-research.md, papers-mlops-drift-research.md): four
+`research` agents scanned arXiv/conference proceedings — both recent
+(2023-2025) and older-but-overlooked papers — in direct response to the
+user's ask for scientific articles that "no one cared but actually could be
+useful," split across preprocessing, AutoML/tuning, DL training
+diagnostics, and MLOps/drift. Every finding cites a real paper URL and,
+where one exists, a maintained OSS package to wrap (`optbinning`, `pyod`,
+`alibi-detect`, `captum`, `cleanlab`, `tabpfn`) rather than requiring
+published algorithms to be reimplemented from scratch. Standout findings:
+optimal/monotonic binning as the single best effort-to-benefit preprocessing
+addition; multi-objective tuning and an ASHA scheduler that plugs directly
+into the already-planned Ray migration; a Captum-backed explainability node
+and a `cleanlab` label-quality report reusable across both the classical-ML
+and DL canvases; and TFDV's own production evidence confirming that the
+already-planned Pandera-style schema capture (Phase 17a) should stay
+prioritized ahead of fancier statistical drift metrics. Folded into the
+master fix list as Phase 18 (18a-18d).
 
 ## Suggested sequencing
 
