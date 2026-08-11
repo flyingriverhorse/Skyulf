@@ -60,7 +60,11 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     if not columns or not aggs:
         return X, _y
 
-    X_out = X.sort(sort_by) if sort_by and sort_by in X.columns else X
+    X_out = (
+        X.sort(sort_by, nulls_last=True, maintain_order=True)
+        if sort_by and sort_by in X.columns
+        else X
+    )
     exprs = _polars_rolling_exprs(
         columns,
         list(X_out.columns),

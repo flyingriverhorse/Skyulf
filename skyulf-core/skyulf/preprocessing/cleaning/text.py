@@ -168,7 +168,8 @@ class TextCleaningApplier(BaseApplier):
         df_out = X.copy()
         for col in valid:
             if not pd.api.types.is_string_dtype(df_out[col]):
-                df_out[col] = df_out[col].astype(str)
+                null_mask = df_out[col].isna()
+                df_out[col] = df_out[col].astype(str).mask(null_mask)
             series = df_out[col]
             for op in operations:
                 handler = _TEXT_OPS_PANDAS.get(op.get("op", ""))

@@ -11,15 +11,30 @@ from ..dispatcher import apply_dual_engine
 from ._common import _normalize_subset, _polars_filter_y_by_kept_indices
 
 
+def _polars_missing_expr(X: Any, col: str) -> Any:
+    """Return an expression that is True when ``col`` is null or (for float
+    dtypes) NaN, so missing-row detection matches pandas' ``isna()``, which
+    treats float NaN as missing too.
+    """
+    import polars as pl
+
+    expr = pl.col(col).is_null()
+    if X.schema[col].is_float():
+        expr = expr | pl.col(col).is_nan()
+    return expr
+
+
 def _polars_dropna_filter(X: Any, check_cols: list, how: str, threshold: int | None) -> Any:
     """Build the polars filter for dropna with optional threshold/how."""
     import polars as pl
 
+    missing = [_polars_missing_expr(X, c) for c in check_cols]
+    not_missing = [~m for m in missing]
     if threshold is not None:
-        return X.filter(pl.sum_horizontal(pl.col(check_cols).is_not_null()) >= threshold)
+        return X.filter(pl.sum_horizontal(not_missing) >= threshold)
     if how == "all":
-        return X.filter(~pl.all_horizontal(pl.col(check_cols).is_null()))
-    return X.drop_nulls(subset=check_cols)
+        return X.filter(~pl.all_horizontal(missing))
+    return X.filter(~pl.any_horizontal(missing))
 
 
 def _drop_missing_rows_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
