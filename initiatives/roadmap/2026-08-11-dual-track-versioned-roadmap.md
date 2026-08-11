@@ -11,9 +11,9 @@
 ## Global Constraints
 
 - **Three independent version lines. Starting values, verified in-repo on branch `080`:**
-  - `backend` — `pyproject.toml:5` → `version = "0.7.7"`
-  - `frontend` — `frontend/ml-canvas/package.json:4` → `"version": "0.7.7"`
-  - `skyulf-core` — `skyulf-core/setup.py:10` → `version="0.5.7"`
+  - `backend` — `pyproject.toml:5` → `version = "0.7.9"`
+  - `frontend` — `frontend/ml-canvas/package.json:4` → `"version": "0.7.9"`
+  - `skyulf-core` — `skyulf-core/setup.py:10` → `version="0.5.8"`
 - **Semver rules applied throughout this plan, no exceptions:**
   - **PATCH** (`x.y.Z+1`) — bug fixes, docs, tests, internal refactors, dependency-pin bumps, and any change with zero new public surface.
   - **MINOR** (`x.Y+1.0`) — new backward-compatible capability: a new node, a new endpoint, a new public function/class, a new UI feature.
@@ -36,8 +36,8 @@ Track A, in release order. `—` means the component is not touched in that rele
 
 | # | Release theme | backend | frontend | skyulf-core |
 |---|---|---|---|---|
-| — | **starting point (branch `080` today)** | 0.7.7 | 0.7.7 | 0.5.7 |
-| R1 | Correctness & Honest Positioning | **0.7.8** | **0.7.8** | **0.5.8** |
+| — | **starting point (branch `080` today)** | 0.7.9 | 0.7.9 | 0.5.9 |
+| R1 | Correctness & Honest Positioning | **0.7.10** | **0.7.10** | **0.5.9** |
 | R2 | Five-Minute First Run | **0.8.0** | **0.8.0** | **0.6.0** |
 | R3 | skyulf-core Stands Alone | **0.8.1** | — (0.8.0) | **0.7.0** |
 | R4 | Leakage-Safe by Construction | **0.9.0** | **0.9.0** | **0.8.0** |
@@ -72,7 +72,7 @@ Every Track A release ends with this procedure. It is written once here with rea
 Create the series file if it does not exist, then add the new block at the top of `SERIES_FILE`:
 
 ```markdown
-## v0.7.8 — Correctness & Honest Positioning
+## v0.7.10 — Correctness & Honest Positioning
 
 ### 🐛 Bug Fixes
 - **Lag/Rolling target alignment:** `y` is now reordered and filtered in lockstep with `X`.
@@ -89,19 +89,19 @@ Backend (`pyproject.toml`, line 5):
 
 ```toml
 [project]
-version = "0.7.8"
+version = "0.7.10"
 ```
 
 Frontend (`frontend/ml-canvas/package.json`, line 4):
 
 ```json
-  "version": "0.7.8",
+  "version": "0.7.10",
 ```
 
 skyulf-core (`skyulf-core/setup.py`, line 10):
 
 ```python
-    version="0.5.8",
+    version="0.5.9",
 ```
 
 - [ ] **Step C: Verify the three versions agree with this plan's Version Ledger**
@@ -131,7 +131,7 @@ Expected: all green. A release is not cut while any of these fail.
 
 ```bash
 git add pyproject.toml frontend/ml-canvas/package.json skyulf-core/setup.py changelog/
-git commit -m "chore: release backend v0.7.8, frontend v0.7.8, skyulf-core v0.5.8
+git commit -m "chore: release backend v0.7.10, frontend v0.7.10, skyulf-core v0.5.9
 
 Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 git push
@@ -140,8 +140,8 @@ git push
 - [ ] **Step F: Tag skyulf-core (only when `CORE_VER` changed)**
 
 ```bash
-git tag core-v0.5.8
-git push origin core-v0.5.8
+git tag core-v0.5.9
+git push origin core-v0.5.9
 ```
 
 Expected: `.github/workflows/release.yml` builds and publishes to PyPI via Trusted Publishing.
@@ -166,7 +166,7 @@ Track A is not optional and is not gated behind any commercial consideration. It
 
 ## Release R1 — Correctness & Honest Positioning
 
-**Versions:** backend `0.7.8` (patch) · frontend `0.7.8` (patch) · skyulf-core `0.5.8` (patch)
+**Versions:** backend `0.7.10` (patch) · frontend `0.7.10` (patch) · skyulf-core `0.5.9` (patch)
 **Effort:** ~5–7 days
 **Draws from:** master-fix-list Phase 12 (all 9 confirmed bugs), Phase 16a (`.env.example` gap), Phase 16d (core packaging metadata, docs discoverability), Phase 17b (positioning/messaging items 1 and 3).
 **Why first:** Phase 12 items 1–3 can silently corrupt training results. Nothing else on this roadmap is worth shipping on top of a platform that misaligns `X` and `y`. Everything else in R1 is free (docs/messaging), which is exactly the right shape of work for a zero-budget, credibility-building first release.
@@ -213,7 +213,7 @@ Expected: PASS, with the 9 new regression tests present.
 - Consumes: the field names declared on every mixin under `backend/config/mixins/`.
 - Produces: an `.env.example` that is a complete superset of every environment variable the app reads.
 
-**Effort:** 2 hours. **Version impact:** backend patch (part of 0.7.8).
+**Effort:** 2 hours. **Version impact:** backend patch (part of 0.7.10).
 
 - [ ] **Step 1: Enumerate every settings field the app reads**
 
@@ -241,7 +241,7 @@ Expected: no `MISSING:` lines.
 - Consumes: existing `setup.py` metadata.
 - Produces: PyPI classifiers, `project.urls` (Homepage/Documentation/Changelog/Issues), long-description content type, and a documented standalone-usage entry point.
 
-**Effort:** 3 hours. **Version impact:** core patch (part of 0.5.8).
+**Effort:** 3 hours. **Version impact:** core patch (part of 0.5.9).
 
 - [ ] **Step 1: Move static metadata into `skyulf-core/pyproject.toml`** — `classifiers` (Development Status, Intended Audience, License :: OSI Approved :: Apache Software License, Programming Language :: Python :: 3.11/3.12, Topic :: Scientific/Engineering :: Artificial Intelligence), `keywords`, `project.urls`.
 - [ ] **Step 2: Point the Changelog URL at the real file** in `skyulf-core/setup.py`:
@@ -272,7 +272,7 @@ Expected: `Checking dist/... PASSED`.
 - Consumes: the already-true architectural facts — calculator/applier fit/apply split (`skyulf-core/skyulf/preprocessing/base.py`), JSON artifacts, `skyulf-core/skyulf/leakage.py`'s static leakage diagnostics, and the existing notebook export (`backend/ml_pipeline/_internal/_routers/notebook_export.py`).
 - Produces: the messaging that R4 then makes literally enforceable in code.
 
-**Effort:** 4 hours. **Version impact:** docs only; ships inside 0.7.8 / 0.5.8. See the full copy in the "Positioning" section at the end of this plan.
+**Effort:** 4 hours. **Version impact:** docs only; ships inside 0.7.10 / 0.5.9. See the full copy in the "Positioning" section at the end of this plan.
 
 - [ ] **Step 1: Replace the README one-liner and lead paragraph** with the copy in the Positioning section below.
 - [ ] **Step 2: Add the "Leakage-safe by construction" section to `skyulf-core/README.md`** with the runnable snippet given in the Positioning section.
@@ -292,14 +292,14 @@ Expected: the artifact prints as JSON — this is the literal evidence for the "
 ### Task R1.5: Release cut R1
 
 **Files:**
-- Create: `changelog/0.7.x.md` entry `## v0.7.8 — Correctness & Honest Positioning` (series file already exists)
+- Create: `changelog/0.7.x.md` entry `## v0.7.10 — Correctness & Honest Positioning` (series file already exists)
 - Modify: `pyproject.toml`, `frontend/ml-canvas/package.json`, `skyulf-core/setup.py`
 
-**Interfaces:** Consumes: R1.1–R1.4. Produces: published backend 0.7.8, frontend 0.7.8, PyPI `skyulf-core` 0.5.8.
+**Interfaces:** Consumes: R1.1–R1.4. Produces: published backend 0.7.10, frontend 0.7.10, PyPI `skyulf-core` 0.5.9.
 
-**Effort:** 1 hour. **Version impact:** backend `0.7.7`→`0.7.8`, frontend `0.7.7`→`0.7.8`, core `0.5.7`→`0.5.8`.
+**Effort:** 1 hour. **Version impact:** backend `0.7.9`→`0.7.10`, frontend `0.7.9`→`0.7.10`, core `0.5.8`→`0.5.9`.
 
-- [ ] Run the **Global Procedure: Release Cut** with `BACKEND_VER=0.7.8`, `FRONTEND_VER=0.7.8`, `CORE_VER=0.5.8`, `SERIES_FILE=changelog/0.7.x.md`, `TITLE=Correctness & Honest Positioning`. Step F applies (core changed).
+- [ ] Run the **Global Procedure: Release Cut** with `BACKEND_VER=0.7.10`, `FRONTEND_VER=0.7.10`, `CORE_VER=0.5.9`, `SERIES_FILE=changelog/0.7.x.md`, `TITLE=Correctness & Honest Positioning`. Step F applies (core changed).
 
 **Gate:** all 9 bug-hunt repro steps in `initiatives/enterprise-readiness/2026-08-11-bug-hunt.md` fail to reproduce, and `python -m twine check dist/*` passes for skyulf-core.
 
@@ -424,7 +424,7 @@ cd /Users/BH7043/Skyulf/frontend/ml-canvas && npm run lint && npx tsc --project 
 
 **Interfaces:** Consumes R2.1–R2.4. Produces backend 0.8.0, frontend 0.8.0, PyPI `skyulf-core` 0.6.0.
 
-**Effort:** 1 hour. **Version impact:** backend `0.7.8`→`0.8.0`, frontend `0.7.8`→`0.8.0`, core `0.5.8`→`0.6.0`.
+**Effort:** 1 hour. **Version impact:** backend `0.7.10`→`0.8.0`, frontend `0.7.10`→`0.8.0`, core `0.5.9`→`0.6.0`.
 
 - [ ] Run the **Global Procedure: Release Cut** with `BACKEND_VER=0.8.0`, `FRONTEND_VER=0.8.0`, `CORE_VER=0.6.0`, `SERIES_FILE=changelog/0.8.x.md`, `TITLE=Five-Minute First Run`. Step F applies. Note `changelog/0.8.x.md` must be **created** — the drafter fails if the series file is missing.
 
@@ -2157,7 +2157,7 @@ Every explicit requirement from the request, mapped to where it is satisfied:
 | Do not lead with "become an enterprise product" | Track A is presented first and is 19 of 29 releases; Track B's "Why this track exists at all" section states the 47-star/zero-revenue/zero-compliance reality plainly and defers the whole track |
 | Exact version numbers per unit of work, per component | Version Ledger (Track A), Track B Version Ledger, and a **Version impact** line on every single task |
 | Semver logic (patch/minor/major) stated and applied | Global Constraints; applied and justified at every release, with MAJOR reserved for R10 (auth required, aliases removed, SQLite dropped), R11 (core base-class change), R14 (Celery removed) |
-| Start at backend 0.7.8 / frontend 0.7.8 / core 0.5.8 | R1 |
+| Start at backend 0.7.10 / frontend 0.7.10 / core 0.5.9 | R1 |
 | Components not required to stay in lockstep | Demonstrated concretely: R3 (frontend untouched), R5 (frontend-only), R8/R9/R10 (core untouched), R13 (backend-only), R16 (backend patch while core/frontend take minors) |
 | Only bump what changed | Global Constraints rule + `—` rows in the ledger + explicit "skip Step F"/"skip `package.json`" instructions in the affected release-cut tasks |
 | Realistic, priced Enterprise tiers with justification | `# Pricing` — seven line items, each with a per-number justification paragraph |
@@ -2186,9 +2186,9 @@ Searched for: `TBD`, `TODO`, `implement later`, `fill in`, `appropriate error ha
 ## 3. Type and version consistency
 
 **Version conflicts:** each component's value was traced release by release through the Version Ledger. Every value is either a legal successor of the previous release's value under the stated semver rule, or an explicit `—` carry-forward. **No release assigns two different values to the same component**, and no version number is reused. Cross-checked specifically:
-- backend: 0.7.7 → 0.7.8 → 0.8.0 → 0.8.1 → 0.9.0 → (0.9.0) → 0.10.0 → 0.11.0 → 0.12.0 → 0.13.0 → 1.0.0 → 1.1.0 → 1.2.0 → 1.3.0 → 2.0.0 → 2.1.0 → 2.1.1 → 2.2.0 → 2.3.0 → 2.4.0 — strictly increasing, three MAJORs each justified by a named breaking change.
-- frontend: 0.7.7 → 0.7.8 → 0.8.0 → (0.8.0) → 0.9.0 → 0.10.0 → 0.11.0 → 0.12.0 → 0.13.0 → 0.14.0 → 1.0.0 → (1.0.0) → 1.1.0 → (1.1.0) → 1.2.0 → 1.3.0 → 1.4.0 → 1.5.0 → 1.6.0 → 1.7.0 — strictly increasing, one MAJOR (login required).
-- skyulf-core: 0.5.7 → 0.5.8 → 0.6.0 → 0.7.0 → 0.8.0 → (0.8.0) → 0.9.0 → 0.10.0 → (0.10.0 ×3) → 1.0.0 → (1.0.0 ×3) → 1.1.0 → 1.2.0 → 1.3.0 → 1.4.0 → 1.5.0 — strictly increasing, one MAJOR (calculator base-class change).
+- backend: 0.7.9 → 0.7.10 → 0.8.0 → 0.8.1 → 0.9.0 → (0.9.0) → 0.10.0 → 0.11.0 → 0.12.0 → 0.13.0 → 1.0.0 → 1.1.0 → 1.2.0 → 1.3.0 → 2.0.0 → 2.1.0 → 2.1.1 → 2.2.0 → 2.3.0 → 2.4.0 — strictly increasing, three MAJORs each justified by a named breaking change.
+- frontend: 0.7.9 → 0.7.10 → 0.8.0 → (0.8.0) → 0.9.0 → 0.10.0 → 0.11.0 → 0.12.0 → 0.13.0 → 0.14.0 → 1.0.0 → (1.0.0) → 1.1.0 → (1.1.0) → 1.2.0 → 1.3.0 → 1.4.0 → 1.5.0 → 1.6.0 → 1.7.0 — strictly increasing, one MAJOR (login required).
+- skyulf-core: 0.5.8 → 0.5.9 → 0.6.0 → 0.7.0 → 0.8.0 → (0.8.0) → 0.9.0 → 0.10.0 → (0.10.0 ×3) → 1.0.0 → (1.0.0 ×3) → 1.1.0 → 1.2.0 → 1.3.0 → 1.4.0 → 1.5.0 — strictly increasing, one MAJOR (calculator base-class change).
 - Track B's line (`skyulf-enterprise` 0.1.0 → 1.0.0) shares no value-space with any Track A line, by construction.
 
 **Interface name consistency** across tasks that reference each other:
