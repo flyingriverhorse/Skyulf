@@ -163,6 +163,7 @@ strategy doc; sequencing notes below reflect real dependencies.
 | Declarative per-node config validation (replace 246 ad-hoc `config.get` call sites) | differentiation-strategy.md Part 3 | Large | Improves error-message quality across the board — ties to the "generic error messages" finding in smooth-experience-fixes.md |
 | Universal calculator contract tests (every registered node, not a curated subset) | differentiation-strategy.md Part 3 | Medium | Cheap insurance once the artifact-versioning/partitionable-contract work above lands — do together |
 | **New from Round 4:** per-node/per-step data preview ("click any node, see the data there, no full run required") | round4-synthesis.md, user-complaints-research.md #4 | Medium-Large | The single most externally-validated UX gap found this session — a real competitor tool was built by an ex-user of an incumbent specifically to solve this exact problem. Directly reinforces Bets #1 and #3 above; pairs naturally with the existing canvas node-config UI |
+| **New from Round 5:** unify job logs, per-node execution ledger, and data-quality warnings into one canonical per-run diagnostic timeline (the pieces already exist — job logs, preview-node failure cards, notification history — they're just fragmented across disconnected UI surfaces) | round5-synthesis.md, user-observability-audit.md | Medium-Large | Reinforces Bet #1 (transparency/anti-black-box) directly; unlike most Phase 9 items this is largely UI/wiring work reusing existing backend data, not new capability |
 
 ## Phase 10 — Security & Scale Hardening (Round 4)
 
@@ -196,6 +197,56 @@ exactly the areas found weakest here.
 | Add direct tests for `job_service.py` and `pipeline_versions_service.py` (retry/cancel/ownership/failure-state), plus an auth/authz endpoint matrix | testing-ci-audit.md | High | Medium |
 | Build a Ray-local failure/retry/serialization/artifact test suite and one real node-contract E2E **before** enabling DL/Ray nodes | testing-ci-audit.md, deep-learning/README.md | High | Medium |
 
+## Phase 12 — Confirmed Bugs (Round 5 — fix independent of any other phase, ASAP)
+
+New from Round 5 (bug-hunt.md). Unlike every other phase, these are not
+architecture/design decisions — they are **verified, reproducible logic
+errors** with exact repro steps already written down. Treat items 1-3 as
+release-blocking regardless of what else is being worked on; they can
+silently corrupt model training results.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Fix cross-process duplicate pipeline-job creation (idempotency guard doesn't hold across processes/workers) | bug-hunt.md #1 | High | Medium |
+| **Fix Lag Features node: `X` is sorted/dropped but `y` is returned unsorted/unfiltered** — silent train/label misalignment on any unsorted input | bug-hunt.md #2 | High | Small-Medium |
+| **Fix Rolling Aggregate node: identical `X`/`y` misalignment bug as Lag Features** — fix the shared root cause once, reuse for both nodes | bug-hunt.md #3 | High | Small-Medium |
+| Fix out-of-order job-list API responses reverting newer job state in the UI (add request sequencing/abort to the polling client) | bug-hunt.md #4 | Medium | Small |
+| Reject cyclic pipeline graphs at validation time instead of failing confusingly at execution time | bug-hunt.md #5 | Medium | Small-Medium |
+| Fix upload UI's incorrect 500MB rejection message when the server default is 10GB | bug-hunt.md #6 | Medium | Small |
+| Fix Feature Selection node: advertised/documented default method silently no-ops instead of executing | bug-hunt.md #7 | Medium | Small |
+| Fix General Binning node: `uniform` metadata default emitted but the calculator can't execute it, silently no-ops | bug-hunt.md #8 | Medium | Small |
+| Fix FeatureMath silent no-op on mixed-timezone datetime extraction (normalize to UTC or raise an actionable error) | bug-hunt.md #9 | Medium | Small |
+
+## Phase 13 — API Contract Hardening (Round 5)
+
+New from Round 5 (api-contract-drift-audit.md). Addresses drift risk
+beyond the already-documented node-param duplication pattern (see the
+repo-wide Backend/Core ↔ Frontend Sync Rule) — this is about the general
+API layer, not individual node configs.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Generate frontend TypeScript types/clients from the backend's OpenAPI spec in CI; fail CI on schema/generated-type drift | api-contract-drift-audit.md | High | Medium |
+| Fix confirmed `JobInfo` drift (`created_at` nullability, missing `preview`, `output_artifact_id` vs `output` naming) | api-contract-drift-audit.md | Medium | Small |
+| Type and normalize EDA job-status values instead of force-casting (`as JobStatus`); add exhaustive status-mapping tests | api-contract-drift-audit.md | High | Small-Medium |
+| Runtime-validate WebSocket message envelopes on the frontend using the already-installed Zod dependency, with versioned fixture tests | api-contract-drift-audit.md | Medium | Small-Medium |
+| Introduce `/api/v1` (or equivalent) versioning and a breaking-change/deprecation policy before any public API or independent frontend deployment | api-contract-drift-audit.md | High | Medium |
+
+## Phase 14 — Internationalization, Mobile & Cross-Browser Reach (Round 5)
+
+New from Round 5 (i18n-mobile-crossbrowser-audit.md). Distinct from Phase
+3 (Accessibility) — these gaps don't block any current customer but
+become hard blockers the moment there's a non-English enterprise
+customer, a Middle-East expansion, or a sales demo on a tablet.
+
+| Item | Doc | Severity | Effort |
+|---|---|---|---|
+| Adopt an i18n architecture (message catalog/provider, locale persistence, `Intl`-based date/number formatting, string-extraction workflow) before any international sales push | i18n-mobile-crossbrowser-audit.md | High (conditional on international GTM) | Large |
+| Make an explicit, documented device-support decision for the canvas (desktop-only + tested tablet *inspection* mode, or fund real touch/pointer authoring) | i18n-mobile-crossbrowser-audit.md | Medium-High | Small (decision) to Large (implementation) |
+| Add RTL as a deliberate workstream once i18n lands (logical CSS properties, real RTL visual testing) | i18n-mobile-crossbrowser-audit.md | High (conditional on Middle-East expansion) | Large |
+| Declare and enforce a browser support matrix; add Firefox/WebKit Playwright projects and a tablet viewport to E2E | i18n-mobile-crossbrowser-audit.md | High | Medium |
+| Centralize numeric/metric rendering (consistent significant-digit and p-value/scientific-notation rules, `Intl.NumberFormat` for counts) | i18n-mobile-crossbrowser-audit.md | Medium | Medium |
+
 ## What NOT to do
 
 - Don't build Phase 5/6 UI against real backend endpoints before Phase 0
@@ -228,3 +279,8 @@ exactly the areas found weakest here.
 - [2026-08-11-data-governance-audit.md](2026-08-11-data-governance-audit.md) — Phase 10 compliance findings detail
 - [2026-08-11-testing-ci-audit.md](2026-08-11-testing-ci-audit.md) — Phase 11 detail
 - [2026-08-11-user-complaints-research.md](2026-08-11-user-complaints-research.md) — evidence behind the Phase 9 per-node-preview addition and cross-validation of Bets #1/#3
+- [2026-08-11-round5-synthesis.md](2026-08-11-round5-synthesis.md) — Round 5 overview and cross-links; Phase 12/13/14 detail
+- [2026-08-11-bug-hunt.md](2026-08-11-bug-hunt.md) — Phase 12 detail; 9 confirmed, reproducible bugs
+- [2026-08-11-api-contract-drift-audit.md](2026-08-11-api-contract-drift-audit.md) — Phase 13 detail
+- [2026-08-11-i18n-mobile-crossbrowser-audit.md](2026-08-11-i18n-mobile-crossbrowser-audit.md) — Phase 14 detail
+- [2026-08-11-user-observability-audit.md](2026-08-11-user-observability-audit.md) — evidence behind the Phase 9 diagnostic-timeline addition
