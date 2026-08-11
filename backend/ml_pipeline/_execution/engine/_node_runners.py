@@ -141,6 +141,23 @@ class NodeRunnersMixin:
                 f"Dataset {dataset_id} not found. Please check if the file exists."
             ) from None
 
+        # The execution engine is pandas-by-construction: every concrete
+        # `DataCatalog` reads via pandas, and skyulf's `apply_dual_engine`
+        # preserves the input engine type, so no node converts pandas ->
+        # Polars mid-pipeline. Dozens of downstream `isinstance(x,
+        # pd.DataFrame)` checks (SHAP extraction, drift-reference capture,
+        # merge, summary) rely on that invariant and would *silently* no-op
+        # on a non-pandas frame. This is the single choke point where data
+        # enters the engine, so assert the invariant here to turn a future
+        # silent degradation (e.g. someone adding a Polars fast-path to a
+        # catalog) into a loud, immediate failure.
+        if not isinstance(df, pd.DataFrame):
+            raise TypeError(
+                f"Dataset {dataset_id} loaded as {type(df).__name__}, but the pipeline "
+                "execution engine requires a pandas DataFrame. Catalogs must return "
+                "pandas frames (convert with `.to_pandas()` before returning)."
+            )
+
         self.log(
             f"Data loaded successfully. Shape: {df.shape} ({len(df)} rows, {len(df.columns)} columns)"
         )
