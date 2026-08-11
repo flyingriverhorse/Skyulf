@@ -653,7 +653,7 @@ Stage 1 data:
 | Post-upload pipeline recommendation | `profiling/recommendations.py` already computes the heuristics; only assembly is missing | smooth-experience-fixes Top 3 #2 |
 | "Live / Reconnecting" indicator | `jobEventsSocket.ts:44-90` plumbing exists with zero rendered consumers | smooth-experience-fixes §C |
 | Post-fit diagnostics **at job completion** | Narrower than first written: the metrics are computed (`_evaluation/classification.py:8,94,117`) *and* already rendered — but only inside Experiments. The gap is placement, not capability. | training-visualization tier (a)1-2 |
-| **Give the Experiments view a URL** | 9,473 lines of comparison, SHAP, diff and threshold-tuning UI that **cannot be linked to**. See below. | found 2026-08-11 |
+| **Make results shareable by URL** | 9,473 lines of comparison, SHAP, diff and threshold-tuning UI, with **no URL sync anywhere** — verified. A result cannot be linked to. See below. | found 2026-08-11 |
 | Read-only per-node generated code | No new execution path; display and export only | code-escape-hatch Phase A |
 
 **The retention surface already exists and has no address.**
@@ -669,22 +669,55 @@ $ find src -path "*xperiment*" -name "*.ts*" | xargs wc -l
 9473 total
 ```
 
-But `App.tsx:36-84` has **no `experiments` route.** It renders as view state
-inside `MainLayout` (`:104-105`, gated on `visitedViews`), reached only by a
-navbar click (`Navbar.tsx:53`). Consequences:
+**None of it is addressable.** Verified — there is no `useSearchParams`,
+`useNavigate`, `useParams` or `window.location` anywhere in `ExperimentsPage`
+or its module. Three layers of state, none in the URL:
 
-- **You cannot send anyone a link to a result.** Not a colleague, not a
-  reviewer, not a hiring manager, not a conference talk. Sharing a result is
-  how a tool spreads inside an organisation, and it is currently impossible.
-- No deep link, no bookmark, no browser back, no restore after refresh.
+| Layer | Where it lives | Survives refresh? |
+|---|---|---|
+| Which view (canvas / experiments / inference) | `useViewStore.ts:50`, plain zustand, defaults `'canvas'` | **No** |
+| Which runs are selected | `ExperimentsPage.tsx:45` `selectedJobIds`, local `useState` | **No** |
+| Which tab (`charts`/`table`/`evaluation`/`importance`/`shap`/`diff`/`segmentation`) | `ExperimentsPage.tsx:72`, local `useState` | **No** |
 
-The work is a route plus URL-synced view state — small, and it converts an
-existing 9,473-line asset into something that can travel. It serves
-retention *and* enterprise (stage 3 of the funnel) at once, which is the bar
-this plan set for anything it schedules.
+So a user cannot send anyone a link to a result — not a colleague, not a
+reviewer, not a hiring manager, not a conference talk. Sharing a result is
+how a tool spreads inside an organisation, and it is currently impossible.
 
-*Unverified:* whether view state survives a refresh at all. Check before
-scheduling.
+**The constraint that makes this a design item, not a one-liner.** The
+obvious fix — "make Experiments a route" — would be a regression. The
+mounted-view architecture is deliberate and documented at
+`MainLayout.tsx:78-89`:
+
+> *…exactly as the user left it when they navigate away and back —
+> previously this ternary unmounted the inactive views, resetting all of
+> that state on every switch.*
+
+All three views stay mounted behind `display: contents` precisely so that
+switching tabs does not destroy canvas graph state, form input, or fetched
+results. A naive `<Route>` per view reintroduces the bug that comment
+describes. **The URL must drive `activeView` without owning the mount.**
+
+**Sequence matters, and the cheap half is the wrong half.** A URL for the
+view alone lands the recipient on an empty Experiments page with no run
+selected — near-worthless. The shareable artifact is *this run, this view*:
+
+```
+/canvas/experiments?jobs=<id>,<id>&tab=shap
+```
+
+Level 2 (selection + tab) is where the value is. Do not ship level 1 alone
+and call it done.
+
+**Adjacent, nearly free:** `useViewStore.ts` already persists
+`perfOverlayEnabled` to localStorage (`:9-28`), so the persistence pattern
+exists in the same file — `activeView` simply never adopted it. Whether the
+URL or localStorage should win on load is a decision to make deliberately,
+not to discover.
+
+*Effort:* small-to-moderate, and unusually well-bounded — it adds no
+backend work, no new views, and no new data. It converts a 9,473-line asset
+that already works into one that can travel. Serves retention **and**
+enterprise, which is the bar this plan requires before scheduling anything.
 
 **Two limits recorded now, so they are not promised by accident:**
 

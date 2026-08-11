@@ -105,6 +105,18 @@ false, and each was reached by grepping for the wrong token.
 The inverse rule also holds: a **positive** claim that something is fixed
 requires running it, not reading the commit that says so.
 
+### 8. Before proposing a fix, find out why the code is the way it is
+
+Read the surrounding comments and history first. Existing structure is
+often load-bearing for a reason that is not visible from the symptom.
+
+*Why:* "Experiments has no URL, so make it a route" would have been a
+regression. `MainLayout.tsx:78-89` documents that the views are kept mounted
+deliberately, because an earlier ternary unmounted them and reset canvas
+state on every switch. The fix is to let the URL drive the active view
+*without* owning the mount — which is a different, and larger, piece of work
+than the obvious one.
+
 ## Relationship to the other initiative folders
 
 | Folder | Disposition |
