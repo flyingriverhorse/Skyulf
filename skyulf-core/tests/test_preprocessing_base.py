@@ -416,6 +416,34 @@ def test_transform_on_plain_dataframe_reuses_stored_params():
     assert list(result["a"]) == [10, 10]
 
 
+def test_transform_on_raw_polars_dataframe_reuses_stored_params():
+    """Regression test: `transform()` previously only checked
+    `isinstance(dataset, pd.DataFrame)` before falling through to the
+    tuple/SplitDataset branches, so a raw (unwrapped) `pl.DataFrame` passed
+    directly crashed with `AttributeError: 'DataFrame' object has no
+    attribute 'train'`. `StatefulTransformer` is a public API class
+    (exported from `skyulf.preprocessing.__init__`), so this is a directly
+    reachable call path, not just an internal implementation detail. Uses a
+    polars-native applier since `_AddOneApplier` above is pandas-only.
+    """
+    import polars as pl
+
+    class _PolarsAddOneApplier(BaseApplier):
+        def apply(self, df, params):
+            """Add params['increment'] to column 'a' via Polars' expression API."""
+            return df.with_columns(pl.col("a") + params["increment"])
+
+    train_df = pl.DataFrame({"a": [1, 2, 3]})
+    transformer = StatefulTransformer(
+        calculator=_AddOneCalculator(), applier=_PolarsAddOneApplier(), node_id="poly1"
+    )
+    transformer.fit_transform(train_df, {"increment": 10})
+
+    new_df = pl.DataFrame({"a": [0, 0]})
+    result = typing.cast(pl.DataFrame, transformer.transform(new_df))
+    assert list(result["a"]) == [10, 10]
+
+
 def test_transform_on_tuple_reuses_stored_params():
     """transform() on an (X, y) tuple should reuse the stored params."""
     train_df = pd.DataFrame({"a": [1, 2, 3]})

@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from typing import Any, Protocol, cast, runtime_checkable
 
 import pandas as pd
+import polars as pl
 
 from ..core.protocols import ApplierProtocol, CalculatorProtocol
 from ..data.dataset import SplitDataset
@@ -157,9 +158,9 @@ class StatefulTransformer:
 
     def fit_transform(
         self,
-        dataset: SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple,
+        dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple,
         config: dict[str, Any],
-    ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
+    ) -> SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple:
         self.rows_in, _ = get_data_stats(dataset)
         tracing_was_active = tracemalloc.is_tracing()
         if not tracing_was_active:
@@ -207,9 +208,9 @@ class StatefulTransformer:
 
     def _fit_transform_inner(
         self,
-        dataset: SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple,
+        dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple,
         config: dict[str, Any],
-    ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
+    ) -> SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple:
         # Check for DataFrame-like (Pandas, Polars, Wrapper)
         if (
             hasattr(dataset, "shape")
@@ -266,13 +267,22 @@ class StatefulTransformer:
         return SplitDataset(train=new_train, test=new_test, validation=new_val)
 
     def transform(
-        self, dataset: SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple
-    ) -> SplitDataset | pd.DataFrame | SkyulfDataFrame | tuple:
+        self, dataset: SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple
+    ) -> SplitDataset | pd.DataFrame | pl.DataFrame | SkyulfDataFrame | tuple:
         # Use stored params
         params = self.params
 
-        if isinstance(dataset, pd.DataFrame):
-            return self.applier.apply(dataset, params)
+        # Check for DataFrame-like (Pandas, Polars, Wrapper) input, mirroring
+        # `_fit_transform_inner`'s detection above -- an `isinstance(dataset,
+        # pd.DataFrame)`-only check here would misroute a raw (unwrapped)
+        # `pl.DataFrame` into the SplitDataset branch below, crashing with
+        # `AttributeError: 'DataFrame' object has no attribute 'train'`.
+        if (
+            hasattr(dataset, "shape")
+            and hasattr(dataset, "columns")
+            and not isinstance(dataset, tuple)
+        ):
+            return self.applier.apply(cast(Any, dataset), params)
 
         if isinstance(dataset, tuple):
             return self.applier.apply(dataset, params)

@@ -60,8 +60,10 @@ class TargetMixin(_AnalyzerState):
         if not ss_total:
             return 0.0
 
-        groups = self.df.group_by(target_col).agg(  # type: ignore[attr-defined]
-            [pl.len().alias("n"), pl.col(col).mean().alias("mean")]
+        groups = (
+            self.df.filter(pl.col(target_col).is_not_null())  # type: ignore[attr-defined]
+            .group_by(target_col)
+            .agg([pl.len().alias("n"), pl.col(col).mean().alias("mean")])
         )
 
         ss_between = 0.0

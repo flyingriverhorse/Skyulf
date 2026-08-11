@@ -169,3 +169,29 @@ def test_drop_reference_column_still_works_on_pandas_dataframe():
     X = pd.DataFrame({"a": [1, 2], "species": ["x", "y"]})
     out = _drop_reference_column(X, "species")
     assert out.columns.tolist() == ["a"]
+
+
+def test_select_numeric_features_does_not_misroute_pandas_wrapper():
+    """Regression test for a rubber-duck-caught fix regression.
+
+    `_select_numeric_features` originally used loose `hasattr(X, "dtypes")
+    and hasattr(X, "columns")` duck-typing to detect "Polars-like" input.
+    `SkyulfPandasWrapper` delegates attribute access to its wrapped
+    `pd.DataFrame` via `__getattr__`, so it exposes both `.dtypes` and
+    `.columns` too — the duck-type check misrouted it into the
+    Polars-specific numeric-dtype-filtering branch, which compared numpy
+    dtypes against Polars dtype objects (never matching) and silently
+    dropped every column, including numeric ones. The fix uses an explicit
+    `isinstance(X, pl.DataFrame | SkyulfPolarsWrapper)` check instead, so a
+    `SkyulfPandasWrapper` must fall through to the safe pandas no-op path
+    (`return X, []`) rather than losing all its columns.
+    """
+    from skyulf.engines.pandas_engine import SkyulfPandasWrapper
+    from skyulf.modeling.clustering import _select_numeric_features
+
+    X = SkyulfPandasWrapper(
+        pd.DataFrame({"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "city": ["x", "y", "z"]})
+    )
+    out, dropped = _select_numeric_features(X)
+    assert dropped == []
+    assert list(out.columns) == ["a", "b", "city"]

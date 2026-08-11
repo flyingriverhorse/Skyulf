@@ -65,9 +65,16 @@ def _to_records(df: Any) -> list[dict[str, Any]]:
         import polars as pl
 
         if isinstance(df, pl.DataFrame):
-            return json.loads(df.head(50).to_pandas().to_json(orient="records"))
+            # Use Polars' own `.to_dicts()` rather than round-tripping through
+            # `.to_pandas()`: the default `to_pandas()` conversion upcasts any
+            # Int*/Boolean column containing nulls to numpy float64/object
+            # (there's no native nullable-int/bool numpy dtype), which
+            # silently renders e.g. an integer `5` as `5.0` in the preview
+            # payload sent to the frontend. `.to_dicts()` preserves the
+            # original Python int/bool/None values as-is.
+            return df.head(50).to_dicts()
         if isinstance(df, pl.Series):
-            return json.loads(df.head(50).to_pandas().to_frame().to_json(orient="records"))
+            return [{df.name or "value": v} for v in df.head(50).to_list()]
     except ImportError:
         pass
     return []
@@ -117,7 +124,13 @@ def _to_pandas_safe(df: Any) -> pd.DataFrame | None:
         import polars as pl
 
         if isinstance(df, pl.DataFrame):
-            return df.to_pandas()
+            # Preserve nullable dtypes (Int*/Boolean with nulls) via pandas'
+            # pyarrow-backed extension arrays. Plain `.to_pandas()` upcasts
+            # any Int*/Boolean column containing nulls to numpy float64/
+            # object, which both misrepresents values (`5` -> `5.0`) and
+            # flips `pd.api.types.is_numeric_dtype(...)` to `False` for a
+            # nulled Boolean column downstream in the advisor's profiling.
+            return df.to_pandas(use_pyarrow_extension_array=True)
     except ImportError:
         pass
     return None

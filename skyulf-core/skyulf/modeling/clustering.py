@@ -10,7 +10,7 @@ from sklearn.mixture import GaussianMixture
 
 from ..core.meta.decorators import node_meta
 from ..engines import SkyulfDataFrame
-from ..engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES
+from ..engines.polars_engine import POLARS_NUMERIC_BOOL_DTYPES, SkyulfPolarsWrapper
 from ..registry import NodeRegistry
 from .sklearn_wrapper import SklearnApplier, SklearnCalculator
 
@@ -31,12 +31,20 @@ def _select_numeric_features(X: Any) -> tuple[Any, list[str]]:
     ``pl.DataFrame`` when the pipeline has no target column configured (the
     "no target" sentinel used throughout clustering), so this must not assume
     pandas is the only non-trivial branch.
+
+    Uses an explicit ``isinstance`` check for the Polars branch (rather than
+    duck-typing on ``hasattr(X, "dtypes")``/``hasattr(X, "columns")``) because
+    this codebase's own ``SkyulfPandasWrapper`` also exposes both attributes
+    via ``__getattr__`` delegation to its wrapped pandas frame — a duck-typed
+    check would misroute it into the Polars branch, compare numpy dtypes
+    against ``POLARS_NUMERIC_BOOL_DTYPES`` (never matching), and silently
+    drop every column, including numeric ones.
     """
     if isinstance(X, pd.DataFrame):
         numeric = X.select_dtypes(include=["number", "bool"])
         dropped = [c for c in X.columns if c not in numeric.columns]
         return numeric, dropped
-    if hasattr(X, "dtypes") and hasattr(X, "columns"):  # polars DataFrame or wrapper
+    if isinstance(X, pl.DataFrame | SkyulfPolarsWrapper):
         numeric_cols = [
             col
             for col, dtype in zip(X.columns, X.dtypes, strict=True)

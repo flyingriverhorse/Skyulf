@@ -370,3 +370,24 @@ def test_analyze_categorical_robust_to_extra_struct_keys() -> None:
     }
     stats = analyzer._analyze_categorical("cat", row, {"cat__unique": 1})
     assert stats.top_k == [{"value": "a", "count": 2}]
+
+
+def test_analyze_categorical_skips_null_value_entries() -> None:
+    """Regression test: Polars' `value_counts` includes null as a real
+    category, so a null-value entry in the top_k struct list previously
+    rendered as the literal string "None" — indistinguishable from a
+    genuine category value named "None". It must be skipped entirely
+    instead.
+    """
+    df = pl.DataFrame({"cat": ["a", "b", None]})
+    analyzer = _basic_analyzer(df)
+    row = {
+        "cat__top_k": [
+            {"cat": "a", "count": 2},
+            {"cat": None, "count": 1},
+            {"cat": "b", "count": 1},
+        ]
+    }
+    stats = analyzer._analyze_categorical("cat", row, {"cat__unique": 2})
+    assert stats.top_k == [{"value": "a", "count": 2}, {"value": "b", "count": 1}]
+    assert all(entry["value"] != "None" for entry in stats.top_k)

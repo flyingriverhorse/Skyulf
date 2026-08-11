@@ -269,6 +269,27 @@ def test_analyze_timeseries_outer_exception_returns_none(monkeypatch) -> None:
     assert result is None
 
 
+def test_compute_seasonality_ignores_null_dates() -> None:
+    """Null ``date_col`` rows must not form a phantom day/month bucket.
+
+    Regression test: `_compute_seasonality` previously built `dow_df`/
+    `moy_df` without filtering out null dates first, so a null date
+    (e.g. an unparsable row) produced a `{"day": None, "count": ...}` /
+    `{"month": None, "count": ...}` bucket in the output, which is bogus
+    and shouldn't be presented to users as a real day-of-week/month bucket.
+    """
+    base = datetime(2022, 1, 1)
+    dates = [base + timedelta(days=i) for i in range(20)] + [None, None, None]
+    value = list(np.linspace(1, 20, 20)) + [999.0, 999.0, 999.0]
+    df = pl.DataFrame({"date": dates, "value": value})
+    analyzer = EDAAnalyzer(df)
+
+    stats = analyzer._compute_seasonality("date", ["value"])
+
+    assert all(row["day"] is not None for row in stats.day_of_week)
+    assert all(row["month"] is not None for row in stats.month_of_year)
+
+
 class TestRealShapedDataset:
     """Integration-style check against the checked-in ``customers.csv`` sample,
     which has a real ``signup_date`` string column plus missing ``age``/

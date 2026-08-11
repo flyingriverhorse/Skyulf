@@ -64,6 +64,46 @@ def test_to_records_polars_series():
     assert records == [{"a": 1}, {"a": 2}]
 
 
+def test_to_records_polars_dataframe_int_with_nulls_preserves_ints():
+    """Regression test: `_to_records` previously round-tripped Polars frames
+    through `.to_pandas()` (default `use_pyarrow_extension_array=False`),
+    which upcasts an Int* column containing nulls to numpy float64 — so an
+    integer `1` silently rendered as `1.0` in the JSON preview payload.
+    `.to_dicts()` preserves the exact int/None values.
+    """
+    pl = pytest.importorskip("polars")
+    df = pl.DataFrame({"a": [1, 2, None]})
+    records = preview_mod._to_records(df)
+    assert records == [{"a": 1}, {"a": 2}, {"a": None}]
+
+
+def test_to_records_polars_dataframe_bool_with_nulls_preserves_bools():
+    """Same regression, but for a Boolean column: `.to_pandas()` upcasts a
+    nulled Boolean column to numpy `object` dtype instead of preserving
+    `True`/`False`/`None` as-is.
+    """
+    pl = pytest.importorskip("polars")
+    df = pl.DataFrame({"flag": [True, False, None]})
+    records = preview_mod._to_records(df)
+    assert records == [{"flag": True}, {"flag": False}, {"flag": None}]
+
+
+def test_to_pandas_safe_polars_int_with_nulls_stays_numeric():
+    """Regression test: `_to_pandas_safe`'s plain `.to_pandas()` conversion
+    upcasts a nulled Int* column to numpy float64 (fine for numeric-ness)
+    but upcasts a nulled Boolean column to numpy `object` dtype, flipping
+    `pd.api.types.is_numeric_dtype()` to False downstream in the advisor's
+    profiling. Using `use_pyarrow_extension_array=True` keeps both as
+    genuinely numeric/boolean dtypes.
+    """
+    pl = pytest.importorskip("polars")
+    df = pl.DataFrame({"age": [1, 2, None], "flag": [True, False, None]})
+    pdf = preview_mod._to_pandas_safe(df)
+    assert pdf is not None
+    assert pd.api.types.is_bool_dtype(pdf["flag"])
+    assert pd.api.types.is_integer_dtype(pdf["age"])
+
+
 def test_to_records_unsupported_type_returns_empty():
     assert preview_mod._to_records(object()) == []
     assert preview_mod._to_records(None) == []
