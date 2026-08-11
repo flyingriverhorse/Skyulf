@@ -165,8 +165,14 @@ class ArtifactsMixin:
             X, y = raw_train
             if isinstance(X, pd.DataFrame):
                 train_df = X.copy()
-                # Add target column back if y is compatible
-                if isinstance(y, (pd.Series, np.ndarray, list)):
+                # Add target column back if y is compatible. A single-column
+                # `pd.DataFrame` is a legitimate target shape (``split_xy`` can
+                # produce one); squeeze it rather than silently dropping the
+                # target from the drift-reference frame.
+                if isinstance(y, pd.DataFrame):
+                    if y.shape[1] == 1:
+                        train_df[target_col] = y.iloc[:, 0].to_numpy()
+                elif isinstance(y, (pd.Series, np.ndarray, list)):
                     train_df[target_col] = y
                 return train_df
         return None
@@ -181,7 +187,10 @@ class ArtifactsMixin:
             self.log(f"Saving reference training data for drift detection: {key}")
             self.artifact_store.save(key, train_df)
         else:
-            logger.warning(f"Could not extract reference data for job {job_id}")
+            reason = (
+                "extracted frame was empty" if train_df is not None else "unsupported data shape"
+            )
+            logger.warning(f"Could not extract reference data for job {job_id} ({reason})")
 
     def _save_reference_data(self, data: Any, job_id: str, target_col: str):
         """
