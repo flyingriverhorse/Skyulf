@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · Build ML pipelines you can trust</title>
+<link rel="icon" type="image/png" href="../static/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f4f5f7; --cell:#ffffff; --border:#e1e4e8; --prompt:#9aa4b0;
+    --ink:#24292f; --dim:#6a737d; --orange:#f37626; --green:#2da44e; --red:#cf222e; --blue:#0969da;
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.6}
+  a{color:var(--blue);text-decoration:none}
+  img{display:block;max-width:100%}
+  .page{max-width:980px;margin:0 auto;padding:0 20px 80px}
+
+  /* toolbar */
+  .toolbar{position:sticky;top:0;z-index:40;background:var(--cell);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;justify-content:space-between;align-items:center}
+  .toolbar .left{display:flex;align-items:center;gap:12px;font-weight:700}
+  .toolbar .left img{width:24px;height:24px;border-radius:5px}
+  .toolbar .fname{font-family:var(--mono);font-size:13px;color:var(--dim)}
+  .toolbar .fname b{color:var(--ink)}
+  .kernel{font-family:var(--mono);font-size:11px;color:var(--green);display:flex;align-items:center;gap:7px}
+  .kernel i{width:8px;height:8px;border-radius:50%;background:var(--green)}
+  .toolbar nav{display:flex;gap:18px;font-size:13px}
+  .toolbar nav a{color:var(--dim)}
+  .toolbar nav a:hover{color:var(--ink)}
+  @media(max-width:820px){.toolbar nav{display:none}}
+
+  /* cells */
+  .cell{display:grid;grid-template-columns:78px 1fr;margin:18px 0;position:relative}
+  .cell::before{content:'';position:absolute;left:-4px;top:0;bottom:0;width:4px;border-radius:2px;background:transparent;transition:.15s}
+  .cell:hover::before{background:var(--orange)}
+  .prompt{font-family:var(--mono);font-size:12px;color:var(--prompt);text-align:right;padding:16px 14px 0 0;user-select:none}
+  .prompt.in{color:var(--blue)}
+  .prompt.out{color:var(--green)}
+  .body{background:var(--cell);border:1px solid var(--border);border-radius:8px;padding:18px 22px;overflow:hidden}
+  .code .body{font-family:var(--mono);font-size:13.5px;line-height:1.8}
+  .md .body{font-size:16px}
+  @media(max-width:680px){.cell{grid-template-columns:1fr}.prompt{display:none}}
+
+  /* syntax */
+  .c-kw{color:#d73a49}.c-str{color:#032f62}.c-fn{color:#6f42c1}.c-com{color:#6a737d;font-style:italic}.c-num{color:#005cc5}
+
+  /* markdown content */
+  .md h1{font-size:42px;font-weight:700;letter-spacing:-0.02em;line-height:1.15;margin-bottom:14px}
+  .md h1 em{font-style:normal;color:var(--orange)}
+  .md h2{font-size:28px;font-weight:700;margin-bottom:10px}
+  .md h3{font-size:20px;font-weight:700;margin:18px 0 8px}
+  .md p{color:#444c56;margin-bottom:10px;max-width:680px}
+  .md blockquote{border-left:4px solid var(--orange);padding:6px 16px;color:var(--dim);margin:14px 0}
+  .md ul{padding-left:22px;color:#444c56}
+  .md li{margin:6px 0}
+  .md code{font-family:var(--mono);font-size:13px;background:#eff1f3;padding:2px 6px;border-radius:5px}
+  .badge{display:inline-block;font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:12px;background:#eff1f3;color:var(--dim);margin-right:8px}
+
+  /* outputs */
+  .out-ok{color:var(--green)}
+  .out-err{color:var(--red)}
+  .out-dim{color:var(--prompt)}
+  .out-img{padding:8px;background:#fff}
+  .out-img img{border:1px solid var(--border);border-radius:6px;width:100%}
+  .out-img .fig{font-family:var(--mono);font-size:11px;color:var(--prompt);margin-top:8px}
+  .traceback{border-left:3px solid var(--red);background:#fff5f5;padding:14px 18px;border-radius:0 8px 8px 0;font-family:var(--mono);font-size:12.5px;line-height:1.8;color:#82071e}
+
+  /* buttons rendered as output */
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .btn{font-family:var(--mono);font-size:13px;font-weight:700;padding:11px 20px;border-radius:7px;border:1px solid var(--border);background:#f6f8fa;color:var(--ink);transition:.15s}
+  .btn:hover{border-color:var(--prompt)}
+  .btn.main{background:var(--orange);border-color:var(--orange);color:#fff}
+  .btn.main:hover{filter:brightness(1.06)}
+
+  /* two-col table output */
+  .tbl{width:100%;border-collapse:collapse;font-size:13.5px;font-family:var(--mono)}
+  .tbl th{text-align:left;color:var(--dim);font-weight:500;border-bottom:2px solid var(--border);padding:8px 10px}
+  .tbl td{border-bottom:1px solid var(--border);padding:8px 10px}
+  .tbl td:last-child{color:var(--ink)}
+  .hl{background:#fff8e6}
+
+  footer{max-width:980px;margin:0 auto;padding:24px 20px;font-family:var(--mono);font-size:12px;color:var(--prompt);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;border-top:1px solid var(--border)}
+  footer a{color:var(--dim)}
+  footer a:hover{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="left">
+    <img src="../static/img/logo.png" alt="Skyulf">
+    <span class="fname"><b>skyulf</b>.ipynb</span>
+    <span class="out-dim" style="font-family:var(--mono);font-size:12px">(autosaved)</span>
+  </div>
+  <nav>
+    <a href="#products">Products</a><a href="#lifecycle">Lifecycle</a><a href="#leakage">Leakage</a><a href="#features">Features</a><a href="#faq">FAQ</a>
+  </nav>
+  <div class="kernel"><i></i>Python 3.12 | Kernel ready</div>
+</div>
+
+<div class="page">
+
+  <!-- markdown: hero -->
+  <div class="cell md">
+    <div class="prompt"></div>
+    <div class="body">
+      <span class="badge">self-hosted</span><span class="badge">free forever</span><span class="badge">no signup</span>
+      <h1 style="margin-top:14px">Build ML pipelines<br><em>you can trust.</em></h1>
+      <p>Skyulf turns scikit-learn into pipelines you can defend: visual canvas or plain Python, automated EDA, tuning, deployment and drift monitoring — with static leakage checks baked in.</p>
+    </div>
+  </div>
+
+  <!-- code: install -->
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[1]:</div>
+    <div class="body"><span class="c-com"># the engine, as a library</span>
+!pip install <span class="c-kw">skyulf-core</span></div>
+  </div>
+  <div class="cell code">
+    <div class="prompt out">Out[1]:</div>
+    <div class="body"><span class="out-ok">Successfully installed skyulf-core</span> <span class="out-dim">— 2,266 tests passing · pandas &amp; polars backends</span>
+      <div class="btnrow">
+        <a class="btn main" href="https://api.skyulf.com/" target="_blank" rel="noopener">▶ Run live demo</a>
+        <a class="btn" href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">View source</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- markdown: products -->
+  <div class="cell md" id="products">
+    <div class="prompt"></div>
+    <div class="body">
+      <h2>Two products, one engine</h2>
+      <p>Both compile to standard scikit-learn objects. No lock-in, no proprietary formats.</p>
+    </div>
+  </div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[2]:</div>
+    <div class="body"><span class="c-kw">from</span> skyulf <span class="c-kw">import</span> Platform, Core
+<span class="c-fn">print</span>(Platform.license, Core.license)</div>
+  </div>
+  <div class="cell code">
+    <div class="prompt out">Out[2]:</div>
+    <div class="body">
+      <table class="tbl">
+        <tr><th>product</th><th>license</th><th>what you get</th></tr>
+        <tr><td><b>Skyulf Platform</b></td><td>AGPLv3</td><td>canvas · EDA · registry · deploy · drift</td></tr>
+        <tr class="hl"><td><b>skyulf-core</b></td><td>Apache-2.0</td><td>pip library for notebooks &amp; CI</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- markdown: lifecycle -->
+  <div class="cell md" id="lifecycle">
+    <div class="prompt"></div>
+    <div class="body">
+      <h2>The lifecycle, executed cell by cell</h2>
+      <p>Seven stages — each one visible, logged and reproducible. 35 node types across 11 workspaces.</p>
+    </div>
+  </div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[3]:</div>
+    <div class="body">ds = <span class="c-fn">connect</span>(<span class="c-str">"churn.csv"</span>)  <span class="c-com"># csv / parquet</span></div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[3]:</div><div class="body out-img"><img src="../static/img/datasource.jpg" alt="Datasources"><div class="fig">fig. datasource registry</div></div></div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[4]:</div>
+    <div class="body">eda = ds.<span class="c-fn">auto_eda</span>()  <span class="c-com"># profiles generated on import</span></div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[4]:</div><div class="body out-img"><img src="../static/img/eda/dashboardeda.jpg" alt="Auto EDA"><div class="fig">fig. automated EDA dashboard</div></div></div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[5]:</div>
+    <div class="body">pipe = <span class="c-fn">Canvas</span>()  <span class="c-com"># drag nodes, wire branches</span></div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[5]:</div><div class="body out-img"><img src="../static/img/canvas.jpg" alt="Pipeline canvas"><div class="fig">fig. visual pipeline canvas</div></div></div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[6]:</div>
+    <div class="body">job = pipe.<span class="c-fn">tune</span>(search=<span class="c-str">"optuna"</span>)  <span class="c-com"># grid / random / halving too</span></div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[6]:</div><div class="body out-img"><img src="../static/img/jobs.jpg" alt="Training jobs"><div class="fig">fig. jobs with live logs</div></div></div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[7]:</div>
+    <div class="body">runs.<span class="c-fn">compare</span>(metric=<span class="c-str">"f1"</span>)</div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[7]:</div><div class="body out-img"><img src="../static/img/experiments.jpg" alt="Experiments"><div class="fig">fig. experiment comparison</div></div></div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[8]:</div>
+    <div class="body">best.<span class="c-fn">deploy</span>()  <span class="c-com"># rest endpoint per model</span></div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[8]:</div><div class="body out-img"><img src="../static/img/deployments.jpg" alt="Deployments"><div class="fig">fig. deployments</div></div></div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[9]:</div>
+    <div class="body">best.<span class="c-fn">monitor</span>(drift=[<span class="c-str">"ks"</span>, <span class="c-str">"psi"</span>, <span class="c-str">"wasserstein"</span>, <span class="c-str">"kl"</span>])</div>
+  </div>
+  <div class="cell code"><div class="prompt out">Out[9]:</div><div class="body out-img"><img src="../static/img/drift/drift.jpg" alt="Drift monitoring"><div class="fig">fig. drift monitoring</div></div></div>
+
+  <!-- leakage -->
+  <div class="cell md" id="leakage">
+    <div class="prompt"></div>
+    <div class="body">
+      <h2>The 94% that wasn't real</h2>
+      <p>An encoder fitted before the split leaks labels into validation. Your notebook says 94% — production says 71%. Skyulf refuses to run that pipeline.</p>
+    </div>
+  </div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[10]:</div>
+    <div class="body"><span class="c-kw">from</span> skyulf.validation <span class="c-kw">import</span> validate_leakage_safety
+<span class="c-fn">validate_leakage_safety</span>(leaky_pipe)</div>
+  </div>
+  <div class="cell code">
+    <div class="prompt out"></div>
+    <div class="body">
+      <div class="traceback">
+<span class="out-err">LeakageError</span>: TargetEncoder fitted on full dataset before train/test split
+&nbsp;&nbsp;→ validation score inflated: <b>0.94</b> (expected honest: 0.71)
+&nbsp;&nbsp;→ every node must declare learn/apply phases
+      </div>
+    </div>
+  </div>
+
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[11]:</div>
+    <div class="body">fixed = pipe.<span class="c-fn">enforce_learn_apply</span>()
+<span class="c-fn">validate_leakage_safety</span>(fixed)
+fixed.<span class="c-fn">score</span>()</div>
+  </div>
+  <div class="cell code">
+    <div class="prompt out">Out[11]:</div>
+    <div class="body"><span class="out-ok">✓ graph validated — no leakage paths</span>
+<span class="out-dim">fingerprint + model card written to registry</span>
+<b>0.71</b> <span class="out-dim"># the score you can defend</span></div>
+  </div>
+
+  <!-- features -->
+  <div class="cell md" id="features">
+    <div class="prompt"></div>
+    <div class="body">
+      <h2>Included, not upsold</h2>
+      <ul>
+        <li><b>Hyperparameter tuning</b> — Optuna, grid, random, halving; auto-logged as experiments</li>
+        <li><b>SHAP explainability</b> — feature importance generated with every artifact</li>
+        <li><b>Notebook export</b> — canvas → clean .ipynb, one click</li>
+        <li><b>Audit log</b> — every change, every workspace, recorded</li>
+        <li><b>Ensembles &amp; multi-branch</b> — merge branches into ensemble models</li>
+        <li><b>Text nodes</b> — TF-IDF and text processing next to tabular nodes</li>
+      </ul>
+      <blockquote>Everything ships in the open-source box. No paid tier, no contact-sales gate.</blockquote>
+    </div>
+  </div>
+
+  <!-- faq -->
+  <div class="cell md" id="faq">
+    <div class="prompt"></div>
+    <div class="body">
+      <h2>FAQ</h2>
+      <h3>Is it free?</h3>
+      <p>Yes. Platform AGPLv3, library Apache-2.0. Self-hosted, no accounts.</p>
+      <h3>Does it lock me in?</h3>
+      <p>No — pipelines compile to standard scikit-learn. Export a notebook and leave with working code.</p>
+      <h3>Run it locally?</h3>
+      <p><code>git clone https://github.com/flyingriverhorse/skyulf &amp;&amp; cd skyulf &amp;&amp; docker compose up</code></p>
+      <h3>What data?</h3>
+      <p>CSV and Parquet via pandas or Polars, plus text columns for NLP nodes. Python 3.12.</p>
+    </div>
+  </div>
+
+  <!-- final cell -->
+  <div class="cell code">
+    <div class="prompt in">In&nbsp;[&nbsp;]:</div>
+    <div class="body"><span class="c-com"># restart kernel &amp; run all — in the live demo</span></div>
+  </div>
+  <div class="cell code">
+    <div class="prompt out"></div>
+    <div class="body">
+      <div class="btnrow">
+        <a class="btn main" href="https://api.skyulf.com/" target="_blank" rel="noopener">▶▶ Restart &amp; Run All (live demo)</a>
+        <a class="btn" href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">pip install skyulf-core</a>
+        <a class="btn" href="../manual/index.html">Read the docs</a>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <span>skyulf.ipynb — kernel idle</span>
+  <span><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">GitHub</a> · <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">PyPI</a> · <a href="../manual/index.html">Docs</a></span>
+</footer>
+
+</body>
+</html>

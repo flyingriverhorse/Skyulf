@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · Build ML pipelines you can trust</title>
+<meta name="description" content="Skyulf turns scikit-learn into pipelines you can trust. Visual canvas or the Apache-2.0 skyulf-core Python library. Self-hosted.">
+<link rel="icon" type="image/png" href="../static/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#05060f; --panel:rgba(255,255,255,.04); --line:rgba(255,255,255,.09);
+    --txt:#e8ecf4; --mut:#8b93a7; --cy:#22d3ee; --vi:#8b5cf6; --te:#2dd4bf;
+    --r:20px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--txt);font-family:'Space Grotesk',sans-serif;overflow-x:hidden}
+  .mono{font-family:'IBM Plex Mono',monospace}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+  a{color:inherit;text-decoration:none}
+  img{display:block;max-width:100%}
+  ::selection{background:var(--cy);color:#04121a}
+
+  /* aurora background */
+  .aurora{position:fixed;inset:0;z-index:-1;overflow:hidden}
+  .aurora::before,.aurora::after{content:"";position:absolute;border-radius:50%;filter:blur(120px);opacity:.5}
+  .aurora::before{width:70vw;height:70vw;top:-30vw;left:-15vw;background:radial-gradient(circle,#164e63,transparent 65%);animation:drift1 18s ease-in-out infinite alternate}
+  .aurora::after{width:60vw;height:60vw;top:10vh;right:-20vw;background:radial-gradient(circle,#3b0764,transparent 65%);animation:drift2 22s ease-in-out infinite alternate}
+  @keyframes drift1{to{transform:translate(8vw,6vh)}}
+  @keyframes drift2{to{transform:translate(-10vw,8vh)}}
+  .grain{position:fixed;inset:0;z-index:-1;background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:28px 28px;mask-image:radial-gradient(ellipse at 50% 0%,black,transparent 70%)}
+
+  /* nav */
+  header{position:sticky;top:0;z-index:60;backdrop-filter:blur(16px);background:rgba(5,6,15,.6);border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;letter-spacing:-.01em}
+  .brand img{width:30px;height:30px;border-radius:8px}
+  nav{display:flex;gap:30px;font-size:14px;color:var(--mut)}
+  nav a:hover{color:var(--txt)}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:12px;padding:11px 22px;font-weight:600;font-size:14px;transition:all .2s;cursor:pointer;border:1px solid transparent}
+  .btn-pri{background:linear-gradient(120deg,var(--cy),var(--vi));color:#05060f;font-weight:700}
+  .btn-pri:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(34,211,238,.35)}
+  .btn-sec{background:var(--panel);border-color:var(--line);color:var(--txt)}
+  .btn-sec:hover{border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.07)}
+
+  /* hero */
+  .hero{padding:110px 0 80px;text-align:center}
+  .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 18px;font-size:13px;color:var(--mut);margin-bottom:32px}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--te);box-shadow:0 0 12px var(--te);animation:pulse 2s infinite}
+  @keyframes pulse{50%{opacity:.4}}
+  h1{font-size:clamp(46px,7.5vw,92px);font-weight:700;line-height:1.02;letter-spacing:-.035em}
+  h1 .grad{background:linear-gradient(100deg,var(--te),var(--cy) 45%,var(--vi));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{max-width:640px;margin:28px auto 0;color:var(--mut);font-size:19px;line-height:1.7}
+  .sub b{color:var(--txt);font-weight:500}
+  .hero-ctas{display:flex;gap:14px;justify-content:center;margin-top:40px;flex-wrap:wrap}
+  .install-line{margin:36px auto 0;max-width:480px;display:flex;justify-content:space-between;align-items:center;gap:14px;border:1px solid var(--line);background:rgba(5,6,15,.6);border-radius:14px;padding:15px 20px}
+  .install-line code{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--cy)}
+  .install-line button{background:none;border:0;color:var(--mut);font-size:12px;cursor:pointer;text-transform:uppercase;letter-spacing:.1em;font-weight:600;font-family:'Space Grotesk'}
+  .install-line button:hover{color:var(--txt)}
+
+  /* hero shot */
+  .shot{position:relative;margin:80px auto 0;max-width:1060px;border-radius:var(--r);border:1px solid var(--line);overflow:hidden;background:var(--panel);box-shadow:0 40px 120px -30px rgba(139,92,246,.35)}
+  .shot .win{display:flex;gap:8px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .shot .win i{width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.14)}
+  .shot img{width:100%}
+
+  /* section head */
+  section{padding:110px 0}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--cy);margin-bottom:16px}
+  h2{font-size:clamp(32px,4.5vw,52px);font-weight:700;letter-spacing:-.025em;line-height:1.08}
+  .sec-sub{color:var(--mut);margin-top:16px;max-width:56ch;font-size:17px}
+
+  /* bento */
+  .bento{display:grid;grid-template-columns:repeat(6,1fr);gap:16px;margin-top:56px}
+  .card{grid-column:span 2;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:28px;transition:border-color .25s, transform .25s;position:relative;overflow:hidden}
+  .card:hover{border-color:rgba(34,211,238,.4);transform:translateY(-3px)}
+  .card.wide{grid-column:span 4}
+  .card.full{grid-column:span 6}
+  .card h3{font-size:19px;font-weight:600;margin:14px 0 8px}
+  .card p{color:var(--mut);font-size:14.5px;line-height:1.6}
+  .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(34,211,238,.12);color:var(--cy);font-size:18px}
+  .ic.v{background:rgba(139,92,246,.14);color:var(--vi)}
+  .ic.t{background:rgba(45,212,191,.12);color:var(--te)}
+  .card img{border-radius:12px;margin-top:20px;border:1px solid var(--line)}
+
+  pre.code{background:#0a0d1a;border:1px solid var(--line);border-radius:14px;padding:22px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.75;overflow-x:auto;color:#c4ccdd;margin-top:20px;text-align:left}
+  pre.code .k{color:#7dd3fc} pre.code .s{color:#fbbf24} pre.code .c{color:#5b6478}
+
+  /* lifecycle rail */
+  .rail{margin-top:64px;display:grid;grid-template-columns:280px 1fr;gap:48px}
+  .rail-nav{display:flex;flex-direction:column;gap:6px;position:sticky;top:100px;align-self:start}
+  .rail-btn{text-align:left;background:none;border:1px solid transparent;border-radius:12px;padding:13px 18px;color:var(--mut);font-family:'Space Grotesk';font-size:15px;cursor:pointer;display:flex;gap:12px;align-items:center;transition:all .15s}
+  .rail-btn .n{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--cy)}
+  .rail-btn:hover{color:var(--txt);background:var(--panel)}
+  .rail-btn.on{background:var(--panel);border-color:var(--line);color:var(--txt)}
+  .rail-view{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:40px;min-height:460px}
+  .rail-view h3{font-size:26px;font-weight:600;letter-spacing:-.01em;margin-bottom:12px}
+  .rail-view p{color:var(--mut);max-width:60ch;line-height:1.7;margin-bottom:24px}
+  .rail-view img{border-radius:12px;border:1px solid var(--line)}
+  .rail-panel{display:none;animation:fadein .35s ease}
+  .rail-panel.on{display:block}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* leakage */
+  .leak{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+  .leak-msg{border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.06);border-radius:16px;padding:28px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.8;color:#fde9b8}
+  .leak-msg .h{color:#fbbf24;font-weight:500;display:flex;gap:8px;margin-bottom:12px}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:56px}
+  .stat{border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:32px 26px;text-align:left}
+  .stat b{font-size:34px;font-weight:700;display:block;background:linear-gradient(100deg,var(--te),var(--cy));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat span{color:var(--mut);font-size:13.5px;display:block;margin-top:8px}
+
+  /* faq */
+  .faq{max-width:760px;margin-top:48px}
+  details{border:1px solid var(--line);background:var(--panel);border-radius:14px;margin-bottom:12px;padding:20px 24px;transition:border-color .2s}
+  details[open]{border-color:rgba(34,211,238,.35)}
+  summary{cursor:pointer;font-weight:600;font-size:16px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:"+";color:var(--cy);font-size:20px;transition:transform .2s;flex-shrink:0}
+  details[open] summary::after{transform:rotate(45deg)}
+  details p{color:var(--mut);font-size:14.5px;line-height:1.7;margin-top:14px}
+
+  /* cta */
+  .cta-box{border:1px solid var(--line);border-radius:28px;padding:80px 40px;text-align:center;background:radial-gradient(ellipse at 50% 120%,rgba(139,92,246,.25),transparent 60%),var(--panel)}
+
+  footer{border-top:1px solid var(--line);padding:44px 0;color:var(--mut);font-size:13px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  footer .ln{display:flex;gap:24px}
+  footer a:hover{color:var(--txt)}
+
+  @media(max-width:960px){
+    nav{display:none}
+    .bento{grid-template-columns:1fr}
+    .card,.card.wide,.card.full{grid-column:span 1}
+    .rail{grid-template-columns:1fr}
+    .rail-nav{position:static;flex-direction:row;overflow-x:auto}
+    .leak{grid-template-columns:1fr}
+    .stats{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+<div class="grain"></div>
+
+<header>
+  <div class="wrap bar">
+    <a class="brand" href="#"><img src="../static/img/logo.png" alt="Skyulf">Skyulf</a>
+    <nav>
+      <a href="#products">Canvas or code</a>
+      <a href="#lifecycle">Lifecycle</a>
+      <a href="#why">Why Skyulf</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div style="display:flex;gap:10px">
+      <a class="btn btn-sec" href="../manual/index.html">Docs</a>
+      <a class="btn btn-pri" href="https://api.skyulf.com/" target="_blank" rel="noopener">Live demo →</a>
+    </div>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <div class="pill"><span class="dot"></span> Self-hosted · Apache-2.0 core · your data stays yours</div>
+    <h1>Build ML pipelines<br><span class="grad">you can trust.</span></h1>
+    <p class="sub">Design them visually on a canvas, or write them in plain Python. Skyulf keeps <b>scikit-learn</b> as the engine and adds what notebooks never gave you: reproducible artifacts, <b>honest validation scores</b>, and a path to production.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-pri" href="https://api.skyulf.com/" target="_blank" rel="noopener">Try the live demo</a>
+      <a class="btn btn-sec" href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">★ GitHub</a>
+      <a class="btn btn-sec" href="#lifecycle">How it works</a>
+    </div>
+    <div class="install-line">
+      <code>$ pip install skyulf-core</code>
+      <button onclick="navigator.clipboard.writeText('pip install skyulf-core');this.textContent='copied ✓'">copy</button>
+    </div>
+
+    <div class="shot">
+      <div class="win"><i></i><i></i><i></i></div>
+      <img src="../static/img/dashboard.jpg" alt="Skyulf dashboard">
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCTS -->
+<section id="products">
+  <div class="wrap">
+    <div class="eyebrow">// two products, one engine</div>
+    <h2>Click or type.<br>Both produce real pipelines.</h2>
+    <p class="sec-sub">The canvas exports to a notebook whenever you want to drop back into code. The library runs anywhere Python runs.</p>
+
+    <div class="bento">
+      <div class="card wide">
+        <div class="ic">◧</div>
+        <h3>Skyulf Platform <span class="mono" style="font-size:11px;color:var(--mut)">· AGPLv3</span></h3>
+        <p>Node canvas, automated EDA, background training, experiment comparison, model registry, deployment and monitoring — all running on your own machine or server.</p>
+        <img src="../static/img/canvas.jpg" alt="Pipeline canvas">
+      </div>
+      <div class="card">
+        <div class="ic v">⬡</div>
+        <h3>skyulf-core <span class="mono" style="font-size:11px;color:var(--mut)">· Apache-2.0</span></h3>
+        <p>No server, no UI, no lock-in. One consistent pipeline API over scikit-learn with leakage checks and artifacts built in.</p>
+        <pre class="code"><span class="k">from</span> skyulf <span class="k">import</span> SkyulfPipeline
+p = SkyulfPipeline({...})
+p.validate_leakage_safety() <span class="c"># []</span>
+p.fit(df, target_column=<span class="s">"target"</span>)</pre>
+      </div>
+      <div class="card">
+        <div class="ic t">✓</div>
+        <h3>35 node types</h3>
+        <p>Cleaning, encoding, scaling, text, time-series and geo — drag, connect, configure.</p>
+      </div>
+      <div class="card wide">
+        <div class="ic t">↻</div>
+        <h3>Run it locally in two commands</h3>
+        <p>No account, no credit card, no per-prediction bill.</p>
+        <pre class="code"><span class="c">$</span> git clone https://github.com/flyingriverhorse/Skyulf
+<span class="c">$</span> docker compose up</pre>
+      </div>
+      <div class="card">
+        <div class="ic">⤴</div>
+        <h3>Notebook export</h3>
+        <p>Any pipeline becomes a runnable Jupyter notebook, compact or full, with a serving snippet.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- LIFECYCLE -->
+<section id="lifecycle" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="eyebrow">// the lifecycle</div>
+    <h2>Raw file in.<br>Monitored model out.</h2>
+
+    <div class="rail">
+      <div class="rail-nav" id="railNav">
+        <button class="rail-btn on" data-p="p1"><span class="n">01</span>Ingest</button>
+        <button class="rail-btn" data-p="p2"><span class="n">02</span>Explore</button>
+        <button class="rail-btn" data-p="p3"><span class="n">03</span>Build</button>
+        <button class="rail-btn" data-p="p4"><span class="n">04</span>Train &amp; tune</button>
+        <button class="rail-btn" data-p="p5"><span class="n">05</span>Compare</button>
+        <button class="rail-btn" data-p="p6"><span class="n">06</span>Deploy</button>
+        <button class="rail-btn" data-p="p7"><span class="n">07</span>Monitor</button>
+      </div>
+      <div class="rail-view">
+        <div class="rail-panel on" id="p1">
+          <h3>Point it at a file and start working</h3>
+          <p>Upload CSV, Excel, JSON or Parquet, or connect an S3-compatible bucket. Skyulf reads it with Polars, profiles the columns and keeps every version you load, so you can always tell which data produced which model.</p>
+          <img src="../static/img/datasource.jpg" alt="Data sources">
+        </div>
+        <div class="rail-panel" id="p2">
+          <h3>Understand the data before you model it</h3>
+          <p>One click profiles every column: distributions, correlations, outliers, interactions and clusters. Surrogate decision trees and causal discovery show you which relationships actually drive your target.</p>
+          <img src="../static/img/eda/dashboardeda.jpg" alt="EDA dashboard">
+        </div>
+        <div class="rail-panel" id="p3">
+          <h3>Design the pipeline instead of retyping it</h3>
+          <p>Drag nodes onto the canvas and connect them. Branch a pipeline to try two feature strategies side by side, preview any node's output as a table, and let validation block a run before it wastes your time.</p>
+          <img src="../static/img/canvas.jpg" alt="Pipeline canvas">
+        </div>
+        <div class="rail-panel" id="p4">
+          <h3>Train in the background, tune when it matters</h3>
+          <p>Runs execute as background jobs, so a long training run never freezes the UI. Start with defaults, then switch on grid, random, halving or Optuna search and watch each trial report as it finishes.</p>
+          <img src="../static/img/jobs.jpg" alt="Background jobs">
+        </div>
+        <div class="rail-panel" id="p5">
+          <h3>Compare runs and pick a winner on evidence</h3>
+          <p>Every run keeps its metrics, curves and confusion matrix. Put runs next to each other, see which change actually helped, and tune decision thresholds rather than accepting whatever 0.5 gives you.</p>
+          <img src="../static/img/experiments.jpg" alt="Experiment comparison">
+        </div>
+        <div class="rail-panel" id="p6">
+          <h3>Promote a version, serve predictions</h3>
+          <p>Trained models land in a registry with their versions and artifacts. Promote one to active and it is served behind a REST endpoint you can call from anything. The full deployment history is kept for audit.</p>
+          <img src="../static/img/deployments.jpg" alt="Deployments">
+        </div>
+        <div class="rail-panel" id="p7">
+          <h3>Find out before your users do</h3>
+          <p>Skyulf compares live data against the training baseline column by column and flags what shifted. There is also an error log, a slow-node profiler and an audit trail of who changed what.</p>
+          <img src="../static/img/drift/drift.jpg" alt="Drift monitoring">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY -->
+<section id="why" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="eyebrow">// the problem nobody sees</div>
+    <h2>Your model says 94%.<br>Production says 71%.</h2>
+    <div class="leak" style="margin-top:56px">
+      <div>
+        <p class="sec-sub" style="margin-top:0">Fill missing values, scale a column or encode a category <b style="color:var(--txt)">before</b> you split into train and test, and those steps quietly learn from the test rows. The code runs fine. The number just isn't real.</p>
+        <p class="sec-sub">Skyulf checks the order of your pipeline and tells you in plain language. Every node is split into a part that <b style="color:var(--txt)">learns</b> and a part that <b style="color:var(--txt)">applies</b> — learning only ever sees training data.</p>
+        <div class="stats" style="grid-template-columns:1fr 1fr;margin-top:36px">
+          <div class="stat"><b>4</b><span>drift tests per column: KS, PSI, Wasserstein, KL</span></div>
+          <div class="stat"><b>2,266</b><span>library tests — plus backend, canvas and a11y suites</span></div>
+        </div>
+      </div>
+      <div class="leak-msg">
+        <div class="h">▲ validate_leakage_safety()</div>
+        Step 0 ('SimpleImputer') is configured before the train/test split (step 1, 'TrainTestSplitter') and will fit its statistics on the full dataset including the test set — move it after the splitter.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="eyebrow">// everything else in the box</div>
+    <h2>Shipped and documented,<br>not on a roadmap.</h2>
+    <div class="bento" style="margin-top:56px">
+      <div class="card"><div class="ic">▤</div><h3>Model registry</h3><p>Versioned models with artifacts and history — always know what is live.</p></div>
+      <div class="card"><div class="ic v">◎</div><h3>Hyperparameter tuning</h3><p>Grid, random and halving built in; Optuna as an optional extra with live trial output.</p></div>
+      <div class="card"><div class="ic t">◐</div><h3>SHAP explanations</h3><p>See which features moved a prediction, globally or row by row.</p></div>
+      <div class="card"><div class="ic t">⎇</div><h3>Multi-branch pipelines</h3><p>Split one canvas into independent paths, run them as parallel jobs.</p></div>
+      <div class="card"><div class="ic v">≡</div><h3>Ensembles</h3><p>Voting and stacking for classification and regression, with nested tuning.</p></div>
+      <div class="card"><div class="ic">Aa</div><h3>Text &amp; NLP nodes</h3><p>TF-IDF, count and hashing vectorizers, tokenisation, dense embeddings.</p></div>
+      <div class="card"><div class="ic">◷</div><h3>Time-series &amp; geo</h3><p>Lag and rolling windows, date parts, H3 indexing, distance features.</p></div>
+      <div class="card"><div class="ic t">✎</div><h3>Audit log</h3><p>Every pipeline save recorded — what changed, and by whom.</p></div>
+      <div class="card"><div class="ic v">◈</div><h3>Data expectations</h3><p>expect_columns_exist, expect_no_nulls, expect_value_range, expect_unique — bad data stops before the model.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" style="border-top:1px solid var(--line)">
+  <div class="wrap">
+    <div class="eyebrow">// faq</div>
+    <h2>Before you try it.</h2>
+    <div class="faq">
+      <details open><summary>What is Skyulf?</summary><p>Two things that share one engine: skyulf-core, a Python library giving you a single pipeline API over scikit-learn, and a self-hosted workspace where you build that same pipeline on a canvas.</p></details>
+      <details><summary>Do I have to self-host it?</summary><p>Try the hosted demo first with nothing to install. For real work, <span class="mono">docker compose up</span> takes a few minutes — no account, no credit card. Your data never leaves your machine, which is what makes it usable in hospitals and banks.</p></details>
+      <details><summary>Is this really free?</summary><p>Yes. skyulf-core is Apache 2.0 (use it in anything, including closed-source commercial products). The platform is AGPLv3, so improvements to the application itself are shared back.</p></details>
+      <details><summary>Can I use it in production?</summary><p>It is perfect for internal tools, research and experimentation. A stable v1.0 for critical production workloads is in progress.</p></details>
+      <details><summary>How can I contribute?</summary><p>Start at <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener" style="color:var(--cy)">GitHub</a>. Code, docs, bug reports or feature ideas — every contribution helps shape Skyulf.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="cta-box">
+      <h2>Ready to build?</h2>
+      <p class="sec-sub" style="margin:16px auto 36px">Try the demo in your browser, or install the library and start from your next notebook.</p>
+      <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">
+        <a class="btn btn-pri" style="padding:15px 34px;font-size:16px" href="https://api.skyulf.com/" target="_blank" rel="noopener">Try the live demo</a>
+        <a class="btn btn-sec" style="padding:15px 34px;font-size:16px" href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">View on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:16px;width:100%">
+    <span>&copy; 2025–2026 Murat Unsal · Platform AGPLv3 · skyulf-core Apache 2.0</span>
+    <div class="ln">
+      <a href="../manual/index.html">Docs</a>
+      <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">PyPI</a>
+      <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://www.linkedin.com/in/murat-u/" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  const btns=document.querySelectorAll('.rail-btn');
+  btns.forEach(b=>b.addEventListener('click',()=>{
+    btns.forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.rail-panel').forEach(p=>p.classList.remove('on'));
+    b.classList.add('on');
+    document.getElementById(b.dataset.p).classList.add('on');
+  }));
+</script>
+</body>
+</html>

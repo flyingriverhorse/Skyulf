@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyulf — a self-hosted platform for the whole machine learning workflow</title>
+<meta name="description" content="Skyulf connects data profiling, automated EDA, node-based pipelines, model training, deployment and drift monitoring in one self-hosted platform, with skyulf-core available as an Apache-2.0 Python package.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Manrope:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#faf8f4;
+  --paper-2:#f1ede5;
+  --ink:#1b1a17;
+  --ink-2:#4e4a42;
+  --ink-3:#847e73;
+  --oxblood:#7c3327;
+  --rule:rgba(27,26,23,.15);
+  --rule-2:rgba(27,26,23,.08);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:Manrope,system-ui,sans-serif;font-size:16.5px;line-height:1.75;font-weight:400;-webkit-font-smoothing:antialiased}
+::selection{background:var(--oxblood);color:var(--paper)}
+::-webkit-scrollbar{width:11px}
+::-webkit-scrollbar-track{background:var(--paper-2)}
+::-webkit-scrollbar-thumb{background:#c9c1b2;border:3px solid var(--paper-2);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:var(--oxblood)}
+html{scrollbar-color:#c9c1b2 var(--paper-2);scrollbar-width:thin}
+:focus-visible{outline:1.5px solid var(--oxblood);outline-offset:5px}
+img{max-width:100%;display:block}
+a{color:var(--ink);text-underline-offset:.28em;text-decoration-thickness:.5px;text-decoration-color:var(--ink-3)}
+a:hover{color:var(--oxblood);text-decoration-color:var(--oxblood)}
+h1,h2,h3{margin:0;font-family:"Cormorant Garamond",Garamond,serif;font-weight:300;letter-spacing:-.012em;line-height:1.02;text-wrap:balance}
+p{text-wrap:pretty}
+.skip{position:absolute;left:-9999px}
+.skip:focus{left:14px;top:14px;z-index:99;background:var(--ink);color:var(--paper);padding:10px 18px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 clamp(22px,5vw,72px)}
+.col{max-width:640px}
+
+/* header */
+header.h{position:sticky;top:0;z-index:40;background:rgba(250,248,244,.9);backdrop-filter:blur(10px)}
+header.h .wrap{display:flex;align-items:center;gap:28px;height:74px;border-bottom:1px solid var(--rule-2)}
+.mark{font-family:"Cormorant Garamond",serif;font-size:1.6rem;font-weight:400;letter-spacing:.14em;text-transform:uppercase;text-decoration:none;color:var(--ink)}
+nav.n{margin-left:auto;display:flex;align-items:center;gap:30px}
+nav.n a{font-size:.8rem;font-weight:500;letter-spacing:.09em;text-transform:uppercase;text-decoration:none;color:var(--ink-2)}
+nav.n a:hover{color:var(--oxblood)}
+nav.n .go{color:var(--ink);border-bottom:1px solid var(--oxblood);padding-bottom:3px}
+@media(max-width:860px){nav.n a:not(.go){display:none}}
+
+/* opening */
+.open{padding:clamp(80px,15vw,220px) 0 clamp(60px,9vw,120px)}
+.open h1{font-size:clamp(3rem,8.4vw,7.4rem);max-width:15ch;font-weight:300}
+.open h1 i{font-style:italic;color:var(--oxblood)}
+.open .lede{font-size:clamp(1.04rem,1.7vw,1.18rem);color:var(--ink-2);max-width:58ch;margin:clamp(30px,4vw,48px) 0 0;font-weight:300}
+.cta{display:flex;flex-wrap:wrap;gap:26px;align-items:center;margin-top:clamp(32px,4vw,48px)}
+.btn{display:inline-flex;align-items:center;padding:14px 32px;font-size:.82rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;text-decoration:none;transition:background .25s,color .25s,border-color .25s}
+.btn-p{background:var(--ink);color:var(--paper);border:1px solid var(--ink)}
+.btn-p:hover{background:var(--oxblood);border-color:var(--oxblood);color:var(--paper)}
+.btn-s{border:1px solid var(--rule);color:var(--ink)}
+.btn-s:hover{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.aside{margin:26px 0 0;font-size:.9rem;color:var(--ink-3);font-weight:300}
+
+/* colophon */
+.colophon{margin-top:clamp(56px,8vw,110px);display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:34px;border-top:1px solid var(--rule);padding-top:28px}
+.colophon dt{font-size:.68rem;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
+.colophon dd{margin:0;font-family:"Cormorant Garamond",serif;font-size:1.24rem;font-weight:400;color:var(--ink)}
+
+/* rooms */
+.room{padding:clamp(70px,11vw,150px) 0;border-top:1px solid var(--rule-2)}
+.room h2{font-size:clamp(2.1rem,5.2vw,4.1rem);max-width:17ch;font-weight:300}
+.room h2 i{font-style:italic;color:var(--oxblood)}
+.room .say{color:var(--ink-2);max-width:62ch;margin:26px 0 0;font-weight:300;font-size:1.02rem}
+.room .say + .say{margin-top:16px}
+
+/* plate + wall label */
+.exhibit{margin:clamp(42px,6vw,80px) 0 0}
+.exhibit img{width:100%;border:1px solid var(--rule-2)}
+.label{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:clamp(18px,3vw,46px);margin-top:20px;padding-top:16px;border-top:1px solid var(--rule)}
+@media(max-width:720px){.label{grid-template-columns:1fr;gap:8px}}
+.label b{font-family:"Cormorant Garamond",serif;font-size:1.32rem;font-weight:400;letter-spacing:.005em}
+.label span{color:var(--ink-3);font-size:.92rem;font-weight:300;max-width:56ch}
+.pairs{display:grid;grid-template-columns:1fr 1fr;gap:clamp(22px,3.4vw,48px);margin-top:clamp(30px,4vw,56px)}
+@media(max-width:760px){.pairs{grid-template-columns:1fr}}
+.pairs .exhibit{margin:0}
+.pairs .label{grid-template-columns:1fr;gap:5px}
+
+/* index list */
+.index{list-style:none;margin:clamp(34px,4.5vw,60px) 0 0;padding:0;border-top:1px solid var(--rule)}
+.index li{display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr);gap:clamp(18px,3vw,44px);padding:19px 0;border-bottom:1px solid var(--rule-2);align-items:baseline}
+@media(max-width:680px){.index li{grid-template-columns:1fr;gap:4px}}
+.index b{font-family:"Cormorant Garamond",serif;font-size:1.28rem;font-weight:400}
+.index span{color:var(--ink-2);font-size:.97rem;font-weight:300}
+
+/* two entrances */
+.entrances{border-top:1px solid var(--rule-2);padding:clamp(70px,11vw,150px) 0}
+.pair2{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);margin-top:clamp(38px,5vw,66px)}
+@media(max-width:880px){.pair2{grid-template-columns:1fr}}
+.pair2 h3{font-size:2.1rem;font-weight:300}
+.pair2 p{color:var(--ink-2);margin:14px 0 0;max-width:46ch;font-weight:300;font-size:.99rem}
+.pair2 ul{list-style:none;margin:24px 0 0;padding:0}
+.pair2 li{padding:11px 0;border-bottom:1px solid var(--rule-2);font-size:.95rem;color:var(--ink-2);font-weight:300}
+pre{margin:24px 0 0;background:var(--paper-2);border:1px solid var(--rule-2);padding:22px 24px;overflow-x:auto;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.77rem;line-height:1.9;color:var(--ink-2)}
+pre .c{color:#a29a8c}pre .s{color:var(--oxblood)}pre .k{color:#3d5a4c}
+
+/* closing */
+.close{border-top:1px solid var(--rule-2);padding:clamp(80px,14vw,200px) 0;text-align:center}
+.close h2{font-size:clamp(2.4rem,7vw,5.6rem);max-width:16ch;margin:0 auto;font-weight:300}
+.close h2 i{font-style:italic;color:var(--oxblood)}
+.close p{max-width:52ch;margin:28px auto 0;color:var(--ink-2);font-weight:300}
+.close .cta{justify-content:center}
+footer{border-top:1px solid var(--rule-2);padding:34px 0 56px}
+footer .wrap{display:flex;flex-wrap:wrap;gap:16px 34px;align-items:center}
+footer a{font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;text-decoration:none;color:var(--ink-2)}
+footer a:hover{color:var(--oxblood)}
+footer .sp{margin-left:auto;font-size:.8rem;color:var(--ink-3);font-weight:300}
+
+.rv{opacity:0;transform:translateY(14px);transition:opacity 1s cubic-bezier(.16,1,.3,1),transform 1s cubic-bezier(.16,1,.3,1)}
+.rv.on{opacity:1;transform:none}
+.pair2>*,.pairs>*,.label>*,.index li>*,.colophon>*{min-width:0}
+pre{max-width:100%}
+.btn{max-width:100%;overflow-wrap:anywhere}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}.rv{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="h">
+  <div class="wrap">
+    <a class="mark" href="#top">Skyulf</a>
+    <nav class="n" aria-label="Primary">
+      <a href="#explore">Explore</a>
+      <a href="#build">Build</a>
+      <a href="#operate">Operate</a>
+      <a href="#entrances">Two entrances</a>
+      <a class="go" href="https://api.skyulf.com">Live demo</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+<section class="open" id="top">
+  <div class="wrap">
+    <h1>Every stage of the work, kept in <i>one place</i>.</h1>
+    <p class="lede">Skyulf is a self-hosted platform that carries a single project from a raw file through exploration, pipelines, and training into deployment, inference, and drift monitoring. The engine behind it is also an Apache-2.0 Python package you can use on its own.</p>
+    <div class="cta">
+      <a class="btn btn-p" href="https://api.skyulf.com">Open the live demo</a>
+      <a class="btn btn-s" href="https://github.com/flyingriverhorse/Skyulf">Read the source</a>
+    </div>
+    <p class="aside">The demo requires no account. Everything runs on your own infrastructure when you are ready.</p>
+
+    <dl class="colophon">
+      <div><dt>Deployment</dt><dd>Self-hosted</dd></div>
+      <div><dt>Data</dt><dd>Local or your S3</dd></div>
+      <div><dt>Export</dt><dd>Jupyter notebook</dd></div>
+      <div><dt>Platform</dt><dd>AGPL-3.0</dd></div>
+      <div><dt>Engine</dt><dd>Apache-2.0</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section class="room" id="explore">
+  <div class="wrap">
+    <h2>Exploration that is <i>actually finished</i>.</h2>
+    <p class="say">Load a CSV, an Excel workbook, JSON, Parquet, or read directly from S3-compatible storage. Skyulf profiles the dataset and produces the statistical survey most projects intend to do and abandon after three charts.</p>
+    <figure class="exhibit rv">
+      <img src="../static/img/eda/dashboardeda.jpg" alt="Automated exploratory data analysis dashboard with statistical summaries" loading="lazy">
+      <figcaption class="label"><b>Automated EDA</b><span>Statistical profiling, distributions, correlations, outliers, segmentation, target analysis, and causal discovery — generated from the loaded dataset.</span></figcaption>
+    </figure>
+    <div class="pairs">
+      <figure class="exhibit rv"><img src="../static/img/eda/correlations.jpg" alt="Correlation matrix across dataset features" loading="lazy"><figcaption class="label"><b>Correlations</b><span>Relationships across every column, not the four you suspected.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/eda/causal.jpg" alt="Causal discovery graph between variables" loading="lazy"><figcaption class="label"><b>Causal discovery</b><span>Structure between variables, beyond correlation.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/eda/outliers.jpg" alt="Outlier detection results" loading="lazy"><figcaption class="label"><b>Outliers</b><span>The records that will distort the model if left alone.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/eda/target%20analysis.jpg" alt="Target variable analysis" loading="lazy"><figcaption class="label"><b>Target analysis</b><span>How the target behaves against everything else.</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="room" id="build">
+  <div class="wrap">
+    <h2>A pipeline whose <i>order you can see</i>.</h2>
+    <p class="say">Preprocessing, feature engineering, splitting, and modeling are nodes on a canvas. Sequence is the whole point: leakage is an ordering mistake, and ordering mistakes disappear inside a long notebook.</p>
+    <p class="say">Training runs in the background through Celery and Redis, or on background threads. Every canvas exports to a Jupyter notebook, full or compact, so the work is never held hostage by the interface that made it.</p>
+    <figure class="exhibit rv">
+      <img src="../static/img/canvas.jpg" alt="Node-based pipeline canvas connecting preprocessing and modeling steps" loading="lazy">
+      <figcaption class="label"><b>Pipeline canvas</b><span>Preprocessing, feature engineering, splitting, and modeling as a connected graph.</span></figcaption>
+    </figure>
+    <div class="pairs">
+      <figure class="exhibit rv"><img src="../static/img/experiments.jpg" alt="Experiment comparison table with metrics" loading="lazy"><figcaption class="label"><b>Experiment comparison</b><span>Runs held side by side with their metrics and parameters.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/eda/featureimportance.jpg" alt="Feature importance ranking" loading="lazy"><figcaption class="label"><b>Feature importance</b><span>What the trained model is actually leaning on.</span></figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section class="room" id="operate">
+  <div class="wrap">
+    <h2>The long part comes <i>after</i> the score.</h2>
+    <p class="say">A registry with version history, deployment, inference, drift monitoring, audit history, and operational diagnostics live in the same project as the pipeline that produced the model. When production moves, the lineage is already in front of you.</p>
+    <figure class="exhibit rv">
+      <img src="../static/img/drift/drift_report.jpg" alt="Drift monitoring report comparing production data to training data" loading="lazy">
+      <figcaption class="label"><b>Drift report</b><span>Live data measured against the distribution the model was trained on.</span></figcaption>
+    </figure>
+    <div class="pairs">
+      <figure class="exhibit rv"><img src="../static/img/model_registry.jpg" alt="Model registry with versioned models" loading="lazy"><figcaption class="label"><b>Model registry</b><span>Registered models with their version history intact.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/deployment.jpg" alt="Model deployment configuration screen" loading="lazy"><figcaption class="label"><b>Deployment</b><span>Serving configuration inside the same self-hosted stack.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/inference.jpg" alt="Inference request and response view" loading="lazy"><figcaption class="label"><b>Inference</b><span>Requests and responses against a deployed version.</span></figcaption></figure>
+      <figure class="exhibit rv"><img src="../static/img/audit.jpg" alt="Audit history of runs and changes" loading="lazy"><figcaption class="label"><b>Audit history</b><span>What changed, when, and on which run.</span></figcaption></figure>
+    </div>
+
+    <ul class="index">
+      <li><b>Ingestion</b><span>CSV, Excel, JSON, Parquet, and S3-compatible object storage</span></li>
+      <li><b>Artifacts</b><span>Local disk or your own S3-compatible storage, with your credentials</span></li>
+      <li><b>Metadata</b><span>SQLite for small deployments, PostgreSQL for larger ones</span></li>
+      <li><b>Execution</b><span>Celery with Redis, or background threads</span></li>
+      <li><b>Diagnostics</b><span>Node-level timings showing which pipeline step is slow</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="entrances" id="entrances">
+  <div class="wrap">
+    <h2>Two entrances to the <i>same engine</i>.</h2>
+    <p class="say">The visual platform and the Python package are not a product and its trailer. They are one workflow with two doors, and you are free to use either.</p>
+    <div class="pair2">
+      <div>
+        <h3>The platform</h3>
+        <p>A self-hosted workspace for ingestion, automated EDA, canvas pipelines, experiments, registry, deployment, and monitoring.</p>
+        <ul>
+          <li>Hosted demo, no signup required</li>
+          <li>Run locally with the repository start scripts</li>
+          <li>Self-host the full stack with Docker Compose</li>
+          <li>Licensed AGPL-3.0</li>
+        </ul>
+        <div class="cta"><a class="btn btn-p" href="https://api.skyulf.com">Open the demo</a></div>
+      </div>
+      <div>
+        <h3>skyulf-core</h3>
+        <p>The engine alone, in scripts and notebooks. Polars-friendly, built on scikit-learn rather than replacing it. Python 3.12+.</p>
+        <pre><code><span class="c"># pip install skyulf-core</span>
+<span class="k">from</span> skyulf <span class="k">import</span> SkyulfPipeline
+
+pipeline = SkyulfPipeline({
+    <span class="s">"preprocessing"</span>: [
+        {<span class="s">"name"</span>: <span class="s">"split"</span>,
+         <span class="s">"transformer"</span>: <span class="s">"TrainTestSplitter"</span>,
+         <span class="s">"params"</span>: {<span class="s">"target_column"</span>: <span class="s">"purchased"</span>}},
+    ],
+    <span class="s">"modeling"</span>: {<span class="s">"type"</span>: <span class="s">"logistic_regression"</span>},
+})
+pipeline.fit(customers, target_column=<span class="s">"purchased"</span>)
+pipeline.save(<span class="s">"customer_model.pkl"</span>)</code></pre>
+        <div class="cta"><a class="btn btn-s" href="https://pypi.org/project/skyulf-core">View on PyPI</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="close">
+  <div class="wrap">
+    <h2>See it on <i>real data</i> before you decide.</h2>
+    <p>The hosted demo is the product itself, with no account and nothing to install. If it holds up, the same stack runs on your own infrastructure.</p>
+    <div class="cta">
+      <a class="btn btn-p" href="https://api.skyulf.com">Open the live demo</a>
+      <a class="btn btn-s" href="https://github.com/flyingriverhorse/Skyulf">View the repository</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a href="https://github.com/flyingriverhorse/Skyulf">Repository</a>
+    <a href="https://api.skyulf.com">Live demo</a>
+    <a href="https://pypi.org/project/skyulf-core">PyPI</a>
+    <a href="https://flyingriverhorse.github.io/Skyulf">Documentation</a>
+    <span class="sp">Platform AGPL-3.0 · skyulf-core Apache-2.0</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var els = Array.prototype.slice.call(document.querySelectorAll('.rv'));
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    els.forEach(function(e){ e.classList.add('on'); }); return;
+  }
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('on'); io.unobserve(e.target); } });
+  }, { rootMargin:'0px 0px -10% 0px', threshold:0.1 });
+  els.forEach(function(e){ io.observe(e); });
+})();
+</script>
+</body>
+</html>
