@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · V16 — Desktop OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Tahoma&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:Tahoma,'Segoe UI',sans-serif;font-size:13px;color:#000;
+    background:#008080;min-height:100vh;padding:24px 24px 70px;
+    background-image:radial-gradient(rgba(255,255,255,.06) 1px,transparent 1px);background-size:4px 4px;
+  }
+  .mono{font-family:'Silkscreen',monospace;}
+  .desktop{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:18px;}
+  .win{background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;box-shadow:2px 2px 0 rgba(0,0,0,.45);}
+  .titlebar{display:flex;align-items:center;gap:8px;padding:3px 4px;background:linear-gradient(90deg,#000080,#1084d0);color:#fff;font-weight:700;font-size:12px;}
+  .titlebar .tb-btns{margin-left:auto;display:flex;gap:2px;}
+  .titlebar .tb-btns span{width:16px;height:14px;background:#c0c0c0;border:1px solid;border-color:#fff #404040 #404040 #fff;font-size:9px;display:flex;align-items:center;justify-content:center;color:#000;font-family:'Silkscreen',monospace;}
+  .winbody{padding:12px;}
+  .toolbar{display:flex;gap:2px;margin-bottom:10px;border:2px solid;border-color:#808080 #fff #fff #808080;padding:3px;background:#c0c0c0;}
+  .toolbar button{font-family:'Silkscreen',monospace;font-size:10px;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;padding:4px 10px;cursor:pointer;}
+  .toolbar button:active{border-color:#404040 #fff #fff #404040;}
+  .btn{font-family:'Silkscreen',monospace;font-size:11px;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;padding:8px 18px;cursor:pointer;text-decoration:none;color:#000;display:inline-block;}
+  .btn:active{border-color:#404040 #fff #fff #404040;}
+  .btn.primary{font-weight:700;}
+  .inset{border:2px solid;border-color:#808080 #fff #fff #808080;background:#fff;padding:10px;}
+  .field{background:#000;color:#00e000;font-family:'Silkscreen',monospace;font-size:12px;padding:14px;border:2px solid;border-color:#808080 #fff #fff #808080;line-height:1.7;white-space:pre-wrap;}
+  .field .y{color:#ffff54;}.field .c{color:#54ffff;}.field .w{color:#fff;}
+  img.shot{width:100%;display:block;border:2px solid;border-color:#808080 #fff #fff #808080;}
+  .statusbar{display:flex;gap:4px;margin-top:10px;}
+  .statusbar span{flex:1;border:1px solid;border-color:#808080 #fff #fff #808080;padding:2px 8px;font-size:11px;color:#222;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  ul.list{list-style:none;}
+  ul.list li{padding:4px 0 4px 22px;position:relative;}
+  ul.list li::before{content:"▣";position:absolute;left:2px;color:#000080;}
+  /* icons row */
+  .icons{display:flex;gap:26px;flex-wrap:wrap;}
+  .icon{width:86px;text-align:center;color:#fff;font-size:11px;cursor:pointer;}
+  .icon .glyph{width:52px;height:44px;margin:0 auto 5px;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;display:flex;align-items:center;justify-content:center;font-family:'Silkscreen',monospace;font-size:16px;color:#000080;}
+  /* error dialog */
+  .dlg{max-width:520px;margin:0 auto;}
+  .dlg .winbody{display:flex;gap:14px;align-items:flex-start;}
+  .dlg .x{width:44px;height:44px;flex:none;border-radius:50%;background:#e00000;border:3px solid #fff;box-shadow:0 0 0 2px #800000;color:#fff;font-family:'Silkscreen',monospace;font-size:22px;display:flex;align-items:center;justify-content:center;}
+  .dlg .ok{width:44px;height:44px;flex:none;border-radius:50%;background:#00a000;border:3px solid #fff;box-shadow:0 0 0 2px #004000;color:#fff;font-family:'Silkscreen',monospace;font-size:20px;display:flex;align-items:center;justify-content:center;}
+  .progress{height:22px;border:2px solid;border-color:#808080 #fff #fff #808080;background:#fff;display:flex;gap:2px;padding:2px;}
+  .progress i{background:#000080;display:block;height:100%;}
+  /* taskbar */
+  .taskbar{position:fixed;left:0;right:0;bottom:0;height:40px;background:#c0c0c0;border-top:2px solid #fff;display:flex;align-items:center;gap:8px;padding:4px 8px;z-index:50;}
+  .start{font-family:'Silkscreen',monospace;font-weight:700;background:#c0c0c0;border:2px solid;border-color:#fff #404040 #404040 #fff;padding:6px 14px;display:flex;gap:8px;align-items:center;text-decoration:none;color:#000;}
+  .task{flex:0 1 220px;border:2px solid;border-color:#808080 #fff #fff #808080;padding:6px 10px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .clock{margin-left:auto;border:1px solid;border-color:#808080 #fff #fff #808080;padding:5px 12px;font-family:'Silkscreen',monospace;font-size:11px;}
+  @media(max-width:820px){.two{grid-template-columns:1fr;}.task{display:none;}}
+</style>
+</head>
+<body>
+
+<div class="desktop">
+
+  <!-- desktop icons -->
+  <div class="icons">
+    <div class="icon"><div class="glyph">SK</div>Skyulf.exe</div>
+    <div class="icon"><div class="glyph">◫</div>Pipelines</div>
+    <div class="icon"><div class="glyph">✓</div>Honest_Validation.txt</div>
+    <div class="icon"><div class="glyph">✕</div>Leaked_Models</div>
+    <div class="icon"><div class="glyph">♺</div>Recycle Bin</div>
+  </div>
+
+  <!-- hero window -->
+  <div class="win">
+    <div class="titlebar"><span>■ Skyulf Setup — Welcome</span><span class="tb-btns"><span>_</span><span>□</span><span>×</span></span></div>
+    <div class="winbody">
+      <div class="toolbar"><button>File</button><button>Edit</button><button>Pipeline</button><button>Help</button></div>
+      <div class="two">
+        <div>
+          <h1 class="mono" style="font-size:24px;margin-bottom:10px;">SKYULF v0.1</h1>
+          <p style="margin-bottom:8px;"><strong>Build ML pipelines you can trust.</strong></p>
+          <p style="margin-bottom:14px;">This wizard will install honest validation on your system. Leakage wizards are <em>not</em> included and will be quarantined on sight.</p>
+          <div class="two" style="gap:8px;margin-bottom:14px;">
+            <div class="inset"><strong class="mono" style="color:#000080;">PLATFORM</strong><br>Canvas · EDA · Registry · Deploy · Drift<br><span class="mono" style="font-size:10px;">License: AGPLv3</span></div>
+            <div class="inset"><strong class="mono" style="color:#000080;">SKYULF-CORE</strong><br>pip library · 35 nodes · pandas/Polars<br><span class="mono" style="font-size:10px;">License: Apache-2.0</span></div>
+          </div>
+          <a class="btn primary" href="https://api.skyulf.com/">Run live demo &gt;</a>
+          <a class="btn" href="https://pypi.org/project/skyulf-core/">pip install skyulf-core</a>
+        </div>
+        <div class="field"><span class="c">C:\&gt; skyulf doctor</span>
+<span class="w">checking environment...</span>
+  python ............ <span class="y">3.12 OK</span>
+  pandas / polars ... <span class="y">OK</span>
+  sklearn engine .... <span class="y">OK</span>
+  node types ........ <span class="y">35 found</span>
+  library tests ..... <span class="y">2,266 passing</span>
+  leakage guard ..... <span class="c">ARMED</span>
+
+<span class="c">C:\&gt;</span> <span class="w">ready_</span></div>
+      </div>
+      <div class="statusbar"><span>Ready</span><span style="flex:0 0 160px;">2,266 tests passing</span><span style="flex:0 0 120px;">CPU: 4%</span></div>
+    </div>
+  </div>
+
+  <!-- lifecycle window -->
+  <div class="win">
+    <div class="titlebar"><span>■ Pipeline Explorer — C:\skyulf\lifecycle</span><span class="tb-btns"><span>_</span><span>□</span><span>×</span></span></div>
+    <div class="winbody">
+      <div class="toolbar"><button>Back</button><button>Forward</button><button>Up</button><span class="inset" style="flex:1;padding:3px 8px;">Address: C:\skyulf\lifecycle</span></div>
+      <div class="two">
+        <div>
+          <ul class="list">
+            <li><strong>01_Connect</strong> — SQL &amp; files into typed dataframes</li>
+            <li><strong>02_Explore</strong> — EDA dashboards before any fitting</li>
+            <li><strong>03_Design</strong> — visual canvas, learn/apply split</li>
+            <li><strong>04_Train</strong> — Optuna / grid / random / halving</li>
+            <li><strong>05_Register</strong> — fingerprint + model card</li>
+            <li><strong>06_Deploy</strong> — REST API or batch jobs</li>
+            <li><strong>07_Monitor</strong> — KS / PSI / Wasserstein / KL drift</li>
+          </ul>
+        </div>
+        <div><img class="shot" src="../static/img/canvas.jpg" alt="Canvas"></div>
+      </div>
+      <div class="two" style="margin-top:12px;">
+        <div><img class="shot" src="../static/img/eda/dashboardeda.jpg" alt="EDA"></div>
+        <div><img class="shot" src="../static/img/registry.jpg" alt="Registry"></div>
+      </div>
+      <div class="two" style="margin-top:12px;">
+        <div><img class="shot" src="../static/img/deployments.jpg" alt="Deployments"></div>
+        <div><img class="shot" src="../static/img/drift/drift.jpg" alt="Drift monitor"></div>
+      </div>
+      <div class="statusbar"><span>7 object(s)</span><span style="flex:0 0 200px;">My Computer</span></div>
+    </div>
+  </div>
+
+  <!-- error dialog: leakage -->
+  <div class="win dlg">
+    <div class="titlebar" style="background:linear-gradient(90deg,#800000,#d04040);"><span>⚠ Validation Error</span><span class="tb-btns"><span>×</span></span></div>
+    <div class="winbody">
+      <div class="x">×</div>
+      <div>
+        <p style="margin-bottom:8px;"><strong>LeakageError: 94% accuracy cannot be trusted.</strong></p>
+        <p style="margin-bottom:10px;">Your scaler was fitted on the full dataset, including validation rows. The reported 94% is a fantasy; production reality is <strong>71%</strong>.</p>
+        <div class="progress"><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i><i style="width:4%"></i></div>
+        <p class="mono" style="margin-top:6px;font-size:10px;">TRUST LEVEL: 94% … CORRUPTED</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- fix dialog -->
+  <div class="win dlg">
+    <div class="titlebar" style="background:linear-gradient(90deg,#004000,#20a020);"><span>✓ Skyulf Guard</span><span class="tb-btns"><span>×</span></span></div>
+    <div class="winbody">
+      <div class="ok">✓</div>
+      <div>
+        <p style="margin-bottom:8px;"><strong>Honest validation restored: 71%, for real this time.</strong></p>
+        <p style="margin-bottom:12px;">Learn nodes fitted on train only. Apply nodes ran blind on validation. <code>validate_leakage_safety()</code> passed. Every artifact fingerprinted.</p>
+        <a class="btn primary" href="https://api.skyulf.com/">OK — take me to the demo</a>
+        <a class="btn" href="../manual/index.html">Details…</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- faq window -->
+  <div class="win">
+    <div class="titlebar"><span>■ Skyulf Help — Frequently Asked Questions</span><span class="tb-btns"><span>_</span><span>□</span><span>×</span></span></div>
+    <div class="winbody">
+      <div class="inset" style="margin-bottom:10px;"><strong>Q: Is Skyulf free?</strong><br>A: Yes. skyulf-core is Apache-2.0; the Platform is AGPLv3. Self-host with <code>git clone</code> + <code>docker compose up</code>.</div>
+      <div class="inset" style="margin-bottom:10px;"><strong>Q: Is it enterprise-ready?</strong><br>A: It's honest v0.1 software — real code, 2,266 tests, real docs. No fake "planetary scale" claims. Read every line yourself.</div>
+      <div class="inset"><strong>Q: Why not just a notebook?</strong><br>A: Notebooks are great for exploring. Skyulf answers the production question notebooks can't: which data fitted this scaler? The registry knows, by construction.</div>
+      <div class="statusbar"><span>Press F1 for more help (just kidding, click the demo)</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- taskbar -->
+<div class="taskbar">
+  <a class="start" href="https://api.skyulf.com/">⊞ Start</a>
+  <div class="task">■ Skyulf Setup — Welcome</div>
+  <div class="task">■ Pipeline Explorer</div>
+  <div class="task">⚠ Validation Error</div>
+  <div class="clock">9:41 AM</div>
+</div>
+
+</body>
+</html>

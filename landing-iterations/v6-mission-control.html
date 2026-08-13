@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · Build ML pipelines you can trust</title>
+<link rel="icon" type="image/png" href="../static/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#101623; --panel2:#141c2c; --line:#1d2739;
+    --txt:#c7d0de; --dim:#7a8699; --white:#f2f6fb;
+    --teal:#2dd4bf; --sky:#38bdf8; --amber:#fbbf24; --red:#f87171; --green:#34d399;
+    --mono:'JetBrains Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--txt);font-family:'Manrope',sans-serif;line-height:1.6}
+  a{color:inherit;text-decoration:none}
+  img{display:block;max-width:100%}
+  .mono{font-family:var(--mono)}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  section{padding:88px 0}
+  h2.sec{font-size:34px;font-weight:800;color:var(--white);letter-spacing:-0.02em;margin-bottom:8px}
+  .sec-sub{color:var(--dim);font-size:15px;margin-bottom:44px;max-width:640px}
+  .chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;letter-spacing:0.12em;text-transform:uppercase;border:1px solid var(--line);border-radius:99px;padding:6px 14px;color:var(--dim)}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+
+  /* top bar */
+  header{position:sticky;top:0;z-index:50;background:rgba(10,14,20,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .bar{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:800;color:var(--white);font-size:17px}
+  .brand img{width:28px;height:28px;border-radius:7px}
+  nav.top{display:flex;gap:26px;font-size:13.5px;color:var(--dim)}
+  nav.top a:hover{color:var(--white)}
+  .bar .cta{font-family:var(--mono);font-size:12px;background:var(--teal);color:#04211c;font-weight:700;padding:9px 18px;border-radius:8px}
+  @media(max-width:860px){nav.top{display:none}}
+
+  /* hero */
+  .hero{padding:96px 0 72px;border-bottom:1px solid var(--line);background:
+    radial-gradient(600px 300px at 80% 0%,rgba(45,212,191,.08),transparent 60%),
+    radial-gradient(500px 300px at 10% 100%,rgba(56,189,248,.06),transparent 60%)}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  .hero h1{font-size:52px;line-height:1.06;font-weight:800;color:var(--white);letter-spacing:-0.03em;margin:20px 0 18px}
+  .hero h1 em{font-style:normal;color:var(--teal)}
+  .hero p.lead{font-size:17px;color:var(--dim);max-width:480px;margin-bottom:28px}
+  .btnrow{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{font-family:var(--mono);font-size:13px;font-weight:700;padding:13px 22px;border-radius:9px;transition:.18s}
+  .btn.primary{background:var(--teal);color:#04211c}
+  .btn.primary:hover{filter:brightness(1.1)}
+  .btn.ghost{border:1px solid var(--line);color:var(--txt)}
+  .btn.ghost:hover{border-color:var(--teal);color:var(--white)}
+  .install{margin-top:22px;font-family:var(--mono);font-size:13px;color:var(--dim);border:1px dashed var(--line);border-radius:9px;padding:11px 16px;display:inline-block}
+  .install b{color:var(--teal);font-weight:500}
+
+  /* graph panel */
+  .graph{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:0 30px 60px rgba(0,0,0,.4)}
+  .graph-head{display:flex;justify-content:space-between;align-items:center;padding:2px 6px 14px;border-bottom:1px solid var(--line);margin-bottom:6px}
+  .graph-head .t{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
+  .graph-head .live{font-family:var(--mono);font-size:10px;color:var(--green);display:flex;align-items:center;gap:6px}
+  .graph-head .live i{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.6s infinite}
+  svg.flow{width:100%;height:auto;display:block}
+  svg.flow .edge{stroke:#28354d;stroke-width:1.5;fill:none}
+  svg.flow .stream{stroke:var(--teal);stroke-width:1.5;fill:none;stroke-dasharray:5 9;animation:flow 1.1s linear infinite;opacity:.9}
+  svg.flow rect{fill:var(--panel2);stroke:#2c3a55;rx:8}
+  svg.flow text{font-family:var(--mono);font-size:10.5px;fill:#aeb9cc;letter-spacing:.08em}
+  svg.flow .ok{fill:var(--green)}
+  @keyframes flow{to{stroke-dashoffset:-28}}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+  /* stats strip */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:34px 0;border-bottom:1px solid var(--line)}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:var(--panel)}
+  .stat .v{font-family:var(--mono);font-size:26px;font-weight:700;color:var(--white)}
+  .stat .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-top:4px}
+  @media(max-width:860px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+  /* products */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:32px}
+  .card .lic{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:6px;display:inline-block;margin-bottom:18px}
+  .lic.agpl{background:rgba(56,189,248,.12);color:var(--sky)}
+  .lic.apache{background:rgba(45,212,191,.12);color:var(--teal)}
+  .card h3{font-size:23px;color:var(--white);font-weight:800;margin-bottom:10px}
+  .card p{color:var(--dim);font-size:14.5px;margin-bottom:20px}
+  .card ul{list-style:none;font-size:14px}
+  .card li{padding:9px 0;border-top:1px solid var(--line);display:flex;gap:10px;color:var(--txt)}
+  .card li::before{content:'▸';color:var(--teal);font-family:var(--mono)}
+  @media(max-width:860px){.duo{grid-template-columns:1fr}}
+
+  /* lifecycle board */
+  .board{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .step .hd{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .step .n{font-family:var(--mono);font-size:11px;color:var(--teal)}
+  .step .nm{font-size:14px;font-weight:700;color:var(--white)}
+  .step img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top left}
+  .step .cap{padding:11px 16px;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .step.wide{grid-column:span 2}
+  @media(max-width:960px){.board{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.board{grid-template-columns:1fr}.step.wide{grid-column:span 1}}
+
+  /* leakage log */
+  .leak-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:center}
+  .leak-copy h2{font-size:34px;color:var(--white);font-weight:800;letter-spacing:-0.02em;margin-bottom:14px}
+  .leak-copy p{color:var(--dim);font-size:15px;margin-bottom:14px}
+  .scores{display:flex;gap:14px;margin-top:22px}
+  .score{border-radius:12px;padding:18px 22px;border:1px solid var(--line);background:var(--panel)}
+  .score .pct{font-family:var(--mono);font-size:30px;font-weight:700}
+  .score.bad .pct{color:var(--red)}
+  .score.good .pct{color:var(--green)}
+  .score .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-top:2px}
+  .terminal{background:#070b11;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .terminal .tbar{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .terminal .tbar i{width:11px;height:11px;border-radius:50%;background:#2c3a55}
+  .terminal pre{padding:20px 22px;font-family:var(--mono);font-size:12.5px;line-height:1.9;color:#9fb0c8;overflow-x:auto}
+  .terminal .fail{color:var(--red)}
+  .terminal .pass{color:var(--green)}
+  .terminal .cmd{color:var(--teal)}
+  @media(max-width:860px){.leak-grid{grid-template-columns:1fr}}
+
+  /* features */
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .feat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px}
+  .feat h4{color:var(--white);font-size:15.5px;margin-bottom:6px}
+  .feat p{font-size:13.5px;color:var(--dim)}
+  .feat .ic{font-family:var(--mono);color:var(--teal);font-size:12px;margin-bottom:12px;display:block}
+  @media(max-width:860px){.feat-grid{grid-template-columns:1fr}}
+
+  /* faq */
+  .faq{max-width:760px}
+  details{border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:12px;padding:20px 24px}
+  summary{cursor:pointer;font-weight:700;color:var(--white);font-size:15.5px;list-style:none;display:flex;justify-content:space-between}
+  summary::after{content:'+';font-family:var(--mono);color:var(--teal)}
+  details[open] summary::after{content:'–'}
+  details p{margin-top:12px;color:var(--dim);font-size:14.5px}
+
+  /* cta */
+  .cta-final{border:1px solid var(--line);border-radius:18px;background:
+    radial-gradient(500px 250px at 50% -50%,rgba(45,212,191,.14),transparent 70%),var(--panel);
+    text-align:center;padding:70px 30px}
+  .cta-final h2{font-size:36px;color:var(--white);font-weight:800;letter-spacing:-0.02em;margin-bottom:12px}
+  .cta-final p{color:var(--dim);margin-bottom:30px}
+
+  footer{border-top:1px solid var(--line);padding:36px 0;font-family:var(--mono);font-size:12px;color:var(--dim)}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+  footer a:hover{color:var(--white)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <div class="brand"><img src="../static/img/logo.png" alt="Skyulf">Skyulf</div>
+    <nav class="top">
+      <a href="#products">Products</a>
+      <a href="#lifecycle">Lifecycle</a>
+      <a href="#leakage">Leakage</a>
+      <a href="#features">Features</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="cta" href="https://api.skyulf.com/" target="_blank" rel="noopener">LIVE DEMO →</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="chip"><span class="dot"></span>self-hosted · no signup · free</span>
+      <h1>ML pipelines,<br>monitored like<br><em>mission control.</em></h1>
+      <p class="lead">Skyulf wraps scikit-learn in a platform that tracks every stage — data, EDA, training, deployment, drift — so your scores in production match the scores you trusted.</p>
+      <div class="btnrow">
+        <a class="btn primary" href="https://api.skyulf.com/" target="_blank" rel="noopener">Launch live demo</a>
+        <a class="btn ghost" href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+      <div class="install">$ <b>pip install skyulf-core</b></div>
+    </div>
+    <div class="graph">
+      <div class="graph-head">
+        <span class="t">pipeline · telemetry</span>
+        <span class="live"><i></i>ALL STAGES OPERATIONAL</span>
+      </div>
+      <svg class="flow" viewBox="0 0 560 330" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path class="edge" d="M150 52 H410"/>
+        <path class="edge" d="M480 82 V142"/>
+        <path class="edge" d="M410 172 H150"/>
+        <path class="edge" d="M80 202 V262"/>
+        <path class="edge" d="M150 292 H410"/>
+        <path class="stream" d="M150 52 H410"/>
+        <path class="stream" d="M480 82 V142"/>
+        <path class="stream" d="M410 172 H150"/>
+        <path class="stream" d="M80 202 V262"/>
+        <path class="stream" d="M150 292 H410"/>
+        <rect x="20" y="22" width="130" height="60" rx="8"/>
+        <text x="40" y="48">DATA</text><circle class="ok" cx="132" cy="42" r="4"><animate attributeName="opacity" values="1;.3;1" dur="2s" repeatCount="indefinite"/></circle>
+        <text x="40" y="66" style="font-size:9px;fill:#5f6d84">csv · parquet</text>
+        <rect x="410" y="22" width="140" height="60" rx="8"/>
+        <text x="430" y="48">AUTO EDA</text><circle class="ok" cx="532" cy="42" r="4"><animate attributeName="opacity" values="1;.3;1" dur="2.3s" repeatCount="indefinite"/></circle>
+        <text x="430" y="66" style="font-size:9px;fill:#5f6d84">profiles · plots</text>
+        <rect x="410" y="142" width="140" height="60" rx="8"/>
+        <text x="430" y="168">PIPELINE</text><circle class="ok" cx="532" cy="162" r="4"><animate attributeName="opacity" values="1;.3;1" dur="1.8s" repeatCount="indefinite"/></circle>
+        <text x="430" y="186" style="font-size:9px;fill:#5f6d84">35 node types</text>
+        <rect x="20" y="142" width="130" height="60" rx="8"/>
+        <text x="40" y="168">TUNE</text><circle class="ok" cx="132" cy="162" r="4"><animate attributeName="opacity" values="1;.3;1" dur="2.6s" repeatCount="indefinite"/></circle>
+        <text x="40" y="186" style="font-size:9px;fill:#5f6d84">optuna · grid</text>
+        <rect x="20" y="262" width="130" height="60" rx="8"/>
+        <text x="40" y="288">REGISTRY</text><circle class="ok" cx="132" cy="282" r="4"><animate attributeName="opacity" values="1;.3;1" dur="2.1s" repeatCount="indefinite"/></circle>
+        <text x="40" y="306" style="font-size:9px;fill:#5f6d84">fingerprint · card</text>
+        <rect x="410" y="262" width="140" height="60" rx="8"/>
+        <text x="430" y="288">DEPLOY+DRIFT</text><circle class="ok" cx="532" cy="282" r="4"><animate attributeName="opacity" values="1;.3;1" dur="1.7s" repeatCount="indefinite"/></circle>
+        <text x="430" y="306" style="font-size:9px;fill:#5f6d84">ks · psi · kl</text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<div class="wrap stats">
+  <div class="stat"><div class="v">35</div><div class="k">pipeline nodes</div></div>
+  <div class="stat"><div class="v">11</div><div class="k">workspaces</div></div>
+  <div class="stat"><div class="v">2,266</div><div class="k">library tests</div></div>
+  <div class="stat"><div class="v">0 €</div><div class="k">cost · self-hosted</div></div>
+</div>
+
+<section id="products">
+  <div class="wrap">
+    <h2 class="sec">Two products, one engine</h2>
+    <p class="sec-sub">Both run on scikit-learn. Use the full platform, or take just the library into your own code.</p>
+    <div class="duo">
+      <div class="card">
+        <span class="lic agpl">AGPLv3 · platform</span>
+        <h3>Skyulf Platform</h3>
+        <p>The self-hosted home for your ML work: a visual canvas, automated EDA, experiment tracking, a model registry, deployment and drift monitoring.</p>
+        <ul>
+          <li>Visual pipeline canvas with 35 node types</li>
+          <li>Automated EDA dashboards on every datasource</li>
+          <li>Registry with fingerprints &amp; model cards</li>
+          <li>One-click deployment + drift alerts (KS, PSI, Wasserstein, KL)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <span class="lic apache">Apache-2.0 · library</span>
+        <h3>skyulf-core</h3>
+        <p>The engine as a Python library. Build, validate and run pipelines in notebooks or CI — no server, no UI, no lock-in.</p>
+        <ul>
+          <li><span class="mono">pip install skyulf-core</span> — that's it</li>
+          <li>Static leakage checks via <span class="mono">validate_leakage_safety()</span></li>
+          <li>pandas &amp; Polars backends, Python 3.12</li>
+          <li>2,266 tests guarding every release</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="lifecycle" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec">The lifecycle board</h2>
+    <p class="sec-sub">Every stage of a model's life, visible in one place.</p>
+    <div class="board">
+      <div class="step"><div class="hd"><span class="n">01</span><span class="nm">Connect</span></div><img src="../static/img/datasource.jpg" alt="Datasources"><div class="cap">upload csv / parquet</div></div>
+      <div class="step"><div class="hd"><span class="n">02</span><span class="nm">Auto EDA</span></div><img src="../static/img/eda/dashboardeda.jpg" alt="EDA dashboard"><div class="cap">profiles generated on import</div></div>
+      <div class="step wide"><div class="hd"><span class="n">03</span><span class="nm">Build on canvas</span></div><img src="../static/img/canvas.jpg" alt="Pipeline canvas"><div class="cap">drag nodes, wire branches, configure</div></div>
+      <div class="step"><div class="hd"><span class="n">04</span><span class="nm">Train &amp; tune</span></div><img src="../static/img/jobs.jpg" alt="Jobs"><div class="cap">jobs with live logs</div></div>
+      <div class="step"><div class="hd"><span class="n">05</span><span class="nm">Compare</span></div><img src="../static/img/experiments.jpg" alt="Experiments"><div class="cap">experiments side by side</div></div>
+      <div class="step"><div class="hd"><span class="n">06</span><span class="nm">Deploy</span></div><img src="../static/img/deployments.jpg" alt="Deployments"><div class="cap">rest endpoint per model</div></div>
+      <div class="step"><div class="hd"><span class="n">07</span><span class="nm">Monitor drift</span></div><img src="../static/img/drift/drift.jpg" alt="Drift monitoring"><div class="cap">ks · psi · wasserstein · kl</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="leakage" style="padding-top:0">
+  <div class="wrap leak-grid">
+    <div class="leak-copy">
+      <span class="chip"><span class="dot" style="background:var(--amber)"></span>the silent killer of ml</span>
+      <h2 style="margin-top:18px">Data leakage inflates your score. Skyulf catches it before you ship.</h2>
+      <p>A target encoder fitted on the full dataset before the split quietly leaks labels into validation. The score looks fantastic — until production.</p>
+      <p>Skyulf splits every node into <span class="mono" style="color:var(--teal)">learn</span> and <span class="mono" style="color:var(--teal)">apply</span> phases, then statically scans the graph with <span class="mono">validate_leakage_safety()</span>.</p>
+      <div class="scores">
+        <div class="score bad"><div class="pct">94%</div><div class="lbl">leaked validation</div></div>
+        <div class="score good"><div class="pct">71%</div><div class="lbl">honest production</div></div>
+      </div>
+    </div>
+    <div class="terminal">
+      <div class="tbar"><i></i><i></i><i></i></div>
+      <pre>
+<span class="cmd">$ skyulf validate pipeline.json</span>
+
+[scan] TargetEncoder fitted pre-split ... <span class="fail">LEAK DETECTED</span>
+[scan] validate_leakage_safety() ....... <span class="fail">FAILED</span>
+
+[fix ] learn/apply split enforced
+[fix ] encoder moved inside cv folds
+
+<span class="cmd">$ skyulf validate pipeline.json</span>
+
+[scan] validate_leakage_safety() ....... <span class="pass">PASSED</span>
+[result] honest score <span class="pass">0.71</span> — not 0.94
+[write] fingerprint + model card saved</pre>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec">Systems check</h2>
+    <p class="sec-sub">Everything below ships in the box.</p>
+    <div class="feat-grid">
+      <div class="feat"><span class="ic">[TUNE]</span><h4>Hyperparameter tuning</h4><p>Optuna, grid, random and halving searches — logged as experiments automatically.</p></div>
+      <div class="feat"><span class="ic">[XAI]</span><h4>SHAP explainability</h4><p>Feature importance per model, generated with the artifact — not bolted on later.</p></div>
+      <div class="feat"><span class="ic">[REG]</span><h4>Model registry</h4><p>Every run gets a fingerprint and a model card. Reproduce any result months later.</p></div>
+      <div class="feat"><span class="ic">[NB]</span><h4>Notebook export</h4><p>One click turns a canvas pipeline into a clean Jupyter notebook you own.</p></div>
+      <div class="feat"><span class="ic">[AUDIT]</span><h4>Audit log</h4><p>Who changed what, when — across workspaces, pipelines and deployments.</p></div>
+      <div class="feat"><span class="ic">[NLP]</span><h4>Text &amp; NLP nodes</h4><p>TF-IDF, embeddings-friendly text processing alongside the tabular nodes.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec">FAQ</h2>
+    <p class="sec-sub">Straight answers, no marketing.</p>
+    <div class="faq">
+      <details><summary>Is Skyulf really free?</summary><p>Yes. The platform is AGPLv3 and self-hosted; skyulf-core is Apache-2.0. No accounts, no cloud dependency, no paid tier.</p></details>
+      <details><summary>Does it replace scikit-learn?</summary><p>No — it runs on scikit-learn. Pipelines compile to standard sklearn objects, so you can leave any time with working code.</p></details>
+      <details><summary>How do I run it locally?</summary><p class="mono">git clone https://github.com/flyingriverhorse/skyulf &amp;&amp; cd skyulf &amp;&amp; docker compose up</p></details>
+      <details><summary>What data formats are supported?</summary><p>CSV and Parquet tabular data via pandas or Polars, plus text columns for NLP nodes. Python 3.12 runtime.</p></details>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <div class="cta-final">
+      <h2>Start trusting your scores.</h2>
+      <p>Live demo running now — no signup, your data stays on your machine.</p>
+      <div class="btnrow" style="justify-content:center">
+        <a class="btn primary" href="https://api.skyulf.com/" target="_blank" rel="noopener">Try the live demo</a>
+        <a class="btn ghost" href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">pip install skyulf-core</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>SKYULF · scikit-learn pipelines you can trust</span>
+    <span>
+      <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">github</a> ·
+      <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">pypi</a> ·
+      <a href="../manual/index.html">docs</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>

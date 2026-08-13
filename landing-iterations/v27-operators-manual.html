@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Skyulf ML Lifecycle System — Operator's Manual. Installation, operation, two control modes, diagnostics and specifications for the self-hosted ML lifecycle platform and the skyulf-core Python package.">
+<title>SKYULF — ML LIFECYCLE SYSTEM · Operator's Manual OM-27</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chivo:ital,wght@0,400;0,500;0,700;0,800;0,900;1,400&family=Chivo+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ============ SKYULF OPERATOR'S MANUAL — FLAT INK ON AGED STOCK ============ */
+:root{
+  --paper:#F1EDE2;
+  --paper-dim:#E8E2D3;
+  --ink:#22252A;
+  --ink-soft:#4A4E55;
+  --red:#C8342A;
+  --steel:#3F5B73;
+  --hazard:#D9A441;
+  --rule:#B7AF9C;
+  --mono:'Chivo Mono',ui-monospace,monospace;
+  --disp:'Chivo',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scrollbar-color:var(--steel) var(--paper)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--disp);
+  font-size:17px;
+  line-height:1.6;
+  caret-color:var(--red);
+}
+::selection{background:var(--red);color:var(--paper)}
+::-webkit-scrollbar{width:12px;height:12px}
+::-webkit-scrollbar-track{background:var(--paper)}
+::-webkit-scrollbar-thumb{background:var(--steel);border:3px solid var(--paper)}
+::-webkit-scrollbar-thumb:hover{background:var(--red)}
+a{color:var(--steel);font-weight:700;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+a:hover{color:var(--red)}
+a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+img{max-width:100%;display:block}
+code,pre,kbd{font-family:var(--mono)}
+.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:var(--paper);padding:10px 18px;font-family:var(--mono);z-index:99}
+.skip:focus{left:12px;top:12px}
+
+/* sheet frame */
+.sheet{max-width:1220px;margin:0 auto;border-left:2px solid var(--ink);border-right:2px solid var(--ink);background:var(--paper)}
+@media (max-width:640px){.sheet{border-left:none;border-right:none}}
+.hazardband{height:12px;background:repeating-linear-gradient(-45deg,var(--ink) 0 12px,var(--hazard) 12px 24px)}
+.runhead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 22px;border-bottom:2px solid var(--ink);font-family:var(--mono);font-size:12px;letter-spacing:.08em;background:var(--paper-dim)}
+.wrap{padding:clamp(20px,4.5vw,56px)}
+
+/* ============ TITLE PAGE ============ */
+.nomen{border:3px solid var(--ink);background:var(--paper)}
+.nomen-top{display:flex;justify-content:space-between;align-items:stretch;gap:0;flex-wrap:wrap;border-bottom:3px solid var(--ink)}
+.nomen-id{padding:22px 26px;flex:1 1 420px;border-right:3px solid var(--ink)}
+@media (max-width:900px){.nomen-id{border-right:none;border-bottom:3px solid var(--ink)}}
+.doctype{font-family:var(--mono);font-size:13px;letter-spacing:.28em;color:var(--red);font-weight:700;border:2px solid var(--red);display:inline-block;padding:4px 10px;margin-bottom:14px}
+h1{font-weight:900;font-size:clamp(42px,7vw,88px);line-height:.95;letter-spacing:.005em;text-transform:uppercase}
+h1 .sub{display:block;font-size:clamp(17px,2.4vw,28px);font-weight:800;letter-spacing:.34em;color:var(--steel);margin-top:10px}
+.nomen-data{flex:1 1 300px;display:grid;grid-template-columns:1fr;align-content:stretch}
+.nomen-data div{display:flex;justify-content:space-between;gap:14px;padding:9px 18px;border-bottom:1px solid var(--rule);font-family:var(--mono);font-size:12.5px}
+.nomen-data div:last-child{border-bottom:none}
+.nomen-data dt{color:var(--ink-soft);letter-spacing:.06em}
+.nomen-data dd{font-weight:700;text-align:right}
+.nomen-data dd.red{color:var(--red)}
+
+/* FIG 1 */
+.fig1box{border-top:3px solid var(--ink);padding:18px 18px 6px;background:var(--paper)}
+.fig1-svg{width:100%;height:auto;display:block}
+.fig1-svg .ln{fill:none;stroke:var(--ink);stroke-width:2.5;stroke-linecap:square;stroke-linejoin:miter}
+.fig1-svg .thin{fill:none;stroke:var(--ink);stroke-width:1.4}
+.fig1-svg .flow{fill:none;stroke:var(--steel);stroke-width:2;stroke-dasharray:7 6}
+.fig1-svg .leader{stroke:var(--ink);stroke-width:1.6;stroke-dasharray:1;stroke-dashoffset:0}
+.fig1-svg .balloon-c{fill:var(--paper);stroke:var(--red);stroke-width:2.5}
+.fig1-svg .balloon-t{fill:var(--red);font-family:var(--mono);font-weight:700;font-size:17px;text-anchor:middle}
+.fig1-svg .pname{fill:var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.14em}
+.fig1-svg .dotend{fill:var(--red)}
+.fig1-svg g.part{transition:transform 1s cubic-bezier(.22,.9,.24,1) var(--d,0s)}
+.fig1-svg g.balloon{transform-box:fill-box;transform-origin:center;transition:opacity .5s ease var(--bd,1s),transform .5s cubic-bezier(.34,1.4,.4,1) var(--bd,1s)}
+.fig1-svg line.leader{transition:stroke-dashoffset .9s ease var(--ld,1.15s)}
+html.js:not(.assembled) .fig1-svg g.part{transform:translate(var(--tx,0),var(--ty,0))}
+html.js:not(.assembled) .fig1-svg g.balloon{opacity:0;transform:scale(.55)}
+html.js:not(.assembled) .fig1-svg line.leader{stroke-dashoffset:1}
+@media (prefers-reduced-motion:reduce){
+  .fig1-svg g.part,.fig1-svg g.balloon,.fig1-svg line.leader{transition:none !important}
+}
+
+/* caption plates */
+.platecap{display:flex;gap:14px;align-items:baseline;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);padding:9px 4px;margin-top:14px;font-family:var(--mono);font-size:13px;line-height:1.5}
+.platecap .fno{color:var(--red);font-weight:700;white-space:nowrap;letter-spacing:.06em}
+.platecap .ftx{color:var(--ink)}
+
+/* legend */
+.legend{list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:2px solid var(--ink);margin-top:18px}
+@media (max-width:900px){.legend{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){.legend{grid-template-columns:1fr}}
+.legend li{display:flex;gap:12px;align-items:baseline;padding:10px 14px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-size:14px}
+.legend li .b{font-family:var(--mono);color:var(--red);font-weight:700;border:2px solid var(--red);border-radius:50%;width:26px;height:26px;flex:0 0 26px;display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+.legend li b{font-weight:800}
+.legend li span.d{color:var(--ink-soft)}
+
+/* general description */
+.gd{margin-top:34px;max-width:78ch}
+.gd h2{font-size:15px;font-family:var(--mono);letter-spacing:.18em;font-weight:700;color:var(--ink);border-bottom:3px solid var(--red);display:inline-block;padding-bottom:4px;margin-bottom:16px}
+.gd p+p{margin-top:14px}
+.gd p:first-of-type::first-letter{font-size:3.1em;font-weight:900;float:left;line-height:.82;padding:4px 10px 0 0;color:var(--red)}
+
+/* ============ TOC ============ */
+.tocbox{border:3px solid var(--ink);margin-top:44px;background:var(--paper)}
+.tocbox>h2{font-family:var(--mono);font-size:14px;letter-spacing:.26em;background:var(--ink);color:var(--paper);padding:10px 18px;font-weight:700}
+.tocgrid{display:grid;grid-template-columns:1.2fr .8fr}
+@media (max-width:900px){.tocgrid{grid-template-columns:1fr}}
+.toclist{list-style:none;padding:16px 18px;border-right:2px solid var(--ink)}
+@media (max-width:900px){.toclist{border-right:none;border-bottom:2px solid var(--ink)}}
+.toclist a{display:flex;align-items:baseline;gap:10px;padding:8px 2px;color:var(--ink);text-decoration:none;font-weight:700}
+.toclist a:hover .tt{color:var(--red)}
+.toclist .no{font-family:var(--mono);color:var(--steel);font-weight:700;flex:0 0 auto}
+.toclist .tt{flex:0 0 auto}
+.toclist .lead{flex:1;border-bottom:2px dotted var(--rule);transform:translateY(-4px)}
+.toclist .ref{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);flex:0 0 auto}
+.tocfigs{list-style:none;padding:16px 18px}
+.tocfigs h3{font-family:var(--mono);font-size:12px;letter-spacing:.22em;color:var(--ink-soft);margin-bottom:10px}
+.tocfigs a{display:flex;gap:10px;align-items:baseline;padding:5px 2px;text-decoration:none;color:var(--ink);font-size:14.5px}
+.tocfigs a:hover .ft{color:var(--red)}
+.tocfigs .fn{font-family:var(--mono);color:var(--red);font-weight:700;flex:0 0 52px}
+.tocfigs .ft{font-weight:500}
+
+/* ============ SECTIONS ============ */
+section{margin-top:64px;scroll-margin-top:20px}
+.sechead{display:flex;align-items:center;gap:14px;background:var(--steel);color:var(--paper);border:3px solid var(--ink);padding:10px 16px}
+.sechead h2{font-size:clamp(18px,2.6vw,26px);font-weight:900;letter-spacing:.05em;text-transform:uppercase;flex:1}
+.sechead .secno{color:var(--hazard);margin-right:14px}
+.screw{width:14px;height:14px;border:2px solid var(--paper);border-radius:50%;position:relative;flex:0 0 14px}
+.screw::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;height:2px;margin-top:-1px;background:var(--paper);transform:rotate(45deg)}
+.secbody{border:2px solid var(--ink);border-top:none;padding:clamp(18px,3vw,34px);background:var(--paper)}
+.secbody>p{max-width:80ch}
+.secbody>p+p{margin-top:12px}
+
+/* parts list table */
+table.m{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13.5px;margin-top:20px}
+table.m th{background:var(--ink);color:var(--paper);text-align:left;padding:9px 12px;letter-spacing:.1em;font-weight:700;font-size:12px}
+table.m td{border:1px solid var(--rule);padding:9px 12px;vertical-align:top}
+table.m td:first-child{color:var(--red);font-weight:700;white-space:nowrap}
+table.m tr:nth-child(even) td{background:var(--paper-dim)}
+.tscroll{overflow-x:auto}
+
+/* procedures */
+.proc{margin-top:34px}
+.proc:first-of-type{margin-top:22px}
+.proc h3{font-family:var(--mono);font-size:15px;letter-spacing:.06em;font-weight:700;border-left:8px solid var(--red);padding:6px 12px;background:var(--paper-dim);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.proc h3 .pno{color:var(--red)}
+.steps{list-style:none;margin-top:14px;counter-reset:st}
+.steps li{display:flex;gap:14px;padding:9px 4px;border-bottom:1px dashed var(--rule);align-items:baseline}
+.steps .st{font-family:var(--mono);font-size:11.5px;font-weight:700;letter-spacing:.12em;color:var(--paper);background:var(--steel);padding:3px 8px;flex:0 0 auto;white-space:nowrap}
+.steps li p{flex:1}
+.steps li>div{flex:1}
+.cmd{background:var(--ink);color:var(--paper);padding:12px 16px;margin:10px 0 4px;font-size:14px;overflow-x:auto;border-left:6px solid var(--steel)}
+.cmd .p{color:var(--hazard);font-weight:700}
+.cmd .c{color:var(--rule)}
+.inline{font-family:var(--mono);font-size:.92em;background:var(--paper-dim);border:1px solid var(--rule);padding:1px 6px}
+
+/* cautions / notices */
+.caut{border:3px solid var(--ink);margin:28px 0;background:var(--paper)}
+.caut .band{height:12px;background:repeating-linear-gradient(-45deg,var(--ink) 0 12px,var(--hazard) 12px 24px);border-bottom:3px solid var(--ink)}
+.caut .lab{display:inline-block;font-family:var(--mono);font-weight:700;letter-spacing:.22em;font-size:13px;padding:5px 14px;margin:12px 0 0 14px}
+.caut.caution .lab{background:var(--red);color:var(--paper)}
+.caut.notice .lab{background:var(--steel);color:var(--paper)}
+.caut .body{padding:12px 18px 18px;font-weight:500}
+.caut .body b{font-weight:800}
+
+/* ============ FIGURE PLATES ============ */
+figure.fig{margin:36px 0 0}
+.plate{position:relative;border:2px solid var(--ink);outline:1px solid var(--steel);outline-offset:5px;background:var(--ink)}
+.plate img{width:100%;height:auto}
+.leaders{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.leaders line{stroke:var(--paper);stroke-width:1.6;vector-effect:non-scaling-stroke;stroke-dasharray:5 4}
+.dot{position:absolute;width:11px;height:11px;border:2px solid var(--paper);background:var(--red);border-radius:50%;transform:translate(-50%,-50%);pointer-events:none}
+.tag{position:absolute;transform:translate(-50%,-50%);font-family:var(--mono);font-size:10.5px;font-weight:700;letter-spacing:.08em;background:var(--paper);color:var(--ink);border:2px solid var(--ink);padding:3px 7px;white-space:nowrap;pointer-events:none}
+@media (max-width:700px){
+  .leaders,.dot{display:none}
+  .tag{position:static;transform:none;display:inline-block;margin:8px 6px 0 0}
+  .tags-row{padding:0 10px 12px}
+}
+.tags-row{position:static}
+.platecap.sub{margin-top:10px}
+.figrow{display:grid;grid-template-columns:1fr;gap:26px}
+
+/* ============ MODES ============ */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:24px}
+@media (max-width:1024px){.modes{grid-template-columns:1fr}}
+.mode{border:3px solid var(--ink);display:flex;flex-direction:column}
+.mode h3{font-family:var(--mono);letter-spacing:.1em;font-size:15px;font-weight:700;padding:10px 16px;border-bottom:3px solid var(--ink)}
+.mode.a h3{background:var(--steel);color:var(--paper)}
+.mode.b h3{background:var(--ink);color:var(--paper)}
+.mode .inner{padding:18px;display:flex;flex-direction:column;gap:12px;flex:1}
+.mode ul{list-style:none}
+.mode ul li{padding:7px 0 7px 26px;border-bottom:1px dashed var(--rule);position:relative}
+.mode ul li::before{content:"";position:absolute;left:4px;top:14px;width:10px;height:10px;border:2px solid var(--red)}
+.mode.a ul li::before{border-color:var(--steel)}
+.mode .foot{margin-top:auto;padding-top:14px;border-top:2px solid var(--ink);font-family:var(--mono);font-size:13px;display:flex;flex-wrap:wrap;gap:8px 18px}
+
+/* fault table */
+.faults td:first-child{font-weight:700}
+.faults td:nth-child(2){color:var(--ink-soft)}
+.faults td:nth-child(3){color:var(--ink)}
+
+/* appendix */
+.spec td:first-child{color:var(--steel);font-weight:700;letter-spacing:.06em;white-space:nowrap;width:220px}
+.entrypoints a{word-break:break-all}
+
+/* footer */
+footer{margin-top:70px;border-top:3px solid var(--ink);background:var(--ink);color:var(--paper)}
+footer .in{padding:34px clamp(20px,4vw,56px);display:grid;grid-template-columns:1.2fr .8fr;gap:30px}
+@media (max-width:900px){footer .in{grid-template-columns:1fr}}
+footer h2{font-family:var(--mono);letter-spacing:.24em;font-size:14px;color:var(--hazard);margin-bottom:12px}
+footer p{font-size:14.5px;color:var(--paper)}
+footer a{color:var(--hazard)}
+footer a:hover{color:var(--paper)}
+footer .end{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-align:center;padding:12px;border-top:1px solid var(--steel);color:var(--rule)}
+
+/* reveals */
+html.js [data-reveal]{opacity:0;transform:translateY(16px);transition:opacity .7s ease,transform .7s ease}
+html.js [data-reveal].in-view{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){
+  html.js [data-reveal]{opacity:1;transform:none;transition:none}
+  html{scroll-behavior:auto}
+}
+</style>
+</head>
+<body>
+<!--
+THESIS: the landing page as the operator's manual for the machine it documents. Refuses the SaaS
+hero-card scaffold; ownership is the pitch, so the document type is a manual.
+OWN-WORLD: aged stock paper, flat inks, hazard stripes, balloon callouts - a workshop sheet, not a website.
+STORY: title page and FIG. 1 cutaway, table of contents, installation procedures, operation figures,
+two control modes, diagnostics, appendix specifications.
+FIRST VIEWPORT: equipment nomenclature block, operator ref and date, FIG. 1 exploded cutaway assembling
+itself, the General Description paragraph.
+FORM: operator's manual, seed key e6d43b02.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md.
+-->
+<a class="skip" href="#main">Skip to manual body</a>
+<div class="sheet">
+  <div class="hazardband" aria-hidden="true"></div>
+  <div class="runhead" aria-hidden="true">
+    <span>DOC NO. SUL-OM-27</span>
+    <span>SKYULF — ML LIFECYCLE SYSTEM</span>
+    <span>REV C · UNCONTROLLED COPY WHEN PRINTED</span>
+  </div>
+
+  <!-- ================= TITLE PAGE ================= -->
+  <header class="wrap" style="padding-bottom:34px">
+    <div class="nomen">
+      <div class="nomen-top">
+        <div class="nomen-id">
+          <span class="doctype">OPERATOR'S MANUAL</span>
+          <h1>Skyulf<span class="sub">ML Lifecycle System</span></h1>
+        </div>
+        <dl class="nomen-data">
+          <div><dt>EQUIPMENT</dt><dd>ML LIFECYCLE SYSTEM, 6-STATION</dd></div>
+          <div><dt>DOC NO.</dt><dd>SUL-OM-27</dd></div>
+          <div><dt>OPERATOR REF. NO.</dt><dd class="red">OP-27-114</dd></div>
+          <div><dt>DATE OF ISSUE</dt><dd><time id="issue-date">ON RECEIPT</time></dd></div>
+          <div><dt>CONTROL MODES FITTED</dt><dd>2 (VISUAL / skyulf-core)</dd></div>
+          <div><dt>PACKAGE LICENSE</dt><dd>APACHE-2.0</dd></div>
+        </dl>
+      </div>
+
+      <div class="fig1box" id="fig-1">
+        <svg class="fig1-svg" viewBox="0 0 1200 560" aria-hidden="true" focusable="false">
+          <!-- ground + flow -->
+          <line class="ln" x1="20" y1="500" x2="1180" y2="500"/>
+          <line class="thin" x1="20" y1="507" x2="1180" y2="507"/>
+          <path class="flow" d="M30 535 H1150"/>
+          <path class="flow" d="M1150 527 L1172 535 L1150 543"/>
+
+          <!-- 1 INTAKE HOPPER -->
+          <g class="part" style="--tx:-36px;--ty:-70px;--d:.05s">
+            <circle class="thin" cx="80" cy="268" r="4"/>
+            <circle class="thin" cx="112" cy="252" r="5"/>
+            <circle class="thin" cx="142" cy="270" r="4"/>
+            <path class="ln" d="M60 300 H170 L140 380 H90 Z"/>
+            <path class="ln" d="M52 300 H178"/>
+            <path class="ln" d="M105 380 V412 M125 380 V412 M105 412 H125"/>
+            <path class="ln" d="M90 380 L78 500 M140 380 L152 500"/>
+          </g>
+          <!-- 2 INSPECTION BENCH -->
+          <g class="part" style="--tx:-20px;--ty:-95px;--d:.15s">
+            <path class="ln" d="M230 380 H380 M240 380 V500 M370 380 V500"/>
+            <path class="thin" d="M270 380 L282 360 H352 L340 380"/>
+            <circle class="ln" cx="308" cy="318" r="26"/>
+            <path class="thin" d="M308 306 V330 M296 318 H320"/>
+            <path class="ln" d="M327 337 L348 358"/>
+          </g>
+          <!-- 3 THE LINE (NODE CANVAS) -->
+          <g class="part" style="--tx:0px;--ty:-120px;--d:.25s">
+            <path class="ln" d="M420 440 H660 M420 470 H660"/>
+            <circle class="thin" cx="440" cy="455" r="8"/><circle class="thin" cx="480" cy="455" r="8"/><circle class="thin" cx="520" cy="455" r="8"/><circle class="thin" cx="560" cy="455" r="8"/><circle class="thin" cx="600" cy="455" r="8"/><circle class="thin" cx="640" cy="455" r="8"/>
+            <path class="ln" d="M430 470 V500 M650 470 V500"/>
+            <rect class="ln" x="435" y="318" width="60" height="42"/>
+            <rect class="ln" x="540" y="288" width="60" height="42"/>
+            <rect class="ln" x="552" y="368" width="60" height="42"/>
+            <path class="thin" d="M443 330 H487 M443 340 H479 M548 300 H592 M548 310 H584 M560 380 H604 M560 390 H596"/>
+            <circle class="thin" cx="495" cy="339" r="3"/><circle class="thin" cx="540" cy="309" r="3"/><circle class="thin" cx="552" cy="389" r="3"/>
+            <path class="thin" d="M495 339 H518 V309 H540 M495 345 H525 V389 H552"/>
+          </g>
+          <!-- 4 DYNAMOMETER -->
+          <g class="part" style="--tx:20px;--ty:-95px;--d:.35s">
+            <circle class="ln" cx="770" cy="415" r="55"/>
+            <circle class="ln" cx="770" cy="415" r="18"/>
+            <path class="thin" d="M788 415 H825 M782.7 427.7 L808.9 453.9 M770 433 V470 M757.3 427.7 L731.1 453.9 M752 415 H715 M757.3 402.3 L731.1 376.1 M770 397 V360 M782.7 402.3 L808.9 376.1"/>
+            <circle class="ln" cx="770" cy="298" r="22"/>
+            <path class="thin" d="M770 298 L783 286"/>
+            <path class="ln" d="M770 320 V360"/>
+            <path class="ln" d="M730 462 L718 500 M810 462 L822 500"/>
+          </g>
+          <!-- 5 DISPATCH -->
+          <g class="part" style="--tx:34px;--ty:-70px;--d:.45s">
+            <path class="ln" d="M900 500 V280 M900 280 H1005 M900 322 L962 280"/>
+            <path class="thin" d="M972 280 V356"/>
+            <rect class="ln" x="947" y="356" width="50" height="46"/>
+            <path class="thin" d="M947 356 L997 402 M997 356 L947 402"/>
+            <path class="ln" d="M1000 452 H1035 M1027 444 L1035 452 L1027 460"/>
+          </g>
+          <!-- 6 GAUGE HOUSE -->
+          <g class="part" style="--tx:48px;--ty:-50px;--d:.55s">
+            <path class="ln" d="M1050 340 V500 H1170 V340"/>
+            <path class="ln" d="M1040 340 L1110 298 L1180 340"/>
+            <path class="thin" d="M1146 316 V282 H1160 V325"/>
+            <circle class="thin" cx="1078" cy="378" r="13"/><circle class="thin" cx="1110" cy="378" r="13"/><circle class="thin" cx="1142" cy="378" r="13"/>
+            <path class="thin" d="M1078 378 L1086 370 M1110 378 L1110 368 M1142 378 L1150 372"/>
+            <rect class="thin" x="1096" y="432" width="28" height="68"/>
+          </g>
+
+          <!-- balloons + leaders -->
+          <g class="balloon" style="--bd:.95s">
+            <line class="leader" pathLength="1" style="--ld:1.1s" x1="115" y1="137" x2="115" y2="246"/>
+            <circle class="dotend" cx="115" cy="248" r="3.5"/>
+            <circle class="balloon-c" cx="115" cy="120" r="17"/>
+            <text class="balloon-t" x="115" y="126">1</text>
+            <text class="pname" x="140" y="125">INTAKE</text>
+          </g>
+          <g class="balloon" style="--bd:1.05s">
+            <line class="leader" pathLength="1" style="--ld:1.2s" x1="305" y1="113" x2="305" y2="288"/>
+            <circle class="dotend" cx="305" cy="290" r="3.5"/>
+            <circle class="balloon-c" cx="305" cy="96" r="17"/>
+            <text class="balloon-t" x="305" y="102">2</text>
+            <text class="pname" x="330" y="101">INSPECT</text>
+          </g>
+          <g class="balloon" style="--bd:1.15s">
+            <line class="leader" pathLength="1" style="--ld:1.3s" x1="540" y1="137" x2="540" y2="282"/>
+            <circle class="dotend" cx="540" cy="284" r="3.5"/>
+            <circle class="balloon-c" cx="540" cy="120" r="17"/>
+            <text class="balloon-t" x="540" y="126">3</text>
+            <text class="pname" x="565" y="125">LINE</text>
+          </g>
+          <g class="balloon" style="--bd:1.25s">
+            <line class="leader" pathLength="1" style="--ld:1.4s" x1="770" y1="113" x2="770" y2="272"/>
+            <circle class="dotend" cx="770" cy="274" r="3.5"/>
+            <circle class="balloon-c" cx="770" cy="96" r="17"/>
+            <text class="balloon-t" x="770" y="102">4</text>
+            <text class="pname" x="795" y="101">DYNO</text>
+          </g>
+          <g class="balloon" style="--bd:1.35s">
+            <line class="leader" pathLength="1" style="--ld:1.5s" x1="945" y1="137" x2="945" y2="276"/>
+            <circle class="dotend" cx="945" cy="278" r="3.5"/>
+            <circle class="balloon-c" cx="945" cy="120" r="17"/>
+            <text class="balloon-t" x="945" y="126">5</text>
+            <text class="pname" x="970" y="125">DISPATCH</text>
+          </g>
+          <g class="balloon" style="--bd:1.45s">
+            <line class="leader" pathLength="1" style="--ld:1.6s" x1="1110" y1="113" x2="1110" y2="294"/>
+            <circle class="dotend" cx="1110" cy="296" r="3.5"/>
+            <circle class="balloon-c" cx="1110" cy="96" r="17"/>
+            <text class="balloon-t" x="1110" y="102">6</text>
+            <text class="pname" x="1010" y="70">GAUGES</text>
+          </g>
+        </svg>
+        <div class="platecap">
+          <span class="fno">FIG. 1</span>
+          <span class="ftx">ML LIFECYCLE SYSTEM, CUTAWAY. SIX-STATION LINE SHOWN ASSEMBLED: INTAKE, INSPECTION, PIPELINE LINE, DYNAMOMETER, DISPATCH, GAUGE HOUSE. BALLOON NUMBERS KEY TO THE PARTS LIST IN SECTION 1.</span>
+        </div>
+      </div>
+
+      <ol class="legend" aria-label="Figure 1 balloon key">
+        <li><span class="b">1</span><span><b>Intake hopper</b> <span class="d">— ingestion</span></span></li>
+        <li><span class="b">2</span><span><b>Inspection bench</b> <span class="d">— automated EDA</span></span></li>
+        <li><span class="b">3</span><span><b>The line</b> <span class="d">— node-canvas pipelines</span></span></li>
+        <li><span class="b">4</span><span><b>Dynamometer</b> <span class="d">— training &amp; comparison</span></span></li>
+        <li><span class="b">5</span><span><b>Dispatch</b> <span class="d">— registry, deployment, inference</span></span></li>
+        <li><span class="b">6</span><span><b>Gauge house</b> <span class="d">— drift, audit, diagnostics</span></span></li>
+      </ol>
+    </div>
+
+    <div class="gd" data-reveal>
+      <h2>1.0 — GENERAL DESCRIPTION</h2>
+      <p>Skyulf is a connected machine for the machine-learning lifecycle. Data enters at the hopper as files or remote sources — CSV, Excel, JSON, Parquet, or an S3-compatible bucket — and moves station to station through exploration, pipeline construction, training, comparison, deployment, and monitoring, without leaving the works.</p>
+      <p>The system is built for data scientists, ML engineers, developers, and product teams who refuse black-box SaaS. Two control modes are fitted as standard and carry equal authority: a self-hosted visual node-canvas console, and the independent Apache-2.0 Python package <span class="inline">skyulf-core</span>, operated from scripts and notebooks. Work authored on the visual line is never trapped in the canvas; it exports to standard Jupyter notebooks, full or compact, on demand.</p>
+      <p>Provisioning is operator-selected: SQLite to start, PostgreSQL at scale; artifacts on local storage or S3-compatible storage. Background training runs on Celery with Redis, or on background threads. This manual covers installation, operation, both control modes, maintenance, and specifications of the system as delivered.</p>
+    </div>
+
+    <!-- ================= TOC ================= -->
+    <nav class="tocbox" aria-label="Table of contents" data-reveal>
+      <h2>TABLE OF CONTENTS</h2>
+      <div class="tocgrid">
+        <ul class="toclist">
+          <li><a href="#sec-1"><span class="no">SEC. 1</span><span class="tt">Description &amp; Parts List</span><span class="lead"></span><span class="ref">#sec-1</span></a></li>
+          <li><a href="#sec-2"><span class="no">SEC. 2</span><span class="tt">Installation</span><span class="lead"></span><span class="ref">#sec-2</span></a></li>
+          <li><a href="#sec-3"><span class="no">SEC. 3</span><span class="tt">Operation</span><span class="lead"></span><span class="ref">#sec-3</span></a></li>
+          <li><a href="#sec-4"><span class="no">SEC. 4</span><span class="tt">Two Control Modes</span><span class="lead"></span><span class="ref">#sec-4</span></a></li>
+          <li><a href="#sec-5"><span class="no">SEC. 5</span><span class="tt">Maintenance &amp; Diagnostics</span><span class="lead"></span><span class="ref">#sec-5</span></a></li>
+          <li><a href="#appendix-a"><span class="no">APP. A</span><span class="tt">Specifications</span><span class="lead"></span><span class="ref">#appendix-a</span></a></li>
+        </ul>
+        <div class="tocfigs">
+          <h3>LIST OF FIGURES</h3>
+          <a href="#fig-1"><span class="fn">FIG. 1</span><span class="ft">System cutaway, assembled view</span></a>
+          <a href="#fig-2"><span class="fn">FIG. 2</span><span class="ft">Intake — source ledger</span></a>
+          <a href="#fig-3"><span class="fn">FIG. 3</span><span class="ft">Inspection bench — automated EDA</span></a>
+          <a href="#fig-4"><span class="fn">FIG. 4</span><span class="ft">The line — node canvas</span></a>
+          <a href="#fig-5"><span class="fn">FIG. 5</span><span class="ft">Dynamometer — job ledger</span></a>
+          <a href="#fig-6"><span class="fn">FIG. 6</span><span class="ft">Comparison bench — experiments</span></a>
+          <a href="#fig-7"><span class="fn">FIG. 7</span><span class="ft">Registry &amp; dispatch — plates A, B, C</span></a>
+          <a href="#fig-8"><span class="fn">FIG. 8</span><span class="ft">Gauge house — drift setup</span></a>
+          <a href="#fig-9"><span class="fn">FIG. 9</span><span class="ft">Diagnostic instruments — plates A, B, C</span></a>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap" style="padding-top:8px">
+
+    <!-- ================= SECTION 1 ================= -->
+    <section id="sec-1" aria-labelledby="h-sec1">
+      <div class="sechead"><span class="screw" aria-hidden="true"></span><h2 id="h-sec1"><span class="secno">SECTION 1</span>Description</h2><span class="screw" aria-hidden="true"></span></div>
+      <div class="secbody" data-reveal>
+        <p>The system comprises six stations arranged in series, FIG. 1. Every station is operable from both control modes (Section 4); no station is console-only or package-only. The parts list below keys the balloon numbers of FIG. 1 to fitted capability.</p>
+        <div class="tscroll">
+        <table class="m">
+          <thead><tr><th>ITEM</th><th>ASSEMBLY</th><th>STATION</th><th>FITTED CAPABILITY</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Intake hopper</td><td>Ingestion</td><td>CSV, Excel, JSON, Parquet; S3-compatible storage; ingestion jobs</td></tr>
+            <tr><td>2</td><td>Inspection bench</td><td>Automated EDA</td><td>Statistical profiling, distributions, correlations, outliers, segmentation, causal discovery, target analysis</td></tr>
+            <tr><td>3</td><td>The line</td><td>Node-canvas pipelines</td><td>Preprocessing, feature engineering, splitting, modeling nodes; visual wiring port-to-port</td></tr>
+            <tr><td>4</td><td>Dynamometer</td><td>Training &amp; comparison</td><td>Background training via Celery + Redis or background threads; experiment comparison; model registry</td></tr>
+            <tr><td>5</td><td>Dispatch</td><td>Deployment</td><td>Deployment, inference, deployment history</td></tr>
+            <tr><td>6</td><td>Gauge house</td><td>Monitoring</td><td>Drift monitoring, audit history, job diagnostics, error log, slow-node analysis</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="caut notice" role="note">
+          <span class="lab">NOTICE</span>
+          <p class="body"><b>Equal paths.</b> The visual console and <span class="inline">skyulf-core</span> are first-class interfaces to the same machine. Anything described in Section 3 may be driven from either mode; choose by workflow, not by capability.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SECTION 2 ================= -->
+    <section id="sec-2" aria-labelledby="h-sec2">
+      <div class="sechead"><span class="screw" aria-hidden="true"></span><h2 id="h-sec2"><span class="secno">SECTION 2</span>Installation</h2><span class="screw" aria-hidden="true"></span></div>
+      <div class="secbody" data-reveal>
+        <p>Three installation paths are supplied. Select one at first commissioning; paths may coexist afterwards (a hosted inspection does not affect a self-hosted unit).</p>
+
+        <div class="proc">
+          <h3><span class="pno">PROCEDURE 2.1</span> — PRE-OPERATION INSPECTION, HOSTED DEMO (NO SETUP)</h3>
+          <ol class="steps">
+            <li><span class="st">STEP 1</span><p>Open the hosted demo console at <a href="https://api.skyulf.com">api.skyulf.com</a>. No signup and no installation are required.</p></li>
+            <li><span class="st">STEP 2</span><p>Walk the stations in order — sources, EDA, canvas, jobs, registry, deployments, drift — exactly as described in Section 3.</p></li>
+            <li><span class="st">STEP 3</span><p>To take ownership of a unit, proceed to Procedure 2.2 or 2.3.</p></li>
+          </ol>
+        </div>
+
+        <div class="proc">
+          <h3><span class="pno">PROCEDURE 2.2</span> — STANDALONE PYTHON OPERATION (skyulf-core)</h3>
+          <ol class="steps">
+            <li><span class="st">STEP 1</span><div><p>Install the independent package from the command line:</p>
+              <pre class="cmd"><code><span class="p">$</span> pip install skyulf-core</code></pre></div></li>
+            <li><span class="st">STEP 2</span><p>Import and operate it from scripts and notebooks. The package does not require the visual platform.</p></li>
+            <li><span class="st">STEP 3</span><p>Source and issue tracking: <a href="https://github.com/flyingriverhorse/Skyulf">github.com/flyingriverhorse/Skyulf</a>. Distributed under Apache-2.0.</p></li>
+          </ol>
+        </div>
+
+        <div class="proc">
+          <h3><span class="pno">PROCEDURE 2.3</span> — FULL SYSTEM SELF-HOST (DOCKER COMPOSE)</h3>
+          <ol class="steps">
+            <li><span class="st">STEP 1</span><div><p>Obtain the source:</p>
+              <pre class="cmd"><code><span class="p">$</span> git clone https://github.com/flyingriverhorse/Skyulf</code></pre></div></li>
+            <li><span class="st">STEP 2</span><div><p>Raise the stack with the shipped compose file:</p>
+              <pre class="cmd"><code><span class="p">$</span> docker compose up -d</code></pre></div></li>
+            <li><span class="st">STEP 3</span><p>Confirm background training transport: Celery with Redis for worker operation, or background threads where a broker is not wanted.</p></li>
+          </ol>
+        </div>
+
+        <div class="proc">
+          <h3><span class="pno">PROCEDURE 2.4</span> — DATABASE &amp; STORAGE PROVISIONING</h3>
+          <ol class="steps">
+            <li><span class="st">STEP 1</span><p>Start on SQLite. No external database is required at commissioning.</p></li>
+            <li><span class="st">STEP 2</span><p>At scale, point the system at PostgreSQL; no change to operating procedure follows.</p></li>
+            <li><span class="st">STEP 3</span><p>Select artifact storage: local filesystem or S3-compatible storage.</p></li>
+          </ol>
+        </div>
+
+        <div class="caut notice" role="note">
+          <span class="lab">NOTICE</span>
+          <p class="body"><b>Provisioning is a choice, not a tier.</b> SQLite to start, PostgreSQL at scale; local or S3-compatible storage. Both ends of each pair are supported as delivered.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SECTION 3 ================= -->
+    <section id="sec-3" aria-labelledby="h-sec3">
+      <div class="sechead"><span class="screw" aria-hidden="true"></span><h2 id="h-sec3"><span class="secno">SECTION 3</span>Operation</h2><span class="screw" aria-hidden="true"></span></div>
+      <div class="secbody">
+        <p data-reveal>Operate the stations in series. Figures 2 through 8 are plates of the system as built; leader-line tags identify the controls named in the text.</p>
+
+        <figure class="fig" id="fig-2" data-reveal>
+          <div class="plate">
+            <img src="../static/img/datasource.jpg" alt="Skyulf Data Sources screen: source ledger listing an uploaded CSV dataset with format badge, size, row and column counts, created date, and actions; Ingestion Jobs, Add Source and Upload File controls at top right.">
+            <svg class="leaders" aria-hidden="true">
+              <line x1="52%" y1="27%" x2="67%" y2="13%"/>
+              <line x1="80%" y1="27%" x2="91%" y2="12%"/>
+              <line x1="35%" y1="68%" x2="52%" y2="50%"/>
+            </svg>
+            <span class="dot" style="left:67%;top:13%"></span>
+            <span class="dot" style="left:91%;top:12%"></span>
+            <span class="dot" style="left:52%;top:50%"></span>
+            <span class="tags-row">
+              <span class="tag" style="left:52%;top:27%">INGESTION JOBS</span>
+              <span class="tag" style="left:80%;top:27%">UPLOAD / ADD SOURCE</span>
+              <span class="tag" style="left:35%;top:68%">SOURCE LEDGER + FORMAT BADGE</span>
+            </span>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 2</span><span class="ftx">INTAKE. Sources logged at the hopper — file uploads and S3-compatible storage — with ingestion jobs tracked to completion and each source badged by format.</span></figcaption>
+        </figure>
+
+        <figure class="fig" id="fig-3" data-reveal>
+          <div class="plate">
+            <img src="../static/img/eda/dashboardeda.jpg" alt="Automated EDA dashboard: profile totals for rows, columns, missing cells and duplicates; column-type donut split into categorical, numeric and text; top missing values bars; and a data quality alerts list flagging outliers and missing values per column.">
+            <svg class="leaders" aria-hidden="true">
+              <line x1="14%" y1="22%" x2="12%" y2="8%"/>
+              <line x1="25%" y1="62%" x2="25%" y2="42%"/>
+              <line x1="72%" y1="60%" x2="74%" y2="38%"/>
+              <line x1="30%" y1="72%" x2="30%" y2="84%"/>
+            </svg>
+            <span class="dot" style="left:12%;top:8%"></span>
+            <span class="dot" style="left:25%;top:42%"></span>
+            <span class="dot" style="left:74%;top:38%"></span>
+            <span class="dot" style="left:30%;top:84%"></span>
+            <span class="tags-row">
+              <span class="tag" style="left:14%;top:22%">PROFILE TOTALS</span>
+              <span class="tag" style="left:25%;top:62%">COLUMN TYPES</span>
+              <span class="tag" style="left:72%;top:60%">MISSING-VALUE SCAN</span>
+              <span class="tag" style="left:30%;top:72%">QUALITY ALERTS: OUTLIERS</span>
+            </span>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 3</span><span class="ftx">INSPECTION BENCH. Automated EDA runs on intake: statistical profiling, distributions, correlations, outliers, segmentation, causal discovery, and target analysis, with quality alerts raised without manual setup.</span></figcaption>
+        </figure>
+
+        <figure class="fig" id="fig-4" data-reveal>
+          <div class="plate">
+            <img src="../static/img/canvas.jpg" alt="Node canvas: left component palette of data source and preprocessing nodes; center canvas with dataset, drop columns, split, encoding and training nodes wired port-to-port by dashed edges; Jobs, Load, Save and Run Preview controls above; dataset schema inspector panel at right.">
+            <svg class="leaders" aria-hidden="true">
+              <line x1="15%" y1="66%" x2="15%" y2="47%"/>
+              <line x1="41%" y1="24%" x2="41%" y2="34%"/>
+              <line x1="47%" y1="52%" x2="47%" y2="41%"/>
+              <line x1="69%" y1="28%" x2="69%" y2="17%"/>
+              <line x1="88%" y1="74%" x2="88%" y2="62%"/>
+            </svg>
+            <span class="dot" style="left:15%;top:47%"></span>
+            <span class="dot" style="left:41%;top:34%"></span>
+            <span class="dot" style="left:47%;top:41%"></span>
+            <span class="dot" style="left:69%;top:17%"></span>
+            <span class="dot" style="left:88%;top:62%"></span>
+            <span class="tags-row">
+              <span class="tag" style="left:15%;top:66%">NODE PALETTE</span>
+              <span class="tag" style="left:41%;top:24%">NODE</span>
+              <span class="tag" style="left:47%;top:52%">EDGE, PORT-TO-PORT</span>
+              <span class="tag" style="left:69%;top:28%">RUN CONTROLS</span>
+              <span class="tag" style="left:88%;top:74%">SCHEMA INSPECTOR</span>
+            </span>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 4</span><span class="ftx">THE LINE. Node canvas: pipeline under construction — preprocessing, feature engineering, splitting, and modeling nodes wired port-to-port; schema inspector alongside.</span></figcaption>
+        </figure>
+
+        <figure class="fig" id="fig-5" data-reveal>
+          <div class="plate">
+            <img src="../static/img/jobs.jpg" alt="Jobs ledger: table of background training jobs with completed and failed status badges, job IDs, type, model details, duration, created time, and a view-details action per row.">
+            <svg class="leaders" aria-hidden="true">
+              <line x1="25%" y1="24%" x2="25%" y2="32%"/>
+              <line x1="35%" y1="44%" x2="35%" y2="32%"/>
+              <line x1="24%" y1="70%" x2="24%" y2="78%"/>
+            </svg>
+            <span class="dot" style="left:25%;top:32%"></span>
+            <span class="dot" style="left:35%;top:32%"></span>
+            <span class="dot" style="left:24%;top:78%"></span>
+            <span class="tags-row">
+              <span class="tag" style="left:25%;top:24%">STATUS BADGE</span>
+              <span class="tag" style="left:35%;top:44%">JOB ID</span>
+              <span class="tag" style="left:24%;top:70%">FAILED RUN — SEE SEC. 5</span>
+            </span>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 5</span><span class="ftx">DYNAMOMETER. Training runs in the background — Celery + Redis workers or background threads — with status, duration, and per-job detail on the ledger. A failed run is a diagnostic entry, not a mystery (Section 5).</span></figcaption>
+        </figure>
+
+        <figure class="fig" id="fig-6" data-reveal>
+          <div class="plate">
+            <img src="../static/img/experiments.jpg" alt="Experiments and Comparison screen: run list at left with completed badges; visual comparison tab with metric chips and train, test, validation toggles; grouped metric bar chart comparing selected runs.">
+            <svg class="leaders" aria-hidden="true">
+              <line x1="20%" y1="26%" x2="20%" y2="38%"/>
+              <line x1="58%" y1="44%" x2="58%" y2="53%"/>
+              <line x1="86%" y1="33%" x2="86%" y2="43%"/>
+            </svg>
+            <span class="dot" style="left:20%;top:38%"></span>
+            <span class="dot" style="left:58%;top:53%"></span>
+            <span class="dot" style="left:86%;top:43%"></span>
+            <span class="tags-row">
+              <span class="tag" style="left:20%;top:26%">RUN LIST</span>
+              <span class="tag" style="left:58%;top:44%">METRIC CHIPS</span>
+              <span class="tag" style="left:86%;top:33%">TRAIN / TEST / VALIDATION</span>
+            </span>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 6</span><span class="ftx">COMPARISON BENCH. Runs selected side by side; metrics and parameters compared across train, test, and validation splits before a model is sent to the registry.</span></figcaption>
+        </figure>
+
+        <figure class="fig" id="fig-7" data-reveal>
+          <div class="figrow">
+            <div class="plate">
+              <img src="../static/img/registry.jpg" alt="Model Registry screen: registered models table with model type, dataset, latest version chips, source, status, and deployment links; filters by model type and dataset.">
+              <svg class="leaders" aria-hidden="true">
+                <line x1="58%" y1="44%" x2="58%" y2="57%"/>
+                <line x1="88%" y1="60%" x2="88%" y2="71%"/>
+              </svg>
+              <span class="dot" style="left:58%;top:57%"></span>
+              <span class="dot" style="left:88%;top:71%"></span>
+              <span class="tags-row">
+                <span class="tag" style="left:58%;top:44%">VERSION LEDGER</span>
+                <span class="tag" style="left:88%;top:60%">DEPLOYMENT LINK</span>
+              </span>
+            </div>
+            <div class="plate">
+              <img src="../static/img/deployment.jpg" alt="Model Deployments screen: active deployment card naming the deployed model with job ID, deployed time, artifact URI and a deactivate control; deployment history table below.">
+              <svg class="leaders" aria-hidden="true">
+                <line x1="40%" y1="26%" x2="40%" y2="39%"/>
+                <line x1="42%" y1="68%" x2="45%" y2="58%"/>
+                <line x1="55%" y1="68%" x2="55%" y2="80%"/>
+              </svg>
+              <span class="dot" style="left:40%;top:39%"></span>
+              <span class="dot" style="left:45%;top:58%"></span>
+              <span class="dot" style="left:55%;top:80%"></span>
+              <span class="tags-row">
+                <span class="tag" style="left:40%;top:26%">ACTIVE DEPLOYMENT</span>
+                <span class="tag" style="left:42%;top:68%">ARTIFACT URI</span>
+                <span class="tag" style="left:55%;top:68%">DEPLOYMENT HISTORY</span>
+              </span>
+            </div>
+            <div class="plate">
+              <img src="../static/img/inference.jpg" alt="Model Inference screen: JSON input payload panel with run prediction control, active deployment summary, and prediction results panel.">
+              <svg class="leaders" aria-hidden="true">
+                <line x1="29%" y1="34%" x2="29%" y2="52%"/>
+                <line x1="43%" y1="76%" x2="43%" y2="90%"/>
+                <line x1="72%" y1="62%" x2="72%" y2="75%"/>
+              </svg>
+              <span class="dot" style="left:29%;top:52%"></span>
+              <span class="dot" style="left:43%;top:90%"></span>
+              <span class="dot" style="left:72%;top:75%"></span>
+              <span class="tags-row">
+                <span class="tag" style="left:29%;top:34%">JSON PAYLOAD</span>
+                <span class="tag" style="left:43%;top:76%">RUN PREDICTION</span>
+                <span class="tag" style="left:72%;top:62%">PREDICTION RESULTS</span>
+              </span>
+            </div>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 7</span><span class="ftx">REGISTRY &amp; DISPATCH. PLATE A — registered models ledgered by version. PLATE B — a version dispatched to active deployment with artifact URI and history. PLATE C — inference served against a JSON payload.</span></figcaption>
+        </figure>
+
+        <figure class="fig" id="fig-8" data-reveal>
+          <div class="plate">
+            <img src="../static/img/drift/drift.jpg" alt="Drift monitoring setup: step 1 selects a reference model from training jobs with reference data files listed; step 2 uploads production data, CSV or Parquet, and runs the analysis comparing reference versus current.">
+            <svg class="leaders" aria-hidden="true">
+              <line x1="25%" y1="16%" x2="25%" y2="6%"/>
+              <line x1="25%" y1="60%" x2="25%" y2="70%"/>
+              <line x1="83%" y1="70%" x2="83%" y2="84%"/>
+            </svg>
+            <span class="dot" style="left:25%;top:6%"></span>
+            <span class="dot" style="left:25%;top:70%"></span>
+            <span class="dot" style="left:83%;top:84%"></span>
+            <span class="tags-row">
+              <span class="tag" style="left:25%;top:16%">STEP 1 — REFERENCE (TRAINING JOB)</span>
+              <span class="tag" style="left:25%;top:60%">STEP 2 — PRODUCTION DATA</span>
+              <span class="tag" style="left:83%;top:70%">RUN ANALYSIS</span>
+            </span>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 8</span><span class="ftx">GAUGE HOUSE, SETUP. A training job is pinned as reference; production data is loaded against it; the analysis compares reference versus current. The report it produces is FIG. 9, PLATE C.</span></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- ================= SECTION 4 ================= -->
+    <section id="sec-4" aria-labelledby="h-sec4">
+      <div class="sechead"><span class="screw" aria-hidden="true"></span><h2 id="h-sec4"><span class="secno">SECTION 4</span>Two Control Modes</h2><span class="screw" aria-hidden="true"></span></div>
+      <div class="secbody" data-reveal>
+        <p>One machine, two control stands. Both are first-class; neither is a wrapper for the other.</p>
+        <div class="modes">
+          <div class="mode a">
+            <h3>MODE A — VISUAL CONSOLE</h3>
+            <div class="inner">
+              <p>The self-hosted node-canvas platform. The whole line of Section 3 is driven from one console:</p>
+              <ul>
+                <li>Drag nodes from the palette; wire ports on the canvas.</li>
+                <li>Run previews and background training from the run controls.</li>
+                <li>Compare experiments, ledger models in the registry, dispatch deployments, serve inference.</li>
+                <li>Read drift, audit, and diagnostic instruments without leaving the console.</li>
+              </ul>
+              <pre class="cmd"><code><span class="c"># inspect a live unit, no signup</span>
+<span class="p">&gt;</span> https://api.skyulf.com
+<span class="c"># or commission your own</span>
+<span class="p">$</span> docker compose up -d</code></pre>
+              <div class="foot"><span><a href="https://api.skyulf.com">HOSTED DEMO</a></span><span><a href="https://github.com/flyingriverhorse/Skyulf">SOURCE</a></span></div>
+            </div>
+          </div>
+          <div class="mode b">
+            <h3>MODE B — skyulf-core COMMAND OPERATION</h3>
+            <div class="inner">
+              <p>The independent Apache-2.0 Python package. The same lifecycle, operated from scripts and notebooks:</p>
+              <ul>
+                <li>Install standalone; no console, no server required.</li>
+                <li>Drive exploration, pipelines, training, and comparison in code.</li>
+                <li>Compose with your own tooling — it is a package, not a platform lock.</li>
+                <li>Runs in notebooks today and in CI tomorrow, unchanged.</li>
+              </ul>
+              <pre class="cmd"><code><span class="p">$</span> pip install skyulf-core
+<span class="c"># operate from scripts / notebooks;
+# package docs and issues live in the repo</span>
+<span class="p">&gt;</span> github.com/flyingriverhorse/Skyulf</code></pre>
+              <div class="foot"><span><a href="https://github.com/flyingriverhorse/Skyulf">REPOSITORY</a></span><span>APACHE-2.0</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="proc">
+          <h3><span class="pno">SERVICE PROCEDURE 4.3</span> — REMOVING THE ASSEMBLY: YOUR WORKFLOW LEAVES AS A STANDARD NOTEBOOK</h3>
+          <ol class="steps">
+            <li><span class="st">STEP 1</span><p>At the visual console, call the export control for the workflow on the canvas.</p></li>
+            <li><span class="st">STEP 2</span><p>Select the form: <b>FULL</b> (the complete workflow) or <b>COMPACT</b>.</p></li>
+            <li><span class="st">STEP 3</span><p>The workflow leaves as a standard Jupyter notebook. It is now ordinary code artifact: version it, share it, run it anywhere notebooks run.</p></li>
+          </ol>
+        </div>
+
+        <div class="caut caution" role="note">
+          <div class="band" aria-hidden="true"></div>
+          <span class="lab">CAUTION</span>
+          <p class="body"><b>No black-box lock-in.</b> Work authored on the visual line is never trapped in the canvas. Export any workflow as a standard Jupyter notebook — full or compact — at any time, and operate it outside Skyulf. A machine you cannot carry out of the shop is not yours.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SECTION 5 ================= -->
+    <section id="sec-5" aria-labelledby="h-sec5">
+      <div class="sechead"><span class="screw" aria-hidden="true"></span><h2 id="h-sec5"><span class="secno">SECTION 5</span>Maintenance &amp; Diagnostics</h2><span class="screw" aria-hidden="true"></span></div>
+      <div class="secbody">
+        <p data-reveal>The system ships its own instruments: an error log with severities and tracebacks, slow-node runtime analysis, drift reports with per-column distance metrics, and an audit history of changes. Use them before touching the line.</p>
+
+        <figure class="fig" id="fig-9" data-reveal>
+          <div class="figrow">
+            <div class="plate">
+              <img src="../static/img/errors.jpg" alt="Error log: counters for HTTP events, server errors and pipeline failures; errors-per-hour chart; event table with severity badges, codes, messages, target node links, resolve actions and traceback links.">
+              <svg class="leaders" aria-hidden="true">
+                <line x1="26%" y1="56%" x2="26%" y2="67%"/>
+                <line x1="94%" y1="80%" x2="94%" y2="91%"/>
+                <line x1="85%" y1="28%" x2="85%" y2="17%"/>
+              </svg>
+              <span class="dot" style="left:26%;top:67%"></span>
+              <span class="dot" style="left:94%;top:91%"></span>
+              <span class="dot" style="left:85%;top:17%"></span>
+              <span class="tags-row">
+                <span class="tag" style="left:26%;top:56%">SEVERITY + CODE</span>
+                <span class="tag" style="left:94%;top:80%">TRACEBACK</span>
+                <span class="tag" style="left:85%;top:28%">PIPELINE FAILURES</span>
+              </span>
+            </div>
+            <div class="plate">
+              <img src="../static/img/slow_nodes.jpg" alt="Slow nodes diagnostics: window and top-N selectors; aggregate counters; total-time-by-step-type bar chart on a log scale; per-step table with runs, total, average, p95, max, share, and an investigate action.">
+              <svg class="leaders" aria-hidden="true">
+                <line x1="30%" y1="22%" x2="30%" y2="12%"/>
+                <line x1="55%" y1="26%" x2="55%" y2="38%"/>
+                <line x1="92%" y1="64%" x2="92%" y2="75%"/>
+              </svg>
+              <span class="dot" style="left:30%;top:12%"></span>
+              <span class="dot" style="left:55%;top:38%"></span>
+              <span class="dot" style="left:92%;top:75%"></span>
+              <span class="tags-row">
+                <span class="tag" style="left:30%;top:22%">WINDOW / TOP-N</span>
+                <span class="tag" style="left:55%;top:26%">RUNTIME BY STEP TYPE</span>
+                <span class="tag" style="left:92%;top:64%">INVESTIGATE</span>
+              </span>
+            </div>
+            <div class="plate">
+              <img src="../static/img/drift/drift_report.jpg" alt="Drift report: drifted-column verdict badge, new-columns alert, per-column table of Wasserstein, PSI, KL divergence and KS p-value with stable statuses, and an expanded distribution comparison chart of current production data against the training reference.">
+              <svg class="leaders" aria-hidden="true">
+                <line x1="7%" y1="18%" x2="7%" y2="9%"/>
+                <line x1="55%" y1="18%" x2="55%" y2="28%"/>
+                <line x1="45%" y1="34%" x2="45%" y2="43%"/>
+              </svg>
+              <span class="dot" style="left:7%;top:9%"></span>
+              <span class="dot" style="left:55%;top:28%"></span>
+              <span class="dot" style="left:45%;top:43%"></span>
+              <span class="tags-row">
+                <span class="tag" style="left:7%;top:18%">DRIFT VERDICT</span>
+                <span class="tag" style="left:55%;top:18%">WASSERSTEIN / PSI / KL / KS</span>
+                <span class="tag" style="left:45%;top:34%">DISTRIBUTION COMPARISON</span>
+              </span>
+            </div>
+          </div>
+          <figcaption class="platecap"><span class="fno">FIG. 9</span><span class="ftx">DIAGNOSTIC INSTRUMENTS. PLATE A — error log with severities, tracebacks, and resolve actions. PLATE B — slow-node runtime analysis by step type. PLATE C — drift report: per-column distances and distribution comparison, reference versus production.</span></figcaption>
+        </figure>
+
+        <div class="tscroll" data-reveal>
+        <table class="m faults">
+          <thead><tr><th>FAULT</th><th>PROBABLE CAUSE</th><th>REMEDY</th></tr></thead>
+          <tbody>
+            <tr><td>Training job halts; ledger reads Failed.</td><td>Node-level failure during a pipeline run.</td><td>Open the job detail; pull severity and traceback from the error log (FIG. 9-A); correct the node; re-run.</td></tr>
+            <tr><td>Pipeline slower than specified.</td><td>One step type absorbing runtime out of proportion to its share.</td><td>Open slow nodes (FIG. 9-B); rank step types by total and p95 over the window; optimize or re-split the line.</td></tr>
+            <tr><td>Deployed model disagrees with training-time behavior.</td><td>Production data has drifted from the training reference.</td><td>Run a drift report (FIG. 9-C); read per-column Wasserstein, PSI, KL divergence, and KS p-value; retrain from the registry against fresh data.</td></tr>
+            <tr><td>Operator cannot determine what changed.</td><td>Multiple sessions edited workflows or deployments.</td><td>Consult the audit history; changes are recorded; deployment history names what shipped and when.</td></tr>
+            <tr><td>Workflow must leave the platform.</td><td>Portability requirement; external review or tooling.</td><td>Execute Service Procedure 4.3; the workflow departs as a standard Jupyter notebook, full or compact.</td></tr>
+          </tbody>
+        </table>
+        </div>
+
+        <div class="caut caution" role="note" data-reveal>
+          <div class="band" aria-hidden="true"></div>
+          <span class="lab">CAUTION</span>
+          <p class="body"><b>Diagnose before re-running.</b> Audit history, job diagnostics, and drift reports are fitted as standard. A re-run without a reading wastes the instrument and the hour.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= APPENDIX A ================= -->
+    <section id="appendix-a" aria-labelledby="h-appa">
+      <div class="sechead"><span class="screw" aria-hidden="true"></span><h2 id="h-appa"><span class="secno">APPENDIX A</span>Specifications</h2><span class="screw" aria-hidden="true"></span></div>
+      <div class="secbody" data-reveal>
+        <div class="tscroll">
+        <table class="m spec">
+          <tbody>
+            <tr><td>FORMATS IN</td><td>CSV, Excel, JSON, Parquet; S3-compatible storage</td></tr>
+            <tr><td>AUTOMATED EDA</td><td>Statistical profiling, distributions, correlations, outliers, segmentation, causal discovery, target analysis</td></tr>
+            <tr><td>PIPELINE NODES</td><td>Preprocessing, feature engineering, splitting, modeling</td></tr>
+            <tr><td>TRAINING EXECUTION</td><td>Background via Celery + Redis, or background threads</td></tr>
+            <tr><td>COMPARISON &amp; REGISTRY</td><td>Experiment comparison across train/test/validation; model registry with version ledger</td></tr>
+            <tr><td>DEPLOYMENT</td><td>Active deployment with artifact URI, deployment history, inference on JSON payload</td></tr>
+            <tr><td>MONITORING</td><td>Drift monitoring (Wasserstein, PSI, KL divergence, KS p-value), audit history, error log, slow-node diagnostics</td></tr>
+            <tr><td>EXPORT</td><td>Jupyter notebook, full or compact</td></tr>
+            <tr><td>DATABASE</td><td>SQLite to start; PostgreSQL at scale</td></tr>
+            <tr><td>STORAGE</td><td>Local filesystem or S3-compatible</td></tr>
+            <tr><td>LICENSE</td><td>Apache-2.0 (skyulf-core)</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="tscroll">
+        <table class="m entrypoints">
+          <thead><tr><th>ENTRY POINT</th><th>REFERENCE</th><th>NOTE</th></tr></thead>
+          <tbody>
+            <tr><td>HOSTED DEMO</td><td><a href="https://api.skyulf.com">https://api.skyulf.com</a></td><td>No signup; live inspection</td></tr>
+            <tr><td>PYTHON PACKAGE</td><td><span class="inline">pip install skyulf-core</span></td><td>Independent; scripts and notebooks</td></tr>
+            <tr><td>SOURCE REPOSITORY</td><td><a href="https://github.com/flyingriverhorse/Skyulf">https://github.com/flyingriverhorse/Skyulf</a></td><td>Issues, docs, releases</td></tr>
+            <tr><td>SELF-HOST</td><td><span class="inline">docker compose up -d</span></td><td>Compose file shipped in repo</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="hazardband" aria-hidden="true"></div>
+    <div class="in">
+      <div>
+        <h2>END OF MANUAL</h2>
+        <p>SKYULF — ML LIFECYCLE SYSTEM. Operator's Manual SUL-OM-27, Rev C. This manual ships with the machine: a self-hosted visual node-canvas platform and the independent Apache-2.0 package <span class="inline">skyulf-core</span>, one lifecycle, two control stands.</p>
+        <p style="margin-top:10px">Data in at the hopper; decisions out at dispatch; gauges on everything between. Infrastructure you own and operate — documented, not decked.</p>
+      </div>
+      <div>
+        <h2>REFERENCES</h2>
+        <p><a href="https://api.skyulf.com">Hosted demo — no signup</a><br>
+        <a href="https://github.com/flyingriverhorse/Skyulf">github.com/flyingriverhorse/Skyulf</a><br>
+        <span class="inline">pip install skyulf-core</span><br>
+        <span class="inline">docker compose up -d</span></p>
+      </div>
+    </div>
+    <div class="end">SUL-OM-27 · REV C · SKYULF ML LIFECYCLE SYSTEM · APACHE-2.0 (skyulf-core)</div>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var rm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (rm) { return; } /* visible by default; no motion */
+  document.documentElement.classList.add('js');
+
+  /* date of issue */
+  var t = document.getElementById('issue-date');
+  if (t) { t.textContent = new Date().toISOString().slice(0,10); }
+
+  /* FIG.1 exploded view assembles on load */
+  function assemble(){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ document.documentElement.classList.add('assembled'); });
+    });
+  }
+  if (document.readyState === 'complete') { assemble(); }
+  else { window.addEventListener('load', assemble); }
+
+  /* intersection reveals */
+  var els = document.querySelectorAll('[data-reveal]');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+    els.forEach(function(el){ io.observe(el); });
+  } else {
+    els.forEach(function(el){ el.classList.add('in-view'); });
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf Kursbuch — the ML lifecycle as a timetable</title>
+<meta name="description" content="Skyulf connects the ML lifecycle — data exploration, pipelines, training, comparison, deployment, monitoring. Two lines serve the whole network: the self-hosted visual node-canvas platform (LINE V) and the independent Apache-2.0 Python package skyulf-core (LINE C).">
+<meta name="color-scheme" content="light">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23EB0000'/%3E%3Crect y='15' width='32' height='2' fill='%23121212'/%3E%3Crect x='6' y='6' width='20' height='8' fill='%23FFFFFF'/%3E%3Crect x='6' y='18' width='20' height='8' fill='%23FFFFFF'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ================================================================
+   SKYULF KURSBUCH · v26 · seed e6d43b02
+   Palette: paper #FFFFFF · ink #121212 · signal red #EB0000. Nothing else.
+   Type: Barlow + Barlow Condensed. Tabular numerals for order/time.
+   ================================================================ */
+:root{
+  --paper:#FFFFFF;
+  --ink:#121212;
+  --red:#EB0000;
+  --rule:3px;
+  --w:1180px;
+  --body:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --disp:'Barlow Condensed','Arial Narrow',sans-serif;
+  --mono:ui-monospace,'Cascadia Mono','SF Mono',Consolas,Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;caret-color:var(--red);scrollbar-color:var(--red) var(--paper);}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto;}}
+body{
+  font-family:var(--body);font-weight:400;font-size:1rem;line-height:1.5;
+  color:var(--ink);background:var(--paper);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+::selection{background:var(--red);color:var(--paper);}
+::-webkit-scrollbar{width:13px;height:13px;}
+::-webkit-scrollbar-track{background:var(--paper);}
+::-webkit-scrollbar-thumb{background:var(--red);border:3px solid var(--paper);}
+a{color:inherit;}
+:focus-visible{outline:3px solid var(--red);outline-offset:2px;}
+.on-ink :focus-visible,.on-red :focus-visible{outline-color:var(--paper);}
+.skip{
+  position:absolute;left:-9999px;top:0;z-index:99;
+  background:var(--red);color:var(--paper);padding:.8rem 1.4rem;
+  font:600 1rem var(--disp);letter-spacing:.08em;text-transform:uppercase;text-decoration:none;
+}
+.skip:focus{left:0;}
+.wrap{max-width:var(--w);margin:0 auto;padding-left:clamp(1rem,4vw,2.5rem);padding-right:clamp(1rem,4vw,2.5rem);}
+.tnum{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;}
+code,.cmd{font-family:var(--mono);font-size:.92em;letter-spacing:0;}
+.visually-hidden{
+  position:absolute!important;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
+}
+/* ---------- reveal (visible by default; only animates when JS present) ---------- */
+html.js [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .55s ease,transform .55s ease;}
+html.js [data-reveal].is-in{opacity:1;transform:none;}
+@media (prefers-reduced-motion:reduce){
+  html.js [data-reveal]{opacity:1!important;transform:none!important;transition:none!important;}
+  *,*::before,*::after{animation:none!important;transition:none!important;}
+}
+/* ---------- pictograms: white geometric glyphs on ink plates ---------- */
+.picto{display:inline-block;width:58px;height:58px;background:var(--ink);color:var(--paper);flex:none;}
+.picto svg{display:block;width:100%;height:100%;}
+.picto--red{background:var(--red);}
+
+/* ================================================================
+   MASTHEAD — the Kursbuch strip
+   ================================================================ */
+.masthead{background:var(--ink);color:var(--paper);border-bottom:6px solid var(--red);}
+.mast-row{display:grid;grid-template-columns:1fr auto;align-items:center;gap:1.5rem;padding-top:1.6rem;padding-bottom:1.6rem;}
+.mast-id{display:flex;align-items:center;gap:1.1rem;min-width:0;}
+.mast-logo{width:52px;height:52px;flex:none;border:2px solid var(--paper);display:grid;place-items:center;background:var(--ink);}
+.mast-logo img{width:38px;height:38px;display:block;}
+.mast-titles h1{
+  font:700 clamp(2.5rem,6vw,4.2rem)/0.92 var(--disp);
+  text-transform:uppercase;letter-spacing:.015em;
+}
+.mast-titles h1 .mast-red{color:var(--red);}
+.mast-sub{font:500 .95rem/1.35 var(--body);opacity:.9;max-width:52ch;margin-top:.45rem;}
+.mast-meta{display:flex;align-items:center;gap:1.4rem;}
+.sheet{
+  background:var(--red);color:var(--paper);padding:.65rem .95rem;text-align:center;
+  font:700 1rem/1.05 var(--disp);text-transform:uppercase;letter-spacing:.06em;min-width:86px;
+}
+.sheet strong{display:block;font-size:2rem;line-height:1;}
+.clock{text-align:right;}
+.clock-time{display:block;font:700 2rem/1 var(--disp);letter-spacing:.06em;}
+.clock-cap{display:block;font:500 .68rem var(--body);text-transform:uppercase;letter-spacing:.16em;opacity:.85;margin-top:.3rem;}
+.mast-strip{border-top:1px solid rgba(255,255,255,.35);}
+.mast-strip-in{display:flex;align-items:center;gap:1.6rem;flex-wrap:wrap;padding-top:.75rem;padding-bottom:.75rem;font:600 .85rem var(--body);}
+.mast-strip nav{display:flex;gap:1.4rem;flex-wrap:wrap;}
+.mast-strip nav a{color:var(--paper);text-decoration:none;text-transform:uppercase;letter-spacing:.08em;font:600 .8rem var(--disp);}
+.mast-strip nav a:hover{color:var(--red);}
+.chip{display:inline-flex;align-items:center;gap:.5rem;text-transform:uppercase;letter-spacing:.08em;font:600 .78rem var(--disp);}
+.chip .sq{width:14px;height:14px;display:inline-block;}
+.chip--v .sq{background:var(--paper);}
+.chip--c .sq{background:var(--red);}
+.mast-strip .chip{opacity:.95;}
+
+/* ================================================================
+   DEPARTURE TABLE — the hero is the table
+   ================================================================ */
+.departure{border-bottom:var(--rule) solid var(--ink);}
+.departure .wrap{padding-top:clamp(2rem,5vw,3.5rem);padding-bottom:clamp(2rem,5vw,3.5rem);}
+.tableframe{position:relative;border:var(--rule) solid var(--ink);background:var(--paper);}
+table.timetable{width:100%;border-collapse:collapse;table-layout:fixed;}
+.timetable caption{
+  caption-side:top;text-align:left;background:var(--red);color:var(--paper);
+  padding:1.1rem 1.4rem;border-bottom:var(--rule) solid var(--ink);
+}
+.cap-main{display:block;font:700 clamp(1.5rem,3.2vw,2.3rem)/1 var(--disp);text-transform:uppercase;letter-spacing:.02em;}
+.cap-sub{display:block;font:500 .88rem/1.4 var(--body);margin-top:.45rem;opacity:.96;}
+.timetable thead th{
+  background:var(--ink);color:var(--paper);text-align:left;
+  font:600 .78rem var(--body);text-transform:uppercase;letter-spacing:.16em;
+  padding:.85rem 1.1rem;border-bottom:var(--rule) solid var(--ink);
+}
+.timetable tbody th,.timetable tbody td{
+  padding:1.05rem 1.1rem;border-bottom:2px solid var(--ink);vertical-align:middle;text-align:left;
+}
+.timetable tbody tr:last-child th,.timetable tbody tr:last-child td{border-bottom:none;}
+.col-stage{width:22%;}
+.col-order{width:11%;}
+.col-platform{width:22%;}
+.st-name{font:700 1.5rem/1 var(--disp);text-transform:uppercase;letter-spacing:.02em;display:block;}
+.st-code{font:600 .74rem var(--body);text-transform:uppercase;letter-spacing:.22em;opacity:.75;display:block;margin-top:.35rem;}
+.st-platform{font:600 1.02rem/1.25 var(--body);}
+.st-remarks{font-size:.94rem;line-height:1.45;}
+.cell-order{text-align:center;}
+.flap{
+  position:relative;display:inline-block;width:3.1rem;height:2.5rem;line-height:2.5rem;
+  font:700 1.5rem var(--disp);letter-spacing:.04em;text-align:center;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;
+}
+.flap::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(18,18,18,.35);pointer-events:none;}
+.flap-val{display:block;width:100%;height:100%;}
+.flap-card{position:absolute;inset:0;pointer-events:none;z-index:2;}
+.fh{position:absolute;left:0;right:0;height:50%;overflow:hidden;display:block;}
+.fh span{position:absolute;left:0;right:0;height:2.5rem;line-height:2.5rem;text-align:center;display:block;}
+.fh-top{top:0;transform-origin:50% 100%;background:var(--red);color:var(--paper);}
+.fh-top span{top:0;}
+.fh-bot{bottom:0;transform-origin:50% 0;background:var(--red);color:var(--paper);transform:rotateX(90deg);}
+.fh-bot span{bottom:0;}
+.flap.flapping .flap-val{visibility:hidden;}
+.flap.flapping::after{background:rgba(255,255,255,.4);}
+.fh-top.fold{animation:foldTop .16s ease-in forwards;}
+.fh-bot.unfold{animation:foldBot .16s ease-out .16s forwards;}
+@keyframes foldTop{to{transform:rotateX(-90deg);}}
+@keyframes foldBot{from{transform:rotateX(90deg);}to{transform:rotateX(0deg);}}
+tr.is-current .cell-order{background:var(--red);}
+tr.is-current .flap{color:var(--paper);}
+tr.is-current .flap::after{background:rgba(255,255,255,.45);}
+tr.is-current>th,tr.is-current>td{box-shadow:inset 8px 0 0 var(--red);}
+@media (hover:hover){.timetable tbody tr:hover:not(.is-current)>th,.timetable tbody tr:hover:not(.is-current)>td{background:rgba(18,18,18,.045);}}
+.nowline{
+  position:absolute;left:-3px;right:-3px;height:3px;background:var(--red);z-index:3;pointer-events:none;
+  transition:top .6s cubic-bezier(.6,0,.2,1);
+}
+.nowline .now-tag{
+  position:absolute;left:0;top:-10px;display:inline-flex;align-items:center;
+  background:var(--red);color:var(--paper);padding:.15rem .5rem .15rem .3rem;
+  font:700 .7rem/1 var(--disp);letter-spacing:.14em;
+}
+.nowline .now-tag::before{content:"";width:.7rem;height:.7rem;background:var(--paper);margin-right:.35rem;}
+.table-note{margin-top:1.1rem;font-size:.9rem;line-height:1.5;max-width:80ch;}
+.table-note b{font-weight:600;}
+
+/* ================================================================
+   LINES — two equal ways to ride
+   ================================================================ */
+.lines{border-bottom:var(--rule) solid var(--ink);}
+.lines .wrap{padding-top:clamp(2.2rem,5vw,3.8rem);padding-bottom:clamp(2.2rem,5vw,3.8rem);}
+.lines>header>h2,.ops h2,.stations-head h2,.closing h2{
+  font:700 clamp(2.1rem,4.6vw,3.3rem)/0.98 var(--disp);text-transform:uppercase;letter-spacing:.015em;
+}
+.lines-lede{margin-top:.9rem;max-width:74ch;font-size:1.02rem;line-height:1.55;}
+.lines-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.6rem,3vw,2.8rem);margin-top:clamp(1.8rem,4vw,2.8rem);}
+.line{border:var(--rule) solid var(--ink);display:flex;flex-direction:column;background:var(--paper);}
+.line-head{padding:1.3rem 1.5rem;display:flex;align-items:center;gap:1.2rem;}
+.line--v .line-head{background:var(--ink);color:var(--paper);}
+.line--c .line-head{background:var(--red);color:var(--paper);}
+.line-badge{
+  width:56px;height:56px;flex:none;display:grid;place-items:center;
+  font:700 2rem/1 var(--disp);border:3px solid var(--paper);
+}
+.line--v .line-badge{background:var(--paper);color:var(--ink);}
+.line--c .line-badge{background:var(--paper);color:var(--red);}
+.line-name{font:700 1.65rem/1 var(--disp);text-transform:uppercase;letter-spacing:.02em;display:block;}
+.line-kind{font:500 .85rem/1.35 var(--body);display:block;margin-top:.3rem;opacity:.94;}
+.line-body{padding:1.5rem;display:flex;flex-direction:column;gap:1.3rem;flex:1;}
+.line-route{border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);padding:1.15rem .3rem;}
+.line-route ol{list-style:none;display:flex;align-items:center;flex-wrap:wrap;}
+.line-route li{display:flex;align-items:center;}
+.stop{
+  font:600 .8rem var(--body);letter-spacing:.14em;text-transform:uppercase;
+  padding:.3rem .15rem;white-space:nowrap;
+}
+.track{width:16px;height:4px;flex:none;}
+.line--v .track{background:var(--ink);}
+.line--c .track{background:var(--red);}
+.line-route li:last-child .track{display:none;}
+.line-copy{font-size:.97rem;line-height:1.55;}
+.board-label{font:600 .8rem var(--body);text-transform:uppercase;letter-spacing:.18em;}
+.board-actions{display:flex;flex-direction:column;gap:.8rem;align-items:flex-start;margin-top:.6rem;}
+.btn{
+  display:inline-block;text-decoration:none;text-align:center;
+  font:600 1.02rem/1.1 var(--disp);text-transform:uppercase;letter-spacing:.07em;
+  padding:.95rem 1.35rem;border:3px solid var(--ink);
+}
+.line--v .btn{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.line--v .btn:hover{background:var(--red);border-color:var(--red);}
+.line--c .btn{background:var(--red);color:var(--paper);border-color:var(--red);}
+.line--c .btn:hover{background:var(--ink);border-color:var(--ink);}
+.board-code{
+  font-family:var(--mono);font-size:1rem;background:var(--paper);
+  border:3px solid var(--ink);padding:.85rem 1rem;width:100%;max-width:100%;overflow-x:auto;
+}
+.line--c .board-code{border-color:var(--red);}
+.board-note{font-size:.88rem;line-height:1.5;opacity:.95;}
+.interchange{border:var(--rule) solid var(--ink);margin-top:clamp(1.6rem,3vw,2.4rem);display:grid;grid-template-columns:auto 1fr;align-items:center;gap:1.2rem;padding:1.1rem 1.4rem;}
+.interchange .picto{width:52px;height:52px;}
+.interchange p{font-size:.98rem;line-height:1.5;}
+.interchange b{font-weight:600;}
+.network-strip{margin-top:clamp(1.6rem,3vw,2.4rem);background:var(--ink);color:var(--paper);border:var(--rule) solid var(--ink);padding:1.3rem 1.5rem;display:flex;flex-wrap:wrap;gap:1rem 2.2rem;align-items:baseline;}
+.network-strip .net-label{font:700 1.25rem/1 var(--disp);text-transform:uppercase;letter-spacing:.04em;color:var(--red);flex-basis:100%;}
+.network-strip span{font-size:.95rem;line-height:1.45;}
+.network-strip code{color:var(--paper);}
+
+/* ================================================================
+   STATIONS — eight spreads
+   ================================================================ */
+.stations-head{padding-top:clamp(2.4rem,5vw,4rem);}
+.stations-lede{margin-top:.9rem;max-width:74ch;font-size:1.02rem;line-height:1.55;}
+.station{border-top:var(--rule) solid var(--ink);padding-top:clamp(2rem,4.5vw,3.2rem);padding-bottom:clamp(2rem,4.5vw,3.2rem);}
+.station-grid{display:grid;grid-template-columns:5fr 7fr;gap:clamp(1.8rem,4vw,3.5rem);align-items:start;}
+.station--flip .station-grid{grid-template-columns:7fr 5fr;}
+.station--flip .station-copy{order:2;}
+.station--flip .station-photo{order:1;}
+.station-kicker{display:flex;align-items:baseline;gap:1rem;}
+.station-idx{font:700 1.1rem/1 var(--disp);color:var(--red);letter-spacing:.1em;font-variant-numeric:tabular-nums;}
+.station h3{font:700 clamp(2.6rem,6vw,4.3rem)/0.95 var(--disp);text-transform:uppercase;letter-spacing:.01em;}
+.station-code{
+  display:inline-block;margin-top:.7rem;border:2px solid var(--ink);padding:.2rem .55rem;
+  font:600 .74rem var(--body);letter-spacing:.26em;
+}
+.station-copy p{margin-top:1.1rem;font-size:1rem;line-height:1.6;max-width:52ch;}
+.station-facts{list-style:none;margin-top:1.3rem;border-top:2px solid var(--ink);}
+.station-facts li{padding:.6rem 0 .6rem 1.6rem;position:relative;border-bottom:2px solid var(--ink);font-size:.95rem;line-height:1.45;}
+.station-facts li::before{content:"";position:absolute;left:0;top:.98em;width:.8rem;height:3px;background:var(--red);}
+.station-photo{min-width:0;}
+.signbar{
+  background:var(--red);color:var(--paper);display:flex;justify-content:space-between;align-items:center;
+  gap:1rem;padding:.6rem 1rem;border:3px solid var(--ink);border-bottom:none;
+  font:600 .85rem/1.2 var(--disp);text-transform:uppercase;letter-spacing:.1em;
+}
+.signbar b{font-weight:700;}
+.photo{border:3px solid var(--ink);background:var(--paper);}
+.photo img{display:block;width:100%;height:auto;}
+.photo--wide img{aspect-ratio:2.37/1;object-fit:cover;object-position:top center;}
+.photo--box img{aspect-ratio:16/10;object-fit:cover;object-position:top center;}
+.photo-cap{border:3px solid var(--ink);border-top:none;padding:.55rem 1rem;font-size:.82rem;line-height:1.4;letter-spacing:.02em;background:var(--paper);}
+
+/* ================================================================
+   OPERATIONS — night service, ink ground
+   ================================================================ */
+.ops{background:var(--ink);color:var(--paper);border-top:6px solid var(--red);}
+.ops .wrap{padding-top:clamp(2.4rem,5vw,4rem);padding-bottom:clamp(2.4rem,5vw,4rem);}
+.ops-lede{margin-top:.9rem;max-width:74ch;font-size:1.02rem;line-height:1.55;opacity:.95;}
+.ops-item{border-top:2px solid rgba(255,255,255,.4);margin-top:clamp(2rem,4vw,3rem);padding-top:clamp(2rem,4vw,3rem);}
+.ops-item h3{font:700 clamp(1.7rem,3.4vw,2.4rem)/1 var(--disp);text-transform:uppercase;letter-spacing:.02em;margin-top:1rem;}
+.ops-item .ops-sub{font:600 .78rem var(--body);text-transform:uppercase;letter-spacing:.2em;color:var(--red);margin-top:.5rem;}
+.ops-item p{margin-top:1rem;font-size:1rem;line-height:1.6;max-width:70ch;}
+.ops-item p code{background:var(--paper);color:var(--ink);padding:.06rem .35rem;}
+.ops-night{display:grid;grid-template-columns:auto 1fr;gap:clamp(1.4rem,3vw,2.4rem);align-items:start;}
+.ops-night .picto{width:76px;height:76px;background:var(--paper);color:var(--ink);}
+.ops-inspect{display:grid;grid-template-columns:7fr 5fr;gap:clamp(1.8rem,4vw,3rem);align-items:start;}
+.ops-inspect .ops-photo{border:3px solid var(--paper);}
+.ops-inspect .ops-photo img{display:block;width:100%;height:auto;aspect-ratio:2.68/1;object-fit:cover;object-position:top center;}
+.ops-log{display:grid;grid-template-columns:5fr 7fr;gap:clamp(1.8rem,4vw,3rem);align-items:start;}
+table.log{width:100%;border-collapse:collapse;}
+.log caption{caption-side:top;text-align:left;font:600 .78rem var(--body);text-transform:uppercase;letter-spacing:.18em;padding-bottom:.8rem;color:var(--paper);opacity:.9;}
+.log th,.log td{border:2px solid rgba(255,255,255,.4);padding:.7rem .9rem;text-align:left;font-size:.92rem;line-height:1.4;vertical-align:top;}
+.log thead th{background:var(--red);color:var(--paper);border-color:var(--red);font:600 .74rem var(--body);text-transform:uppercase;letter-spacing:.14em;}
+.log tbody th{font-weight:600;white-space:nowrap;}
+
+/* ================================================================
+   CLOSING — red ground, white type
+   ================================================================ */
+.closing{background:var(--red);color:var(--paper);border-top:var(--rule) solid var(--ink);}
+.closing .wrap{padding-top:clamp(2.6rem,6vw,4.5rem);padding-bottom:clamp(2.6rem,6vw,4.5rem);}
+.closing-lede{margin-top:1rem;font-size:1.1rem;line-height:1.55;max-width:70ch;}
+.closing-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.4rem,3vw,2.4rem);margin-top:clamp(2rem,4vw,3rem);}
+.board-card{border:3px solid var(--paper);padding:1.5rem;display:flex;flex-direction:column;gap:1rem;align-items:flex-start;}
+.board-card h3{font:700 1.9rem/1 var(--disp);text-transform:uppercase;letter-spacing:.02em;display:flex;align-items:center;gap:.8rem;}
+.board-card h3 .sq{width:20px;height:20px;background:var(--paper);flex:none;}
+.board-card p{font-size:.98rem;line-height:1.55;}
+.board-card .btn{background:var(--paper);color:var(--red);border-color:var(--paper);}
+.board-card .btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.board-card code{background:var(--paper);color:var(--red);padding:.5rem .7rem;font-size:1rem;display:inline-block;}
+.closing-net{margin-top:clamp(1.4rem,3vw,2.4rem);border:3px solid var(--paper);padding:1.5rem;}
+.closing-net h3{font:700 1.9rem/1 var(--disp);text-transform:uppercase;letter-spacing:.02em;display:flex;align-items:center;gap:.8rem;}
+.closing-net h3 .picto{width:40px;height:40px;background:var(--paper);color:var(--red);}
+.closing-net p{margin-top:.9rem;font-size:.98rem;line-height:1.55;max-width:90ch;}
+.closing-net ul{list-style:none;margin-top:1.1rem;display:flex;flex-wrap:wrap;gap:.6rem 1.6rem;}
+.closing-net li{font:600 .95rem var(--body);padding-left:1.3rem;position:relative;}
+.closing-net li::before{content:"";position:absolute;left:0;top:.42em;width:.7rem;height:3px;background:var(--paper);}
+.closing-link{margin-top:clamp(1.8rem,3.5vw,2.6rem);font-size:1.05rem;line-height:1.6;}
+.closing-link a{color:var(--paper);font-weight:600;text-decoration-thickness:3px;text-underline-offset:4px;}
+.closing-link a:hover{color:var(--ink);}
+
+/* ================================================================
+   FOOTER — the fine print
+   ================================================================ */
+.fineprint{background:var(--ink);color:var(--paper);border-top:6px solid var(--red);}
+.fineprint .wrap{padding-top:1.6rem;padding-bottom:2rem;}
+.fp-row{display:flex;flex-wrap:wrap;gap:.8rem 2rem;align-items:center;font-size:.85rem;line-height:1.5;}
+.fp-row a{color:var(--paper);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;}
+.fp-row a:hover{color:var(--red);}
+.fp-motto{margin-top:1rem;font:600 1.05rem var(--disp);text-transform:uppercase;letter-spacing:.08em;color:var(--red);}
+.fp-tiny{margin-top:.8rem;font-size:.78rem;opacity:.75;line-height:1.5;}
+
+/* ================================================================
+   RESPONSIVE — ~1024 and ~640
+   ================================================================ */
+@media (max-width:1024px){
+  .lines-grid{grid-template-columns:1fr;}
+  .station-grid,.station--flip .station-grid{grid-template-columns:1fr;}
+  .station--flip .station-copy{order:1;}
+  .station--flip .station-photo{order:2;}
+  .ops-inspect{grid-template-columns:1fr;}
+  .ops-log{grid-template-columns:1fr;}
+  .closing-grid{grid-template-columns:1fr;}
+  .col-remarks-head{display:none;}
+}
+@media (max-width:640px){
+  .mast-row{grid-template-columns:1fr;gap:1.2rem;}
+  .mast-meta{justify-content:flex-start;}
+  /* departure table degrades to a stacked stop list */
+  table.timetable,
+  .timetable thead,
+  .timetable tbody,
+  .timetable tr,
+  .timetable th,
+  .timetable td{display:block;width:100%;}
+  .timetable thead{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;}
+  .timetable caption{display:block;}
+  .timetable tbody tr{border-bottom:3px solid var(--ink);padding:.4rem 0 .8rem;}
+  .timetable tbody tr:last-child{border-bottom:none;}
+  .timetable tbody th,.timetable tbody td{border:none;padding:.45rem 1rem;display:block;text-align:left;width:auto;}
+  .timetable tbody td::before{
+    content:attr(data-label);display:block;
+    font:600 .68rem var(--body);text-transform:uppercase;letter-spacing:.2em;opacity:.7;margin-bottom:.2rem;
+  }
+  .timetable tbody th .st-name{font-size:1.7rem;}
+  .timetable tbody th::before{
+    content:"Stage / Halt";display:block;
+    font:600 .68rem var(--body);text-transform:uppercase;letter-spacing:.2em;opacity:.7;margin-bottom:.2rem;
+  }
+  .cell-order{text-align:left;}
+  tr.is-current>th,tr.is-current>td{box-shadow:inset 6px 0 0 var(--red);}
+  .interchange{grid-template-columns:1fr;}
+  .ops-night{grid-template-columns:1fr;}
+  .signbar{flex-direction:column;align-items:flex-start;gap:.2rem;}
+  .fp-row{flex-direction:column;align-items:flex-start;}
+}
+</style>
+</head>
+<body><!--
+THESIS: the landing page IS the timetable. A full-width Kursbuch departure table opens the page;
+there is no SaaS hero, no card scaffold. The product is the schedule, the schedule is the page.
+OWN-WORLD: a Swiss railway network run by two equal lines — LINE V, the self-hosted visual
+node-canvas platform, and LINE C, the independent Apache-2.0 Python package skyulf-core.
+STORY: stages depart in order; you board a line, ride the lifecycle, inspect the track.
+FIRST VIEWPORT: the departure table itself, red now-line crossing the stage the clock says is current.
+FORM: Kursbuch, seed key e6d43b02.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review,
+the verdict, and DESIGN.md.
+-->
+<a class="skip" href="#abfahrt">Skip to departure table</a>
+
+<!-- ================= MASTHEAD ================= -->
+<header class="masthead on-ink">
+  <div class="wrap mast-row">
+    <div class="mast-id">
+      <span class="mast-logo"><img src="../static/img/logo.png" alt="Skyulf logo" width="273" height="281"></span>
+      <div class="mast-titles">
+        <h1>Skyulf <span class="mast-red">Kursbuch</span></h1>
+        <p class="mast-sub">The ML lifecycle, printed as a timetable. Data exploration, pipelines, training, comparison, deployment, monitoring — every stage runs as a scheduled service.</p>
+      </div>
+    </div>
+    <div class="mast-meta">
+      <div class="sheet"><span>Blatt</span> <strong class="tnum">26</strong></div>
+      <div class="clock">
+        <span class="clock-time tnum" id="nowClock" aria-label="Current local time">--:--</span>
+        <span class="clock-cap">Local time · Ortszeit</span>
+      </div>
+    </div>
+  </div>
+  <div class="mast-strip">
+    <div class="wrap mast-strip-in">
+      <nav aria-label="Timetable sections">
+        <a href="#abfahrt">Departures</a>
+        <a href="#linien">Lines</a>
+        <a href="#stationen">Stations</a>
+        <a href="#betrieb">Operations</a>
+        <a href="#einsteigen">Board</a>
+      </nav>
+      <span class="chip chip--v" aria-label="Line V, visual platform"><span class="sq" aria-hidden="true"></span>Line V · Visual canvas</span>
+      <span class="chip chip--c" aria-label="Line C, skyulf-core"><span class="sq" aria-hidden="true"></span>Line C · skyulf-core</span>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<!-- ================= DEPARTURE TABLE ================= -->
+<section class="departure" id="abfahrt" aria-labelledby="abfahrt-cap">
+  <div class="wrap" data-reveal>
+    <div class="tableframe">
+      <table class="timetable">
+        <caption id="abfahrt-cap">
+          <span class="cap-main">Abfahrt · Departure — the ML lifecycle</span>
+          <span class="cap-sub">Eight stages, one line of travel. Stages depart in order; every service is a real product module. The red line marks the stage on duty at your current local hour.</span>
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col" class="col-stage">Stage · Halt</th>
+            <th scope="col" class="col-order">Order · Folge</th>
+            <th scope="col" class="col-platform">Platform · Gleis</th>
+            <th scope="col" class="col-remarks-head">Remarks · Bemerkungen</th>
+          </tr>
+        </thead>
+        <tbody id="departureBody">
+          <tr>
+            <th scope="row"><span class="st-name">Ingest</span><span class="st-code">ING</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">01</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Data sources</span></td>
+            <td data-label="Remarks" class="st-remarks">CSV, Excel, JSON, Parquet and S3-compatible storage connect straight onto the network. Local disk or object store — same platform.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">EDA</span><span class="st-code">EDA</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">02</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Automated profiling</span></td>
+            <td data-label="Remarks" class="st-remarks">Statistical profiling on arrival: distributions, correlations, outliers, segmentation, causal discovery, target analysis.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">Pipeline</span><span class="st-code">PIP</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">03</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Node canvas</span></td>
+            <td data-label="Remarks" class="st-remarks">Preprocessing, feature engineering, splitting, modeling — wired node by node on the visual canvas, or in code.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">Train</span><span class="st-code">TRN</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">04</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Background jobs</span></td>
+            <td data-label="Remarks" class="st-remarks">Training runs as background work via Celery + Redis or background threads. The timetable moves while you do other things.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">Compare</span><span class="st-code">CMP</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">05</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Experiment comparison</span></td>
+            <td data-label="Remarks" class="st-remarks">Runs side by side, compared on evidence. Choose the service that actually performs.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">Registry</span><span class="st-code">REG</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">06</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Model registry</span></td>
+            <td data-label="Remarks" class="st-remarks">The depot: models registered and versioned, with their history on record.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">Deploy</span><span class="st-code">DEP</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">07</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Deployment &amp; inference</span></td>
+            <td data-label="Remarks" class="st-remarks">A pipeline is a scheduled service: deploy from the registry and serve inference.</td>
+          </tr>
+          <tr>
+            <th scope="row"><span class="st-name">Monitor</span><span class="st-code">MON</span></th>
+            <td class="cell-order" data-label="Order"><span class="flap"><span class="flap-val tnum">08</span></span></td>
+            <td data-label="Platform"><span class="st-platform">Drift monitoring</span></td>
+            <td data-label="Remarks" class="st-remarks">Track inspection for deployed models: drift reports and diagnostics keep the line safe.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="nowline" id="nowline" aria-hidden="true" style="top:240px;">
+        <span class="now-tag">Jetzt · Now</span>
+      </div>
+    </div>
+    <p class="table-note">The railway metaphor is honest, not decoration: a pipeline <b>is</b> a scheduled service — stages depart in order, jobs run on time, the registry is the depot, drift is track inspection. No invented times: the <b>departure order</b> is the contract.</p>
+  </div>
+</section>
+
+<!-- ================= LINES ================= -->
+<section class="lines" id="linien" aria-labelledby="linien-h">
+  <div class="wrap">
+    <header data-reveal>
+      <h2 id="linien-h">Two lines serve this network</h2>
+      <p class="lines-lede">Skyulf runs on two first-class interfaces, drawn equal. Ride the canvas, ride the package, or change trains whenever you like — the network is the same.</p>
+    </header>
+    <div class="lines-grid">
+      <article class="line line--v" data-reveal aria-labelledby="linev-name">
+        <div class="line-head">
+          <span class="line-badge" aria-hidden="true">V</span>
+          <div>
+            <span class="line-name" id="linev-name">Line V · Visual platform</span>
+            <span class="line-kind">Self-hosted visual node-canvas platform</span>
+          </div>
+        </div>
+        <div class="line-body">
+          <div class="line-route" aria-label="Line V stops">
+            <ol>
+              <li><span class="stop">ING</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">EDA</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">PIP</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">TRN</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">CMP</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">REG</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">DEP</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">MON</span><span class="track" aria-hidden="true"></span></li>
+            </ol>
+          </div>
+          <p class="line-copy">Explore data, wire node-based pipelines, launch background training, compare experiments, register, deploy and monitor — all on a canvas you host yourself. For data scientists, ML engineers, developers and product teams who refuse black-box SaaS.</p>
+          <div>
+            <span class="board-label">Boarding · Einstieg</span>
+            <div class="board-actions">
+              <a class="btn" href="https://api.skyulf.com" target="_blank" rel="noopener">Board the hosted demo — no signup</a>
+              <span class="board-note">Or self-host Line V with Docker Compose — it runs on the same network as Line C.</span>
+            </div>
+          </div>
+        </div>
+      </article>
+      <article class="line line--c" data-reveal aria-labelledby="linec-name">
+        <div class="line-head">
+          <span class="line-badge" aria-hidden="true">C</span>
+          <div>
+            <span class="line-name" id="linec-name">Line C · skyulf-core</span>
+            <span class="line-kind">Independent Apache-2.0 Python package</span>
+          </div>
+        </div>
+        <div class="line-body">
+          <div class="line-route" aria-label="Line C stops">
+            <ol>
+              <li><span class="stop">ING</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">EDA</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">PIP</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">TRN</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">CMP</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">REG</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">DEP</span><span class="track" aria-hidden="true"></span></li>
+              <li><span class="stop">MON</span><span class="track" aria-hidden="true"></span></li>
+            </ol>
+          </div>
+          <p class="line-copy">The same lifecycle in your own scripts and notebooks. <code>skyulf-core</code> is an independent package — no canvas required, no lock-in. Install it and run the network from anywhere Python runs.</p>
+          <div>
+            <span class="board-label">Boarding · Einstieg</span>
+            <div class="board-actions">
+              <code class="board-code">pip install skyulf-core</code>
+              <span class="board-note">Apache-2.0 · usable in scripts and notebooks, alongside or without the canvas.</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+    <div class="interchange" data-reveal>
+      <span class="picto" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square">
+          <path d="M10 36 V19 a7 7 0 0 1 7-7 h6"/><path d="M38 12 v17 a7 7 0 0 1-7 7 h-6"/>
+          <path d="M17 6 l6 6 -6 6" fill="none"/><path d="M31 42 l-6 -6 6 -6" fill="none"/>
+        </svg>
+      </span>
+      <p><b>Interchange · Übergang.</b> Visual work exports to Jupyter notebooks — full or compact. Nothing is trapped in the canvas; change lines without leaving the network.</p>
+    </div>
+    <div class="network-strip" data-reveal>
+      <span class="net-label">The whole network, self-hosted</span>
+      <span>Run it with <b>Docker Compose</b> — the repo carries the composition.</span>
+      <span><b>SQLite</b> to start, <b>PostgreSQL</b> at scale.</span>
+      <span><b>Local</b> or <b>S3-compatible</b> storage.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= STATIONS ================= -->
+<section class="station-group" id="stationen" aria-labelledby="stationen-h">
+  <div class="wrap stations-head" data-reveal>
+    <h2 id="stationen-h">Stations of the line</h2>
+    <p class="stations-lede">Every lifecycle stage is a station with a real platform: a product module you can stand on. Eight stops, photographed as they actually look.</p>
+  </div>
+
+  <article class="station" aria-labelledby="st-ing">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">01</span><h3 id="st-ing">Ingest</h3></div>
+        <span class="station-code">ING · Halt 01</span>
+        <p>The load comes aboard here. Skyulf connects your data to the network without ceremony — files on disk or objects in the cloud, same platform, same timetable.</p>
+        <ul class="station-facts">
+          <li>CSV, Excel, JSON and Parquet sources</li>
+          <li>S3-compatible storage, or your local disk</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 01</b> · Ingest · Data sources</span><span>ING</span></div>
+        <div class="photo photo--wide"><img src="../static/img/datasource.jpg" alt="Skyulf data source screen: configuring an ingested dataset" loading="lazy" width="1918" height="808"></div>
+        <figcaption class="photo-cap">Station photograph — data sources arrive on platform one.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station station--flip" aria-labelledby="st-eda">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">02</span><h3 id="st-eda">EDA</h3></div>
+        <span class="station-code">EDA · Halt 02</span>
+        <p>Automated exploration while the data is still warm from the load. Skyulf profiles it end to end so you board the pipeline already knowing the terrain.</p>
+        <ul class="station-facts">
+          <li>Statistical profiling, distributions, correlations, outliers</li>
+          <li>Segmentation, causal discovery, target analysis</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 02</b> · EDA · Automated profiling</span><span>EDA</span></div>
+        <div class="photo photo--wide"><img src="../static/img/eda/dashboardeda.jpg" alt="Skyulf automated EDA dashboard with statistical profiles of a dataset" loading="lazy" width="1606" height="643"></div>
+        <figcaption class="photo-cap">Station photograph — the automated EDA dashboard, mid-profiling.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station" aria-labelledby="st-pip">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">03</span><h3 id="st-pip">Pipeline</h3></div>
+        <span class="station-code">PIP · Halt 03</span>
+        <p>Node-based pipelines, wired by hand: preprocessing, feature engineering, splitting, modeling. The canvas is a first-class interface — and everything on it can equally be written as code with <code>skyulf-core</code>.</p>
+        <ul class="station-facts">
+          <li>Preprocessing, feature engineering, splitting, modeling nodes</li>
+          <li>Visual workflows export to Jupyter notebooks — full or compact</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 03</b> · Pipeline · Node canvas</span><span>PIP</span></div>
+        <div class="photo photo--wide"><img src="../static/img/canvas.jpg" alt="Skyulf visual node canvas with a machine-learning pipeline wired between nodes" loading="lazy" width="1896" height="807"></div>
+        <figcaption class="photo-cap">Station photograph — the node canvas, junctions wired.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station station--flip" aria-labelledby="st-trn">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">04</span><h3 id="st-trn">Train</h3></div>
+        <span class="station-code">TRN · Halt 04</span>
+        <p>Training departs as background work — Celery + Redis queues, or background threads where that fits. Jobs run on time; you are not chained to the platform while they move.</p>
+        <ul class="station-facts">
+          <li>Background training via Celery + Redis</li>
+          <li>Background threads as the lighter alternative</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 04</b> · Train · Background jobs</span><span>TRN</span></div>
+        <div class="photo photo--box"><img src="../static/img/jobs.jpg" alt="Skyulf jobs screen showing background training runs and their status" loading="lazy" width="1440" height="900"></div>
+        <figcaption class="photo-cap">Station photograph — the departures board for background training jobs.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station" aria-labelledby="st-cmp">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">05</span><h3 id="st-cmp">Compare</h3></div>
+        <span class="station-code">CMP · Halt 05</span>
+        <p>Experiments pull in side by side and are compared on evidence. No folklore about which model is best — the comparison is the answer.</p>
+        <ul class="station-facts">
+          <li>Experiment comparison across runs</li>
+          <li>Decisions made on recorded results, not memory</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 05</b> · Compare · Experiments</span><span>CMP</span></div>
+        <div class="photo photo--wide"><img src="../static/img/experiments.jpg" alt="Skyulf experiments screen comparing multiple training runs" loading="lazy" width="1900" height="820"></div>
+        <figcaption class="photo-cap">Station photograph — experiments standing side by side.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station station--flip" aria-labelledby="st-reg">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">06</span><h3 id="st-reg">Registry</h3></div>
+        <span class="station-code">REG · Halt 06</span>
+        <p>The depot. Models are registered and versioned with their history on record, ready for the next departure — and the audit history keeps the books honest.</p>
+        <ul class="station-facts">
+          <li>Model registry with versions</li>
+          <li>Audit history on record</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 06</b> · Registry · The depot</span><span>REG</span></div>
+        <div class="photo photo--box"><img src="../static/img/registry.jpg" alt="Skyulf model registry listing registered models and their versions" loading="lazy" width="1440" height="900"></div>
+        <figcaption class="photo-cap">Station photograph — rolling stock in the depot, each unit on record.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station" aria-labelledby="st-dep">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">07</span><h3 id="st-dep">Deploy</h3></div>
+        <span class="station-code">DEP · Halt 07</span>
+        <p>Departure into production. A pipeline is a scheduled service once deployed — it serves inference and holds its place in the timetable.</p>
+        <ul class="station-facts">
+          <li>Deployment from the registry</li>
+          <li>Inference served from deployed pipelines</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 07</b> · Deploy · Inference</span><span>DEP</span></div>
+        <div class="photo photo--wide"><img src="../static/img/deployment.jpg" alt="Skyulf deployment screen for putting a registered model into service" loading="lazy" width="1905" height="814"></div>
+        <figcaption class="photo-cap">Station photograph — a service cleared for departure.</figcaption>
+      </figure>
+    </div>
+  </article>
+
+  <article class="station station--flip" aria-labelledby="st-mon">
+    <div class="wrap station-grid">
+      <div class="station-copy" data-reveal>
+        <div class="station-kicker"><span class="station-idx tnum">08</span><h3 id="st-mon">Monitor</h3></div>
+        <span class="station-code">MON · Halt 08</span>
+        <p>Track inspection. Deployed models are watched for drift, with reports and diagnostics when the line shifts under load. The service does not end at departure.</p>
+        <ul class="station-facts">
+          <li>Drift monitoring for deployed models</li>
+          <li>Drift reports and diagnostics</li>
+        </ul>
+      </div>
+      <figure class="station-photo" data-reveal>
+        <div class="signbar"><span><b>Gleis 08</b> · Monitor · Track inspection</span><span>MON</span></div>
+        <div class="photo photo--box"><img src="../static/img/drift/drift_report.jpg" alt="Skyulf drift report detailing detected drift on a deployed model" loading="lazy" width="1636" height="824"></div>
+        <figcaption class="photo-cap">Station photograph — a drift report, filed after inspection.</figcaption>
+      </figure>
+    </div>
+  </article>
+</section>
+
+<!-- ================= OPERATIONS ================= -->
+<section class="ops on-ink" id="betrieb" aria-labelledby="betrieb-h">
+  <div class="wrap">
+    <header data-reveal>
+      <h2 id="betrieb-h">Operations · Betriebszentrale</h2>
+      <p class="ops-lede">What keeps a railway honest happens off the passenger platforms: freight that moves at night, track that gets inspected, a log that records everything.</p>
+    </header>
+
+    <div class="ops-item ops-night" data-reveal>
+      <span class="picto" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="currentColor">
+          <path d="M8 14 h32 v16 h-32 z" fill="none" stroke="currentColor" stroke-width="4"/>
+          <path d="M14 30 v4 M34 30 v4" stroke="currentColor" stroke-width="4"/>
+          <circle cx="15" cy="38" r="4"/><circle cx="33" cy="38" r="4"/>
+          <path d="M8 22 h32" stroke="currentColor" stroke-width="3"/>
+        </svg>
+      </span>
+      <div>
+        <span class="ops-sub">Night freight · Güterverkehr</span>
+        <h3>Background training</h3>
+        <p>Training jobs ride as night freight on <code>Celery + Redis</code> workers — or background threads on lighter routes. Dispatch a job from the canvas or from code and it moves through the queue while you sleep. Freight doesn't wait for you, and it doesn't need you on the footplate.</p>
+      </div>
+    </div>
+
+    <div class="ops-item ops-inspect" data-reveal>
+      <div>
+        <span class="ops-sub">Track inspection · Gleiskontrolle</span>
+        <h3>Drift monitoring</h3>
+        <p>Deployed models are inspected like track: Skyulf watches for drift and writes the report when the line has shifted under your data. Diagnostics show where, so the repair is targeted instead of guesswork.</p>
+        <div class="board-actions" style="margin-top:1.2rem;">
+          <span class="board-note" style="opacity:.9;">See the inspection at the Monitor station — Gleis 08.</span>
+        </div>
+      </div>
+      <div class="ops-photo">
+        <img src="../static/img/drift/drift.jpg" alt="Skyulf drift monitoring view tracking drift across a deployed model" loading="lazy" width="1644" height="614">
+      </div>
+    </div>
+
+    <div class="ops-item ops-log" data-reveal>
+      <div>
+        <span class="ops-sub">Operations log · Betriebslogbuch</span>
+        <h3>Audit history</h3>
+        <p>Everything that moves on this network is written down. The audit history is the operations log — what ran, what was registered, what departed, what was inspected. When a question comes up at 2 a.m., the log answers it.</p>
+      </div>
+      <table class="log">
+        <caption>Recorded in the operations log</caption>
+        <thead>
+          <tr>
+            <th scope="col">Entry</th>
+            <th scope="col">Recorded</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Training run</th>
+            <td>Background jobs as they queue, run and complete</td>
+          </tr>
+          <tr>
+            <th scope="row">Registration</th>
+            <td>Models entering the depot, with versions</td>
+          </tr>
+          <tr>
+            <th scope="row">Deployment</th>
+            <td>Services departing into production</td>
+          </tr>
+          <tr>
+            <th scope="row">Inspection</th>
+            <td>Drift checks, reports and diagnostics</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ops-item" data-reveal>
+      <span class="ops-sub">Control room · Stellwerk</span>
+      <h3>The overview</h3>
+      <p>One dashboard where the whole network is visible at once — services, runs and the state of the line.</p>
+      <div class="ops-photo" style="margin-top:1.4rem;border:3px solid var(--paper);">
+        <img src="../static/img/dashboard.jpg" alt="Skyulf main dashboard summarizing projects, runs and deployments" loading="lazy" width="1671" height="880">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CLOSING ================= -->
+<section class="closing on-red" id="einsteigen" aria-labelledby="einsteigen-h">
+  <div class="wrap">
+    <header data-reveal>
+      <h2 id="einsteigen-h">Two lines. One network. Board either.</h2>
+      <p class="closing-lede">Skyulf is for data scientists, ML engineers, developers and product teams who refuse black-box SaaS. Both lines are real, both are equal, and both are waiting at the platform.</p>
+    </header>
+    <div class="closing-grid">
+      <div class="board-card" data-reveal>
+        <h3><span class="sq" aria-hidden="true"></span>Board Line V</h3>
+        <p>The hosted demo runs the full visual platform — canvas, EDA, pipelines, deployments. No signup, no sales call.</p>
+        <a class="btn" href="https://api.skyulf.com" target="_blank" rel="noopener">Open the demo — api.skyulf.com</a>
+      </div>
+      <div class="board-card" data-reveal>
+        <h3><span class="sq" aria-hidden="true"></span>Board Line C</h3>
+        <p>The independent Apache-2.0 Python package. Install it and run the lifecycle from your own scripts and notebooks.</p>
+        <code>pip install skyulf-core</code>
+      </div>
+    </div>
+    <div class="closing-net" data-reveal>
+      <h3><span class="picto" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square">
+          <path d="M14 44 V16 l10 -8 10 8 v28"/>
+          <path d="M14 22 h20 M14 30 h20 M14 38 h20"/>
+        </svg>
+      </span>Self-host the whole network</h3>
+      <p>Run both lines yourself with Docker Compose — the repository carries the composition. Start small, grow without moving.</p>
+      <ul>
+        <li>SQLite to start, PostgreSQL at scale</li>
+        <li>Local or S3-compatible storage</li>
+        <li>Apache-2.0 licensed</li>
+      </ul>
+    </div>
+    <p class="closing-link" data-reveal>Read the live schedule: <a href="https://github.com/flyingriverhorse/Skyulf" target="_blank" rel="noopener">github.com/flyingriverhorse/Skyulf</a></p>
+  </div>
+</section>
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="fineprint on-ink">
+  <div class="wrap">
+    <div class="fp-row">
+      <span>Skyulf Kursbuch · Blatt 26</span>
+      <span>License: <a href="https://github.com/flyingriverhorse/Skyulf" target="_blank" rel="noopener">Apache-2.0</a></span>
+      <span><a href="https://github.com/flyingriverhorse/Skyulf" target="_blank" rel="noopener">Repository</a></span>
+      <span><a href="https://api.skyulf.com" target="_blank" rel="noopener">Hosted demo</a></span>
+    </div>
+    <p class="fp-motto">Timetable subject to change — the repo is the live schedule.</p>
+    <p class="fp-tiny">Line V: self-hosted visual node-canvas platform · Line C: skyulf-core, the independent Apache-2.0 Python package. Visual work exports to Jupyter notebooks — full or compact. Nothing trapped in the canvas.</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+  'use strict';
+  var doc = document.documentElement;
+  doc.classList.add('js');
+
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- live clock (real time, no invented numbers) ---------- */
+  var clockEl = document.getElementById('nowClock');
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+  function tickClock(){
+    if(!clockEl) return;
+    var d = new Date();
+    clockEl.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  tickClock();
+  setInterval(tickClock, 15000);
+
+  /* ---------- current stage from the real clock ----------
+     8 stages share the day: 3 hours each, stage = floor(hour/3). */
+  function currentStageIndex(){
+    return Math.floor(new Date().getHours() / 3); // 0..7
+  }
+
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#departureBody tr'));
+  var nowline = document.getElementById('nowline');
+  var frame = document.querySelector('.tableframe');
+  var activeRow = -1;
+
+  function placeNowLine(row){
+    if(!nowline || !frame || !row) return;
+    var fr = frame.getBoundingClientRect();
+    var rr = row.getBoundingClientRect();
+    var top = rr.top - fr.top + rr.height / 2;
+    nowline.style.top = top + 'px';
+  }
+
+  /* ---------- split-flap: one departure row flips when it becomes current ---------- */
+  function flapRow(row){
+    var flap = row.querySelector('.flap');
+    var val = row.querySelector('.flap-val');
+    if(!flap || !val) return;
+    var finalText = val.textContent.trim();
+
+    if(reduce || !('onanimationend' in window)){
+      val.textContent = finalText;
+      return;
+    }
+    var others = rows.filter(function(r){ return r !== row; })
+      .map(function(r){
+        var v = r.querySelector('.flap-val');
+        return v ? v.textContent.trim() : '00';
+      });
+    var seq = [];
+    var guard = 0;
+    while(seq.length < 3 && guard < 40){
+      var cand = others[Math.floor(Math.random() * others.length)];
+      if(seq.indexOf(cand) === -1 && cand !== finalText) seq.push(cand);
+      guard++;
+    }
+
+    flap.classList.add('flapping');
+    var shown = seq.length ? seq[0] : finalText;
+    var i = 0;
+
+    function finish(){
+      val.textContent = finalText;
+      flap.classList.remove('flapping');
+    }
+    function step(){
+      var target = (i < seq.length) ? seq[i] : finalText;
+      var card = document.createElement('span');
+      card.className = 'flap-card';
+      card.setAttribute('aria-hidden', 'true');
+      card.innerHTML =
+        '<span class="fh fh-top fold"><span>' + shown + '</span></span>' +
+        '<span class="fh fh-bot unfold"><span>' + target + '</span></span>';
+      flap.appendChild(card);
+      var bot = card.querySelector('.fh-bot');
+      var done = false;
+      function settle(){
+        if(done) return; done = true;
+        shown = target;
+        val.textContent = target;
+        if(card.parentNode) card.parentNode.removeChild(card);
+        i++;
+        if(i <= seq.length){ setTimeout(step, 55); } else { finish(); }
+      }
+      bot.addEventListener('animationend', settle);
+      setTimeout(settle, 500); // safety net
+    }
+    step();
+  }
+
+  function setCurrent(idx, animate){
+    if(idx === activeRow && !animate) { placeNowLine(rows[idx]); return; }
+    rows.forEach(function(r){ r.classList.remove('is-current'); });
+    var row = rows[idx];
+    if(!row) return;
+    row.classList.add('is-current');
+    activeRow = idx;
+    placeNowLine(row);
+    if(animate) flapRow(row);
+  }
+
+  function initDeparture(){
+    if(!rows.length) return;
+    var idx = currentStageIndex();
+    if(reduce || !('IntersectionObserver' in window)){
+      setCurrent(idx, false);
+      return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          setCurrent(currentStageIndex(), true);
+          io.disconnect();
+          setInterval(function(){ setCurrent(currentStageIndex(), true); }, 60000);
+        }
+      });
+    }, { threshold: 0.2 });
+    io.observe(frame);
+    // keep the now-line pinned during resize / lazy image growth
+    var rt;
+    window.addEventListener('resize', function(){
+      clearTimeout(rt);
+      rt = setTimeout(function(){ if(activeRow >= 0) placeNowLine(rows[activeRow]); }, 120);
+    });
+    window.addEventListener('load', function(){ if(activeRow >= 0) placeNowLine(rows[activeRow]); });
+  }
+
+  /* ---------- reveal on scroll: visible by default, animated when possible ---------- */
+  function initReveals(){
+    var els = Array.prototype.slice.call(document.querySelectorAll('[data-reveal]'));
+    if(reduce || !('IntersectionObserver' in window)){
+      els.forEach(function(el){ el.classList.add('is-in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){
+        if(e.isIntersecting){
+          e.target.classList.add('is-in');
+          io.unobserve(e.target);
+        }
+      });
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+    els.forEach(function(el){ io.observe(el); });
+  }
+
+  initReveals();
+  initDeparture();
+})();
+</script>
+</body>
+</html>

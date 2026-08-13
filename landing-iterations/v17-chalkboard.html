@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · V17 — Chalkboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@300;400;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --board:#2b3230; --board2:#242b29; --chalk:#f2f0e6; --yellow:#ffe08a; --pink:#ffb3c7; --blue:#9ad1ff; --green:#b8e6a8;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:'Kalam',cursive;color:var(--chalk);
+    background:
+      radial-gradient(ellipse at 30% 20%,rgba(255,255,255,.05),transparent 55%),
+      radial-gradient(ellipse at 75% 80%,rgba(255,255,255,.04),transparent 50%),
+      repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.06) 3px 4px),
+      var(--board);
+    line-height:1.7;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px;}
+  section{padding:72px 0;}
+  h1,h2{font-family:'Caveat',cursive;font-weight:700;}
+  h2{font-size:clamp(38px,5.5vw,54px);margin-bottom:18px;color:var(--yellow);}
+  .lesson{font-family:'Caveat',cursive;font-size:20px;color:var(--blue);letter-spacing:.05em;}
+  a{color:var(--blue);}
+  .u{border-bottom:3px wavy underline;text-decoration:underline wavy var(--pink) 2px;text-underline-offset:6px;text-decoration-color:var(--pink);}
+  /* hero */
+  .hero{text-align:center;padding:100px 0 60px;}
+  .hero h1{font-size:clamp(52px,9vw,100px);line-height:1.1;}
+  .hero h1 .hl{color:var(--yellow);text-decoration:underline wavy var(--yellow) 3px;text-underline-offset:10px;}
+  .hero p{font-size:21px;max-width:640px;margin:20px auto 36px;color:#d8d6ca;}
+  .chalk-btns{display:flex;gap:22px;justify-content:center;flex-wrap:wrap;}
+  .cbtn{font-family:'Caveat',cursive;font-size:24px;font-weight:700;color:var(--chalk);text-decoration:none;padding:10px 34px;border:3px solid var(--chalk);border-radius:255px 15px 225px 15px/15px 225px 15px 255px;transition:transform .15s;display:inline-block;}
+  .cbtn:hover{transform:rotate(-1.5deg) scale(1.04);}
+  .cbtn.y{color:var(--yellow);border-color:var(--yellow);}
+  .cbtn.b{color:var(--blue);border-color:var(--blue);}
+  .stick{font-size:56px;opacity:.9;}
+  /* frame box */
+  .box{border:3px solid rgba(242,240,230,.75);border-radius:18px 240px 20px 230px/230px 20px 240px 18px;padding:34px 38px;margin:26px 0;position:relative;}
+  .box .pin{position:absolute;top:-14px;left:24px;font-family:'Caveat',cursive;font-size:19px;color:var(--pink);background:var(--board);padding:0 12px;}
+  /* equation */
+  .eq{font-family:'Caveat',cursive;font-size:clamp(22px,3.4vw,32px);text-align:center;color:var(--chalk);padding:18px 0;}
+  .eq .op{color:var(--pink);}
+  .eq .res{color:var(--green);font-size:1.25em;}
+  .eq s{color:var(--pink);text-decoration-thickness:3px;}
+  /* two products */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:26px;}
+  .card{border:3px dashed rgba(242,240,230,.6);border-radius:20px;padding:28px;}
+  .card h3{font-family:'Caveat',cursive;font-size:30px;margin-bottom:8px;}
+  .card.c1 h3{color:var(--yellow);}
+  .card.c2 h3{color:var(--blue);}
+  .card ul{list-style:none;margin-top:8px;}
+  .card li{padding:3px 0 3px 26px;position:relative;}
+  .card li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700;}
+  /* lesson list */
+  .steps{counter-reset:step;}
+  .step{display:grid;grid-template-columns:90px 1fr;gap:20px;padding:22px 0;border-bottom:2px dashed rgba(242,240,230,.25);}
+  .step:last-child{border-bottom:none;}
+  .step .n{font-family:'Caveat',cursive;font-size:42px;color:var(--pink);text-align:right;}
+  .step h3{font-family:'Caveat',cursive;font-size:27px;color:var(--chalk);}
+  .step p{color:#cfcdbf;font-size:16px;}
+  .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px;margin-top:30px;}
+  .shots figure{border:3px solid rgba(242,240,230,.8);border-radius:8px 60px 10px 50px/50px 10px 60px 8px;padding:10px;background:rgba(255,255,255,.04);transform:rotate(-1deg);}
+  .shots figure:nth-child(2n){transform:rotate(1.2deg);}
+  .shots img{width:100%;display:block;border-radius:4px;filter:saturate(.85) contrast(1.05);}
+  .shots figcaption{font-family:'Caveat',cursive;font-size:19px;color:var(--yellow);text-align:center;padding-top:8px;}
+  /* homework */
+  .exam{border:4px solid var(--pink);border-radius:24px 200px 24px 210px/210px 24px 200px 24px;padding:44px;text-align:center;}
+  .exam h2{color:var(--pink);}
+  .exam .row{display:flex;justify-content:center;gap:60px;flex-wrap:wrap;margin-top:20px;}
+  .exam .col .big{font-family:'Caveat',cursive;font-size:80px;line-height:1;}
+  .exam .bad .big{color:var(--pink);text-decoration:line-through wavy var(--chalk) 4px;}
+  .exam .good .big{color:var(--green);}
+  .exam .lbl{font-size:18px;margin-top:6px;}
+  .grade{font-family:'Caveat',cursive;font-size:26px;margin-top:26px;color:var(--yellow);}
+  /* faq */
+  .faq details{border-bottom:2px dashed rgba(242,240,230,.3);padding:6px 0;}
+  .faq summary{cursor:pointer;list-style:none;font-family:'Caveat',cursive;font-size:25px;color:var(--blue);padding:10px 0;}
+  .faq summary::before{content:"Q. ";color:var(--pink);}
+  .faq details p{padding:0 0 16px 34px;color:#d3d1c5;font-size:16px;}
+  .faq details p::before{content:"A. ";color:var(--green);font-weight:700;}
+  /* cta */
+  .cta{text-align:center;padding:90px 0;}
+  .cta h2{font-size:clamp(40px,6vw,64px);}
+  .foot{text-align:center;padding:40px 0 60px;color:#b9b7ab;font-size:15px;}
+  .foot .stick{font-size:34px;}
+  @media(max-width:760px){.duo{grid-template-columns:1fr;}.step{grid-template-columns:56px 1fr;}}
+</style>
+</head>
+<body>
+
+<section class="hero wrap">
+  <div class="lesson">Welcome to class! Today's subject:</div>
+  <h1>Machine learning you can <span class="hl">actually trust</span></h1>
+  <p>Take out your notebooks, everyone. Today we learn why a 94% on the board isn't always a 94% in the world — and how Skyulf keeps your pipelines honest.</p>
+  <div class="chalk-btns">
+    <a class="cbtn y" href="https://api.skyulf.com/">Try the live demo →</a>
+    <a class="cbtn b" href="https://pypi.org/project/skyulf-core/">pip install skyulf-core</a>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="lesson">Lesson 01 — the two tools on your desk</div>
+  <h2>One engine, two packages</h2>
+  <div class="duo">
+    <div class="card c1">
+      <h3>Skyulf Platform</h3>
+      <div class="lesson" style="font-size:16px;">AGPLv3 · self-host it</div>
+      <ul>
+        <li>Visual pipeline canvas</li>
+        <li>EDA dashboards</li>
+        <li>Model registry</li>
+        <li>One-click deployment</li>
+        <li>Drift monitoring</li>
+      </ul>
+    </div>
+    <div class="card c2">
+      <h3>skyulf-core</h3>
+      <div class="lesson" style="font-size:16px;">Apache-2.0 · pip library</div>
+      <ul>
+        <li>35 transformers & models</li>
+        <li>pandas & Polars</li>
+        <li>Leakage safety checks</li>
+        <li>2,266 tests (graded A+)</li>
+        <li>Python 3.12</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="lesson">Lesson 02 — the weekly routine</div>
+  <h2>Seven steps, every project</h2>
+  <div class="steps">
+    <div class="step"><div class="n">1.</div><div><h3>Connect your data</h3><p>Postgres, MySQL, Snowflake, BigQuery, CSV — write it on the board once, reuse it everywhere.</p></div></div>
+    <div class="step"><div class="n">2.</div><div><h3>Explore first</h3><p>EDA dashboards show distributions, correlations and missing values <em>before</em> you fit anything.</p></div></div>
+    <div class="step"><div class="n">3.</div><div><h3>Design on the canvas</h3><p>Learn nodes study the training set. Apply nodes face the world blind. Underline that — it's on the exam.</p></div></div>
+    <div class="step"><div class="n">4.</div><div><h3>Train & tune</h3><p>Optuna, grid, random, halving — every trial written down where you can find it.</p></div></div>
+    <div class="step"><div class="n">5.</div><div><h3>Register the model</h3><p>Fingerprint plus model card. No more "which data fitted this scaler?" mysteries.</p></div></div>
+    <div class="step"><div class="n">6.</div><div><h3>Deploy</h3><p>REST endpoints or batch jobs. Same artifact you tested — not a re-implementation.</p></div></div>
+    <div class="step"><div class="n">7.</div><div><h3>Watch for drift</h3><p>KS, PSI, Wasserstein, KL — the hall monitors of your features.</p></div></div>
+  </div>
+  <div class="shots">
+    <figure><img src="../static/img/canvas.jpg" alt="Canvas" loading="lazy"><figcaption>fig. 3 — the canvas</figcaption></figure>
+    <figure><img src="../static/img/eda/dashboardeda.jpg" alt="EDA" loading="lazy"><figcaption>fig. 2 — explore first!</figcaption></figure>
+    <figure><img src="../static/img/registry.jpg" alt="Registry" loading="lazy"><figcaption>fig. 5 — the registry</figcaption></figure>
+    <figure><img src="../static/img/drift/drift.jpg" alt="Drift" loading="lazy"><figcaption>fig. 7 — drift watch</figcaption></figure>
+  </div>
+</section>
+
+<section class="wrap">
+  <div class="lesson">Lesson 03 — POP QUIZ!</div>
+  <div class="exam">
+    <h2>Which score do you trust?</h2>
+    <div class="eq">accuracy = <span class="op">fit(</span>train + test<span class="op">)</span> ⇒ <s>94%</s> <span class="op">vs</span> fit(train) ⇒ <span class="res">71% ✓</span></div>
+    <div class="row">
+      <div class="col bad"><div class="big">94%</div><div class="lbl">leaked — see me after class</div></div>
+      <div class="col good"><div class="big">71%</div><div class="lbl">honest — gold star ★</div></div>
+    </div>
+    <p class="grade">Skyulf runs validate_leakage_safety() on every pipeline. The 94% never makes it to your report card.</p>
+  </div>
+</section>
+
+<section class="wrap faq">
+  <div class="lesson">Lesson 04 — questions from the back row</div>
+  <h2>FAQ</h2>
+  <details open><summary>Is Skyulf free?</summary><p>Yes — core is Apache-2.0, platform is AGPLv3. <code>git clone</code>, <code>docker compose up</code>, and you're teaching your own class.</p></details>
+  <details><summary>Is it enterprise-ready?</summary><p>It's honest v0.1: real code, 2,266 passing tests, real docs. No inflated claims — we grade ourselves.</p></details>
+  <details><summary>Why not just use a notebook?</summary><p>Notebooks are lovely for homework. In production, someone asks "which data fitted this scaler?" — Skyulf's registry answers by construction.</p></details>
+  <details><summary>What powers it?</summary><p>A scikit-learn engine, Python 3.12, pandas or Polars. SHAP for explanations, Optuna for tuning, notebook export for the road.</p></details>
+</section>
+
+<section class="cta wrap">
+  <div class="lesson">Final lesson — go try it yourself</div>
+  <h2>Class dismissed.<br>Demo's open.</h2>
+  <div class="chalk-btns" style="margin-top:30px;">
+    <a class="cbtn y" href="https://api.skyulf.com/">api.skyulf.com →</a>
+    <a class="cbtn b" href="../manual/index.html">Read the manual</a>
+  </div>
+</section>
+
+<div class="foot wrap">
+  <div class="stick">★</div>
+  Skyulf · honest ML, explained on one board · <a href="https://github.com/flyingriverhorse/skyulf">GitHub</a> · <a href="https://pypi.org/project/skyulf-core/">PyPI</a>
+</div>
+
+</body>
+</html>

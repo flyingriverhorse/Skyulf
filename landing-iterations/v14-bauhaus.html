@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · Build ML pipelines you can trust</title>
+<link rel="icon" type="image/png" href="../static/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#f6f4ef; --ink:#191919; --red:#d7263d; --blue:#1f4fa3; --yellow:#f0b429;
+    --dim:#5c5a54;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--paper);color:var(--ink);font-family:'Jost',sans-serif;line-height:1.6;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  img{display:block;max-width:100%}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 28px}
+  section{padding:88px 0;position:relative}
+  .uc{text-transform:uppercase}
+  h2.sec{font-size:clamp(32px,4.6vw,52px);font-weight:800;text-transform:uppercase;letter-spacing:.02em;line-height:1.02;margin-bottom:10px}
+  .sec-sub{color:var(--dim);font-size:16px;max-width:540px;margin-bottom:50px}
+
+  /* shapes */
+  .circle{border-radius:50%}
+  .semicircle{border-radius:100px 100px 0 0}
+  .shape{position:absolute;pointer-events:none}
+
+  header{display:flex;justify-content:space-between;align-items:center;padding:24px 0;border-bottom:4px solid var(--ink)}
+  .brand{font-weight:800;font-size:24px;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;gap:12px}
+  .brand .dot{width:16px;height:16px;background:var(--red);border-radius:50%;display:inline-block}
+  header nav{display:flex;gap:26px;font-weight:600;font-size:14px;text-transform:uppercase;letter-spacing:.1em}
+  header nav a:hover{color:var(--red)}
+  header .demo{background:var(--ink);color:#fff;font-weight:600;font-size:13px;letter-spacing:.12em;text-transform:uppercase;padding:12px 24px;transition:.15s}
+  header .demo:hover{background:var(--red)}
+  @media(max-width:860px){header nav{display:none}}
+
+  /* hero: diagonal composition */
+  .hero{padding:90px 0 100px;min-height:78vh;display:flex;align-items:center;position:relative}
+  .hero .shape.c1{width:280px;height:280px;background:var(--blue);border-radius:50%;top:8%;right:6%}
+  .hero .shape.c2{width:170px;height:85px;background:var(--yellow);border-radius:170px 170px 0 0;bottom:12%;right:22%}
+  .hero .shape.c3{width:0;height:0;border-left:110px solid transparent;border-right:110px solid transparent;border-bottom:190px solid var(--red);top:36%;right:-4%;opacity:.95}
+  .hero .shape.bar{width:60px;height:340px;background:var(--ink);left:-2%;top:20%;transform:rotate(12deg)}
+  .hero-inner{position:relative;z-index:2;max-width:640px}
+  .hero .kick{font-weight:700;font-size:13px;letter-spacing:.3em;text-transform:uppercase;margin-bottom:26px;display:flex;align-items:center;gap:12px}
+  .hero .kick::before{content:'';width:44px;height:6px;background:var(--red)}
+  .hero h1{font-size:clamp(50px,7.4vw,96px);font-weight:800;text-transform:uppercase;line-height:.98;letter-spacing:.01em;margin-bottom:26px}
+  .hero h1 .r{color:var(--red)}.hero h1 .b{color:var(--blue)}
+  .hero p{font-size:18px;color:#3c3a35;max-width:480px;margin-bottom:34px}
+  .hero .btns{display:flex;gap:14px;flex-wrap:wrap}
+  .gbtn{font-weight:700;font-size:14px;letter-spacing:.12em;text-transform:uppercase;padding:16px 30px;transition:.15s}
+  .gbtn.red{background:var(--red);color:#fff}
+  .gbtn.red:hover{background:var(--ink)}
+  .gbtn.out{border:3px solid var(--ink)}
+  .gbtn.out:hover{background:var(--ink);color:#fff}
+  .hero .pip{margin-top:26px;font-size:14px;color:var(--dim)}
+  .hero .pip b{color:var(--blue);font-weight:700}
+
+  /* stat bar */
+  .stats{border-top:4px solid var(--ink);border-bottom:4px solid var(--ink);display:grid;grid-template-columns:repeat(4,1fr)}
+  .stat{padding:26px;text-align:center;border-right:4px solid var(--ink)}
+  .stat:last-child{border-right:none}
+  .stat .v{font-size:38px;font-weight:800;line-height:1}
+  .stat:nth-child(1) .v{color:var(--red)}.stat:nth-child(2) .v{color:var(--blue)}
+  .stat:nth-child(3) .v{color:var(--yellow)}.stat:nth-child(4) .v{color:var(--ink)}
+  .stat .k{font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+  @media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}.stat:nth-child(2){border-right:none}.stat:nth-child(1),.stat:nth-child(2){border-bottom:4px solid var(--ink)}}
+
+  /* products */
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:0;border:4px solid var(--ink)}
+  .prod{padding:44px 38px;position:relative;overflow:hidden}
+  .prod:first-child{border-right:4px solid var(--ink)}
+  .prod .geom{position:absolute;top:-40px;right:-40px;width:140px;height:140px}
+  .prod.p1 .geom{background:var(--blue);border-radius:50%}
+  .prod.p2 .geom{background:var(--yellow);border-radius:0}
+  .prod .lic{font-size:12px;font-weight:700;letter-spacing:.24em;text-transform:uppercase;margin-bottom:18px;display:block}
+  .prod.p1 .lic{color:var(--blue)}.prod.p2 .lic{color:#b58407}
+  .prod h3{font-size:32px;font-weight:800;text-transform:uppercase;margin-bottom:12px;position:relative;z-index:1}
+  .prod p{color:#3c3a35;font-size:15.5px;margin-bottom:20px;position:relative;z-index:1}
+  .prod ul{list-style:none;position:relative;z-index:1}
+  .prod li{padding:10px 0;border-top:2px solid var(--ink);font-size:15px;font-weight:500}
+  .prod li::before{content:'■ ';font-size:10px;vertical-align:2px}
+  .prod.p1 li::before{color:var(--blue)}
+  .prod.p2 li::before{color:var(--red)}
+  @media(max-width:820px){.duo{grid-template-columns:1fr}.prod:first-child{border-right:none;border-bottom:4px solid var(--ink)}}
+
+  /* lifecycle — shape-coded steps */
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+  .step{border:3px solid var(--ink);background:#fff;padding:20px;position:relative}
+  .step .glyph{width:30px;height:30px;margin-bottom:14px}
+  .step:nth-child(4n+1) .glyph{background:var(--red);border-radius:50%}
+  .step:nth-child(4n+2) .glyph{background:var(--blue)}
+  .step:nth-child(4n+3) .glyph{background:var(--yellow);clip-path:polygon(50% 0,100% 100%,0 100%)}
+  .step:nth-child(4n) .glyph{background:var(--ink);border-radius:15px 15px 0 0}
+  .step .n{font-weight:800;font-size:13px;letter-spacing:.2em;color:var(--dim)}
+  .step h4{font-size:19px;font-weight:800;text-transform:uppercase;margin:4px 0 12px}
+  .step img{border:2px solid var(--ink);width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top left}
+  .step.wide{grid-column:span 2}
+  @media(max-width:920px){.steps{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:540px){.steps{grid-template-columns:1fr}.step.wide{grid-column:span 1}}
+
+  /* leakage: circle vs square */
+  .duel{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .fighter{border:4px solid var(--ink);padding:44px 34px;text-align:center;position:relative}
+  .fighter .shape-big{width:150px;height:150px;margin:0 auto 24px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:34px}
+  .fighter.bad .shape-big{background:var(--red);border-radius:50%}
+  .fighter.good .shape-big{background:var(--blue);border-radius:0}
+  .fighter .name{font-weight:800;font-size:15px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:8px}
+  .fighter.bad .name{color:var(--red)}
+  .fighter.good .name{color:var(--blue)}
+  .fighter .cap{font-size:13.5px;color:var(--dim);margin-bottom:18px}
+  .fighter ul{list-style:none;text-align:left;max-width:340px;margin:0 auto;font-size:14px}
+  .fighter li{padding:8px 0;border-top:2px solid var(--ink)}
+  @media(max-width:820px){.duel{grid-template-columns:1fr}}
+
+  /* features */
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);border:4px solid var(--ink)}
+  .feat{padding:28px;border-right:4px solid var(--ink);border-bottom:4px solid var(--ink)}
+  .feat:nth-child(3n){border-right:none}
+  .feat:nth-last-child(-n+3){border-bottom:none}
+  .feat .mark{width:20px;height:20px;margin-bottom:12px}
+  .feat:nth-child(3n+1) .mark{background:var(--red);border-radius:50%}
+  .feat:nth-child(3n+2) .mark{background:var(--blue)}
+  .feat:nth-child(3n) .mark{background:var(--yellow);clip-path:polygon(50% 0,100% 100%,0 100%)}
+  .feat h4{font-size:17px;font-weight:800;text-transform:uppercase;margin-bottom:6px}
+  .feat p{font-size:13.5px;color:var(--dim)}
+  @media(max-width:820px){.feats{grid-template-columns:1fr}.feat{border-right:none;border-bottom:4px solid var(--ink)}.feat:last-child{border-bottom:none}}
+
+  details{border-bottom:3px solid var(--ink);padding:22px 0}
+  summary{cursor:pointer;font-weight:800;font-size:19px;text-transform:uppercase;list-style:none;display:flex;justify-content:space-between;align-items:center}
+  summary::after{content:'+';font-size:26px;color:var(--red)}
+  details[open] summary::after{content:'–';color:var(--blue)}
+  details p{margin-top:12px;color:#3c3a35;font-size:15px;max-width:680px}
+
+  .cta{background:var(--ink);color:var(--paper);text-align:center;padding:90px 28px;position:relative;overflow:hidden}
+  .cta .shape.cc{width:200px;height:200px;background:var(--red);border-radius:50%;left:-60px;top:-60px}
+  .cta .shape.ct{width:0;height:0;border-left:80px solid transparent;border-right:80px solid transparent;border-bottom:140px solid var(--yellow);right:4%;bottom:-40px}
+  .cta .shape.cb{width:120px;height:120px;background:var(--blue);right:18%;top:-50px}
+  .cta h2{font-size:clamp(36px,6vw,68px);font-weight:800;text-transform:uppercase;line-height:1;margin-bottom:16px;position:relative;z-index:2}
+  .cta p{color:#b9b6ae;margin-bottom:32px;position:relative;z-index:2}
+  .cta .gbtn{position:relative;z-index:2}
+
+  footer{padding:26px 0;display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  footer a:hover{color:var(--red)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="dot"></span>Skyulf</div>
+    <nav>
+      <a href="#products">Products</a><a href="#lifecycle">Lifecycle</a><a href="#leakage">Leakage</a><a href="#features">Features</a><a href="#faq">FAQ</a>
+    </nav>
+    <a class="demo" href="https://api.skyulf.com/" target="_blank" rel="noopener">Live demo</a>
+  </header>
+
+  <section class="hero">
+    <div class="shape c1"></div><div class="shape c2"></div><div class="shape c3"></div><div class="shape bar"></div>
+    <div class="hero-inner">
+      <div class="kick">Form follows function</div>
+      <h1>Pipelines<br><span class="r">you can</span><br><span class="b">trust.</span></h1>
+      <p>Skyulf gives scikit-learn the structure it deserves: visual canvas or plain Python, honest validation, and production in one continuous form.</p>
+      <div class="btns">
+        <a class="gbtn red" href="https://api.skyulf.com/" target="_blank" rel="noopener">Try the demo</a>
+        <a class="gbtn out" href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <div class="pip">$ <b>pip install skyulf-core</b></div>
+    </div>
+  </section>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="v">35</div><div class="k">Node types</div></div>
+  <div class="stat"><div class="v">11</div><div class="k">Workspaces</div></div>
+  <div class="stat"><div class="v">2266</div><div class="k">Tests</div></div>
+  <div class="stat"><div class="v">0€</div><div class="k">Forever</div></div>
+</div>
+
+<section id="products">
+  <div class="wrap">
+    <h2 class="sec">Two forms,<br>one function</h2>
+    <p class="sec-sub">Both compile to plain scikit-learn objects. Circle or square — the engine is the same.</p>
+    <div class="duo">
+      <div class="prod p1">
+        <div class="geom"></div>
+        <span class="lic">Skyulf Platform · AGPLv3</span>
+        <h3>The circle</h3>
+        <p>The complete self-hosted platform: canvas, EDA, registry, deploy, drift.</p>
+        <ul>
+          <li>Visual canvas — 35 nodes, multi-branch</li>
+          <li>Auto EDA per datasource</li>
+          <li>Fingerprint + model card registry</li>
+          <li>Drift: KS · PSI · Wasserstein · KL</li>
+        </ul>
+      </div>
+      <div class="prod p2">
+        <div class="geom"></div>
+        <span class="lic">skyulf-core · Apache-2.0</span>
+        <h3>The square</h3>
+        <p>The engine as a library — notebooks, scripts, CI. No server needed.</p>
+        <ul>
+          <li>pip install skyulf-core</li>
+          <li>validate_leakage_safety()</li>
+          <li>pandas &amp; Polars · Python 3.12</li>
+          <li>2,266 tests per release</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="lifecycle" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec">Seven elements</h2>
+    <p class="sec-sub">Composed in order — each stage a shape in the system.</p>
+    <div class="steps">
+      <div class="step"><div class="glyph"></div><div class="n">01</div><h4>Connect</h4><img src="../static/img/datasource.jpg" alt="Datasources"></div>
+      <div class="step"><div class="glyph"></div><div class="n">02</div><h4>Auto EDA</h4><img src="../static/img/eda/dashboardeda.jpg" alt="EDA"></div>
+      <div class="step wide"><div class="glyph"></div><div class="n">03</div><h4>Build on canvas</h4><img src="../static/img/canvas.jpg" alt="Canvas"></div>
+      <div class="step"><div class="glyph"></div><div class="n">04</div><h4>Train &amp; tune</h4><img src="../static/img/jobs.jpg" alt="Jobs"></div>
+      <div class="step"><div class="glyph"></div><div class="n">05</div><h4>Compare</h4><img src="../static/img/experiments.jpg" alt="Experiments"></div>
+      <div class="step"><div class="glyph"></div><div class="n">06</div><h4>Deploy</h4><img src="../static/img/deployments.jpg" alt="Deployments"></div>
+      <div class="step"><div class="glyph"></div><div class="n">07</div><h4>Drift watch</h4><img src="../static/img/drift/drift.jpg" alt="Drift"></div>
+    </div>
+  </div>
+</section>
+
+<section id="leakage" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec">Circle of doubt,<br>square of trust</h2>
+    <p class="sec-sub">Leakage inflates the score. Skyulf flattens the illusion.</p>
+    <div class="duel">
+      <div class="fighter bad">
+        <div class="shape-big">94%</div>
+        <div class="name">Leaked validation</div>
+        <div class="cap">the encoder read the answers before the exam</div>
+        <ul>
+          <li>Fitted before the split</li>
+          <li>Labels bleed into folds</li>
+          <li>Production: 71% — surprise</li>
+        </ul>
+      </div>
+      <div class="fighter good">
+        <div class="shape-big">71%</div>
+        <div class="name">Honest validation</div>
+        <div class="cap">the score that survives production</div>
+        <ul>
+          <li>learn / apply split per node</li>
+          <li>validate_leakage_safety() scan</li>
+          <li>Fingerprint + model card</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="padding-top:0">
+  <div class="wrap">
+    <h2 class="sec">The construction kit</h2>
+    <p class="sec-sub">Every piece included.</p>
+    <div class="feats">
+      <div class="feat"><div class="mark"></div><h4>Tuning</h4><p>Optuna, grid, random, halving — auto-logged.</p></div>
+      <div class="feat"><div class="mark"></div><h4>SHAP</h4><p>Feature importance per artifact.</p></div>
+      <div class="feat"><div class="mark"></div><h4>Notebook export</h4><p>Canvas → clean .ipynb.</p></div>
+      <div class="feat"><div class="mark"></div><h4>Audit log</h4><p>Every change recorded.</p></div>
+      <div class="feat"><div class="mark"></div><h4>Ensembles</h4><p>Multi-branch merges.</p></div>
+      <div class="feat"><div class="mark"></div><h4>Text nodes</h4><p>TF-IDF beside tabular.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" style="padding-top:0">
+  <div class="wrap" style="max-width:820px">
+    <h2 class="sec">FAQ</h2>
+    <p class="sec-sub">Direct forms, direct answers.</p>
+    <details><summary>Is it free?</summary><p>Yes. Platform AGPLv3, library Apache-2.0. Self-hosted, no accounts.</p></details>
+    <details><summary>Lock-in?</summary><p>No. Pipelines compile to plain scikit-learn and export to notebooks.</p></details>
+    <details><summary>Local run?</summary><p>git clone https://github.com/flyingriverhorse/skyulf &amp;&amp; docker compose up</p></details>
+    <details><summary>Data?</summary><p>CSV / Parquet via pandas or Polars, plus text columns. Python 3.12.</p></details>
+  </div>
+</section>
+
+<div class="cta">
+  <div class="shape cc"></div><div class="shape ct"></div><div class="shape cb"></div>
+  <h2>Compose your pipeline</h2>
+  <p>Live demo running. No signup. Your data stays on your machine.</p>
+  <a class="gbtn red" href="https://api.skyulf.com/" target="_blank" rel="noopener">Open live demo</a>
+</div>
+
+<div class="wrap">
+  <footer>
+    <span>Skyulf — scikit-learn pipelines you can trust</span>
+    <span><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" rel="noopener">GitHub</a> / <a href="https://pypi.org/project/skyulf-core/" target="_blank" rel="noopener">PyPI</a> / <a href="../manual/index.html">Docs</a></span>
+  </footer>
+</div>
+
+</body>
+</html>

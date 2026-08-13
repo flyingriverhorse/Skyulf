@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf · V20 — Pixel Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0f0f1b; --ink:#e8e8f0; --green:#3ee06c; --red:#ff3b5c; --yellow:#ffd93b; --blue:#4da6ff; --purple:#b26bff; }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:'VT323',monospace;background:var(--bg);color:var(--ink);font-size:22px;line-height:1.45;
+    image-rendering:pixelated;
+  }
+  h1,h2,h3,.px{font-family:'Press Start 2P',monospace;line-height:1.6;}
+  .wrap{max-width:960px;margin:0 auto;padding:0 20px;}
+  section{padding:60px 0;}
+  .pbox{border:4px solid var(--ink);box-shadow:8px 8px 0 #000;padding:28px;background:#171726;}
+  .pximg{image-rendering:pixelated;width:100%;display:block;border:4px solid var(--ink);}
+  a{color:var(--blue);}
+  /* hero */
+  .hero{text-align:center;padding:80px 0 50px;}
+  .hero .coin{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--yellow);margin-bottom:26px;animation:blink 1s steps(2) infinite;}
+  @keyframes blink{50%{opacity:0;}}
+  .hero h1{font-size:clamp(22px,4.6vw,40px);color:var(--green);text-shadow:4px 4px 0 #063d1a;margin-bottom:8px;}
+  .hero h1 span{color:var(--ink);}
+  .hero .sub{color:#b9b9d0;max-width:640px;margin:22px auto 34px;font-size:24px;}
+  .pbtn{font-family:'Press Start 2P',monospace;font-size:12px;display:inline-block;text-decoration:none;padding:18px 26px;border:4px solid var(--ink);box-shadow:6px 6px 0 #000;margin:6px;color:#000;background:var(--green);transition:transform .1s;}
+  .pbtn:hover{transform:translate(2px,2px);box-shadow:4px 4px 0 #000;}
+  .pbtn.alt{background:var(--yellow);}
+  .pbtn.blue{background:var(--blue);}
+  /* character select */
+  .select h2{font-size:clamp(16px,3vw,24px);text-align:center;margin-bottom:34px;color:var(--yellow);}
+  .chars{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;}
+  .char{text-align:center;padding:30px 20px;border:4px solid var(--ink);box-shadow:8px 8px 0 #000;background:#171726;}
+  .char .avatar{font-size:64px;line-height:1;margin-bottom:16px;image-rendering:pixelated;}
+  .char h3{font-size:14px;margin-bottom:14px;}
+  .char.c1 h3{color:var(--green);}
+  .char.c2 h3{color:var(--blue);}
+  .char p{font-size:20px;color:#b9b9d0;}
+  .char .stats{margin-top:14px;font-size:18px;text-align:left;}
+  .bar{height:14px;border:3px solid var(--ink);margin:4px 0 10px;background:#0a0a12;}
+  .bar i{display:block;height:100%;}
+  .bar.g i{background:var(--green);} .bar.b i{background:var(--blue);} .bar.y i{background:var(--yellow);}
+  /* levels */
+  .levels h2{font-size:clamp(16px,3vw,24px);text-align:center;margin-bottom:34px;color:var(--purple);}
+  .lvl{display:grid;grid-template-columns:70px 1fr auto;gap:18px;align-items:center;border:4px solid var(--ink);background:#171726;box-shadow:6px 6px 0 #000;padding:16px 20px;margin-bottom:16px;}
+  .lvl .n{font-family:'Press Start 2P',monospace;color:var(--yellow);font-size:15px;}
+  .lvl .t h3{font-size:12px;margin-bottom:6px;color:var(--ink);}
+  .lvl .t p{font-size:19px;color:#b9b9d0;}
+  .lvl .st{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--green);}
+  /* boss fight */
+  .boss{border:4px solid var(--red);box-shadow:8px 8px 0 #000;background:#1d1220;padding:34px;}
+  .boss h2{font-size:clamp(15px,2.8vw,22px);color:var(--red);text-align:center;margin-bottom:26px;}
+  .fight{display:grid;grid-template-columns:1fr 60px 1fr;gap:10px;align-items:center;text-align:center;}
+  .side .name{font-family:'Press Start 2P',monospace;font-size:11px;margin-bottom:12px;}
+  .side.bad .name{color:var(--red);}
+  .side.good .name{color:var(--green);}
+  .hp{height:26px;border:4px solid var(--ink);background:#0a0a12;margin-bottom:10px;}
+  .hp i{display:block;height:100%;}
+  .side.bad .hp i{background:var(--red);width:94%;}
+  .side.good .hp i{background:var(--green);width:71%;}
+  .side .num{font-family:'Press Start 2P',monospace;font-size:20px;}
+  .side.bad .num{color:var(--red);}
+  .side.good .num{color:var(--green);}
+  .vsmark{font-family:'Press Start 2P',monospace;color:var(--yellow);font-size:18px;}
+  .boss .log{margin-top:26px;font-size:20px;color:#d8b9ff;background:#120a18;border:3px solid var(--purple);padding:16px 20px;}
+  /* gallery */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:22px;}
+  .shot{padding:12px;}
+  .shot .cap{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--yellow);margin-top:10px;text-align:center;}
+  /* items */
+  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:18px;}
+  .item{border:4px solid var(--ink);box-shadow:5px 5px 0 #000;background:#171726;padding:18px;text-align:center;}
+  .item .ic{font-size:34px;}
+  .item h3{font-size:10px;margin:10px 0 8px;color:var(--blue);}
+  .item p{font-size:17px;color:#b9b9d0;}
+  /* faq */
+  .faq details{border:4px solid var(--ink);background:#171726;box-shadow:5px 5px 0 #000;margin-bottom:14px;}
+  .faq summary{cursor:pointer;list-style:none;font-family:'Press Start 2P',monospace;font-size:11px;padding:16px 18px;color:var(--yellow);}
+  .faq details p{padding:0 18px 16px;font-size:20px;color:#cfcfe6;}
+  /* cta */
+  .cta{text-align:center;padding:80px 0;}
+  .cta h2{font-size:clamp(18px,3.6vw,30px);color:var(--green);margin-bottom:26px;text-shadow:4px 4px 0 #063d1a;}
+  .cta .press{font-family:'Press Start 2P',monospace;font-size:13px;color:var(--yellow);animation:blink 1s steps(2) infinite;margin-top:26px;}
+  footer{text-align:center;padding:40px 0 50px;font-size:18px;color:#8a8aa5;}
+  @media(max-width:680px){.fight{grid-template-columns:1fr;}.vsmark{padding:8px 0;}.lvl{grid-template-columns:50px 1fr;}.lvl .st{display:none;}}
+</style>
+</head>
+<body>
+
+<section class="hero wrap">
+  <div class="coin">★ INSERT COIN ★</div>
+  <h1>SKYULF<br><span>TRUSTED PIPELINE QUEST</span></h1>
+  <p class="sub">A 7-stage adventure where your validation score actually means something. Defeat the Leakage Boss. Ship honest models.</p>
+  <a class="pbtn" href="https://api.skyulf.com/">▶ START DEMO</a>
+  <a class="pbtn alt" href="https://pypi.org/project/skyulf-core/">GET CARTRIDGE</a>
+</section>
+
+<section class="select wrap">
+  <h2>SELECT YOUR PIPELINE</h2>
+  <div class="chars">
+    <div class="char c1">
+      <div class="avatar">🧙</div>
+      <h3>SKYULF PLATFORM</h3>
+      <p>The full party: canvas, EDA, registry, deploy, drift watch.</p>
+      <div class="stats">
+        POWER <div class="bar g"><i style="width:92%"></i></div>
+        LICENSE <div class="bar g"><i style="width:100%"></i></div>
+        <span style="color:var(--green)">AGPLv3 · SELF-HOST</span>
+      </div>
+    </div>
+    <div class="char c2">
+      <div class="avatar">🥷</div>
+      <h3>SKYULF-CORE</h3>
+      <p>The stealth engine: 35 nodes, pip install, pandas & Polars.</p>
+      <div class="stats">
+        SPEED <div class="bar b"><i style="width:95%"></i></div>
+        TESTS <div class="bar b"><i style="width:100%"></i></div>
+        <span style="color:var(--blue)">APACHE-2.0 · 2,266 TESTS</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="levels wrap">
+  <h2>WORLD MAP — 7 STAGES</h2>
+  <div class="lvl"><span class="n">1-1</span><div class="t"><h3>CONNECT</h3><p>SQL, Snowflake, BigQuery, CSV — grab the data key.</p></div><span class="st">★ CLEAR</span></div>
+  <div class="lvl"><span class="n">1-2</span><div class="t"><h3>EXPLORE</h3><p>EDA dashboards reveal hidden traps before you jump.</p></div><span class="st">★ CLEAR</span></div>
+  <div class="lvl"><span class="n">1-3</span><div class="t"><h3>DESIGN</h3><p>Canvas time: learn nodes train, apply nodes stay blind.</p></div><span class="st">★ CLEAR</span></div>
+  <div class="lvl"><span class="n">1-4</span><div class="t"><h3>TRAIN &amp; TUNE</h3><p>Optuna, grid, random, halving — grind those trials.</p></div><span class="st">★ CLEAR</span></div>
+  <div class="lvl"><span class="n">2-1</span><div class="t"><h3>REGISTER</h3><p>Fingerprint + model card stamped on every artifact.</p></div><span class="st">★ CLEAR</span></div>
+  <div class="lvl"><span class="n">2-2</span><div class="t"><h3>DEPLOY</h3><p>REST endpoints and batch jobs enter the real world.</p></div><span class="st">★ CLEAR</span></div>
+  <div class="lvl"><span class="n">2-3</span><div class="t"><h3>MONITOR</h3><p>Drift sentries: KS, PSI, Wasserstein, KL on patrol.</p></div><span class="st">★ CLEAR</span></div>
+</section>
+
+<section class="wrap">
+  <div class="boss">
+    <h2>⚔ BOSS FIGHT: LEAKAGE ⚔</h2>
+    <div class="fight">
+      <div class="side bad">
+        <div class="name">LEAKED MODEL</div>
+        <div class="hp"><i></i></div>
+        <div class="num">94%</div>
+        <p style="font-size:18px;margin-top:8px;color:#e6a5b2;">fake HP — fitted on the test set</p>
+      </div>
+      <div class="vsmark">VS</div>
+      <div class="side good">
+        <div class="name">SKYULF MODEL</div>
+        <div class="hp"><i></i></div>
+        <div class="num">71%</div>
+        <p style="font-size:18px;margin-top:8px;color:#a5e6b2;">real HP — survives production</p>
+      </div>
+    </div>
+    <div class="log">
+      &gt; LEAKED MODEL uses PEEK AT VALIDATION!<br>
+      &gt; It's super effective... against itself. 94% → 71% in production.<br>
+      &gt; SKYULF casts VALIDATE_LEAKAGE_SAFETY()!<br>
+      &gt; Leakage fainted. You gained 1,000 TRUST POINTS.
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2 class="px" style="font-size:clamp(15px,2.8vw,22px);text-align:center;margin-bottom:30px;color:var(--blue);">SCREENSHOTS FROM THE QUEST</h2>
+  <div class="gallery">
+    <div class="pbox shot"><img class="pximg" src="../static/img/canvas.jpg" alt="Canvas" loading="lazy"><div class="cap">STAGE 1-3 · CANVAS</div></div>
+    <div class="pbox shot"><img class="pximg" src="../static/img/eda/dashboardeda.jpg" alt="EDA" loading="lazy"><div class="cap">STAGE 1-2 · EDA</div></div>
+    <div class="pbox shot"><img class="pximg" src="../static/img/registry.jpg" alt="Registry" loading="lazy"><div class="cap">STAGE 2-1 · REGISTRY</div></div>
+    <div class="pbox shot"><img class="pximg" src="../static/img/deployments.jpg" alt="Deploy" loading="lazy"><div class="cap">STAGE 2-2 · DEPLOY</div></div>
+    <div class="pbox shot"><img class="pximg" src="../static/img/drift/drift.jpg" alt="Drift" loading="lazy"><div class="cap">STAGE 2-3 · DRIFT</div></div>
+    <div class="pbox shot"><img class="pximg" src="../static/img/jobs.jpg" alt="Jobs" loading="lazy"><div class="cap">BONUS · JOBS</div></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2 class="px" style="font-size:clamp(15px,2.8vw,22px);text-align:center;margin-bottom:30px;color:var(--yellow);">ITEM SHOP</h2>
+  <div class="items">
+    <div class="item"><div class="ic">🧩</div><h3>35 NODES</h3><p>Every tool for every dungeon.</p></div>
+    <div class="item"><div class="ic">🗺️</div><h3>11 WORKSPACES</h3><p>The full overworld map.</p></div>
+    <div class="item"><div class="ic">🔍</div><h3>SHAP</h3><p>Reveal hidden mechanics.</p></div>
+    <div class="item"><div class="ic">📓</div><h3>NOTEBOOK EXPORT</h3><p>Take your save file anywhere.</p></div>
+    <div class="item"><div class="ic">📜</div><h3>AUDIT LOG</h3><p>Every move recorded.</p></div>
+    <div class="item"><div class="ic">🤝</div><h3>ENSEMBLES</h3><p>Party up your models.</p></div>
+  </div>
+</section>
+
+<section class="faq wrap">
+  <h2 class="px" style="font-size:clamp(15px,2.8vw,22px);text-align:center;margin-bottom:30px;color:var(--purple);">TOWN FOLK SAY…</h2>
+  <details open><summary>"Is this game free?"</summary><p>Free as in freedom! skyulf-core is Apache-2.0, the Platform is AGPLv3. <code>git clone</code> + <code>docker compose up</code> and the quest begins at home.</p></details>
+  <details><summary>"Is it enterprise-ready?"</summary><p>It's an honest v0.1 cartridge: real code, 2,266 passing tests, real manual. No fake "999 games in 1" claims on the box.</p></details>
+  <details><summary>"Why not just use a notebook?"</summary><p>Notebooks are the practice mode. In the ranked ladder of production, you need to know which data fitted your scaler — and Skyulf's registry always knows.</p></details>
+  <details><summary>"What are the system requirements?"</summary><p>Python 3.12, a scikit-learn engine, pandas or Polars. Runs on any machine that can run Docker.</p></details>
+</section>
+
+<section class="cta wrap">
+  <h2>READY PLAYER ONE?</h2>
+  <a class="pbtn" href="https://api.skyulf.com/">▶ PLAY NOW — api.skyulf.com</a>
+  <a class="pbtn blue" href="../manual/index.html">READ MANUAL</a>
+  <div class="press">PRESS START</div>
+</section>
+
+<footer class="wrap">
+  © 2026 SKYULF SOFT · <a href="https://github.com/flyingriverhorse/skyulf">GitHub</a> · <a href="https://pypi.org/project/skyulf-core/">PyPI</a> · LICENSED FOR HONEST ML ONLY
+</footer>
+
+</body>
+</html>
