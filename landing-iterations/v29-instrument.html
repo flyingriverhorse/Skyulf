@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf — Your model says 94%. Production says 71%.</title>
+<meta name="description" content="That gap is data leakage. Skyulf's self-hosted ML workspace makes leaky pipelines structurally impossible — and proves it before every run. AGPL platform, Apache-2.0 Python core.">
+<link rel="icon" type="image/png" href="../static/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --carbon:#0B0E11;
+    --panel:#12161C;
+    --panel-2:#0E1216;
+    --well:#090B0E;
+    --line:#232A33;
+    --line-soft:#1A2027;
+    --ink:#E8ECF1;
+    --soft:#B6BFCA;
+    --muted:#9AA4B2;
+    --dim:#78828F;
+    --amber:#FFB454;
+    --amber-tint:rgba(255,180,84,.08);
+    --red:#FF6B5E;
+    --red-tint:rgba(255,107,94,.08);
+    --green:#4ADE80;
+    --green-deep:#22C55E;
+    --green-tint:rgba(74,222,128,.08);
+    --cyan:#67E8F9;
+    --display:'Space Grotesk',system-ui,sans-serif;
+    --body:'IBM Plex Sans',system-ui,sans-serif;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --radius:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--carbon);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--green);color:#06220F}
+  :focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:3px}
+  a{color:inherit}
+  img{display:block;max-width:100%}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+  .mono{font-family:var(--mono)}
+  .skip{position:absolute;left:-9999px;top:0;background:var(--green);color:#06220F;padding:10px 18px;border-radius:0 0 8px 0;z-index:99;font-weight:600;text-decoration:none}
+  .skip:focus{left:0}
+  ::-webkit-scrollbar{width:12px;height:10px}
+  ::-webkit-scrollbar-track{background:var(--carbon)}
+  ::-webkit-scrollbar-thumb{background:#2A323D;border-radius:8px;border:3px solid var(--carbon)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--green-deep)}
+
+  /* ---------- corner-bracket frames ---------- */
+  .frame{position:relative}
+  .frame::before{content:'';position:absolute;inset:0;pointer-events:none;background-repeat:no-repeat;
+    background-image:
+      linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),
+      linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),
+      linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),
+      linear-gradient(var(--bk,var(--green)),var(--bk,var(--green))),linear-gradient(var(--bk,var(--green)),var(--bk,var(--green)));
+    background-position:top left,top left,top right,top right,bottom left,bottom left,bottom right,bottom right;
+    background-size:18px 2px,2px 18px,18px 2px,2px 18px,18px 2px,2px 18px,18px 2px,2px 18px;
+  }
+
+  /* ---------- utility bar ---------- */
+  .util{background:var(--well);border-bottom:1px solid var(--line-soft);color:var(--muted);font-size:13.5px}
+  .util .wrap{display:flex;align-items:center;gap:14px;min-height:44px;flex-wrap:wrap;padding-top:6px;padding-bottom:6px}
+  .util .chip{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.09em;color:var(--green);border:1px solid rgba(74,222,128,.35);border-radius:4px;padding:3px 8px;white-space:nowrap}
+  .util .right{margin-left:auto;display:flex;gap:18px}
+  .util a{color:var(--soft);text-decoration:none;font-weight:500}
+  .util a:hover{color:var(--green)}
+
+  /* ---------- nav ---------- */
+  header.nav{position:sticky;top:0;z-index:50;background:rgba(11,14,17,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line-soft)}
+  .nav .wrap{display:flex;align-items:center;gap:32px;min-height:64px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.01em;text-decoration:none}
+  .brand img{width:28px;height:28px}
+  .nav nav{display:flex;gap:24px;margin-left:8px}
+  .nav nav a{text-decoration:none;font-weight:500;font-size:14.5px;color:var(--muted)}
+  .nav nav a:hover{color:var(--green)}
+  .nav .ctas{margin-left:auto;display:flex;gap:12px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:8px;font-weight:600;font-size:15px;font-family:var(--body);text-decoration:none;padding:12px 22px;border:1px solid transparent;cursor:pointer;transition:transform .15s ease,background .15s ease,border-color .15s ease,color .15s ease}
+  .btn:hover{transform:translateY(-1px)}
+  .btn.primary{background:var(--green-deep);color:#06220F;box-shadow:0 0 0 1px rgba(74,222,128,.35),0 8px 28px -10px rgba(34,197,94,.55)}
+  .btn.primary:hover{background:var(--green)}
+  .btn.ghost{background:transparent;border-color:var(--line);color:var(--soft)}
+  .btn.ghost:hover{border-color:var(--green);color:var(--green)}
+  @media(max-width:960px){.nav nav{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;padding:92px 0 72px;border-bottom:1px solid var(--line-soft);overflow:hidden}
+  .hero::before{content:'';position:absolute;inset:0;pointer-events:none;
+    background:
+      radial-gradient(52% 44% at 82% 8%, rgba(255,107,94,.09), transparent 70%),
+      radial-gradient(40% 36% at 8% 92%, rgba(74,222,128,.06), transparent 70%);
+  }
+  .hero::after{content:'';position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(70% 60% at 60% 30%, #000 20%, transparent 78%);
+    -webkit-mask-image:radial-gradient(70% 60% at 60% 30%, #000 20%, transparent 78%);
+  }
+  .hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,6fr) minmax(0,5fr);gap:56px;align-items:center}
+  .eyebrow{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.14em;color:var(--green);margin-bottom:22px;display:inline-flex;align-items:center;gap:10px}
+  .eyebrow::before{content:'';width:26px;height:1px;background:var(--green)}
+  h1{font-family:var(--display);font-weight:700;letter-spacing:-.03em;line-height:1.04;font-size:clamp(40px,5.6vw,72px);text-wrap:balance}
+  h1 .line{display:block;overflow:hidden;padding-bottom:.08em;margin-bottom:-.08em}
+  h1 .num-94{color:var(--amber)}
+  h1 .num-71{color:var(--red)}
+  html.motion h1 .line-in{display:inline-block;transform:translateY(112%)}
+  .hero p.lede{margin:24px 0 32px;font-size:18.5px;color:var(--soft);max-width:54ch}
+  .hero p.lede b{color:var(--ink);font-weight:600}
+  .cta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .codechip{display:inline-flex;align-items:center;gap:12px;background:var(--well);border:1px solid var(--line);color:var(--soft);border-radius:8px;padding:11px 14px;font-family:var(--mono);font-size:13.5px}
+  .codechip .dollar{color:var(--green)}
+  .codechip button{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:5px;font-family:var(--mono);font-size:11px;padding:4px 9px;cursor:pointer;transition:color .15s,border-color .15s}
+  .codechip button:hover{color:var(--green);border-color:var(--green)}
+  .hero .fine{margin-top:22px;font-size:14px;color:var(--dim)}
+  .hero .fine b{color:var(--muted);font-weight:500}
+
+  /* terminal cards */
+  .term{background:var(--well);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:0 30px 70px -30px rgba(0,0,0,.8)}
+  .term .bar{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--line-soft);background:var(--panel-2)}
+  .term .dot{width:9px;height:9px;border-radius:50%;background:#2A323D}
+  .term .title{font-family:var(--mono);font-size:12px;color:var(--dim);margin-left:8px}
+  .term .status{margin-left:auto;font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.08em;padding:3px 9px;border-radius:4px}
+  .term.warn .status{color:var(--amber);background:var(--amber-tint);border:1px solid rgba(255,180,84,.3)}
+  .term.pass .status{color:var(--green);background:var(--green-tint);border:1px solid rgba(74,222,128,.3)}
+  .term pre{padding:20px 22px;font-family:var(--mono);font-size:13px;line-height:1.75;color:var(--soft);white-space:pre-wrap;word-break:break-word}
+  .term .cmd{color:var(--ink)}
+  .term .cmd .dollar{color:var(--green)}
+  .term .warn-t{color:var(--amber)}
+  .term .fail-t{color:var(--red)}
+  .term .ok-t{color:var(--green)}
+  .term .dim-t{color:var(--dim)}
+  .term .exit{display:inline-block;margin-top:10px;font-weight:600}
+  .term.warn .exit{color:var(--red)}
+  .term.pass .exit{color:var(--green)}
+  @media(max-width:960px){.hero .wrap{grid-template-columns:1fr}}
+
+  /* ---------- ruler divider ---------- */
+  .ruler{position:relative;height:34px;border-bottom:1px solid var(--line-soft);overflow:hidden}
+  .ruler .ticks{position:absolute;inset:0;background:repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 14px)}
+  .ruler .ticks.major{background:repeating-linear-gradient(90deg,var(--dim) 0 1px,transparent 1px 140px);height:22px}
+  .ruler .lbl{position:absolute;top:7px;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em}
+
+  /* ---------- facts strip ---------- */
+  .facts{border-bottom:1px solid var(--line-soft);background:var(--panel-2)}
+  .facts .wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+  .fact{padding:28px 26px;border-left:1px solid var(--line-soft)}
+  .fact:first-child{border-left:none}
+  .fact .n{font-family:var(--display);font-weight:700;font-size:32px;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+  .fact .n em{font-style:normal;color:var(--green)}
+  .fact .l{margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.06em;line-height:1.5}
+  @media(max-width:880px){.facts .wrap{grid-template-columns:1fr 1fr}.fact:nth-child(3){border-left:none}.fact{border-top:1px solid var(--line-soft)}.fact:nth-child(-n+2){border-top:none}}
+
+  section{padding:104px 0}
+  h2{font-family:var(--display);font-weight:700;letter-spacing:-.025em;line-height:1.08;font-size:clamp(30px,4.2vw,52px);text-wrap:balance}
+  h2 .em-r{color:var(--red)}
+  h2 .em-a{color:var(--amber)}
+  h2 .em-g{color:var(--green)}
+  .sec-kicker{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.14em;color:var(--dim);margin-bottom:18px;display:flex;align-items:center;gap:10px}
+  .sec-kicker::before{content:'';width:26px;height:1px;background:var(--dim)}
+  .sec-kicker.kg{color:var(--green)}.sec-kicker.kg::before{background:var(--green)}
+  .sec-kicker.kr{color:var(--red)}.sec-kicker.kr::before{background:var(--red)}
+  .sec-kicker.ka{color:var(--amber)}.sec-kicker.ka::before{background:var(--amber)}
+  .sec-lede{margin-top:18px;font-size:18px;color:var(--soft);max-width:64ch}
+
+  /* ---------- problem ---------- */
+  .diag-grid{margin-top:56px;display:grid;gap:24px}
+  .diag{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:30px 32px}
+  .diag .dhead{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap}
+  .diag .dhead h3{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.01em}
+  .diag .tag{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.1em;padding:4px 10px;border-radius:4px}
+  .diag.bad .tag{color:var(--red);background:var(--red-tint);border:1px solid rgba(255,107,94,.3)}
+  .diag.good .tag{color:var(--green);background:var(--green-tint);border:1px solid rgba(74,222,128,.3)}
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .step{flex:1 1 0;min-width:120px;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);padding:13px 14px;display:flex;flex-direction:column;gap:3px;justify-content:center}
+  .step .st{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-weight:500}
+  .step .ss{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+  .step.bad-step{border-color:rgba(255,107,94,.45);background:var(--red-tint)}
+  .step.bad-step .st{color:var(--red)}
+  .step.ok-step{border-color:rgba(74,222,128,.45);background:var(--green-tint)}
+  .step.ok-step .st{color:var(--green)}
+  .arrow{display:flex;align-items:center;padding:0 10px;color:var(--dim);font-family:var(--mono);font-size:16px}
+  .diag .verdict{margin-top:20px;font-family:var(--mono);font-size:13px;line-height:1.7;padding:14px 16px;border-radius:8px}
+  .diag.bad .verdict{color:#FFB0A8;background:var(--red-tint);border:1px dashed rgba(255,107,94,.4)}
+  .diag.good .verdict{color:#A7F3C4;background:var(--green-tint);border:1px dashed rgba(74,222,128,.4)}
+  .split-note{margin-top:26px;max-width:70ch;color:var(--soft);font-size:16.5px}
+  .split-note b{color:var(--ink);font-weight:600}
+  .split-note .mono-g{color:var(--green);font-family:var(--mono);font-size:14.5px}
+
+  /* ---------- method ---------- */
+  .method{background:var(--panel-2);border-block:1px solid var(--line-soft)}
+  .cards3{margin-top:56px;display:grid;grid-template-columns:repeat(3,1fr);gap:22px}
+  .gcard{border:1px solid var(--line);border-radius:var(--radius);background:var(--carbon);padding:30px 28px;display:flex;flex-direction:column;gap:14px}
+  .gcard .gn{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.1em;color:var(--green)}
+  .gcard h3{font-family:var(--display);font-size:22px;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+  .gcard p{color:var(--soft);font-size:15.5px}
+  .gcard ul{list-style:none;display:grid;gap:8px;margin-top:2px}
+  .gcard li{display:flex;gap:10px;font-size:14px;color:var(--muted);line-height:1.55}
+  .gcard li::before{content:'▸';color:var(--green);flex-shrink:0;font-size:12px;line-height:1.9}
+  .method-bottom{margin-top:56px;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:44px;align-items:center}
+  .method-bottom h3{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:-.015em;margin-bottom:14px}
+  .method-bottom p{color:var(--soft);font-size:16.5px}
+  .method-bottom p + p{margin-top:12px}
+  @media(max-width:960px){.cards3{grid-template-columns:1fr}.method-bottom{grid-template-columns:1fr}}
+
+  /* ---------- lifecycle rail ---------- */
+  .life{padding-bottom:0}
+  .life .head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .rail-progress{height:2px;background:var(--line-soft);margin-top:44px;border-radius:2px;overflow:hidden}
+  .rail-progress .bar{height:100%;width:0;background:linear-gradient(90deg,var(--amber),var(--red) 45%,var(--green));transition:width .1s linear}
+  .rail-outer{margin-top:26px}
+  .rail{display:flex;gap:22px;overflow-x:auto;padding:8px 28px 44px;scroll-snap-type:x mandatory;scrollbar-width:thin}
+  .rail .station{flex:0 0 min(480px,82vw);scroll-snap-align:start;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+  .station .shead{display:flex;align-items:center;gap:14px;padding:20px 24px;border-bottom:1px solid var(--line-soft)}
+  .station .idx{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--green);letter-spacing:.1em}
+  .station:nth-child(3n+2) .idx{color:var(--amber)}
+  .station:nth-child(3n) .idx{color:var(--cyan)}
+  .station h3{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:-.01em}
+  .station .scopy{padding:18px 24px 20px;color:var(--soft);font-size:15px}
+  .station .scopy ul{list-style:none;display:grid;gap:6px;margin-top:10px}
+  .station .scopy li{display:flex;gap:9px;font-size:13.5px;color:var(--muted)}
+  .station .scopy li::before{content:'·';color:var(--green);font-weight:700;flex-shrink:0}
+  .station .shot{margin-top:auto;padding:0 24px 24px}
+  .station .shot img{border:1px solid var(--line);border-radius:8px;width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top left;background:var(--well)}
+  @media(min-width:960px){html.motion .rail{overflow:visible;padding-left:max(28px,calc((100vw - 1180px)/2 + 28px));scroll-snap-type:none}}
+
+  /* ---------- interfaces ---------- */
+  .duo{margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .iface{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+  .iface .ihead{padding:26px 30px 20px;border-bottom:1px solid var(--line-soft);display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .iface h3{font-family:var(--display);font-size:24px;font-weight:600;letter-spacing:-.01em}
+  .iface .tag{font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.1em;padding:4px 10px;border-radius:4px}
+  .iface.visual .tag{color:var(--green);background:var(--green-tint);border:1px solid rgba(74,222,128,.3)}
+  .iface.code .tag{color:var(--cyan);background:rgba(103,232,249,.07);border:1px solid rgba(103,232,249,.3)}
+  .iface .ibody{padding:24px 30px 30px;display:flex;flex-direction:column;gap:18px;flex:1}
+  .iface p{color:var(--soft);font-size:15.5px}
+  .iface ul{list-style:none;display:grid;gap:9px}
+  .iface li{display:flex;gap:10px;font-size:14.5px;color:var(--muted);line-height:1.5}
+  .iface li::before{content:'▸';color:var(--green);font-size:12px;line-height:1.85;flex-shrink:0}
+  .iface.code li::before{color:var(--cyan)}
+  .iface .shot{padding:0 30px 6px}
+  .iface .shot img{border:1px solid var(--line);border-radius:8px;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top left}
+  .iface .codechip{width:100%;justify-content:space-between;background:var(--well);margin-top:auto}
+  .py{background:var(--well);border:1px solid var(--line);border-radius:8px;padding:18px 20px;font-family:var(--mono);font-size:12.5px;line-height:1.75;overflow-x:auto;color:var(--soft);white-space:pre}
+  .py .kw{color:var(--red)}
+  .py .fn{color:var(--cyan)}
+  .py .str{color:var(--green)}
+  .py .cm{color:var(--dim)}
+  .py .var{color:var(--amber)}
+  @media(max-width:880px){.duo{grid-template-columns:1fr}}
+
+  /* ---------- evidence ---------- */
+  .evidence{background:var(--panel-2);border-block:1px solid var(--line-soft)}
+  .ev-grid{margin-top:56px;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:26px}
+  .cert{border:1px solid var(--line);border-radius:var(--radius);background:var(--carbon);padding:34px}
+  .cert h3{font-family:var(--display);font-size:21px;font-weight:600;margin-bottom:22px}
+  .cert table{width:100%;border-collapse:collapse;font-size:14.5px}
+  .cert th{text-align:left;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--dim);padding:10px 12px;border-bottom:1px solid var(--line)}
+  .cert td{padding:12px;border-bottom:1px solid var(--line-soft);color:var(--soft)}
+  .cert td:first-child{color:var(--muted);font-size:13.5px}
+  .cert td .big{font-family:var(--display);font-weight:700;font-size:24px;color:var(--ink);letter-spacing:-.02em}
+  .cert td .big em{font-style:normal;color:var(--green)}
+  .ev-side{display:flex;flex-direction:column;gap:22px}
+  .ev-card{border:1px solid var(--line);border-radius:var(--radius);background:var(--carbon);padding:26px 28px}
+  .ev-card h4{font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;color:var(--green);margin-bottom:14px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chips span{font-family:var(--mono);font-size:12px;color:var(--soft);border:1px solid var(--line);border-radius:6px;padding:6px 11px;background:var(--panel-2)}
+  .chips span.hl{color:var(--green);border-color:rgba(74,222,128,.4)}
+  .ev-card p{color:var(--muted);font-size:13.5px;margin-top:12px}
+  .shots2{margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .shotcard{border:1px solid var(--line);border-radius:var(--radius);background:var(--carbon);overflow:hidden}
+  .shotcard img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top left}
+  .shotcard figcaption{padding:14px 18px;font-family:var(--mono);font-size:12px;color:var(--muted);border-top:1px solid var(--line-soft);display:flex;justify-content:space-between;gap:10px}
+  .shotcard figcaption b{color:var(--ink);font-weight:600}
+  @media(max-width:960px){.ev-grid{grid-template-columns:1fr}.shots2{grid-template-columns:1fr}}
+
+  /* ---------- start ---------- */
+  .doors{margin-top:52px;display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:22px;align-items:stretch}
+  .door{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);padding:30px;display:flex;flex-direction:column;gap:13px}
+  .door.featured{border-color:rgba(74,222,128,.5);background:linear-gradient(180deg,rgba(74,222,128,.06),transparent 55%),var(--panel)}
+  .door .dk{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;color:var(--dim)}
+  .door.featured .dk{color:var(--green)}
+  .door h3{font-family:var(--display);font-size:22px;font-weight:600;letter-spacing:-.01em}
+  .door p{font-size:14.5px;color:var(--muted)}
+  .door p b{color:var(--soft);font-weight:500}
+  .door .codechip{margin-top:auto;font-size:12.5px}
+  .door a.btn{align-self:flex-start;margin-top:auto}
+  .door .honest{font-family:var(--mono);font-size:11.5px;color:var(--dim);margin-top:4px}
+  @media(max-width:960px){.doors{grid-template-columns:1fr}}
+
+  /* ---------- footer ---------- */
+  footer{background:var(--well);border-top:1px solid var(--line-soft);color:var(--muted);padding:64px 0 40px}
+  footer .wrap{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+  footer h4{color:var(--ink);font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.12em;margin-bottom:16px}
+  footer a{display:block;color:var(--muted);text-decoration:none;font-size:14.5px;padding:4px 0}
+  footer a:hover{color:var(--green)}
+  footer .brandline{display:flex;align-items:center;gap:10px;color:var(--ink);font-family:var(--display);font-weight:700;font-size:20px;margin-bottom:14px}
+  footer .brandline img{width:26px;height:26px}
+  footer .fblurb{font-size:14px;max-width:34ch}
+  footer .legal{grid-column:1/-1;border-top:1px solid var(--line-soft);margin-top:26px;padding-top:22px;font-size:13px;display:flex;gap:24px;flex-wrap:wrap;font-family:var(--mono)}
+  footer .legal .g{color:var(--green)}
+  @media(max-width:880px){footer .wrap{grid-template-columns:1fr 1fr}}
+
+  /* ---------- motion gating ---------- */
+  html.motion .rv{opacity:0;transform:translateY(24px)}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .btn{transition:none}
+  }
+</style>
+</head>
+<body>
+<!--
+THESIS: A dark calibration-lab page that leads with Skyulf's sharpest truth — data leakage — and presents the product as the instrument that makes honest scores structurally inevitable. Where v28 was a polite flagship overview, v29 takes a position.
+OWN-WORLD: carbon ground #0B0E11, hairline rules, corner-bracket frames, mono annotations, one color story: amber (warning) → red (what production sees) → green (pass). Space Grotesk display / IBM Plex Sans body / JetBrains Mono data.
+STORY: the visitor is shown the 94%→71% gap, shown exactly how it happens, shown the rule that prevents it, then walks the full lifecycle and the receipts before choosing a door.
+FIRST VIEWPORT: left-aligned failure headline with amber/red numerals, green CTA + pip chip, and the real validate_leakage_safety() message as a terminal card exiting 1.
+FORM: funnel (Problem → Method → Proof → Start) in an instrument aesthetic; GSAP standard reveals + one pinned scrubbed lifecycle rail, everything progressively enhanced.
+EVERY NUMBER IS REAL: 35 nodes, 11 workspaces, 2266/1089/661 tests, 4 drift metrics, 5 templates — per PRODUCT.md, nothing is invented.
+-->
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="util">
+  <div class="wrap">
+    <span class="chip">PLATFORM AGPL-3.0 · CORE APACHE-2.0</span>
+    <span>Self-hosted ML lifecycle. Your infra, your data, your exported notebooks.</span>
+    <span class="right">
+      <a href="https://github.com/flyingriverhorse/Skyulf" rel="noopener">GitHub ↗</a>
+      <a href="https://pypi.org/project/skyulf-core/" rel="noopener">PyPI ↗</a>
+    </span>
+  </div>
+</div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="../static/img/logo.png" alt="Skyulf logo">Skyulf</a>
+    <nav aria-label="Primary">
+      <a href="#problem">The problem</a>
+      <a href="#method">The rule</a>
+      <a href="#lifecycle">Lifecycle</a>
+      <a href="#evidence">Receipts</a>
+    </nav>
+    <div class="ctas">
+      <a class="btn ghost" href="#start">Self-host</a>
+      <a class="btn primary" href="https://api.skyulf.com" rel="noopener">Open live demo</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============ HERO ============ -->
+  <section class="hero" aria-label="Introduction">
+    <div class="wrap">
+      <div>
+        <p class="eyebrow mono rv">SELF-HOSTED ML LIFECYCLE · VALIDATED BEFORE EVERY RUN</p>
+        <h1>
+          <span class="line"><span class="line-in">Your model says <span class="num-94">94%</span>.</span></span>
+          <span class="line"><span class="line-in">Production says <span class="num-71">71%</span>.</span></span>
+        </h1>
+        <p class="lede rv">That gap is <b>data leakage</b> — preprocessing fitted on rows your model was never supposed to see. Skyulf's canvas makes it structurally impossible, and <b>proves it before every run</b>.</p>
+        <div class="cta-row rv">
+          <a class="btn primary" href="https://api.skyulf.com" rel="noopener">Open the live demo — no signup</a>
+          <span class="codechip"><span><span class="dollar">$</span> pip install skyulf-core</span><button type="button" data-copy="pip install skyulf-core" aria-label="Copy pip install command">copy</button></span>
+        </div>
+        <p class="fine rv"><b>No black box.</b> Visual work exports to Jupyter. Start on SQLite, grow to PostgreSQL. Local or S3-compatible storage.</p>
+      </div>
+      <div class="rv">
+        <div class="term warn frame" style="--bk:var(--amber)">
+          <div class="bar">
+            <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+            <span class="title">skyulf validate — churn-pipeline.json</span>
+            <span class="status">LEAKAGE FOUND</span>
+          </div>
+          <pre><span class="cmd"><span class="dollar">$</span> skyulf validate --canvas churn-pipeline.json</span>
+<span class="dim-t">┌ checking leakage safety …</span>
+<span class="fail-t">✗ FAIL</span> <span class="warn-t">Step 0 ('SimpleImputer') is configured before the
+  train/test split (step 1, 'TrainTestSplitter') and will fit
+  its statistics on the full dataset including the test set
+  — move it after the splitter.</span>
+<span class="exit">exit 1</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ FACTS STRIP ============ -->
+  <div class="facts" aria-label="Project facts">
+    <div class="wrap">
+      <div class="fact rv">
+        <div class="n"><em class="count" data-count="35">35</em></div>
+        <div class="l">CANVAS NODES — CLEAN · ENCODE · SCALE · TEXT · TIME · GEO</div>
+      </div>
+      <div class="fact rv">
+        <div class="n"><em class="count" data-count="11">11</em></div>
+        <div class="l">WORKSPACES — INGEST TO MONITORING, ONE PROJECT</div>
+      </div>
+      <div class="fact rv">
+        <div class="n"><em class="count" data-count="2266">2,266</em> <span style="font-size:17px;color:var(--dim)">tests</span></div>
+        <div class="l">LIBRARY 2,266 · BACKEND <span class="count" data-count="1089">1,089</span> · CANVAS <span class="count" data-count="661">661</span></div>
+      </div>
+      <div class="fact rv">
+        <div class="n">3.12</div>
+        <div class="l">PYTHON · SCIKIT-LEARN · POLARS · APACHE-2.0 CORE</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ruler" aria-hidden="true">
+    <div class="ticks"></div>
+    <div class="ticks major"></div>
+    <span class="lbl" style="left:28px">000</span>
+    <span class="lbl" style="left:calc(25% + 28px)">250</span>
+    <span class="lbl" style="left:calc(50% + 28px)">500</span>
+    <span class="lbl" style="left:calc(75% + 28px)">750</span>
+  </div>
+
+  <!-- ============ PROBLEM ============ -->
+  <section id="problem">
+    <div class="wrap">
+      <p class="sec-kicker kr rv">01 · THE PROBLEM</p>
+      <h2 class="rv">Leakage isn't a bug in your code.<br>It's a property of <span class="em-r">your workflow.</span></h2>
+      <p class="sec-lede rv">Most notebooks fit imputers, scalers and encoders on the full dataset, then split. The test set quietly teaches the preprocessing. Scores look great in the notebook — and collapse the day the model meets real data.</p>
+
+      <div class="diag-grid">
+        <div class="diag bad rv">
+          <div class="dhead">
+            <span class="tag">THE NOTEBOOK WAY</span>
+            <h3>Fit first, split later</h3>
+          </div>
+          <div class="flow" role="img" aria-label="Diagram: full dataset flows into SimpleImputer fit, then into a train test splitter, then into a model — the imputer sees test rows">
+            <div class="step"><span class="st">full dataset</span><span class="ss">all rows</span></div>
+            <div class="arrow" aria-hidden="true">──▶</div>
+            <div class="step bad-step"><span class="st">SimpleImputer</span><span class="ss">.fit() on everything</span></div>
+            <div class="arrow" aria-hidden="true">──▶</div>
+            <div class="step"><span class="st">train/test split</span><span class="ss">too late</span></div>
+            <div class="arrow" aria-hidden="true">──▶</div>
+            <div class="step"><span class="st">model</span><span class="ss">94% 😌</span></div>
+          </div>
+          <p class="verdict">The imputer's statistics already contain the test rows. The "holdout" is a fiction — and no amount of careful plotting reveals it.</p>
+        </div>
+
+        <div class="diag good rv">
+          <div class="dhead">
+            <span class="tag">THE SKYULF WAY</span>
+            <h3>Split first, learn from train only</h3>
+          </div>
+          <div class="flow" role="img" aria-label="Diagram: full dataset flows into the splitter first; learn nodes fit on training rows only, apply nodes transform validation and test rows">
+            <div class="step"><span class="st">full dataset</span><span class="ss">all rows</span></div>
+            <div class="arrow" aria-hidden="true">──▶</div>
+            <div class="step ok-step"><span class="st">splitter</span><span class="ss">step 0, always</span></div>
+            <div class="arrow" aria-hidden="true">──▶</div>
+            <div class="step ok-step"><span class="st">Learn nodes</span><span class="ss">fit on train only</span></div>
+            <div class="arrow" aria-hidden="true">──▶</div>
+            <div class="step"><span class="st">Apply nodes</span><span class="ss">transform val/test</span></div>
+          </div>
+          <p class="verdict">Fitting and transforming are different node types. The validator rejects any fit configured before the split — before a single row is processed.</p>
+        </div>
+      </div>
+
+      <p class="split-note rv"><b>Honest scores by construction.</b> Because <span class="mono-g">Learn</span> and <span class="mono-g">Apply</span> are separate node types and validation runs before execution, a leaky pipeline can't sneak through a deadline, a copy-paste, or a teammate's canvas.</p>
+    </div>
+  </section>
+
+  <!-- ============ METHOD ============ -->
+  <section id="method" class="method">
+    <div class="wrap">
+      <p class="sec-kicker kg rv">02 · THE RULE</p>
+      <h2 class="rv">Three guarantees, enforced by the <span class="em-g">canvas itself.</span></h2>
+
+      <div class="cards3">
+        <div class="gcard rv">
+          <span class="gn">G-01</span>
+          <h3>Honest scores by construction</h3>
+          <p>Preprocessing can only learn from training rows. The structure of the canvas — not your discipline — keeps the test set unseen.</p>
+          <ul>
+            <li>Separate Learn (fit) and Apply (transform) nodes</li>
+            <li>Leakage validation blocks the run before it starts</li>
+            <li>The exact fix is named in the error message</li>
+          </ul>
+        </div>
+        <div class="gcard rv">
+          <span class="gn">G-02</span>
+          <h3>Reproducible by default</h3>
+          <p>Every canvas gets a fingerprint, and every trained model ships with a model card — data, parameters and metrics recorded together.</p>
+          <ul>
+            <li>Canvas fingerprint per run</li>
+            <li>Model registry with versions and artifacts</li>
+            <li>Export any canvas to a runnable Jupyter notebook</li>
+          </ul>
+        </div>
+        <div class="gcard rv">
+          <span class="gn">G-03</span>
+          <h3>Operable after training</h3>
+          <p>The workflow doesn't end at a good score. Live data is compared against the training baseline, and failures point at themselves.</p>
+          <ul>
+            <li>Per-column drift measured four ways</li>
+            <li>Error log links straight to the failing node</li>
+            <li>Slow-node profiling and an audit trail</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="method-bottom">
+        <div class="rv">
+          <h3>Move the imputer, get a green exit.</h3>
+          <p>The validator doesn't just say "no". It tells you which step to move where — then gets out of the way. Fix applied, same command, one second later:</p>
+          <p style="font-family:var(--mono);font-size:13.5px;color:var(--green);margin-top:14px">Step 0 → after TrainTestSplitter ✓</p>
+        </div>
+        <div class="rv">
+          <div class="term pass frame" style="--bk:var(--green)">
+            <div class="bar">
+              <span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span><span class="dot" aria-hidden="true"></span>
+              <span class="title">skyulf validate — churn-pipeline.json</span>
+              <span class="status">CLEAN</span>
+            </div>
+            <pre><span class="cmd"><span class="dollar">$</span> skyulf validate --canvas churn-pipeline.json</span>
+<span class="ok-t">✓ leakage safety:</span> every fit occurs after the split
+<span class="ok-t">✓ expectations:</span> columns, nulls, ranges, uniqueness
+<span class="exit">exit 0</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIFECYCLE RAIL ============ -->
+  <section id="lifecycle" class="life">
+    <div class="wrap head">
+      <div>
+        <p class="sec-kicker kg rv">03 · THE LIFECYCLE</p>
+        <h2 class="rv">Seven stations.<br>One connected <span class="em-g">workflow.</span></h2>
+      </div>
+      <p class="sec-lede rv" style="margin-top:0;max-width:40ch">Scroll the rail — every stage lives in the same project, so nothing gets lost between the notebook and what's actually running.</p>
+    </div>
+    <div class="wrap"><div class="rail-progress" aria-hidden="true"><div class="bar" id="railBar"></div></div></div>
+
+    <div class="rail-outer">
+      <div class="rail" id="rail" tabindex="0" aria-label="Lifecycle stations, horizontally scrollable">
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 01</span><h3>Ingest</h3></div>
+          <div class="scopy">Point it at a file: CSV, Excel, JSON, Parquet or an S3-compatible bucket. Polars reads it, columns get profiled, and every version is kept so results stay traceable.
+            <ul><li>Types and quality issues detected on upload</li><li>Dataset versions preserved</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/datasource.jpg" alt="Data sources screen listing uploaded datasets" loading="lazy" decoding="async"></div>
+        </article>
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 02</span><h3>Explore</h3></div>
+          <div class="scopy">One click profiles every column: distributions, correlations, outliers, interactions and clusters — plus surrogate trees and causal discovery for what actually drives the target.
+            <ul><li>Automated EDA with statistical alerts</li><li>2D/3D bivariate and PCA views</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/eda/dashboardeda.jpg" alt="EDA overview dashboard" loading="lazy" decoding="async"></div>
+        </article>
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 03</span><h3>Build</h3></div>
+          <div class="scopy">Drag nodes, connect them, branch the pipeline to try two feature strategies side by side. Per-node validation blocks bad runs and points at the fix.
+            <ul><li>35 nodes: cleaning, encoding, scaling, text, time, geo</li><li>Branches run in parallel</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/canvas.jpg" alt="Visual pipeline canvas with connected nodes" loading="lazy" decoding="async"></div>
+        </article>
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 04</span><h3>Train &amp; tune</h3></div>
+          <div class="scopy">Runs execute as background jobs — the UI never freezes. Start with defaults, then switch on grid, random, halving or Optuna search and watch trials report in.
+            <ul><li>Classification, regression, clustering, text</li><li>Voting and stacking ensembles with nested tuning</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/jobs.jpg" alt="Jobs list showing background training runs" loading="lazy" decoding="async"></div>
+        </article>
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 05</span><h3>Compare</h3></div>
+          <div class="scopy">Every run keeps its metrics, curves and confusion matrix. Put runs side by side, see which change helped, and tune decision thresholds instead of accepting 0.5.
+            <ul><li>ROC, confusion matrix, per-class metrics</li><li>Threshold optimisation on a held-out set</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/experiments.jpg" alt="Experiment comparison view with metrics and charts" loading="lazy" decoding="async"></div>
+        </article>
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 06</span><h3>Deploy</h3></div>
+          <div class="scopy">Trained models land in a registry with versions and artifacts. Promote one to active and it serves behind a REST endpoint. Full deployment history — rollback is a decision, not archaeology.
+            <ul><li>Versioned registry with stored artifacts</li><li>REST predictions from the active version</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/deployments.jpg" alt="Deployments screen with active model version and history" loading="lazy" decoding="async"></div>
+        </article>
+        <article class="station rv">
+          <div class="shead"><span class="idx">STN 07</span><h3>Monitor</h3></div>
+          <div class="scopy">Models decay because the world moves. Live data is compared against the training baseline column by column, with an error log, slow-node profiler and audit trail.
+            <ul><li>Drift measured four ways per column</li><li>Error log links to the failing node</li></ul>
+          </div>
+          <div class="shot"><img src="../static/img/drift/drift_report.jpg" alt="Drift report per column" loading="lazy" decoding="async"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ INTERFACES ============ -->
+  <section id="interfaces">
+    <div class="wrap">
+      <p class="sec-kicker rv">04 · TWO INTERFACES</p>
+      <h2 class="rv">One workflow. <span class="em-g">Visual</span> or <span style="color:var(--cyan)">code</span> — your call.</h2>
+      <p class="sec-lede rv">The canvas and the package are equal citizens. Build visually and export to Jupyter, or script everything with the Apache-2.0 core. Nothing is trapped in either.</p>
+
+      <div class="duo">
+        <div class="iface visual rv">
+          <div class="ihead"><h3>The canvas</h3><span class="tag">VISUAL · SELF-HOSTED</span></div>
+          <div class="ibody">
+            <p>A node-based workspace for the whole lifecycle — cleaning to monitoring — with validation that runs before execution, not after deployment.</p>
+            <ul>
+              <li>35 nodes across cleaning, encoding, scaling, text, time-series and geo</li>
+              <li>Multi-branch pipelines run in parallel via Celery or background threads</li>
+              <li>One-click export to a fully runnable Jupyter notebook</li>
+            </ul>
+          </div>
+          <div class="shot"><img src="../static/img/canvas.jpg" alt="Skyulf canvas with a branching node pipeline" loading="lazy" decoding="async"></div>
+          <div class="ibody"><a class="btn primary" style="align-self:flex-start" href="https://api.skyulf.com" rel="noopener">Try it in the live demo</a></div>
+        </div>
+
+        <div class="iface code rv">
+          <div class="ihead"><h3>The package</h3><span class="tag">CODE · APACHE-2.0</span></div>
+          <div class="ibody">
+            <p><span class="mono" style="font-size:13px;color:var(--cyan)">skyulf-core</span> runs the same engine in your own scripts and notebooks — no server required.</p>
+<div class="py" role="img" aria-label="Python code example: profile a CSV with EDAAnalyzer and render it with EDAVisualizer"><span class="kw">import</span> polars <span class="kw">as</span> pl
+<span class="kw">from</span> skyulf <span class="kw">import</span> EDAAnalyzer, EDAVisualizer
+
+df = pl.<span class="fn">read_csv</span>(<span class="str">"your_dataset.csv"</span>)
+
+<span class="var">analyzer</span> = <span class="fn">EDAAnalyzer</span>(df)
+<span class="var">profile</span> = analyzer.<span class="fn">analyze</span>(
+    target_col=<span class="str">"target"</span>,
+    task_type=<span class="str">"Classification"</span>,
+)
+
+<span class="var">viz</span> = <span class="fn">EDAVisualizer</span>(profile, df)
+viz.<span class="fn">summary</span>()   <span class="cm"># rich terminal dashboard</span>
+viz.<span class="fn">plot</span>()      <span class="cm"># matplotlib charts</span></div>
+            <ul>
+              <li>Zero-copy Arrow hand-off from Polars to scikit-learn</li>
+              <li>Optional extras for EDA, viz and NLP embeddings</li>
+            </ul>
+            <span class="codechip"><span><span class="dollar">$</span> pip install "skyulf-core[eda,viz]"</span><button type="button" data-copy='pip install "skyulf-core[eda,viz]"' aria-label="Copy install command">copy</button></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EVIDENCE ============ -->
+  <section id="evidence" class="evidence">
+    <div class="wrap">
+      <p class="sec-kicker kg rv">05 · THE RECEIPTS</p>
+      <h2 class="rv">Claims are cheap.<br>Here's what's <span class="em-g">in the repo.</span></h2>
+
+      <div class="ev-grid">
+        <div class="cert frame rv" style="--bk:var(--green)">
+          <h3>Certificate of substance</h3>
+          <table>
+            <thead><tr><th scope="col">ITEM</th><th scope="col">VALUE</th><th scope="col">WHERE</th></tr></thead>
+            <tbody>
+              <tr><td>Library tests</td><td><span class="big"><em class="count" data-count="2266">2,266</em></span></td><td class="mono" style="font-size:12.5px">skyulf-core test suite</td></tr>
+              <tr><td>Backend tests</td><td><span class="big"><em class="count" data-count="1089">1,089</em></span></td><td class="mono" style="font-size:12.5px">FastAPI backend</td></tr>
+              <tr><td>Canvas tests</td><td><span class="big"><em class="count" data-count="661">661</em></span></td><td class="mono" style="font-size:12.5px">React frontend</td></tr>
+              <tr><td>Platform license</td><td class="mono" style="color:var(--ink)">AGPL-3.0</td><td class="mono" style="font-size:12.5px">full workspace</td></tr>
+              <tr><td>Core license</td><td class="mono" style="color:var(--green)">Apache-2.0</td><td class="mono" style="font-size:12.5px">skyulf-core on PyPI</td></tr>
+              <tr><td>Python</td><td class="mono" style="color:var(--ink)">3.12</td><td class="mono" style="font-size:12.5px">scikit-learn · Polars</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ev-side">
+          <div class="ev-card rv">
+            <h4>DRIFT, MEASURED FOUR WAYS</h4>
+            <div class="chips">
+              <span>Kolmogorov–Smirnov</span><span>PSI</span><span>Wasserstein</span><span>KL divergence</span>
+            </div>
+            <p>Every monitored column is checked against the training baseline with independent statistics — not one number waved at you.</p>
+          </div>
+          <div class="ev-card rv">
+            <h4>DATA EXPECTATIONS, CODED INTO THE PIPELINE</h4>
+            <div class="chips">
+              <span class="hl">expect_columns_exist</span><span class="hl">expect_no_nulls</span><span class="hl">expect_value_range</span><span class="hl">expect_unique</span>
+            </div>
+            <p>Violations raise <span class="mono" style="font-size:12px;color:var(--red)">ExpectationError</span> at the exact node — not three stages downstream.</p>
+          </div>
+          <div class="ev-card rv">
+            <h4>START FROM A TEMPLATE</h4>
+            <div class="chips">
+              <span>Tabular Classification</span><span>Tabular Regression</span><span>Text Classification</span><span>Customer Segmentation</span><span>Ensemble Classification</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="shots2">
+        <figure class="shotcard rv">
+          <img src="../static/img/registry.jpg" alt="Model registry with versions and artifacts" loading="lazy" decoding="async">
+          <figcaption><b>REGISTRY</b><span>versions · artifacts · model cards</span></figcaption>
+        </figure>
+        <figure class="shotcard rv">
+          <img src="../static/img/audit.jpg" alt="Audit trail of workspace changes" loading="lazy" decoding="async">
+          <figcaption><b>AUDIT TRAIL</b><span>who changed what, when</span></figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ START ============ -->
+  <section id="start">
+    <div class="wrap">
+      <p class="sec-kicker kg rv">06 · START</p>
+      <h2 class="rv">Three doors. <span class="em-g">All of them real.</span></h2>
+      <p class="sec-lede rv">No sales call required for any of them.</p>
+
+      <div class="doors">
+        <div class="door featured rv">
+          <span class="dk">DOOR 01 · FASTEST</span>
+          <h3>Open the live demo</h3>
+          <p>The full workspace, hosted, with sample data loaded. <b>No signup.</b></p>
+          <p class="honest">// honest note: cold instances take ~30s to wake</p>
+          <a class="btn primary" href="https://api.skyulf.com" rel="noopener">api.skyulf.com ↗</a>
+        </div>
+        <div class="door rv">
+          <span class="dk">DOOR 02 · LOCAL</span>
+          <h3>One command on your machine</h3>
+          <p>Clone the repo, run the start script. Virtual env, dependencies and safe defaults (SQLite, no Redis) are handled for you.</p>
+          <span class="codechip"><span><span class="dollar">$</span> ./start.sh &nbsp;·&nbsp; start.bat</span><button type="button" data-copy="git clone https://github.com/flyingriverhorse/Skyulf.git" aria-label="Copy clone command">clone</button></span>
+        </div>
+        <div class="door rv">
+          <span class="dk">DOOR 03 · PRODUCTION-LIKE</span>
+          <h3>Docker Compose</h3>
+          <p>API + Redis + Celery worker in containers. Mounts your working tree, so edits are picked up on reload.</p>
+          <span class="codechip"><span><span class="dollar">$</span> docker compose up --build</span><button type="button" data-copy="docker compose up --pull always --build" aria-label="Copy docker command">copy</button></span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="brandline"><img src="../static/img/logo.png" alt="Skyulf logo">Skyulf</div>
+      <p class="fblurb">The machine-learning lifecycle, connected — from raw file to monitored model, in one self-hosted workspace.</p>
+    </div>
+    <div>
+      <h4>PRODUCT</h4>
+      <a href="https://api.skyulf.com" rel="noopener">Live demo</a>
+      <a href="../QUICKSTART.md">Quickstart</a>
+      <a href="../README.md">README</a>
+    </div>
+    <div>
+      <h4>CODE</h4>
+      <a href="https://github.com/flyingriverhorse/Skyulf" rel="noopener">GitHub</a>
+      <a href="https://pypi.org/project/skyulf-core/" rel="noopener">PyPI · skyulf-core</a>
+      <a href="../CHANGELOG.md">Changelog</a>
+    </div>
+    <div>
+      <h4>DOCS</h4>
+      <a href="https://flyingriverhorse.github.io/Skyulf/" rel="noopener">User guides</a>
+      <a href="https://github.com/flyingriverhorse/Skyulf/discussions" rel="noopener">Discussions</a>
+      <a href="https://github.com/flyingriverhorse/Skyulf/issues" rel="noopener">Issues</a>
+    </div>
+    <div class="legal">
+      <span><span class="g">Platform:</span> AGPL-3.0</span>
+      <span><span class="g">skyulf-core:</span> Apache-2.0</span>
+      <span>© 2026 Skyulf</span>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" integrity="sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt" crossorigin="anonymous" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" integrity="sha384-Z3REaz79l2IaAZqJsSABtTbhjgOUYyV3p90XNnAPCSHg3EMTz1fouunq9WZRtj3d" crossorigin="anonymous" defer></script>
+<script>
+document.documentElement.classList.add('js');
+window.addEventListener('load', function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var hasGsap = typeof window.gsap !== 'undefined' && typeof window.ScrollTrigger !== 'undefined';
+
+  // copy buttons work regardless of motion support
+  document.querySelectorAll('[data-copy]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var text = btn.getAttribute('data-copy');
+      var done = function(){ var old = btn.textContent; btn.textContent = 'copied'; setTimeout(function(){ btn.textContent = old; }, 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function(){ fallbackCopy(text); done(); });
+      } else { fallbackCopy(text); done(); }
+    });
+  });
+  function fallbackCopy(text){
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+  }
+
+  // native scroll progress for the rail when not pinned (mobile / no JS-motion)
+  var rail = document.getElementById('rail');
+  var bar = document.getElementById('railBar');
+  function nativeProgress(){
+    if (!rail || !bar || document.documentElement.classList.contains('pinned')) return;
+    var max = rail.scrollWidth - rail.clientWidth;
+    bar.style.width = (max > 0 ? (rail.scrollLeft / max) * 100 : 100) + '%';
+  }
+  if (rail) rail.addEventListener('scroll', nativeProgress, {passive:true});
+  window.addEventListener('resize', nativeProgress);
+  nativeProgress();
+
+  if (reduced || !hasGsap) return;
+
+  // -------- motion path --------
+  document.documentElement.classList.add('motion');
+  gsap.registerPlugin(ScrollTrigger);
+
+  // standard reveals
+  gsap.utils.toArray('.rv').forEach(function(el){
+    gsap.fromTo(el, {opacity:0, y:24}, {
+      opacity:1, y:0, duration:.65, ease:'power2.out',
+      scrollTrigger:{trigger:el, start:'top 86%', once:true}
+    });
+  });
+
+  // hero line stagger
+  gsap.to('h1 .line-in', {transform:'none', duration:1, ease:'power3.out', stagger:.14, delay:.1});
+
+  // count-ups
+  document.querySelectorAll('.count').forEach(function(el){
+    var target = parseInt(el.getAttribute('data-count'), 10);
+    if (isNaN(target)) return;
+    var obj = {v:0};
+    gsap.to(obj, {
+      v:target, duration:1.4, ease:'power2.out',
+      scrollTrigger:{trigger:el, start:'top 88%', once:true},
+      onUpdate:function(){
+        el.textContent = Math.round(obj.v).toLocaleString('en-US');
+      }
+    });
+  });
+
+  // ONE pinned, scrubbed lifecycle rail on desktop only
+  ScrollTrigger.matchMedia({
+    '(min-width: 960px)': function(){
+      var dist = function(){ return rail.scrollWidth - window.innerWidth + 56; };
+      document.documentElement.classList.add('pinned');
+      bar.style.width = '0%';
+      gsap.to(rail, {
+        x: function(){ return -dist(); },
+        ease:'none',
+        scrollTrigger:{
+          trigger:'.rail-outer',
+          start:'top top+=64',
+          end: function(){ return '+=' + dist(); },
+          scrub:1,
+          pin:true,
+          anticipatePin:1,
+          invalidateOnRefresh:true,
+          onUpdate:function(self){ bar.style.width = (self.progress * 100) + '%'; }
+        }
+      });
+    },
+    '(max-width: 959px)': function(){
+      document.documentElement.classList.remove('pinned');
+      nativeProgress();
+    }
+  });
+});
+</script>
+</body>
+</html>

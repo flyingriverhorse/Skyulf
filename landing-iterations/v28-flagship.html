@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skyulf — Data to deployment, one connected workflow</title>
+<meta name="description" content="Skyulf connects the machine-learning lifecycle from data exploration to monitoring: a self-hosted visual platform and an Apache-2.0 Python package.">
+<link rel="icon" type="image/png" href="../static/img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ground:#FAFAF9;
+    --panel:#FFFFFF;
+    --ink:#0E1116;
+    --ink-soft:#3E4552;
+    --muted:#5A6070;
+    --line:#E4E6EC;
+    --indigo:#5457E8;
+    --indigo-deep:#3B3ECB;
+    --indigo-tint:#EDEDFD;
+    --orange:#E8501F;
+    --orange-tint:#FDEEE8;
+    --cyan:#007A93;
+    --cyan-tint:#E4F5F9;
+    --night:#0B0E1A;
+    --night-soft:#141A2E;
+    --display:'Bricolage Grotesque',system-ui,sans-serif;
+    --body:'Figtree',system-ui,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --shadow:0 2px 6px rgba(14,17,22,.06),0 18px 44px -18px rgba(14,17,22,.22);
+    --radius:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  ::selection{background:var(--indigo);color:#fff}
+  :focus-visible{outline:3px solid var(--indigo);outline-offset:3px;border-radius:4px}
+  a{color:inherit}
+  img{display:block;max-width:100%}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+  .mono{font-family:var(--mono)}
+  .skip{position:absolute;left:-9999px;top:0;background:var(--indigo);color:#fff;padding:10px 18px;border-radius:0 0 10px 0;z-index:99;font-weight:600}
+  .skip:focus{left:0}
+
+  /* browser surfaces */
+  ::-webkit-scrollbar{width:12px}
+  ::-webkit-scrollbar-track{background:var(--ground)}
+  ::-webkit-scrollbar-thumb{background:#C6CAD6;border-radius:8px;border:3px solid var(--ground)}
+  ::-webkit-scrollbar-thumb:hover{background:var(--indigo)}
+  input,textarea{caret-color:var(--indigo)}
+
+  /* ---------- utility bar (Proof) ---------- */
+  .util{background:var(--night);color:#DDE1F0;font-size:13.5px}
+  .util .wrap{display:flex;align-items:center;gap:14px;min-height:42px;flex-wrap:wrap;padding-top:6px;padding-bottom:6px}
+  .util .chip{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;background:var(--indigo);color:#fff;border-radius:999px;padding:3px 10px}
+  .util a{color:#9FE8FF;text-decoration:none;font-weight:600}
+  .util a:hover{text-decoration:underline}
+  .util .right{margin-left:auto;display:flex;gap:18px}
+
+  /* ---------- nav ---------- */
+  header.nav{position:sticky;top:0;z-index:50;background:rgba(250,250,249,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  .nav .wrap{display:flex;align-items:center;gap:34px;min-height:68px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.01em;text-decoration:none}
+  .brand img{width:30px;height:30px}
+  .nav nav{display:flex;gap:26px;margin-left:12px}
+  .nav nav a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink-soft)}
+  .nav nav a:hover{color:var(--indigo)}
+  .nav .ctas{margin-left:auto;display:flex;gap:12px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:8px;border-radius:10px;font-weight:700;font-size:15px;text-decoration:none;padding:12px 22px;border:1px solid transparent;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
+  .btn:hover{transform:translateY(-1px)}
+  .btn.primary{background:var(--indigo);color:#fff;box-shadow:0 2px 4px rgba(59,62,203,.25),0 10px 24px -10px rgba(59,62,203,.5)}
+  .btn.primary:hover{background:var(--indigo-deep)}
+  .btn.ghost{background:var(--panel);border-color:var(--line);color:var(--ink)}
+  .btn.ghost:hover{border-color:var(--indigo);color:var(--indigo)}
+  .btn.night{background:#fff;color:var(--night)}
+  @media(max-width:960px){.nav nav{display:none}}
+
+  /* ---------- hero ---------- */
+  .hero{position:relative;overflow:hidden;padding:96px 0 72px}
+  .ribbon{position:absolute;top:-30%;right:-22%;width:72%;height:160%;pointer-events:none;filter:saturate(1.05);
+    background:
+      radial-gradient(42% 34% at 62% 30%, rgba(255,122,73,.85), transparent 70%),
+      radial-gradient(50% 40% at 40% 55%, rgba(240,86,160,.55), transparent 70%),
+      radial-gradient(56% 46% at 70% 70%, rgba(84,87,232,.75), transparent 72%),
+      radial-gradient(40% 34% at 30% 20%, rgba(0,179,216,.5), transparent 70%);
+    transform:rotate(-8deg);
+    animation:drift 26s ease-in-out infinite alternate;
+  }
+  @keyframes drift{from{transform:rotate(-8deg) translate3d(0,0,0)}to{transform:rotate(-5deg) translate3d(-4%,3%,0)}}
+  .hero .wrap{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:56px;align-items:center}
+  h1{font-family:var(--display);font-weight:800;letter-spacing:-.025em;line-height:1.02;font-size:clamp(44px,6.2vw,84px);text-wrap:balance}
+  h1 .em-i{color:var(--indigo)}
+  h1 .em-o{color:var(--orange)}
+  h1 .line{display:block;overflow:hidden;padding-bottom:.1em;margin-bottom:-.1em}
+  html.js h1 .line-in{display:inline-block;transform:translateY(112%);transition:transform 1s cubic-bezier(.16,1,.3,1)}
+  html.js h1 .line:nth-child(2) .line-in{transition-delay:.12s}
+  html.js .hero-in h1 .line-in{transform:none}
+  html.js .fan figure{opacity:0}
+  html.js .hero-in .fan figure{opacity:1;animation:fan-in .9s cubic-bezier(.16,1,.3,1) backwards}
+  html.js .hero-in .fan .f2{animation-delay:.12s}
+  html.js .hero-in .fan .f3{animation-delay:.22s}
+  @keyframes fan-in{from{opacity:0;translate:0 28px}}
+  .hero p.lede{margin:26px 0 34px;font-size:19px;color:var(--ink-soft);max-width:56ch}
+  .hero .cta-row{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  .codechip{display:inline-flex;align-items:center;gap:12px;background:var(--night);color:#D7F0FF;border-radius:10px;padding:12px 16px;font-family:var(--mono);font-size:14px}
+  .codechip .dollar{color:#7EE0A3}
+  .codechip button{background:transparent;border:1px solid #3A4763;color:#9FB4D8;border-radius:6px;font-family:var(--mono);font-size:11px;padding:4px 9px;cursor:pointer}
+  .codechip button:hover{color:#fff;border-color:#7EE0A3}
+  .hero .fine{margin-top:22px;font-size:14px;color:var(--muted)}
+  .hero .fine b{color:var(--ink-soft)}
+
+  /* fanned artifact cards (Proof) */
+  .fan{position:relative;min-height:520px}
+  .fan figure{position:absolute;width:min(340px,78%);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;transition:transform .5s cubic-bezier(.2,.8,.2,1)}
+  .fan figure img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top left}
+  .fan figcaption{display:flex;justify-content:space-between;gap:10px;padding:10px 14px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .fan figcaption b{color:var(--ink);font-weight:600}
+  .fan .f1{left:0;top:6%;transform:rotate(-7deg);z-index:1}
+  .fan .f2{left:22%;top:0;transform:rotate(0deg);z-index:3}
+  .fan .f3{left:40%;top:12%;transform:rotate(7deg);z-index:2}
+  .fan:hover .f1{transform:rotate(-10deg) translateX(-14px)}
+  .fan:hover .f3{transform:rotate(10deg) translateX(14px)}
+  @media(max-width:960px){
+    .hero .wrap{grid-template-columns:1fr}
+    .fan{min-height:0;display:grid;gap:16px;margin-top:8px}
+    .fan figure{position:static;width:100%;transform:none}
+  }
+
+  /* ---------- evidence strip (honest logo strip) ---------- */
+  .evidence{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel)}
+  .evidence .wrap{display:flex;flex-wrap:wrap;gap:14px 34px;align-items:center;justify-content:center;padding:22px 28px}
+  .evidence span{font-family:var(--mono);font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:8px}
+  .evidence span::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--indigo)}
+  .evidence span:nth-child(2)::before{background:var(--orange)}
+  .evidence span:nth-child(3)::before{background:var(--cyan)}
+  .evidence span:nth-child(4)::before{background:var(--indigo)}
+  .evidence span:nth-child(5)::before{background:var(--orange)}
+  .evidence span:nth-child(6)::before{background:var(--cyan)}
+
+  section{padding:96px 0}
+  h2{font-family:var(--display);font-weight:800;letter-spacing:-.02em;line-height:1.06;font-size:clamp(32px,4.4vw,56px);text-wrap:balance}
+  h2 .em-i{color:var(--indigo)}
+  h2 .em-o{color:var(--orange)}
+  h2 .em-c{color:var(--cyan)}
+  .sec-lede{margin-top:18px;font-size:18px;color:var(--ink-soft);max-width:62ch}
+
+  /* ---------- two interfaces ---------- */
+  .duo{margin-top:56px;display:grid;grid-template-columns:1fr 1fr;gap:26px}
+  .iface{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+  .iface .head{padding:26px 30px 20px;border-bottom:1px solid var(--line);display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .iface h3{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.01em}
+  .iface .tag{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.1em;padding:5px 10px;border-radius:999px}
+  .iface.visual .tag{background:var(--indigo-tint);color:var(--indigo-deep)}
+  .iface.code .tag{background:var(--orange-tint);color:var(--orange)}
+  .iface .shot{padding:22px 22px 0}
+  .iface .shot img{border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0;width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top left}
+  .iface .body{padding:24px 30px 30px}
+  .iface p{color:var(--ink-soft);font-size:16px}
+  .iface ul{list-style:none;margin:18px 0 22px;display:grid;gap:10px}
+  .iface li{display:flex;gap:10px;font-size:15.5px;color:var(--ink-soft)}
+  .iface li svg{flex:0 0 18px;margin-top:3px}
+  .iface .codechip{width:100%;justify-content:space-between}
+  @media(max-width:880px){.duo{grid-template-columns:1fr}}
+
+  /* ---------- lifecycle ---------- */
+  .life{background:var(--night);color:#E8EBF5}
+  .life h2{color:#fff}
+  .life .sec-lede{color:#A6AEC6}
+  .stages{margin-top:64px;display:grid;gap:0;position:relative}
+  .stages::before{content:'';position:absolute;left:27px;top:10px;bottom:10px;width:2px;background:linear-gradient(#5457E8,#E8501F 55%,#00B3D8)}
+  .stage{display:grid;grid-template-columns:56px minmax(0,5fr) minmax(0,6fr);gap:34px;align-items:center;padding:34px 0}
+  .stage>.node{grid-column:1;grid-row:1}
+  .stage>div:not(.shot){grid-column:2;grid-row:1}
+  .stage>.shot{grid-column:3;grid-row:1}
+  .stage:nth-child(even){grid-template-columns:56px minmax(0,6fr) minmax(0,5fr)}
+  .stage:nth-child(even)>div:not(.shot){grid-column:3}
+  .stage:nth-child(even)>.shot{grid-column:2}
+  .stage .node{width:56px;height:56px;border-radius:50%;background:var(--night-soft);border:2px solid var(--indigo);display:grid;place-items:center;font-family:var(--mono);font-weight:600;font-size:15px;color:#BFC6FF;position:relative;z-index:1}
+  .stage:nth-child(3n+2) .node{border-color:var(--orange);color:#FFC9B4}
+  .stage:nth-child(3n) .node{border-color:#00B3D8;color:#9FE8FF}
+  .stage h3{font-family:var(--display);font-size:26px;font-weight:700;color:#fff;letter-spacing:-.01em;margin-bottom:10px}
+  .stage p{color:#A6AEC6;font-size:16px;max-width:52ch}
+  .stage .shot img{border-radius:12px;border:1px solid #2A3149;box-shadow:0 24px 60px -24px rgba(0,0,0,.7);width:100%;aspect-ratio:16/9;object-fit:cover;object-position:top left}
+  @media(max-width:880px){
+    .stages::before{display:none}
+    .stage{grid-template-columns:1fr;gap:18px}
+    .stage .node{width:44px;height:44px;font-size:13px}
+    .stage>.node,.stage>div:not(.shot),.stage>.shot{grid-column:auto;grid-row:auto}
+  }
+
+  /* ---------- export / prove ---------- */
+  .prove .wrap{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,5fr);gap:56px;align-items:center}
+  .prove .shot img{border-radius:var(--radius);border:1px solid var(--line);box-shadow:var(--shadow);width:100%}
+  .prove blockquote{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:22px 26px;color:var(--ink-soft);font-size:17px}
+  .prove blockquote::before{content:'\201C';display:block;font-family:var(--display);font-weight:800;font-size:46px;line-height:.5;color:var(--orange);margin-bottom:12px}
+  @media(max-width:880px){.prove .wrap{grid-template-columns:1fr}}
+
+  /* ---------- get started ---------- */
+  .start{background:var(--indigo-tint)}
+  .paths{margin-top:52px;display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:22px;align-items:stretch}
+  .path{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:30px;display:flex;flex-direction:column;gap:14px;box-shadow:var(--shadow)}
+  .path.featured{background:var(--night);color:#E8EBF5;border-color:var(--night)}
+  .path h3{font-family:var(--display);font-size:22px;font-weight:700}
+  .path p{font-size:15px;color:var(--ink-soft)}
+  .path.featured p{color:#A6AEC6}
+  .path .codechip{margin-top:auto}
+  .path a.btn{align-self:flex-start;margin-top:auto}
+  @media(max-width:960px){.paths{grid-template-columns:1fr}}
+
+  /* ---------- footer ---------- */
+  footer{background:var(--night);color:#A6AEC6;padding:64px 0 40px}
+  footer .wrap{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
+  footer h4{color:#fff;font-family:var(--display);font-size:15px;font-weight:700;letter-spacing:.02em;margin-bottom:16px}
+  footer a{display:block;color:#A6AEC6;text-decoration:none;font-size:14.5px;padding:4px 0}
+  footer a:hover{color:#9FE8FF}
+  footer .brandline{display:flex;align-items:center;gap:10px;color:#fff;font-family:var(--display);font-weight:800;font-size:20px;margin-bottom:14px}
+  footer .brandline img{width:28px;height:28px}
+  footer .legal{grid-column:1/-1;border-top:1px solid #232A41;margin-top:24px;padding-top:22px;font-size:13px;display:flex;gap:24px;flex-wrap:wrap}
+  @media(max-width:880px){footer .wrap{grid-template-columns:1fr 1fr}}
+
+  /* reveal */
+  html.js .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.8,.2,1)}
+  html.js .rv.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){
+    html{scroll-behavior:auto}
+    .ribbon{animation:none}
+    html.js .rv{opacity:1;transform:none;transition:none}
+    html.js h1 .line-in{transform:none;transition:none}
+    html.js .fan figure{opacity:1;animation:none}
+    .fan figure,.btn{transition:none}
+  }
+</style>
+</head>
+<body>
+<!--
+THESIS: A light, confident infrastructure page that proves with real artifacts, not claims; refuses the dark-neon and cream-serif ruts.
+OWN-WORLD: cool white ground, indigo/orange/cyan roles, Bricolage Grotesque display + Figtree body + Plex Mono code, flowing ribbon field, fanned screenshot cards.
+STORY: visitor sees the connected lifecycle, believes via real screenshots and repo/PyPI evidence, then picks demo, pip, or compose.
+FIRST VIEWPORT: left statement headline with solid-color emphasis, dual CTA with copyable pip chip, fanned real screenshots over a drifting ribbon.
+FORM: combined flagship (Proof statement + Notion clarity + Stripe field), seed key e6d43b02.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="util">
+  <div class="wrap">
+    <span class="chip">APACHE-2.0</span>
+    <span>Self-hosted ML lifecycle — your infra, your data, your exported notebooks.</span>
+    <span class="right">
+      <a href="https://github.com/flyingriverhorse/Skyulf" rel="noopener">GitHub ↗</a>
+      <a href="https://pypi.org/project/skyulf-core/" rel="noopener">PyPI ↗</a>
+    </span>
+  </div>
+</div>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#"><img src="../static/img/logo.png" alt="Skyulf logo">Skyulf</a>
+    <nav aria-label="Primary">
+      <a href="#interfaces">Two interfaces</a>
+      <a href="#lifecycle">Lifecycle</a>
+      <a href="#export">Notebook export</a>
+      <a href="#start">Self-host</a>
+    </nav>
+    <div class="ctas">
+      <a class="btn ghost" href="#start">pip install</a>
+      <a class="btn primary" href="https://api.skyulf.com" rel="noopener">Open live demo</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <!-- ============ HERO ============ -->
+  <section class="hero" aria-label="Introduction">
+    <div class="ribbon" aria-hidden="true"></div>
+    <div class="wrap">
+      <div>
+        <h1><span class="line"><span class="line-in">Data to deployment.</span></span><span class="line"><span class="line-in"><span class="em-i">One workflow,</span> <span class="em-o">two interfaces.</span></span></span></h1>
+        <p class="lede">Skyulf connects the machine-learning lifecycle — exploration, pipelines, training, comparison, deployment, and monitoring — as a self-hosted visual platform and an independent Apache-2.0 Python package.</p>
+        <div class="cta-row">
+          <a class="btn primary" href="https://api.skyulf.com" rel="noopener">Open the live demo — no signup</a>
+          <span class="codechip"><span><span class="dollar">$</span> pip install skyulf-core</span><button type="button" data-copy="pip install skyulf-core">copy</button></span>
+        </div>
+        <p class="fine"><b>No black box.</b> Visual work exports to Jupyter. Start on SQLite, grow to PostgreSQL. Store data locally or in S3-compatible storage.</p>
+      </div>
+      <div class="fan" aria-label="Product screenshots">
+        <figure class="f1"><img src="../static/img/eda/dashboardeda.jpg" alt="Automated EDA dashboard with distributions and correlations"><figcaption><b>EDA</b><span>profiling · outliers</span></figcaption></figure>
+        <figure class="f2"><img src="../static/img/canvas.jpg" alt="Node-based pipeline canvas"><figcaption><b>CANVAS</b><span>node pipelines</span></figcaption></figure>
+        <figure class="f3"><img src="../static/img/drift/drift_report.jpg" alt="Drift monitoring report"><figcaption><b>DRIFT</b><span>monitoring</span></figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EVIDENCE STRIP ============ -->
+  <div class="evidence" aria-label="Real project facts">
+    <div class="wrap">
+      <span>Apache-2.0 license</span>
+      <span>PyPI · skyulf-core</span>
+      <span>GitHub · flyingriverhorse/Skyulf</span>
+      <span>Docker Compose self-host</span>
+      <span>CSV · Excel · JSON · Parquet · S3</span>
+      <span>SQLite → PostgreSQL</span>
+    </div>
+  </div>
+
+  <!-- ============ TWO INTERFACES ============ -->
+  <section id="interfaces">
+    <div class="wrap">
+      <h2 class="rv">Two <span class="em-i">first-class</span> ways in.</h2>
+      <p class="sec-lede rv">The visual workspace and the Python engine are equal, complementary entry paths — not a demo and an afterthought. Work in either; the artifacts stay portable.</p>
+      <div class="duo">
+        <article class="iface visual rv">
+          <div class="head"><h3>Visual platform</h3><span class="tag">SELF-HOSTED</span></div>
+          <div class="shot"><img src="../static/img/dashboard.jpg" alt="Skyulf platform dashboard"></div>
+          <div class="body">
+            <p>A node-canvas workspace for the whole lifecycle, served from your own infrastructure.</p>
+            <ul>
+              <li><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9.5l4 4 8-9" stroke="#5457E8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Node-based preprocessing, feature engineering, splitting, modeling</li>
+              <li><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9.5l4 4 8-9" stroke="#5457E8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Background training via Celery + Redis or threads</li>
+              <li><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9.5l4 4 8-9" stroke="#5457E8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Registry, deployment, inference, drift, audit history</li>
+            </ul>
+            <span class="codechip"><span><span class="dollar">$</span> docker compose up -d</span><button type="button" data-copy="docker compose up -d">copy</button></span>
+          </div>
+        </article>
+        <article class="iface code rv">
+          <div class="head"><h3>skyulf-core</h3><span class="tag">APACHE-2.0</span></div>
+          <div class="shot"><img src="../static/img/experiments.jpg" alt="Experiment comparison view"></div>
+          <div class="body">
+            <p>The same engine as an independent Python package, for scripts and notebooks.</p>
+            <ul>
+              <li><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9.5l4 4 8-9" stroke="#E8501F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Automated EDA: profiling, correlations, outliers, causal discovery</li>
+              <li><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9.5l4 4 8-9" stroke="#E8501F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Build and run pipelines without the web platform</li>
+              <li><svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M3 9.5l4 4 8-9" stroke="#E8501F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Install from PyPI; no account, no lock-in</li>
+            </ul>
+            <span class="codechip"><span><span class="dollar">$</span> pip install skyulf-core</span><button type="button" data-copy="pip install skyulf-core">copy</button></span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ LIFECYCLE ============ -->
+  <section id="lifecycle" class="life">
+    <div class="wrap">
+      <h2 class="rv">The lifecycle, <span class="em-c">connected.</span></h2>
+      <p class="sec-lede rv">Eight stages, one continuous line. Nothing is re-exported between tools because nothing leaves the workflow.</p>
+      <div class="stages">
+        <div class="stage rv"><span class="node">01</span><div><h3>Ingest</h3><p>CSV, Excel, JSON, Parquet, and S3-compatible storage land in one place you control.</p></div><div class="shot"><img src="../static/img/datasource.jpg" alt="Data source connection screen"></div></div>
+        <div class="stage rv"><span class="node">02</span><div><h3>Explore</h3><p>Automated EDA: statistical profiling, distributions, correlations, outliers, segmentation, causal discovery, target analysis.</p></div><div class="shot"><img src="../static/img/eda/correlations.jpg" alt="Correlation matrix from automated EDA"></div></div>
+        <div class="stage rv"><span class="node">03</span><div><h3>Pipeline</h3><p>Node-based preprocessing, feature engineering, splitting, and modeling on a visual canvas.</p></div><div class="shot"><img src="../static/img/canvas.jpg" alt="Pipeline node canvas"></div></div>
+        <div class="stage rv"><span class="node">04</span><div><h3>Train</h3><p>Background training through Celery and Redis, or background threads for lighter setups.</p></div><div class="shot"><img src="../static/img/jobs.jpg" alt="Training jobs list"></div></div>
+        <div class="stage rv"><span class="node">05</span><div><h3>Compare</h3><p>Experiments side by side, so a model choice is a decision with evidence.</p></div><div class="shot"><img src="../static/img/experiments.jpg" alt="Experiment comparison table"></div></div>
+        <div class="stage rv"><span class="node">06</span><div><h3>Registry</h3><p>A model registry with version history and audit trail.</p></div><div class="shot"><img src="../static/img/registry.jpg" alt="Model registry with versions"></div></div>
+        <div class="stage rv"><span class="node">07</span><div><h3>Deploy &amp; infer</h3><p>Ship a model and serve inference from the same workspace.</p></div><div class="shot"><img src="../static/img/deployment.jpg" alt="Deployment screen"></div></div>
+        <div class="stage rv"><span class="node">08</span><div><h3>Monitor</h3><p>Drift monitoring and operational diagnostics keep the workflow honest after launch.</p></div><div class="shot"><img src="../static/img/drift/drift.jpg" alt="Drift monitoring chart"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ EXPORT / PROVE ============ -->
+  <section id="export" class="prove">
+    <div class="wrap">
+      <div class="rv">
+        <h2>Nothing is <span class="em-o">trapped.</span></h2>
+        <p class="sec-lede">Every visual pipeline exports to a Jupyter notebook — full or compact. Your work stays yours, in a format the whole ecosystem already reads.</p>
+        <blockquote>Visual work remains portable through notebook export rather than being trapped inside the canvas.</blockquote>
+      </div>
+      <div class="shot rv"><img src="../static/img/eda/featureimportance.jpg" alt="Feature importance analysis exportable to notebook"></div>
+    </div>
+  </section>
+
+  <!-- ============ GET STARTED ============ -->
+  <section id="start" class="start">
+    <div class="wrap">
+      <h2 class="rv">Start where you are.</h2>
+      <p class="sec-lede rv">Three real doors in. No signup wall, no sales call required to see it work.</p>
+      <div class="paths">
+        <article class="path featured rv">
+          <h3>Hosted demo</h3>
+          <p>Evaluate the whole product in the browser against a live deployment. No account.</p>
+          <a class="btn night" href="https://api.skyulf.com" rel="noopener">api.skyulf.com ↗</a>
+        </article>
+        <article class="path rv">
+          <h3>Python package</h3>
+          <p>Use the engine directly in scripts and notebooks.</p>
+          <span class="codechip"><span><span class="dollar">$</span> pip install skyulf-core</span><button type="button" data-copy="pip install skyulf-core">copy</button></span>
+        </article>
+        <article class="path rv">
+          <h3>Self-host</h3>
+          <p>Run the full stack from the repository with Docker Compose.</p>
+          <span class="codechip"><span><span class="dollar">$</span> docker compose up -d</span><button type="button" data-copy="docker compose up -d">copy</button></span>
+        </article>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <div class="brandline"><img src="../static/img/logo.png" alt="">Skyulf</div>
+      <p style="font-size:14.5px;max-width:36ch">One machine-learning workflow with two first-class interfaces: a visual, self-hosted workspace and an Apache-2.0 Python engine.</p>
+    </div>
+    <div>
+      <h4>Product</h4>
+      <a href="https://api.skyulf.com" rel="noopener">Live demo</a>
+      <a href="#interfaces">Visual platform</a>
+      <a href="#interfaces">skyulf-core</a>
+      <a href="#lifecycle">Lifecycle</a>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <a href="https://github.com/flyingriverhorse/Skyulf" rel="noopener">GitHub repository</a>
+      <a href="https://pypi.org/project/skyulf-core/" rel="noopener">PyPI package</a>
+      <a href="#start">Self-hosting</a>
+    </div>
+    <div>
+      <h4>Trust</h4>
+      <a href="#export">Notebook export</a>
+      <a href="#start">Apache-2.0</a>
+      <a href="#lifecycle">Drift monitoring</a>
+    </div>
+    <div class="legal">
+      <span>Apache-2.0</span><span>© Skyulf</span><span>No signup required for the demo</span><span>Screenshots are the real product</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  document.documentElement.classList.add('js');
+  requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      var hero = document.querySelector('.hero');
+      if (hero) hero.classList.add('hero-in');
+    });
+  });
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce && 'IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('.rv').forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll('.rv').forEach(function (el) { el.classList.add('in'); });
+  }
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-copy');
+      function done() { var t = btn.textContent; btn.textContent = 'copied'; setTimeout(function () { btn.textContent = t; }, 1400); }
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, done); } else { done(); }
+    });
+  });
+</script>
+</body>
+</html>
