@@ -397,14 +397,27 @@ class DeploymentService:
         dropped_cols = artifact.get("dropped_columns", [])
         df = DeploymentService._drop_target_and_dropped_columns(df, target_col, dropped_cols)
 
-        # Validate against the exact columns the model was trained on (when
-        # known) so a mismatch surfaces as a clear message, not a raw sklearn
-        # feature-count error.
-        DeploymentService._validate_required_columns(df, artifact.get("feature_columns"))
+        # Validate against the feature engineer's expected input columns
+        # (pre-transform), not the model's feature_columns (post-transform).
+        # F-03: feature_columns was recorded from the training frame *after*
+        # feature engineering, so validating the raw request against it would
+        # reject any pipeline with column-adding transformers.
+        input_columns = DeploymentService._extract_features_from_engineer(feature_engineer)
+        DeploymentService._validate_required_columns(df, input_columns)
 
         estimator = DeploymentService._unwrap_tuple_estimator(estimator)
 
         X_transformed = DeploymentService._transform_bundled_features(feature_engineer, df)
+
+        # F-02: Reindex to the recorded training feature order so that
+        # positional consumers (sklearn on bare numpy, no feature_names_in_)
+        # receive columns in the order they were trained on. The legacy path
+        # already does this; the bundled path was missing it.
+        feature_columns = artifact.get("feature_columns")
+        if feature_columns and hasattr(X_transformed, "columns"):
+            missing = [c for c in feature_columns if c not in X_transformed.columns]
+            if not missing:
+                X_transformed = X_transformed[feature_columns]
 
         return DeploymentService._predict_and_decode(
             estimator, X_transformed, feature_engineer, target_col, thresholds=thresholds
@@ -555,26 +568,34 @@ class DeploymentService:
 
     @staticmethod
     def _extract_features_from_bundled_artifact(artifact: dict) -> Any:
-        """Best-effort extraction of input feature names from a bundled artifact's feature engineer or model."""
-        # Prefer the exact, ordered column list persisted at training time
-        # (authoritative — doesn't rely on sklearn's `feature_names_in_`,
-        # which is unset for estimators fit on a bare numpy array, e.g. KMeans).
+        """Best-effort extraction of input feature names from a bundled artifact.
+
+        Returns the columns the *caller* must send — i.e. the feature engineer's
+        expected input, not the post-transform columns the model sees internally.
+        Falls back to the persisted ``feature_columns`` only when there is no
+        feature engineer (e.g. a bare model without preprocessing).
+        """
+        fe = artifact.get("feature_engineer")
+        if fe is not None:
+            input_features = DeploymentService._extract_features_from_engineer(fe)
+            if len(input_features) > 0:
+                return input_features
+
+        # No feature engineer (or it yielded nothing) — fall back to the
+        # persisted feature_columns, which are the model's expected columns.
         feature_columns = artifact.get("feature_columns")
         if feature_columns:
             return feature_columns
 
-        fe = artifact["feature_engineer"]
-        input_features = DeploymentService._extract_features_from_engineer(fe)
-
-        # If still empty, try model
-        if len(input_features) == 0 and "model" in artifact:
+        # Last resort: try the model's feature_names_in_
+        if "model" in artifact:
             model = artifact["model"]
             if isinstance(model, tuple):
                 model = model[0]
             if hasattr(model, "feature_names_in_"):
-                input_features = model.feature_names_in_
+                return model.feature_names_in_
 
-        return input_features
+        return []
 
     @staticmethod
     def _extract_input_features(artifact: Any) -> Any:

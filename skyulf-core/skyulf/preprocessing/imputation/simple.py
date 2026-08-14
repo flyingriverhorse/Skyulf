@@ -42,7 +42,10 @@ class SimpleImputerApplier(BaseApplier):
         exprs: list[Any] = []
         for col in X.columns:
             if col in cols and col in fill_values:
-                exprs.append(pl.col(col).fill_null(fill_values[col]).alias(col))
+                expr = pl.col(col).fill_null(fill_values[col])
+                if X.schema[col].is_float():
+                    expr = expr.fill_nan(fill_values[col])
+                exprs.append(expr.alias(col))
             else:
                 exprs.append(pl.col(col))
 

@@ -202,6 +202,8 @@ class TuningCalculator(BaseModelCalculator):
         nan_msg: str,
         inf_msg: str,
         object_nan_msg: str,
+        *,
+        allow_nan: bool = False,
     ) -> None:
         """Raise ValueError if a numpy array contains NaN/Inf (numeric) or NaN (object dtype).
 
@@ -209,16 +211,32 @@ class TuningCalculator(BaseModelCalculator):
         instant failures. We catch this early to give a clear message. Object-dtype arrays
         (e.g. mixed dtypes or leftover categorical/string columns that were never encoded)
         are also scanned via pd.isna, since np.isnan/np.isinf raise on non-numeric dtypes.
+
+        ``allow_nan`` skips the NaN checks for models that handle missing values
+        natively (XGBoost, LightGBM, HistGradientBoosting); Inf is still rejected.
         """
         if not isinstance(arr, np.ndarray):
             return
         if np.issubdtype(arr.dtype, np.number):
-            if np.isnan(arr).any():
+            if not allow_nan and np.isnan(arr).any():
                 raise ValueError(nan_msg)
             if np.isinf(arr).any():
                 raise ValueError(inf_msg)
-        elif arr.dtype == object and pd.isna(arr).any():
+        elif arr.dtype == object and not allow_nan and pd.isna(arr).any():
             raise ValueError(object_nan_msg)
+
+    # Model classes that natively handle missing values in X; NaN must not be
+    # rejected for these (y still is — no estimator accepts missing targets).
+    _MISSING_NATIVE_MODEL_CLASSES = frozenset(
+        {
+            "XGBClassifier",
+            "XGBRegressor",
+            "LGBMClassifier",
+            "LGBMRegressor",
+            "HistGradientBoostingClassifier",
+            "HistGradientBoostingRegressor",
+        }
+    )
 
     def _refit_best_model(
         self,
@@ -298,11 +316,20 @@ class TuningCalculator(BaseModelCalculator):
         X_np, y_np = SklearnBridge.to_sklearn((X, y))
 
         # --- VALIDATION: Check for NaNs/Inf in Data ---
+        # Models with native missing-value support (XGBoost, LightGBM,
+        # HistGradientBoosting) accept NaN in X; forcing an Imputer on them
+        # would wrongly block a legitimate configuration. y is always checked.
+        model_cls = getattr(self.model_calculator, "model_class", None)
+        x_allows_nan = (
+            model_cls is not None
+            and getattr(model_cls, "__name__", "") in self._MISSING_NATIVE_MODEL_CLASSES
+        )
         self._validate_no_nan_inf(
             X_np,
             "Input features (X) contain NaN values. Please use an 'Imputer' node before this model.",
             "Input features (X) contain Infinite values. Please scale or clean your data.",
             "Input features (X) contain missing/NaN values. Please use an 'Imputer' node before this model.",
+            allow_nan=x_allows_nan,
         )
         self._validate_no_nan_inf(
             y_np,

@@ -365,6 +365,13 @@ def calculate_clustering_metrics(
     X_np, _ = SklearnBridge.to_sklearn((X, None))
     labels_np = np.asarray(labels).ravel()
     silhouette_sample_size = _validate_silhouette_sample_size(silhouette_sample_size)
+    # Guard before the row-count check: polars collapses a 0-column frame to
+    # shape (0, 0), so otherwise a 0-feature input raises the misleading
+    # row-count error instead of the sklearn-style "0 feature" message.
+    if X_np.ndim != 2 or X_np.shape[1] == 0:
+        raise ValueError(
+            f"Found array with 0 feature(s) (shape={X_np.shape}) while a minimum of 1 is required."
+        )
     if X_np.shape[0] != len(labels_np):
         raise ValueError("X and labels must have the same number of rows")
 

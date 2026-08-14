@@ -127,11 +127,11 @@ a way that the rest of `initiatives/` is not.
 
 **Its Tier 1 is adopted into Stage 0 as-is:**
 
-| ID | Defect | Why it outranks most of T1–T6 |
-|---|---|---|
-| F-01 | `DummyEncoder` emits null dummies on Polars → training hard-fails | Breaks a documented engine |
-| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression |
-| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form |
+| ID | Defect | Why it outranks most of T1–T6 | Status 2026-08-14 |
+|---|---|---|---|
+| F-01 | `DummyEncoder` emits null dummies on Polars → training hard-fails | Breaks a documented engine | ✅ fixed, red-green verified |
+| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression | 🟡 fixed in `service.py`, 102 existing deployment tests pass; own regression test still owed |
+| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form | 🟡 fixed in `service.py` (pre-transform validation); own regression test still owed |
 
 **F-02 is the most severe defect found anywhere in this repo.** Two
 identical requests differing only in JSON key order return different
@@ -173,19 +173,25 @@ recover from, and it is the kind of thing users write about publicly.
 **Order within Stage 0** (revised after the dual-engine audit):
 
 1. **F-02, F-03** — deployment-blocking, engine-independent, affect every
-   user regardless of engine choice.
+   user regardless of engine choice. 🟡
 2. **T1** — silent target misalignment; corrupts results rather than
-   blocking them, which is worse but affects fewer pipelines.
-3. **F-01, F-04, F-05, F-06** — silent corruption on the Polars path.
+   blocking them, which is worse but affects fewer pipelines. ✅
+3. **F-01, F-04, F-05, F-06** — silent corruption on the Polars path. ✅
 4. **T2, T3, T6** — self-inflicted defaults that no-op. Cheap; can ride
-   with any of the above.
-5. **T5** — the contract test. Last to write, first in value.
+   with any of the above. ✅
+5. **T5** — the contract test. Last to write, first in value. ✅
+
+**Status markers (updated 2026-08-14):** ✅ fixed + verified with red-green
+tests; 🟡 implemented, verified against existing suites but still missing
+its own new regression tests; ⏳ not started. Full evidence table:
+`initiatives/2026-08-14-stage0-dual-engine-progress.md`. All fixes are in
+the working tree of `078`, **not yet committed**.
 
 **Every T-item below was re-reproduced on branch `078` on 2026-08-11** via a
 throwaway worktree. F-items were reproduced by the dual-engine audit; F-04
 and F-06 were additionally re-verified here.
 
-### T1 — Lag and Rolling nodes return a stale, misaligned `y` (critical)
+### T1 — Lag and Rolling nodes return a stale, misaligned `y` (critical) — ✅ fixed 2026-08-14
 
 `X` is sorted and row-filtered; `y` is returned untouched. Every row ends up
 with another row's label.
@@ -229,7 +235,7 @@ propagate row drops to `y` correctly (`X:5→4, y:5→4`). The blast radius is
 narrower than the root cause first suggests — but it must be enumerated, not
 assumed, which is what T5 is for.
 
-### T2 — FeatureSelection's own default is an unknown method
+### T2 — FeatureSelection's own default is an unknown method — ✅ fixed 2026-08-14
 
 ```
 FeatureSelectionCalculator().fit(X, {'method':'variance','threshold':0.0})
@@ -241,7 +247,7 @@ The registered default is `variance`; the dispatch table
 (`feature_selection/facade.py`) only knows `variance_threshold`. The node
 calls its own default "unknown."
 
-### T3 — GeneralBinning's own default produces no bins
+### T3 — GeneralBinning's own default produces no bins — ✅ fixed 2026-08-14
 
 ```
 GeneralBinningCalculator().fit(X, {'columns':['x'],'n_bins':2,'strategy':'uniform'})
@@ -273,7 +279,7 @@ only because it is how the packaging gap was discovered, and because the
 same gap would mislead a self-hoster filing a bug report against the wrong
 version.
 
-### T5 — The actual deliverable: a registry-wide contract test
+### T5 — The actual deliverable: a registry-wide contract test — ✅ landed 2026-08-14
 
 T1–T3 share one shape: **a node's own declared defaults do not work.** Fix
 the three and the class remains. So the exit criterion for Stage 0 is a
@@ -306,7 +312,7 @@ Three bug fixes are worth a week. A test that makes the whole class
 impossible is worth considerably more, and it is the single highest-value
 artifact in this plan.
 
-### T6 — FeatureMath silently drops datetime features on mixed-offset input
+### T6 — FeatureMath silently drops datetime features on mixed-offset input — ✅ fixed 2026-08-14
 
 The same silent-no-op family as T2/T3, independently re-verified:
 
@@ -819,15 +825,22 @@ dual-engine audit landed.
    competes with that. **F-03 requires a frontend check** — it drives the
    UI input schema, so per repo policy the node components must be verified
    against the corrected contract.
+   **Status 2026-08-14: 🟡 implemented in `service.py` and covered by the
+   existing 102 deployment tests; the frontend check and dedicated
+   red-green regression tests are still owed. Not yet committed.**
 2. **The `skyulf-core` fixes → ship to PyPI.** F-01, F-04, F-05, F-06 plus
    T1, T2, T3, T6. `skyulf-core` releases on its own `core-v*` tag and
    **never touches the demo branch**, so this path is unblocked today. It
    is also the one actively corrupting results for 1,222 downloads/month.
+   **Status 2026-08-14: ✅ all fixed and red-green verified (suite: 3183
+   collected, 3113 passed, 0 failed); PyPI release still pending.**
 3. **T5 — the contract test**, together with the audit's cross-cutting test
    debt: parity tests that use **float NaN** (not only nulls) and **wrapped**
    frames. The existing 195-test parity suite passes clean against *every
    bug in both audits*, which is the real finding. Without this, the suite
    keeps going green while the product stays broken.
+   **Status 2026-08-14: ✅ `tests/test_registry_contract.py` landed
+   (175 parametrised cases over the full registry, all three clauses).**
 4. **Check the GitHub traffic panel** (Stage 1b, first half). Free, no code,
    and it decides whether the funnel work below is justified at all. Do this
    *before* Stage 2, not after.
