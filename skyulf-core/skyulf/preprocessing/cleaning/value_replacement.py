@@ -18,16 +18,56 @@ def _is_mapping_like(obj: Any) -> bool:
     return isinstance(obj, (dict, pd.Series)) or hasattr(obj, "items")
 
 
-def _polars_mapping_exprs(valid: list[str], mapping: dict[str, Any]) -> list[Any]:
+def _coerce_key(key: Any, dtype_kind: str) -> Any:
+    """Coerce a single (possibly JSON-string) mapping key to match ``dtype_kind``."""
+    if not isinstance(key, str):
+        return key
+    try:
+        if dtype_kind in ("i", "u"):
+            return int(key)
+        if dtype_kind == "f":
+            return float(key)
+        if dtype_kind == "b":
+            return key.strip().lower() in ("true", "1")
+    except (ValueError, TypeError):
+        return key
+    return key
+
+
+def _coerce_mapping_keys(mapping: dict[str, Any], dtype_kind: str) -> dict[Any, Any]:
+    """Coerce string-typed mapping keys (as produced by JSON configs) to a
+    column's numeric/boolean dtype so lookups actually match values instead
+    of silently no-op'ing (pandas) or stringifying the whole column
+    (polars ``replace_strict``).
+    """
+    if dtype_kind not in ("i", "u", "f", "b"):
+        return mapping
+    return {_coerce_key(k, dtype_kind): v for k, v in mapping.items()}
+
+
+def _polars_dtype_kind(dtype: Any) -> str:
+    """Map a polars dtype to a numpy-style dtype-kind character."""
+    if dtype.is_integer():
+        return "i"
+    if dtype.is_float():
+        return "f"
+    if str(dtype) == "Boolean":
+        return "b"
+    return ""
+
+
+def _polars_mapping_exprs(X: Any, valid: list[str], mapping: dict[str, Any]) -> list[Any]:
     import polars as pl
 
     is_nested = any(isinstance(v, dict) for v in mapping.values())
+    schema = X.schema
     exprs: list[Any] = []
     for col in valid:
-        if is_nested and col in mapping:
-            exprs.append(pl.col(col).replace_strict(mapping[col], default=pl.col(col)).alias(col))
-        elif not is_nested:
-            exprs.append(pl.col(col).replace_strict(mapping, default=pl.col(col)).alias(col))
+        if is_nested and col not in mapping:
+            continue
+        col_map = mapping[col] if is_nested else mapping
+        col_map = _coerce_mapping_keys(col_map, _polars_dtype_kind(schema[col]))
+        exprs.append(pl.col(col).replace_strict(col_map, default=pl.col(col)).alias(col))
     return exprs
 
 
@@ -47,16 +87,26 @@ def _polars_to_replace_exprs(valid: list[str], to_replace: Any, value: Any) -> l
 
 
 def _value_replacement_exprs_polars(
+    X: Any,
     valid: list[str],
     mapping: dict[str, Any] | None,
     to_replace: Any,
     value: Any,
 ) -> list[Any]:
     if mapping:
-        return _polars_mapping_exprs(valid, mapping)
+        return _polars_mapping_exprs(X, valid, mapping)
     if to_replace is None:
         return []
     return _polars_to_replace_exprs(valid, to_replace, value)
+
+
+def _pandas_dtype_kind(dtype: Any) -> str:
+    """Map a pandas/numpy dtype to a dtype-kind character, treating pandas
+    nullable extension dtypes (``Int64``, ``Float64``, ``boolean``) the same
+    as their numpy equivalents.
+    """
+    kind = getattr(dtype, "kind", "")
+    return kind if kind in ("i", "u", "f", "b") else ""
 
 
 def _pandas_apply_mapping(
@@ -71,10 +121,12 @@ def _pandas_apply_mapping(
         if is_nested:
             for col, map_dict in mapping.items():
                 if col in valid:
+                    map_dict = _coerce_mapping_keys(map_dict, _pandas_dtype_kind(df_out[col].dtype))
                     df_out[col] = df_out[col].replace(map_dict).infer_objects()
         else:
             for col in valid:
-                df_out[col] = df_out[col].replace(mapping).infer_objects()
+                col_map = _coerce_mapping_keys(mapping, _pandas_dtype_kind(df_out[col].dtype))
+                df_out[col] = df_out[col].replace(col_map).infer_objects()
     return df_out
 
 
@@ -116,6 +168,7 @@ class ValueReplacementApplier(BaseApplier):
         if not valid:
             return X, _y
         exprs = _value_replacement_exprs_polars(
+            X,
             valid,
             params.get("mapping"),
             params.get("to_replace"),

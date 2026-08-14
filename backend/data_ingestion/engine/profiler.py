@@ -36,7 +36,18 @@ class DataProfiler:
             )
             col_stats["unique_count"] = series.n_unique()
 
-            if dtype in ["Int64", "Float64", "Int32", "Float32"]:
+            if dtype in [
+                "Int64",
+                "Float64",
+                "Int32",
+                "Float32",
+                "Int8",
+                "Int16",
+                "UInt8",
+                "UInt16",
+                "UInt32",
+                "UInt64",
+            ]:
                 col_stats["mean"] = series.mean()
                 col_stats["std"] = series.std()
                 col_stats["min"] = series.min()

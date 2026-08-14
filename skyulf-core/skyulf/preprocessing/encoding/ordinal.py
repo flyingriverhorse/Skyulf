@@ -49,21 +49,49 @@ def _apply_features_pandas(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     return X_out
 
 
+def _target_to_str_array(y: Any) -> Any:
+    """Best-effort conversion of ``y`` to a 2-D string numpy array (shape ``(n, 1)``).
+
+    For Polars Series, casts to Utf8 and fills nulls with the literal "nan"
+    string *before* calling ``.to_numpy()``. Polars' native ``.to_numpy()``
+    casts integer columns containing nulls to float (NaN), which flips the
+    string representation of every value (e.g. "1" -> "1.0") depending on
+    whether nulls happen to be present in a given batch -- doing the string
+    cast in Polars first keeps fit and apply representations identical
+    regardless of null presence.
+
+    Note: this returns a 2-D array (unlike ``label.py``'s ``_y_to_str_array``,
+    which returns a flat 1-D array for sklearn's ``LabelEncoder``) because
+    sklearn's ``OrdinalEncoder.fit``/``.transform`` expect a 2-D
+    ``(n_samples, n_features)`` array, even for a single target column.
+    """
+    # Polars is a hard runtime dependency of this package (see setup.py) and is
+    # already imported at process startup via `engines/polars_engine.py`'s
+    # module-level import, so importing it here is not a lazy/optional-import
+    # pattern -- it's just kept local to this function (matching the sibling
+    # helpers in this module) to use `isinstance(y, pl.Series)` rather than
+    # duck-typing on `hasattr(y, "fill_null")`, which could misroute any
+    # unrelated object that happens to expose a `fill_null` method.
+    import polars as pl
+
+    if isinstance(y, pl.Series):
+        return y.cast(pl.Utf8).fill_null("nan").to_numpy().reshape(-1, 1)
+    if hasattr(y, "to_numpy"):
+        return y.to_numpy().astype(str).reshape(-1, 1)
+    return np.array(y).astype(str).reshape(-1, 1)
+
+
 def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
     import polars as pl
 
-    y_arr = y.to_numpy().astype(str).reshape(-1, 1)
+    y_arr = _target_to_str_array(y)
     encoded = enc.transform(y_arr).flatten()
     y_name = y.name if hasattr(y, "name") else "target"
     return pl.Series(y_name, encoded.astype(np.float32))
 
 
 def _apply_target_pandas(y: Any, enc: OrdinalEncoder) -> Any:
-    y_arr = (
-        y.to_numpy().astype(str).reshape(-1, 1)
-        if hasattr(y, "to_numpy")
-        else np.array(y).astype(str).reshape(-1, 1)
-    )
+    y_arr = _target_to_str_array(y)
     encoded = enc.transform(y_arr).flatten()
     return pd.Series(
         encoded,
@@ -143,11 +171,7 @@ def _fit_target_encoder(
 ) -> OrdinalEncoder:
     """Fit a one-column OrdinalEncoder on ``y``."""
     enc = _make_ordinal_encoder(categories, handle_unknown, unknown_value)
-    y_arr = (
-        y_series.to_numpy().astype(str).reshape(-1, 1)
-        if hasattr(y_series, "to_numpy")
-        else np.array(y_series).astype(str).reshape(-1, 1)
-    )
+    y_arr = _target_to_str_array(y_series)
     enc.fit(y_arr)
     return enc
 

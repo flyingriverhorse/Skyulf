@@ -133,8 +133,9 @@ class PolarsEngine(BaseEngine):
 
     @classmethod
     def to_numpy(cls, df: Any) -> Any:
-        if isinstance(df, SkyulfPolarsWrapper):
-            return df._df.to_numpy()
+        # `SkyulfPolarsWrapper.__getattr__` delegates to the wrapped
+        # `pl.DataFrame`, so `df.to_numpy()` and `df._df.to_numpy()` are
+        # identical -- no need for a separate `isinstance` branch.
         if hasattr(df, "to_numpy"):
             return df.to_numpy()
         return np.array(df)

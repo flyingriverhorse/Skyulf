@@ -129,7 +129,8 @@ class TemporalMixin(_AnalyzerState):
             agg_expr = pl.col(target_metric).mean().alias("count")
 
         dow_df = _collect(
-            self.lazy_df.with_columns(  # type: ignore[attr-defined]
+            self.lazy_df.filter(pl.col(date_col).is_not_null())  # type: ignore[attr-defined]
+            .with_columns(
                 pl.col(date_col).dt.weekday().alias("dow_idx"),
                 pl.col(date_col).dt.strftime("%a").alias("dow_name"),
             )
@@ -142,7 +143,8 @@ class TemporalMixin(_AnalyzerState):
         ]
 
         moy_df = _collect(
-            self.lazy_df.with_columns(  # type: ignore[attr-defined]
+            self.lazy_df.filter(pl.col(date_col).is_not_null())  # type: ignore[attr-defined]
+            .with_columns(
                 pl.col(date_col).dt.month().alias("month_idx"),
                 pl.col(date_col).dt.strftime("%b").alias("month_name"),
             )

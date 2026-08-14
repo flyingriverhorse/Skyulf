@@ -168,7 +168,7 @@ class MultivariateMixin(_AnalyzerState):
         """Build PCAPoint entries from the padded PCA output and optional label values."""
         points = []
         for i in range(len(X_pca)):
-            label_val = str(labels[i]) if labels else None
+            label_val = None if labels is None or labels[i] is None else str(labels[i])
             points.append(
                 PCAPoint(
                     x=float(X_pca[i, 0]),
@@ -243,7 +243,11 @@ class MultivariateMixin(_AnalyzerState):
         """Build 2D ClusteringPoint entries from padded PCA output and cluster/original labels."""
         points = []
         for i in range(len(X_pca)):
-            label_val = str(original_labels[i]) if original_labels else None
+            label_val = (
+                None
+                if original_labels is None or original_labels[i] is None
+                else str(original_labels[i])
+            )
             points.append(
                 ClusteringPoint(
                     x=float(X_pca[i, 0]),
