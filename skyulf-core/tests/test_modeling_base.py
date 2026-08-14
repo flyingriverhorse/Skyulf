@@ -526,6 +526,28 @@ def test_fit_predict_tuple_train_test_dataframes():
     assert len(preds["test"]) == 2
 
 
+def test_fit_predict_raw_polars_dataframe_single_frame():
+    """Regression test: a raw (unwrapped) `pl.DataFrame` passed directly (not
+    inside a tuple/`SplitDataset`) previously fell through to the tuple/
+    SplitDataset branches of `_normalize_fit_predict_dataset`, which only
+    checked `isinstance(dataset, pd.DataFrame)` before that. It then
+    crashed with `AttributeError: 'DataFrame' object has no attribute
+    'train'` when the Polars-engine `.train`-style attribute access failed.
+    This path is reachable in production via `pipeline.py`'s no-splitter
+    fallback, which wraps whatever engine's `transformed_data` directly
+    into `fit_predict`.
+    """
+    import polars as pl
+
+    df = pl.DataFrame({"a": [1, 2, 3, 4, 5, 6], "target": [0, 1, 0, 1, 0, 1]})
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="t2"
+    )
+    preds = estimator.fit_predict(df, "target", config={})
+    assert len(preds["train"]) == 6
+    assert "test" not in preds
+
+
 def test_fit_predict_tuple_xy_fallback_warns():
     """Passing a plain (X, y) tuple (no target embedded) should log a leakage warning."""
     X = pd.DataFrame({"a": [1, 2, 3, 4]})

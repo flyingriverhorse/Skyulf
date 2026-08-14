@@ -120,10 +120,19 @@ def _compute_reference_crosstab_polars(
     Groups directly by (cluster, reference value) instead of building a dense
     ``pd.crosstab`` grid — occurring combinations always have a positive
     count, so the result matches the Pandas path's zero-filtered dict.
+
+    Rows with a null reference value are excluded, matching ``pd.crosstab``'s
+    default behavior of dropping NaN entries from the reference column
+    (``pd.crosstab`` never emits a ``"nan"``/``"None"`` row) -- without this,
+    Polars' ``group_by`` (which treats null as a normal, valid group key)
+    would report a bogus ``"None"`` reference category that doesn't exist on
+    the Pandas engine for identical input.
     """
     ref_name = reference_values.name or "reference"
-    frame = pl.DataFrame({"__skyulf_cluster__": labels}).with_columns(
-        reference_values.alias(ref_name)
+    frame = (
+        pl.DataFrame({"__skyulf_cluster__": labels})
+        .with_columns(reference_values.alias(ref_name))
+        .filter(pl.col(ref_name).is_not_null())
     )
     counts = frame.group_by(["__skyulf_cluster__", ref_name]).agg(pl.len().alias("count"))
 

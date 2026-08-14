@@ -42,7 +42,11 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     if not columns or not lags:
         return X, _y
 
-    X_out = X.sort(sort_by) if sort_by and sort_by in X.columns else X
+    X_out = (
+        X.sort(sort_by, nulls_last=True, maintain_order=True)
+        if sort_by and sort_by in X.columns
+        else X
+    )
     exprs = _polars_lag_exprs(columns, list(X_out.columns), lags, params.get("group_by") or None)
     if exprs:
         X_out = X_out.with_columns(exprs)
@@ -52,7 +56,12 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 
 
 def _pandas_lag_column(df: Any, col: str, lags: list[int], group_by: list[str] | None) -> None:
-    source = df.groupby(group_by)[col] if group_by else df[col]
+    # `dropna=False` matches Polars' `.over(group_by)` semantics, where a null
+    # group key is treated as a normal (self-equal) group rather than
+    # excluded. Pandas' `groupby` defaults to `dropna=True`, which would
+    # otherwise force every null-group row's lag to NaN regardless of what
+    # preceded it, diverging from the Polars apply path on the same data.
+    source = df.groupby(group_by, dropna=False)[col] if group_by else df[col]
     for lag in lags:
         df[_lag_name(col, lag)] = source.shift(lag)
 

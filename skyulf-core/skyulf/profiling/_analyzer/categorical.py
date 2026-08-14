@@ -19,7 +19,15 @@ class CategoricalMixin(_AnalyzerState):
                     val_key = next((k for k in item if k != "count"), None)
                     if val_key is None:
                         continue
-                    top_k.append({"value": str(item[val_key]), "count": item["count"]})
+                    value = item[val_key]
+                    if value is None:
+                        # Polars' `value_counts` includes null as a real
+                        # category; render it as an actual missing marker
+                        # rather than the literal string "None", which would
+                        # otherwise look like (and be indistinguishable
+                        # from) a genuine category value of that name.
+                        continue
+                    top_k.append({"value": str(value), "count": item["count"]})
 
         rare_count = row.get(f"{col}__rare", 0)
         return CategoricalStats(

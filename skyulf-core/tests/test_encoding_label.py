@@ -214,6 +214,29 @@ def test_label_apply_engine_parity_on_unseen_category() -> None:
     )
 
 
+def test_polars_col_to_str_array_fills_nulls_with_nan_string() -> None:
+    """_polars_col_to_str_array casts to Utf8 and fills nulls as "nan" natively,
+    matching the apply-time representation in `_build_polars_feature_exprs`."""
+    from skyulf.preprocessing.encoding.label import _polars_col_to_str_array
+
+    X = pl.DataFrame({"cat": [1, 2, None]})
+    result = _polars_col_to_str_array(X, "cat")
+    np.testing.assert_array_equal(result, np.array(["1", "2", "nan"]))
+
+
+def test_label_encoder_polars_feature_fit_apply_stable_across_null_presence() -> None:
+    """Regression test: an integer-like feature column fitted with nulls present
+    must not be treated as unseen when applied on a null-free batch (or vice versa).
+    """
+    X_fit = pl.DataFrame({"cat": [1, 2, None, 1]})
+    params = dict(LabelEncoderCalculator().fit(X_fit, {"columns": ["cat"]}))
+
+    X_apply = pl.DataFrame({"cat": [1, 2, 1]})
+    result = LabelEncoderApplier().apply(X_apply, dict(params))
+
+    assert -1 not in result["cat"].to_list()
+
+
 def test_polars_apply_target_column_is_encoded() -> None:
     """The polars apply path encodes y via `__target__` when configured."""
     X = pd.DataFrame({"category": ["a", "b", "a"]})
@@ -235,6 +258,46 @@ def test_y_to_str_array_without_to_numpy_uses_np_array_fallback() -> None:
 
     result = _y_to_str_array([1, 2, 3])
     np.testing.assert_array_equal(result, np.array(["1", "2", "3"]))
+
+
+def test_y_to_str_array_polars_series_fills_nulls_with_nan_string() -> None:
+    """_y_to_str_array casts a Polars Series to Utf8 and fills nulls as "nan" natively,
+    instead of relying on `.to_numpy()`'s int->float->"1.0" null-driven cast."""
+    from skyulf.preprocessing.encoding.label import _y_to_str_array
+
+    result = _y_to_str_array(pl.Series("target", [1, 2, None]))
+    np.testing.assert_array_equal(result, np.array(["1", "2", "nan"]))
+
+
+def test_y_to_str_array_polars_series_without_nulls_matches_apply_representation() -> None:
+    """A null-free Polars Series still goes through the Utf8 cast path (not `.to_numpy().astype(str)`),
+    so fit and apply agree even when null presence differs between batches."""
+    from skyulf.preprocessing.encoding.label import _y_to_str_array
+
+    result = _y_to_str_array(pl.Series("target", [1, 2, 1]))
+    np.testing.assert_array_equal(result, np.array(["1", "2", "1"]))
+
+
+def test_label_encoder_polars_target_fit_apply_stable_across_null_presence() -> None:
+    """Regression test: fitting on a batch with null targets and applying on a batch
+    without nulls (or vice versa) must not silently map every value to missing_code.
+
+    Before the fix, `_y_to_str_array` used `.to_numpy().astype(str)` directly, which
+    casts an int Polars Series with nulls to float ("1" -> "1.0"), while the apply
+    path already used `.cast(pl.Utf8).fill_null("nan")` ("1" stays "1"). This flip
+    made fit and apply learn/produce mismatched string categories.
+    """
+    X_fit = pl.DataFrame({"cat": ["a", "b", None, "a"]})
+    y_fit = pl.Series("target", [1, 2, None, 1])
+
+    params = dict(LabelEncoderCalculator().fit((X_fit, y_fit), {"columns": ["cat", "target"]}))
+
+    X_apply = pl.DataFrame({"cat": ["a", "b", "a"]})
+    y_apply = pl.Series("target", [1, 2, 1])
+    X_out, y_out = LabelEncoderApplier().apply((X_apply, y_apply), dict(params))
+
+    assert -1 not in X_out["cat"].to_list()
+    assert -1 not in y_out.to_list()
 
 
 class TestMaybePullYExtractsTargetColumn:

@@ -15,6 +15,27 @@ The :class:`PipelineEngine` orchestrates execution of pipelines defined by
 
 This module owns the public API (``run``), per-node dispatch (``_execute_node``),
 upstream-input resolution helpers, and the ``log`` shim.
+
+Engine data-type invariant
+--------------------------
+**Frames flowing through the engine are always pandas.** This is true by
+construction, not by coincidence:
+
+* every concrete :class:`~skyulf.data.catalog.DataCatalog` implementation in
+  ``backend/data/catalog.py`` reads via ``pd.read_csv``/``pd.read_parquet``;
+* skyulf-core's ``apply_dual_engine`` dispatches on the *input* engine, so a
+  pandas input always yields a pandas output — no node converts to Polars
+  mid-pipeline;
+* intermediate artifacts round-trip through joblib (pickle), which is
+  type-faithful.
+
+The numerous ``isinstance(x, pd.DataFrame)`` checks throughout this package
+depend on that invariant; a non-pandas frame would make them silently no-op
+(losing SHAP explanations and drift-detection baselines rather than erroring).
+``_run_data_loader`` therefore asserts the invariant at the single point where
+data enters the engine. Note that ``DataService._should_use_polars`` (which
+*does* default to Polars) belongs to the separate EDA/ingestion/preview path
+and never feeds this engine.
 """
 
 import logging

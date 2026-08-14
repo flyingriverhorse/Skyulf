@@ -236,7 +236,7 @@ def test_missing_indicator_explicit_columns_adds_indicator_cols() -> None:
     out = MissingIndicatorCalculator().infer_output_schema(s, {"columns": ["a"]})
     assert out is not None
     assert out.column_list() == ["a", "b", "a_missing"]
-    assert out.dtypes["a_missing"] == "bool"
+    assert out.dtypes["a_missing"] == "int64"
 
 
 def test_missing_indicator_no_columns_returns_none() -> None:

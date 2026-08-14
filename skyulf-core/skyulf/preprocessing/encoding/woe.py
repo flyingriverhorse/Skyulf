@@ -164,6 +164,28 @@ def _woe_fit_common(
     return _build_woe_artifact(frame, y_bin, cols, reg)
 
 
+def _categorical_frame_for_fit(X: Any, cols: list[str]) -> Any:
+    """Return a pandas frame of ``cols`` with string keys matching the apply path.
+
+    For a Polars ``X``, casting to Utf8 and filling nulls with the literal
+    "nan" string natively (before the pandas conversion) mirrors
+    ``_woe_apply_polars``'s representation exactly (e.g. integer category ``1``
+    stays "1", not "1.0", and nulls become "nan" instead of the pandas-only
+    "None"/NaN-object quirks). Without this, an all-Polars column's fit-time
+    keys can silently diverge from its own apply-time keys -- e.g. any integer
+    categorical column containing nulls gets upcast to float by pandas'
+    ``.to_pandas()`` conversion, so ``.astype(str)`` on the fit side yields
+    "1.0" while the Polars apply path renders "1", and every known category
+    ends up falling back to ``default`` at apply time.
+    """
+    if hasattr(X, "fill_null"):  # polars DataFrame
+        import polars as pl
+
+        exprs = [pl.col(col).cast(pl.Utf8).fill_null("nan") for col in cols]
+        return X.select(exprs).to_pandas()
+    return select_then_to_pandas(X, cols)[cols]
+
+
 def _woe_fit(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     """Fit WOE for either dataframe engine using one narrow Pandas boundary."""
     y = _extract_target(X, y, config.get("target_column"))
@@ -178,8 +200,8 @@ def _woe_fit(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     )
     if not cols:
         return {}
-    frame = select_then_to_pandas(X, cols)
-    return _woe_fit_common(frame[cols], y, cols, config)
+    frame = _categorical_frame_for_fit(X, cols)
+    return _woe_fit_common(frame, y, cols, config)
 
 
 @NodeRegistry.register("WOEEncoder", WOEEncoderApplier)

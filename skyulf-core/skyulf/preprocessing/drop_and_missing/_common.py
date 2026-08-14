@@ -22,7 +22,10 @@ def _polars_filter_y_by_kept_indices(y: Any, kept_indices: Any) -> Any:
         )
     if isinstance(y, pl.Series):
         return y.gather(kept_indices)
-    return y
+    raise TypeError(
+        f"Cannot filter y of type {type(y).__name__} by kept row indices on the Polars "
+        "engine; expected a polars DataFrame or Series (or None)."
+    )
 
 
 def _normalize_subset(subset: Any, existing_cols: list) -> list | None:
