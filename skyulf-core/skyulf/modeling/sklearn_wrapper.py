@@ -245,6 +245,6 @@ class SklearnApplier(BaseModelApplier):
         # already done in modeling/_evaluation/classification.py.
         columns = None
         if hasattr(model_artifact, "classes_"):
-            columns = [str(c) for c in model_artifact.classes_]
+            columns = pd.Index([str(c) for c in model_artifact.classes_])
 
         return pd.DataFrame(probs, index=index, columns=columns)

@@ -51,7 +51,15 @@ def _apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     if exprs:
         X_out = X_out.with_columns(exprs)
     if params.get("drop_na"):
-        X_out = X_out.drop_nulls()
+        if _y is not None:
+            import polars as pl
+
+            null_mask = pl.any_horizontal([pl.col(c).is_null() for c in X_out.columns])
+            mask_series = X_out.select(null_mask.alias("__null")).get_column("__null")
+            X_out = X_out.filter(~mask_series)
+            _y = _y.filter(~mask_series)
+        else:
+            X_out = X_out.drop_nulls()
     return X_out, _y
 
 
@@ -85,7 +93,9 @@ def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
 class LagFeaturesApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_dual_engine(X, params, _apply_polars, _apply_pandas)
+        return apply_dual_engine(
+            (X, _y) if _y is not None else X, params, _apply_polars, _apply_pandas
+        )
 
 
 @NodeRegistry.register("LagFeatures", LagFeaturesApplier)

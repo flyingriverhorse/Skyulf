@@ -1,5 +1,6 @@
 """Unit tests for the HashEncoder Calculator/Applier (fit + apply, dual-engine)."""
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -206,11 +207,15 @@ def test_pandas_bucket_assignment_stable_across_process_hash_seeds() -> None:
     )
 
     def _run_with_seed(seed: str) -> str:
+        # Inherit the full environment and override only PYTHONHASHSEED:
+        # a stripped env breaks Windows DLL loading (Winsock provider) and
+        # the subprocess dies at import with WinError 10106.
+        env = {**os.environ, "PYTHONHASHSEED": seed}
         result = subprocess.run(
             [sys.executable, "-c", script],
             capture_output=True,
             text=True,
-            env={"PYTHONHASHSEED": seed, "PATH": __import__("os").environ.get("PATH", "")},
+            env=env,
             check=True,
         )
         return result.stdout.strip()

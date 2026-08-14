@@ -42,6 +42,7 @@ class FeatureSelectionApplier(BaseApplier):
 
 
 _FS_CALCULATORS: dict[str, Callable[[], BaseCalculator]] = {
+    "variance": VarianceThresholdCalculator,
     "variance_threshold": VarianceThresholdCalculator,
     "correlation_threshold": CorrelationThresholdCalculator,
     "select_k_best": UnivariateSelectionCalculator,

@@ -737,3 +737,47 @@ class TestRealShapedDataset:
         np.testing.assert_allclose(
             out.loc[df["income"].isna(), "income"], df["income"].mean(), rtol=1e-9
         )
+
+
+def test_simple_imputer_polars_float_nan_parity_with_pandas() -> None:
+    """F-04 residual: the polars path must treat float NaN as missing, exactly
+    like pandas/sklearn do.
+
+    sklearn ignores NaN when computing mean/median and counts it in the missing
+    total; the polars path previously included NaN in the statistic (producing
+    a NaN fill value that no-ops) and reported too few missing values. Note the
+    polars frame carries one null *and* one NaN — pandas ``isna()`` sees both,
+    polars ``null_count()`` sees only one, and ``pl.from_pandas`` in other tests
+    silently converts NaN to null, which is why the existing parity suite never
+    caught this.
+    """
+    pdf = pd.DataFrame({"n": [1.0, 2.0, np.nan, 4.0, np.nan]})
+    ldf = pl.DataFrame({"n": [1.0, 2.0, None, 4.0, float("nan")]})
+
+    for strategy in ("mean", "median"):
+        art_pd = SimpleImputerCalculator().fit(pdf, {"columns": ["n"], "strategy": strategy})
+        art_pl = SimpleImputerCalculator().fit(ldf, {"columns": ["n"], "strategy": strategy})
+
+        assert np.isfinite(art_pl["fill_values"]["n"]), (
+            f"{strategy}: polars fill value must not be NaN"
+        )
+        assert art_pl["fill_values"]["n"] == pytest.approx(art_pd["fill_values"]["n"])
+        assert art_pl["missing_counts"] == art_pd["missing_counts"]
+        assert art_pl["total_missing"] == art_pd["total_missing"]
+
+        out = SimpleImputerApplier().apply(ldf, art_pl)
+        assert out["n"].null_count() == 0
+        assert out["n"].is_nan().sum() == 0
+
+
+def test_simple_imputer_polars_most_frequent_ignores_float_nan() -> None:
+    """sklearn ``most_frequent`` treats NaN as missing; polars ``mode()`` counts
+    it as a candidate value, so NaN must be excluded before taking the mode."""
+    pdf = pd.DataFrame({"n": [1.0, 1.0, np.nan, 2.0, float("nan")]})
+    ldf = pl.DataFrame({"n": [1.0, 1.0, None, 2.0, float("nan")]})
+
+    art_pd = SimpleImputerCalculator().fit(pdf, {"columns": ["n"], "strategy": "most_frequent"})
+    art_pl = SimpleImputerCalculator().fit(ldf, {"columns": ["n"], "strategy": "most_frequent"})
+
+    assert art_pl["fill_values"]["n"] == art_pd["fill_values"]["n"] == 1.0
+    assert art_pl["missing_counts"] == art_pd["missing_counts"] == {"n": 2}

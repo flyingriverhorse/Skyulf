@@ -24,7 +24,7 @@ def _manual_bounds_col_mask_polars(col: str, bound: dict[str, Any]) -> Any:
         col_mask = col_mask & (pl.col(col) >= lower)
     if upper is not None:
         col_mask = col_mask & (pl.col(col) <= upper)
-    return col_mask | pl.col(col).is_null()
+    return col_mask | pl.col(col).is_null() | pl.col(col).is_nan()
 
 
 def _manual_bounds_col_mask_pandas(series: pd.Series, bound: dict[str, Any]) -> pd.Series:
