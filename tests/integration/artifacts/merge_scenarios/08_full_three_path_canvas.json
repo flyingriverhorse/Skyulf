@@ -1,0 +1,423 @@
+{
+  "scenario": "08_full_three_path_canvas",
+  "pipeline_id": "s08_three_paths",
+  "status": "success",
+  "node_outputs": {
+    "data": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "drop_a": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "fts_a": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm"
+      ],
+      "y_name": "Species"
+    },
+    "split_a": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 112,
+        "y_name": "Species",
+        "y_len": 112
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 38,
+        "y_name": "Species",
+        "y_len": 38
+      },
+      "validation": null
+    },
+    "train_a": {
+      "kind": "(X, y) tuple",
+      "X_columns": null,
+      "y_name": null
+    },
+    "drop_b": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "fts_b": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm"
+      ],
+      "y_name": "Species"
+    },
+    "split_b": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 112,
+        "y_name": "Species",
+        "y_len": 112
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 38,
+        "y_name": "Species",
+        "y_len": 38
+      },
+      "validation": null
+    },
+    "train_b": {
+      "kind": "(X, y) tuple",
+      "X_columns": null,
+      "y_name": null
+    },
+    "drop_c": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "fts_c": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm"
+      ],
+      "y_name": "Species"
+    },
+    "split_c": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 112,
+        "y_name": "Species",
+        "y_len": 112
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 38,
+        "y_name": "Species",
+        "y_len": 38
+      },
+      "validation": null
+    },
+    "train_c": {
+      "kind": "(X, y) tuple",
+      "X_columns": null,
+      "y_name": null
+    }
+  },
+  "merge_warnings": [],
+  "node_results": {
+    "data": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": []
+    },
+    "drop_a": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts_a": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split_a": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "train_a": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "best_params",
+        "best_score",
+        "feature_importances",
+        "n_features",
+        "n_rows",
+        "scoring_metric",
+        "shap_explanation",
+        "test_accuracy",
+        "test_balanced_accuracy",
+        "test_f1_weighted",
+        "test_g_score",
+        "test_log_loss",
+        "test_matthews_corrcoef",
+        "test_pr_auc_weighted",
+        "test_precision_weighted",
+        "test_recall_weighted",
+        "test_roc_auc_ovo",
+        "test_roc_auc_ovo_weighted",
+        "test_roc_auc_ovr",
+        "test_roc_auc_ovr_weighted",
+        "test_roc_auc_weighted",
+        "train_accuracy",
+        "train_balanced_accuracy",
+        "train_f1_weighted",
+        "train_g_score",
+        "train_log_loss",
+        "train_matthews_corrcoef",
+        "train_pr_auc_weighted",
+        "train_precision_weighted",
+        "train_recall_weighted",
+        "train_roc_auc_ovo",
+        "train_roc_auc_ovo_weighted",
+        "train_roc_auc_ovr",
+        "train_roc_auc_ovr_weighted",
+        "train_roc_auc_weighted",
+        "trials"
+      ]
+    },
+    "drop_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "train_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "best_params",
+        "best_score",
+        "feature_importances",
+        "n_features",
+        "n_rows",
+        "scoring_metric",
+        "shap_explanation",
+        "test_accuracy",
+        "test_balanced_accuracy",
+        "test_f1_weighted",
+        "test_g_score",
+        "test_log_loss",
+        "test_matthews_corrcoef",
+        "test_pr_auc_weighted",
+        "test_precision_weighted",
+        "test_recall_weighted",
+        "test_roc_auc_ovo",
+        "test_roc_auc_ovo_weighted",
+        "test_roc_auc_ovr",
+        "test_roc_auc_ovr_weighted",
+        "test_roc_auc_weighted",
+        "train_accuracy",
+        "train_balanced_accuracy",
+        "train_f1_weighted",
+        "train_g_score",
+        "train_log_loss",
+        "train_matthews_corrcoef",
+        "train_pr_auc_weighted",
+        "train_precision_weighted",
+        "train_recall_weighted",
+        "train_roc_auc_ovo",
+        "train_roc_auc_ovo_weighted",
+        "train_roc_auc_ovr",
+        "train_roc_auc_ovr_weighted",
+        "train_roc_auc_weighted",
+        "trials"
+      ]
+    },
+    "drop_c": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts_c": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split_c": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "train_c": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "best_params",
+        "best_score",
+        "feature_importances",
+        "n_features",
+        "n_rows",
+        "scoring_metric",
+        "shap_explanation",
+        "test_accuracy",
+        "test_balanced_accuracy",
+        "test_f1_weighted",
+        "test_g_score",
+        "test_log_loss",
+        "test_matthews_corrcoef",
+        "test_pr_auc_weighted",
+        "test_precision_weighted",
+        "test_recall_weighted",
+        "test_roc_auc_ovo",
+        "test_roc_auc_ovo_weighted",
+        "test_roc_auc_ovr",
+        "test_roc_auc_ovr_weighted",
+        "test_roc_auc_weighted",
+        "train_accuracy",
+        "train_balanced_accuracy",
+        "train_f1_weighted",
+        "train_g_score",
+        "train_log_loss",
+        "train_matthews_corrcoef",
+        "train_pr_auc_weighted",
+        "train_precision_weighted",
+        "train_recall_weighted",
+        "train_roc_auc_ovo",
+        "train_roc_auc_ovo_weighted",
+        "train_roc_auc_ovr",
+        "train_roc_auc_ovr_weighted",
+        "train_roc_auc_weighted",
+        "trials"
+      ]
+    }
+  }
+}
