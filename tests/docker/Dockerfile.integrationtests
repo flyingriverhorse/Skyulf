@@ -35,4 +35,4 @@ ENV CELERY_RESULT_BACKEND=redis://redis:6379/0
 # suite against a live Redis instead of running unmarked. Once specific tests
 # are tagged `@pytest.mark.integration` (marker registered in pyproject.toml),
 # narrow this to `-m integration` so it stays fast and focused.
-CMD ["python", "-m", "pytest", "-q", "--disable-warnings"]
+CMD ["python", "-m", "pytest", "tests/integration", "-q", "--disable-warnings"]

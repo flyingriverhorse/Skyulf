@@ -1,0 +1,50 @@
+{
+  "scenario": "07_duplicate_edges_dedup",
+  "pipeline_id": "s07_duplicate_edges",
+  "status": "success",
+  "node_outputs": {
+    "data": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "drop_id": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    }
+  },
+  "merge_warnings": [],
+  "node_results": {
+    "data": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": []
+    },
+    "drop_id": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    }
+  }
+}

@@ -1,0 +1,192 @@
+{
+  "scenario": "02_fan_in_to_transformer_lastwins",
+  "pipeline_id": "s02_fan_in_lastwins",
+  "status": "success",
+  "node_outputs": {
+    "data": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "drop_id": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "fts": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm"
+      ],
+      "y_name": "Species"
+    },
+    "split": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 120,
+        "y_name": "Species",
+        "y_len": 120
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 30,
+        "y_name": "Species",
+        "y_len": 30
+      },
+      "validation": null
+    },
+    "scaler": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 120,
+        "y_name": "Species",
+        "y_len": 120
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 30,
+        "y_name": "Species",
+        "y_len": 30
+      },
+      "validation": null
+    },
+    "downstream": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 120,
+        "y_name": "Species",
+        "y_len": 120
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 30,
+        "y_name": "Species",
+        "y_len": 30
+      },
+      "validation": null
+    }
+  },
+  "merge_warnings": [],
+  "node_results": {
+    "data": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": []
+    },
+    "drop_id": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "scaler": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "downstream": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    }
+  }
+}
