@@ -13,7 +13,7 @@
 # geopandas is unavailable.
 #
 # Build (context must be skyulf-core/, not the repo root):
-#   cd skyulf-core && docker build -f tests/docker/Dockerfile.unittests -t skyulf-core-unit-tests .
+#   cd skyulf-core && docker build -f tests/docker/Dockerfile.tests -t skyulf-core-tests .
 # Or via compose from skyulf-core/ (shared by both services; the compose
 # services override the CMD to scope the run to tests/unit or
 # tests/integration):
