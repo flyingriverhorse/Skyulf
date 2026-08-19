@@ -21,11 +21,13 @@ from skyulf.preprocessing.bucketing import (
     CustomBinningCalculator,
     GeneralBinningApplier,
     GeneralBinningCalculator,
+    KBinsDiscretizerApplier,
     KBinsDiscretizerCalculator,
     _fit_equal_frequency,
     _fit_one_column_into_maps,
     _resolve_kbins_strategy,
 )
+from skyulf.registry import NodeRegistry
 
 _fit_edges_cases = TestCaseLoader("preprocessing/bucketing", group="fit_edges").load()
 _resolve_kbins_strategy_cases = TestCaseLoader(
@@ -846,3 +848,19 @@ class TestRealShapedDataset:
         assert result.loc[nan_mask, "age_binned"].isna().all()
         # Non-missing rows must have a valid bin index assigned.
         assert result.loc[~nan_mask, "age_binned"].notna().all()
+
+
+# ---------------------------------------------------------------------------
+# KBinsDiscretizer — registry wiring (integration add-on)
+# ---------------------------------------------------------------------------
+
+
+class TestKBinsRegistry:
+    """The KBinsDiscretizer node must be registered under its canonical ID so
+    the canvas and the API can resolve it to the Calculator/Applier pair."""
+
+    def test_kbins_node_registered(self) -> None:
+        assert NodeRegistry.get_calculator("KBinsDiscretizer") is KBinsDiscretizerCalculator
+        assert NodeRegistry.get_applier("KBinsDiscretizer") is KBinsDiscretizerApplier
+        metadata = NodeRegistry.get_all_metadata()
+        assert metadata["KBinsDiscretizer"]["category"] == "Preprocessing"
