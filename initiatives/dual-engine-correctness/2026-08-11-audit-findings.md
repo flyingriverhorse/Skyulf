@@ -444,6 +444,8 @@ metric-semantics and UI-state bugs that cause users to **read the wrong number a
 ### F-33 🔴 CRITICAL · LIVE — Evaluation panel silently shows another job's data
 `frontend/ml-canvas/src/components/pages/ExperimentsPage.tsx:227-255`
 
+**Status:** ✅ Fixed (0.7.9 wave) — evaluation fetch + threshold-tuning state extracted into the `useEvaluationFetch` hook with a monotonic request-sequence guard that discards late/stale responses; 5 new hook tests, full frontend suite green.
+
 `fetchEvaluationData` sets `evalJobId` synchronously, then `await`s the fetch and applies the
 response **unconditionally** — no request-id or `AbortController` guard. Verified at source: there
 is no staleness check between the `await` and `setEvaluationData(res.data)`.
