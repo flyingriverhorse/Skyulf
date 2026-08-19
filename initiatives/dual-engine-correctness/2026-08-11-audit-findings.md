@@ -543,6 +543,15 @@ metrics.
 `skyulf-core/skyulf/modeling/_explainability/shap_explanation.py:37-78` (passes the **estimator
 object** to `shap.Explainer`); message from `utils/artifactCoverage.ts:35-36,80-84`
 
+**Status:** ✅ Fixed (0.7.9 wave) — `_build_explainer` in
+`shap_explanation.py` now falls back to the estimator's `predict_proba`
+(then `predict`) when the estimator is not callable, so all six families
+(SVC-RBF, KNN, GaussianNB, MLP, Voting, Stacking) get SHAP; 3 new unit
+tests, 25/25 pass. The Experiments page artifact-coverage text now says
+*not supported for this model type* instead of blaming an older run.
+Permutation feature importance for these families remains `None`
+(follow-up).
+
 ```
 random_forest, decision_tree, gradient_boosting, logistic_regression, ridge_classifier -> FI YES, shap ok
 svc_rbf, knn, gaussian_nb, mlp, voting(soft), stacking                                 -> FI None, shap none

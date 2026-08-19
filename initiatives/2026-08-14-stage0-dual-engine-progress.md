@@ -73,7 +73,9 @@ Notes on the items the owner asked to check:
    - F-35 (weighted-scorer ambiguity in binary threshold tuning) — ✅ fixed:
      positive-class scorers (`average="binary"`, `pos_label=classes[1]`) for
      `f1`/`precision`/`recall` on 2-class jobs (see audit doc).
-   - F-37 (SHAP/feature-importance coverage) — ⏳ not started.
+   - F-37 (SHAP/feature-importance coverage) — ✅ fixed: `_build_explainer`
+     falls back to `predict_proba`/`predict` for non-callable estimators, so
+     all six families get SHAP (see audit doc).
    Wave T2b (F-36, F-38–F-44) is later still.
 4. **A2.2 template fix** on `078`, then demo cherry-pick (Stage 1a) — ⏳.
 5. **PyPI release** of the fixed `skyulf-core` (`core-v*` tag) — pending

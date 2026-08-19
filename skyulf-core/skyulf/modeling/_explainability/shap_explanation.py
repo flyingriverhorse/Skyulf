@@ -47,7 +47,11 @@ def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tupl
     https://github.com/shap/shap/issues/3657). `shap.TreeExplainer` raises
     for anything that isn't a supported tree model, which is how non-tree
     estimators (linear/SVM/etc.) fall through to the generic, masker-based
-    `shap.Explainer` below.
+    `shap.Explainer` below. If that generic constructor still fails because
+    the estimator isn't directly callable (e.g. `SVC` with an RBF kernel,
+    KNN, GaussianNB, MLP, Voting, Stacking), it retries with
+    `model.predict_proba` (or `model.predict` for regressors) as the
+    predictor function.
 
     Returns `(explainer, is_exact_tree)` where `is_exact_tree` indicates the
     explainer is the exact tree-path-dependent one (used by the caller to
@@ -74,7 +78,17 @@ def _build_explainer(shap_module: Any, model: Any, sample: pd.DataFrame) -> tupl
     # time and warn. Build the masker explicitly so it matches the size we
     # already chose.
     masker = shap_module.maskers.Independent(sample, max_samples=len(sample))
-    return shap_module.Explainer(model, masker), False
+    try:
+        explainer = shap_module.Explainer(model, masker)
+    except TypeError:
+        # Non-tree, non-linear estimators (SVC, KNN, GaussianNB, MLP, Voting,
+        # Stacking) are not `__call__`-able, so `shap.Explainer(model, masker)`
+        # raises TypeError. Retry with a plain predictor function instead.
+        explainer = shap_module.Explainer(
+            getattr(model, "predict_proba", None) or model.predict,
+            masker,
+        )
+    return explainer, False
 
 
 def _mean_abs_per_feature(shap_values: Any, feature_names: list[str]) -> dict[str, float] | None:
