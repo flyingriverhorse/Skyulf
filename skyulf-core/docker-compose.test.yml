@@ -5,6 +5,7 @@
 #
 #   cd skyulf-core
 #   docker compose -f docker-compose.test.yml run --rm --build unit-tests
+#   docker compose -f docker-compose.test.yml run --rm --build integration-tests
 
 name: skyulf-core-tests
 
@@ -13,3 +14,16 @@ services:
     build:
       context: .
       dockerfile: tests/docker/Dockerfile.unittests
+    command: ["python", "-m", "pytest", "tests/unit", "-q", "--disable-warnings",
+              "--cov=skyulf", "--cov-branch", "--cov-report=term-missing"]
+
+  integration-tests:
+    # Same isolated image as unit-tests (the build cache makes the second
+    # --build a no-op); only the test tree differs. Integration tests rely
+    # on the checked-in data and test-case files under tests/ that are
+    # already COPY-ed into the image.
+    build:
+      context: .
+      dockerfile: tests/docker/Dockerfile.unittests
+    command: ["python", "-m", "pytest", "tests/integration", "-q", "--disable-warnings",
+              "--cov=skyulf", "--cov-branch", "--cov-report=term-missing"]
