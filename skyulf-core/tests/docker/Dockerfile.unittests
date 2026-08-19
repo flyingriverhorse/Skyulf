@@ -14,8 +14,11 @@
 #
 # Build (context must be skyulf-core/, not the repo root):
 #   cd skyulf-core && docker build -f tests/docker/Dockerfile.unittests -t skyulf-core-unit-tests .
-# Or via compose from skyulf-core/:
+# Or via compose from skyulf-core/ (shared by both services; the compose
+# services override the CMD to scope the run to tests/unit or
+# tests/integration):
 #   docker compose -f docker-compose.test.yml run --rm --build unit-tests
+#   docker compose -f docker-compose.test.yml run --rm --build integration-tests
 
 FROM python:3.12-slim
 
