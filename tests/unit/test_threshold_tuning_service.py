@@ -143,6 +143,40 @@ def _fake_binary_string_evaluation_data() -> dict:
     }
 
 
+def _fake_binary_recall_split_evaluation_data() -> dict:
+    """Builds a raw binary payload where weighted and positive-class recall disagree.
+
+    Six "no" rows carry "yes" probabilities 0.1..0.6 and two "yes" rows carry
+    0.35/0.45, so the weighted-averaged recall scorer (which equals accuracy
+    here) prefers t=0.61 (recall_yes=0), while the positive-class scorer
+    prefers t=0.01 (recall_yes=1.0).
+    """
+    return {
+        "job_id": "job-1",
+        "problem_type": "binary",
+        "splits": {
+            "validation": {
+                "y_true": ["no", "no", "no", "no", "no", "no", "yes", "yes"],
+                "y_pred": ["no", "no", "no", "no", "no", "yes", "no", "no"],
+                "y_proba": {
+                    "classes": ["no", "yes"],
+                    "values": [
+                        [0.9, 0.1],
+                        [0.8, 0.2],
+                        [0.7, 0.3],
+                        [0.6, 0.4],
+                        [0.5, 0.5],
+                        [0.4, 0.6],
+                        [0.65, 0.35],
+                        [0.55, 0.45],
+                    ],
+                },
+            },
+            "test": None,
+        },
+    }
+
+
 @pytest.mark.asyncio
 async def test_preview_returns_thresholds_for_valid_job(async_session):
     """preview() returns thresholds/classes/metric/split_used using the validation split."""
@@ -220,6 +254,30 @@ async def test_preview_roc_auc_works_with_string_labels(async_session):
     assert set(result["classes"]) == {"no", "yes"}
     assert set(result["thresholds"].keys()) == {"no", "yes"}
     assert all(0.0 < v < 1.0 for v in result["thresholds"].values())
+
+
+@pytest.mark.asyncio
+async def test_preview_recall_uses_positive_class_not_class_mixture(async_session):
+    """preview() with recall must tune for the positive class on binary jobs (F-35).
+
+    On this dataset the weighted-averaged recall scorer (which equals accuracy
+    here) prefers t=0.61 — a threshold that abandons the positive class
+    entirely (recall_yes=0) — while the positive-class scorer keeps every
+    positive (t=0.01). "Tune for recall" must mean "catch the positive
+    class", so the returned "yes" threshold has to stay below the lowest
+    positive probability (0.35).
+    """
+    await _insert_job(async_session, "job-1")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_binary_recall_split_evaluation_data(), None)),
+    ):
+        result = await ThresholdTuningService.preview(async_session, "job-1", metric="recall")
+
+    assert result["metric"] == "recall"
+    assert 0.0 < result["thresholds"]["yes"] < 0.35
 
 
 @pytest.mark.asyncio

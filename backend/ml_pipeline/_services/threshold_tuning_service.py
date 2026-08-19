@@ -56,6 +56,23 @@ def _build_scorer(metric: str, classes: list) -> Callable[[Any, Any], float]:
     label-dependent behavior (e.g. roc_auc's positive class) needs
     ``classes``, which is only known once the evaluation data is loaded.
     """
+    if metric in ("f1", "precision", "recall") and len(classes) == 2:
+        # For binary jobs the threshold only moves the positive class's
+        # decision, so score the positive class (classes[1]) instead of a
+        # weighted mixture that would let the negative class dominate.
+        pos_label = classes[1]
+        if metric == "f1":
+            return lambda y_true, y_pred: f1_score(
+                y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
+            )
+        if metric == "precision":
+            return lambda y_true, y_pred: precision_score(
+                y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
+            )
+        return lambda y_true, y_pred: recall_score(
+            y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
+        )
+
     if metric == "roc_auc":
         positive = classes[1]
 

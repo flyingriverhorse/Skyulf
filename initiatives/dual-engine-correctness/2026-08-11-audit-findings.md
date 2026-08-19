@@ -486,6 +486,14 @@ Fix: validate before selecting the scorer and raise `ThresholdTuningError` (→4
 ### F-35 🟠 HIGH · LIVE — "Recall" tuning is literally Accuracy, and makes recall *worse*
 `backend/ml_pipeline/_services/threshold_tuning_service.py:36-47`
 
+**Status:** ✅ Fixed (0.7.9 wave) — `_build_scorer()` now returns
+`average="binary"`, `pos_label=classes[1]` scorers for `f1`/`precision`/
+`recall` on 2-class jobs (multiclass keeps the weighted scorers), so
+tuning "Recall" optimizes positive-class recall again; regression test
+`test_preview_recall_uses_positive_class_not_class_mixture` fails with
+`thresholds["yes"] == 0.6078` (accuracy optimum) before the fix and passes
+after.
+
 Every scorer in `_METRIC_SCORERS` uses `average="weighted"`. Weighted-average recall is
 **identical to accuracy by definition** — independently reproduced:
 
