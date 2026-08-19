@@ -13,7 +13,7 @@ services:
   unit-tests:
     build:
       context: .
-      dockerfile: tests/docker/Dockerfile.unittests
+      dockerfile: tests/docker/Dockerfile.tests
     command: ["python", "-m", "pytest", "tests/unit", "-q", "--disable-warnings",
               "--cov=skyulf", "--cov-branch", "--cov-report=term-missing"]
 
@@ -24,6 +24,6 @@ services:
     # already COPY-ed into the image.
     build:
       context: .
-      dockerfile: tests/docker/Dockerfile.unittests
+      dockerfile: tests/docker/Dockerfile.tests
     command: ["python", "-m", "pytest", "tests/integration", "-q", "--disable-warnings",
               "--cov=skyulf", "--cov-branch", "--cov-report=term-missing"]
