@@ -463,6 +463,13 @@ Fix: capture a monotonic request id before the `await`, discard if it is no long
 `backend/ml_pipeline/_services/threshold_tuning_service.py:46`; router `_routers/jobs.py:228-240`
 catches only `ThresholdTuningError`
 
+**Status:** ✅ Fixed (0.7.9 wave) — metric scorers are now built per request via
+`_build_scorer()` in `threshold_tuning_service.py`; the `roc_auc` scorer maps
+raw labels (string or numeric) to 0/1 positive-indicator arrays before
+`roc_auc_score`, so string targets no longer 500. Rank-preserving for numeric
+labels, so existing 0/1 behavior is unchanged; regression test
+`test_preview_roc_auc_works_with_string_labels` green.
+
 Train on a CSV with a `yes`/`no` target (the engine never requires label encoding), open
 Evaluation → Threshold Tuning → "ROC AUC":
 

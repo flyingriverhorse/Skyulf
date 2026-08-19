@@ -68,8 +68,9 @@ Notes on the items the owner asked to check:
 3. **Wave T1 remainder from the audit:**
    - F-33 (stale evaluation-response clobber) — ✅ fixed: `useEvaluationFetch`
      hook with monotonic request-sequence guard (see audit doc).
-   - F-34, F-35, F-37 (threshold-tuning 500 on string labels, weighted-
-     scorer ambiguity, SHAP/feature-importance coverage) — ⏳ not started.
+   - F-34 (threshold-tuning 500 on string labels) — ✅ fixed: per-request
+     `_build_scorer()` with a label-aware `roc_auc` scorer (see audit doc).
+   - F-35, F-37 (weighted-scorer ambiguity, SHAP/feature-importance coverage) — ⏳ not started.
    Wave T2b (F-36, F-38–F-44) is later still.
 4. **A2.2 template fix** on `078`, then demo cherry-pick (Stage 1a) — ⏳.
 5. **PyPI release** of the fixed `skyulf-core` (`core-v*` tag) — pending
