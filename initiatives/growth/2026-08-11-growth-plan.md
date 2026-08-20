@@ -5,6 +5,17 @@
 **Budget:** 2–3 days/week, paired
 **Horizon:** three stages, ~6–8 weeks. Nothing beyond that is planned here.
 
+## Status — 2026-08-20 (read this before re-mining this file)
+
+| Item | State |
+|---|---|
+| F-02, F-03 | ✅ **DONE** — fixed + regression tests, shipped in **0.7.9** (branch `079`) |
+| F-33, F-34, F-35, F-37 | ✅ **DONE** — shipped in 0.7.9 |
+| A2.2 | ✅ **DONE** — shipped in 0.7.9; Stage 1a demo cherry-pick still pending |
+| A2.3 | 🟡 **1/3** — `start.sh` chmod shipped in 0.7.9; `/` dashboard-zeros + install-time claim still open (0.8.0) |
+| A2.6 | ✅ **DONE** — shipped in 0.7.9, went beyond the ask: limit now served from `GET /api/config` (single source of truth) |
+| A2.1, A2.4, A2.5 | Open — scheduled per `initiatives/2026-08-12-execution-tasks.md` ledger |
+
 ## Branch reality (read this first)
 
 Two branches matter, and they are not the same:
@@ -130,8 +141,8 @@ a way that the rest of `initiatives/` is not.
 | ID | Defect | Why it outranks most of T1–T6 | Status 2026-08-14 |
 |---|---|---|---|
 | F-01 | `DummyEncoder` emits null dummies on Polars → training hard-fails | Breaks a documented engine | ✅ fixed, red-green verified |
-| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression | 🟡 fixed in `service.py`, 102 existing deployment tests pass; own regression test still owed |
-| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form | 🟡 fixed in `service.py` (pre-transform validation); own regression test still owed |
+| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression | ✅ **DONE in 0.7.9** — fixed in `service.py`, regression tests in `tests/unit/test_deployment_service_extra.py` (all passing) |
+| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form | ✅ **DONE in 0.7.9** — fixed in `service.py` (pre-transform validation), regression tests in `tests/unit/test_deployment_service_extra.py` (all passing) |
 
 **F-02 is the most severe defect found anywhere in this repo.** Two
 identical requests differing only in JSON key order return different
@@ -517,6 +528,10 @@ nothing. Ship the two together as one path.
 
 ### A2.2 — Fix the shipped templates (they are currently blocked)
 
+> ✅ **DONE in 0.7.9** — all 4 templates now place `TrainTestSplitter`
+> upstream of impute/encode/scale. Remaining: Stage 1a cherry-pick to
+> `deploy/demo-mode` + redeploy.
+
 **This item changed completely after audit.** It was "bind one template to a
 dataset." The truth is that **4 of the 5 shipped templates cannot run at
 all** — they are blocked by Skyulf's own leakage guard.
@@ -563,11 +578,8 @@ diagnose it.*
 
 Three separate confirmed blockers, all cheap:
 
-- **`start.sh` is not executable.** `git ls-files -s start.sh` → `100644` on
-  both `078` and `080`. `README.md:59` tells macOS/Linux users to run
-  `./start.sh`; it fails **100% of the time** with `Permission denied`
-  (exit 126). The literal first command in the README. Fix with
-  `git update-index --chmod=+x start.sh`.
+- ✅ ~~**`start.sh` is not executable.**~~ **DONE in 0.7.9** — mode is now
+  `100755` in git.
 - **`/` is a dashboard of zeros.** `App.tsx:37-38` routes `/` to
   `<Dashboard />`; the canvas is at `/canvas`. Live: `/api/pipeline/stats` →
   `{"total_jobs":0,...}` plus "No recent jobs found." A "Visual MLOps
@@ -630,6 +642,10 @@ more than the feature earns.
 *Audiences: data scientists, ML engineers.*
 
 ### A2.6 — Fix the upload size message
+
+> ✅ **DONE in 0.7.9** — went beyond the ask: the limit and accepted
+> extensions are now served by `GET /api/config` and displayed via a
+> `useUploadConfig` hook; zero hardcoded limits in the frontend.
 
 `FileUpload.tsx:52-54` hardcodes a 500MB limit *and* the "500MB" text, while
 the server accepts 10GB (`config/mixins/files.py:18`) — a 20× discrepancy —

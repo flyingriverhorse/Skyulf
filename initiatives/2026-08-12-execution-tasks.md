@@ -1,6 +1,6 @@
 # Execution tasks and versioning — Stage 0
 
-**Date:** 2026-08-12 · **Branch:** `078` · **Status:** planning (no task started)
+**Date:** 2026-08-12 · **Branch:** `078` → `079` · **Status:** Wave 1 (0.7.9) **complete 2026-08-20** — all rows 1.1–1.5 shipped, verified (76 backend + 730 frontend tests, green build), branch `079` ends at `chore(release): v0.7.9`. Waves 2–3 not started.
 
 **Sources:** this file sequences work decided in two places and adds nothing
 new:
@@ -65,6 +65,12 @@ returning different predictions for the same data.
 **Ship rule:** one commit per row, tests first. Version bump in
 `pyproject.toml` + `frontend/ml-canvas/package.json` in the final commit of
 the wave. Core stays 0.5.8.
+
+> ✅ **Wave 1 shipped (2026-08-20, branch `079`).** All rows done:
+> 1.1 F-02/F-03 + regression tests · 1.2 F-33/F-34/F-35/F-37 ·
+> 1.3 A2.2 templates · 1.4 start.sh chmod · 1.5 A2.6 upload config
+> (extended to backend-driven `GET /api/config`). Core stayed 0.5.8.
+> Do not re-plan this wave.
 
 ---
 
