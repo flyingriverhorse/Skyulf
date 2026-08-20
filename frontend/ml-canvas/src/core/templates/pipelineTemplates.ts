@@ -105,25 +105,25 @@ const TABULAR_CLASSIFICATION: PipelineTemplate = {
   id: 'tabular_classification',
   name: 'Tabular Classification',
   description:
-    'Classic supervised pipeline: dataset → drop ids → impute → encode → scale → split → train. Bind your dataset, set the target column on the split node, and Run All.',
+    'Classic supervised pipeline: dataset → drop ids → split → impute → encode → scale → train. The split runs before any data-dependent preprocessing so transformers fit on train data only. Bind your dataset, set the target column on the split node, and Run All.',
   category: 'classification',
   icon: Layers,
   nodes: [
     { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
     { localId: 'drop', type: 'drop_missing_columns', position: { x: col(1), y: row(0) } },
-    { localId: 'imp', type: 'imputation_node', position: { x: col(2), y: row(0) } },
-    { localId: 'enc', type: 'encoding', position: { x: col(3), y: row(0) } },
-    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(4), y: row(0) } },
-    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(5), y: row(0) } },
+    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(2), y: row(0) } },
+    { localId: 'imp', type: 'imputation_node', position: { x: col(3), y: row(0) } },
+    { localId: 'enc', type: 'encoding', position: { x: col(4), y: row(0) } },
+    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(5), y: row(0) } },
     { localId: 'train', type: 'classification', position: { x: col(6), y: row(0) } },
   ],
   edges: [
     { source: 'ds', target: 'drop' },
-    { source: 'drop', target: 'imp' },
+    { source: 'drop', target: 'split' },
+    { source: 'split', target: 'imp' },
     { source: 'imp', target: 'enc' },
     { source: 'enc', target: 'scl' },
-    { source: 'scl', target: 'split' },
-    { source: 'split', target: 'train' },
+    { source: 'scl', target: 'train' },
   ],
 };
 
@@ -131,15 +131,15 @@ const TABULAR_REGRESSION: PipelineTemplate = {
   id: 'tabular_regression',
   name: 'Tabular Regression',
   description:
-    'Regression starter: dataset → impute → outlier removal → scale → split → train. Pick a numeric target column on the split node before running.',
+    'Regression starter: dataset → split → impute → outlier removal → scale → train. The split runs before any data-dependent preprocessing so transformers fit on train data only. Pick a numeric target column on the split node before running.',
   category: 'regression',
   icon: LineChart,
   nodes: [
     { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
-    { localId: 'imp', type: 'imputation_node', position: { x: col(1), y: row(0) } },
-    { localId: 'out', type: 'outlier', position: { x: col(2), y: row(0) } },
-    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(3), y: row(0) } },
-    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(4), y: row(0) } },
+    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(1), y: row(0) } },
+    { localId: 'imp', type: 'imputation_node', position: { x: col(2), y: row(0) } },
+    { localId: 'out', type: 'outlier', position: { x: col(3), y: row(0) } },
+    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(4), y: row(0) } },
     {
       localId: 'train',
       type: 'regression',
@@ -148,11 +148,11 @@ const TABULAR_REGRESSION: PipelineTemplate = {
     },
   ],
   edges: [
-    { source: 'ds', target: 'imp' },
+    { source: 'ds', target: 'split' },
+    { source: 'split', target: 'imp' },
     { source: 'imp', target: 'out' },
     { source: 'out', target: 'scl' },
-    { source: 'scl', target: 'split' },
-    { source: 'split', target: 'train' },
+    { source: 'scl', target: 'train' },
   ],
 };
 
@@ -160,14 +160,14 @@ const TEXT_CLASSIFICATION: PipelineTemplate = {
   id: 'text_classification',
   name: 'Text Classification',
   description:
-    'Text → numbers → model: dataset → text cleaning → TF-IDF vectorizer → split → Logistic Regression. Point the Text Cleaning and TF-IDF nodes at your raw-text column, pick the label column on the split, then Run All. (TF-IDF + Logistic Regression is the standard strong baseline for text.)',
+    'Text → numbers → model: dataset → split → text cleaning → TF-IDF vectorizer → Logistic Regression. The split runs first so the TF-IDF vocabulary is learned from train data only. Point the Text Cleaning and TF-IDF nodes at your raw-text column, pick the label column on the split, then Run All. (TF-IDF + Logistic Regression is the standard strong baseline for text.)',
   category: 'text',
   icon: FileText,
   nodes: [
     { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
-    { localId: 'clean', type: 'TextCleaning', position: { x: col(1), y: row(0) } },
-    { localId: 'vec', type: 'tfidf_vectorizer', position: { x: col(2), y: row(0) } },
-    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(3), y: row(0) } },
+    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(1), y: row(0) } },
+    { localId: 'clean', type: 'TextCleaning', position: { x: col(2), y: row(0) } },
+    { localId: 'vec', type: 'tfidf_vectorizer', position: { x: col(3), y: row(0) } },
     {
       localId: 'train',
       type: 'text_classification',
@@ -176,10 +176,10 @@ const TEXT_CLASSIFICATION: PipelineTemplate = {
     },
   ],
   edges: [
-    { source: 'ds', target: 'clean' },
+    { source: 'ds', target: 'split' },
+    { source: 'split', target: 'clean' },
     { source: 'clean', target: 'vec' },
-    { source: 'vec', target: 'split' },
-    { source: 'split', target: 'train' },
+    { source: 'vec', target: 'train' },
   ],
 };
 
@@ -207,25 +207,25 @@ const ENSEMBLE_CLASSIFICATION: PipelineTemplate = {
   id: 'ensemble_classification',
   name: 'Ensemble Classification',
   description:
-    'Combine multiple models for stronger predictions: dataset → drop ids → impute → encode → scale → split → Ensemble (Voting Classifier). Bind your dataset, set the target column on the split node, adjust base models if needed, then Run All.',
+    'Combine multiple models for stronger predictions: dataset → drop ids → split → impute → encode → scale → Ensemble (Voting Classifier). The split runs before any data-dependent preprocessing so transformers fit on train data only. Bind your dataset, set the target column on the split node, adjust base models if needed, then Run All.',
   category: 'ensemble',
   icon: Combine,
   nodes: [
     { localId: 'ds', type: 'dataset_node', position: { x: col(0), y: row(0) } },
     { localId: 'drop', type: 'drop_missing_columns', position: { x: col(1), y: row(0) } },
-    { localId: 'imp', type: 'imputation_node', position: { x: col(2), y: row(0) } },
-    { localId: 'enc', type: 'encoding', position: { x: col(3), y: row(0) } },
-    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(4), y: row(0) } },
-    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(5), y: row(0) } },
+    { localId: 'split', type: 'TrainTestSplitter', position: { x: col(2), y: row(0) } },
+    { localId: 'imp', type: 'imputation_node', position: { x: col(3), y: row(0) } },
+    { localId: 'enc', type: 'encoding', position: { x: col(4), y: row(0) } },
+    { localId: 'scl', type: 'scale_numeric_features', position: { x: col(5), y: row(0) } },
     { localId: 'train', type: 'EnsembleNode', position: { x: col(6), y: row(0) } },
   ],
   edges: [
     { source: 'ds', target: 'drop' },
-    { source: 'drop', target: 'imp' },
+    { source: 'drop', target: 'split' },
+    { source: 'split', target: 'imp' },
     { source: 'imp', target: 'enc' },
     { source: 'enc', target: 'scl' },
-    { source: 'scl', target: 'split' },
-    { source: 'split', target: 'train' },
+    { source: 'scl', target: 'train' },
   ],
 };
 
