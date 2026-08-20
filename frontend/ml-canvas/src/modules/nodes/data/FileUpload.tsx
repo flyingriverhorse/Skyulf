@@ -49,9 +49,9 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
     setError(null);
     setProgress(0);
 
-    const MAX_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024 * 1024; // 10GB (matches backend MAX_UPLOAD_SIZE)
     if (file.size > MAX_SIZE_BYTES) {
-      setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 500MB.`);
+      setError(`File is too large (${(file.size / (1024 * 1024 * 1024)).toFixed(2)}GB). Maximum size is 10GB.`);
       return;
     }
 
@@ -110,13 +110,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
                 <input
                   type="file"
                   className="hidden"
-                  accept=".csv,.xlsx,.parquet,.json"
+                  accept=".csv,.xlsx,.xls,.parquet,.json,.txt,.feather"
                   onChange={handleChange}
                 />
               </label>
             </p>
             <p className="text-xs text-slate-400">
-              Supports CSV, Excel, Parquet, JSON
+              Supports CSV, Excel, Parquet, JSON, TXT, Feather
             </p>
           </>
         )}
