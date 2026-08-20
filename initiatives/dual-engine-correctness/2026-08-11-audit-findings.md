@@ -144,6 +144,11 @@ or guard with `pl.when(pl.col(c).is_null()).then(0)`.
 #### F-02 🔴 Inference trusts positional column order — silently wrong predictions
 `backend/ml_pipeline/deployment/service.py:450` and `:356` · **engine-independent**
 
+**Status: fixed in `4e95f170` (0.7.9).** `_predict_with_bundled_artifact` reindexes `X_transformed` to
+the recorded training `feature_columns` order after `_transform_bundled_features` (guarded: only
+when all recorded columns are present). Covered by
+`tests/unit/test_deployment_service_extra.py::test_predict_with_bundled_artifact_reorders_columns_to_match_training`.
+
 `SklearnBridge` (`skyulf/engines/sklearn_bridge.py:37`) hands sklearn a bare numpy array, so
 sklearn never records `feature_names_in_` and cannot validate or reorder at predict time.
 At serve time `df = pd.DataFrame(data)` takes column order from **the JSON key order of the
@@ -167,6 +172,14 @@ bundled path regressed. Fix: reindex to the recorded training feature order afte
 
 #### F-03 🔴 `feature_columns` recorded post-transform, validated pre-transform
 recorded `_node_runners.py:254-265` · validated `service.py:403` · schema `service.py:562-564`
+
+**Status: fixed in `4e95f170` (0.7.9).** Validation now uses `_extract_features_from_engineer`
+(pre-transform input columns) and the API/UI input schema uses
+`_extract_features_from_bundled_artifact` (engineer → `feature_columns` → `feature_names_in_`
+fallback). Frontend sync check passed: `InferencePage.tsx`/`deployment.ts` consume `input_schema`
+generically (`{name, type}[]`), no post-transform assumption. Covered by
+`tests/unit/test_deployment_service_extra.py::test_predict_with_bundled_artifact_validates_pre_transform_columns`
+and the `_extract_features_from_*` / `_extract_input_features` tests.
 
 The training node records feature names from its *input* — i.e. **after** feature engineering —
 but deployment validates them against the **raw request frame**, before `feature_engineer.transform`.
