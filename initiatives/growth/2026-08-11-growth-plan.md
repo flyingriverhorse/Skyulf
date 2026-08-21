@@ -11,10 +11,11 @@
 |---|---|
 | F-02, F-03 | ✅ **DONE** — fixed + regression tests, shipped in **0.7.9** (branch `079`) |
 | F-33, F-34, F-35, F-37 | ✅ **DONE** — shipped in 0.7.9 |
-| A2.2 | ✅ **DONE** — shipped in 0.7.9; Stage 1a demo cherry-pick still pending |
+| A2.2 | ✅ **DONE** — shipped in 0.7.9; Stage 1a demo cherry-pick landed on `deploy/demo-mode` as `69f34221` (2026-08-21, red-green verified) |
 | A2.3 | 🟡 **1/3** — `start.sh` chmod shipped in 0.7.9; `/` dashboard-zeros + install-time claim still open (0.8.0) |
 | A2.6 | ✅ **DONE** — shipped in 0.7.9, went beyond the ask: limit now served from `GET /api/config` (single source of truth) |
-| A2.1, A2.4, A2.5 | Open — scheduled per `initiatives/2026-08-12-execution-tasks.md` ledger |
+| A2.4, A2.5 | ✅ **DONE** — shipped with the 0.8.0 release (2026-08-21): PyPI-ready core README + notebook-export bullet |
+| A2.1 | Open — scheduled per `initiatives/2026-08-12-execution-tasks.md` ledger |
 
 ## Branch reality (read this first)
 

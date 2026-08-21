@@ -1,0 +1,111 @@
+# © 2025 Murat Unsal — Skyulf Project
+#
+# Demo promotion: after commits land on master, cherry-pick them onto
+# deploy/demo-mode via scripts/promote_to_demo.sh. The script enforces the
+# hard guards — demo-specific arrangements (upload block, Iris-only dataset,
+# DEMO_MODE, SlowNodesPage) must survive, versions never drift, frontend
+# tests must not regress — and rebuilds the committed static/ml_canvas
+# bundles before pushing.
+#
+# Skips promotion when the pushed range only touches release/versioning or
+# docs files (nothing demo-deployable). On conflict or guard failure the run
+# goes red: resolve manually with the script locally, never force the demo.
+
+name: Promote to Demo
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      commits:
+        description: "Space-separated commit SHAs to promote (empty = since last demo promotion)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: promote-to-demo
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    name: Promote master commits to demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine commits to promote
+        id: commits
+        env:
+          INPUT_COMMITS: ${{ github.event.inputs.commits }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+          git fetch origin deploy/demo-mode
+
+          if [ -n "$INPUT_COMMITS" ]; then
+            COMMITS="$INPUT_COMMITS"
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            # Fallback (branch created, etc.): everything not on demo yet.
+            COMMITS="$(git rev-list --no-merges --reverse origin/deploy/demo-mode.."$AFTER" | tr '\n' ' ')"
+          else
+            COMMITS="$(git rev-list --no-merges --reverse "$BEFORE..$AFTER" | tr '\n' ' ')"
+          fi
+          COMMITS="$(echo "$COMMITS" | xargs || true)"
+          if [ -z "$COMMITS" ]; then
+            echo "Nothing to promote."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Release/docs-only pushes carry nothing demo-deployable; the
+          # script's version-drift guard would (correctly) reject them.
+          DEPLOYABLE=""
+          for sha in $COMMITS; do
+            if git show --name-only --format="" "$sha" | grep -qvE '^(pyproject\.toml|uv\.lock|skyulf-core/setup\.py|frontend/ml-canvas/package(-lock)?\.json|CHANGELOG\.md|changelog/|initiatives/|\.github/|README\.md|.*\.md|LICENSE)'; then
+              DEPLOYABLE="$DEPLOYABLE $sha"
+            fi
+          done
+          DEPLOYABLE="$(echo "$DEPLOYABLE" | xargs || true)"
+          if [ -z "$DEPLOYABLE" ]; then
+            echo "Only release/docs/version files changed — nothing to promote."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Promoting: $DEPLOYABLE"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "list=$DEPLOYABLE" >> "$GITHUB_OUTPUT"
+
+      - name: Run promotion script (guarded cherry-pick + bundle rebuild)
+        if: steps.commits.outputs.skip != 'true'
+        run: bash scripts/promote_to_demo.sh ${{ steps.commits.outputs.list }} --push
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## 🚀 Demo promotion"
+            if [ "${{ steps.commits.outputs.skip }}" = "true" ]; then
+              echo "Skipped — no deployable changes in this push."
+            else
+              echo "Promoted: \`${{ steps.commits.outputs.list }}\` to \`deploy/demo-mode\`."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
