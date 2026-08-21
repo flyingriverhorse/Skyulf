@@ -40,6 +40,39 @@ def _elliptic_filter_pandas(X_pd: Any, models: dict[str, Any]) -> pd.Series:
     return mask
 
 
+def _elliptic_mask_numpy(X: Any, models: dict[str, Any]) -> Any:
+    """Build a row-keep boolean numpy mask by applying every fitted model.
+
+    Mirrors :func:`_elliptic_filter_pandas` semantics: missing values are kept
+    (later steps decide), columns absent from *X* or without valid values are
+    skipped, and a failing ``predict`` logs and fails open.
+    """
+    import numpy as np
+    import polars as pl
+
+    mask = np.ones(X.height, dtype=bool)
+    for col, model in models.items():
+        if col not in X.columns:
+            continue
+        try:
+            series = X.get_column(col).cast(pl.Float64, strict=False)
+        except Exception:  # not coercible to numbers: contributes no filtering
+            continue
+        arr = series.to_numpy()
+        valid = ~np.isnan(arr)
+        if not valid.any():
+            continue
+        try:
+            preds = model.predict(arr[valid].reshape(-1, 1))
+        except Exception as e:
+            logger.warning(f"EllipticEnvelope predict failed for column {col}: {e}")
+            continue
+        col_mask = np.ones(X.height, dtype=bool)
+        col_mask[valid] = preds == 1  # 1 == inlier
+        mask &= col_mask
+    return mask
+
+
 class EllipticEnvelopeApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
@@ -52,24 +85,17 @@ class EllipticEnvelopeApplier(BaseApplier):
 
     @staticmethod
     def _apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-        # sklearn models require numpy/pandas input — convert, filter, convert back.
         import polars as pl
 
         models = params.get("models", {})
         if not models:
             return X, y
 
-        X_pd = X.to_pandas()
-        y_pd = y.to_pandas() if (y is not None and hasattr(y, "to_pandas")) else y
-
-        mask = _elliptic_filter_pandas(X_pd, models)
-        X_filtered = X_pd[mask]
-        X_out = pl.from_pandas(X_filtered)
-
-        if y_pd is None:
+        mask = pl.Series(_elliptic_mask_numpy(X, models))
+        X_out = X.filter(mask)
+        if y is None:
             return X_out, y
-        y_filtered = y_pd[mask]
-        y_out = pl.from_pandas(y_filtered) if y_filtered is not None else None
+        y_out = y.filter(mask) if hasattr(y, "filter") else y
         return X_out, y_out
 
     @staticmethod

@@ -186,12 +186,21 @@ In value order: H3Index → EllipticEnvelope → TrainTestSplitter → the 5 vec
 Leave resampling on pandas. Each must be verified with a before/after parity test proving output
 values are unchanged.
 
+*Done (2026-08-22)* — all four sites are Polars-native; resampling stays on pandas as planned.
+Each site landed with a red-green dtype-preservation test (the round-trip silently upcast nullable
+`Int64` → `Float64`) plus the existing value-parity suites, and the full core suite passes under
+both `SKYULF_ENGINE` values.
+
 ### Phase 5 — Flip the default
 
 *Default flip done early by decision of 2026-08-21* — `SKYULF_ENGINE=polars` is the default from
 Phase 1a onward, with pandas kept supported and documented as a first-class option. The remaining
 obligation stands: publish a benchmark showing the actual gain — otherwise the migration has no
 evidence behind it.
+
+*Benchmark published (2026-08-22)* — `skyulf-core/benchmarks/bench_roundtrip_removal.py` measures
+the Phase 4 removals against a reconstruction of the old round-trip path; results are in
+`docs/performance.md` (splitter 2.79x, elliptic envelope 3.47x, count vectorizer 1.13x).
 
 ---
 

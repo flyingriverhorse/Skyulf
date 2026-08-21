@@ -73,6 +73,27 @@ def _safe_stratify(y: Any, label: str) -> Any:
     return y
 
 
+def _safe_stratify_polars(y: Any, label: str) -> Any:
+    """Return ``y.to_numpy()`` if every class has ≥ 2 members, else ``None``.
+
+    Polars counterpart of :func:`_safe_stratify`: checks counts via the native
+    ``value_counts`` (nulls counted as their own group, like pandas) and hands
+    back a numpy label array that ``train_test_split`` can stratify on.
+    """
+    if y is None:
+        return None
+    min_count = y.value_counts().get_column("count").min()
+    if min_count is not None and min_count < 2:
+        logger.warning(
+            "%s requested but the least populated class has only %s member(s). "
+            "Stratification will be disabled.",
+            label,
+            min_count,
+        )
+        return None
+    return y.to_numpy()
+
+
 # -----------------------------------------------------------------------------
 # SplitApplier — entry point that picks tuple vs frame routing
 # -----------------------------------------------------------------------------
@@ -206,6 +227,9 @@ class DataSplitter:
     # ---- public API ---------------------------------------------------------
 
     def split_xy(self, X: pd.DataFrame | SkyulfDataFrame, y: pd.Series | Any) -> SplitDataset:
+        if is_polars(X):
+            return self._split_xy_polars(cast(Any, X), y)
+
         X_pd, was_polars = _to_pandas_remember_engine(X)
         y_pd, _ = _to_pandas_remember_engine(y)
 
@@ -232,6 +256,9 @@ class DataSplitter:
         return SplitDataset(train=train, test=test, validation=validation)
 
     def split(self, df: pd.DataFrame | SkyulfDataFrame) -> SplitDataset:
+        if is_polars(df):
+            return self._split_polars(cast(Any, df))
+
         df_pd, was_polars = _to_pandas_remember_engine(df)
         stratify = self._frame_stratify(df_pd, label="Stratified split")
 
@@ -249,6 +276,93 @@ class DataSplitter:
             test=_back_to_engine(test, was_polars),
             validation=_back_to_engine(validation, was_polars),
         )
+
+    # ---- polars-native paths (index split + gather, no frame conversion) ----
+
+    def _split_indices(self, n: int, stratify: Any) -> tuple[Any, Any]:
+        """Split row positions ``0..n-1``; same partitioning as splitting rows."""
+        import numpy as np
+
+        return train_test_split(
+            np.arange(n),
+            test_size=self.test_size,
+            random_state=self.random_state,
+            shuffle=self.shuffle,
+            stratify=stratify,
+        )
+
+    def _split_xy_polars(self, X: Any, y: Any) -> SplitDataset:
+        stratify = _safe_stratify_polars(y, "Stratified split") if self.stratify_col else None
+
+        tv_idx, test_idx = self._split_indices(X.height, stratify)
+
+        validation = None
+        train_idx = tv_idx
+        if self.validation_size > 0:
+            relative_val_size = self.validation_size / (1 - self.test_size)
+            stratify_val = (
+                _safe_stratify_polars(y.gather(tv_idx), "Stratified validation split")
+                if stratify is not None and y is not None
+                else None
+            )
+            train_idx, val_idx = train_test_split(
+                tv_idx,
+                test_size=relative_val_size,
+                random_state=self.random_state,
+                shuffle=self.shuffle,
+                stratify=stratify_val,
+            )
+            validation = (X.gather(val_idx), y.gather(val_idx) if y is not None else None)
+
+        return SplitDataset(
+            train=(X.gather(train_idx), y.gather(train_idx) if y is not None else None),
+            test=(X.gather(test_idx), y.gather(test_idx) if y is not None else None),
+            validation=validation,
+        )
+
+    def _split_polars(self, df: Any) -> SplitDataset:
+        stratify = self._frame_stratify_polars(df, label="Stratified split")
+
+        tv_idx, test_idx = self._split_indices(df.height, stratify)
+
+        validation = None
+        train_idx = tv_idx
+        if self.validation_size > 0:
+            relative_val_size = self.validation_size / (1 - self.test_size)
+            stratify_val = (
+                _safe_stratify_polars(
+                    df.get_column(self.stratify_col).gather(tv_idx), "Stratified validation split"
+                )  # noqa: E501
+                if stratify is not None
+                else None
+            )
+            train_idx, val_idx = train_test_split(
+                tv_idx,
+                test_size=relative_val_size,
+                random_state=self.random_state,
+                shuffle=self.shuffle,
+                stratify=stratify_val,
+            )
+            validation = df.gather(val_idx)
+
+        return SplitDataset(
+            train=df.gather(train_idx),
+            test=df.gather(test_idx),
+            validation=validation,
+        )
+
+    def _frame_stratify_polars(self, df: Any, label: str) -> Any:
+        """Polars counterpart of :meth:`_frame_stratify`."""
+        if not (self.stratify_col and self.stratify_col in df.columns):
+            if self.stratify_col:
+                logger.warning(
+                    "%s requested but no target_column is configured for this "
+                    "plain-DataFrame input, so there is no column to stratify on. "
+                    "Stratification will be disabled.",
+                    label,
+                )
+            return None
+        return _safe_stratify_polars(df.get_column(self.stratify_col), label)
 
     # ---- private helpers ----------------------------------------------------
 
