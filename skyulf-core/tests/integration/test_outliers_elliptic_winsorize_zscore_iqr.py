@@ -571,3 +571,24 @@ class TestRealShapedDataset:
         assert (in_bounds | kept_income.isna()).all()
         # Rows with a missing income must be retained, not treated as outliers.
         assert df["income"].isna().sum() == out["income"].isna().sum()
+
+
+def test_winsorize_clips_nullable_int64_column_like_polars() -> None:
+    """F-10: clipping a nullable ``Int64`` column with float bounds raised
+    ``TypeError: Invalid value for dtype 'Int64'`` on the pandas path while
+    Polars (which casts to Float64 first) worked. Pandas must match."""
+    df_pd = pd.DataFrame({"a": pd.array([1, 2, 3, 4, 5, 100], dtype="Int64")})
+    df_pl = pl.DataFrame({"a": [1, 2, 3, 4, 5, 100]})
+    config = {"columns": ["a"], "lower_percentile": 5.0, "upper_percentile": 95.0}
+
+    params_pd = dict(WinsorizeCalculator().fit(df_pd, config))
+    params_pl = dict(WinsorizeCalculator().fit(df_pl, config))
+    out_pd = WinsorizeApplier().apply(df_pd, params_pd)
+    out_pl = WinsorizeApplier().apply(df_pl, params_pl)
+    frame_pd = out_pd[0] if isinstance(out_pd, tuple) else out_pd
+    frame_pl = out_pl[0] if isinstance(out_pl, tuple) else out_pl
+
+    np.testing.assert_allclose(
+        np.asarray(frame_pd["a"], dtype="float64"),
+        np.asarray(frame_pl["a"], dtype="float64"),
+    )

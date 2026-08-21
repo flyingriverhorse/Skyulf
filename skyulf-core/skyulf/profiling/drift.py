@@ -138,8 +138,11 @@ class DriftCalculator:
                 # If casting fails completely (unlikely with strict=False), skip
                 return None  # nosec B112
 
-        ref_data = self.reference_df[col].drop_nulls().to_numpy()
-        curr_data = curr_series.drop_nulls().to_numpy()
+        # drop_nans() first: pl.read_csv turns literal 'NaN' tokens into float
+        # NaN (not null), and NaN-poisoned stats make every comparison below
+        # silently vote "no drift" (F-13). No-op on integer series.
+        ref_data = self.reference_df[col].drop_nans().drop_nulls().to_numpy()
+        curr_data = curr_series.drop_nans().drop_nulls().to_numpy()
 
         if len(ref_data) == 0 or len(curr_data) == 0:
             return None

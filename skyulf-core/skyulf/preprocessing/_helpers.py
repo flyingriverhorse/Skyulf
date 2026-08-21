@@ -101,7 +101,14 @@ def resolve_columns_then_to_numpy(
         select_cols = [c for c in columns if c in X.columns]
         X_np = X.select(select_cols).to_numpy() if select_cols else np.empty((0, 0))
     else:
-        X_np = X[columns].to_numpy()
+        subset = X[columns]
+        # Nullable extension dtypes (Int64, Float64...) to_numpy() as object
+        # arrays full of pd.NA, which crash sklearn (F-10). Force the
+        # float64/NaN representation the Polars path produces natively.
+        if any(isinstance(dt, pd.api.extensions.ExtensionDtype) for dt in subset.dtypes):
+            X_np = subset.to_numpy(dtype="float64", na_value=np.nan)
+        else:
+            X_np = subset.to_numpy()
     return X_np, columns
 
 

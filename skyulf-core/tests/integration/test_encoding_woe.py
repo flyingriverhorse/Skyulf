@@ -1,7 +1,7 @@
 """Unit tests for the WOEEncoder Calculator/Applier (fit + apply, dual-engine)."""
 
 import math
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -315,3 +315,181 @@ class TestRealShapedDataset:
         for woe_val in params["mappings"]["plan_type"].values():
             assert isinstance(woe_val, float)
             assert math.isfinite(woe_val)
+
+
+# ---------------------------------------------------------------------------
+# fit_transform_train — leakage-safe cross-fitting of training rows (F-14)
+# ---------------------------------------------------------------------------
+
+
+def _expected_out_of_fold_woe(
+    cats: list[str], y_bin: np.ndarray, reg: float, n_folds: int, default: float = 0.0
+) -> np.ndarray:
+    """Independently recompute out-of-fold WOE.
+
+    Each row is encoded with the mapping fitted on the complement of its own
+    fold; a category unseen in that complement falls back to ``default``,
+    mirroring the apply path's unseen-category behaviour.
+    """
+    from sklearn.model_selection import KFold
+
+    values = np.asarray(cats)
+    encoded = np.zeros(len(cats))
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    for train_idx, hold_idx in kf.split(np.arange(len(cats))):
+        train_vals = values[train_idx]
+        y_sub = y_bin[train_idx]
+        total_pos = float(y_sub.sum())
+        total_neg = float(len(train_idx) - total_pos)
+        for i in hold_idx:
+            mask = train_vals == values[i]
+            if not mask.any():
+                encoded[i] = default
+                continue
+            pos = float(y_sub[mask].sum())
+            neg = float(mask.sum() - pos)
+            dist_pos = (pos + reg) / (total_pos + reg)
+            dist_neg = (neg + reg) / (total_neg + reg)
+            encoded[i] = math.log(dist_neg / dist_pos)
+    return encoded
+
+
+def test_fit_transform_train_cross_fits_training_rows() -> None:
+    """Training rows must be encoded out-of-fold; the artifact keeps the full-data fit."""
+    X = pd.DataFrame({"city": ["a", "b", "c", "a", "b", "c"]})
+    y = pd.Series([1, 0, 0, 1, 0, 1], name="target")
+    config: dict[str, Any] = {"columns": ["city"], "regularization": 0.5}
+
+    artifact, transformed = WOEEncoderCalculator().fit_transform_train((X, y), config)
+    X_out, y_out = transformed
+
+    full_artifact = WOEEncoderCalculator().fit((X, y), config)
+    assert artifact["mappings"] == full_artifact["mappings"]
+
+    y_bin = np.array([1.0, 0.0, 0.0, 1.0, 0.0, 1.0])
+    expected = _expected_out_of_fold_woe(list(X["city"]), y_bin, reg=0.5, n_folds=3)
+    np.testing.assert_allclose(X_out["city"].to_numpy(), expected)
+
+    leaky = X["city"].map(full_artifact["mappings"]["city"]).to_numpy()
+    assert not np.allclose(X_out["city"].to_numpy(), leaky)
+    assert list(y_out) == list(y)
+
+
+def test_fit_transform_train_cross_fit_matches_across_engines() -> None:
+    """Pandas and Polars fit_transform_train must produce identical encoded values."""
+    X_pd = pd.DataFrame({"city": ["a", "b", "c", "a", "b", "c"]})
+    y_pd = pd.Series([1, 0, 0, 1, 0, 1], name="target")
+    config: dict[str, Any] = {"columns": ["city"], "regularization": 0.5}
+
+    _, (X_out_pd, _) = WOEEncoderCalculator().fit_transform_train((X_pd, y_pd), config)
+
+    X_pl = pl.from_pandas(X_pd)
+    y_pl = pl.Series("target", y_pd)
+    _, (X_out_pl, _) = WOEEncoderCalculator().fit_transform_train((X_pl, y_pl), config)
+
+    np.testing.assert_allclose(
+        X_out_pd["city"].to_numpy(), X_out_pl["city"].to_numpy(), rtol=1e-9, atol=1e-9
+    )
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_fit_transform_train_noise_target_auc_stays_near_chance(engine: str) -> None:
+    """On a pure-noise target, cross-fitted train rows must not leak the label.
+
+    With many categories and few rows per category, the leaky full-fit encoding
+    memorises each row's own label into its category's WOE, becoming strongly
+    predictive of the noise target. WOE uses a log(neg/pos) convention, so the
+    leak shows up as an AUC far from 0.5 in *either* direction — measure
+    discriminative power as ``max(auc, 1 - auc)``.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    def discriminative_power(y_true: Any, values: np.ndarray) -> float:
+        auc = roc_auc_score(y_true, values)
+        return max(auc, 1.0 - auc)
+
+    rng = np.random.default_rng(42)
+    n, n_categories = 400, 200
+    X_pd = pd.DataFrame({"city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)]})
+    y_pd = pd.Series(rng.integers(0, 2, size=n), name="target")
+    config: dict[str, Any] = {"columns": ["city"], "regularization": 0.5}
+
+    leaky_params = WOEEncoderCalculator().fit((X_pd, y_pd), config)
+    leaky_out, _ = WOEEncoderApplier().apply((X_pd, y_pd), dict(leaky_params))
+    disc_leaky = discriminative_power(y_pd, leaky_out["city"].to_numpy())
+
+    if engine == "pandas":
+        _, (X_out, _) = WOEEncoderCalculator().fit_transform_train((X_pd, y_pd), config)
+    else:
+        X_pl = pl.from_pandas(X_pd)
+        y_pl = pl.Series("target", y_pd)
+        _, (X_out_pl, _) = WOEEncoderCalculator().fit_transform_train((X_pl, y_pl), config)
+        X_out = X_out_pl.to_pandas()
+    disc_cross = discriminative_power(y_pd, X_out["city"].to_numpy())
+
+    assert disc_leaky > 0.75, f"expected the leaky encoding to memorise labels, got {disc_leaky}"
+    assert disc_cross < 0.60, f"cross-fitted encoding should sit near chance, got {disc_cross}"
+
+
+def test_fit_transform_train_no_columns_picked_is_noop() -> None:
+    """Explicitly picking zero columns returns an empty artifact and the input."""
+    X = pd.DataFrame({"city": ["a", "b"]})
+    y = pd.Series([0, 1], name="target")
+    artifact, transformed = WOEEncoderCalculator().fit_transform_train((X, y), {"columns": []})
+    assert artifact == {}
+    X_out, y_out = transformed
+    pd.testing.assert_frame_equal(X_out, X)
+    assert list(y_out) == list(y)
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_feature_engineer_pipeline_cross_fits_woe_training_rows(engine: str) -> None:
+    """Pipeline training rows get out-of-fold WOE; held-out splits get the full artifact."""
+    from skyulf.data.dataset import SplitDataset
+    from skyulf.preprocessing.pipeline import FeatureEngineer
+
+    train_x_pd = pd.DataFrame({"city": ["a", "b", "c"] * 10})
+    train_y_pd = pd.Series([1, 0, 0, 1, 0, 1] * 5, name="target")
+    test_x_pd = pd.DataFrame({"city": ["a", "b", "c"]})
+    test_y_pd = pd.Series([1, 0, 1], name="target")
+
+    if engine == "polars":
+        dataset = SplitDataset(
+            train=cast(Any, (pl.from_pandas(train_x_pd), pl.Series("target", train_y_pd))),
+            test=cast(Any, (pl.from_pandas(test_x_pd), pl.Series("target", test_y_pd))),
+        )
+    else:
+        dataset = SplitDataset(train=(train_x_pd, train_y_pd), test=(test_x_pd, test_y_pd))
+
+    engineer = FeatureEngineer(
+        [{"name": "woe_city", "transformer": "WOEEncoder", "params": {"columns": ["city"]}}]
+    )
+    result, _ = engineer.fit_transform(dataset)
+    assert isinstance(result, SplitDataset)
+
+    config: dict[str, Any] = {"columns": ["city"]}
+    full_artifact = WOEEncoderCalculator().fit((train_x_pd, train_y_pd), config)
+    _, (expected_train, _) = WOEEncoderCalculator().fit_transform_train(
+        (train_x_pd, train_y_pd), config
+    )
+
+    train_out, train_y_out = result.train
+    test_out, _ = result.test
+    train_values = (
+        train_out.get_column("city").to_numpy()
+        if engine == "polars"
+        else train_out["city"].to_numpy()
+    )
+    test_values = (
+        test_out.get_column("city").to_numpy()
+        if engine == "polars"
+        else test_out["city"].to_numpy()
+    )
+
+    np.testing.assert_allclose(train_values, expected_train["city"].to_numpy())
+    leaky = train_x_pd["city"].map(full_artifact["mappings"]["city"]).to_numpy()
+    assert not np.allclose(train_values, leaky)
+
+    expected_test = test_x_pd["city"].map(full_artifact["mappings"]["city"]).to_numpy()
+    np.testing.assert_allclose(test_values, expected_test)
+    assert list(train_y_out) == list(train_y_pd)
