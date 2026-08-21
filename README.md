@@ -67,7 +67,7 @@ These scripts auto-create a virtualenv, install deps, generate a `.env` with saf
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install --upgrade pip
-pip install -r requirements-fastapi.txt
+pip install -r requirements.txt
 python run_skyulf.py
 ```
 
@@ -75,7 +75,7 @@ python run_skyulf.py
 ```powershell
 uv venv
 .\.venv\Scripts\Activate.ps1
-uv pip install -r requirements-fastapi.txt
+uv pip install -r requirements.txt
 python run_skyulf.py
 ```
 

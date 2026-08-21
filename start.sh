@@ -292,11 +292,12 @@ if ! python -c "import uvicorn" 2>/dev/null; then
     fi
     echo "[OK] Internet connection verified."
     echo ""
-    echo "[SETUP] Installing dependencies (first run only; may take 3-5 minutes)..."
+    echo "[SETUP] Installing dependencies (first run only; typically 2-5 minutes)..."
+    echo "        (NLP embeddings extra is optional: requirements-nlp.txt)"
     echo "        Please wait..."
     echo ""
     pip install --upgrade pip -q
-    pip install --prefer-binary -r requirements-fastapi.txt
+    pip install --prefer-binary -r requirements.txt
     echo ""
     echo "[OK] Dependencies installed successfully."
 fi

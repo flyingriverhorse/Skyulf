@@ -107,7 +107,7 @@ source .venv/bin/activate
 
 ```bash
 pip install --upgrade pip
-pip install -r requirements-fastapi.txt
+pip install -r requirements.txt
 ```
 
 ### Start Redis (if `USE_CELERY=true`)
@@ -185,7 +185,7 @@ For a detailed step-by-step walkthrough, see [Platform Walkthrough](platform_wal
 |---|---|
 | `Connection refused` on port 8000 | Is the API running? Check `docker compose logs api` or your terminal. |
 | Celery tasks stuck in "pending" | Verify Redis is running: `redis-cli ping` should return `PONG`. |
-| `ModuleNotFoundError` on startup | Activate your virtualenv and run `pip install -r requirements-fastapi.txt`. |
+| `ModuleNotFoundError` on startup | Activate your virtualenv and run `pip install -r requirements.txt`. |
 | Database errors after update | Delete `mlops_database.db` (SQLite) to start fresh — it auto-recreates on boot. |
 | CORS errors in browser | Add your frontend URL to `CORS_ORIGINS` in `.env`. Default allows `localhost:3000` and `localhost:8080`. |
 

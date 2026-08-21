@@ -61,13 +61,13 @@ add the same pin to the file CI consumes:
 
 | Dependency kind        | pyproject table                   | requirements file          |
 | ---------------------- | --------------------------------- | -------------------------- |
-| App runtime (FastAPI)  | `[project.dependencies]`          | `requirements-fastapi.txt` |
+| App runtime (FastAPI)  | `[project.dependencies]`          | `requirements.txt` |
 | Dev / test / lint      | `[dependency-groups].dev`         | `requirements-dev.txt`     |
 | CI gate tooling        | `[dependency-groups].dev`         | `requirements-ci.txt`      |
 | Optional extra (geo…)  | `[project.optional-dependencies]` | `requirements-geo.txt` etc.|
 
 > ⚠️ **`uv sync` foot-gun:** `uv sync` PRUNES any installed package not declared
-> in `pyproject.toml`. Use `uv pip install -r requirements-fastapi.txt` to ADD
+> in `pyproject.toml`. Use `uv pip install -r requirements.txt` to ADD
 > without pruning, or `uv lock` when you only need the lockfile refreshed.
 >
 > ⚠️ **RECORD warning:** if `uv pip install` prints `Failed to uninstall ... due
