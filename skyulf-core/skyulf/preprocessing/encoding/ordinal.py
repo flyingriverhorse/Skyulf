@@ -34,7 +34,12 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], An
 def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     import polars as pl
 
-    X_subset = X.select(valid_cols).select([pl.col(c).cast(pl.Utf8) for c in valid_cols])
+    # `fill_null("nan")` mirrors the pandas path's `.astype(str)` ("NaN" ->
+    # "nan"), so polars nulls reuse the fitted "nan" class instead of drifting
+    # into unknown_value (F-07).
+    X_subset = X.select(valid_cols).select(
+        [pl.col(c).cast(pl.Utf8).fill_null("nan") for c in valid_cols]
+    )
     X_np, _ = SklearnBridge.to_sklearn(X_subset)
     encoded = encoder.transform(X_np)
     new_cols_pl = [pl.Series(col, encoded[:, i]) for i, col in enumerate(valid_cols)]
@@ -43,7 +48,7 @@ def _apply_features_polars(X: Any, valid_cols: list[str], encoder: Any) -> Any:
 
 def _apply_features_pandas(X: Any, valid_cols: list[str], encoder: Any) -> Any:
     X_out = X.copy()
-    X_subset = X_out[valid_cols].astype(str)
+    X_subset = _subset_to_str_pandas(X_out, valid_cols)
     X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
     X_out[valid_cols] = encoder.transform(X_input)
     return X_out
@@ -76,9 +81,12 @@ def _target_to_str_array(y: Any) -> Any:
 
     if isinstance(y, pl.Series):
         return y.cast(pl.Utf8).fill_null("nan").to_numpy().reshape(-1, 1)
-    if hasattr(y, "to_numpy"):
-        return y.to_numpy().astype(str).reshape(-1, 1)
-    return np.array(y).astype(str).reshape(-1, 1)
+    raw = y.to_numpy() if hasattr(y, "to_numpy") else np.asarray(y)
+    arr = raw.astype(str)
+    # astype(str) renders object-None as "None" while the polars branch fills
+    # with "nan" — collapse so both fit the same missing class (F-07).
+    arr[arr == "None"] = "nan"
+    return arr.reshape(-1, 1)
 
 
 def _apply_target_polars(y: Any, enc: OrdinalEncoder) -> Any:
@@ -187,7 +195,11 @@ def _resolve_target_categories(raw_order: Any, n_features: int) -> str | list[li
 def _build_subset_polars(X: Any, feature_cols: list[str]) -> Any:
     import polars as pl
 
-    return X.select(feature_cols).select([pl.col(c).cast(pl.Utf8) for c in feature_cols])
+    # Same fill_null("nan") normalisation as _apply_features_polars so fit
+    # categories and apply-time strings agree for missing values (F-07).
+    return X.select(feature_cols).select(
+        [pl.col(c).cast(pl.Utf8).fill_null("nan") for c in feature_cols]
+    )
 
 
 def _fit_feature_encoder(
@@ -286,8 +298,15 @@ def _ordinal_fit_polars(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, 
     return _ordinal_fit_dispatch(X, y, config, _build_subset_polars)
 
 
+def _subset_to_str_pandas(X: Any, feature_cols: list[str]) -> Any:
+    # astype(str) renders float NaN as "nan" but object-None as "None";
+    # collapse the latter so every missing representation shares one class
+    # (F-07 parity with the polars fill_null("nan") path).
+    return X[feature_cols].astype(str).replace("None", "nan")
+
+
 def _ordinal_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
-    return _ordinal_fit_dispatch(X, y, config, lambda Xi, fc: Xi[fc].astype(str))
+    return _ordinal_fit_dispatch(X, y, config, _subset_to_str_pandas)
 
 
 @NodeRegistry.register("OrdinalEncoder", OrdinalEncoderApplier)

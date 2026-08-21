@@ -60,6 +60,8 @@ class SimpleImputerApplier(BaseApplier):
 
     @staticmethod
     def _apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
+        import pandas as pd
+
         cols = params.get("columns", [])
         fill_values = params.get("fill_values", {})
         if not cols:
@@ -73,7 +75,16 @@ class SimpleImputerApplier(BaseApplier):
             if col not in X_out.columns:
                 X_out[col] = val
             else:
-                X_out[col] = X_out[col].fillna(val)
+                series = X_out[col]
+                # Nullable numeric extension dtypes (Int64...) refuse a float
+                # fill value; upcast like the Polars fill does (F-10).
+                if (
+                    isinstance(val, float)
+                    and isinstance(series.dtype, pd.api.extensions.ExtensionDtype)
+                    and pd.api.types.is_numeric_dtype(series.dtype)
+                ):
+                    series = series.astype("float64")
+                X_out[col] = series.fillna(val)
         return X_out, _y
 
 

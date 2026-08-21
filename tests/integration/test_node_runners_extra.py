@@ -1024,3 +1024,58 @@ def test_additional_clustering_algorithms_train_and_bundle(tmp_path, algorithm):
 
     bundled = engine.artifact_store.load(f"job_{algorithm}")
     assert bundled["feature_columns"] == ["a", "b"]
+
+
+# --- F-12: numeric-only feature resolution for Polars clustering -----------
+
+
+def test_resolve_train_feature_columns_polars_numeric_only_matches_clustering_fit():
+    """A Polars training frame must get the same numeric filter the clustering
+    fit applies, so the persisted feature_columns never advertise columns the
+    model was never fit on."""
+    import polars as pl
+
+    harness = _Harness()
+    train_pl = pl.DataFrame(
+        {
+            "customer_id": ["c1", "c2", "c3", "c4"],
+            "amount": [1.0, 2.0, 3.0, 4.0],
+            "freq": [4, 5, 6, 7],
+        }
+    )
+    cols = harness._resolve_train_feature_columns(train_pl, "", numeric_only=True)
+    assert cols == ["amount", "freq"]
+
+
+def test_resolve_train_feature_columns_polars_wrapper_numeric_only():
+    """The SkyulfPolarsWrapper training frame gets the numeric filter too."""
+    import polars as pl
+
+    from skyulf.engines.polars_engine import SkyulfPolarsWrapper
+
+    harness = _Harness()
+    train = SkyulfPolarsWrapper(
+        pl.DataFrame(
+            {
+                "customer_id": ["c1", "c2", "c3", "c4"],
+                "amount": [1.0, 2.0, 3.0, 4.0],
+                "active": [True, False, True, False],
+            }
+        )
+    )
+    cols = harness._resolve_train_feature_columns(train, "", numeric_only=True)
+    assert cols == ["amount", "active"]
+
+
+def test_resolve_train_feature_columns_pandas_numeric_only_unchanged():
+    """The pandas numeric filter keeps its existing behaviour (regression guard)."""
+    harness = _Harness()
+    train_pd = pd.DataFrame(
+        {
+            "customer_id": ["c1", "c2", "c3", "c4"],
+            "amount": [1.0, 2.0, 3.0, 4.0],
+            "freq": [4, 5, 6, 7],
+        }
+    )
+    cols = harness._resolve_train_feature_columns(train_pd, "", numeric_only=True)
+    assert cols == ["amount", "freq"]

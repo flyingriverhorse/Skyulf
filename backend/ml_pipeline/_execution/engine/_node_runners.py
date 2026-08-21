@@ -29,6 +29,7 @@ from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling.base import StatefulEstimator
+from skyulf.modeling.clustering import _select_numeric_features
 from skyulf.preprocessing.pipeline import FeatureEngineer
 from skyulf.registry import NodeRegistry
 
@@ -257,9 +258,17 @@ class NodeRunnersMixin:
         columns = list(train_frame.columns)
         if target_col and target_col in columns:
             columns.remove(target_col)
-        if numeric_only and hasattr(train_frame, "select_dtypes"):
-            numeric_cols = set(train_frame.select_dtypes(include=["number", "bool"]).columns)
-            columns = [c for c in columns if c in numeric_cols]
+        if numeric_only:
+            if hasattr(train_frame, "select_dtypes"):
+                numeric_cols = set(train_frame.select_dtypes(include=["number", "bool"]).columns)
+                columns = [c for c in columns if c in numeric_cols]
+            else:
+                # Polars frames have no select_dtypes; reuse the exact filter
+                # the clustering fit applies so the persisted list can never
+                # advertise columns the model was never fit on (F-12).
+                _, dropped = _select_numeric_features(train_frame)
+                if dropped:
+                    columns = [c for c in columns if c not in set(dropped)]
         if exclude_columns:
             columns = [c for c in columns if c not in exclude_columns]
         return columns

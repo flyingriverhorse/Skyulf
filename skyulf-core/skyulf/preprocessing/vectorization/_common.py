@@ -44,7 +44,18 @@ def apply_text_pandas_only(
     """
     X, y, is_tuple = unpack_pipeline_input(df)
 
-    was_polars = hasattr(X, "to_pandas") and type(X).__module__.startswith("polars")
+    # Polars input arrives either as a raw pl.DataFrame or as a
+    # SkyulfPolarsWrapper (documented public input type). The wrapper lives
+    # under `skyulf.*` and holds the real frame in `._df`, so a plain module
+    # check misses it and would hand the wrapper itself to `fn` (F-09).
+    was_wrapped = (
+        type(X).__module__.startswith("skyulf")
+        and hasattr(X, "_df")
+        and type(X._df).__module__.startswith("polars")
+    )
+    was_polars = (
+        hasattr(X, "to_pandas") and type(X).__module__.startswith("polars")
+    ) or was_wrapped
 
     X_pd: pd.DataFrame = X.to_pandas() if was_polars else X  # type: ignore[assignment]
 
@@ -55,6 +66,10 @@ def apply_text_pandas_only(
         import polars as pl
 
         X_out = pl.from_pandas(X_out_pd)
+        if was_wrapped:
+            from ...engines.polars_engine import SkyulfPolarsWrapper
+
+            X_out = SkyulfPolarsWrapper(X_out)
 
     return pack_pipeline_output(X_out, y_out, is_tuple)
 

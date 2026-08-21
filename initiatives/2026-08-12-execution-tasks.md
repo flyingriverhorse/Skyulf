@@ -113,7 +113,7 @@ its ledger version so nothing has to be re-derived:
 
 | Scope | Finds | skyulf-core | backend + frontend |
 |---|---|---|---|
-| Audit Tier 2 remainder (engine-divergent transformers, drift NaN, WOE leakage, clustering deploy, pandas `Int64` crashes…) | F-07–F-14 | **0.6.0** if merged before the tag, else next minor | **0.8.0** |
+| Audit Tier 2 remainder (engine-divergent transformers, drift NaN, WOE leakage, clustering deploy, pandas `Int64` crashes…) — **done on `080` 2026-08-21** (F-07–F-14 red-green; core 3276 / backend 1201 tests green; F-11 buckets + F-14 scores are documented behaviour changes) | F-07–F-14 | **0.6.0** (merged before the tag) | **0.8.0** |
 | Experiments batch 2 (metric comparability, diff rendering, threshold validation) | F-36, F-38–F-44 | — | **0.8.0** (call out F-36 in changelog) |
 | Stage 2 funnel: sample-dataset entry point, dashboard, install story, rest of activation | growth A2.1, A2.3 (remainder), A2.4/A2.5 (if not shipped with core 0.6.0) | — | **0.8.0** |
 | Leakage enforcement + Tier 3 (gate bypasses, no-splitter pipelines, inference row-drops) | F-16–F-26 | **0.6.1** | **0.8.1** (F-22 frontend sync check) |

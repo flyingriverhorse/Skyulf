@@ -33,12 +33,22 @@ logger = logging.getLogger(__name__)
 # -----------------------------------------------------------------------------
 
 
-def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any) -> Any:
+def _polars_cut_expr(col: str, sorted_edges: list[float], labels: Any, include_lowest: bool) -> Any:
     """Build a single polars ``cut`` expression for one column."""
     import polars as pl
 
     breaks = sorted_edges[1:-1]
-    return pl.col(col).cut(breaks=breaks, labels=labels, left_closed=False, include_breaks=False)
+    cut = pl.col(col).cut(breaks=breaks, labels=labels, left_closed=False, include_breaks=False)
+    # pd.cut yields NaN outside [edges[0], edges[-1]], but polars cut() has
+    # open outer bins that would silently absorb those values (F-08). Mask
+    # them to null so test-time out-of-range values are flagged on both
+    # engines instead of clipped into the outer bin.
+    lower, upper = sorted_edges[0], sorted_edges[-1]
+    if include_lowest:
+        out_of_range = (pl.col(col) < lower) | (pl.col(col) > upper)
+    else:
+        out_of_range = (pl.col(col) <= lower) | (pl.col(col) > upper)
+    return pl.when(out_of_range).then(None).otherwise(cut)
 
 
 def _range_edge_labels(
@@ -85,7 +95,7 @@ def _polars_one_col_expr(
         # of relying on pl.cut()'s own default interval-label text.
         labels = _range_edge_labels(sorted_edges, include_lowest, precision)
 
-    cut_expr = _polars_cut_expr(col, sorted_edges, labels)
+    cut_expr = _polars_cut_expr(col, sorted_edges, labels, include_lowest)
     target_col_name = f"{col}{output_suffix}"
     if label_format in ("ordinal", "bin_index") and not has_valid_custom_labels:
         # Polars cut returns Categorical; cast → physical index.

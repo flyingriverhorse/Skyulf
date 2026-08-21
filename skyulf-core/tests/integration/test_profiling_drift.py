@@ -26,6 +26,26 @@ def test_calculate_drift_detects_shifted_distribution() -> None:
     assert {"wasserstein_distance", "ks_test_p_value", "psi", "kl_divergence"} == metric_names
 
 
+def test_calculate_drift_still_flags_shift_when_data_contains_nan() -> None:
+    """F-13: `pl.read_csv` turns literal 'NaN' tokens into float NaN, not null.
+    `drop_nulls()` keeps NaN, so the metrics used to go NaN and every
+    comparison silently voted "no drift". NaN rows must be dropped alongside
+    nulls so a real shift is still detected."""
+    rng = np.random.default_rng(0)
+    reference = pl.DataFrame({"feature": rng.normal(0, 1, 500)})
+    shifted = rng.normal(5, 1, 500)
+    shifted[::50] = float("nan")  # one NaN token every 50 rows
+    current = pl.DataFrame({"feature": shifted})
+
+    report = DriftCalculator(reference, current).calculate_drift()
+
+    assert "feature" in report.column_drifts
+    column_drift = report.column_drifts["feature"]
+    assert column_drift.drift_detected is True
+    for metric in column_drift.metrics:
+        assert np.isfinite(metric.value), f"{metric.metric} is not finite: {metric.value}"
+
+
 def test_calculate_drift_detects_shift_in_small_int_dtypes() -> None:
     """Regression test: Int8/Int16/UInt* columns must not be silently dropped
     from the report — only the original Float32/Float64/Int32/Int64 allow-list

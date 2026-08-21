@@ -246,3 +246,41 @@ class TestRealShapedDataset:
         for val in df["plan_type"].unique():
             mask = df["plan_type"] == val
             assert out.loc[mask, "plan_type"].nunique() == 1
+
+
+def test_apply_buckets_identical_across_engines() -> None:
+    """F-11: the polars path used polars' native ``hash()`` while the pandas
+    path used blake2b, so the same category landed in different buckets per
+    engine — and deployment guarantees an engine crossing (Polars-trained
+    pipelines always serve a pandas frame), making every production encoding
+    diverge silently. Both engines must now produce identical buckets."""
+    values = ["alpha", "beta", "gamma", "alpha", "delta", "beta"]
+    df_pd = pd.DataFrame({"category": values})
+    df_pl = pl.DataFrame({"category": values})
+    calc = HashEncoderCalculator()
+    applier = HashEncoderApplier()
+    config = {"columns": ["category"], "n_features": 8}
+
+    out_pd = applier.apply(df_pd, dict(calc.fit(df_pd, config)))
+    out_pl = applier.apply(df_pl, dict(calc.fit(df_pl, config)))
+    frame_pd = out_pd[0] if isinstance(out_pd, tuple) else out_pd
+    frame_pl = out_pl[0] if isinstance(out_pl, tuple) else out_pl
+
+    assert list(frame_pd["category"]) == list(frame_pl["category"])
+
+
+def test_apply_buckets_identical_across_engines_with_missing() -> None:
+    """F-11 follow-up: missing values must hash to the same bucket on both
+    engines too (both normalise missing to the literal "nan" string)."""
+    df_pd = pd.DataFrame({"category": ["a", None, "b", None]})
+    df_pl = pl.DataFrame({"category": ["a", None, "b", None]})
+    applier = HashEncoderApplier()
+    params = {"columns": ["category"], "n_features": 8}
+
+    out_pd = applier.apply(df_pd, params)
+    out_pl = applier.apply(df_pl, params)
+    frame_pd = out_pd[0] if isinstance(out_pd, tuple) else out_pd
+    frame_pl = out_pl[0] if isinstance(out_pl, tuple) else out_pl
+
+    assert list(frame_pd["category"]) == list(frame_pl["category"])
+    assert frame_pl["category"][1] == frame_pl["category"][3]
