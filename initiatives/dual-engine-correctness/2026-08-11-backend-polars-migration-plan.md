@@ -217,10 +217,8 @@ and it does not claim a performance number. Phase 5 must measure one.
 
 ## 5. Interim: fix the claim, not just the code
 
-The migration is multi-release. Until Phase 5 ships, **any documentation or marketing stating the
-canvas/backend runs on Polars is inaccurate** and should be corrected to reflect what is true
-today: `skyulf-core` supports both engines and runs Polars end-to-end; the hosted backend currently
-executes pipelines on pandas.
-
-This is the same discipline applied to the "leakage proof" claim in the companion plan — fix the
-code so the claim becomes true, and in the meantime do not assert something the code does not do.
+*Resolved (2026-08-22):* the backend now defaults to `SKYULF_ENGINE=polars` (Phase 1a decision,
+2026-08-21) with Phases 2–3 landed, so the "canvas/backend runs on Polars" claim is accurate —
+the README's dual-engine marketing line matches reality again. The discipline stands for any
+future gap: fix the code so the claim becomes true, and in the meantime do not assert something
+the code does not do.
