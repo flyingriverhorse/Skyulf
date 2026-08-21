@@ -2,10 +2,13 @@
 
 **Date:** 2026-08-11
 **Branch:** `078` → `080`
-**Status:** Phase 0 complete (F-07–F-14 shipped red-green on `080`, 2026-08-21). Phase 1a landed:
-`SKYULF_ENGINE` setting exists — and by decision of 2026-08-21 it **defaults to `polars`**, not
-pandas. This pulls the Phase 3 fixes (F-31/F-32/F-30/F-43, drift consumer, serving frame) forward
-as mandatory before the default is safe for users; they ship in the same release.
+**Status:** ✅ **COMPLETE (2026-08-22).** All five phases landed on `080`: Phase 0 (Tier 1/2
+correctness), Phase 1 (engine setting + job/deployment recording + UI + dual-engine CI matrix),
+Phase 2 (Polars ingestion), Phase 3 (all pandas-only assumptions fixed), Phase 4 (Category B
+round-trips removed, red-green dtype tests), Phase 5 (polars default + benchmark obligation met:
+`bench_roundtrip_removal.py` and the 22-node parity-checked `bench_engine_comparison.py`, both
+published in `docs/performance.md`; user-facing map in `docs/guides/engine_data_paths.md`).
+Remaining steps are release logistics (PR → master, next version), tracked outside this file.
 **Companion:** [`2026-08-11-audit-findings.md`](2026-08-11-audit-findings.md), [`2026-08-11-leakage-enforcement-plan.md`](2026-08-11-leakage-enforcement-plan.md)
 
 ---
