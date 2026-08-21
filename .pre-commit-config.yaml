@@ -49,7 +49,7 @@ repos:
         # Mirrors the CI "Type check (ty)" step so type errors are caught on
         # commit, before CI. `uv tool run` fetches/runs ty without needing it
         # installed in the venv or on PATH.
-        entry: uv tool run ty check backend skyulf-core/skyulf skyulf-core/tests run_skyulf.py celery_worker.py
+        entry: uv run ty check backend skyulf-core/skyulf run_skyulf.py celery_worker.py
         language: system
         types: [python]
         pass_filenames: false

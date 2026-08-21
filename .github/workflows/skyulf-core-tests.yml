@@ -124,3 +124,12 @@ jobs:
           bash ../.github/scripts/run_check.sh "docker compose unit-tests (skyulf-core)" \
             docker compose -f docker-compose.test.yml run --rm --build unit-tests
           echo "::endgroup::"
+
+      - name: Run skyulf-core integration-test image
+        # Reuses the image built by the previous step (same build context /
+        # Dockerfile, so the build cache makes --build a no-op here).
+        run: |
+          echo "::group::docker compose run (integration-tests)"
+          bash ../.github/scripts/run_check.sh "docker compose integration-tests (skyulf-core)" \
+            docker compose -f docker-compose.test.yml run --rm --build integration-tests
+          echo "::endgroup::"

@@ -1,0 +1,258 @@
+{
+  "scenario": "09_path_a_full_chain",
+  "pipeline_id": "s09_path_a",
+  "status": "success",
+  "node_outputs": {
+    "data": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "mi": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing",
+        "PetalLengthCm_missing",
+        "PetalWidthCm_missing"
+      ],
+      "rows": 150
+    },
+    "dmc": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing",
+        "PetalLengthCm_missing",
+        "PetalWidthCm_missing"
+      ],
+      "rows": 150
+    },
+    "tx": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing",
+        "PetalLengthCm_missing",
+        "PetalWidthCm_missing"
+      ],
+      "rows": 150
+    },
+    "dmr": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing",
+        "PetalLengthCm_missing",
+        "PetalWidthCm_missing"
+      ],
+      "rows": 145
+    },
+    "fts": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "SepalLengthCm_missing",
+        "SepalWidthCm_missing",
+        "PetalLengthCm_missing",
+        "PetalWidthCm_missing"
+      ],
+      "y_name": "Species"
+    },
+    "split": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "PetalLengthCm_missing",
+          "PetalWidthCm_missing"
+        ],
+        "X_rows": 116,
+        "y_name": "Species",
+        "y_len": 116
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "PetalLengthCm_missing",
+          "PetalWidthCm_missing"
+        ],
+        "X_rows": 29,
+        "y_name": "Species",
+        "y_len": 29
+      },
+      "validation": null
+    },
+    "enc": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "PetalLengthCm_missing",
+          "PetalWidthCm_missing"
+        ],
+        "X_rows": 116,
+        "y_name": "Species",
+        "y_len": 116
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm",
+          "SepalLengthCm_missing",
+          "SepalWidthCm_missing",
+          "PetalLengthCm_missing",
+          "PetalWidthCm_missing"
+        ],
+        "X_rows": 29,
+        "y_name": "Species",
+        "y_len": 29
+      },
+      "validation": null
+    }
+  },
+  "merge_warnings": [],
+  "node_results": {
+    "data": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": []
+    },
+    "mi": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "dmc": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "tx": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "dmr": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "enc": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    }
+  }
+}

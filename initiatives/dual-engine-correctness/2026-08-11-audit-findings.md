@@ -144,6 +144,11 @@ or guard with `pl.when(pl.col(c).is_null()).then(0)`.
 #### F-02 🔴 Inference trusts positional column order — silently wrong predictions
 `backend/ml_pipeline/deployment/service.py:450` and `:356` · **engine-independent**
 
+**Status: fixed in `4e95f170` (0.7.9).** `_predict_with_bundled_artifact` reindexes `X_transformed` to
+the recorded training `feature_columns` order after `_transform_bundled_features` (guarded: only
+when all recorded columns are present). Covered by
+`tests/unit/test_deployment_service_extra.py::test_predict_with_bundled_artifact_reorders_columns_to_match_training`.
+
 `SklearnBridge` (`skyulf/engines/sklearn_bridge.py:37`) hands sklearn a bare numpy array, so
 sklearn never records `feature_names_in_` and cannot validate or reorder at predict time.
 At serve time `df = pd.DataFrame(data)` takes column order from **the JSON key order of the
@@ -167,6 +172,14 @@ bundled path regressed. Fix: reindex to the recorded training feature order afte
 
 #### F-03 🔴 `feature_columns` recorded post-transform, validated pre-transform
 recorded `_node_runners.py:254-265` · validated `service.py:403` · schema `service.py:562-564`
+
+**Status: fixed in `4e95f170` (0.7.9).** Validation now uses `_extract_features_from_engineer`
+(pre-transform input columns) and the API/UI input schema uses
+`_extract_features_from_bundled_artifact` (engineer → `feature_columns` → `feature_names_in_`
+fallback). Frontend sync check passed: `InferencePage.tsx`/`deployment.ts` consume `input_schema`
+generically (`{name, type}[]`), no post-transform assumption. Covered by
+`tests/unit/test_deployment_service_extra.py::test_predict_with_bundled_artifact_validates_pre_transform_columns`
+and the `_extract_features_from_*` / `_extract_input_features` tests.
 
 The training node records feature names from its *input* — i.e. **after** feature engineering —
 but deployment validates them against the **raw request frame**, before `feature_engineer.transform`.
@@ -444,6 +457,8 @@ metric-semantics and UI-state bugs that cause users to **read the wrong number a
 ### F-33 🔴 CRITICAL · LIVE — Evaluation panel silently shows another job's data
 `frontend/ml-canvas/src/components/pages/ExperimentsPage.tsx:227-255`
 
+**Status:** ✅ Fixed (0.7.9 wave) — evaluation fetch + threshold-tuning state extracted into the `useEvaluationFetch` hook with a monotonic request-sequence guard that discards late/stale responses; 5 new hook tests, full frontend suite green.
+
 `fetchEvaluationData` sets `evalJobId` synchronously, then `await`s the fetch and applies the
 response **unconditionally** — no request-id or `AbortController` guard. Verified at source: there
 is no staleness check between the `await` and `setEvaluationData(res.data)`.
@@ -461,6 +476,13 @@ Fix: capture a monotonic request id before the `await`, discard if it is no long
 `backend/ml_pipeline/_services/threshold_tuning_service.py:46`; router `_routers/jobs.py:228-240`
 catches only `ThresholdTuningError`
 
+**Status:** ✅ Fixed (0.7.9 wave) — metric scorers are now built per request via
+`_build_scorer()` in `threshold_tuning_service.py`; the `roc_auc` scorer maps
+raw labels (string or numeric) to 0/1 positive-indicator arrays before
+`roc_auc_score`, so string targets no longer 500. Rank-preserving for numeric
+labels, so existing 0/1 behavior is unchanged; regression test
+`test_preview_roc_auc_works_with_string_labels` green.
+
 Train on a CSV with a `yes`/`no` target (the engine never requires label encoding), open
 Evaluation → Threshold Tuning → "ROC AUC":
 
@@ -476,6 +498,14 @@ Fix: validate before selecting the scorer and raise `ThresholdTuningError` (→4
 
 ### F-35 🟠 HIGH · LIVE — "Recall" tuning is literally Accuracy, and makes recall *worse*
 `backend/ml_pipeline/_services/threshold_tuning_service.py:36-47`
+
+**Status:** ✅ Fixed (0.7.9 wave) — `_build_scorer()` now returns
+`average="binary"`, `pos_label=classes[1]` scorers for `f1`/`precision`/
+`recall` on 2-class jobs (multiclass keeps the weighted scorers), so
+tuning "Recall" optimizes positive-class recall again; regression test
+`test_preview_recall_uses_positive_class_not_class_mixture` fails with
+`thresholds["yes"] == 0.6078` (accuracy optimum) before the fix and passes
+after.
 
 Every scorer in `_METRIC_SCORERS` uses `average="weighted"`. Weighted-average recall is
 **identical to accuracy by definition** — independently reproduced:
@@ -525,6 +555,15 @@ metrics.
 `_execution/engine/_artifacts.py:60-70` (reads only `feature_importances_`/`coef_`);
 `skyulf-core/skyulf/modeling/_explainability/shap_explanation.py:37-78` (passes the **estimator
 object** to `shap.Explainer`); message from `utils/artifactCoverage.ts:35-36,80-84`
+
+**Status:** ✅ Fixed (0.7.9 wave) — `_build_explainer` in
+`shap_explanation.py` now falls back to the estimator's `predict_proba`
+(then `predict`) when the estimator is not callable, so all six families
+(SVC-RBF, KNN, GaussianNB, MLP, Voting, Stacking) get SHAP; 3 new unit
+tests, 25/25 pass. The Experiments page artifact-coverage text now says
+*not supported for this model type* instead of blaming an older run.
+Permutation feature importance for these families remains `None`
+(follow-up).
 
 ```
 random_forest, decision_tree, gradient_boosting, logistic_regression, ridge_classifier -> FI YES, shap ok

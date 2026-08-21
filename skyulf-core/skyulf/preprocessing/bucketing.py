@@ -344,7 +344,7 @@ def _fit_one_column_edges(
 ) -> tuple[Any, Any]:
     """Dispatch one column to its strategy-specific fitter; returns ``(edges, labels)``."""
     default_n_bins = defaults["default_n_bins"]
-    if strategy == "equal_width":
+    if strategy in ("equal_width", "uniform"):
         return _fit_equal_width(series, override.get("equal_width_bins", defaults["n_bins"])), None
     if strategy == "equal_frequency":
         return (

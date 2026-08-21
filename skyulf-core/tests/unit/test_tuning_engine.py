@@ -203,6 +203,64 @@ def test_fit_raises_on_nan_target():
         tuner.fit(X, y_float, config=cfg.__dict__)
 
 
+def test_fit_allows_nan_features_for_missing_native_models():
+    """Models that handle missing values natively (XGBoost, LightGBM,
+    HistGradientBoosting) must not be rejected by the NaN pre-flight check —
+    forcing an Imputer on them would block a legitimate configuration."""
+    from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
+
+    X, y = _clf_xy()
+    X[0, 0] = float("nan")
+    X[5, 2] = float("nan")
+    tuner = TuningCalculator(HistGradientBoostingClassifierCalculator())
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"max_iter": [5]},
+        cv_folds=2,
+    )
+    model, result = tuner.fit(X, y, config=cfg.__dict__)
+    assert model is not None
+    assert result.best_params == {"max_iter": 5}
+
+
+def test_fit_raises_on_nan_target_even_for_missing_native_models():
+    """No estimator accepts missing targets: the y NaN check must stay in
+    force even for models with native missing-value support in X."""
+    from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
+
+    X, y = _clf_xy()
+    y_float = y.astype(float)
+    y_float[0] = float("nan")
+    tuner = TuningCalculator(HistGradientBoostingClassifierCalculator())
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"max_iter": [5]},
+        cv_folds=2,
+    )
+    with pytest.raises(ValueError, match="NaN values"):
+        tuner.fit(X, y_float, config=cfg.__dict__)
+
+
+def test_fit_raises_on_inf_features_even_for_missing_native_models():
+    """Inf is not supported even by missing-native models and must keep
+    raising."""
+    from skyulf.modeling.classification import HistGradientBoostingClassifierCalculator
+
+    X, y = _clf_xy()
+    X[0, 1] = float("inf")
+    tuner = TuningCalculator(HistGradientBoostingClassifierCalculator())
+    cfg = TuningConfig(
+        strategy="grid",
+        metric="accuracy",
+        search_space={"max_iter": [5]},
+        cv_folds=2,
+    )
+    with pytest.raises(ValueError, match="Infinite values"):
+        tuner.fit(X, y, config=cfg.__dict__)
+
+
 # ---------------------------------------------------------------------------
 # TuningCalculator.fit — metric validation
 # ---------------------------------------------------------------------------
@@ -636,12 +694,12 @@ class _FlipModelClassCalculator(BaseModelCalculator):
 
     @property
     def model_class(self):
-        # `hasattr()` in tune() consumes one access, and the actual
-        # `getattr(...)` in tune() consumes a second — both must return the
-        # real class so tune() succeeds. Only the post-tune check in fit()
-        # (the third access) should see a falsy value.
+        # The NaN pre-flight check in fit() consumes one access, `hasattr()`
+        # in tune() a second, and the actual `getattr(...)` in tune() a third
+        # — all must return the real class so tune() succeeds. Only the
+        # post-tune check in fit() (the fourth access) should see a falsy value.
         self._access_count += 1
-        if self._access_count <= 2:
+        if self._access_count <= 3:
             return LogisticRegression
         return None
 

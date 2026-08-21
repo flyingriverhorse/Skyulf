@@ -155,6 +155,12 @@ export interface NodeWarning {
   message: string;
 }
 
+/** Server-side upload limits, mirrored to the client by `GET /api/config`. */
+export interface UploadConfig {
+  max_upload_size_bytes: number;
+  allowed_extensions: string[];
+}
+
 // --- Functions ---
 
 export const runPipelinePreview = async (payload: PipelineConfigModel): Promise<PreviewResponse> => {
@@ -193,5 +199,11 @@ export const fetchPipeline = async (datasetId: string): Promise<SavedPipeline | 
 
 export const submitTrainingJob = async (payload: PipelineConfigModel): Promise<{ job_id: string }> => {
   const response = await apiClient.post<{ job_id: string }>('/pipeline/run', payload);
+  return response.data;
+};
+
+/** Fetch the server-side upload limits (size + allowed extensions). */
+export const fetchUploadConfig = async (): Promise<UploadConfig> => {
+  const response = await apiClient.get<UploadConfig>('/config');
   return response.data;
 };

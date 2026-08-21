@@ -38,7 +38,7 @@ class IQRApplier(BaseApplier):
             if col not in X.columns:
                 continue
             col_mask = (pl.col(col) >= bound["lower"]) & (pl.col(col) <= bound["upper"])
-            mask = mask & (col_mask | pl.col(col).is_null())
+            mask = mask & (col_mask | pl.col(col).is_null() | pl.col(col).is_nan())
 
         mask_series = X.select(mask.alias("mask")).get_column("mask")
         return X.filter(mask_series), _filter_y_polars(y, mask_series)
