@@ -83,7 +83,7 @@ python -m pip install --upgrade pip
 ### 4.2 Install runtime dependencies
 
 ```powershell
-pip install -r requirements-fastapi.txt
+pip install -r requirements.txt
 ```
 
 Redis is required for background training. On Windows, install via [WSL](https://learn.microsoft.com/windows/wsl/install) or Docker (`docker run --name redis-mlops -p 6379:6379 -d redis:7`).
