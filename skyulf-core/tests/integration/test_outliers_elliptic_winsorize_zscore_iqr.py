@@ -527,6 +527,19 @@ class TestEllipticEnvelopeApplier:
         pl_out = EllipticEnvelopeApplier().apply(pl.from_pandas(df), params)
         assert sorted(pd_out["val"].tolist()) == sorted(pl_out["val"].to_list())
 
+    def test_polars_filter_preserves_unrelated_column_dtypes(self) -> None:
+        """No whole-frame round-trip: a nullable Int64 column not involved in
+        filtering must keep its dtype (pandas round-trip upcasts to Float64)."""
+        rng = np.random.RandomState(4)
+        values = rng.normal(0, 1, 60).tolist()
+        values.append(500.0)
+        df = pl.DataFrame(
+            {"val": values, "id": [None if i == 5 else i for i in range(len(values))]}
+        )
+        params = EllipticEnvelopeCalculator().fit(df, {"columns": ["val"], "contamination": 0.05})
+        out = EllipticEnvelopeApplier().apply(df, params)
+        assert out.schema["id"] == pl.Int64
+
     def test_polars_tuple_xy_filters_y_in_sync(self) -> None:
         """Polars engine with an (X, y) tuple must filter y rows to match survivors."""
         rng = np.random.RandomState(7)

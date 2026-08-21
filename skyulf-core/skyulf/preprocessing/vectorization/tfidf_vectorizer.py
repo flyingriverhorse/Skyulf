@@ -18,8 +18,9 @@ from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
 from ._common import (
     _join_text_columns,
     _sklearn_vectorizer_apply_pandas,
+    _sklearn_vectorizer_apply_polars,
     _warn_large_output,
-    apply_text_pandas_only,
+    apply_text_dual_engine,
     resolve_fit_text_columns,
 )
 
@@ -39,7 +40,9 @@ def _tfidf_apply_pandas(
 class TfidfVectorizerApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_text_pandas_only(X, params, _tfidf_apply_pandas)
+        return apply_text_dual_engine(
+            X, params, _tfidf_apply_pandas, _sklearn_vectorizer_apply_polars
+        )
 
 
 # ── Calculate ─────────────────────────────────────────────────────────────────

@@ -341,6 +341,33 @@ def test_data_splitter_split_polars_round_trips_back_to_polars() -> None:
     assert result.test.height == 4
 
 
+def test_data_splitter_polars_split_preserves_dtypes() -> None:
+    """No whole-frame round-trip: a nullable Int64 column must keep its dtype
+    through split() (a pandas round-trip upcasts it to Float64)."""
+    df = pl.DataFrame(
+        {
+            "feature": [None if i % 7 == 0 else i for i in range(20)],
+            "target": [i % 2 for i in range(20)],
+        }
+    )
+    splitter = DataSplitter(test_size=0.2, random_state=42)
+    result = splitter.split(typing.cast(Any, df))
+    assert result.train.schema["feature"] == pl.Int64
+    assert result.test.schema["feature"] == pl.Int64
+
+
+def test_data_splitter_polars_split_xy_preserves_dtypes() -> None:
+    """split_xy() must also keep nullable Int64 dtypes intact on Polars input."""
+    X = pl.DataFrame({"feature": [None if i % 7 == 0 else i for i in range(20)]})
+    y = pl.Series("target", [i % 2 for i in range(20)])
+    splitter = DataSplitter(test_size=0.2, random_state=42)
+    result = splitter.split_xy(typing.cast(Any, X), typing.cast(Any, y))
+    X_train, _ = result.train
+    X_test, _ = result.test
+    assert X_train.schema["feature"] == pl.Int64
+    assert X_test.schema["feature"] == pl.Int64
+
+
 def test_data_splitter_split_polars_with_validation_round_trips() -> None:
     """split() with validation on Polars input must return Polars frames for all splits."""
     df = pl.DataFrame({"feature": range(20), "target": [i % 2 for i in range(20)]})
