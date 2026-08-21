@@ -60,6 +60,8 @@ Prerequisites: **Python 3.12**
 
 These scripts auto-create a virtualenv, install deps, generate a `.env` with safe defaults (SQLite, no Redis), and launch the server. Open http://127.0.0.1:8000 when ready.
 
+For Docker Compose, manual setup, and a guided first pipeline, see [QUICKSTART.md](QUICKSTART.md).
+
 ### On Windows PowerShell (Manual)
 
 **Using pip:**

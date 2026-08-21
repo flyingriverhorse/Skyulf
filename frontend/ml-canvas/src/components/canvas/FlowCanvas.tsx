@@ -10,7 +10,14 @@ import {
 import { useShallow } from 'zustand/react/shallow';
 import '@xyflow/react/dist/style.css';
 
-import { useGraphStore } from '../../core/store/useGraphStore';
+import {
+  useGraphStore,
+  wouldCreateCycle,
+  isModelEndpointViolation,
+  CYCLE_CONNECTION_MESSAGE,
+  MODEL_ENDPOINT_CONNECTION_MESSAGE,
+} from '../../core/store/useGraphStore';
+import { toast } from '../../core/toast';
 import { useViewStore } from '../../core/store/useViewStore';
 import { useClipboard } from '../../core/hooks/useClipboard';
 import { useBranchColors } from '../../core/hooks/useBranchColors';
@@ -310,6 +317,30 @@ const FlowCanvasContent: React.FC = () => {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        isValidConnection={(connection) => {
+          if (wouldCreateCycle(edges, connection.source ?? '', connection.target ?? '')) return false;
+          const sourceType = nodes.find((n) => n.id === connection.source)?.data.definitionType as
+            | string
+            | undefined;
+          const targetType = nodes.find((n) => n.id === connection.target)?.data.definitionType as
+            | string
+            | undefined;
+          if (sourceType && targetType && isModelEndpointViolation(sourceType, targetType)) return false;
+          return true;
+        }}
+        // isValidConnection rejects silently and suppresses onConnect (where the
+        // store's explanatory toasts live), so re-fire the same wording here
+        // when a drag is released on a rejected handle.
+        onConnectEnd={(_event, state) => {
+          if (state.isValid !== false || !state.fromNode || !state.toNode) return;
+          const sourceType = state.fromNode.data.definitionType as string | undefined;
+          const targetType = state.toNode.data.definitionType as string | undefined;
+          if (sourceType && targetType && isModelEndpointViolation(sourceType, targetType)) {
+            toast.error('Invalid connection', MODEL_ENDPOINT_CONNECTION_MESSAGE);
+          } else if (wouldCreateCycle(edges, state.fromNode.id, state.toNode.id)) {
+            toast.error('Invalid connection', CYCLE_CONNECTION_MESSAGE);
+          }
+        }}
         nodeTypes={nodeTypes}
         onDragOver={onDragOver}
         onDrop={onDrop}
