@@ -24,7 +24,7 @@ setup(
         "pandas>=2.0.0,<3.0.0",
         "numpy>=1.24.0",
         "scikit-learn>=1.4.0,<2.0.0",
-        "polars>=1.36.0",
+        "polars>=1.43.2",
         "pyarrow>=21.0.0",
         "pydantic>=2.0.0",
         "scipy>=1.10.0",

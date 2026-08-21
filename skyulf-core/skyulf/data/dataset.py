@@ -3,11 +3,19 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from skyulf.engines import SkyulfDataFrame
 
-# Payload for a split slot: engine-neutral frame, pandas frame, or (X, y) tuple.
-SplitPayload = SkyulfDataFrame | pd.DataFrame | tuple[SkyulfDataFrame | pd.DataFrame, Any]
+# Payload for a split slot: engine-neutral frame, pandas frame, raw Polars
+# frame, or (X, y) tuple. Raw Polars frames appear when the backend runs with
+# SKYULF_ENGINE=polars and wraps a plain frame for evaluation.
+SplitPayload = (
+    SkyulfDataFrame
+    | pd.DataFrame
+    | pl.DataFrame
+    | tuple[SkyulfDataFrame | pd.DataFrame | pl.DataFrame, Any]
+)
 
 
 @dataclass

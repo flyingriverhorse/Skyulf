@@ -632,11 +632,14 @@ class DeploymentService:
 
     @staticmethod
     def _pretty_dtype(raw: Any) -> str:
-        """Map a pandas/numpy dtype string to a short label users can act on.
+        """Map a pandas/numpy or Polars dtype string to a short label users can act on.
 
         Nullable extension dtypes ("Int32", "Float32", "boolean") normalise to the
         same label as their numpy counterparts — the distinction is an
         implementation detail no one filling in a prediction form cares about.
+        Polars dtype names (``Date``, ``Duration('us')``, ``Categorical``, ``Enum``)
+        are recognised too, since the configured engine's schema strings are
+        captured verbatim at training time (F-30).
         """
         if not raw:
             return "unknown"
@@ -644,9 +647,11 @@ class DeploymentService:
         name = str(raw).lower()
         if name.startswith(("datetime", "period")):
             return "datetime"
-        if name.startswith("timedelta"):
+        if name == "date":
+            return "date"
+        if name.startswith(("timedelta", "duration")):
             return "duration"
-        if name.startswith("category"):
+        if name.startswith(("category", "categorical", "enum")):
             return "category"
         if name in {"bool", "boolean"}:
             return "boolean"

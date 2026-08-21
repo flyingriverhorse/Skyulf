@@ -39,6 +39,9 @@ class JobInfo(BaseModel):
     # `graph_utils.resolve_training_model_family`) so the two surfaces can
     # never disagree. `None` when unresolvable (e.g. legacy/unknown model_type).
     model_family: str | None = None
+    # DataFrame engine the job trained on ("pandas"/"polars"); None for
+    # legacy rows created before engine recording landed (F-25).
+    engine: str | None = None
     hyperparameters: dict[str, Any] | None = None
     created_at: datetime | None = None
     metrics: dict[str, Any] | None = None

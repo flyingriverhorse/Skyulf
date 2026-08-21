@@ -18,24 +18,23 @@ upstream-input resolution helpers, and the ``log`` shim.
 
 Engine data-type invariant
 --------------------------
-**Frames flowing through the engine are always pandas.** This is true by
-construction, not by coincidence:
+**Every frame flowing through the engine matches the configured
+``SKYULF_ENGINE`` (``polars`` by default, ``pandas`` selectable).** This is
+true by construction, not by coincidence:
 
-* every concrete :class:`~skyulf.data.catalog.DataCatalog` implementation in
-  ``backend/data/catalog.py`` reads via ``pd.read_csv``/``pd.read_parquet``;
+* the catalogs in ``backend/data/catalog.py`` read via the engine's native
+  readers, selected by ``SKYULF_ENGINE``;
 * skyulf-core's ``apply_dual_engine`` dispatches on the *input* engine, so a
-  pandas input always yields a pandas output — no node converts to Polars
-  mid-pipeline;
+  frame keeps its engine through every node — nothing converts mid-pipeline;
 * intermediate artifacts round-trip through joblib (pickle), which is
-  type-faithful.
+  type-faithful;
+* the few pandas-only internals (merge column-conflict detection, preview
+  stats) convert at their boundary and convert back, so the engine's frame
+  type is preserved across them.
 
-The numerous ``isinstance(x, pd.DataFrame)`` checks throughout this package
-depend on that invariant; a non-pandas frame would make them silently no-op
-(losing SHAP explanations and drift-detection baselines rather than erroring).
-``_run_data_loader`` therefore asserts the invariant at the single point where
-data enters the engine. Note that ``DataService._should_use_polars`` (which
-*does* default to Polars) belongs to the separate EDA/ingestion/preview path
-and never feeds this engine.
+``_run_data_loader`` guards the invariant at the single point where data
+enters the engine: a frame matching neither configured engine fails loudly
+instead of silently no-op-ing downstream.
 """
 
 import logging
@@ -44,6 +43,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from skyulf.data.catalog import DataCatalog
 
@@ -302,7 +302,7 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         try:
             if node.inputs:
                 upstream = self.artifact_store.load(node.inputs[0])
-                if isinstance(upstream, pd.DataFrame):
+                if isinstance(upstream, (pd.DataFrame, pl.DataFrame)):
                     input_shape = upstream.shape
         except Exception:
             input_shape = None

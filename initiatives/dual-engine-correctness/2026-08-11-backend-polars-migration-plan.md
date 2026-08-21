@@ -1,8 +1,11 @@
 # Backend Polars Migration — Plan
 
 **Date:** 2026-08-11
-**Branch:** `078`
-**Status:** Plan only. No code changes.
+**Branch:** `078` → `080`
+**Status:** Phase 0 complete (F-07–F-14 shipped red-green on `080`, 2026-08-21). Phase 1a landed:
+`SKYULF_ENGINE` setting exists — and by decision of 2026-08-21 it **defaults to `polars`**, not
+pandas. This pulls the Phase 3 fixes (F-31/F-32/F-30/F-43, drift consumer, serving frame) forward
+as mandatory before the default is safe for users; they ship in the same release.
 **Companion:** [`2026-08-11-audit-findings.md`](2026-08-11-audit-findings.md), [`2026-08-11-leakage-enforcement-plan.md`](2026-08-11-leakage-enforcement-plan.md)
 
 ---
@@ -115,15 +118,28 @@ F-06 (IQR/ZScore/ManualBounds), F-07 (OrdinalEncoder), F-08 (KBins), F-09 (wrapp
 
 ### Phase 1 — Make the engine choice explicit and observable
 
-1. Add an explicit engine setting (config/env, e.g. `SKYULF_ENGINE=pandas|polars`), defaulting to
-   **pandas** — i.e. no behaviour change on day one.
+1. ~~Add an explicit engine setting (config/env, e.g. `SKYULF_ENGINE=pandas|polars`), defaulting to
+   **pandas**~~ **Done on `080` (2026-08-21), with the default overridden to `polars`** —
+   `backend/config/mixins/core.py` declares `SKYULF_ENGINE: Literal["polars", "pandas"] = "polars"`
+   (case/whitespace-normalized by a validator in `backend/config/base.py`; covered by
+   `tests/unit/test_settings_engine.py`). The original plan deferred the polars default to Phase 5;
+   the 2026-08-21 decision pulls it forward, which makes every Phase 3 fix a blocking item for this
+   release.
 2. Record the engine on the job record and in the deployment bundle (this is audit finding **F-25**
-   — nothing currently detects "trained on Polars, served on pandas").
+   — nothing currently detects "trained on Polars, served on pandas"). **Done on `080`
+   (2026-08-21)** — deployment bundles and job `job_metadata` record the training engine.
 3. Surface it in the UI (job details / experiments) so the engine in use is never a guess.
+   **Done on `080` (2026-08-21)** — engine tile in job details, Polars badge on job cards.
 4. Add engine-parity CI: run a representative pipeline set under both engines and assert identical
-   artifacts and metrics.
+   artifacts and metrics. **Done on `080` (2026-08-21)** — `backend-tests.yml` now matrices the
+   backend suite over `SKYULF_ENGINE=[polars, pandas]`, so neither engine can regress while the
+   other stays green.
 
 ### Phase 2 — Polars ingestion behind the flag
+
+**Done on `080` (2026-08-21)** — `backend/data/catalog.py` reads CSV/parquet natively with Polars
+under `SKYULF_ENGINE=polars` (items 5–7 all landed), including the `NaN`-token parity coverage and
+the engine-aware ingestion guard.
 
 5. Add `pl.read_csv` / `pl.read_parquet` readers to `backend/data/catalog.py`, selected by the
    Phase 1 flag.
@@ -135,6 +151,15 @@ F-06 (IQR/ZScore/ManualBounds), F-07 (OrdinalEncoder), F-08 (KBins), F-09 (wrapp
    the loud failure for the mismatch case.
 
 ### Phase 3 — Fix the backend's pandas-only assumptions
+
+**Done on `080` (2026-08-21)** — every finding in the table below is fixed: F-12/F-11 shipped in
+skyulf-core 0.6.0 (F-11's cross-engine hash parity makes the "serving builds a `pd.DataFrame`"
+crossing harmless); F-31/F-32/F-30 fixed in the backend engine (`_artifacts.py`,
+`_node_runners.py`, `deployment/service.py`); F-43 fixed in
+`skyulf-core/skyulf/modeling/_evaluation/clustering.py` (Polars NaN is a valid value, not a null,
+so float reference columns also filter `is_nan()`). The drift consumer
+(`backend/monitoring/router.py`) accepts a Polars reference frame directly. Full backend suite
+passes under both `SKYULF_ENGINE=polars` (default) and `SKYULF_ENGINE=pandas`.
 
 The engine currently assumes pandas in several places the audit already documented. All must be
 fixed before Polars can be enabled by default:
@@ -163,9 +188,10 @@ values are unchanged.
 
 ### Phase 5 — Flip the default
 
-Only after Phases 1–4 are green in CI on both engines: default `SKYULF_ENGINE=polars`, keep pandas
-supported and documented as a first-class option. Publish a benchmark showing the actual gain —
-otherwise the migration has no evidence behind it.
+*Default flip done early by decision of 2026-08-21* — `SKYULF_ENGINE=polars` is the default from
+Phase 1a onward, with pandas kept supported and documented as a first-class option. The remaining
+obligation stands: publish a benchmark showing the actual gain — otherwise the migration has no
+evidence behind it.
 
 ---
 
