@@ -1,6 +1,20 @@
 import React, { useState, useCallback } from 'react';
 import { Upload, FileSpreadsheet, AlertCircle, X } from 'lucide-react';
 import { useUploadDataset } from '../../../core/hooks/useDatasets';
+import { useUploadConfig } from '../../../core/hooks/useUploadConfig';
+import { formatBytes } from '../../../core/utils/format';
+
+// Display labels for configured extensions; unknown ones render as their
+// uppercase suffix. The values themselves come exclusively from `GET /api/config`.
+const EXTENSION_LABELS: Record<string, string> = {
+  '.csv': 'CSV',
+  '.xlsx': 'Excel',
+  '.xls': 'Excel',
+  '.parquet': 'Parquet',
+  '.json': 'JSON',
+  '.txt': 'TXT',
+  '.feather': 'Feather',
+};
 
 interface FileUploadProps {
   onUploadComplete: (datasetId: string, datasetName: string) => void;
@@ -17,6 +31,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
   // without an explicit refetch.
   const uploadMutation = useUploadDataset();
   const uploading = uploadMutation.isPending;
+
+  const { data: uploadConfig } = useUploadConfig();
+  // No hardcoded fallbacks: until the config resolves the client skips the
+  // size check and the accept filter — the server always enforces the limits.
+  const maxSizeBytes = uploadConfig?.max_upload_size_bytes;
+  const allowedExtensions = uploadConfig?.allowed_extensions;
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -49,9 +69,8 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
     setError(null);
     setProgress(0);
 
-    const MAX_SIZE_BYTES = 500 * 1024 * 1024; // 500MB
-    if (file.size > MAX_SIZE_BYTES) {
-      setError(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 500MB.`);
+    if (maxSizeBytes !== undefined && file.size > maxSizeBytes) {
+      setError(`File is too large (${formatBytes(file.size)}). Maximum size is ${formatBytes(maxSizeBytes)}.`);
       return;
     }
 
@@ -110,14 +129,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onUploadComplete, onCanc
                 <input
                   type="file"
                   className="hidden"
-                  accept=".csv,.xlsx,.parquet,.json"
+                  accept={allowedExtensions?.join(',') ?? ''}
                   onChange={handleChange}
                 />
               </label>
             </p>
-            <p className="text-xs text-slate-400">
-              Supports CSV, Excel, Parquet, JSON
-            </p>
+            {allowedExtensions && (
+              <p className="text-xs text-slate-400">
+                Supports {[...new Set(allowedExtensions.map((ext) => EXTENSION_LABELS[ext] ?? ext.toUpperCase().slice(1)))].join(', ')}
+              </p>
+            )}
           </>
         )}
       </div>

@@ -59,7 +59,7 @@ describe('getArtifactCoverage', () => {
       hasArtifact: false,
     });
     expect(result.status).toBe('not_computed');
-    expect(result.reason).toMatch(/was not computed/i);
+    expect(result.reason).toMatch(/not supported for this model type/i);
   });
 
   it('marks a completed supported run with the artifact as available', () => {

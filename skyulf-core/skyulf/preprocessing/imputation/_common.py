@@ -30,13 +30,16 @@ def _polars_stat_for_strategy(strategy: str, fill_value: Any) -> Any:
     if strategy == "constant":
         return None  # handled by caller
     if strategy == "mean":
-        return lambda c: pl.col(c).mean()
+        # polars keeps NaN as a value in mean(); sklearn treats NaN as
+        # missing, so drop them first for parity.
+        return lambda c: pl.col(c).drop_nans().mean()
     if strategy == "median":
-        return lambda c: pl.col(c).median()
+        return lambda c: pl.col(c).drop_nans().median()
     if strategy == "most_frequent":
         # sklearn/scipy break ties by picking the smallest value; polars' .mode()
         # has no guaranteed tie-break order, so sort ascending before taking first.
-        return lambda c: pl.col(c).mode().sort().first()
+        # drop_nans() is a no-op on non-float dtypes (this strategy may see strings).
+        return lambda c: pl.col(c).drop_nulls().drop_nans().mode().sort().first()
     raise_invalid_choice(strategy, ("constant", "mean", "median", "most_frequent"), "strategy")
 
 
@@ -56,7 +59,15 @@ def _compute_polars_fill_values(
 def _polars_missing_counts(X_pl: Any, cols: list[str]) -> tuple[dict[str, int], int]:
     import polars as pl
 
-    raw = X_pl.select([pl.col(c).null_count() for c in cols]).to_dict(as_series=False)
+    # pandas' isna() counts NaN as missing; polars' null_count() does not, so
+    # float columns need an explicit NaN count to keep the artifact in parity.
+    exprs = [
+        pl.col(c).is_null().sum() + pl.col(c).is_nan().sum()
+        if X_pl.schema[c].is_float()
+        else pl.col(c).null_count()
+        for c in cols
+    ]
+    raw = X_pl.select(exprs).to_dict(as_series=False)
     counts = {c: int(raw[c][0]) for c in cols}
     return counts, sum(counts.values())
 

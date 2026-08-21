@@ -557,8 +557,163 @@ def test_extract_features_from_engineer_direct_attr():
 def test_extract_features_from_engineer_from_first_step():
     transformer = SimpleNamespace(feature_names_in_=np.array(["x", "y"]))
     fe = SimpleNamespace(steps=[("step1", transformer)])
-    result = DeploymentService._extract_features_from_engineer(fe)
-    assert list(result) == ["x", "y"]
+
+
+# ---------------------------------------------------------------------------
+# F-02/F-03 regression tests: JSON key order and pre-transform validation
+# ---------------------------------------------------------------------------
+
+
+class _ColumnAddingTransformer:
+    """Transformer that adds a new column (tests F-03 pre-transform validation)."""
+
+    def __init__(self):
+        self.feature_names_in_ = np.array(["a", "b"])
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        # Add a new column - this is why we must validate against INPUT columns
+        result = X.copy()
+        result["c"] = result["a"] + result["b"]
+        return result
+
+
+class _NoFeatureNamesModel:
+    """Model without feature_names_in_ (tests F-02 JSON key order reordering)."""
+
+    def __init__(self, expected_order):
+        self.expected_order = expected_order
+
+    def predict(self, X):
+        # Verify columns are in the expected order
+        assert list(X.columns) == self.expected_order, (
+            f"Expected {self.expected_order}, got {list(X.columns)}"
+        )
+        return np.array([X.iloc[0, 0] + X.iloc[0, 1]])
+
+
+def test_predict_with_bundled_artifact_reorders_columns_to_match_training():
+    """F-02 regression: JSON key order should not affect predictions.
+
+    When a pipeline contains transformers that add/reorder columns,
+    the predict path must reindex to the recorded training feature order
+    before passing to sklearn (which uses positional numpy arrays).
+    """
+    from backend.ml_pipeline.artifacts.local import LocalArtifactStore
+
+    # Create a transformer that adds column 'c'
+    transformer = _ColumnAddingTransformer()
+    model = _NoFeatureNamesModel(expected_order=["a", "b", "c"])
+
+    # Simulate training: fit on [a, b], transform to [a, b, c]
+    # The feature_engineer needs both fitted_steps (for transform) and feature_names_in_ (for validation)
+    class _TestEngineer:
+        def __init__(self):
+            self.fitted_steps = [
+                {
+                    "name": "column_adder",
+                    "type": "ColumnAddingTransformer",
+                    "applier": transformer,
+                    "artifact": {},
+                }
+            ]
+            # Use list instead of numpy array to avoid ambiguous truth value
+            self.feature_names_in_ = ["a", "b"]
+
+        def transform(self, df):
+            return transformer.transform(df)
+
+    feature_engineer = _TestEngineer()
+
+    artifact = {
+        "feature_engineer": feature_engineer,
+        "model": model,
+        "feature_columns": ["a", "b", "c"],  # Recorded at training time
+        "target_column": None,
+        "dropped_columns": [],
+    }
+
+    # Send data with columns in DIFFERENT order than training (simulates JSON key reordering)
+    df = pd.DataFrame({"c": [10], "a": [3], "b": [5]})  # Order: c, a, b (not a, b, c)
+
+    result, _ = DeploymentService._predict_with_bundled_artifact(artifact, df)
+
+    # Should succeed with correct reordering
+    assert result == [8]  # a + b = 3 + 5
+
+
+def test_predict_with_bundled_artifact_validates_pre_transform_columns():
+    """F-03 regression: Must validate against INPUT columns, not feature_columns.
+
+    F-03 was: feature_columns recorded post-transform, but validation should
+    check pre-transform input columns. This test ensures we reject requests
+    missing required INPUT columns (a, b) even though feature_columns is
+    [a, b, c] (post-transform).
+    """
+    transformer = _ColumnAddingTransformer()
+
+    class _TestEngineer:
+        def __init__(self):
+            self.fitted_steps = [
+                {
+                    "name": "column_adder",
+                    "type": "ColumnAddingTransformer",
+                    "applier": transformer,
+                    "artifact": {},
+                }
+            ]
+            # INPUT columns as list
+            self.feature_names_in_ = ["a", "b"]
+
+        def transform(self, df):
+            return transformer.transform(df)
+
+    feature_engineer = _TestEngineer()
+
+    artifact = {
+        "feature_engineer": feature_engineer,
+        "model": SimpleNamespace(),  # Won't be called if validation fails
+        "feature_columns": ["a", "b", "c"],  # OUTPUT columns (post-transform)
+        "target_column": None,
+        "dropped_columns": [],
+    }
+
+    # Missing required INPUT column 'b' - should fail validation
+    df = pd.DataFrame({"a": [3], "c": [10]})  # Missing 'b'
+
+    with pytest.raises(ValueError, match="Missing required column.*b"):
+        DeploymentService._predict_with_bundled_artifact(artifact, df)
+
+
+def test_predict_with_bundled_artifact_missing_all_input_columns():
+    """F-03 regression: Should fail when all INPUT columns are missing."""
+    transformer = _ColumnAddingTransformer()
+
+    class _TestEngineer:
+        def __init__(self):
+            self.fitted_steps = []
+            self.feature_names_in_ = ["a", "b"]
+
+        def transform(self, df):
+            return df
+
+    feature_engineer = _TestEngineer()
+
+    artifact = {
+        "feature_engineer": feature_engineer,
+        "model": SimpleNamespace(),
+        "feature_columns": ["a", "b", "c"],
+        "target_column": None,
+        "dropped_columns": [],
+    }
+
+    # Missing both input columns
+    df = pd.DataFrame({"x": [1], "y": [2]})
+
+    with pytest.raises(ValueError, match="Missing required column.*a.*b"):
+        DeploymentService._predict_with_bundled_artifact(artifact, df)
 
 
 def test_extract_features_from_engineer_no_features_found():

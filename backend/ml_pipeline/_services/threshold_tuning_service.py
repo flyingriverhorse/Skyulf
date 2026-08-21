@@ -8,6 +8,7 @@ threshold dict's keys match the live model's actual ``estimator.classes_``
 values at predict time.
 """
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -33,7 +34,7 @@ class ThresholdTuningError(ValueError):
     """Raised for invalid threshold-tuning requests (maps to HTTP 400)."""
 
 
-_METRIC_SCORERS: dict[str, Any] = {
+_STATIC_SCORERS: dict[str, Callable[[Any, Any], float]] = {
     "accuracy": lambda y_true, y_pred: accuracy_score(y_true, y_pred),
     "f1": lambda y_true, y_pred: f1_score(y_true, y_pred, average="weighted", zero_division=0),
     "precision": lambda y_true, y_pred: precision_score(
@@ -43,8 +44,53 @@ _METRIC_SCORERS: dict[str, Any] = {
         y_true, y_pred, average="weighted", zero_division=0
     ),
     "balanced_accuracy": lambda y_true, y_pred: balanced_accuracy_score(y_true, y_pred),
-    "roc_auc": lambda y_true, y_pred: roc_auc_score(y_true, y_pred),
 }
+
+_SUPPORTED_METRICS: frozenset[str] = frozenset(_STATIC_SCORERS) | frozenset({"roc_auc"})
+
+
+def _build_scorer(metric: str, classes: list) -> Callable[[Any, Any], float]:
+    """Build the per-request metric callable for ``metric``.
+
+    Scorers are built per request instead of a static table because
+    label-dependent behavior (e.g. roc_auc's positive class) needs
+    ``classes``, which is only known once the evaluation data is loaded.
+    """
+    if metric in ("f1", "precision", "recall") and len(classes) == 2:
+        # For binary jobs the threshold only moves the positive class's
+        # decision, so score the positive class (classes[1]) instead of a
+        # weighted mixture that would let the negative class dominate.
+        pos_label = classes[1]
+        if metric == "f1":
+            return lambda y_true, y_pred: f1_score(
+                y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
+            )
+        if metric == "precision":
+            return lambda y_true, y_pred: precision_score(
+                y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
+            )
+        return lambda y_true, y_pred: recall_score(
+            y_true, y_pred, average="binary", pos_label=pos_label, zero_division=0
+        )
+
+    if metric == "roc_auc":
+        positive = classes[1]
+
+        def roc_auc(y_true: Any, y_pred: Any) -> float:
+            # roc_auc_score requires numeric inputs; raw class labels may be
+            # strings (e.g. "no"/"yes"), so map both sides to 0/1
+            # positive-indicator arrays first. Rank-preserving for numeric
+            # labels, so existing 0/1 behavior is unchanged.
+            return float(
+                roc_auc_score(
+                    (np.asarray(y_true) == positive).astype(int),
+                    (np.asarray(y_pred) == positive).astype(int),
+                )
+            )
+
+        return roc_auc
+
+    return _STATIC_SCORERS[metric]
 
 
 class ThresholdTuningService:
@@ -130,8 +176,7 @@ class ThresholdTuningService:
     @staticmethod
     async def preview(session: AsyncSession, job_id: str, metric: str) -> dict:
         """Compute (without saving) tuned per-class thresholds for a job's evaluation data."""
-        scorer = _METRIC_SCORERS.get(metric)
-        if scorer is None:
+        if metric not in _SUPPORTED_METRICS:
             raise ThresholdTuningError(f"Unsupported metric: {metric}")
 
         await ThresholdTuningService._get_job_or_raise(session, job_id)
@@ -157,6 +202,7 @@ class ThresholdTuningService:
                 f"(job has {len(classes)} classes)."
             )
 
+        scorer = _build_scorer(metric, classes)
         thresholds = optimize_thresholds(y_true, y_proba_values, metric=scorer, classes=classes)
 
         return {

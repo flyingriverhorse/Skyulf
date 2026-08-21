@@ -25,6 +25,7 @@ from slowapi.errors import RateLimitExceeded
 
 # Use absolute imports to fix import issues
 from backend.config import get_settings
+from backend.config.routes import router as config_router
 from backend.data_ingestion.router import router as data_ingestion_router
 from backend.data_ingestion.router import sources_router as data_sources_router
 from backend.database.engine import close_db, create_tables, init_db
@@ -378,6 +379,9 @@ def _include_routers(app: FastAPI) -> None:
 
     # Health check (no prefix, available at /health)
     app.include_router(health_router, tags=["health"])
+
+    # Runtime configuration (upload limits) — available at /api/config
+    app.include_router(config_router, prefix="/api")
 
     # ML Pipeline — canonical path is /api/pipeline.
     app.include_router(ml_pipeline_router, prefix="/api/pipeline")

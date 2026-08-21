@@ -21,7 +21,7 @@ def _feature_frame(X: pd.DataFrame | SkyulfDataFrame | Any) -> pd.DataFrame:
     if hasattr(X, "to_pandas"):
         return X.to_pandas()
     X_np, _ = SklearnBridge.to_sklearn((X, None))
-    return pd.DataFrame(X_np, columns=[f"feature_{i}" for i in range(X_np.shape[1])])
+    return pd.DataFrame(X_np, columns=pd.Index([f"feature_{i}" for i in range(X_np.shape[1])]))
 
 
 def _as_polars_frame(X: Any) -> pl.DataFrame | None:

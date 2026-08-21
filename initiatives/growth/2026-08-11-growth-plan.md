@@ -5,6 +5,17 @@
 **Budget:** 2–3 days/week, paired
 **Horizon:** three stages, ~6–8 weeks. Nothing beyond that is planned here.
 
+## Status — 2026-08-20 (read this before re-mining this file)
+
+| Item | State |
+|---|---|
+| F-02, F-03 | ✅ **DONE** — fixed + regression tests, shipped in **0.7.9** (branch `079`) |
+| F-33, F-34, F-35, F-37 | ✅ **DONE** — shipped in 0.7.9 |
+| A2.2 | ✅ **DONE** — shipped in 0.7.9; Stage 1a demo cherry-pick still pending |
+| A2.3 | 🟡 **1/3** — `start.sh` chmod shipped in 0.7.9; `/` dashboard-zeros + install-time claim still open (0.8.0) |
+| A2.6 | ✅ **DONE** — shipped in 0.7.9, went beyond the ask: limit now served from `GET /api/config` (single source of truth) |
+| A2.1, A2.4, A2.5 | Open — scheduled per `initiatives/2026-08-12-execution-tasks.md` ledger |
+
 ## Branch reality (read this first)
 
 Two branches matter, and they are not the same:
@@ -127,11 +138,11 @@ a way that the rest of `initiatives/` is not.
 
 **Its Tier 1 is adopted into Stage 0 as-is:**
 
-| ID | Defect | Why it outranks most of T1–T6 |
-|---|---|---|
-| F-01 | `DummyEncoder` emits null dummies on Polars → training hard-fails | Breaks a documented engine |
-| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression |
-| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form |
+| ID | Defect | Why it outranks most of T1–T6 | Status 2026-08-14 |
+|---|---|---|---|
+| F-01 | `DummyEncoder` emits null dummies on Polars → training hard-fails | Breaks a documented engine | ✅ fixed, red-green verified |
+| F-02 | Inference trusts **JSON key order**; reordering keys silently changes predictions (`deployment/service.py:450`) | Engine-independent, blocks any real deployment, and the *legacy* path was correct — this is a regression | ✅ **DONE in 0.7.9** — fixed in `service.py`, regression tests in `tests/unit/test_deployment_service_extra.py` (all passing) |
+| F-03 | `feature_columns` recorded post-transform but validated pre-transform | Makes any pipeline containing a column-*adding* transformer undeployable, and drives a wrong UI form | ✅ **DONE in 0.7.9** — fixed in `service.py` (pre-transform validation), regression tests in `tests/unit/test_deployment_service_extra.py` (all passing) |
 
 **F-02 is the most severe defect found anywhere in this repo.** Two
 identical requests differing only in JSON key order return different
@@ -173,19 +184,25 @@ recover from, and it is the kind of thing users write about publicly.
 **Order within Stage 0** (revised after the dual-engine audit):
 
 1. **F-02, F-03** — deployment-blocking, engine-independent, affect every
-   user regardless of engine choice.
+   user regardless of engine choice. 🟡
 2. **T1** — silent target misalignment; corrupts results rather than
-   blocking them, which is worse but affects fewer pipelines.
-3. **F-01, F-04, F-05, F-06** — silent corruption on the Polars path.
+   blocking them, which is worse but affects fewer pipelines. ✅
+3. **F-01, F-04, F-05, F-06** — silent corruption on the Polars path. ✅
 4. **T2, T3, T6** — self-inflicted defaults that no-op. Cheap; can ride
-   with any of the above.
-5. **T5** — the contract test. Last to write, first in value.
+   with any of the above. ✅
+5. **T5** — the contract test. Last to write, first in value. ✅
+
+**Status markers (updated 2026-08-14):** ✅ fixed + verified with red-green
+tests; 🟡 implemented, verified against existing suites but still missing
+its own new regression tests; ⏳ not started. Full evidence table:
+`initiatives/2026-08-14-stage0-dual-engine-progress.md`. All fixes are in
+the working tree of `078`, **not yet committed**.
 
 **Every T-item below was re-reproduced on branch `078` on 2026-08-11** via a
 throwaway worktree. F-items were reproduced by the dual-engine audit; F-04
 and F-06 were additionally re-verified here.
 
-### T1 — Lag and Rolling nodes return a stale, misaligned `y` (critical)
+### T1 — Lag and Rolling nodes return a stale, misaligned `y` (critical) — ✅ fixed 2026-08-14
 
 `X` is sorted and row-filtered; `y` is returned untouched. Every row ends up
 with another row's label.
@@ -229,7 +246,7 @@ propagate row drops to `y` correctly (`X:5→4, y:5→4`). The blast radius is
 narrower than the root cause first suggests — but it must be enumerated, not
 assumed, which is what T5 is for.
 
-### T2 — FeatureSelection's own default is an unknown method
+### T2 — FeatureSelection's own default is an unknown method — ✅ fixed 2026-08-14
 
 ```
 FeatureSelectionCalculator().fit(X, {'method':'variance','threshold':0.0})
@@ -241,7 +258,7 @@ The registered default is `variance`; the dispatch table
 (`feature_selection/facade.py`) only knows `variance_threshold`. The node
 calls its own default "unknown."
 
-### T3 — GeneralBinning's own default produces no bins
+### T3 — GeneralBinning's own default produces no bins — ✅ fixed 2026-08-14
 
 ```
 GeneralBinningCalculator().fit(X, {'columns':['x'],'n_bins':2,'strategy':'uniform'})
@@ -273,7 +290,7 @@ only because it is how the packaging gap was discovered, and because the
 same gap would mislead a self-hoster filing a bug report against the wrong
 version.
 
-### T5 — The actual deliverable: a registry-wide contract test
+### T5 — The actual deliverable: a registry-wide contract test — ✅ landed 2026-08-14
 
 T1–T3 share one shape: **a node's own declared defaults do not work.** Fix
 the three and the class remains. So the exit criterion for Stage 0 is a
@@ -306,7 +323,7 @@ Three bug fixes are worth a week. A test that makes the whole class
 impossible is worth considerably more, and it is the single highest-value
 artifact in this plan.
 
-### T6 — FeatureMath silently drops datetime features on mixed-offset input
+### T6 — FeatureMath silently drops datetime features on mixed-offset input — ✅ fixed 2026-08-14
 
 The same silent-no-op family as T2/T3, independently re-verified:
 
@@ -511,6 +528,10 @@ nothing. Ship the two together as one path.
 
 ### A2.2 — Fix the shipped templates (they are currently blocked)
 
+> ✅ **DONE in 0.7.9** — all 4 templates now place `TrainTestSplitter`
+> upstream of impute/encode/scale. Remaining: Stage 1a cherry-pick to
+> `deploy/demo-mode` + redeploy.
+
 **This item changed completely after audit.** It was "bind one template to a
 dataset." The truth is that **4 of the 5 shipped templates cannot run at
 all** — they are blocked by Skyulf's own leakage guard.
@@ -557,11 +578,8 @@ diagnose it.*
 
 Three separate confirmed blockers, all cheap:
 
-- **`start.sh` is not executable.** `git ls-files -s start.sh` → `100644` on
-  both `078` and `080`. `README.md:59` tells macOS/Linux users to run
-  `./start.sh`; it fails **100% of the time** with `Permission denied`
-  (exit 126). The literal first command in the README. Fix with
-  `git update-index --chmod=+x start.sh`.
+- ✅ ~~**`start.sh` is not executable.**~~ **DONE in 0.7.9** — mode is now
+  `100755` in git.
 - **`/` is a dashboard of zeros.** `App.tsx:37-38` routes `/` to
   `<Dashboard />`; the canvas is at `/canvas`. Live: `/api/pipeline/stats` →
   `{"total_jobs":0,...}` plus "No recent jobs found." A "Visual MLOps
@@ -624,6 +642,10 @@ more than the feature earns.
 *Audiences: data scientists, ML engineers.*
 
 ### A2.6 — Fix the upload size message
+
+> ✅ **DONE in 0.7.9** — went beyond the ask: the limit and accepted
+> extensions are now served by `GET /api/config` and displayed via a
+> `useUploadConfig` hook; zero hardcoded limits in the frontend.
 
 `FileUpload.tsx:52-54` hardcodes a 500MB limit *and* the "500MB" text, while
 the server accepts 10GB (`config/mixins/files.py:18`) — a 20× discrepancy —
@@ -819,15 +841,22 @@ dual-engine audit landed.
    competes with that. **F-03 requires a frontend check** — it drives the
    UI input schema, so per repo policy the node components must be verified
    against the corrected contract.
+   **Status 2026-08-14: 🟡 implemented in `service.py` and covered by the
+   existing 102 deployment tests; the frontend check and dedicated
+   red-green regression tests are still owed. Not yet committed.**
 2. **The `skyulf-core` fixes → ship to PyPI.** F-01, F-04, F-05, F-06 plus
    T1, T2, T3, T6. `skyulf-core` releases on its own `core-v*` tag and
    **never touches the demo branch**, so this path is unblocked today. It
    is also the one actively corrupting results for 1,222 downloads/month.
+   **Status 2026-08-14: ✅ all fixed and red-green verified (suite: 3183
+   collected, 3113 passed, 0 failed); PyPI release still pending.**
 3. **T5 — the contract test**, together with the audit's cross-cutting test
    debt: parity tests that use **float NaN** (not only nulls) and **wrapped**
    frames. The existing 195-test parity suite passes clean against *every
    bug in both audits*, which is the real finding. Without this, the suite
    keeps going green while the product stays broken.
+   **Status 2026-08-14: ✅ `tests/test_registry_contract.py` landed
+   (175 parametrised cases over the full registry, all three clauses).**
 4. **Check the GitHub traffic panel** (Stage 1b, first half). Free, no code,
    and it decides whether the funnel work below is justified at all. Do this
    *before* Stage 2, not after.

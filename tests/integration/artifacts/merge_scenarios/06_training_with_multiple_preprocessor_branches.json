@@ -1,0 +1,301 @@
+{
+  "scenario": "06_training_with_multiple_preprocessor_branches",
+  "pipeline_id": "s06_multi_branch_training",
+  "status": "success",
+  "node_outputs": {
+    "data": {
+      "kind": "DataFrame",
+      "columns": [
+        "Id",
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "drop_id": {
+      "kind": "DataFrame",
+      "columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "Species"
+      ],
+      "rows": 150
+    },
+    "fts": {
+      "kind": "(X, y) tuple",
+      "X_columns": [
+        "SepalLengthCm",
+        "SepalWidthCm",
+        "PetalLengthCm",
+        "PetalWidthCm"
+      ],
+      "y_name": "Species"
+    },
+    "split": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 105,
+        "y_name": "Species",
+        "y_len": 105
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 45,
+        "y_name": "Species",
+        "y_len": 45
+      },
+      "validation": null
+    },
+    "scaler_a": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 105,
+        "y_name": "Species",
+        "y_len": 105
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 45,
+        "y_name": "Species",
+        "y_len": 45
+      },
+      "validation": null
+    },
+    "scaler_b": {
+      "kind": "SplitDataset",
+      "train": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 105,
+        "y_name": "Species",
+        "y_len": 105
+      },
+      "test": {
+        "kind": "(X, y) tuple",
+        "X_columns": [
+          "SepalLengthCm",
+          "SepalWidthCm",
+          "PetalLengthCm",
+          "PetalWidthCm"
+        ],
+        "X_rows": 45,
+        "y_name": "Species",
+        "y_len": 45
+      },
+      "validation": null
+    },
+    "training": {
+      "kind": "(X, y) tuple",
+      "X_columns": null,
+      "y_name": null
+    }
+  },
+  "merge_warnings": [
+    {
+      "node_id": "training",
+      "kind": "sibling_fan_in",
+      "inputs": [
+        "scaler_a",
+        "scaler_b"
+      ],
+      "common_ancestors": [
+        "data",
+        "drop_id",
+        "fts",
+        "split"
+      ],
+      "overlap_columns": [
+        "PetalLengthCm",
+        "PetalWidthCm",
+        "SepalLengthCm",
+        "SepalWidthCm"
+      ],
+      "winner_input": "scaler_b",
+      "strategy": "last_wins",
+      "message": "Node 'training' merges 2 sibling branches that share ancestor(s) ['data', 'drop_id', 'fts', 'split']. 4 column(s) were modified by more than one branch; the last_wins input 'scaler_b' wins and the other branch's edits to those columns are discarded. Chain the transformers linearly instead if you wanted both applied."
+    }
+  ],
+  "node_results": {
+    "data": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": []
+    },
+    "drop_id": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "fts": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "split": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "scaler_a": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "scaler_b": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "fit_time",
+        "peak_memory_bytes",
+        "rows_in",
+        "rows_out",
+        "steps",
+        "summary"
+      ]
+    },
+    "training": {
+      "status": "success",
+      "error": null,
+      "metrics_keys": [
+        "best_params",
+        "best_score",
+        "feature_importances",
+        "n_features",
+        "n_rows",
+        "scoring_metric",
+        "shap_explanation",
+        "test_accuracy",
+        "test_balanced_accuracy",
+        "test_f1_weighted",
+        "test_g_score",
+        "test_log_loss",
+        "test_matthews_corrcoef",
+        "test_pr_auc_weighted",
+        "test_precision_weighted",
+        "test_recall_weighted",
+        "test_roc_auc_ovo",
+        "test_roc_auc_ovo_weighted",
+        "test_roc_auc_ovr",
+        "test_roc_auc_ovr_weighted",
+        "test_roc_auc_weighted",
+        "train_accuracy",
+        "train_balanced_accuracy",
+        "train_f1_weighted",
+        "train_g_score",
+        "train_log_loss",
+        "train_matthews_corrcoef",
+        "train_pr_auc_weighted",
+        "train_precision_weighted",
+        "train_recall_weighted",
+        "train_roc_auc_ovo",
+        "train_roc_auc_ovo_weighted",
+        "train_roc_auc_ovr",
+        "train_roc_auc_ovr_weighted",
+        "train_roc_auc_weighted",
+        "trials"
+      ]
+    }
+  },
+  "training_metrics_keys": [
+    "best_params",
+    "best_score",
+    "feature_importances",
+    "n_features",
+    "n_rows",
+    "scoring_metric",
+    "shap_explanation",
+    "test_accuracy",
+    "test_balanced_accuracy",
+    "test_f1_weighted",
+    "test_g_score",
+    "test_log_loss",
+    "test_matthews_corrcoef",
+    "test_pr_auc_weighted",
+    "test_precision_weighted",
+    "test_recall_weighted",
+    "test_roc_auc_ovo",
+    "test_roc_auc_ovo_weighted",
+    "test_roc_auc_ovr",
+    "test_roc_auc_ovr_weighted",
+    "test_roc_auc_weighted",
+    "train_accuracy",
+    "train_balanced_accuracy",
+    "train_f1_weighted",
+    "train_g_score",
+    "train_log_loss",
+    "train_matthews_corrcoef",
+    "train_pr_auc_weighted",
+    "train_precision_weighted",
+    "train_recall_weighted",
+    "train_roc_auc_ovo",
+    "train_roc_auc_ovo_weighted",
+    "train_roc_auc_ovr",
+    "train_roc_auc_ovr_weighted",
+    "train_roc_auc_weighted",
+    "trials"
+  ]
+}

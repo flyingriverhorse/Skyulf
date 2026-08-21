@@ -7,6 +7,9 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 from skyulf.modeling._explainability import compute_shap_explanation
@@ -208,6 +211,35 @@ def test_random_forest_regressor_explanation_is_not_none(regression_data):
     assert result is not None
     assert result["mean_abs_importance"]
     assert any(v > 0 for v in result["mean_abs_importance"].values())
+    assert result["samples"]
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        SVC(random_state=0),
+        KNeighborsClassifier(n_neighbors=3),
+        GaussianNB(),
+    ],
+    ids=["svc-rbf", "knn", "gaussian-nb"],
+)
+def test_non_callable_classifier_shap_not_none(classification_data, model):
+    """Non-tree, non-linear classifiers are not ``__call__``-able, so the generic
+    `shap.Explainer(model, masker)` raises TypeError and explainability silently
+    returned `None` (audit finding F-37). `_build_explainer` must fall back to
+    `model.predict_proba` / `model.predict` instead.
+
+    `SVC` (RBF), `KNeighborsClassifier`, and `GaussianNB` stand in for all six
+    affected families (`svc_rbf`, `knn`, `gaussian_nb`, `mlp`, `voting`,
+    `stacking`) — each reaches the same generic, masker-based path.
+    """
+    X, y = classification_data
+    model.fit(X, y)
+
+    result = compute_shap_explanation(model, X, max_display_samples=3)
+
+    assert result is not None
+    assert set(result["mean_abs_importance"].keys()) == {"a", "b", "c"}
     assert result["samples"]
 
 

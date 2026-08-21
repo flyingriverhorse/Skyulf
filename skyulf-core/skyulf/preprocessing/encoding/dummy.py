@@ -76,7 +76,7 @@ def _dummy_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, An
     for col in valid_cols:
         cats = _drop_first_if_needed(categories.get(col, []), drop_first)
         exprs = [
-            (pl.col(col).cast(pl.Utf8) == str(cat)).cast(pl.Int8).alias(f"{col}_{cat}")
+            (pl.col(col).cast(pl.Utf8) == str(cat)).cast(pl.Int8).fill_null(0).alias(f"{col}_{cat}")
             for cat in cats
         ]
         X_out = X_out.with_columns(exprs)

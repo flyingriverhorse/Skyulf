@@ -84,7 +84,7 @@ export function getArtifactCoverage(kind: ArtifactKind, input: ArtifactCoverageI
   if (!input.hasArtifact) {
     return {
       status: 'not_computed',
-      reason: `${label} was not computed for this run (an older run, or the trainer skipped it).`,
+      reason: `${label} was not computed for this run — not supported for this model type, or this run predates support for it.`,
     };
   }
 

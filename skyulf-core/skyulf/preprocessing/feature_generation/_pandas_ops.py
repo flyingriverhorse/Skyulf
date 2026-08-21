@@ -176,7 +176,7 @@ def _pandas_datetime_apply(op: dict[str, Any], df_out: Any) -> None:
     features = op.get("datetime_features", [])
     for col in valid:
         try:
-            dt = pd.to_datetime(df_out[col], errors="coerce")
+            dt = pd.to_datetime(df_out[col], errors="coerce", utc=True)
             for feat in features:
                 builder = _PANDAS_DT_FEATURES.get(feat)
                 if builder is None:

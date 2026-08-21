@@ -137,6 +137,11 @@ class PolarsEngine(BaseEngine):
         # `pl.DataFrame`, so `df.to_numpy()` and `df._df.to_numpy()` are
         # identical -- no need for a separate `isinstance` branch.
         if hasattr(df, "to_numpy"):
+            # polars' to_numpy() raises "need at least one array to
+            # concatenate" on a 0-column frame; pandas yields (n, 0) float64,
+            # so mirror that to keep engine parity for empty selections.
+            if getattr(df, "width", None) == 0:
+                return np.empty((df.height, 0), dtype=np.float64)
             return df.to_numpy()
         return np.array(df)
 
