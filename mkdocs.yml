@@ -62,6 +62,7 @@ nav:
     - Performance: performance.md
     - Adding New Engine: guides/adding_new_engine.md
     - Engine Mechanics: guides/engine_mechanics.md
+    - Engine Data Paths: guides/engine_data_paths.md
     - Data Drift Roadmap: guides/data_drift_roadmap.md
   - Examples:
     - Quickstart: examples/quickstart.md
