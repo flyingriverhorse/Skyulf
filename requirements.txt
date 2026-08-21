@@ -36,7 +36,7 @@ aiofiles>=24.1.0                     # Async file operations
 # === STATISTICS & ANALYSIS ===
 scipy>=1.10.0,<2.0.0
 statsmodels>=0.14.0,<1.0.0
-patsy>=0.5.0,<1.0.0                  # Required by statsmodels
+patsy>=0.5.0,<2.0.0                  # Required by statsmodels
 shapely>=2.0.2,<2.2.0                # Geometric operations
 
 # === HTTP CLIENT (ASYNC) ===
