@@ -263,6 +263,18 @@ def test_load_reference_dataframe_converts_pandas():
     assert isinstance(df, pl.DataFrame)
 
 
+def test_load_reference_dataframe_passes_through_polars():
+    """A polars artifact (polars-engine training saves it natively) passes through."""
+    import polars as pl
+
+    artifact_store = MagicMock()
+    ref = pl.DataFrame({"a": [1, 2]})
+    artifact_store.load.return_value = ref
+
+    df = _load_reference_dataframe(artifact_store, "ref-key", "job-1")
+    assert df is ref
+
+
 def test_load_reference_dataframe_raises_skyulf_exception_on_failure():
     """A load failure surfaces as a SkyulfException, not the raw exception."""
     from backend.exceptions.core import SkyulfException

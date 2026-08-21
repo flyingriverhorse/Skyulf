@@ -31,7 +31,9 @@ def resolve_valid_columns(X: Any, requested: Iterable[str]) -> list[str]:
     """
     cols = list(X.columns)
     cols_set = set(cols)
-    return [c for c in requested if c in cols_set]
+    # Order-preserving dedupe: polars `.select` raises DuplicateError on
+    # repeated output names where pandas silently duplicated them.
+    return [c for c in dict.fromkeys(requested) if c in cols_set]
 
 
 def safe_scale(scale_arr: np.ndarray) -> np.ndarray:

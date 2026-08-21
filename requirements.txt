@@ -52,7 +52,7 @@ sentry-sdk[fastapi]>=2.0.0           # Error tracking + release tagging + transa
 rich>=13.0.0                         # Beautiful terminal logging
 
 # === DATA PROCESSING ===
-polars>=1.36.0                       # Fast DataFrame library (V2 Ingestion)
+polars>=1.43.2                       # Fast DataFrame library (V2 Ingestion)
 xlsx2csv>=0.8.0                      # Excel to CSV converter (used by Polars internally)
 openpyxl>=3.1.0                      # Excel reading support (used by Pandas internally)
 pandas>=2.0.0,<3.0.0

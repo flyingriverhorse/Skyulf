@@ -1,6 +1,7 @@
 """Core application metadata and server settings."""
 
 from importlib.metadata import PackageNotFoundError, version
+from typing import Literal
 
 try:
     _APP_VERSION = version("skyulf")
@@ -22,6 +23,11 @@ class CoreMixin:
     )
     DEBUG: bool = False
     TESTING: bool = False
+
+    # DataFrame engine used end-to-end by dataset reads and pipeline execution
+    # (backend Polars migration, Phase 1). Polars is the platform default;
+    # pandas remains a first-class, explicitly selectable option.
+    SKYULF_ENGINE: Literal["polars", "pandas"] = "polars"
 
     # Environment name reported by health checks / monitoring (e.g. "development",
     # "staging", "production"). Read from the ENVIRONMENT env var. When unset, falls

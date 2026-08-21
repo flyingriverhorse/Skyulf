@@ -19,6 +19,14 @@ def _has_pyarrow() -> bool:
 
 
 class TestFileSystemCatalog:
+    @pytest.fixture(autouse=True)
+    def _pandas_engine(self, monkeypatch):
+        # These round-trip tests pin the legacy pandas path; the polars path
+        # is covered by tests/integration/test_catalog_polars_ingestion.py.
+        from backend.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "pandas", raising=False)
+
     def test_load_save_csv(self, tmp_path):
         catalog = FileSystemCatalog(base_path=str(tmp_path))
         dataset_id = "test_data.csv"
@@ -153,13 +161,32 @@ class TestS3Catalog:
 
     @patch("pandas.read_csv")
     def test_load_s3(self, mock_read_csv):
-        with patch.dict("sys.modules", {"s3fs": MagicMock()}):
+        with (
+            patch.dict("sys.modules", {"s3fs": MagicMock()}),
+            patch("backend.data.catalog.get_settings") as mock_settings,
+        ):
+            mock_settings.return_value = MagicMock(SKYULF_ENGINE="pandas", AWS_ENDPOINT_URL=None)
             catalog = S3Catalog(bucket_name="my-bucket")
             catalog.load("data.csv")
 
             mock_read_csv.assert_called_with(
                 "s3://my-bucket/data.csv", nrows=None, storage_options={}
             )
+
+    @patch("backend.data.catalog.pl.from_pandas")
+    @patch("pandas.read_csv")
+    def test_load_s3_converts_to_polars_when_engine_polars(self, mock_read_csv, mock_from_pandas):
+        """With SKYULF_ENGINE=polars, the pandas source read is converted before return."""
+        with (
+            patch.dict("sys.modules", {"s3fs": MagicMock()}),
+            patch("backend.data.catalog.get_settings") as mock_settings,
+        ):
+            mock_settings.return_value = MagicMock(SKYULF_ENGINE="polars", AWS_ENDPOINT_URL=None)
+            catalog = S3Catalog(bucket_name="my-bucket")
+            catalog.load("data.csv")
+
+            mock_read_csv.assert_called_once()
+            mock_from_pandas.assert_called_once_with(mock_read_csv.return_value)
 
     def test_caller_supplied_endpoint_url_is_dropped(self):
         """SSRF fix: a caller-supplied endpoint_url must never reach s3fs unless the

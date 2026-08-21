@@ -155,6 +155,7 @@ class FeatureEngMixin:
         dropped_columns: list[str] | None,
         feature_columns: list[str] | None = None,
         feature_dtypes: dict[str, str] | None = None,
+        engine: str | None = None,
     ) -> dict[str, Any]:
         """Fallback bundle assembled from ``self.executed_transformers`` (manual steps).
 
@@ -195,6 +196,7 @@ class FeatureEngMixin:
             "dropped_columns": dropped_columns or [],
             "feature_columns": feature_columns,
             "feature_dtypes": feature_dtypes,
+            "engine": engine,
         }
 
     def _bundle_transformers_with_model(
@@ -207,6 +209,7 @@ class FeatureEngMixin:
         dropped_columns: list[str] | None = None,
         feature_columns: list[str] | None = None,
         feature_dtypes: dict[str, str] | None = None,
+        engine: str | None = None,
     ):
         """Bundles fitted transformers with the model artifact for inference.
 
@@ -215,6 +218,10 @@ class FeatureEngMixin:
         service and the manual-prediction UI can validate/build the expected
         input shape precisely, instead of guessing from ``feature_names_in_``
         (unreliable for estimators fit on a bare numpy array, e.g. clustering).
+
+        ``engine`` records the DataFrame engine the model was trained on
+        ("pandas"/"polars") so serving can detect engine mismatches instead
+        of silently assuming pandas (F-25).
         """
         try:
             model_artifact = self.artifact_store.load(model_artifact_key)
@@ -240,6 +247,7 @@ class FeatureEngMixin:
                     "dropped_columns": dropped_columns or [],
                     "feature_columns": feature_columns,
                     "feature_dtypes": feature_dtypes,
+                    "engine": engine,
                 }
             else:
                 # Fallback to old logic if no FeatureEngineer found (e.g. manual steps)
@@ -250,6 +258,7 @@ class FeatureEngMixin:
                     dropped_columns,
                     feature_columns,
                     feature_dtypes,
+                    engine,
                 )
 
             # Save to job_id key if available - this is the final artifact for the job

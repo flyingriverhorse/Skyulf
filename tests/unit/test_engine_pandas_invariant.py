@@ -1,16 +1,15 @@
-"""Regression tests for the pipeline execution engine's pandas-only invariant.
+"""Regression tests for the pipeline execution engine's frame-type guard.
 
 Background: an audit flagged `backend/ml_pipeline/_execution/engine/` as
-"pandas-only despite Polars being the default engine", claiming SHAP
-explanations and drift-detection baselines were silently disabled on Polars
-runs. That turned out to be a false alarm — the engine's injected
-`DataCatalog` implementations all read via pandas, and skyulf's
-`apply_dual_engine` preserves the input engine type, so no Polars frame can
-reach the engine. These tests pin down that reasoning:
+"pandas-only despite Polars being the default engine". The engine originally
+enforced a hard pandas-only invariant at the ingestion choke point. With the
+backend Polars migration (Phase 2), the guard became engine-aware:
 
-1. `_run_data_loader` raises loudly if a catalog ever returns a non-pandas
-   frame, instead of letting dozens of downstream `isinstance(x,
-   pd.DataFrame)` checks silently no-op.
+1. `_run_data_loader` accepts a Polars frame when `SKYULF_ENGINE=polars`
+   (the platform default), keeps accepting pandas, and still raises loudly on
+   an engine mismatch (e.g. a Polars frame while `SKYULF_ENGINE=pandas`) or
+   on a non-frame object — so downstream `isinstance(x, pd.DataFrame)`
+   assumptions can never silently no-op.
 2. `_normalize_train_frame` accepts a single-column `pd.DataFrame` target
    (a legitimate `split_xy` output shape) instead of silently dropping the
    target column from the saved drift-reference frame.
@@ -22,6 +21,7 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
+from backend.config import get_settings
 from backend.ml_pipeline._execution.engine._artifacts import ArtifactsMixin
 from backend.ml_pipeline._execution.engine._node_runners import NodeRunnersMixin
 
@@ -63,12 +63,33 @@ def test_data_loader_accepts_pandas() -> None:
     store.save.assert_called_once_with("n1", df)
 
 
-def test_data_loader_rejects_non_pandas_frame() -> None:
-    """A non-pandas frame must fail loudly rather than silently degrading
+def test_data_loader_accepts_polars_when_engine_polars(monkeypatch) -> None:
+    """With SKYULF_ENGINE=polars (the default), a Polars frame passes through."""
+    pl = pytest.importorskip("polars")
+    monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
+    frame = pl.DataFrame({"a": [1, 2]})
+    loader = _Loader(frame)
+    assert loader._run_data_loader(_node(), job_id="unknown") == "n1"
+    store = cast(MagicMock, loader.artifact_store)
+    store.save.assert_called_once_with("n1", frame)
+
+
+def test_data_loader_rejects_polars_frame_when_engine_pandas(monkeypatch) -> None:
+    """An engine mismatch must fail loudly rather than silently degrading
     SHAP/drift downstream."""
     pl = pytest.importorskip("polars")
+    settings = get_settings()
+    monkeypatch.setattr(settings, "SKYULF_ENGINE", "pandas", raising=False)
     loader = _Loader(pl.DataFrame({"a": [1, 2]}))
     with pytest.raises(TypeError, match="requires a pandas DataFrame"):
+        loader._run_data_loader(_node(), job_id="unknown")
+
+
+def test_data_loader_rejects_non_frame_objects(monkeypatch) -> None:
+    """Anything that is neither a pandas nor a Polars frame fails loudly."""
+    monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
+    loader = _Loader([{"a": 1}])
+    with pytest.raises(TypeError, match=r"requires a pandas or Polars DataFrame"):
         loader._run_data_loader(_node(), job_id="unknown")
 
 
@@ -99,3 +120,70 @@ def test_normalize_train_frame_ignores_multi_column_dataframe_target() -> None:
     out = _Artifacts()._normalize_train_frame((X, y), target_col="target")
     assert out is not None
     assert "target" not in out.columns
+
+
+# ── F-31/F-32: polars frames must produce drift references + feature names ──
+
+
+def test_normalize_train_frame_accepts_polars_frame() -> None:
+    """F-31: a polars training frame must yield a reference frame, not None
+    (None silently disables drift detection under the polars engine)."""
+    pl = pytest.importorskip("polars")
+    df = pl.DataFrame({"f": [1, 2, 3], "target": [0, 1, 0]})
+    out = _Artifacts()._normalize_train_frame(df, target_col="target")
+    assert out is not None
+    assert isinstance(out, pl.DataFrame)
+    assert list(out.columns) == ["f", "target"]
+
+
+def test_normalize_train_frame_accepts_polars_split_dataset() -> None:
+    pl = pytest.importorskip("polars")
+    from skyulf.data.dataset import SplitDataset
+
+    sd = SplitDataset(
+        train=pl.DataFrame({"f": [1, 2], "target": [0, 1]}),
+        test=pl.DataFrame(),
+        validation=None,
+    )
+    out = _Artifacts()._normalize_train_frame(sd, target_col="target")
+    assert out is not None
+    assert isinstance(out, pl.DataFrame)
+
+
+def test_normalize_train_frame_reattaches_target_for_polars_xy_tuple() -> None:
+    pl = pytest.importorskip("polars")
+    import numpy as np
+
+    X = pl.DataFrame({"f": [1, 2, 3]})
+    y = np.array([0, 1, 0])
+    out = _Artifacts()._normalize_train_frame((X, y), target_col="target")
+    assert out is not None
+    assert "target" in out.columns
+    assert out["target"].to_list() == [0, 1, 0]
+
+
+def test_feature_names_for_importance_accepts_polars() -> None:
+    """F-32: feature-importance resolution must not return [] for polars frames."""
+    pl = pytest.importorskip("polars")
+    df = pl.DataFrame({"f1": [1.0], "f2": [2.0], "target": [0]})
+    assert _Artifacts()._feature_names_for_importance(df, "target") == ["f1", "f2"]
+
+
+def test_save_reference_data_persists_polars_frame() -> None:
+    """F-31 end-to-end: a polars training frame must reach the artifact store
+    as the drift reference, not be dropped as 'unsupported data shape'."""
+    pl = pytest.importorskip("polars")
+
+    class _Store(ArtifactsMixin):
+        def __init__(self) -> None:
+            self.artifact_store = MagicMock()
+            self.dataset_name = "ds"
+            self.logs: list[str] = []
+
+        def log(self, msg: str) -> None:
+            self.logs.append(msg)
+
+    store = _Store()
+    df = pl.DataFrame({"f": [1, 2, 3], "target": [0, 1, 0]})
+    store._save_reference_data(df, job_id="job-9", target_col="target")
+    store.artifact_store.save.assert_called_once_with("reference_data_ds_job-9", df)

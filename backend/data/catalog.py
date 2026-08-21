@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 from sqlalchemy.orm import Session
 
 from backend.config import get_settings
@@ -85,25 +86,44 @@ class FileSystemCatalog(DataCatalog):
         return path
 
     @staticmethod
-    def _read_csv(path: str, limit: int | None) -> Any:
-        """Read a CSV file, applying the row limit at read time."""
+    def _read_csv(path: str, limit: int | None, engine: str) -> Any:
+        """Read a CSV file, applying the row limit at read time.
+
+        ``infer_schema_length=None`` scans the whole file for dtypes: the
+        default 100-row sample mis-infers an integer column whose missing
+        values sit in the sample window as String, silently corrupting types.
+        """
+        if engine == "polars":
+            return pl.read_csv(path, n_rows=limit, infer_schema_length=None)
         return pd.read_csv(path, nrows=limit)
 
     @staticmethod
-    def _read_parquet(path: str, limit: int | None) -> Any:
+    def _read_parquet(path: str, limit: int | None, engine: str) -> Any:
         """Read a parquet file and apply the row limit afterwards."""
+        if engine == "polars":
+            df = pl.read_parquet(path)
+            return df.head(limit) if limit else df
         df = pd.read_parquet(path)
         return df.head(limit) if limit else df
 
     @staticmethod
-    def _read_json(path: str, limit: int | None) -> Any:
-        """Read a JSON file and apply the row limit afterwards."""
-        return pd.read_json(path).head(limit) if limit else pd.read_json(path)
+    def _read_json(path: str, limit: int | None, engine: str) -> Any:
+        """Read a JSON file and apply the row limit afterwards.
+
+        Polars' row-oriented ``read_json`` does not accept pandas-style
+        JSON everywhere, so JSON stays a pandas read and is converted when
+        the engine is polars.
+        """
+        df = pd.read_json(path)
+        df = df.head(limit) if limit else df
+        return pl.from_pandas(df) if engine == "polars" else df
 
     @staticmethod
-    def _read_excel(path: str, limit: int | None) -> Any:
+    def _read_excel(path: str, limit: int | None, engine: str) -> Any:
         """Read an Excel file and apply the row limit afterwards."""
-        return pd.read_excel(path).head(limit) if limit else pd.read_excel(path)
+        df = pd.read_excel(path)
+        df = df.head(limit) if limit else df
+        return pl.from_pandas(df) if engine == "polars" else df
 
     _EXTENSION_READERS = (
         (".csv", _read_csv),
@@ -114,15 +134,20 @@ class FileSystemCatalog(DataCatalog):
     )
 
     def _read_dataframe(self, path: str, dataset_id: str, limit: int | None) -> Any:
-        """Dispatch to the pandas reader matching the file's extension, applying the row limit."""
+        """Dispatch to the reader matching the file's extension, honoring SKYULF_ENGINE."""
+        engine = get_settings().SKYULF_ENGINE
         for suffix, reader in self._EXTENSION_READERS:
             if path.endswith(suffix):
-                return reader(path, limit)
+                return reader(path, limit, engine)
         return self._read_fallback_parquet(path, dataset_id, limit)
 
     def _read_fallback_parquet(self, path: str, dataset_id: str, limit: int | None) -> Any:
         """Try reading a file with no recognized extension as parquet, or raise ValueError."""
+        engine = get_settings().SKYULF_ENGINE
         try:
+            if engine == "polars":
+                df = pl.read_parquet(path)
+                return df.head(limit) if limit else df
             df = pd.read_parquet(path)
             return df.head(limit) if limit else df
         except Exception:
@@ -259,7 +284,7 @@ class S3Catalog(DataCatalog):
 
     def _load_from_cache_if_fresh(
         self, path: str, cache_path: str, limit: int | None, kwargs: dict
-    ) -> pd.DataFrame | None:
+    ) -> Any:
         """Return a cached DataFrame if a local cache file exists and is newer than S3.
 
         Returns None if there is no usable cache (missing, stale, custom creds, or
@@ -276,8 +301,14 @@ class S3Catalog(DataCatalog):
 
                 if s3_info["LastModified"].timestamp() < local_mtime:
                     logger.info(f"Cache hit for {path}")
+                    engine = get_settings().SKYULF_ENGINE
                     if path.endswith(".csv"):
+                        if engine == "polars":
+                            return pl.read_csv(cache_path, n_rows=limit, infer_schema_length=None)
                         return pd.read_csv(cache_path, nrows=limit)
+                    if engine == "polars":
+                        df = pl.read_parquet(cache_path)
+                        return df.head(limit) if limit else df
                     df = pd.read_parquet(cache_path)
                     return df.head(limit) if limit else df
         except Exception as e:
@@ -285,11 +316,17 @@ class S3Catalog(DataCatalog):
         return None
 
     @staticmethod
-    def _read_from_source(path: str, limit: int | None, storage_options: dict) -> pd.DataFrame:
-        """Read `path` from S3 as a DataFrame, dispatching on file extension."""
+    def _read_from_source(path: str, limit: int | None, storage_options: dict) -> Any:
+        """Read `path` from S3 as a DataFrame, dispatching on file extension.
+
+        Source reads go through pandas (its fsspec integration handles the
+        full S3 feature set); when the engine is polars the frame is
+        converted before returning so ``load`` honors SKYULF_ENGINE. A
+        native ``pl.read_*`` fast-path is a future optimization.
+        """
         if path.endswith(".csv"):
-            return pd.read_csv(path, nrows=limit, storage_options=storage_options)
-        if path.endswith(".parquet"):
+            df = pd.read_csv(path, nrows=limit, storage_options=storage_options)
+        elif path.endswith(".parquet"):
             df = pd.read_parquet(path, storage_options=storage_options)
         elif path.endswith(".json"):
             df = pd.read_json(path, storage_options=storage_options)
@@ -297,20 +334,27 @@ class S3Catalog(DataCatalog):
             df = pd.read_parquet(path, storage_options=storage_options)
         if limit:
             df = df.head(limit)
+        if get_settings().SKYULF_ENGINE == "polars":
+            return pl.from_pandas(df)
         return df
 
     @staticmethod
-    def _write_to_cache(df: pd.DataFrame, cache_path: str, path: str) -> None:
+    def _write_to_cache(df: Any, cache_path: str, path: str) -> None:
         """Best-effort write of `df` to the local cache path; failures are logged only."""
         try:
-            if path.endswith(".csv"):
+            if isinstance(df, pl.DataFrame):
+                if path.endswith(".csv"):
+                    df.write_csv(cache_path)
+                else:
+                    df.write_parquet(cache_path)
+            elif path.endswith(".csv"):
                 df.to_csv(cache_path, index=False)
             else:
                 df.to_parquet(cache_path, index=False)
         except Exception as e:
             logger.warning(f"Failed to write to cache {cache_path}: {e}")
 
-    def load(self, dataset_id: str, **kwargs) -> pd.DataFrame:
+    def load(self, dataset_id: str, **kwargs) -> Any:
         path = self._get_s3_path(dataset_id)
         limit = kwargs.get("limit")
 

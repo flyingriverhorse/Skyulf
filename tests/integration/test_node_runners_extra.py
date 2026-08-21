@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from backend.data.catalog import FileSystemCatalog
@@ -117,6 +118,28 @@ def test_record_data_shape_metrics_dispatches_to_tuple_branch():
     harness._record_data_shape_metrics(metrics, (X, np.zeros(4)), "target")
     assert metrics["n_rows"] == 4
     assert metrics["n_features"] == 2
+
+
+def test_to_split_dataset_wraps_polars_frame():
+    """A Polars frame must become a SplitDataset with Polars splits, not pass through."""
+    harness = _Harness()
+    df = pl.DataFrame({"a": [1, 2, 3], "target": [0, 1, 0]})
+    result = harness._to_split_dataset(df, "target")
+    assert isinstance(result, SplitDataset)
+    assert isinstance(result.train, pl.DataFrame)
+    assert isinstance(result.test, pl.DataFrame)
+    assert result.train.shape == (3, 2)
+
+
+def test_data_preview_df_info_accepts_polars_frame():
+    """Preview payload building must work on Polars frames (converted for stats)."""
+    harness = _Harness()
+    df = pl.DataFrame({"a": [1, 2], "b": ["x", None]})
+    info = harness._data_preview_df_info(df, "Full Dataset")
+    assert info["name"] == "Full Dataset"
+    assert info["shape"] == (2, 2)
+    assert info["columns"] == ["a", "b"]
+    assert info["sample"][1]["b"] is None
 
 
 def test_safe_record_data_shape_metrics_swallows_exceptions():

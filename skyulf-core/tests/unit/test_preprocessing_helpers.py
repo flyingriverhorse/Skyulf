@@ -200,3 +200,25 @@ class TestAutoDetectDatetimeColumns:
         df = _build_datetime_frame(frame_type, datetime_columns, other_columns)
         result = auto_detect_datetime_columns(typing.cast(pd.DataFrame, df))
         assert set(result) == set(expected)
+
+
+# ---------------------------------------------------------------------------
+# duplicate-requested-column handling (polars select raises on duplicates)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_valid_columns_dedupes_requested_duplicates() -> None:
+    """Duplicate requested columns must be collapsed — polars `.select` raises
+    DuplicateError on repeated output names while pandas silently duplicated."""
+    X = pl.DataFrame({"a": [1], "b": [2]})
+    assert resolve_valid_columns(X, ["a", "b", "a"]) == ["a", "b"]
+
+
+def test_select_then_to_pandas_with_duplicate_requested_columns() -> None:
+    """GeoDistance-style configs may name the same column twice (lat1==lat2);
+    the polars narrowing path must not crash on the duplicate."""
+    from skyulf.preprocessing._helpers import select_then_to_pandas
+
+    X = pl.DataFrame({"target": [1.0, 2.0], "C": [3.0, 4.0]})
+    result = select_then_to_pandas(X, ["target", "C", "target", "C"])
+    assert list(result.columns) == ["target", "C"]

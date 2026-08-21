@@ -23,10 +23,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from backend.config import get_settings
 from skyulf.data.catalog import DataCatalog
 from skyulf.data.dataset import SplitDataset
+from skyulf.engines.registry import EngineRegistry
 from skyulf.modeling._tuning.engine import TuningApplier, TuningCalculator
 from skyulf.modeling.base import StatefulEstimator
 from skyulf.modeling.clustering import _select_numeric_features
@@ -142,21 +144,23 @@ class NodeRunnersMixin:
                 f"Dataset {dataset_id} not found. Please check if the file exists."
             ) from None
 
-        # The execution engine is pandas-by-construction: every concrete
-        # `DataCatalog` reads via pandas, and skyulf's `apply_dual_engine`
-        # preserves the input engine type, so no node converts pandas ->
-        # Polars mid-pipeline. Dozens of downstream `isinstance(x,
+        # Frame-type guard at the single choke point where data enters the
+        # engine. Catalogs honor SKYULF_ENGINE, so the loaded frame must
+        # match the configured engine; dozens of downstream `isinstance(x,
         # pd.DataFrame)` checks (SHAP extraction, drift-reference capture,
-        # merge, summary) rely on that invariant and would *silently* no-op
-        # on a non-pandas frame. This is the single choke point where data
-        # enters the engine, so assert the invariant here to turn a future
-        # silent degradation (e.g. someone adding a Polars fast-path to a
-        # catalog) into a loud, immediate failure.
-        if not isinstance(df, pd.DataFrame):
+        # merge, summary) depend on knowing exactly which engine is running.
+        # A mismatch or a non-frame object fails loudly here instead of
+        # silently no-op-ing downstream.
+        engine = get_settings().SKYULF_ENGINE
+        frame_ok = isinstance(df, pd.DataFrame) or (
+            engine == "polars" and isinstance(df, pl.DataFrame)
+        )
+        if not frame_ok:
+            expected = "pandas" if engine == "pandas" else "pandas or Polars"
             raise TypeError(
                 f"Dataset {dataset_id} loaded as {type(df).__name__}, but the pipeline "
-                "execution engine requires a pandas DataFrame. Catalogs must return "
-                "pandas frames (convert with `.to_pandas()` before returning)."
+                f"execution engine (SKYULF_ENGINE={engine}) requires a {expected} DataFrame. "
+                "Catalogs must return frames matching the configured engine."
             )
 
         self.log(
@@ -194,10 +198,12 @@ class NodeRunnersMixin:
         """
         if isinstance(data, pd.DataFrame):
             return SplitDataset(train=data, test=pd.DataFrame(), validation=None)
+        if isinstance(data, pl.DataFrame):
+            return SplitDataset(train=data, test=pl.DataFrame(), validation=None)
         if isinstance(data, tuple):
             # Check if it's (train_df, test_df) or (X, y)
             elem0 = data[0]
-            if isinstance(elem0, pd.DataFrame) and target_col in elem0.columns:
+            if isinstance(elem0, (pd.DataFrame, pl.DataFrame)) and target_col in elem0.columns:
                 train_df, test_df = data
                 return SplitDataset(train=train_df, test=test_df, validation=None)
             return SplitDataset(train=data, test=pd.DataFrame(), validation=None)
@@ -228,6 +234,19 @@ class NodeRunnersMixin:
         if isinstance(data, tuple) and len(data) >= 1:
             return self._resolve_train_frame(data[0])
         return data
+
+    def _resolve_train_engine(self, data: Any) -> str:
+        """Engine the model was actually trained on, detected from the training frame (F-25).
+
+        Recorded in the deployment bundle so serving can detect a
+        trained-on-polars/served-on-pandas mismatch instead of silently
+        assuming pandas. Falls back to the configured ``SKYULF_ENGINE``
+        when no frame is available to inspect (e.g. numpy-only inputs).
+        """
+        frame = self._resolve_train_frame(data) if data is not None else None
+        if frame is not None and hasattr(frame, "columns"):
+            return str(EngineRegistry.resolve(frame).name)
+        return get_settings().SKYULF_ENGINE
 
     def _resolve_train_feature_columns(
         self,
@@ -324,6 +343,7 @@ class NodeRunnersMixin:
             dropped_columns=self._upstream_dropped_columns(node),
             feature_columns=feature_columns,
             feature_dtypes=feature_dtypes,
+            engine=self._resolve_train_engine(data),
         )
 
     def _flatten_split_metrics(self, splits: dict[str, Any], metrics: dict[str, Any]) -> None:
@@ -911,8 +931,10 @@ class NodeRunnersMixin:
                 f"Unknown algorithm: {algorithm} (Registry ID: {registry_id})"
             ) from None
 
-    def _data_preview_df_info(self, df: pd.DataFrame, name: str) -> dict[str, Any]:
+    def _data_preview_df_info(self, df: Any, name: str) -> dict[str, Any]:
         """Build the preview payload (shape/columns/sample) for a single DataFrame."""
+        if not isinstance(df, pd.DataFrame) and hasattr(df, "to_pandas"):
+            df = df.to_pandas()
         return {
             "name": name,
             "shape": df.shape,
@@ -926,6 +948,8 @@ class NodeRunnersMixin:
         if isinstance(slot, tuple):
             X, _ = slot
             return self._data_preview_df_info(X, f"{name} (X)")
+        if isinstance(slot, pl.DataFrame) and not slot.is_empty():
+            return self._data_preview_df_info(slot, name)
         if isinstance(slot, pd.DataFrame) and not slot.empty:
             return self._data_preview_df_info(slot, name)
         return None
@@ -970,7 +994,7 @@ class NodeRunnersMixin:
         if isinstance(data, SplitDataset):
             preview_info["operation_mode"] = "Train: fit_transform | Test/Val: transform"
             preview_info["data_summary"] = self._build_split_dataset_data_summary(data)
-        elif isinstance(data, pd.DataFrame):
+        elif isinstance(data, (pd.DataFrame, pl.DataFrame)):
             preview_info["operation_mode"] = "fit_transform"
             preview_info["data_summary"]["full"] = self._data_preview_df_info(data, "Full Dataset")
 

@@ -126,7 +126,9 @@ def _compute_reference_crosstab_polars(
     (``pd.crosstab`` never emits a ``"nan"``/``"None"`` row) -- without this,
     Polars' ``group_by`` (which treats null as a normal, valid group key)
     would report a bogus ``"None"`` reference category that doesn't exist on
-    the Pandas engine for identical input.
+    the Pandas engine for identical input. Float NaN is a separate case (F-43):
+    in Polars NaN is a valid value, not a null, so ``is_not_null()`` alone
+    would invent a ``"nan"`` segment — float columns also filter ``is_nan()``.
     """
     ref_name = reference_values.name or "reference"
     frame = (
@@ -134,6 +136,8 @@ def _compute_reference_crosstab_polars(
         .with_columns(reference_values.alias(ref_name))
         .filter(pl.col(ref_name).is_not_null())
     )
+    if frame.schema[ref_name] in (pl.Float32, pl.Float64):
+        frame = frame.filter(pl.col(ref_name).is_not_nan())
     counts = frame.group_by(["__skyulf_cluster__", ref_name]).agg(pl.len().alias("count"))
 
     result: dict[str, dict[str, int]] = {}
