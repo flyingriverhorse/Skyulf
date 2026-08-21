@@ -1,6 +1,6 @@
 # Execution tasks and versioning — Stage 0
 
-**Date:** 2026-08-12 · **Branch:** `078` → `079` · **Status:** Wave 1 (0.7.9) **complete 2026-08-20** — all rows 1.1–1.5 shipped, verified (76 backend + 730 frontend tests, green build), branch `079` ends at `chore(release): v0.7.9`. Waves 2–3 not started.
+**Date:** 2026-08-12 · **Branch:** `078` → `079` → `080` · **Status:** Wave 1 (0.7.9) **complete 2026-08-20** — all rows 1.1–1.5 shipped, verified (76 backend + 730 frontend tests, green build), branch `079` ends at `chore(release): v0.7.9`. Wave 2 (core 0.6.0) **shipped 2026-08-21** with the 0.8.0 release (`e6eeae3f`, 3255 tests green). Wave 3: 3.1 **done** — A2.2 cherry-picked to `deploy/demo-mode` as `69f34221` (red-green verified); 3.2 (GitHub traffic check) still open.
 
 **Sources:** this file sequences work decided in two places and adds nothing
 new:
