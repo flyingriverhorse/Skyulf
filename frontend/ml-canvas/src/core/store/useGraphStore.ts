@@ -166,6 +166,52 @@ const getNodeLabel = (node: Node): string => {
   );
 };
 
+/**
+ * True if adding the edge source→target would create a cycle: either a
+ * self-loop, or target can already reach source through existing edges.
+ * Cyclic graphs cannot execute in order and die late with a cryptic
+ * "Artifact not found" error, so they are rejected at connect time.
+ */
+export function wouldCreateCycle(edges: Edge[], source: string, target: string): boolean {
+  if (source === target) return true;
+  const stack = [target];
+  const seen = new Set<string>();
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current === source) return true;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const edge of edges) {
+      if (edge.source === current) stack.push(edge.target);
+    }
+  }
+  return false;
+}
+
+/** Node types whose output is a trained model (spec), not a DataFrame. */
+export const MODEL_NODE_TYPES = [
+  'classification',
+  'regression',
+  'text_classification',
+  'SegmentationNode',
+  'EnsembleNode',
+];
+
+/**
+ * Training/model nodes are pipeline endpoints: the only node that may consume
+ * a model output is EnsembleNode. Any other target is a wiring mistake,
+ * regardless of which branch the target sits on.
+ */
+export function isModelEndpointViolation(sourceType: string, targetType: string): boolean {
+  return MODEL_NODE_TYPES.includes(sourceType) && targetType !== 'EnsembleNode';
+}
+
+/** Toast wording for the two connect-time rejections (shared with FlowCanvas). */
+export const CYCLE_CONNECTION_MESSAGE =
+  'This connection would create a loop. Pipelines must flow in one direction — remove the backwards wire instead.';
+export const MODEL_ENDPOINT_CONNECTION_MESSAGE =
+  'Training nodes are the end of a pipeline: their output is a trained model, not data. Only an Ensemble can consume a model output — wire preprocessing or training from the dataset branch instead.';
+
 /** Collects the blocking validation issues for a canvas graph. */
 export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): GraphValidationIssue[] {
   const previewNodeIds = new Set(
@@ -296,13 +342,21 @@ export const useGraphStore = create<GraphState>()(
       const sourceType = sourceNode.data.definitionType as string;
       const targetType = targetNode.data.definitionType as string;
 
-      // Block: connecting a training/tuning output into another training/tuning node
-      const modelTypes = ['classification', 'regression', 'text_classification', 'SegmentationNode', 'EnsembleNode'];
-      if (modelTypes.includes(sourceType) && modelTypes.includes(targetType)) {
-        toast.error(
-          'Invalid connection',
-          'You cannot connect a model output to another training node. Training nodes expect data (DataFrame), not a trained model.',
-        );
+      // Block: connections that close a loop. A cyclic graph has no valid
+      // execution order and fails late with a cryptic "Artifact not found"
+      // error — reject at connect time with an actionable message instead.
+      if (wouldCreateCycle(edges, connection.source!, connection.target!)) {
+        toast.error('Invalid connection', CYCLE_CONNECTION_MESSAGE);
+        return;
+      }
+
+      // Block: training nodes are pipeline endpoints. Their output is a
+      // trained model (spec), not a DataFrame — the only node that consumes
+      // model specs is the Ensemble. Anything downstream of a dataset must be
+      // wired from the dataset branch, never from a model output, no matter
+      // which branch the target sits on.
+      if (isModelEndpointViolation(sourceType, targetType)) {
+        toast.error('Invalid connection', MODEL_ENDPOINT_CONNECTION_MESSAGE);
         return;
       }
 
@@ -413,7 +467,7 @@ export const useGraphStore = create<GraphState>()(
         // Ensemble nodes auto-detect their inputs (Phase 2): one dataset edge +
         // N model-spec edges. The converter separates them by source type, so a
         // fan-in here is NOT a column merge — suppress the merge confirm.
-      } else if (isNewSource && uniqueSourceCount >= 2 && modelTypes.includes(targetType)) {
+      } else if (isNewSource && uniqueSourceCount >= 2 && MODEL_NODE_TYPES.includes(targetType)) {
         // window.confirm: see note above on sync onConnect contract.
         const proceed = window.confirm(
           `This training node will receive ${uniqueSourceCount} inputs.\n\n` +
@@ -424,7 +478,7 @@ export const useGraphStore = create<GraphState>()(
           'Click OK to connect (merge mode), or Cancel to abort.'
         );
         if (!proceed) return;
-      } else if (isNewSource && uniqueSourceCount >= 2 && !modelTypes.includes(targetType)) {
+      } else if (isNewSource && uniqueSourceCount >= 2 && !MODEL_NODE_TYPES.includes(targetType)) {
         // Pre-flight lint for non-training nodes (audit issue #7).
         // Non-training nodes auto-merge fan-in per column: each column is
         // supplied by whichever branch actually changed it (see the engine's

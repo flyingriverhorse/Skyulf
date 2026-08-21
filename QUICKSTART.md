@@ -10,7 +10,10 @@ After cloning, just double-click **`start.bat`** (Windows) or run **`./start.sh`
 
 These scripts automatically create a virtual environment, install dependencies, generate a `.env` file with safe defaults (SQLite, no Redis), and launch the server. **No Docker, no Redis, no manual steps.**
 
-Once running, open: http://127.0.0.1:8000/docs
+Once running, open:
+
+- **Web UI:** http://127.0.0.1:8000 — the ML Canvas, datasets, and experiments
+- **API docs:** http://127.0.0.1:8000/docs
 
 ---
 
@@ -64,7 +67,7 @@ docker compose up --pull always --build
 
 ## 4. Manual setup (no Docker)
 
-If you picked Option B, the steps below set up the services directly on your host.
+If you picked Option C (manual), the steps below set up the services directly on your host.
 
 ### 4.1 Create a virtual environment
 
@@ -86,7 +89,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Redis is required for background training. On Windows, install via [WSL](https://learn.microsoft.com/windows/wsl/install) or Docker (`docker run --name redis-mlops -p 6379:6379 -d redis:7`).
+Redis is **optional**: the generated `.env` defaults to `USE_CELERY=false`, in which case background jobs run in-process with no extra services. Only if you enable Celery (`USE_CELERY=true`) do you need Redis — on Windows, install via [WSL](https://learn.microsoft.com/windows/wsl/install) or Docker (`docker run --name redis-mlops -p 6379:6379 -d redis:7`).
 
 ### 4.3 Launch the API server
 
@@ -123,20 +126,20 @@ You can tail logs in `logs/` to watch training and feature-engineering jobs prog
 
 ## 5. Load sample data
 
-1. Sign in to the web UI with the default credentials: **username** `admin`, **password** `admin123` (defined in `backend/config.py`).
-2. Navigate to **Data Ingestion → Upload** and select a CSV from `data/`.
+1. Open the web UI at http://127.0.0.1:8000
+2. Go to **Data Sources**, upload a CSV, and wait for ingestion to finish. Sample data ships in the repo under `skyulf-core/examples/data/` — each dataset has its own folder with a `train.csv` (e.g. `house_prices/train.csv`, `spaceship_titanic/train.csv`).
 3. Save the inferred schema to reuse columns in future experiments.
 
 ---
 
 ## 6. Build your first flow
 
-1. Open the **ML Canvas** and drag a **Dataset Source** node onto the grid.
-2. Connect it to a **Train/Val/Test Split** node (70/15/15 by default).
-3. Finish with a **Model Trainer** node targeting `RandomForestClassifier`.
-4. Hit **Save & Run** — the job is queued immediately.
+1. Open the **ML Canvas** and click **Browse templates**.
+2. Pick **Tabular Classification** — it builds a ready-made pipeline: dataset → cleanup → impute → encode → scale → train/test split → train.
+3. Click the **Dataset** node and bind the dataset you uploaded. On the **Train/Test Split** node, select your target column.
+4. Hit **Run All** — the job starts immediately.
 
-You can follow progress from the **Experiments** page or by watching the worker logs. Once trained, you can register the model and test it on the **Deployments** page.
+Follow progress in the jobs panel; once trained, compare runs on the **Experiments** page, then deploy the model from **Deployments**.
 
 ---
 

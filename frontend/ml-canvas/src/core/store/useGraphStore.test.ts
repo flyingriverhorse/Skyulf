@@ -278,6 +278,80 @@ describe('useGraphStore — registry-dependent reducers', () => {
     expect(toastSpy).toHaveBeenCalledOnce();
     toastSpy.mockRestore();
   });
+
+  it('onConnect blocks a connection that closes a multi-hop cycle', async () => {
+    const toastModule = await import('../toast');
+    const toastSpy = vi.spyOn(toastModule.toast, 'error').mockImplementation(() => {});
+    const a = useGraphStore.getState().addNode('imputation_node', { x: 0, y: 0 });
+    const b = useGraphStore.getState().addNode('encoding', { x: 100, y: 0 });
+    const c = useGraphStore.getState().addNode('scale_numeric_features', { x: 200, y: 0 });
+    const connect = useGraphStore.getState().onConnect;
+    connect({ source: a, target: b, sourceHandle: null, targetHandle: null });
+    connect({ source: b, target: c, sourceHandle: null, targetHandle: null });
+    // c → a would close the loop a → b → c → a
+    connect({ source: c, target: a, sourceHandle: null, targetHandle: null });
+    expect(useGraphStore.getState().edges).toHaveLength(2);
+    expect(toastSpy).toHaveBeenCalledOnce();
+    toastSpy.mockRestore();
+  });
+
+  it('onConnect blocks a direct self-connection', async () => {
+    const toastModule = await import('../toast');
+    const toastSpy = vi.spyOn(toastModule.toast, 'error').mockImplementation(() => {});
+    const a = useGraphStore.getState().addNode('imputation_node', { x: 0, y: 0 });
+    useGraphStore.getState().onConnect({ source: a, target: a, sourceHandle: null, targetHandle: null });
+    expect(useGraphStore.getState().edges).toHaveLength(0);
+    expect(toastSpy).toHaveBeenCalledOnce();
+    toastSpy.mockRestore();
+  });
+
+  it('onConnect allows a diamond shape (shared ancestor is not a cycle)', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const a = useGraphStore.getState().addNode('imputation_node', { x: 0, y: 0 });
+    const b = useGraphStore.getState().addNode('encoding', { x: 100, y: 0 });
+    const c = useGraphStore.getState().addNode('scale_numeric_features', { x: 100, y: 100 });
+    const d = useGraphStore.getState().addNode('TrainTestSplitter', { x: 200, y: 50 });
+    const connect = useGraphStore.getState().onConnect;
+    connect({ source: a, target: b, sourceHandle: null, targetHandle: null });
+    connect({ source: a, target: c, sourceHandle: null, targetHandle: null });
+    connect({ source: b, target: d, sourceHandle: null, targetHandle: null });
+    // Second fan-in source: the existing merge confirm fires (accepted here);
+    // the cycle guard must NOT block it — b and c share ancestor a, no loop.
+    connect({ source: c, target: d, sourceHandle: null, targetHandle: null });
+    expect(useGraphStore.getState().edges).toHaveLength(4);
+    confirmSpy.mockRestore();
+  });
+
+  it('onConnect blocks model output feeding back into a preprocessing node', async () => {
+    const toastModule = await import('../toast');
+    const toastSpy = vi.spyOn(toastModule.toast, 'error').mockImplementation(() => {});
+    const model = useGraphStore.getState().addNode('classification', { x: 0, y: 0 });
+    const imputer = useGraphStore.getState().addNode('imputation_node', { x: 100, y: 0 });
+    useGraphStore.getState().onConnect({ source: model, target: imputer, sourceHandle: null, targetHandle: null });
+    expect(useGraphStore.getState().edges).toHaveLength(0);
+    expect(toastSpy).toHaveBeenCalledOnce();
+    toastSpy.mockRestore();
+  });
+
+  it('onConnect blocks model output into a splitter node', async () => {
+    const toastModule = await import('../toast');
+    const toastSpy = vi.spyOn(toastModule.toast, 'error').mockImplementation(() => {});
+    const model = useGraphStore.getState().addNode('regression', { x: 0, y: 0 });
+    const splitter = useGraphStore.getState().addNode('TrainTestSplitter', { x: 100, y: 0 });
+    useGraphStore.getState().onConnect({ source: model, target: splitter, sourceHandle: null, targetHandle: null });
+    expect(useGraphStore.getState().edges).toHaveLength(0);
+    expect(toastSpy).toHaveBeenCalledOnce();
+    toastSpy.mockRestore();
+  });
+
+  it('onConnect still allows model output into an EnsembleNode', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const model = useGraphStore.getState().addNode('classification', { x: 0, y: 0 });
+    const ensemble = useGraphStore.getState().addNode('EnsembleNode', { x: 100, y: 0 });
+    useGraphStore.getState().onConnect({ source: model, target: ensemble, sourceHandle: null, targetHandle: null });
+    expect(useGraphStore.getState().edges).toHaveLength(1);
+    confirmSpy.mockRestore();
+  });
 });
 
 // History (zundo temporal) integration — duplicate is a structural
