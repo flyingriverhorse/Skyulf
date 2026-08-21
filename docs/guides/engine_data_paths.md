@@ -22,6 +22,24 @@ When `SKYULF_ENGINE=pandas`, every node simply runs its pandas implementation
 (the right-hand path everywhere) — the table below describes the **Polars
 input** paths, which is the default.
 
+## What "the sklearn/XGBoost boundary" means
+
+scikit-learn, XGBoost, LightGBM and imblearn do not read dataframe objects —
+they train on raw NumPy arrays. So there is a line every model eventually
+crosses: the data leaves the dataframe world (Polars **or** pandas) as a NumPy
+matrix, the library does its work, and the results come back out. That line is
+**the boundary**.
+
+Two consequences:
+
+1. **Where the crossing happens is the only thing Skyulf controls.** It
+   crosses at the cheapest point: `SklearnBridge.to_sklearn` converts
+   Polars → NumPy *directly*, skipping pandas entirely.
+2. **Engine choice can't change how long the model itself takes.** The heavy
+   compute happens inside the library, on NumPy, identically for both engines —
+   which is exactly why every model row in the
+   [benchmark](../performance.md) lands at ~1.0x.
+
 ## Preprocessing nodes
 
 ### Cleaning, rows & columns — all native Polars
@@ -76,17 +94,17 @@ input** paths, which is the default.
 | Node | Fit | Apply | Notes |
 | :--- | :--- | :--- | :--- |
 | GeneralBinning, CustomBinning, KBinsDiscretizer | P | **P** | `cut`-style binning via expressions. |
-| FeatureMath, FeatureInteraction, FeatureGeneration | P | **P** | Expression arithmetic. |
-| PolynomialFeatures | P | **P→N→P** | Cross-products computed on NumPy for speed. |
+| FeatureMath, FeatureInteraction, FeatureGeneration (`FeatureGenerationNode` alias) | P | **P** | Expression arithmetic. |
+| PolynomialFeatures (`PolynomialFeaturesNode` alias) | P | **P→N→P** | Cross-products computed on NumPy for speed. |
 | DateFeatures, LagFeatures, RollingAggregate | — | **P** | Native datetime/`shift`/`rolling` expressions. |
 | CorrelationThreshold | **P** | **P** | Correlation matrix from Polars; apply drops columns. |
-| UnivariateSelection, ModelBasedSelection, VarianceThreshold | P→sk | **P** | Fit scores via sklearn on NumPy; apply is a native column drop. |
+| UnivariateSelection, ModelBasedSelection, VarianceThreshold, `feature_selection` dispatcher | P→sk | **P** | Fit scores via sklearn on NumPy; apply is a native column drop. |
 
 ### Splitting
 
 | Node | Fit | Apply | Notes |
 | :--- | :--- | :--- | :--- |
-| TrainTestSplitter, Split, FeatureTargetSplitter | — | **P→N→P** | `train_test_split` runs on row *indices* (`np.arange(n)`, incl. stratified and validation splits); the Polars frame is partitioned with native `gather` — rows and dtypes untouched. |
+| TrainTestSplitter, Split, FeatureTargetSplitter (`feature_target_split`) | — | **P→N→P** | `train_test_split` runs on row *indices* (`np.arange(n)`, incl. stratified and validation splits); the Polars frame is partitioned with native `gather` — rows and dtypes untouched. |
 
 ### Geo & text
 
@@ -95,17 +113,38 @@ input** paths, which is the default.
 | GeoDistance | — | **P** | Haversine as expressions. |
 | H3Index | — | **P→N→P** | Coordinates pulled as NumPy, `h3` called per row, result attached as a String column. |
 | Tokenizer | — | **P→Py→P** | Text columns pulled as Python strings, sklearn analyzer applied, token columns attached back. |
-| CountVectorizer, TfidfVectorizer, HashingVectorizer | P→Py→sk | **P→Py→sk→P** | Text joined to `list[str]`, sklearn fit/transform, dense matrix rebuilt with `pl.from_numpy` and `hstack`. Non-String text columns fall back to the pandas path for `astype(str)` parity. |
-| SentenceEmbedder | P→Py | **P→Py→P** | sentence-transformers encodes Python strings; embedding matrix re-attached from NumPy. |
+| CountVectorizer (`count_vectorizer`), TfidfVectorizer (`tfidf_vectorizer`), HashingVectorizer (`hashing_vectorizer`) | P→Py→sk | **P→Py→sk→P** | Text joined to `list[str]`, sklearn fit/transform, dense matrix rebuilt with `pl.from_numpy` and `hstack`. Non-String text columns fall back to the pandas path for `astype(str)` parity. |
+| SentenceEmbedder (`sentence_embedder`) | P→Py | **P→Py→P** | sentence-transformers encodes Python strings; embedding matrix re-attached from NumPy. |
 
 ## Models & training
 
+Every model node crosses the boundary the same way (see explainer above):
+fit extracts NumPy from the configured engine's frame, the library trains,
+and predictions come back as columns in the configured engine's frame type.
+**This is the complete list of registered model nodes** — the path is
+identical for all of them:
+
+| Family | Nodes (registry IDs) | Fit | Predict |
+| :--- | :--- | :--- | :--- |
+| Linear | `linear_regression`, `ridge_regression`, `lasso_regression`, `elasticnet_regression`, `logistic_regression`, `sgd_classifier` | **P→sk** | **P→sk→P** |
+| Trees | `decision_tree_classifier`, `decision_tree_regressor` | **P→sk** | **P→sk→P** |
+| Forests | `random_forest_classifier`, `random_forest_regressor`, `extra_trees_classifier`, `extra_trees_regressor` | **P→sk** | **P→sk→P** |
+| Boosting (sklearn) | `gradient_boosting_classifier`, `gradient_boosting_regressor`, `hist_gradient_boosting_classifier`, `hist_gradient_boosting_regressor`, `adaboost_classifier`, `adaboost_regressor` | **P→sk** | **P→sk→P** |
+| Boosting (libraries) | `xgboost_classifier`, `xgboost_regressor`, `lgbm_classifier`, `lgbm_regressor` | **P→N→lib** | **P→N→lib→P** |
+| Naive Bayes | `gaussian_nb`, `multinomial_nb`, `bernoulli_nb` | **P→sk** | **P→sk→P** |
+| SVM | `svc`, `svr` | **P→sk** | **P→sk→P** |
+| Neighbors | `k_neighbors_classifier`, `k_neighbors_regressor` | **P→sk** | **P→sk→P** |
+| Calibration | `calibrated_classifier` | **P→sk** | **P→sk→P** |
+| Clustering | `kmeans`, `minibatch_kmeans`, `birch`, `gaussian_mixture` | **P→sk** | labels: **P→sk→P** |
+| Meta-ensembles | `stacking_classifier`, `stacking_regressor`, `voting_classifier`, `voting_regressor` | **P→sk** (base learners on the same bridge, per fold) | **P→sk→P** |
+
+Supporting machinery uses the same bridge:
+
 | Stage | Path | Notes |
 | :--- | :--- | :--- |
-| fit (sklearn models) | **P→sk** | `SklearnBridge.to_sklearn` extracts NumPy straight from Polars — no pandas in between. |
-| fit (XGBoost / LightGBM) | **P→N→lib** | Both libraries accept NumPy directly. |
-| predict / predict_proba | **P→sk→P** | Predictions come back as columns in the configured engine's frame type. |
-| Tuning, cross-validation | **P→sk** | Same bridge per fold. |
+| Hyperparameter tuning | **P→sk** | One bridge crossing per candidate/fold. |
+| Cross-validation | **P→sk** | Same bridge per fold. |
+| SHAP explanations | P→pd→P | SHAP internals are pandas-based; converted at the boundary, result handed back in the engine's frame type. |
 
 ## Deliberate pandas islands
 
@@ -116,7 +155,9 @@ These stay on pandas **by design**, whatever `SKYULF_ENGINE` is set to:
 | **Resampling** (Oversampling / Undersampling) | imblearn's SMOTE & co. are pandas/NumPy-bound; the node converts in, resamples, and hands the configured engine's frame type back. |
 | **Matplotlib visualizations** (e.g. scatter-matrix in the visualizer) | matplotlib's DataFrame API expects pandas. |
 | **great_expectations profiling** (`profiling/expect.py`) | The library consumes pandas. |
-| **sklearn model fit boundaries** | covered above — NumPy bridge, not pandas. |
+
+(Model fits are **not** a pandas island — they cross to NumPy directly, see
+the boundary explainer above.)
 
 ## Boundary services (convert at the edge, hand the engine's type back)
 
