@@ -5,6 +5,10 @@ frame and once as a Polars frame, so the numbers measure what a
 ``SKYULF_ENGINE`` choice costs end to end — including the legitimate
 pandas/sklearn boundaries that Polars still has to cross.
 
+Every node also runs a **parity check**: both engines' outputs are normalized
+to pandas and compared value-for-value, so a timing row is only reported for
+a node the two engines agree on.
+
 Run from the repo root:
     .venv/Scripts/python.exe skyulf-core/benchmarks/bench_engine_comparison.py
 """
@@ -63,7 +67,7 @@ NODES: list[tuple[str, str, dict[str, Any], str]] = [
     (
         "EllipticEnvelope",
         "EllipticEnvelope",
-        {"columns": NUMERIC[:2], "contamination": 0.01},
+        {"columns": NUMERIC[:2], "contamination": 0.01, "random_state": 42},
         "frame",
     ),
     ("OneHotEncoder", "OneHotEncoder", {"columns": CATS}, "frame"),
@@ -74,7 +78,7 @@ NODES: list[tuple[str, str, dict[str, Any], str]] = [
     (
         "TrainTestSplitter",
         "TrainTestSplitter",
-        {"test_size": 0.2, "target_column": TARGET},
+        {"test_size": 0.2, "target_column": TARGET, "random_state": 42},
         "frame",
     ),
     ("CountVectorizer", "count_vectorizer", {"columns": [TEXT]}, "frame"),
@@ -95,10 +99,84 @@ NODES: list[tuple[str, str, dict[str, Any], str]] = [
     (
         "GradientBoosting(n=30)",
         "gradient_boosting_classifier",
-        {"n_estimators": 30, "learning_rate": 0.1, "max_depth": 3},
+        {"n_estimators": 30, "learning_rate": 0.1, "max_depth": 3, "random_state": 42},
+        "model",
+    ),
+    (
+        "XGBoost(n=30)",
+        "xgboost_classifier",
+        {"n_estimators": 30, "max_depth": 4, "random_state": 42, "tree_method": "hist"},
         "model",
     ),
 ]
+
+
+# ── Parity: both engines must produce the same numbers, not just run ────────
+
+
+def _to_pandas_frames(out: Any) -> list[pd.DataFrame]:
+    """Normalize any node output (frames, tuples, SplitDataset) to pandas frames."""
+    if isinstance(out, tuple):
+        return [f for item in out for f in _to_pandas_frames(item)]
+    if hasattr(out, "train") and hasattr(out, "test"):  # SplitDataset
+        members = [out.train, out.test] + (
+            [out.validation] if getattr(out, "validation", None) is not None else []
+        )
+        return [f for item in members for f in _to_pandas_frames(item)]
+    if isinstance(out, pl.DataFrame):
+        return [out.to_pandas()]
+    if isinstance(out, pl.Series):
+        return [out.to_frame().to_pandas()]
+    if isinstance(out, pd.Series):
+        return [out.to_frame()]
+    if isinstance(out, pd.DataFrame):
+        return [out]
+    return []
+
+
+def _frames_equal(a: pd.DataFrame, b: pd.DataFrame) -> bool:
+    if list(a.columns) != list(b.columns) or len(a) != len(b):
+        return False
+    for col in a.columns:
+        ca, cb = a[col], b[col]
+        if pd.api.types.is_numeric_dtype(ca) and pd.api.types.is_numeric_dtype(cb):
+            if not np.allclose(
+                ca.astype(float), cb.astype(float), rtol=1e-9, atol=1e-9, equal_nan=True
+            ):
+                return False
+        elif not (ca.astype(str).values == cb.astype(str).values).all():
+            return False
+    return True
+
+
+def _parity(name: str, config: dict[str, Any], kind: str, frame_pd: pd.DataFrame) -> bool:
+    """True when the pandas-engine and polars-engine outputs agree value-for-value."""
+    calc_cls = NodeRegistry._calculators[name]
+
+    if kind == "model":
+        X_pd = frame_pd[NUMERIC].fillna(0.0)
+        y_pd = frame_pd[TARGET]
+        X_pl = pl.from_pandas(X_pd)
+        y_pl = pl.from_pandas(y_pd.to_frame()).to_series()
+        model_pd = calc_cls().fit(X_pd, y_pd, config)
+        model_pl = calc_cls().fit(X_pl, y_pl, config)
+        applier = NodeRegistry._appliers[name]()
+        pred_pd = np.asarray(applier.predict(X_pd, model_pd), dtype=float)
+        pred_pl = np.asarray(applier.predict(X_pl, model_pl), dtype=float)
+        return np.allclose(pred_pd, pred_pl, atol=1e-6)
+
+    frame_pl = pl.from_pandas(frame_pd)
+    params_pd = calc_cls().fit(frame_pd, config)
+    params_pl = calc_cls().fit(frame_pl, config)
+    applier = NodeRegistry._appliers[name]()
+    frames_pd = _to_pandas_frames(applier.apply(frame_pd, params_pd))
+    frames_pl = _to_pandas_frames(applier.apply(frame_pl, params_pl))
+    return len(frames_pd) == len(frames_pl) > 0 and all(
+        _frames_equal(a, b) for a, b in zip(frames_pd, frames_pl, strict=True)
+    )
+
+
+# ── Timing ───────────────────────────────────────────────────────────────────
 
 
 def _run_node(
@@ -144,15 +222,18 @@ def main() -> None:
         f"{len(CATS)} cat, 1 text, 1 target)"
     )
     frame_pd = _make_pandas()
-    print(f"\n{'node':<22} {'pandas':>10} {'polars':>10} {'speedup':>9}")
+    print(f"\n{'node':<22} {'parity':>7} {'pandas':>10} {'polars':>10} {'speedup':>9}")
     for label, name, config, kind in NODES:
         try:
+            ok = _parity(name, config, kind, frame_pd)
             pd_t, pl_t = _run_node(name, config, kind, frame_pd)
         except Exception as e:  # keep the table alive if one node can't run
-            print(f"{label:<22} {'SKIP':>10} {type(e).__name__}: {e}")
+            print(f"{label:<22} {'-':>7} {'SKIP':>10} {type(e).__name__}: {e}")
             continue
         speedup = pd_t / pl_t if pl_t > 0 else float("inf")
-        print(f"{label:<22} {pd_t:>9.3f}s {pl_t:>9.3f}s {speedup:>8.2f}x")
+        print(
+            f"{label:<22} {'ok' if ok else 'DIFF':>7} {pd_t:>9.3f}s {pl_t:>9.3f}s {speedup:>8.2f}x"
+        )
 
 
 if __name__ == "__main__":
