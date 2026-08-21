@@ -53,6 +53,10 @@ boundaries Polars still has to cross, i.e. they measure what the
 
 *   **Dataset:** 200,000 rows × 21 columns (12 floats incl. 4 with 5% missing,
     4 nullable ints, 3 categorical, 1 text, 1 binary target).
+*   **Configs:** every node runs with realistic, fully-specified settings —
+    8–12 column sets, n-gram (1,2) + `max_features` text options, stratified
+    train/test/validation split, quantile binning with missing labels,
+    `drop_first`/unknown-handling encoders, 50-tree models with subsampling.
 *   **Measurement:** median of 3 runs per node (model fits: 1 run).
 *   **Correctness:** before any timing, the script runs a **parity check** —
     each node is fit+applied on both engines and the outputs are compared
@@ -61,37 +65,38 @@ boundaries Polars still has to cross, i.e. they measure what the
 
 | Node | pandas | polars | Speedup |
 | :--- | :--- | :--- | :--- |
-| **SimpleImputer** | 0.166s | **0.003s** | **58.1x** |
-| **HashEncoder** | 0.040s | **0.010s** | **4.18x** |
-| **MinMaxScaler** | 0.025s | **0.007s** | **3.45x** |
-| **TrainTestSplitter** | 0.040s | **0.018s** | **2.17x** |
-| **GeneralBinning** | 0.016s | **0.009s** | **1.80x** |
-| **LabelEncoder** | 0.041s | **0.027s** | **1.52x** |
-| **Winsorize** | 0.029s | **0.019s** | **1.51x** |
-| **ZScore** | 0.022s | **0.015s** | **1.48x** |
-| **RobustScaler** | 0.074s | **0.056s** | **1.33x** |
-| **StandardScaler** | 0.048s | **0.037s** | **1.30x** |
-| **EllipticEnvelope** | 0.090s | **0.071s** | **1.26x** |
-| **IQR** | 0.029s | **0.026s** | **1.14x** |
-| **OrdinalEncoder** | 0.104s | **0.093s** | **1.12x** |
-| **Tokenizer** | 0.572s | **0.509s** | **1.12x** |
-| **LogisticRegression** | 0.104s | **0.095s** | **1.10x** |
-| **PowerTransformer** | 1.437s | **1.381s** | **1.04x** |
-| **CountVectorizer** | 1.173s | **1.132s** | **1.04x** |
-| **GradientBoosting (n=30)** | 10.439s | **10.285s** | **1.02x** |
-| **TfidfVectorizer** | 1.141s | 1.163s | 0.98x |
-| **XGBoost (n=30)** | 0.141s | 0.143s | 0.98x |
-| **RandomForest (n=20)** | 0.749s | 0.769s | 0.97x |
-| **OneHotEncoder** | 0.225s | 0.233s | 0.96x |
+| **SimpleImputer** | 0.171s | **0.002s** | **105.8x** |
+| **HashEncoder** | 0.046s | **0.009s** | **4.90x** |
+| **MinMaxScaler** | 0.023s | **0.005s** | **4.57x** |
+| **StandardScaler** | 0.051s | **0.029s** | **1.78x** |
+| **TrainTestSplitter** | 0.118s | **0.069s** | **1.71x** |
+| **LabelEncoder** | 0.046s | **0.028s** | **1.65x** |
+| **Winsorize** | 0.053s | **0.037s** | **1.42x** |
+| **ZScore** | 0.035s | **0.025s** | **1.40x** |
+| **RobustScaler** | 0.076s | **0.055s** | **1.37x** |
+| **EllipticEnvelope** | 0.182s | **0.144s** | **1.27x** |
+| **OrdinalEncoder** | 0.106s | **0.088s** | **1.20x** |
+| **Tokenizer** | 1.033s | **0.909s** | **1.14x** |
+| **LogisticRegression** | 0.104s | **0.102s** | **1.01x** |
+| **RandomForest (n=50)** | 1.715s | **1.695s** | **1.01x** |
+| **GradientBoosting (n=50)** | 15.343s | **15.342s** | **1.00x** |
+| **TfidfVectorizer** | 2.350s | 2.406s | 0.98x |
+| **OneHotEncoder** | 0.256s | 0.264s | 0.97x |
+| **CountVectorizer** | 2.233s | 2.292s | 0.97x |
+| **IQR** | 0.054s | 0.056s | 0.96x |
+| **XGBoost (n=50)** | 0.270s | 0.283s | 0.95x |
+| **PowerTransformer** | 1.542s | 1.666s | 0.93x |
+| **GeneralBinning** | 0.002s | 0.003s | 0.50x |
 
-**Read:** data-munging nodes (imputation, scaling, binning, splitting, hash
-encoding) win big on Polars — up to 58x. Nodes whose runtime is dominated by
+**Read:** data-munging nodes (imputation, scaling, splitting, hash encoding)
+win big on Polars — up to 106x. Nodes whose runtime is dominated by
 scikit-learn / XGBoost compute (PowerTransformer, text vectorizers, all model
 fits) land at ~1.0x, because their work happens on the other side of the
 unavoidable sklearn boundary and the frame conversion is a rounding error.
-Polars never loses meaningfully: the worst case is noise-level. Sub-100ms rows
-vary a few tenths of a speedup step between runs on dev hardware; the ordering
-is stable.
+Polars never loses meaningfully: everything at or below 1.0x is noise-level
+(GeneralBinning's whole fit+apply takes ~2ms — below the measurement floor).
+Sub-100ms rows vary a few tenths of a speedup step between runs on dev
+hardware; the ordering is stable.
 
 That is exactly the hybrid design's bet: stay Polars end to end for data
 movement, convert only at the sklearn boundary, and pay no penalty for doing so.
