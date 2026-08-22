@@ -34,6 +34,7 @@ __all__ = [
     "SplitDataset",
     "FeatureEngineer",
     "NodeRegistry",
+    "validate_leakage_safety",
     "EDAAnalyzer",
     "EDAVisualizer",
     "ExpectationError",
