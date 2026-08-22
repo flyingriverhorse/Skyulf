@@ -320,6 +320,7 @@ def _woe_fit_transform_train_polars(
         "category with its log-odds and records Information Value per column."
     ),
     params={"regularization": 0.5, "columns": []},
+    learns_from_data=True,
 )
 class WOEEncoderCalculator(BaseCalculator):
     @fit_method

@@ -138,6 +138,8 @@ class SplitApplier(BaseApplier):
         "stratify": False,
         "target_column": "target",
     },
+    learns_from_data=False,
+    is_splitter=True,
 )
 class SplitCalculator(BaseCalculator):
     def fit(
@@ -376,6 +378,7 @@ class FeatureTargetSplitApplier(BaseApplier):
     category="Data Operations",
     description="Split the dataset into features (X) and target (y).",
     params={"target_column": "target"},
+    learns_from_data=False,
 )
 class FeatureTargetSplitCalculator(BaseCalculator):
     def fit(

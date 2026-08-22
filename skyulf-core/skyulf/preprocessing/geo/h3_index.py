@@ -114,6 +114,7 @@ class H3IndexApplier(BaseApplier):
         "'h3' package (pip install skyulf-core[geo])."
     ),
     params={"lat_col": "", "lon_col": "", "resolution": 9, "output_column": "h3_index"},
+    learns_from_data=False,
 )
 class H3IndexCalculator(BaseCalculator):
     @fit_method

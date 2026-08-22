@@ -30,6 +30,7 @@ class FeatureGenerationApplier(BaseApplier):
     category="Feature Engineering",
     description="Generate new features using mathematical operations.",
     params={"operations": []},
+    learns_from_data=False,
 )
 class FeatureGenerationCalculator(BaseCalculator):
     def fit(

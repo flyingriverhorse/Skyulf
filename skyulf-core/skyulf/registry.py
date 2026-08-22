@@ -47,6 +47,8 @@ class NodeRegistry:
                         "description": meta.description,
                         "params": meta.params,
                         "tags": meta.tags,
+                        "learns_from_data": meta.learns_from_data,
+                        "is_splitter": meta.is_splitter,
                     }
 
             return calculator_cls

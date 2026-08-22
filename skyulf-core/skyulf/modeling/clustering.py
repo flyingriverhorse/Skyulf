@@ -119,6 +119,7 @@ class KMeansApplier(_NumericOnlyClusteringApplier):
     description="Partition rows into a fixed number of clusters (segments) by similarity.",
     params={"n_clusters": 3, "n_init": 10, "random_state": 42},
     tags=["clustering", "requires_scaling"],
+    learns_from_data=True,
 )
 class KMeansCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator):
     """K-Means Calculator."""
@@ -151,6 +152,7 @@ class MiniBatchKMeansApplier(_NumericOnlyClusteringApplier):
     ),
     params={"n_clusters": 3, "batch_size": 1024, "n_init": 10, "random_state": 42},
     tags=["clustering", "requires_scaling"],
+    learns_from_data=True,
 )
 class MiniBatchKMeansCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator):
     """Mini-Batch K-Means Calculator."""
@@ -190,6 +192,7 @@ class GaussianMixtureApplier(_NumericOnlyClusteringApplier):
     ),
     params={"n_components": 3, "covariance_type": "full", "random_state": 42},
     tags=["clustering", "requires_scaling"],
+    learns_from_data=True,
 )
 class GaussianMixtureCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator):
     """Gaussian Mixture Calculator."""
@@ -222,6 +225,7 @@ class BirchApplier(_NumericOnlyClusteringApplier):
     ),
     params={"n_clusters": 3, "threshold": 0.5, "branching_factor": 50},
     tags=["clustering", "requires_scaling"],
+    learns_from_data=True,
 )
 class BirchCalculator(_NumericOnlyClusteringCalculatorMixin, SklearnCalculator):
     """Birch Calculator."""

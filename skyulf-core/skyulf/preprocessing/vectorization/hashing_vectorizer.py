@@ -106,6 +106,7 @@ def _build_hashing_artifact(
         "drop_original": False,
     },
     tags=["text", "nlp", "hashing", "vectorizer", "stateless"],
+    learns_from_data=False,
 )
 class HashingVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:

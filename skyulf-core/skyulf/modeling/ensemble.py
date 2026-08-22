@@ -510,6 +510,7 @@ class VotingClassifierApplier(SklearnApplier):
         "voting": "soft",
     },
     tags=["requires_scaling", "classification"],
+    learns_from_data=True,
 )
 class VotingClassifierCalculator(_BaseEnsembleCalculator):
     """Voting Classifier Calculator with selectable base learners."""
@@ -547,6 +548,7 @@ class StackingClassifierApplier(SklearnApplier):
         "cv": 5,
     },
     tags=["requires_scaling", "classification"],
+    learns_from_data=True,
 )
 class StackingClassifierCalculator(_BaseEnsembleCalculator):
     """Stacking Classifier Calculator with selectable base + final learners."""
@@ -583,6 +585,7 @@ class VotingRegressorApplier(SklearnApplier):
         "base_estimators": ["linear_regression", "random_forest", "gradient_boosting"],
     },
     tags=["requires_scaling", "regression"],
+    learns_from_data=True,
 )
 class VotingRegressorCalculator(_BaseEnsembleCalculator):
     """Voting Regressor Calculator with selectable base learners."""
@@ -619,6 +622,7 @@ class StackingRegressorApplier(SklearnApplier):
         "cv": 5,
     },
     tags=["requires_scaling", "regression"],
+    learns_from_data=True,
 )
 class StackingRegressorCalculator(_BaseEnsembleCalculator):
     """Stacking Regressor Calculator with selectable base + final learners."""

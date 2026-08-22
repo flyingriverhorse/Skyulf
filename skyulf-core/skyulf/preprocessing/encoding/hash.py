@@ -92,6 +92,7 @@ class HashEncoderApplier(BaseApplier):
     category="Preprocessing",
     description="Encode categorical features using hashing.",
     params={"n_features": 8, "columns": []},
+    learns_from_data=True,
 )
 class HashEncoderCalculator(BaseCalculator):
     @fit_method

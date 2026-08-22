@@ -185,6 +185,7 @@ class TextCleaningApplier(BaseApplier):
     category="Cleaning",
     description="Clean text data (trim, case conversion, remove special chars).",
     params={"columns": [], "operations": []},
+    learns_from_data=False,
 )
 class TextCleaningCalculator(BaseCalculator):
     def infer_output_schema(

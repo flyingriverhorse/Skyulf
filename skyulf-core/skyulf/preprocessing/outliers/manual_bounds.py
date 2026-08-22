@@ -89,6 +89,7 @@ class ManualBoundsApplier(BaseApplier):
     category="Preprocessing",
     description="Filter outliers by manually specifying lower and upper bounds for columns.",
     params={"bounds": {}},
+    learns_from_data=False,
 )
 class ManualBoundsCalculator(BaseCalculator):
     def infer_output_schema(

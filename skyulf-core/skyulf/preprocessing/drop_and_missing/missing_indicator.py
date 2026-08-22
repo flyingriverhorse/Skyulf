@@ -85,6 +85,7 @@ def _missing_indicator_fit_pandas(
     category="Feature Engineering",
     description="Create binary indicators for missing values.",
     params={"columns": [], "flag_suffix": _DEFAULT_FLAG_SUFFIX},
+    learns_from_data=True,
 )
 class MissingIndicatorCalculator(BaseCalculator):
     def infer_output_schema(

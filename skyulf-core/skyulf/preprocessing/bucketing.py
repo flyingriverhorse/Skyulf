@@ -428,6 +428,7 @@ def _fit_one_column_into_maps(
     category="Preprocessing",
     description="Bin continuous data into intervals.",
     params={"n_bins": 5, "strategy": "uniform", "columns": []},
+    learns_from_data=True,
 )
 class GeneralBinningCalculator(BaseCalculator):
     """Master calculator that handles mixed strategies and per-column overrides."""
@@ -473,6 +474,7 @@ class CustomBinningApplier(GeneralBinningApplier):
     category="Preprocessing",
     description="Bin data using custom edges.",
     params={"bins": [], "columns": []},
+    learns_from_data=False,
 )
 class CustomBinningCalculator(BaseCalculator):
     """Apply user-supplied bin edges to selected columns."""
@@ -511,6 +513,7 @@ class KBinsDiscretizerApplier(GeneralBinningApplier):
     category="Preprocessing",
     description="Bin continuous data into intervals using sklearn KBinsDiscretizer.",
     params={"n_bins": 5, "encode": "ordinal", "strategy": "quantile", "columns": []},
+    learns_from_data=True,
 )
 class KBinsDiscretizerCalculator(GeneralBinningCalculator):
     """Thin wrapper around :class:`GeneralBinningCalculator` with ``kbins`` strategy."""

@@ -146,6 +146,7 @@ class ValueReplacementApplier(BaseApplier):
     category="Cleaning",
     description="Replace specified values with new values.",
     params={"columns": [], "mapping": {}},
+    learns_from_data=False,
 )
 class ValueReplacementCalculator(BaseCalculator):
     def infer_output_schema(

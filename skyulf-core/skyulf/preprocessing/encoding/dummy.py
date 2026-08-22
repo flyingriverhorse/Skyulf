@@ -130,6 +130,7 @@ def _dummy_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     category="Preprocessing",
     description="Convert categorical variables into dummy/indicator variables (pandas.get_dummies).",
     params={"columns": [], "drop_first": False},
+    learns_from_data=True,
 )
 class DummyEncoderCalculator(BaseCalculator):
     @fit_method

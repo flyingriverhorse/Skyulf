@@ -1,5 +1,7 @@
 """Tests for the standalone preprocessing leakage-safety diagnostic."""
 
+import pytest
+
 import skyulf
 from skyulf.pipeline import SkyulfPipeline
 
@@ -14,15 +16,29 @@ def test_validate_leakage_safety_reports_learned_step_before_splitter():
         "modeling": {},
     }
 
-    warnings = skyulf.validate_leakage_safety(config)
+    warnings = skyulf.validate_leakage_safety(config, on_leakage="warn")
 
     assert len(warnings) == 1
     assert "Step 0 ('SimpleImputer')" in warnings[0]
     assert "step 1, 'TrainTestSplitter'" in warnings[0]
 
 
-def test_validate_leakage_safety_allows_splitter_first_or_absent():
-    """A safe order or no train/test boundary should produce no warnings."""
+def test_validate_leakage_safety_raises_on_learned_step_before_splitter_by_default():
+    """Since the enforcement batch the default on_leakage is 'raise'."""
+    config = {
+        "preprocessing": [
+            {"name": "fill missing", "transformer": "SimpleImputer", "params": {}},
+            {"name": "split", "transformer": "TrainTestSplitter", "params": {}},
+        ],
+        "modeling": {},
+    }
+
+    with pytest.raises(ValueError, match="SimpleImputer"):
+        skyulf.validate_leakage_safety(config)
+
+
+def test_validate_leakage_safety_allows_splitter_first():
+    """A safe order should produce no warnings."""
     splitter_first = {
         "preprocessing": [
             {"name": "split", "transformer": "Split", "params": {}},
@@ -30,6 +46,12 @@ def test_validate_leakage_safety_allows_splitter_first_or_absent():
         ],
         "modeling": {},
     }
+
+    assert skyulf.validate_leakage_safety(splitter_first) == []
+
+
+def test_validate_leakage_safety_reports_missing_splitter():
+    """No train/test boundary now yields an explicit advisory diagnostic."""
     no_splitter = {
         "preprocessing": [
             {"name": "scale", "transformer": "StandardScaler", "params": {}},
@@ -37,8 +59,10 @@ def test_validate_leakage_safety_allows_splitter_first_or_absent():
         "modeling": {},
     }
 
-    assert skyulf.validate_leakage_safety(splitter_first) == []
-    assert skyulf.validate_leakage_safety(no_splitter) == []
+    warnings = skyulf.validate_leakage_safety(no_splitter)
+
+    assert len(warnings) == 1
+    assert "No train/test split" in warnings[0]
 
 
 def test_pipeline_validate_leakage_safety_delegates_to_module_function():
@@ -51,9 +75,9 @@ def test_pipeline_validate_leakage_safety_delegates_to_module_function():
         "modeling": {},
     }
 
-    assert SkyulfPipeline(config).validate_leakage_safety() == skyulf.validate_leakage_safety(
-        config
-    )
+    assert SkyulfPipeline(config).validate_leakage_safety(
+        on_leakage="warn"
+    ) == skyulf.validate_leakage_safety(config, on_leakage="warn")
 
 
 def test_validate_leakage_safety_is_importable_from_package_top_level():

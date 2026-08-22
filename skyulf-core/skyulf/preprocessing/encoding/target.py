@@ -300,6 +300,7 @@ def _target_fit_transform_train_pandas(
     category="Preprocessing",
     description="Encode categorical features using target statistics.",
     params={"smooth": "auto", "target_type": "auto", "columns": []},
+    learns_from_data=True,
 )
 class TargetEncoderCalculator(BaseCalculator):
     @fit_method

@@ -15,80 +15,60 @@ actionable ``ValueError`` before execution starts if any data-dependent
 preprocessing node can reach a train/test splitter downstream (i.e. it is
 an ancestor of a splitter, meaning it necessarily runs and fits *before*
 the split).
+
+The node classification is **single-sourced from skyulf-core**: every node
+declares ``learns_from_data`` on its ``@node_meta``, and
+``skyulf.leakage.data_dependent_transformers`` /
+``train_test_splitters`` derive both sets from the registry. There is no
+second hand-maintained list here to drift (audit finding F-16 / gap G2).
+Nodes deliberately classified ``learns_from_data=False`` include the
+fixed-map replacements (ValueReplacement/AliasReplacement/
+InvalidValueReplacement), Casting, user-fixed edges/bounds
+(CustomBinning/ManualBounds), per-row rules (DropMissingRows, GeoDistance,
+H3Index, DateFeatures, LagFeatures, RollingAggregate, feature math /
+polynomial / interaction generation, TextCleaning, tokenizer,
+sentence_embedder, hashing_vectorizer) and the inspection nodes.
 """
+
+import logging
+
+from skyulf.leakage import (
+    OnLeakage,
+    data_dependent_transformers,
+    train_test_splitters,
+)
 
 from .schemas import NodeConfig
 
-# Step types whose ``.fit()`` learns parameters from the statistical
-# distribution of the data it's given (means/std, learned categories,
-# medians, variance/correlation, quantile-based thresholds, target
-# statistics, vocabulary/IDF, etc.). Fitting one of these on data that
-# still includes the test/validation portion leaks that portion's
-# information into the fitted parameters, even though the transformer is
-# only ever *applied* to train afterward.
-#
-# Deliberately excluded (stateless / rule-based — safe regardless of
-# graph position): HashEncoder (deterministic hash, no learned vocabulary),
-# CustomBinning/ManualBounds (user-fixed edges/bounds, not data-derived),
-# ValueReplacement/AliasReplacement/InvalidValueReplacement (fixed
-# replacement maps), Casting, DropMissingColumns/Rows, Deduplicate,
-# MissingIndicator, GeoDistance, H3Index, DateFeatures, RollingAggregate,
-# LagFeatures, FeatureMath/FeatureGenerationNode/FeatureInteraction,
-# PolynomialFeatures, TextCleaning, tokenizer, sentence_embedder,
-# hashing_vectorizer.
-DATA_DEPENDENT_FIT_STEP_TYPES: frozenset[str] = frozenset(
-    {
-        # Imputation — mean/median/most-frequent/KNN-neighbor/iterative-model
-        # statistics learned from the data.
-        "SimpleImputer",
-        "KNNImputer",
-        "IterativeImputer",
-        # Scaling — mean/std/min/max/median/IQR learned from the data.
-        "StandardScaler",
-        "MinMaxScaler",
-        "RobustScaler",
-        "MaxAbsScaler",
-        # Encoding — category vocabulary, frequency, or target statistics
-        # learned from the data.
-        "OneHotEncoder",
-        "LabelEncoder",
-        "OrdinalEncoder",
-        "DummyEncoder",
-        "TargetEncoder",
-        "WOEEncoder",
-        # Outlier detection — thresholds/covariance learned from the data's
-        # own distribution.
-        "IQR",
-        "ZScore",
-        "Winsorize",
-        "EllipticEnvelope",
-        # Feature selection — selects/drops features using data statistics
-        # (variance, correlation, univariate score, model importance).
-        "VarianceThreshold",
-        "CorrelationThreshold",
-        "UnivariateSelection",
-        "ModelBasedSelection",
-        "feature_selection",
-        # Bucketing/binning — bin edges learned from the data's own
-        # quantiles/distribution (not user-fixed).
-        "GeneralBinning",
-        "EqualWidthBinning",
-        "EqualFrequencyBinning",
-        "KBinsDiscretizer",
-        # Distribution transforms — optimal lambda learned from the data.
-        "PowerTransformer",
-        # Text vectorization — vocabulary/IDF learned from the training
-        # corpus.
-        "count_vectorizer",
-        "tfidf_vectorizer",
-    }
+logger = logging.getLogger(__name__)
+
+_ON_LEAKAGE_MODES = frozenset({"raise", "warn", "ignore"})
+
+NO_SPLIT_DIAGNOSTIC = (
+    "No train/test split is defined in this pipeline graph, so the leakage "
+    "guarantee does not apply: every fit sees the whole dataset. Add a "
+    "TrainTestSplitter (or rely on cross-validation) to restore the guarantee."
 )
 
-# Step types that partition rows into train/test (the leakage boundary).
-# "feature_target_split" is deliberately excluded — it only separates
-# features (X) from the target (y) and creates no train/test boundary, so
-# preprocessing before it is not a leakage concern.
-TRAIN_TEST_SPLIT_STEP_TYPES: frozenset[str] = frozenset({"TrainTestSplitter", "Split"})
+
+def data_dependent_step_types() -> frozenset[str]:
+    """Step types whose ``.fit()`` learns parameters from the data it's given
+    (means/std, learned categories, medians, variance/correlation,
+    quantile-based thresholds, target statistics, vocabulary/IDF, missingness
+    structure, duplicate sets, etc.). Fitting one of these on data that still
+    includes the test/validation portion leaks that portion's information
+    into the fitted parameters, even though the transformer is only ever
+    *applied* to train afterward. Derived from the skyulf-core registry."""
+    return data_dependent_transformers()
+
+
+def train_test_split_step_types() -> frozenset[str]:
+    """Step types that partition rows into train/test (the leakage boundary).
+    ``feature_target_split`` is deliberately not one — it only separates
+    features (X) from the target (y) and creates no train/test boundary, so
+    preprocessing before it is not a leakage concern."""
+    return train_test_splitters()
+
 
 # Encoder step types that can operate purely on the target column (y)
 # instead of feature columns, depending on their config.
@@ -151,7 +131,7 @@ def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
     Built with a single reverse-topological accumulation pass (each node's
     descendant set is the union of its direct children's descendant sets,
     plus the children themselves) rather than a BFS/DFS per node, so the
-    whole map is O(nodes + edges) instead of O(nodes^2) in the worst case.
+    whole map is O(nodes + edges) instead of O(n^2) in the worst case.
     """
     children: dict[str, list[str]] = {n.node_id: [] for n in nodes}
     for n in nodes:
@@ -182,7 +162,9 @@ def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
     return descendants
 
 
-def validate_no_preprocessing_before_split(nodes: list[NodeConfig]) -> None:
+def validate_no_preprocessing_before_split(
+    nodes: list[NodeConfig], on_leakage: OnLeakage = "raise"
+) -> None:
     """Raises ``ValueError`` if a data-dependent preprocessing node precedes a splitter.
 
     A node "precedes" a splitter here if the splitter is reachable by
@@ -190,26 +172,43 @@ def validate_no_preprocessing_before_split(nodes: list[NodeConfig]) -> None:
     i.e. the preprocessing node is a topological ancestor of the splitter,
     so it necessarily executes (and fits) before the split happens.
 
-    No-op if the graph has no train/test splitter node at all (e.g.
-    inference-only pipelines, or pipelines that never split), since there's
-    no train/test boundary to leak across.
+    ``on_leakage`` selects the verdict for definite violations: ``"raise"``
+    (default) blocks execution, ``"warn"`` logs the same message without
+    blocking, ``"ignore"`` stays silent. A graph with no train/test splitter
+    at all (e.g. inference-only pipelines) gets an explicit advisory warning
+    instead of silence — the leakage guarantee simply does not apply there —
+    unless ``on_leakage="ignore"``.
+
+    Step types unknown to the skyulf-core registry (backend infrastructure
+    such as data loaders, trainers and evaluators) are skipped: every real
+    preprocessing node is registered there, and the required
+    ``learns_from_data`` declaration makes it impossible for one to be
+    silently omitted from the data-dependent set.
     """
-    splitter_ids = {n.node_id for n in nodes if n.step_type in TRAIN_TEST_SPLIT_STEP_TYPES}
+    if on_leakage not in _ON_LEAKAGE_MODES:
+        raise ValueError(
+            f"on_leakage must be one of {sorted(_ON_LEAKAGE_MODES)}, got {on_leakage!r}"
+        )
+
+    splitter_ids = {n.node_id for n in nodes if n.step_type in train_test_split_step_types()}
     if not splitter_ids:
+        if on_leakage != "ignore":
+            logger.warning(NO_SPLIT_DIAGNOSTIC)
         return
 
     descendants = _build_descendant_map(nodes)
     target_column = _find_target_column(nodes)
+    data_dependent = data_dependent_step_types()
 
     for n in nodes:
-        if n.step_type not in DATA_DEPENDENT_FIT_STEP_TYPES:
+        if n.step_type not in data_dependent:
             continue
         if _is_target_only_encoding(n.step_type, n.params, target_column):
             continue
         leaking_splitters = descendants.get(n.node_id, set()) & splitter_ids
         if leaking_splitters:
             splitter_name = sorted(leaking_splitters)[0]
-            raise ValueError(
+            message = (
                 f"Data leakage risk: node '{n.node_id}' ({n.step_type}) fits on "
                 f"the whole dataset before the '{splitter_name}' train/test split "
                 "downstream, so its learned statistics (e.g. mean/std, learned "
@@ -219,3 +218,7 @@ def validate_no_preprocessing_before_split(nodes: list[NodeConfig]) -> None:
                 "FeatureTargetSplitter before it if you only need to separate "
                 "the target column (that does not create a train/test boundary)."
             )
+            if on_leakage == "raise":
+                raise ValueError(message)
+            if on_leakage == "warn":
+                logger.warning(message)

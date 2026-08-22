@@ -87,6 +87,7 @@ class LagFeaturesApplier(BaseApplier):
     description="Create lagged copies of columns to expose past values (time series).",
     params={"columns": [], "lags": [1], "group_by": None, "sort_by": None, "drop_na": False},
     tags=["time-series"],
+    learns_from_data=False,
 )
 class LagFeaturesCalculator(BaseCalculator):
     def fit(

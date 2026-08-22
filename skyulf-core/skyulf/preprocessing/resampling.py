@@ -238,6 +238,7 @@ class OversamplingApplier(BaseApplier):
     category="Preprocessing",
     description="Resample dataset to balance classes by oversampling minority class.",
     params={"method": "smote", "target_column": "target", "sampling_strategy": "auto"},
+    learns_from_data=True,
 )
 class OversamplingCalculator(BaseCalculator):
     def infer_output_schema(
@@ -349,6 +350,7 @@ class UndersamplingApplier(BaseApplier):
         "target_column": "target",
         "sampling_strategy": "auto",
     },
+    learns_from_data=True,
 )
 class UndersamplingCalculator(BaseCalculator):
     def infer_output_schema(

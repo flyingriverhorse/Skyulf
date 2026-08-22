@@ -67,6 +67,7 @@ class IQRApplier(BaseApplier):
     category="Preprocessing",
     description="Remove outliers using Interquartile Range.",
     params={"multiplier": 1.5, "columns": []},
+    learns_from_data=True,
 )
 class IQRCalculator(BaseCalculator):
     def infer_output_schema(

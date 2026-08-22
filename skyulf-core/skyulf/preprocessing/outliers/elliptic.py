@@ -88,6 +88,7 @@ class EllipticEnvelopeApplier(BaseApplier):
     category="Preprocessing",
     description="Detect outliers in a Gaussian distributed dataset.",
     params={"contamination": 0.01, "columns": [], "random_state": 42},
+    learns_from_data=True,
 )
 class EllipticEnvelopeCalculator(BaseCalculator):
     def infer_output_schema(
