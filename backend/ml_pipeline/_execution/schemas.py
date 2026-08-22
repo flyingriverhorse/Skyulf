@@ -137,3 +137,9 @@ class PipelineExecutionResult:
     # was available, ``None`` otherwise. Populated in ``PipelineEngine.run``
     # before the per-node loop runs.
     predicted_schemas: dict[str, dict[str, Any] | None] = field(default_factory=dict)
+    # Pre-execution leakage-gate verdict
+    # (``{"status": "passed" | "no_split" | "warnings", "messages": [...]}``),
+    # captured by ``PipelineEngine.run`` before any node fits and stamped
+    # onto the job metrics by ``JobStrategy.handle_success`` so Job Details
+    # can show it. ``None`` for runs that bypass the gate (e.g. previews).
+    leakage_verdict: dict[str, Any] | None = None

@@ -300,4 +300,34 @@ describe('JobDetailsView', () => {
     const progressValue = within(progressLabel.parentElement as HTMLElement).getByText('Not reported');
     expect(progressValue).toBeInTheDocument();
   });
+
+  it('shows a passed leakage-gate verdict tile for jobs that ran through the gate', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: { metrics: { leakage_gate: { status: 'passed', messages: [] } } },
+    }));
+    const label = screen.getByText('Leakage Gate');
+    expect(within(label.parentElement as HTMLElement).getByText('Passed')).toBeInTheDocument();
+  });
+
+  it('flags jobs trained without a train/test split in the gate tile', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'no_split',
+            messages: ['No train/test split is defined in this pipeline graph.'],
+          },
+        },
+      },
+    }));
+    const label = screen.getByText('Leakage Gate');
+    expect(within(label.parentElement as HTMLElement).getByText('No split')).toBeInTheDocument();
+  });
+
+  it('omits the gate tile for legacy jobs without a verdict', () => {
+    renderDetails(makeJob({ status: 'completed', result: { metrics: { accuracy: 0.9 } } }));
+    expect(screen.queryByText('Leakage Gate')).not.toBeInTheDocument();
+  });
 });

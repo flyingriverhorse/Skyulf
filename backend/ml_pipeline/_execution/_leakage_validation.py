@@ -31,6 +31,7 @@ sentence_embedder, hashing_vectorizer) and the inspection nodes.
 """
 
 import logging
+from typing import Any
 
 from skyulf.leakage import (
     OnLeakage,
@@ -168,7 +169,7 @@ def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
 
 def validate_no_preprocessing_before_split(
     nodes: list[NodeConfig], on_leakage: OnLeakage = "raise"
-) -> None:
+) -> dict[str, Any]:
     """Raises ``ValueError`` if a data-dependent preprocessing node precedes a splitter.
 
     A node "precedes" a splitter here if the splitter is reachable by
@@ -182,6 +183,13 @@ def validate_no_preprocessing_before_split(
     at all (e.g. inference-only pipelines) gets an explicit advisory warning
     instead of silence — the leakage guarantee simply does not apply there —
     unless ``on_leakage="ignore"``.
+
+    Returns the gate verdict so the engine can persist it on the job record
+    (Job Details shows it as factual per-job information):
+    ``{"status": "passed" | "no_split" | "warnings", "messages": [...]}``.
+    The verdict reflects the graph analysis regardless of ``on_leakage``;
+    the mode only controls whether violations raise or log. Under ``"raise"``
+    a violating graph never returns — it raises first.
 
     Step types unknown to the skyulf-core registry (backend infrastructure
     such as data loaders, trainers and evaluators) are skipped: every real
@@ -198,12 +206,13 @@ def validate_no_preprocessing_before_split(
     if not splitter_ids:
         if on_leakage != "ignore":
             logger.warning(NO_SPLIT_DIAGNOSTIC)
-        return
+        return {"status": "no_split", "messages": [NO_SPLIT_DIAGNOSTIC]}
 
     descendants = _build_descendant_map(nodes)
     target_column = _find_target_column(nodes)
     data_dependent = data_dependent_step_types()
 
+    messages: list[str] = []
     for n in nodes:
         if n.step_type not in data_dependent:
             continue
@@ -234,3 +243,8 @@ def validate_no_preprocessing_before_split(
                 raise ValueError(message)
             if on_leakage == "warn":
                 logger.warning(message)
+            messages.append(message)
+
+    if messages:
+        return {"status": "warnings", "messages": messages}
+    return {"status": "passed", "messages": []}

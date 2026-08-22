@@ -13,6 +13,7 @@ import logging
 import pytest
 
 from backend.ml_pipeline._execution._leakage_validation import (
+    NO_SPLIT_DIAGNOSTIC,
     validate_no_preprocessing_before_split,
 )
 from backend.ml_pipeline._execution.schemas import NodeConfig
@@ -145,6 +146,41 @@ def test_on_leakage_warn_logs_instead_of_raising(caplog):
     ):
         validate_no_preprocessing_before_split(nodes, on_leakage="warn")  # must not raise
     assert any("Data leakage risk" in r.message for r in caplog.records)
+
+
+def test_validate_returns_passed_verdict_for_a_clean_graph():
+    """The gate returns a structured verdict the engine persists on the job."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("split", "TrainTestSplitter", ["load"]),
+        _node("scale", "StandardScaler", ["split"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict == {"status": "passed", "messages": []}
+
+
+def test_validate_returns_no_split_verdict_with_the_advisory_diagnostic(caplog):
+    """A splitter-less graph gets the advisory diagnostic in the verdict."""
+    nodes = [_node("load", "DataLoader", []), _node("scale", "StandardScaler", ["load"])]
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict["status"] == "no_split"
+    assert verdict["messages"] == [NO_SPLIT_DIAGNOSTIC]
+
+
+def test_validate_returns_warning_verdict_in_warn_mode():
+    """warn mode returns the violation messages instead of raising."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+    assert verdict["status"] == "warnings"
+    assert len(verdict["messages"]) == 1
+    assert "Data leakage risk" in verdict["messages"][0]
 
 
 def test_raises_for_indirect_ancestor_through_branching_graph():
