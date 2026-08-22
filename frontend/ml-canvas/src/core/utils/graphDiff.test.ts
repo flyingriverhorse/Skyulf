@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Node, Edge } from '@xyflow/react';
-import { diffGraphs } from './graphDiff';
+import { diffGraphs, uniqueNodeDiffs } from './graphDiff';
 
 const n = (id: string, data: Record<string, unknown> = {}): Node => ({
   id,
@@ -124,5 +124,51 @@ describe('diffGraphs', () => {
     expect(diff.summary.edgesUnchanged).toBe(1);
     expect(diff.summary.edgesAdded).toBe(0);
     expect(diff.summary.edgesRemoved).toBe(0);
+  });
+
+  // F-39: registerPair stores the same NodeDiff object under both the
+  // left and right id so each canvas side can look it up. Iterating
+  // diff.nodes.values() then yields that object twice, and the diff view
+  // double-listed every renamed-and-modified node (plus a React
+  // duplicate-key warning). uniqueNodeDiffs must collapse them back to
+  // one entry per real change.
+  it('uniqueNodeDiffs dedupes a node registered under both renamed ids', () => {
+    const left = [
+      n('enc-old', { definitionType: 'encoding', method: 'onehot' }),
+      n('scale-old', { definitionType: 'scaling', method: 'standard' }),
+    ];
+    const right = [
+      n('enc-new', { definitionType: 'encoding', method: 'ordinal' }),
+      n('scale-new', { definitionType: 'scaling', method: 'standard' }),
+    ];
+    const diff = diffGraphs(left, [], right, []);
+    // Both ids resolve for canvas colouring…
+    expect(diff.nodes.get('enc-old')).toBe(diff.nodes.get('enc-new'));
+    expect(diff.nodes.size).toBe(4);
+    // …but the rendered list has exactly one entry per node.
+    const unique = uniqueNodeDiffs(diff.nodes);
+    expect(unique).toHaveLength(2);
+    expect(unique.map(d => d.status).sort()).toEqual(['modified', 'unchanged']);
+  });
+
+  // F-44: a real int→string coercion (5 → "5") was detected correctly
+  // but rendered as "v: 5 → 5" because describeValue showed numbers and
+  // strings identically, so users dismissed a genuine config change.
+  // String values must be quoted in descriptions to stay distinguishable.
+  it('renders int-to-string coercion as a visibly distinguishable change', () => {
+    const diff = diffGraphs(
+      [n('a', { v: 5 })],
+      [],
+      [n('a', { v: '5' })],
+      [],
+    );
+    const node = diff.nodes.get('a');
+    expect(node?.status).toBe('modified');
+    const desc = node?.changeDescriptions[0];
+    expect(desc).toBeDefined();
+    // desc is "key: <before> → <after>"; compare only the value halves.
+    const valuesPart = desc!.split(': ')[1]!;
+    const [before, after] = valuesPart.split(' → ');
+    expect(before).not.toBe(after);
   });
 });

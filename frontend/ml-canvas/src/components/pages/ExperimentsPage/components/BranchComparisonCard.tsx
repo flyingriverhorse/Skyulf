@@ -4,7 +4,7 @@ import type { JobInfo } from '../../../../core/api/jobs';
 import { formatMetricName } from '../../../../core/utils/format';
 import { getMetricDirection, pickBestIndex, type MetricDirection } from '../../../../core/utils/metricMeta';
 import { MetricDirectionBadge } from '../../../ui/MetricDirectionBadge';
-import { getJobScoringMetric } from '../utils/jobMeta';
+import { groupJobsByScoringMetric } from '../utils/jobMeta';
 
 interface Props {
   selectedJobs: JobInfo[];
@@ -13,6 +13,7 @@ interface Props {
 
 interface MetricRow {
   key: string;
+  label: string;
   values: (number | undefined)[];
   bestIndex: number | null;
   direction: MetricDirection;
@@ -50,13 +51,30 @@ export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuratio
 
     return rawMultiGroups.map(([parentId, groupJobsRaw]) => {
       const groupJobs = [...groupJobsRaw].sort((a, b) => (a.branch_index ?? 0) - (b.branch_index ?? 0));
-      const metricRows = allBranchMetricKeys.map(key => {
-        const values = groupJobs.map(j => {
-          const m = (j.metrics || j.result?.metrics || {}) as Record<string, number>;
-          return m[key];
-        });
+      // F-36: best_score is only comparable between runs that optimised the
+      // same metric, so expand it into one row per metric — labelled from
+      // that row's own metric and starred only within it.
+      const metricRows: MetricRow[] = allBranchMetricKeys.flatMap(key => {
         const direction = getMetricDirection(key);
-        return { key, values, bestIndex: pickBestIndex(values, direction), direction };
+        const allValues = groupJobs.map(j => {
+          const m = (j.metrics || j.result?.metrics || {}) as Record<string, unknown>;
+          const raw = m[key];
+          return typeof raw === 'number' ? raw : undefined;
+        });
+        const rows = key === 'best_score'
+          ? groupJobsByScoringMetric(groupJobs)
+              .map(row => ({
+                key: `best_score__${row.metric ?? 'unknown'}`,
+                label: `Best Score (${formatMetricName(row.metric) || 'CV'})`,
+                values: allValues.map((v, i) => (row.indices.includes(i) ? v : undefined)),
+              }))
+              .filter(row => row.values.some(v => v !== undefined))
+          : [{
+              key,
+              label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+              values: allValues,
+            }];
+        return rows.map(row => ({ ...row, direction, bestIndex: pickBestIndex(row.values, direction) }));
       });
       return { parentId, groupJobs, metricRows };
     });
@@ -94,13 +112,11 @@ export const BranchComparisonCard: React.FC<Props> = ({ selectedJobs, getDuratio
                 </tr>
               </thead>
               <tbody>
-                {metricRows.map(({ key, values, bestIndex, direction }) => (
+                {metricRows.map(({ key, label, values, bestIndex, direction }) => (
                   <tr key={key} className="border-b border-purple-100 dark:border-purple-800/50">
                     <td className="px-3 py-1.5 text-gray-600 dark:text-gray-400">
                       <span className="inline-flex items-center gap-1">
-                        {key === 'best_score'
-                          ? `Best Score (${formatMetricName(getJobScoringMetric(groupJobs[0] ?? {} as JobInfo)) || 'CV'})`
-                          : key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        {label}
                         <MetricDirectionBadge direction={direction} />
                       </span>
                     </td>

@@ -79,4 +79,35 @@ describe('getArtifactCoverage', () => {
     });
     expect(result.status).toBe('available');
   });
+
+  // F-42: task 'other' means the model's task could not be resolved
+  // (e.g. registry not loaded yet). It must not be treated as proof the
+  // artifact can never exist — runs with the artifact on board were
+  // labelled "unsupported" while the tab next to them rendered it.
+  it('marks an "other"-task run with the artifact present as available', () => {
+    const result = getArtifactCoverage('shap', {
+      task: 'other',
+      status: 'completed',
+      hasArtifact: true,
+    });
+    expect(result.status).toBe('available');
+  });
+
+  it('does not claim "unsupported" for an unresolvable task missing the artifact', () => {
+    const result = getArtifactCoverage('feature_importance', {
+      task: 'other',
+      status: 'completed',
+      hasArtifact: false,
+    });
+    expect(result.status).not.toBe('unsupported');
+  });
+
+  it('treats a present artifact as ground truth even for a task the support list excludes', () => {
+    const result = getArtifactCoverage('feature_importance', {
+      task: 'segmentation',
+      status: 'completed',
+      hasArtifact: true,
+    });
+    expect(result.status).toBe('available');
+  });
 });

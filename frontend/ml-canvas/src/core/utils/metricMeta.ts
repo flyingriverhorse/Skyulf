@@ -128,3 +128,30 @@ export function pickBestIndex(
   const tied = comparable.filter(entry => entry.value === best.value).length > 1;
   return tied ? null : best.index;
 }
+
+/** Which data split a metric key was measured on, from the UI-visibility
+ *  perspective. `best_score` is the cross-validated tuning score (its split
+ *  label is already "CV mean"), so it belongs to the CV split even though it
+ *  carries no `cv_` prefix. Unprefixed keys like `accuracy` or
+ *  `silhouette_score` carry no split context. */
+export function splitOfMetric(key: string): 'train' | 'test' | 'val' | 'cv' | 'other' {
+  if (key === 'best_score' || key.startsWith('cv_')) return 'cv';
+  if (key.startsWith('train_')) return 'train';
+  if (key.startsWith('test_')) return 'test';
+  if (key.startsWith('val_')) return 'val';
+  return 'other';
+}
+
+/** Hide metric keys whose split the user has toggled off. Keys without a
+ *  split context are always kept — there is no checkbox that could hide
+ *  them. F-41: `best_score` must be gated by the CV flag together with the
+ *  `cv_`-prefixed keys, otherwise "Show CV metrics" leaves it behind. */
+export function filterMetricKeysBySplitVisibility(
+  keys: string[],
+  visibility: { train: boolean; test: boolean; val: boolean; cv: boolean },
+): string[] {
+  return keys.filter(key => {
+    const split = splitOfMetric(key);
+    return split === 'other' ? true : visibility[split];
+  });
+}

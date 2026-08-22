@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMetricDirection, getMetricSplitLabel, pickBestIndex } from './metricMeta';
+import {
+  filterMetricKeysBySplitVisibility,
+  getMetricDirection,
+  getMetricSplitLabel,
+  pickBestIndex,
+  splitOfMetric,
+} from './metricMeta';
 
 describe('getMetricDirection', () => {
   it.each(['accuracy', 'balanced_accuracy', 'f1_weighted', 'roc_auc_ovr', 'pr_auc', 'r2', 'g_score', 'matthews_corrcoef', 'explained_variance', 'precision', 'recall'])(
@@ -104,5 +110,59 @@ describe('pickBestIndex', () => {
 
   it('does not treat a single run as a comparison winner', () => {
     expect(pickBestIndex([0.9], 'higher')).toBeNull();
+  });
+});
+
+describe('splitOfMetric', () => {
+  it('maps prefixed keys to their split', () => {
+    expect(splitOfMetric('train_f1')).toBe('train');
+    expect(splitOfMetric('test_f1')).toBe('test');
+    expect(splitOfMetric('val_f1')).toBe('val');
+    expect(splitOfMetric('cv_f1_mean')).toBe('cv');
+    expect(splitOfMetric('cv_f1_std')).toBe('cv');
+  });
+
+  // best_score is the cross-validated tuning score (its split label is
+  // already "CV mean"), so it belongs to the CV split — not the
+  // validation split its bare name might suggest.
+  it('classifies the tuning best_score as a CV metric', () => {
+    expect(splitOfMetric('best_score')).toBe('cv');
+  });
+
+  it('returns other for keys with no split context', () => {
+    expect(splitOfMetric('accuracy')).toBe('other');
+    expect(splitOfMetric('silhouette_score')).toBe('other');
+  });
+});
+
+describe('filterMetricKeysBySplitVisibility', () => {
+  const allOn = { train: true, test: true, val: true, cv: true };
+
+  it('keeps everything when all splits are visible', () => {
+    const keys = ['train_f1', 'test_f1', 'val_f1', 'cv_f1_mean', 'best_score', 'accuracy'];
+    expect(filterMetricKeysBySplitVisibility(keys, allOn)).toEqual(keys);
+  });
+
+  // F-41: the "Show CV metrics" checkbox gated only cv_-prefixed keys, so
+  // best_score stayed visible when the user turned CV metrics off. It must
+  // be hidden together with the other CV metrics.
+  it('hides best_score when the CV split is hidden', () => {
+    const keys = ['cv_f1_mean', 'best_score', 'test_f1'];
+    const visible = filterMetricKeysBySplitVisibility(keys, { ...allOn, cv: false });
+    expect(visible).toEqual(['test_f1']);
+  });
+
+  it('gates each split independently', () => {
+    const keys = ['train_f1', 'test_f1', 'val_f1', 'cv_f1_mean'];
+    expect(
+      filterMetricKeysBySplitVisibility(keys, { train: false, test: true, val: false, cv: true }),
+    ).toEqual(['test_f1', 'cv_f1_mean']);
+  });
+
+  it('never hides metrics that carry no split context', () => {
+    const keys = ['accuracy', 'silhouette_score'];
+    expect(
+      filterMetricKeysBySplitVisibility(keys, { train: false, test: false, val: false, cv: false }),
+    ).toEqual(keys);
   });
 });

@@ -34,9 +34,9 @@ use **float NaN** (not only nulls) and **wrapped** frames.
 | **0.7.9** | backend + frontend | patch | F-02, F-03 (deployment blockers) · F-33, F-34, F-35, F-37 (experiments) · A2.2 (templates) · ride-alongs: `start.sh` chmod, A2.6 upload-size text |
 | **core 0.6.0** | skyulf-core only (`core-v*` tag, PyPI) | **minor** — behaviour changes | F-01, F-04, F-05, F-06 · growth T1, T2, T3, T6 · T5 contract test + NaN/wrapped parity tests |
 | demo redeploy | `deploy/demo-mode` | **no bump** (stays 0.7.6) | cherry-pick of A2.2 only (growth 1a) |
-| **0.8.0** | backend + frontend | minor | F-36, F-38–F-44 (experiments batch 2, audit T2b) · F-07–F-14 backend-side effects if any · A2.1 sample-dataset entry point + rest of Stage 2, weighted by 1b traffic data |
+| **0.8.0** | backend + frontend | minor | ~~F-36, F-38–F-44 (experiments batch 2, audit T2b)~~ — **slipped, moved to 0.8.1** (done on `080` 2026-08-22) · F-07–F-14 backend-side effects if any · A2.1 sample-dataset entry point + rest of Stage 2, weighted by 1b traffic data |
 | **core 0.6.0 cont. or next minor** | skyulf-core | minor | F-07–F-14 (audit T2 remainder) — into 0.6.0 if done before the tag, else next minor; ledger is explicit either way |
-| **0.8.1 / core 0.6.1** | all three | patch | F-16–F-26 + leakage enforcement (audit T3). F-22 needs a frontend sync check (param rename) |
+| **0.8.1 / core 0.6.1** | all three | patch | F-36, F-38–F-42, F-44 (experiments batch 2 — **done on `080` 2026-08-22**) · F-16–F-26 + leakage enforcement (audit T3). F-22 needs a frontend sync check (param rename) |
 | **0.8.2 / core 0.6.2** | all three | patch | F-27–F-32, F-45–F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) (audit T4) |
 | **core 0.7.0** | skyulf-core | minor/major | F-15 per-fold preprocessing refit — **design note first**, separate initiative, changes every reported score |
 
