@@ -227,6 +227,8 @@ def _load_reference_dataframe(artifact_store, reference_key: str, job_id: str) -
     try:
         ref_data = artifact_store.load(reference_key)
         # Convert to Polars
+        if isinstance(ref_data, pl.DataFrame):
+            return ref_data
         if isinstance(ref_data, pd.DataFrame):
             return pl.from_pandas(ref_data)
         # Assume it's already compatible or fail

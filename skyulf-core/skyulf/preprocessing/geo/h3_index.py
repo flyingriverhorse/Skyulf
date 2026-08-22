@@ -4,8 +4,9 @@ Optional dependency: requires the ``h3`` package (install via
 ``pip install skyulf-core[geo]`` or ``pip install h3``). The import is lazy
 so the rest of skyulf-core works without it installed.
 
-``h3`` has no vectorized numpy/polars-native API, so both engines convert to
-pandas internally and compute the cell index with a row-wise ``.apply()``.
+``h3`` has no vectorized numpy/polars-native API, so cell indices are computed
+row-wise: the pandas engine via ``.apply()``, the polars engine over the two
+coordinate columns as numpy arrays (the frame itself is never converted).
 """
 
 from typing import Any, cast
@@ -65,15 +66,27 @@ def _h3_index_apply_pandas(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any
 
 
 def _h3_index_apply_polars(X: Any, _y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Compute the H3 cell index via pandas conversion, then rebuild a polars frame."""
+    """Compute the H3 cell index from the lat/lon columns and attach it natively.
+
+    Only the two coordinate columns cross into numpy; the rest of the frame is
+    never converted, so unrelated column dtypes are preserved.
+    """
     import polars as pl
 
     lat_col, lon_col = params["lat_col"], params["lon_col"]
     if lat_col not in X.columns or lon_col not in X.columns:
         return X, _y
 
-    X_pd, _ = _h3_index_apply_pandas(X.to_pandas(), _y, params)
-    return pl.from_pandas(X_pd), _y
+    h3 = _import_h3()
+    resolution = params.get("resolution", 9)
+
+    lats = X.get_column(lat_col).to_numpy()
+    lons = X.get_column(lon_col).to_numpy()
+    cells = [
+        _h3_cell_or_none(lat, lon, h3, resolution) for lat, lon in zip(lats, lons, strict=True)
+    ]
+    output_column = params.get("output_column", "h3_index")
+    return X.with_columns(pl.Series(output_column, cells, dtype=pl.String)), _y
 
 
 def _validate_h3_columns(X_pd: pd.DataFrame, lat_col: str, lon_col: str) -> None:

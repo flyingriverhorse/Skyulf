@@ -351,6 +351,24 @@ class TestH3Index:
 
         assert result_pd["h3_index"].tolist() == result_pl["h3_index"].to_list()
 
+    def test_polars_apply_preserves_unrelated_column_dtypes(self) -> None:
+        """No whole-frame round-trip: a nullable Int64 column untouched by the
+        node must keep its dtype (a pandas round-trip upcasts it to Float64)."""
+        df_pl = pl.DataFrame(
+            {
+                "lat": [_NYC_LAT, _LAX_LAT, 0.0],
+                "lon": [_NYC_LON, _LAX_LON, 0.0],
+                "id": [1, None, 3],
+            }
+        )
+        calc = H3IndexCalculator()
+        applier = H3IndexApplier()
+        params = calc.fit(df_pl, {"lat_col": "lat", "lon_col": "lon", "resolution": 9})
+
+        result = applier.apply(df_pl, params)
+
+        assert result.schema["id"] == pl.Int64
+
     def test_nan_coordinates_produce_none_instead_of_crashing(self) -> None:
         """Regression test: a missing/NaN lat or lon must produce None for that
         row (consistent with GeoDistance's NaN-propagation policy), not crash

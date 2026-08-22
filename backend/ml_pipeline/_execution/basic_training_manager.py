@@ -61,7 +61,7 @@ class BasicTrainingManager(TrainingJobManagerBase):
             version=version,
             model_type=model_type_val,
             graph=graph,
-            job_metadata={"branch_index": branch_index},
+            job_metadata={"branch_index": branch_index, "engine": get_settings().SKYULF_ENGINE},
             started_at=datetime.now(UTC),
         )
 
@@ -91,6 +91,8 @@ class BasicTrainingManager(TrainingJobManagerBase):
         if not hyperparameters:
             hyperparameters = type_cast(dict[str, Any] | None, job.hyperparameters)
 
+        meta = job.job_metadata if isinstance(job.job_metadata, dict) else {}
+
         return JobInfo(
             job_id=job.id,
             pipeline_id=job.pipeline_id,
@@ -107,6 +109,7 @@ class BasicTrainingManager(TrainingJobManagerBase):
             model_family=resolve_training_model_family(
                 type_cast(dict[str, Any], job.graph), job.node_id, job.model_type
             ),
+            engine=t_cast(str | None, meta.get("engine")),
             hyperparameters=t_cast(dict[str, Any], hyperparameters),
             created_at=t_cast(datetime, job.created_at),
             metrics=t_cast(dict[str, Any] | None, job.metrics),

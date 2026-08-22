@@ -7,6 +7,10 @@
 # .github/instructions/project_architecture.instructions.md) and should be
 # re-runnable/required independently.
 #
+# The suite runs once per DataFrame engine (SKYULF_ENGINE=polars|pandas) as
+# the engine-parity gate from the backend Polars migration plan — neither
+# engine may regress while the other stays green.
+#
 # Static analysis (lint/format/type checks) is NOT duplicated here — that's
 # pr_check.yml's job. This workflow assumes pr_check.yml already gates PRs.
 
@@ -28,7 +32,7 @@ concurrency:
 
 jobs:
   test:
-    name: Backend test suite
+    name: Backend test suite (engine ${{ matrix.engine }})
     runs-on: ubuntu-latest
     services:
       redis:
@@ -43,6 +47,11 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.12"]
+        # Engine-parity gate (migration plan Phase 1.4): the suite must stay
+        # green under both DataFrame engines; polars is the platform default.
+        engine: [polars, pandas]
+    env:
+      SKYULF_ENGINE: ${{ matrix.engine }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -93,6 +102,9 @@ jobs:
               --cov=backend --cov-branch --cov-report=term-missing --cov-report=xml
 
       - name: Upload coverage reports to Codecov
+        # Single upload per push: both matrix legs produce the same coverage,
+        # so only the default-engine leg reports it.
+        if: matrix.engine == 'polars'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

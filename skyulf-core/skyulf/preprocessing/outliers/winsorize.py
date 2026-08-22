@@ -54,7 +54,12 @@ class WinsorizeApplier(BaseApplier):
             if col not in df_out.columns:
                 continue
             if pd.api.types.is_numeric_dtype(df_out[col]):
-                df_out[col] = df_out[col].clip(lower=bound["lower"], upper=bound["upper"])
+                series = df_out[col]
+                # Nullable extension dtypes (Int64...) refuse float clip
+                # bounds; the Polars branch casts to Float64 first (F-10).
+                if isinstance(series.dtype, pd.api.extensions.ExtensionDtype):
+                    series = series.astype("float64")
+                df_out[col] = series.clip(lower=bound["lower"], upper=bound["upper"])
         return df_out, y
 
 

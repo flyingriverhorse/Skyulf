@@ -11,10 +11,10 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first (cached unless requirements change)
-COPY requirements-fastapi.txt ./
+COPY requirements.txt ./
 COPY skyulf-core/ ./skyulf-core/
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements-fastapi.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code (changes most often — last layer)
 COPY . .

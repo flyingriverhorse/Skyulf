@@ -559,7 +559,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                 {activeTab === 'overview' ? (
                     <div className="space-y-6">
                         {/* Status Section */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
                                 <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
@@ -596,6 +596,13 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                     {/* The job payload carries no numeric progress field, so a running/queued
                                         job states that honestly instead of implying a bar we can't back. */}
                                     {isTerminalStatus(job.status) ? '—' : 'Not reported'}
+                                </div>
+                            </div>
+                            <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Engine</div>
+                                <div className="font-medium text-gray-800 dark:text-gray-200">
+                                    {/* Legacy jobs predate engine recording and trained on pandas. */}
+                                    {job.engine === 'polars' ? 'Polars' : 'pandas'}
                                 </div>
                             </div>
                         </div>

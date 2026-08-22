@@ -73,6 +73,14 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, registryItems })
         {hasTuningMetadata(job) && job.search_strategy && (
           <span className="text-gray-400 truncate">({job.search_strategy})</span>
         )}
+        {job.engine === 'polars' && (
+          <span
+            className="px-1.5 py-0.5 rounded border bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800 whitespace-nowrap"
+            title="Trained on the Polars engine"
+          >
+            Polars
+          </span>
+        )}
         {isEnsemble && (
           <span className="px-1.5 py-0.5 rounded border bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800 whitespace-nowrap">
             {ensembleStrategy} · {ensembleSubTask === 'regression' ? 'Regression' : 'Classification'}

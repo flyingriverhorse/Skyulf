@@ -22,6 +22,14 @@ def _has_pyarrow() -> bool:
 
 
 class TestFileSystemCatalog:
+    @pytest.fixture(autouse=True)
+    def _pandas_engine(self, monkeypatch):
+        # These round-trip tests pin the legacy pandas path; the polars path
+        # is covered by tests/integration/test_catalog_polars_ingestion.py.
+        from backend.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "pandas", raising=False)
+
     @pytest.fixture
     def catalog(self):
         tmp_dir = tempfile.mkdtemp()

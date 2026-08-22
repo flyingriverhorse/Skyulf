@@ -23,7 +23,14 @@ def _resolve_valid_cols(X: Any, params: dict[str, Any]) -> list[str]:
 
 
 def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
-    """Polars apply path — uses Polars native ``hash()`` for speed."""
+    """Polars apply path — same ``_stable_hash`` (blake2b) as the pandas path.
+
+    Polars' native ``hash()`` used to bucket differently from pandas' blake2b,
+    and deployment guarantees an engine crossing (Polars-trained pipelines
+    always serve a pandas frame), so the divergence hit every production
+    encoding (F-11). Hashing once per *unique* value keeps this cheap on
+    low-cardinality categorical columns.
+    """
     import polars as pl
 
     valid_cols = _resolve_valid_cols(X, params)
@@ -31,7 +38,14 @@ def _hash_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any
         return X, y
 
     n_features = params.get("n_features", 10)
-    exprs = [(pl.col(col).cast(pl.Utf8).hash() % n_features).alias(col) for col in valid_cols]
+    exprs = []
+    for col in valid_cols:
+        # fill_null("nan") mirrors pandas' astype(str) so missing values land
+        # in the same bucket on both engines.
+        str_col = pl.col(col).cast(pl.Utf8).fill_null("nan")
+        unique_vals = X.select(str_col.alias(col)).to_series().unique().to_list()
+        bucket_by_value = {v: _stable_hash(v) % n_features for v in unique_vals}
+        exprs.append(str_col.replace_strict(bucket_by_value, default=None).alias(col))
     return X.with_columns(exprs), y
 
 
@@ -42,13 +56,9 @@ def _stable_hash(value: str) -> int:
     so the same category would map to a different bucket every time the
     interpreter restarts (e.g. a new Celery worker or API server), silently
     corrupting encodings learned at fit time. ``blake2b`` is deterministic,
-    fixing that cross-process instability.
-
-    Note: this does not make pandas and polars produce identical buckets for
-    the same input — ``_hash_apply_polars`` uses polars' own native hash,
-    which is a different algorithm. Fit and apply must use the same engine
-    for encodings to be reproducible; mixing engines was already inconsistent
-    before this change and remains a separate, unaddressed limitation.
+    fixing that cross-process instability. Both the pandas and polars apply
+    paths use this function, so buckets are identical across engines (F-11) —
+    artifacts remain portable even when fit and serve use different engines.
     """
     digest = hashlib.blake2b(value.encode("utf-8"), digest_size=8).digest()
     return int.from_bytes(digest, "little")

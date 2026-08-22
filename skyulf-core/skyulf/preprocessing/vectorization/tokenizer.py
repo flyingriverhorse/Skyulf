@@ -18,7 +18,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import TokenizerArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import apply_text_pandas_only, resolve_fit_text_valid_columns
+from ._common import apply_text_dual_engine, resolve_fit_text_valid_columns
 
 logger = logging.getLogger(__name__)
 
@@ -68,10 +68,38 @@ def _tokenizer_apply_pandas(
     return X_out, y
 
 
+def _tokenizer_apply_polars(X: Any, params: dict[str, Any]) -> Any:
+    """Native-Polars tokenizer apply; returns ``None`` to fall back to pandas
+    when a text column is not String dtype (``astype(str)`` parity)."""
+    import polars as pl
+
+    cols: list[str] = params.get("columns", [])
+    drop_original: bool = params.get("drop_original", False)
+    add_token_count: bool = params.get("add_token_count", False)
+
+    valid_cols = [c for c in cols if c in X.columns]
+    if not valid_cols:
+        return X
+
+    analyze = _build_analyzer(params)
+    new_cols = []
+    for col in valid_cols:
+        series = X.get_column(col)
+        if series.dtype != pl.String:
+            return None
+        tokens = [analyze(text) for text in series.fill_null("").to_list()]
+        new_cols.append(pl.Series(f"{col}__tokens", [" ".join(toks) for toks in tokens]))
+        if add_token_count:
+            new_cols.append(pl.Series(f"{col}__token_count", [len(toks) for toks in tokens]))
+
+    X_out = X.drop(valid_cols) if drop_original else X
+    return X_out.hstack(new_cols)
+
+
 class TokenizerApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_text_pandas_only(X, params, _tokenizer_apply_pandas)
+        return apply_text_dual_engine(X, params, _tokenizer_apply_pandas, _tokenizer_apply_polars)
 
 
 # ── Calculate ─────────────────────────────────────────────────────────────────

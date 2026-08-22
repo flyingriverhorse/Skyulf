@@ -89,8 +89,17 @@ def _sklearn_transform_subset(X: Any, cols: list[str], imputer: Any, is_polars: 
         new_cols = [pl.Series(col, X_transformed[:, i]) for i, col in enumerate(cols)]
         return X.with_columns(new_cols)
 
+    import pandas as pd
+
     X_out = X.copy()
     X_subset = X_out[cols].copy()
+    # Nullable extension dtypes (Int64...) hand pd.NA to sklearn and refuse
+    # float results on write-back; upcast them to float64 like the Polars
+    # branch does natively (F-10).
+    ext_cols = [c for c in cols if isinstance(X_subset[c].dtype, pd.api.extensions.ExtensionDtype)]
+    if ext_cols:
+        X_subset[ext_cols] = X_subset[ext_cols].astype("float64")
+        X_out[ext_cols] = X_out[ext_cols].astype("float64")
     X_input = X_subset.values if hasattr(X_subset, "values") else X_subset
     X_transformed = imputer.transform(X_input)
     X_out[cols] = X_transformed

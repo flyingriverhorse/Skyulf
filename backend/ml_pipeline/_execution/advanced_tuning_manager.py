@@ -58,7 +58,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
             model_type=model_type,
             search_strategy=search_strategy,
             graph=graph,
-            job_metadata={"branch_index": branch_index},
+            job_metadata={"branch_index": branch_index, "engine": get_settings().SKYULF_ENGINE},
             started_at=datetime.now(UTC),
         )
 
@@ -88,6 +88,8 @@ class AdvancedTuningManager(TrainingJobManagerBase):
             job.metrics if job.metrics else ({"score": job.best_score} if job.best_score else None)
         )
 
+        meta = job.job_metadata if isinstance(job.job_metadata, dict) else {}
+
         return JobInfo(
             job_id=job.id,
             pipeline_id=job.pipeline_id,
@@ -111,6 +113,7 @@ class AdvancedTuningManager(TrainingJobManagerBase):
             model_family=resolve_training_model_family(
                 type_cast(dict[str, Any], job.graph), job.node_id, job.model_type
             ),
+            engine=type_cast(str | None, meta.get("engine")),
             hyperparameters=type_cast(dict[str, Any], hyperparameters),
             created_at=type_cast(datetime, job.created_at),
             metrics=type_cast(dict[str, Any] | None, metrics),

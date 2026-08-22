@@ -11,6 +11,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import polars as pl
 import pytest
 
 from backend.data.catalog import FileSystemCatalog
@@ -71,8 +72,8 @@ def _build_config(csv: str, *, transformation_first: bool) -> PipelineConfig:
     )
 
 
-def _merged_frame(payload: Any) -> pd.DataFrame:
-    return payload if isinstance(payload, pd.DataFrame) else payload.train
+def _merged_frame(payload: Any) -> Any:
+    return payload if isinstance(payload, (pd.DataFrame, pl.DataFrame)) else payload.train
 
 
 @pytest.mark.parametrize("transformation_first", [False, True])

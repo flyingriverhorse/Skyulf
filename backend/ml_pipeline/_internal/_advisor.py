@@ -54,7 +54,12 @@ class DataProfiler:
         return float(cast(float | int, value))
 
     @staticmethod
-    def generate_profile(df: pd.DataFrame) -> AnalysisProfile:
+    def generate_profile(df: Any) -> AnalysisProfile:
+        # The profiler is pandas-based; catalog reads now honor SKYULF_ENGINE
+        # and may hand us a Polars frame. Samples are small (<=1000 rows), so
+        # converting here is cheap and keeps the stats engine single.
+        if not isinstance(df, pd.DataFrame) and hasattr(df, "to_pandas"):
+            df = df.to_pandas()
         columns = {}
         for col in df.columns:
             is_numeric = pd.api.types.is_numeric_dtype(df[col])

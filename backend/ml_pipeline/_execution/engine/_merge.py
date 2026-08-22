@@ -13,7 +13,9 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pandas as pd
+import polars as pl
 
+from backend.config import get_settings
 from skyulf.data.dataset import SplitDataset
 
 from ..graph_utils import _extract_columns
@@ -58,7 +60,8 @@ class MergeMixin:
         if ancestor_id is None:
             return None
         try:
-            return self._coerce_to_frame(self.artifact_store.load(ancestor_id))
+            baseline = self._coerce_to_frame(self.artifact_store.load(ancestor_id))
+            return self._to_pandas_frame(baseline) if baseline is not None else None
         except Exception as exc:  # noqa: BLE001 - baseline is an optimisation, never fatal
             self.log(f"Node {node_id}: could not load merge baseline '{ancestor_id}': {exc}")
             return None
@@ -128,11 +131,16 @@ class MergeMixin:
                 owners[col] = changed_by[0]
         return owners
 
-    def _coerce_tuple_to_frame(self, payload: tuple, target_col: str) -> pd.DataFrame | None:
+    def _coerce_tuple_to_frame(self, payload: tuple, target_col: str) -> Any | None:
         """Coerce an ``(X, y)``-shaped tuple payload to a DataFrame, or ``None`` if empty/unusable."""
         if len(payload) < 1:
             return None
         first = payload[0]
+        if isinstance(first, pl.DataFrame):
+            df = first.clone()
+            if len(payload) == 2 and target_col:
+                df = df.with_columns(pl.Series(name=target_col, values=payload[1]))
+            return df if not df.is_empty() else None
         if not isinstance(first, pd.DataFrame):
             return None
         df = first.copy()
@@ -140,7 +148,7 @@ class MergeMixin:
             df[target_col] = payload[1]
         return df if not df.empty else None
 
-    def _coerce_to_frame(self, payload: Any, target_col: str = "") -> pd.DataFrame | None:
+    def _coerce_to_frame(self, payload: Any, target_col: str = "") -> Any | None:
         """Best-effort coercion of a single payload to a DataFrame.
 
         Returns ``None`` for empty / missing payloads (e.g. an empty test split)
@@ -148,20 +156,22 @@ class MergeMixin:
         """
         if payload is None:
             return None
+        if isinstance(payload, pl.DataFrame):
+            return payload if not payload.is_empty() else None
         if isinstance(payload, pd.DataFrame):
             return payload if not payload.empty else None
         if isinstance(payload, tuple):
             return self._coerce_tuple_to_frame(payload, target_col)
         return None
 
-    def _to_dataframe(self, artifact: Any, target_col: str = "") -> pd.DataFrame:
+    def _to_dataframe(self, artifact: Any, target_col: str = "") -> Any:
         """Normalize an artifact to a single DataFrame (train portion only).
 
         Kept for callers that explicitly want a flat frame. Multi-input merging
         should prefer :meth:`_merge_inputs`, which preserves SplitDataset shape
         when possible.
         """
-        if isinstance(artifact, pd.DataFrame):
+        if isinstance(artifact, (pd.DataFrame, pl.DataFrame)):
             return artifact
         if isinstance(artifact, SplitDataset):
             df = self._coerce_to_frame(artifact.train, target_col)
@@ -282,13 +292,25 @@ class MergeMixin:
         )
         return merged
 
+    @staticmethod
+    def _to_pandas_frame(df: Any) -> pd.DataFrame:
+        """Convert a Polars frame to pandas for the pandas-only merge internals."""
+        if isinstance(df, pl.DataFrame):
+            return df.to_pandas()
+        return df
+
     def _merge_frames(
         self,
-        frames: list[pd.DataFrame],
+        frames: list[Any],
         node_id: str,
         part_label: str = "",
-    ) -> pd.DataFrame:
+    ) -> Any:
         """Concatenate a list of DataFrames column-wise (preferred) or row-wise.
+
+        Engine boundary: the merge semantics below are pandas-only, so Polars
+        inputs are converted in, and the merged result is converted back to
+        Polars when the inputs were Polars and the configured engine is Polars
+        — downstream nodes keep receiving the engine's frame type.
 
         ``part_label`` is only used in log messages (``"train"``, ``"test"``...)
         to make multi-split merges easier to follow in job logs.
@@ -306,6 +328,9 @@ class MergeMixin:
         if len(frames) == 1:
             return frames[0]
 
+        had_polars = any(isinstance(df, pl.DataFrame) for df in frames)
+        frames = [self._to_pandas_frame(df) for df in frames]
+
         prefix = f"Node {node_id}"
         if part_label:
             prefix = f"{prefix} [{part_label}]"
@@ -315,14 +340,20 @@ class MergeMixin:
         same_rows = all(rc == row_counts[0] for rc in row_counts)
         strategy = self._get_merge_strategy(node_id)
 
-        if same_rows:
-            return self._merge_frames_columnwise(frames, node_id, strategy, prefix)
-
-        return self._merge_frames_rowwise(frames, node_id, part_label, prefix, row_counts, col_sets)
+        merged = (
+            self._merge_frames_columnwise(frames, node_id, strategy, prefix)
+            if same_rows
+            else self._merge_frames_rowwise(
+                frames, node_id, part_label, prefix, row_counts, col_sets
+            )
+        )
+        if had_polars and get_settings().SKYULF_ENGINE == "polars":
+            return pl.from_pandas(merged)
+        return merged
 
     def _split_dataset_train_columns(self, art: SplitDataset) -> list[str]:
         """Best-effort extraction of column names from a ``SplitDataset``'s train slot."""
-        if isinstance(art.train, pd.DataFrame):
+        if isinstance(art.train, (pd.DataFrame, pl.DataFrame)):
             return list(art.train.columns)
         if isinstance(art.train, tuple):
             X = art.train[0]
@@ -331,7 +362,7 @@ class MergeMixin:
 
     def _artifact_columns(self, art: Any) -> list[str]:
         """Best-effort extraction of column names from a single resolved artifact."""
-        if isinstance(art, pd.DataFrame):
+        if isinstance(art, (pd.DataFrame, pl.DataFrame)):
             return list(art.columns)
         if isinstance(art, SplitDataset):
             return self._split_dataset_train_columns(art)
@@ -347,6 +378,7 @@ class MergeMixin:
         Falls back to plain name overlap when no baseline is available.
         """
         frames = [f for f in (self._coerce_to_frame(art) for art in artifacts) if f is not None]
+        frames = [self._to_pandas_frame(f) for f in frames]
         if len(frames) == len(artifacts):
             modifiers = self._column_modifiers(frames, node_id)
             if modifiers:
@@ -459,7 +491,7 @@ class MergeMixin:
         Merges X column-wise; reuses y from the first edge (duplicate edges
         to the same source share the same y).
         """
-        x_frames = [a[0] for a in artifacts if isinstance(a[0], pd.DataFrame)]
+        x_frames = [a[0] for a in artifacts if isinstance(a[0], (pd.DataFrame, pl.DataFrame))]
         if not x_frames:
             raise ValueError(
                 f"Node {node.node_id}: cannot merge (X, y) tuples - X parts are not DataFrames."
@@ -476,10 +508,15 @@ class MergeMixin:
         first branch (all branches descend from the same Splitter, so y is
         identical).
         """
-        x_frames: list[pd.DataFrame] = []
+        x_frames: list[Any] = []
         for p in non_empty:
             x = p[0]
-            if isinstance(x, pd.DataFrame) and not x.empty:
+            if (
+                isinstance(x, pl.DataFrame)
+                and not x.is_empty()
+                or isinstance(x, pd.DataFrame)
+                and not x.empty
+            ):
                 x_frames.append(x)
         if not x_frames:
             return None
@@ -537,7 +574,9 @@ class MergeMixin:
         # Empty test defaults to an empty DataFrame for downstream consumers
         # that assume `.test` is iterable.
         if merged_test is None:
-            merged_test = pd.DataFrame()
+            merged_test = (
+                pl.DataFrame() if get_settings().SKYULF_ENGINE == "polars" else pd.DataFrame()
+            )
 
         return SplitDataset(
             train=cast(Any, merged_train),
@@ -559,12 +598,12 @@ class MergeMixin:
                 "merging on train portions only; held-out splits are dropped."
             )
 
-        dataframes: list[pd.DataFrame] = []
+        dataframes: list[Any] = []
         for i, art in enumerate(artifacts):
             df = self._coerce_to_frame(art, target_col)
             if df is None:
                 df = self._to_dataframe(art, target_col)
-            if df.empty:
+            if len(df) == 0:
                 raise ValueError(
                     f"Node {node.node_id}: input #{i} produced an empty DataFrame "
                     "(0 rows). Check upstream preprocessing branches."
@@ -587,13 +626,17 @@ class MergeMixin:
             dropped.extend(_extract_columns(cfg.step_type, cfg.params or {}))
         return sorted(set(dropped))
 
-    def _strip_columns_from_frame(self, df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    def _strip_columns_from_frame(self, df: Any, columns: list[str]) -> Any:
         present = [c for c in columns if c in df.columns]
-        return df.drop(columns=present) if present else df
+        if not present:
+            return df
+        if isinstance(df, pl.DataFrame):
+            return df.drop(present)
+        return df.drop(columns=present)
 
     def _strip_columns(self, payload: Any, columns: list[str]) -> Any:
         """Remove ``columns`` from any merge-result shape, leaving other shapes untouched."""
-        if isinstance(payload, pd.DataFrame):
+        if isinstance(payload, (pd.DataFrame, pl.DataFrame)):
             return self._strip_columns_from_frame(payload, columns)
         if isinstance(payload, SplitDataset):
             return SplitDataset(
@@ -601,7 +644,11 @@ class MergeMixin:
                 test=self._strip_columns(payload.test, columns),
                 validation=self._strip_columns(payload.validation, columns),
             )
-        if isinstance(payload, tuple) and payload and isinstance(payload[0], pd.DataFrame):
+        if (
+            isinstance(payload, tuple)
+            and payload
+            and isinstance(payload[0], (pd.DataFrame, pl.DataFrame))
+        ):
             return (self._strip_columns_from_frame(payload[0], columns), *payload[1:])
         return payload
 

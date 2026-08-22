@@ -527,6 +527,19 @@ class TestEllipticEnvelopeApplier:
         pl_out = EllipticEnvelopeApplier().apply(pl.from_pandas(df), params)
         assert sorted(pd_out["val"].tolist()) == sorted(pl_out["val"].to_list())
 
+    def test_polars_filter_preserves_unrelated_column_dtypes(self) -> None:
+        """No whole-frame round-trip: a nullable Int64 column not involved in
+        filtering must keep its dtype (pandas round-trip upcasts to Float64)."""
+        rng = np.random.RandomState(4)
+        values = rng.normal(0, 1, 60).tolist()
+        values.append(500.0)
+        df = pl.DataFrame(
+            {"val": values, "id": [None if i == 5 else i for i in range(len(values))]}
+        )
+        params = EllipticEnvelopeCalculator().fit(df, {"columns": ["val"], "contamination": 0.05})
+        out = EllipticEnvelopeApplier().apply(df, params)
+        assert out.schema["id"] == pl.Int64
+
     def test_polars_tuple_xy_filters_y_in_sync(self) -> None:
         """Polars engine with an (X, y) tuple must filter y rows to match survivors."""
         rng = np.random.RandomState(7)
@@ -571,3 +584,24 @@ class TestRealShapedDataset:
         assert (in_bounds | kept_income.isna()).all()
         # Rows with a missing income must be retained, not treated as outliers.
         assert df["income"].isna().sum() == out["income"].isna().sum()
+
+
+def test_winsorize_clips_nullable_int64_column_like_polars() -> None:
+    """F-10: clipping a nullable ``Int64`` column with float bounds raised
+    ``TypeError: Invalid value for dtype 'Int64'`` on the pandas path while
+    Polars (which casts to Float64 first) worked. Pandas must match."""
+    df_pd = pd.DataFrame({"a": pd.array([1, 2, 3, 4, 5, 100], dtype="Int64")})
+    df_pl = pl.DataFrame({"a": [1, 2, 3, 4, 5, 100]})
+    config = {"columns": ["a"], "lower_percentile": 5.0, "upper_percentile": 95.0}
+
+    params_pd = dict(WinsorizeCalculator().fit(df_pd, config))
+    params_pl = dict(WinsorizeCalculator().fit(df_pl, config))
+    out_pd = WinsorizeApplier().apply(df_pd, params_pd)
+    out_pl = WinsorizeApplier().apply(df_pl, params_pl)
+    frame_pd = out_pd[0] if isinstance(out_pd, tuple) else out_pd
+    frame_pl = out_pl[0] if isinstance(out_pl, tuple) else out_pl
+
+    np.testing.assert_allclose(
+        np.asarray(frame_pd["a"], dtype="float64"),
+        np.asarray(frame_pl["a"], dtype="float64"),
+    )

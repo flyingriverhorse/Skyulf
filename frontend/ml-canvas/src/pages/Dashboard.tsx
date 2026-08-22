@@ -7,7 +7,7 @@ import {
 import {
   Activity, Database, Play, Server,
   Plus, ExternalLink,
-  CheckCircle
+  CheckCircle, Layers
 } from 'lucide-react';
 import { apiClient } from '../core/api/client';
 import { jobsApi } from '../core/api/jobs';
@@ -110,6 +110,9 @@ export const Dashboard: React.FC = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
+  const isEmpty = !loading && !error && stats !== null
+    && stats.total_jobs === 0 && stats.data_sources === 0 && jobs.length === 0;
+
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-500">
       {/* Header */}
@@ -129,6 +132,10 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {isEmpty ? (
+        <GettingStarted />
+      ) : (
+      <>
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
@@ -303,6 +310,8 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 };
@@ -335,4 +344,36 @@ const QuickActionButton = ({ to, icon, title, desc }: { to: string; icon: React.
     </div>
     <ExternalLink size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />
   </Link>
+);
+
+const GettingStarted = () => (
+  <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm p-10 text-center max-w-3xl mx-auto">
+    <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Build your first pipeline</h2>
+    <p className="text-slate-500 dark:text-slate-400 mt-2">
+      Nothing has run here yet. Three steps to your first trained model:
+    </p>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 text-left">
+      <Link
+        to="/data"
+        className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+      >
+        <Database size={20} className="text-blue-500" />
+        <div className="font-medium text-slate-900 dark:text-slate-100 mt-3 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">1. Add a dataset</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Upload a file or pick a sample dataset.</div>
+      </Link>
+      <Link
+        to="/canvas"
+        className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all group"
+      >
+        <Layers size={20} className="text-indigo-500" />
+        <div className="font-medium text-slate-900 dark:text-slate-100 mt-3 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">2. Start from a template</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Browse templates on the canvas and bind your data.</div>
+      </Link>
+      <div className="p-4 rounded-lg border border-slate-200 dark:border-slate-700">
+        <Play size={20} className="text-emerald-500" />
+        <div className="font-medium text-slate-900 dark:text-slate-100 mt-3">3. Run and inspect results</div>
+        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Run All, then compare runs in Experiments.</div>
+      </div>
+    </div>
+  </div>
 );
