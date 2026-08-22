@@ -16,7 +16,9 @@ import { toast } from '../toast';
  * The backend already hard-blocks this at execution time, but surfacing
  * the same check here means the user gets instant feedback on the canvas
  * instead of waiting for a round trip + job failure. Keep this list in
- * sync with `DATA_DEPENDENT_FIT_STEP_TYPES` in the backend module above.
+ * sync with the backend gate, which derives its node list from the
+ * skyulf-core registry (`learns_from_data` on each node's `@node_meta` —
+ * see `backend/ml_pipeline/_execution/_leakage_validation.py`).
  */
 export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
   // Imputation
@@ -28,13 +30,15 @@ export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
   'MinMaxScaler',
   'RobustScaler',
   'MaxAbsScaler',
-  // Encoding (category vocabulary / frequency / target statistics)
+  // Encoding (category vocabulary / frequency / target statistics;
+  // HashEncoder's bucket occupancy also depends on the fitted rows)
   'OneHotEncoder',
   'LabelEncoder',
   'OrdinalEncoder',
   'DummyEncoder',
   'TargetEncoder',
   'WOEEncoder',
+  'HashEncoder',
   // Outlier detection
   'IQR',
   'ZScore',
@@ -56,6 +60,14 @@ export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
   // Text vectorization (vocabulary/IDF learned from the corpus)
   'count_vectorizer',
   'tfidf_vectorizer',
+  // Missingness / dedup / resampling — each learns from the fitted rows:
+  // which columns carry missing values, which columns to drop, the
+  // duplicate set, and the resampled row distribution respectively.
+  'MissingIndicator',
+  'DropMissingColumns',
+  'Deduplicate',
+  'Oversampling',
+  'Undersampling',
 ]);
 
 // `feature_target_split` is deliberately excluded — it only separates

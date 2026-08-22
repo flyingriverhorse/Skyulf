@@ -62,12 +62,25 @@ describe('findPreprocessingBeforeSplitIssues', () => {
     const nodes = [
       node('load', 'DataLoader'),
       node('bounds', 'ManualBounds', ['load']),
-      node('hash', 'HashEncoder', ['bounds']),
-      node('split', 'TrainTestSplitter', ['hash']),
+      node('split', 'TrainTestSplitter', ['bounds']),
       node('model', 'LogisticRegression', ['split']),
     ];
     expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
   });
+
+  it.each(['HashEncoder', 'MissingIndicator', 'DropMissingColumns', 'Deduplicate', 'Oversampling', 'Undersampling'])(
+    'flags reclassified stateful node %s before the splitter',
+    (stepType) => {
+      const nodes = [
+        node('load', 'DataLoader'),
+        node('step', stepType, ['load']),
+        node('split', 'TrainTestSplitter', ['step']),
+        node('model', 'LogisticRegression', ['split']),
+      ];
+      const issues = findPreprocessingBeforeSplitIssues(nodes);
+      expect(issues.map((i) => i.nodeId)).toEqual(['step']);
+    },
+  );
 
   it('flags an indirect ancestor reached through intermediate stateless nodes', () => {
     const nodes = [

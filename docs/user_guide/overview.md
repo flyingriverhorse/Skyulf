@@ -59,6 +59,11 @@ The safe pattern is:
 - Fit preprocessing on `train` only.
 - Reuse the learned `params` to transform `test` / new inference data.
 
+Skyulf enforces this pattern: pipeline configurations that fit a data-dependent step before the
+train/test split are rejected before execution (`validate_leakage_safety`, `on_leakage="raise"`
+by default). For the demonstrated guarantee and its current limits (including the CV caveat), see
+[Leakage Proof — What is and is not covered](../examples/leakage_proof.md#what-is-and-is-not-covered).
+
 ## Where things live
 
 - `skyulf.preprocessing`: feature engineering nodes (imputation, encoding, scaling, …)
