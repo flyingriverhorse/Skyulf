@@ -864,3 +864,34 @@ class TestKBinsRegistry:
         assert NodeRegistry.get_applier("KBinsDiscretizer") is KBinsDiscretizerApplier
         metadata = NodeRegistry.get_all_metadata()
         assert metadata["KBinsDiscretizer"]["category"] == "Preprocessing"
+
+
+def test_apply_out_of_range_values_polars_matches_pandas_missing() -> None:
+    """F-08: ``pd.cut`` yields NaN for values outside the fitted edge range,
+    but polars ``cut()`` absorbed them into the outer bin, so the two engines
+    silently disagreed at test time. Out-of-range values must be missing on
+    both engines; in-range values keep identical ordinal codes."""
+    params: dict[str, Any] = {
+        "bin_edges": {"x": [0.0, 5.0, 10.0]},
+        "output_suffix": "_binned",
+        "drop_original": False,
+        "label_format": "ordinal",
+        "missing_strategy": "keep",
+        "missing_label": "Missing",
+        "include_lowest": True,
+        "precision": 3,
+    }
+    values = [-5.0, 0.0, 2.0, 7.0, 10.0, 15.0]
+
+    result_pd = GeneralBinningApplier().apply(pd.DataFrame({"x": values}), params)
+    result_pl = GeneralBinningApplier().apply(pl.DataFrame({"x": values}), params)
+
+    binned_pd = result_pd["x_binned"]
+    binned_pl = result_pl["x_binned"]
+
+    # Out-of-range rows are missing on BOTH engines.
+    assert np.isnan(binned_pd.iloc[0]) and binned_pl[0] is None
+    assert np.isnan(binned_pd.iloc[-1]) and binned_pl[-1] is None
+    # In-range codes are identical engine to engine.
+    for i in (1, 2, 3, 4):
+        assert binned_pl[i] == binned_pd.iloc[i], f"row {i} diverged"

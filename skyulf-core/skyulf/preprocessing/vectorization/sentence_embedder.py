@@ -18,7 +18,7 @@ from ...core.meta.decorators import node_meta
 from ...registry import NodeRegistry
 from .._artifacts import SentenceEmbedderArtifact
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ._common import _join_text_columns, apply_text_pandas_only, resolve_fit_text_valid_columns
+from ._common import _join_text_columns, apply_text_dual_engine, resolve_fit_text_valid_columns
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +88,40 @@ def _embed_apply_pandas(
     return pd.concat([X_out, emb_df], axis=1), y
 
 
+def _embed_apply_polars(X: Any, params: dict[str, Any]) -> Any:
+    """Native-Polars embed apply; returns ``None`` to fall back to pandas when
+    a text column is not String dtype."""
+    import numpy as np
+    import polars as pl
+
+    from ._common import _drop_and_concat_polars, _join_text_columns_polars
+
+    cols: list[str] = params.get("columns", [])
+    output_columns: list[str] = params.get("output_columns", [])
+    model_name: str = params.get("model_name", "all-MiniLM-L6-v2")
+    normalize: bool = params.get("normalize", True)
+    drop_original: bool = params.get("drop_original", False)
+
+    valid_cols = [c for c in cols if c in X.columns]
+    if not valid_cols or not output_columns:
+        return X
+
+    text = _join_text_columns_polars(X, valid_cols)
+    if text is None:
+        return None
+
+    model = _load_model(model_name)
+    embeddings = model.encode(
+        text.to_list(), normalize_embeddings=normalize, show_progress_bar=False
+    )
+    emb_frame = pl.from_numpy(np.asarray(embeddings), schema=output_columns)
+    return _drop_and_concat_polars(X, emb_frame, valid_cols, drop_original)
+
+
 class SentenceEmbedderApplier(BaseApplier):
     @apply_method
     def apply(self, X: Any, _y: Any, params: dict[str, Any]) -> Any:  # pylint: disable=arguments-differ
-        return apply_text_pandas_only(X, params, _embed_apply_pandas)
+        return apply_text_dual_engine(X, params, _embed_apply_pandas, _embed_apply_polars)
 
 
 # ── Calculate ─────────────────────────────────────────────────────────────────

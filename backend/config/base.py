@@ -74,6 +74,13 @@ class Settings(
             )
         return self
 
+    @field_validator("SKYULF_ENGINE", mode="before")
+    @classmethod
+    def normalize_skyulf_engine(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
+
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: Any) -> list[str]:

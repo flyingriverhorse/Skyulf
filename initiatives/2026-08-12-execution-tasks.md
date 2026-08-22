@@ -1,6 +1,6 @@
 # Execution tasks and versioning — Stage 0
 
-**Date:** 2026-08-12 · **Branch:** `078` → `079` · **Status:** Wave 1 (0.7.9) **complete 2026-08-20** — all rows 1.1–1.5 shipped, verified (76 backend + 730 frontend tests, green build), branch `079` ends at `chore(release): v0.7.9`. Waves 2–3 not started.
+**Date:** 2026-08-12 · **Branch:** `078` → `079` → `080` · **Status:** Wave 1 (0.7.9) **complete 2026-08-20** — all rows 1.1–1.5 shipped, verified (76 backend + 730 frontend tests, green build), branch `079` ends at `chore(release): v0.7.9`. Wave 2 (core 0.6.0) **shipped 2026-08-21** with the 0.8.0 release (`e6eeae3f`, 3255 tests green). Wave 3: 3.1 **done** — A2.2 cherry-picked to `deploy/demo-mode` as `69f34221` (red-green verified); 3.2 **done 2026-08-21** — GitHub traffic panel checked (14-day): **2,709 clones / 1,271 unique cloners** vs 225 views / 17 unique visitors. Distribution is clone-driven (self-hosting installs), not badge-click-driven — first-run install/boot quality is the load-bearing surface for this audience; activation-rate instrumentation deferred until demo-side traffic is separately confirmed.
 
 **Sources:** this file sequences work decided in two places and adds nothing
 new:
@@ -113,7 +113,7 @@ its ledger version so nothing has to be re-derived:
 
 | Scope | Finds | skyulf-core | backend + frontend |
 |---|---|---|---|
-| Audit Tier 2 remainder (engine-divergent transformers, drift NaN, WOE leakage, clustering deploy, pandas `Int64` crashes…) | F-07–F-14 | **0.6.0** if merged before the tag, else next minor | **0.8.0** |
+| Audit Tier 2 remainder (engine-divergent transformers, drift NaN, WOE leakage, clustering deploy, pandas `Int64` crashes…) — **done on `080` 2026-08-21** (F-07–F-14 red-green; core 3276 / backend 1201 tests green; F-11 buckets + F-14 scores are documented behaviour changes) | F-07–F-14 | **0.6.0** (merged before the tag) | **0.8.0** |
 | Experiments batch 2 (metric comparability, diff rendering, threshold validation) | F-36, F-38–F-44 | — | **0.8.0** (call out F-36 in changelog) |
 | Stage 2 funnel: sample-dataset entry point, dashboard, install story, rest of activation | growth A2.1, A2.3 (remainder), A2.4/A2.5 (if not shipped with core 0.6.0) | — | **0.8.0** |
 | Leakage enforcement + Tier 3 (gate bypasses, no-splitter pipelines, inference row-drops) | F-16–F-26 | **0.6.1** | **0.8.1** (F-22 frontend sync check) |

@@ -28,6 +28,14 @@ class TestPrettyDtype:
             ("category", "category"),
             ("datetime64[ns]", "datetime"),
             ("timedelta64[ns]", "duration"),
+            # Polars dtype names (captured as ``str(dtype)`` from the schema)
+            ("Date", "date"),
+            ("Datetime('us')", "datetime"),
+            ("Duration('us')", "duration"),
+            ("Categorical", "category"),
+            ("Enum(categories: ['a', 'b'])", "category"),
+            ("String", "text"),
+            ("UInt8", "integer"),
         ],
     )
     def test_maps_known_dtypes_to_display_labels(self, raw, expected):
@@ -85,3 +93,26 @@ class TestFrameDtypeCapture:
     def test_skips_columns_absent_from_the_frame(self):
         df = pd.DataFrame({"Id": [1, 2]})
         assert DeploymentService._dtypes_for_columns(df, ["Id", "Ghost"]) == {"Id": "int64"}
+
+    def test_captures_polars_dtypes_and_maps_them_to_labels(self):
+        import datetime
+
+        import polars as pl
+
+        df = pl.DataFrame(
+            {
+                "Id": [1, 2],
+                "Sepal": [1.0, 2.0],
+                "flag": [True, False],
+                "name": ["a", "b"],
+                "day": [datetime.date(2026, 1, 1), datetime.date(2026, 1, 2)],
+            }
+        )
+
+        captured = DeploymentService._dtypes_for_columns(df, ["Id", "Sepal", "flag", "name", "day"])
+
+        assert DeploymentService._pretty_dtype(captured["Id"]) == "integer"
+        assert DeploymentService._pretty_dtype(captured["Sepal"]) == "float"
+        assert DeploymentService._pretty_dtype(captured["flag"]) == "boolean"
+        assert DeploymentService._pretty_dtype(captured["name"]) == "text"
+        assert DeploymentService._pretty_dtype(captured["day"]) == "date"

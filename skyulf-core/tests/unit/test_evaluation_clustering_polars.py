@@ -166,6 +166,34 @@ def test_evaluate_clustering_model_reference_crosstab_null_value_matches_pandas(
     assert all("None" not in row for row in polars_crosstab.values())
 
 
+def test_evaluate_clustering_model_reference_crosstab_float_nan_matches_pandas() -> None:
+    """Regression test (F-43): in Polars a float NaN is a valid value, not a
+    null, so the crosstab filter's ``is_not_null()`` let NaN through and
+    invented a ``"nan"`` segment — while ``pd.crosstab`` drops NaN rows.
+    Both engines must agree on a float reference column containing NaN.
+    """
+    fixture: dict[str, list[Any]] = dict(_FIXTURE)
+    fixture["score_ref"] = [1.0, 1.0, 2.0, 2.0, float("nan"), 3.0]
+
+    pdf = pd.DataFrame(fixture)
+    pldf = pl.DataFrame(fixture)
+
+    pandas_report = evaluate_clustering_model(
+        None, pdf, _LABELS, dataset_name="fixture", reference_column="score_ref"
+    )
+    polars_report = evaluate_clustering_model(
+        None, pldf, _LABELS, dataset_name="fixture", reference_column="score_ref"
+    )
+
+    assert pandas_report.clustering is not None
+    assert polars_report.clustering is not None
+    polars_crosstab = polars_report.clustering.reference_crosstab
+    assert polars_crosstab == pandas_report.clustering.reference_crosstab
+    assert polars_crosstab is not None
+    assert all("nan" not in row for row in polars_crosstab.values())
+    assert polars_crosstab == {"0": {"1.0": 2}, "1": {"2.0": 2}, "2": {"3.0": 1}}
+
+
 def test_evaluate_clustering_model_polars_reference_dtype_preserved() -> None:
     """Reference values keep their original dtype through the native crosstab path."""
     fixture = dict(_FIXTURE)

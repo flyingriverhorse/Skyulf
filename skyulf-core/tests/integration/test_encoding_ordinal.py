@@ -11,6 +11,7 @@ from hypothesis import strategies as st
 from tests.utils.dataset_loader import load_sample_dataset
 from tests.utils.test_case_loader import TestCaseLoader
 
+from skyulf.engines.polars_engine import SkyulfPolarsWrapper
 from skyulf.preprocessing.encoding.ordinal import (
     OrdinalEncoderApplier,
     OrdinalEncoderCalculator,
@@ -447,3 +448,32 @@ class TestRealShapedDataset:
         for val in df["plan_type"].unique():
             mask = df["plan_type"] == val
             assert result.loc[mask, "plan_type"].nunique() == 1
+
+
+def test_ordinal_missing_values_encode_identically_across_engines_and_dtypes() -> None:
+    """F-07: the same column expressed as pandas float-NaN, pandas object-None,
+    polars null, and a *wrapped* polars frame must all fit the same categories
+    and produce identical codes. Before the fix, polars null skipped the
+    ``fill_null("nan")`` normalisation label.py applies, so the three
+    representations disagreed."""
+    calc = OrdinalEncoderCalculator()
+    applier = OrdinalEncoderApplier()
+    config = {"columns": ["category"]}
+
+    df_nan = pd.DataFrame({"category": ["a", "b", np.nan, "a", "b", np.nan]})
+    df_none = pd.DataFrame({"category": pd.Series(["a", "b", None, "a", "b", None], dtype=object)})
+    pl_frame = pl.DataFrame({"category": ["a", "b", None, "a", "b", None]})
+
+    coded: list[np.ndarray] = []
+    for df in (df_nan, df_none):
+        params = dict(calc.fit(df, config))
+        result = applier.apply(df, params)
+        coded.append(result["category"].to_numpy())
+
+    for frame in (pl_frame, SkyulfPolarsWrapper(pl_frame)):
+        params = dict(calc.fit(frame, config))
+        result = applier.apply(frame, params)
+        coded.append(np.asarray(result["category"]))
+
+    for other in coded[1:]:
+        np.testing.assert_array_equal(coded[0], other)

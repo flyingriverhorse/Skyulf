@@ -11,7 +11,7 @@ Thanks for considering contributing! This repo focuses on the backend (FastAPI +
 
 Alternatively, without uv:
 - `python -m venv .venv && .venv/Scripts/Activate.ps1` (Windows PowerShell)
-- `pip install -r requirements-fastapi.txt -r requirements-ci.txt`
+- `pip install -r requirements.txt -r requirements-ci.txt`
 
 ## Running tests
 - Quick subset (fast, backend-only): `uv run pytest -q tests/test_training_tasks.py tests/test_hyperparameter_tuning_optuna.py tests/test_hyperparameter_tuning_strategies.py`

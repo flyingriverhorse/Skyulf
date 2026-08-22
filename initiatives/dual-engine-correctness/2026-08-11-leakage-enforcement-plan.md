@@ -131,7 +131,9 @@ to over-claim just moves the problem.
       reclassified; misleading comment corrected.
 - [ ] No-splitter pipelines emit an explicit diagnostic instead of silence.
 - [ ] `on_leakage` implemented, default `"raise"` for definite violations, changelog marks it breaking.
-- [ ] `WOEEncoder.fit_transform_train` implemented; every other target-aware encoder audited.
+- [x] `WOEEncoder.fit_transform_train` implemented (done on `080`, 2026-08-21, red-green);
+      every other target-aware encoder audited — `TargetEncoder` (hook pre-existing) and
+      `WOEEncoder` are the only target-aware encoders in the registry.
 - [ ] Pure-noise-target regression test covers all target-aware encoders, verified **red-green**.
 - [ ] All doc sites in §3 updated in the same PR as the code.
 - [ ] Phase 4 (CV refit) has a written design note; docs carry the CV caveat until it lands.

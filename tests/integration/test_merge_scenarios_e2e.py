@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import polars as pl
 
 from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
@@ -33,7 +34,7 @@ ARTIFACT_DIR = Path(__file__).parent / "artifacts" / "merge_scenarios"
 
 def _summarize_artifact(art: Any) -> dict[str, Any]:
     """Same shape used by the engine's node_trace dump."""
-    if isinstance(art, pd.DataFrame):
+    if isinstance(art, (pd.DataFrame, pl.DataFrame)):
         return {"kind": "DataFrame", "columns": list(art.columns), "rows": len(art)}
     if isinstance(art, pd.Series):
         return {"kind": "Series", "name": art.name, "len": len(art)}
@@ -42,7 +43,7 @@ def _summarize_artifact(art: Any) -> dict[str, Any]:
         def _part(p: Any) -> Any:
             if p is None:
                 return None
-            if isinstance(p, pd.DataFrame):
+            if isinstance(p, (pd.DataFrame, pl.DataFrame)):
                 return {"kind": "DataFrame", "columns": list(p.columns), "rows": len(p)}
             if isinstance(p, tuple) and len(p) == 2:
                 X, y = p
@@ -392,6 +393,12 @@ def test_scenario_05_sibling_fanin_warning(tmp_path: Path) -> None:
     merged = store.load("merge_consumer")
     scaled_a = store.load("sib_a")
     scaled_b = store.load("sib_b")
+    if isinstance(merged, pl.DataFrame):
+        merged = merged.to_pandas()
+    if isinstance(scaled_a, pl.DataFrame):
+        scaled_a = scaled_a.to_pandas()
+    if isinstance(scaled_b, pl.DataFrame):
+        scaled_b = scaled_b.to_pandas()
     # Each branch's own edit survives the merge.
     pd.testing.assert_series_equal(
         merged["SepalLengthCm"].reset_index(drop=True),

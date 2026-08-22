@@ -2,13 +2,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-
-try:
-    import polars as pl
-
-    HAS_POLARS = True
-except ImportError:
-    HAS_POLARS = False
+import polars as pl
 
 from .protocol import SkyulfDataFrame
 from .registry import BaseEngine, EngineName, EngineRegistry
@@ -17,32 +11,26 @@ from .registry import BaseEngine, EngineName, EngineRegistry
 # correlation and clustering evaluation), mirroring pandas'
 # `select_dtypes(include=["number", "bool"])`. Shared so call sites stay
 # consistent as new native-Polars paths are added.
-POLARS_NUMERIC_BOOL_DTYPES: frozenset = (
-    frozenset(
-        (
-            pl.Boolean,
-            pl.Float32,
-            pl.Float64,
-            pl.Int8,
-            pl.Int16,
-            pl.Int32,
-            pl.Int64,
-            pl.UInt8,
-            pl.UInt16,
-            pl.UInt32,
-            pl.UInt64,
-        )
+POLARS_NUMERIC_BOOL_DTYPES: frozenset = frozenset(
+    (
+        pl.Boolean,
+        pl.Float32,
+        pl.Float64,
+        pl.Int8,
+        pl.Int16,
+        pl.Int32,
+        pl.Int64,
+        pl.UInt8,
+        pl.UInt16,
+        pl.UInt32,
+        pl.UInt64,
     )
-    if HAS_POLARS
-    else frozenset()
 )
 
 # Polars numeric dtypes (float/int/uint), excluding bool — mirrors pandas'
 # `select_dtypes(include=["number"])`. Shared so numeric-only column detection
 # stays consistent as new native-Polars paths are added.
-POLARS_NUMERIC_DTYPES: frozenset = (
-    POLARS_NUMERIC_BOOL_DTYPES - frozenset((pl.Boolean,)) if HAS_POLARS else frozenset()
-)
+POLARS_NUMERIC_DTYPES: frozenset = POLARS_NUMERIC_BOOL_DTYPES - frozenset((pl.Boolean,))
 
 
 class SkyulfPolarsWrapper:
@@ -121,14 +109,10 @@ class PolarsEngine(BaseEngine):
 
     @classmethod
     def is_compatible(cls, data: Any) -> bool:
-        if not HAS_POLARS:
-            return False
         return isinstance(data, pl.DataFrame)
 
     @classmethod
     def from_pandas(cls, df: Any) -> Any:
-        if not HAS_POLARS:
-            raise ImportError("Polars not installed")
         return pl.from_pandas(df)
 
     @classmethod
@@ -153,11 +137,8 @@ class PolarsEngine(BaseEngine):
 
     @classmethod
     def create_dataframe(cls, data: Any) -> Any:
-        if not HAS_POLARS:
-            raise ImportError("Polars not installed")
         return pl.DataFrame(data)
 
 
 # Register automatically
-if HAS_POLARS:
-    EngineRegistry.register("polars", PolarsEngine)
+EngineRegistry.register("polars", PolarsEngine)

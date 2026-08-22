@@ -101,16 +101,6 @@ def test_simple_imputer_mean_pyarrow_float_matches_numpy_backend() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "SimpleImputer's pandas apply path uses Series.fillna(mean_value) directly; "
-        "on an int64[pyarrow] column this silently truncates the (float) mean fill "
-        "value to an int instead of raising or upcasting, unlike pandas' own nullable "
-        "Int64 dtype which raises TypeError for the same input. Genuine pyarrow dtype "
-        "gap in skyulf.preprocessing.imputation.simple, not a test bug."
-    ),
-    strict=True,
-)
 def test_simple_imputer_mean_pyarrow_int_matches_numpy_backend() -> None:
     """Mean-strategy SimpleImputer on an int64[pyarrow] column should not silently truncate."""
     values = [1, 2, 3, None, 5]

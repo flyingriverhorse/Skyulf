@@ -60,6 +60,34 @@ class TestResolveTrainFeatureDtypes:
     def test_returns_none_for_a_payload_that_is_not_tabular(self, engine):
         assert engine._resolve_train_feature_dtypes(object(), ["rank"]) is None
 
+    def test_records_polars_dtypes_that_the_schema_builder_can_label(self, engine):
+        import datetime
+
+        import polars as pl
+
+        from backend.ml_pipeline.deployment.service import DeploymentService
+
+        train = pl.DataFrame(
+            {
+                "SepalLengthCm": [1.0, 2.0],
+                "rank": [1, 2],
+                "Species": ["a", "b"],
+                "day": [datetime.date(2026, 1, 1), datetime.date(2026, 1, 2)],
+            }
+        )
+        dtypes = engine._resolve_train_feature_dtypes(
+            train, ["SepalLengthCm", "rank", "Species", "day"]
+        )
+
+        assert dtypes is not None
+        labels = {name: DeploymentService._pretty_dtype(raw) for name, raw in dtypes.items()}
+        assert labels == {
+            "SepalLengthCm": "float",
+            "rank": "integer",
+            "Species": "text",
+            "day": "date",
+        }
+
 
 class TestBundledDroppedColumns:
     def test_bundle_records_columns_dropped_upstream_of_the_training_node(self, engine):

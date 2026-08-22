@@ -3,13 +3,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pandas as pd
-
-try:
-    import polars as pl
-
-    HAS_POLARS = True
-except ImportError:
-    HAS_POLARS = False
+import polars as pl
 
 from skyulf.engines import get_engine
 
@@ -66,13 +60,8 @@ class DataService:
             raise
 
     def _should_use_polars(self, force_type: str | None) -> bool:
-        """Decide whether Polars should be used given availability and the requested engine."""
-        if force_type == "pandas":
-            return False
-        if force_type == "polars" and not HAS_POLARS:
-            logger.warning("Polars requested but not installed. Falling back to Pandas.")
-            return False
-        return HAS_POLARS
+        """Decide whether Polars should be used given the requested engine."""
+        return force_type != "pandas"
 
     def _load_polars_with_fallback(self, path_str: str, storage_options: dict | None) -> Any:
         """Load via Polars, falling back to Pandas (converted to Polars) on failure."""
@@ -118,13 +107,12 @@ class DataService:
         """
         path_str = str(path)
 
-        if HAS_POLARS:
-            sample = self._try_polars_lazy_sample(path_str, limit)
-            if sample is not None:
-                return sample
+        sample = self._try_polars_lazy_sample(path_str, limit)
+        if sample is not None:
+            return sample
 
-        # Fallback: Load full file (or eager load) and take head
-        data = await self.load_file(path, force_type="pandas" if not HAS_POLARS else None)
+        # Fallback: load the full file eagerly and take head
+        data = await self.load_file(path)
         return self._sample_from_loaded_data(data, limit)
 
     def _try_polars_lazy_sample(self, path_str: str, limit: int) -> Any | None:
@@ -148,7 +136,7 @@ class DataService:
         # Handle SkyulfWrapper
         if hasattr(data, "to_pandas"):  # Wrapper or Polars
             # If it's Polars
-            if HAS_POLARS and isinstance(data, pl.DataFrame):
+            if isinstance(data, pl.DataFrame):
                 return data.head(limit).to_dicts()
             # If it's Wrapper or Pandas
             df = data.to_pandas()
@@ -170,14 +158,12 @@ class DataService:
 
         engine = get_engine(data)
 
-        # If we have Polars and the data is compatible, use Polars for writing (faster)
-        if HAS_POLARS and engine.__name__ == "PolarsEngine":
+        # Use Polars for writing when the data is compatible (faster);
+        # otherwise convert to Polars for a fast write.
+        if engine.__name__ == "PolarsEngine":
             self._save_polars_native(data, path_str)
-        elif HAS_POLARS:
-            self._save_via_polars_conversion(data, path_str)
         else:
-            # No Polars, use Pandas
-            self._save_pandas(data, path_str)
+            self._save_via_polars_conversion(data, path_str)
 
     def _save_polars_native(self, data: Any, path_str: str) -> None:
         """Write already-Polars(-wrapped) data directly via `write_parquet`."""

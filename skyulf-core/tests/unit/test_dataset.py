@@ -60,8 +60,10 @@ def test_copy_produces_independent_dataframes() -> None:
     # Mutate the copy — original must be unchanged.
     assert not isinstance(ds_copy.train, tuple)
     assert not isinstance(ds.train, tuple)
-    ds_copy.train.loc[0, "a"] = 999
-    assert ds.train.loc[0, "a"] == 1
+    train_copy = typing.cast(pd.DataFrame, ds_copy.train)
+    train_orig = typing.cast(pd.DataFrame, ds.train)
+    train_copy.loc[0, "a"] = 999
+    assert train_orig.loc[0, "a"] == 1
 
 
 def test_copy_with_validation_copies_all_three_splits() -> None:

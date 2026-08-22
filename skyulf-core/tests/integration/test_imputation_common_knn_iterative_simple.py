@@ -781,3 +781,42 @@ def test_simple_imputer_polars_most_frequent_ignores_float_nan() -> None:
 
     assert art_pl["fill_values"]["n"] == art_pd["fill_values"]["n"] == 1.0
     assert art_pl["missing_counts"] == art_pd["missing_counts"] == {"n": 2}
+
+
+def _frame_of(result: Any) -> Any:
+    return result[0] if isinstance(result, tuple) else result
+
+
+def test_pandas_nullable_int64_survives_all_three_imputers() -> None:
+    """F-10: nullable ``Int64`` (reachable via ``.convert_dtypes()`` or
+    Arrow-backed input) carries ``pd.NA``. The pandas path crashed on it in
+    SimpleImputer (float mean into Int64), KNNImputer and IterativeImputer
+    (``pd.NA`` dies in numpy/sklearn conversion) while Polars handled all
+    three. Pandas must produce the same values as Polars."""
+    df_pd = pd.DataFrame(
+        {
+            "a": pd.array([1, 2, None, 4, 5, 6], dtype="Int64"),
+            "b": [1.0, 2.0, 3.0, None, 5.0, 6.0],
+        }
+    )
+    df_pl = pl.DataFrame({"a": [1, 2, None, 4, 5, 6], "b": [1.0, 2.0, 3.0, None, 5.0, 6.0]})
+
+    cases = [
+        (
+            SimpleImputerCalculator(),
+            SimpleImputerApplier(),
+            {"columns": ["a", "b"], "strategy": "mean"},
+        ),
+        (KNNImputerCalculator(), KNNImputerApplier(), {"columns": ["a", "b"], "n_neighbors": 2}),
+        (IterativeImputerCalculator(), IterativeImputerApplier(), {"columns": ["a", "b"]}),
+    ]
+    for calc, applier, config in cases:
+        out_pd = _frame_of(applier.apply(df_pd, dict(calc.fit(df_pd, config))))
+        out_pl = _frame_of(applier.apply(df_pl, dict(calc.fit(df_pl, config))))
+        for col in ("a", "b"):
+            pd_vals = np.asarray(out_pd[col], dtype="float64")
+            pl_vals = np.asarray(out_pl[col], dtype="float64")
+            assert not np.isnan(pd_vals).any(), (
+                f"{type(calc).__name__}: {col} still has missing values"
+            )
+            np.testing.assert_allclose(pd_vals, pl_vals, err_msg=f"{type(calc).__name__} col {col}")

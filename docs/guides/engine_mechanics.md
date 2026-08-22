@@ -38,7 +38,23 @@ def fit(self, df: SkyulfDataFrame, ...):
         # Run standard Pandas logic
 ```
 
-## 3. The Hybrid Architecture
+## 3. Choosing the engine: `SKYULF_ENGINE`
+
+Inside `skyulf-core`, the engine always follows the **data** (detection above).
+The Skyulf backend additionally has one explicit switch, `SKYULF_ENGINE`
+(`polars` | `pandas`, settable as an environment variable), which decides
+which engine pipelines run on — it governs dataset ingestion and the engine's
+frame-type invariant:
+
+- **Default: `polars`.** CSV/Parquet are read natively by Polars, and frames
+  stay Polars end to end.
+- **`pandas` remains a first-class option.** Set `SKYULF_ENGINE=pandas` to run
+  everything on pandas; the full test suite is gated under both engines in CI.
+- **Provenance is recorded.** Each training job and deployment bundle records
+  the engine it was produced with, and the ingestion guard fails loudly on any
+  engine mismatch instead of degrading silently.
+
+## 4. The Hybrid Architecture
 
 We want the **speed of Polars** but the **ecosystem of Scikit-Learn**. To achieve this, we use a hybrid strategy.
 
@@ -94,7 +110,7 @@ This isolates the "compatibility boilerplate" away from your ML logic.
 
 This allows us to support *every* ML feature without rewriting Scikit-Learn from scratch in Polars.
 
-## 4. Calculator vs. Applier in the Hybrid World
+## 5. Calculator vs. Applier in the Hybrid World
 
 ### Calculator (`fit`)
 *   **Polars Engine:** Calculates stats (min, max, mean) using fast Polars aggregations. Returns a simple Python dictionary (e.g., `{'mean': 5.2}`).
@@ -109,7 +125,7 @@ This allows us to support *every* ML feature without rewriting Scikit-Learn from
 
 This means you can **train on Pandas** and **predict on Polars** (or vice versa)!
 
-## 5. The Engine-Parity Contract
+## 6. The Engine-Parity Contract
 
 "Behaves the same on Polars and Pandas" has a precise meaning in Skyulf. A node
 honours the parity contract when, for the *same underlying data*, both engines

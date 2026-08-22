@@ -11,6 +11,7 @@ training/tuning. Covers:
 """
 
 import pandas as pd
+import polars as pl
 import pytest
 
 from backend.data.catalog import FileSystemCatalog
@@ -332,7 +333,7 @@ class TestPreprocessingMerge:
         assert result.status == "success", _failure_summary(result)
 
         out = artifact_store.load("dedup")
-        assert isinstance(out, pd.DataFrame)
+        assert isinstance(out, (pd.DataFrame, pl.DataFrame))
         # Both upstream column sets must reach the downstream node.
         assert {"f1", "f2", "target"}.issubset(set(out.columns))
 
