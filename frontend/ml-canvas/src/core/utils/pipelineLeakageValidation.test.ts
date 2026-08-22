@@ -1,8 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import type { NodeConfigModel } from '../api/client';
 import {
+  DATA_DEPENDENT_FIT_STEP_TYPES,
+  TRAIN_TEST_SPLIT_STEP_TYPES,
+  applyRegistryLeakageFlags,
   findPreprocessingBeforeSplitIssues,
   formatLeakageIssueMessage,
+  resetLeakageFlags,
 } from './pipelineLeakageValidation';
 
 const node = (
@@ -159,5 +163,57 @@ describe('formatLeakageIssueMessage', () => {
     expect(message).toContain("'scale'");
     expect(message).toContain('StandardScaler');
     expect(message).toContain("'split'");
+  });
+});
+
+describe('applyRegistryLeakageFlags', () => {
+  afterEach(() => {
+    resetLeakageFlags();
+  });
+
+  it('overrides the bundled lists with registry-provided flags', () => {
+    applyRegistryLeakageFlags([
+      { id: 'StandardScaler', learns_from_data: true, is_splitter: false },
+      // 'SimpleImputer' is in the bundled fallback but NOT flagged here.
+      { id: 'SimpleImputer', learns_from_data: false, is_splitter: false },
+      { id: 'BrandNewNode', learns_from_data: true, is_splitter: false },
+      { id: 'TrainTestSplitter', learns_from_data: false, is_splitter: true, aliases: ['Split'] },
+    ]);
+
+    expect(DATA_DEPENDENT_FIT_STEP_TYPES.has('StandardScaler')).toBe(true);
+    expect(DATA_DEPENDENT_FIT_STEP_TYPES.has('BrandNewNode')).toBe(true);
+    expect(DATA_DEPENDENT_FIT_STEP_TYPES.has('SimpleImputer')).toBe(false);
+    expect(TRAIN_TEST_SPLIT_STEP_TYPES.has('TrainTestSplitter')).toBe(true);
+    // Alias spellings used by saved graphs stay gated.
+    expect(TRAIN_TEST_SPLIT_STEP_TYPES.has('Split')).toBe(true);
+  });
+
+  it('makes the graph check follow the overridden lists', () => {
+    applyRegistryLeakageFlags([
+      { id: 'SimpleImputer', learns_from_data: false, is_splitter: false },
+      { id: 'TrainTestSplitter', learns_from_data: false, is_splitter: true },
+    ]);
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('impute', 'SimpleImputer', ['load']),
+      node('split', 'TrainTestSplitter', ['impute']),
+    ];
+    expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+  });
+
+  it('keeps the bundled fallback when the registry payload is empty', () => {
+    applyRegistryLeakageFlags([]);
+    expect(DATA_DEPENDENT_FIT_STEP_TYPES.has('StandardScaler')).toBe(true);
+    expect(TRAIN_TEST_SPLIT_STEP_TYPES.has('TrainTestSplitter')).toBe(true);
+  });
+
+  it('resetLeakageFlags restores the bundled fallback', () => {
+    applyRegistryLeakageFlags([
+      { id: 'TrainTestSplitter', learns_from_data: false, is_splitter: true },
+    ]);
+    expect(DATA_DEPENDENT_FIT_STEP_TYPES.size).toBe(0);
+    resetLeakageFlags();
+    expect(DATA_DEPENDENT_FIT_STEP_TYPES.has('SimpleImputer')).toBe(true);
+    expect(TRAIN_TEST_SPLIT_STEP_TYPES.has('Split')).toBe(true);
   });
 });

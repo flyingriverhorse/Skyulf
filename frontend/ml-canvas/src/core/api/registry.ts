@@ -7,6 +7,9 @@ export interface RegistryItem {
     description: string;
     params: Record<string, unknown>;
     tags?: string[];
+    learns_from_data?: boolean;
+    is_splitter?: boolean;
+    aliases?: string[];
 }
 
 export const registryApi = {
