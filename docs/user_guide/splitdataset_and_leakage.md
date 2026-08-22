@@ -13,8 +13,12 @@ If those statistics are computed on the full dataset and then evaluated on test 
 
 Each split can be either:
 
-- a `pd.DataFrame` (with the target column inside), or
-- a tuple `(X: pd.DataFrame, y: pd.Series)`.
+- a `pd.DataFrame` (with the target column inside),
+- a `pl.DataFrame` (Polars; same shape), or
+- a tuple `(X: frame, y: Series)` on either engine.
+
+A `SplitDataset` handed to `fit()` is treated as the trust boundary: the gate assumes the
+caller already split safely, so it does not require a `TrainTestSplitter` in the config.
 
 ## Recommended patterns
 

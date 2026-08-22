@@ -35,6 +35,10 @@ import logging
 from skyulf.leakage import (
     OnLeakage,
     data_dependent_transformers,
+    is_constant_imputation,
+    is_explicit_column_drop,
+    is_explicit_hash_encoding,
+    is_explicit_missing_indicator,
     train_test_splitters,
 )
 
@@ -204,6 +208,14 @@ def validate_no_preprocessing_before_split(
         if n.step_type not in data_dependent:
             continue
         if _is_target_only_encoding(n.step_type, n.params, target_column):
+            continue
+        if is_explicit_column_drop(n.step_type, n.params):
+            continue
+        if is_constant_imputation(n.step_type, n.params):
+            continue
+        if is_explicit_missing_indicator(n.step_type, n.params):
+            continue
+        if is_explicit_hash_encoding(n.step_type, n.params):
             continue
         leaking_splitters = descendants.get(n.node_id, set()) & splitter_ids
         if leaking_splitters:

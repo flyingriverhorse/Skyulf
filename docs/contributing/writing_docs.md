@@ -40,7 +40,7 @@ docs/
     ...
   examples/                 # Runnable examples and proofs
     quickstart.md
-    leakage_proof.md
+    leakage_proof_pandas.md
   reference/                # Auto-generated API docs (mkdocstrings)
     preprocessing_nodes.md
     modeling_nodes.md
