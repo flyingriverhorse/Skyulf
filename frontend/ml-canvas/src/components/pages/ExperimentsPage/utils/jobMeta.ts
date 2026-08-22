@@ -24,23 +24,65 @@ export function getJobScoringMetric(job: { result?: Record<string, unknown> | nu
   return undefined;
 }
 
+/** One display row of a best_score comparison: a scoring metric and the
+ *  positions (into the caller's jobs array) of the jobs scored with it. */
+export interface ScoringMetricRow {
+  /** The shared scoring metric; undefined when a job's metric is unknown. */
+  metric: string | undefined;
+  indices: number[];
+}
+
+/**
+ * Partitions jobs into one row per distinct scoring metric, in
+ * first-appearance order, for best_score comparisons.
+ *
+ * `best_score` is only comparable between jobs that optimised the same
+ * metric — a basic run carries an internal `accuracy` default while a
+ * tuned run carries whatever the user picked. Ranking or starring jobs
+ * across different metrics compares numbers that mean different things
+ * (F-36), so comparison views render one row per metric instead of a
+ * single mixed row labelled from the first job.
+ */
+export function groupJobsByScoringMetric(
+  jobs: { result?: Record<string, unknown> | null; config?: unknown }[],
+): ScoringMetricRow[] {
+  const byMetric = new Map<string, ScoringMetricRow>();
+  jobs.forEach((job, index) => {
+    const metric = getJobScoringMetric(job);
+    const key = metric ?? '';
+    let row = byMetric.get(key);
+    if (!row) {
+      row = { metric, indices: [] };
+      byMetric.set(key, row);
+    }
+    row.indices.push(index);
+  });
+  return [...byMetric.values()];
+}
+
 /**
  * Maps a job's own scoring metric (as reported by `getJobScoringMetric`,
  * e.g. "f1_weighted", "roc_auc", "precision_weighted") to the closest
  * dropdown option, so the Model Evaluation metric selector defaults to
  * whatever the job was actually scored/tuned on instead of always F1.
- * Unmappable/threshold-independent metrics (e.g. "roc_auc",
- * "balanced_accuracy") fall back to "f1_weighted" — a safe default that
- * works for both binary and multiclass jobs.
+ *
+ * Only faithful 1:1 mappings are used. Macro/micro-averaged metrics
+ * (e.g. "f1_macro") and threshold-independent metrics (e.g. "roc_auc",
+ * "balanced_accuracy") have no equivalent in the threshold-scan dropdown,
+ * so they fall back to "f1_weighted" — a safe default that works for both
+ * binary and multiclass jobs. They must NOT be conflated with a different
+ * metric's form (F-38): defaulting an f1_macro-tuned job onto the binary
+ * positive-class F1 scan showed a number up to 0.29 away from the metric
+ * the run actually optimised.
  */
 export function mapJobMetricToDropdown(scoringMetric: string | undefined): ThresholdMetric {
   if (!scoringMetric) return 'f1_weighted';
   const m = scoringMetric.toLowerCase();
   if (m === 'accuracy') return 'accuracy';
   if (m === 'f1_weighted') return 'f1_weighted';
-  if (m === 'f1' || m === 'f1_macro') return 'f1';
-  if (m.startsWith('precision')) return 'precision';
-  if (m.startsWith('recall')) return 'recall';
+  if (m === 'f1') return 'f1';
+  if (m.startsWith('precision') && !m.includes('macro') && !m.includes('micro')) return 'precision';
+  if (m.startsWith('recall') && !m.includes('macro') && !m.includes('micro')) return 'recall';
   return 'f1_weighted';
 }
 

@@ -194,6 +194,18 @@ describe('JobDetailsView', () => {
     expect(screen.getByText('Something exploded')).toBeInTheDocument();
   });
 
+  it('lets the user hide CV metrics in the results grid', () => {
+    renderDetails(makeJob({
+      job_type: 'training',
+      status: 'completed',
+      result: { metrics: { test_f1_weighted: 0.91, cv_f1_weighted_mean: 0.9 } },
+    }));
+    expect(screen.getByText('cv f1 weighted mean')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /show cv metrics/i }));
+    expect(screen.queryByText('cv f1 weighted mean')).not.toBeInTheDocument();
+    expect(screen.getByText('test f1 weighted')).toBeInTheDocument();
+  });
+
   it('links the dataset using the shared RecordLink primitive', () => {
     renderDetails(
       makeJob({ dataset_id: 'ds-1', dataset_name: 'Sales Data', pipeline_id: 'pipe-42' }),

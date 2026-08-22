@@ -410,7 +410,7 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 |---|---|---|---|
 | **T1** | F-01, F-02, F-03, **F-33, F-34, F-35, F-37** | core **0.5.9** · backend/frontend **0.7.9** | **Patch — ship first, alone.** All engine-independent and LIVE. F-02/F-03 block deployments; F-33 shows the wrong job's evaluation; F-35 makes "Recall" tuning actively harmful; F-37 is a ~2-line SHAP fix restoring 6 model families. |
 | **T2** | F-04 … F-14 (excl. F-15) | core **0.6.0** · backend/frontend **0.8.0** | **Minor.** Behaviour changes: rows previously dropped are now kept (F-06), imputers that previously no-opped now impute (F-04), HashEncoder buckets change (F-11 — artifacts fitted before this release will not reproduce, needs a release note). |
-| **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend **0.8.0** | Ships with T2. Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — call it out in the changelog. |
+| **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend ~~0.8.0~~ → **0.8.1** | **Done on `080` 2026-08-22; slipped 0.8.0, ships in 0.8.1** (F-43 already shipped via core 0.6.0). Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — called out in the 0.8.1 changelog. |
 | **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | Patch/minor. F-22 changes a param name users may rely on. |
 | **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.2** · backend/frontend **0.8.2** | Patch. Cosmetic and latent-only. |
 | **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. Design note first. |
@@ -534,6 +534,15 @@ options "Recall (weighted)" etc. and add explicit binary variants.
 ### F-36 🟠 HIGH · LIVE — "Best Score" compares different metrics under one label
 `ComparisonTableView.tsx:370-371`, `MetricsComparisonChart.tsx:39,141`, `BranchComparisonCard.tsx:101-102`
 
+**Status:** ✅ Fixed (Experiments batch 2) — `best_score` is now expanded
+into one row per scoring metric via `groupJobsByScoringMetric` in both
+starring surfaces (`ComparisonTableView`, `BranchComparisonCard`): each row
+is labelled from its own metric ("Best Score (F1 Weighted)"), values are
+masked to the jobs that optimised that metric, and `pickBestIndex` stars
+only within the group. `MetricsComparisonChart` was checked and carries no
+`selectedJobs[0]`-derived label — its bar is split-labelled ("CV mean"), so
+no change was needed there. Helper covered by 4 unit tests; red-green.
+
 ```
 basic run (run_mode=fixed) : best_score=0.9   scoring_metric=accuracy
 tuned run (run_mode=tuned) : best_score=0.92  scoring_metric=f1_weighted
@@ -581,6 +590,13 @@ permutation importance; change the UI text to *"not supported for this model typ
 ### F-38 🟠 HIGH · LIVE — `f1_macro` conflated with binary/weighted F1
 `ExperimentsPage/utils/jobMeta.ts:41`
 
+**Status:** ✅ Fixed (Experiments batch 2) — `mapJobMetricToDropdown` now
+maps only exact `accuracy`/`f1_weighted`/`f1` (plus non-macro/micro
+precision/recall prefixes); `f1_macro` and other averaged or
+threshold-independent variants fall back to the documented `f1_weighted`
+default instead of being routed onto the binary positive-class F1 scan.
+5 unit tests; red-green.
+
 ```
 f1_macro    = 0.7957   <- what the job was tuned on
 f1_weighted = 0.9232
@@ -597,15 +613,20 @@ the same `NodeDiff` object under both `left.id` and `right.id`. Node-id drift be
 **normal** case, so nearly every real diff double-lists every change, plus a React duplicate-key
 warning that can mis-reconcile rows. Fix: dedupe by object identity before rendering.
 
+**Status:** ✅ Fixed (Experiments batch 2) — new `uniqueNodeDiffs` helper
+in `graphDiff.ts` dedupes by object identity; `PipelineDiffView` renders
+`uniqueNodeDiffs(diff.nodes)` before filtering to modified nodes. Unit
+test covers a renamed-and-modified node appearing once; red-green.
+
 ### F-40 … F-48
 
 | ID | Sev | Live? | Finding | Location |
 |---|---|---|---|---|
-| F-40 | 🟡 | LIVE | `thresholds/save` validates nothing; garbage persists and is silently discarded at predict time | `threshold_tuning_service.py:169-190`, `deployment/service.py:304-328` |
-| F-41 | 🟡 | LIVE | "Show CV metrics" checkbox does not hide `best_score` | `ExperimentsPage.tsx` |
-| F-42 | 🟡 | LIVE | Task `'other'` always reports "unsupported" even when the artifact exists | `utils/artifactCoverage.ts` |
+| F-40 | 🟡 | ✅ Fixed (batch 2) | `thresholds/save` validates nothing; garbage persists and is silently discarded at predict time. **Fix:** `save()` now validates metric ∈ supported set, non-empty classes, threshold keys exactly matching the stringified classes, finite values, and split ∈ {validation, test}; 7 rejection cases + a preview→save round-trip acceptance test + 1 HTTP-400 integration case; red-green. | `threshold_tuning_service.py:169-190`, `deployment/service.py:304-328` |
+| F-41 | 🟡 | ✅ Fixed (batch 2) | "Show CV metrics" checkbox does not hide `best_score`. **Fix:** `metricKeys` is filtered through new `splitOfMetric`/`filterMetricKeysBySplitVisibility` helpers (`metricMeta.ts`), so `best_score` follows the CV checkbox; 7 unit tests; red-green. | `ExperimentsPage.tsx` |
+| F-42 | 🟡 | ✅ Fixed (batch 2) | Task `'other'` always reports "unsupported" even when the artifact exists. **Fix:** `artifactCoverage.ts` precedence reordered to failed > not-terminal > has-artifact (`available`) > unsupported > not_computed, and `task === 'other'` no longer counts as unsupported; 3 unit tests; red-green. | `utils/artifactCoverage.ts` |
 | F-43 | 🟡 | **LIVE in the published `skyulf-core` SDK**, latent in the app | Polars reference crosstab invents a `"nan"` segment — `is_not_null()` misses float NaN, inflating segment counts. Docstring wrongly claims pandas parity. Same root cause as §1. | `skyulf-core/skyulf/modeling/_evaluation/clustering.py` |
-| F-44 | 🟡 | LATENT | `changeDescriptions` renders `"v: 5 → 5"` for a real int/str coercion, so users dismiss a genuine config change. Detection is correct; only the rendering is wrong. | `graphDiff.ts:93-99` |
+| F-44 | 🟡 | ✅ Fixed (batch 2) | `changeDescriptions` renders `"v: 5 → 5"` for a real int/str coercion, so users dismiss a genuine config change. Detection is correct; only the rendering is wrong. **Fix:** `describeValue` quotes strings, so the coercion now renders `5 → "5"`; unit test plus the PipelineDiffView swap test updated to the quoted rendering; red-green. | `graphDiff.ts:93-99` |
 | F-45 | ⚪ | LATENT | `stableStringify` collapses `NaN` and `null` → false "unchanged" | `graphDiff.ts` |
 | F-46 | ⚪ | LATENT | Numeric class labels sort lexicographically when `y_proba` is absent | experiments |
 | F-47 | ⚪ | info | `shortRunId` 8-char collisions | `utils/jobMeta.ts` |

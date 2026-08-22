@@ -263,9 +263,9 @@ describe('run identifier labels', () => {
       expect(screen.getByText(new RegExp(new Date(jobB.created_at).toLocaleString()))).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/method: mean → median/)).toBeInTheDocument();
+    expect(screen.getByText(/method: "mean" → "median"/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /swap/i }));
-    expect(screen.getByText(/method: median → mean/)).toBeInTheDocument();
+    expect(screen.getByText(/method: "median" → "mean"/)).toBeInTheDocument();
     expect(screen.getAllByText('Baseline')[0]).toBeInTheDocument();
     expect(screen.getAllByText('Candidate')[0]).toBeInTheDocument();
     expect(screen.getByText(/Dataset Alpha/)).toBeInTheDocument();
