@@ -41,6 +41,7 @@ class UnivariateSelectionApplier(BaseApplier):
     category="Feature Selection",
     description="Select best features based on univariate statistical tests.",
     params={"method": "SelectKBest", "score_func": "f_classif", "k": 10},
+    learns_from_data=True,
 )
 class UnivariateSelectionCalculator(BaseCalculator):
     @fit_method

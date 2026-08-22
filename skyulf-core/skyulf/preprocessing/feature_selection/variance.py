@@ -27,6 +27,7 @@ class VarianceThresholdApplier(BaseApplier):
     category="Feature Selection",
     description="Remove features with low variance.",
     params={"threshold": 0.0},
+    learns_from_data=True,
 )
 class VarianceThresholdCalculator(BaseCalculator):
     @fit_method

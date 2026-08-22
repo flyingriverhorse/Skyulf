@@ -95,6 +95,7 @@ class SimpleImputerApplier(BaseApplier):
     category="Preprocessing",
     description="Imputes missing values using mean, median, or constant.",
     params={"strategy": "mean", "fill_value": None, "columns": []},
+    learns_from_data=True,
 )
 class SimpleImputerCalculator(BaseCalculator):
     """Fit per-column values for filling missing data with sklearn-compatible strategies.

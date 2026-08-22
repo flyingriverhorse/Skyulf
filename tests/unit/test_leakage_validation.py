@@ -8,6 +8,8 @@ this is the fastest, most reliable way to *trigger* the
 dataset or a full pipeline run.
 """
 
+import logging
+
 import pytest
 
 from backend.ml_pipeline._execution._leakage_validation import (
@@ -46,14 +48,32 @@ def test_allows_scaler_after_splitter():
     validate_no_preprocessing_before_split(nodes)  # must not raise
 
 
-def test_noop_when_no_splitter_in_graph():
-    """Inference-only pipelines (no train/test boundary) are never flagged."""
+def test_no_splitter_logs_explicit_diagnostic(caplog):
+    """Pipelines with no train/test boundary get an explicit diagnostic
+    instead of silence (G1) — still non-blocking."""
     nodes = [
         _node("load", "DataLoader", []),
         _node("impute", "SimpleImputer", ["load"]),
         _node("scale", "StandardScaler", ["impute"]),
     ]
-    validate_no_preprocessing_before_split(nodes)  # must not raise
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        validate_no_preprocessing_before_split(nodes)  # must not raise
+    assert any("No train/test split" in r.message for r in caplog.records)
+
+
+def test_no_splitter_silent_under_ignore(caplog):
+    """on_leakage='ignore' suppresses even the advisory diagnostic."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("impute", "SimpleImputer", ["load"]),
+    ]
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        validate_no_preprocessing_before_split(nodes, on_leakage="ignore")
+    assert caplog.records == []
 
 
 def test_feature_target_split_does_not_trigger_leakage():
@@ -68,15 +88,56 @@ def test_feature_target_split_does_not_trigger_leakage():
 
 
 def test_stateless_nodes_before_splitter_are_allowed():
-    """Rule-based/stateless nodes (fixed bounds, hashing) never leak."""
+    """Rule-based/stateless nodes (fixed bounds) never leak."""
     nodes = [
         _node("load", "DataLoader", []),
         _node("bounds", "ManualBounds", ["load"]),
-        _node("hash", "HashEncoder", ["bounds"]),
-        _node("split", "TrainTestSplitter", ["hash"]),
+        _node("split", "TrainTestSplitter", ["bounds"]),
         _node("model", "LogisticRegression", ["split"]),
     ]
     validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+@pytest.mark.parametrize(
+    "step_type",
+    ["HashEncoder", "MissingIndicator", "DropMissingColumns", "Deduplicate"],
+)
+def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type):
+    """F-16: nodes previously exempted as 'stateless' do learn from the data
+    they are fitted on (hash bucket occupancy, missingness structure, drop
+    lists, duplicate sets) and are now gated."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("step", step_type, ["load"]),
+        _node("split", "TrainTestSplitter", ["step"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_step_type_lists_are_derived_from_the_core_registry():
+    """G2: the backend gate consumes the skyulf-core registry-derived lists;
+    there is no second hand-maintained copy to drift."""
+    from backend.ml_pipeline._execution import _leakage_validation
+    from skyulf.leakage import data_dependent_transformers, train_test_splitters
+
+    assert _leakage_validation.data_dependent_step_types() == data_dependent_transformers()
+    assert _leakage_validation.train_test_split_step_types() == train_test_splitters()
+
+
+def test_on_leakage_warn_logs_instead_of_raising(caplog):
+    """on_leakage='warn' restores the old non-blocking behaviour."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        validate_no_preprocessing_before_split(nodes, on_leakage="warn")  # must not raise
+    assert any("Data leakage risk" in r.message for r in caplog.records)
 
 
 def test_raises_for_indirect_ancestor_through_branching_graph():

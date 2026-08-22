@@ -94,6 +94,7 @@ class PolynomialFeaturesApplier(BaseApplier):
     category="Feature Engineering",
     description="Generate polynomial and interaction features.",
     params={"degree": 2, "interaction_only": False, "include_bias": False},
+    learns_from_data=False,
 )
 class PolynomialFeaturesCalculator(BaseCalculator):
     @fit_method

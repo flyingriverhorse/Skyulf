@@ -166,6 +166,7 @@ def _build_sentence_embedder_artifact(
         "drop_original": False,
     },
     tags=["text", "nlp", "embeddings", "transformers"],
+    learns_from_data=False,
 )
 class SentenceEmbedderCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:

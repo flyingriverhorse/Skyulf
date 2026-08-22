@@ -39,6 +39,7 @@ class ModelBasedSelectionApplier(BaseApplier):
     category="Feature Selection",
     description="Select features based on importance weights.",
     params={"estimator": "RandomForest", "threshold": "mean", "max_features": None},
+    learns_from_data=True,
 )
 class ModelBasedSelectionCalculator(BaseCalculator):
     @fit_method

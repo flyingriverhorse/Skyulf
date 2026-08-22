@@ -292,6 +292,7 @@ def _label_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, An
     category="Preprocessing",
     description="Encode target labels with value between 0 and n_classes-1.",
     params={"columns": [], "missing_code": -1},
+    learns_from_data=True,
 )
 class LabelEncoderCalculator(BaseCalculator):
     def infer_output_schema(

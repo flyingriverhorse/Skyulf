@@ -388,6 +388,7 @@ class CastingApplier(BaseApplier):
     category="Data Operations",
     description="Cast columns to specific data types.",
     params={"type_map": {}, "coerce_on_error": True},
+    learns_from_data=False,
 )
 class CastingCalculator(BaseCalculator):
     def infer_output_schema(

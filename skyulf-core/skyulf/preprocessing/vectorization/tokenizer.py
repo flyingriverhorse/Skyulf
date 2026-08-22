@@ -152,6 +152,7 @@ def _build_tokenizer_artifact(config: dict[str, Any], valid_cols: list[str]) -> 
         "drop_original": False,
     },
     tags=["text", "nlp", "tokenizer"],
+    learns_from_data=False,
 )
 class TokenizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:

@@ -63,6 +63,7 @@ class SimpleTransformationApplier(BaseApplier):
     category="Preprocessing",
     description="Apply simple mathematical transformations (log, sqrt, etc.).",
     params={"func": "log", "columns": []},
+    learns_from_data=False,
 )
 class SimpleTransformationCalculator(BaseCalculator):
     def infer_output_schema(
