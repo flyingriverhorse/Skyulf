@@ -23,6 +23,15 @@ class RegistryItem(BaseModel):
     description: str
     params: dict[str, Any] = {}
     tags: list[str] = []
+    # Leakage-gate flags, single-sourced from each node's `@node_meta` in
+    # skyulf-core. The frontend canvas leakage check derives its node lists
+    # from these instead of a hand-synced copy.
+    learns_from_data: bool = False
+    is_splitter: bool = False
+    # Other registration names for the same node (e.g. 'Split' for
+    # 'TrainTestSplitter'). Dedupe keeps one card per id, but saved graphs
+    # may use any spelling, so consumers need all of them.
+    aliases: list[str] = []
 
 
 class NodeConfigModel(BaseModel):

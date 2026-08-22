@@ -15,12 +15,17 @@ import { toast } from '../toast';
  *
  * The backend already hard-blocks this at execution time, but surfacing
  * the same check here means the user gets instant feedback on the canvas
- * instead of waiting for a round trip + job failure. Keep this list in
- * sync with the backend gate, which derives its node list from the
- * skyulf-core registry (`learns_from_data` on each node's `@node_meta` —
- * see `backend/ml_pipeline/_execution/_leakage_validation.py`).
+ * instead of waiting for a round trip + job failure.
+ *
+ * Single source of truth: at startup the app fetches the node registry
+ * (`GET /api/pipeline/registry`, which carries each node's
+ * `learns_from_data` / `is_splitter` flags straight from the skyulf-core
+ * `@node_meta` declarations) and calls `applyRegistryLeakageFlags` to
+ * replace the gate lists below. The hardcoded lists are only a bundled
+ * fallback used until that fetch lands (or if it fails), so they should
+ * stay a reasonable snapshot of the registry rather than being curated.
  */
-export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
+const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   // Imputation
   'SimpleImputer',
   'KNNImputer',
@@ -68,11 +73,57 @@ export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>([
   'Deduplicate',
   'Oversampling',
   'Undersampling',
-]);
+];
 
 // `feature_target_split` is deliberately excluded — it only separates
 // features (X) from the target (y) and creates no train/test boundary.
-export const TRAIN_TEST_SPLIT_STEP_TYPES = new Set<string>(['TrainTestSplitter', 'Split']);
+const BUNDLED_TRAIN_TEST_SPLIT_STEP_TYPES: readonly string[] = ['TrainTestSplitter', 'Split'];
+
+// Live gate lists, seeded from the bundled fallback above. Set identity is
+// stable — `applyRegistryLeakageFlags` mutates them in place so every
+// consumer sees the backend-provided flags once they arrive.
+export const DATA_DEPENDENT_FIT_STEP_TYPES = new Set<string>(
+  BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES,
+);
+export const TRAIN_TEST_SPLIT_STEP_TYPES = new Set<string>(
+  BUNDLED_TRAIN_TEST_SPLIT_STEP_TYPES,
+);
+
+export interface RegistryLeakageFlags {
+  id: string;
+  learns_from_data?: boolean;
+  is_splitter?: boolean;
+  aliases?: string[];
+}
+
+/**
+ * Replace the gate lists with the flags served by the backend node
+ * registry (`GET /api/pipeline/registry`), the single source of truth —
+ * each node declares `learns_from_data` / `is_splitter` on its
+ * `@node_meta` in skyulf-core, so a reclassified node reaches the canvas
+ * without any code change here. Aliases (extra registration names for the
+ * same node, e.g. 'Split' for 'TrainTestSplitter') are gated under every
+ * spelling, since saved graphs may use any of them. An empty payload keeps
+ * the bundled fallback rather than silently disabling the gate.
+ */
+export function applyRegistryLeakageFlags(items: readonly RegistryLeakageFlags[]): void {
+  if (items.length === 0) return;
+  DATA_DEPENDENT_FIT_STEP_TYPES.clear();
+  TRAIN_TEST_SPLIT_STEP_TYPES.clear();
+  for (const item of items) {
+    const names = [item.id, ...(item.aliases ?? [])];
+    if (item.learns_from_data) names.forEach((n) => DATA_DEPENDENT_FIT_STEP_TYPES.add(n));
+    if (item.is_splitter) names.forEach((n) => TRAIN_TEST_SPLIT_STEP_TYPES.add(n));
+  }
+}
+
+/** Restore the bundled fallback gate lists (e.g. after a failed fetch). */
+export function resetLeakageFlags(): void {
+  DATA_DEPENDENT_FIT_STEP_TYPES.clear();
+  TRAIN_TEST_SPLIT_STEP_TYPES.clear();
+  for (const id of BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES) DATA_DEPENDENT_FIT_STEP_TYPES.add(id);
+  for (const id of BUNDLED_TRAIN_TEST_SPLIT_STEP_TYPES) TRAIN_TEST_SPLIT_STEP_TYPES.add(id);
+}
 
 // Encoder step types that can operate purely on the target column (y)
 // instead of feature columns, depending on their config.
