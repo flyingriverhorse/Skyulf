@@ -55,7 +55,16 @@ def _build_node_registry() -> list[RegistryItem]:
     ]
     dynamic: list[RegistryItem] = []
     seen_ids: set[str] = set()
-    for node_id, meta in SkyulfRegistry.get_all_metadata().items():
+    all_metadata = SkyulfRegistry.get_all_metadata()
+    # Reverse map: logical node id -> extra registration names (aliases).
+    # Dedupe below keeps one card per id, but saved graphs may reference a
+    # node by any of its registration names, so expose them all.
+    aliases_by_id: dict[str, list[str]] = {}
+    for registration_name, meta in all_metadata.items():
+        logical_id = meta.get("id", registration_name)
+        if registration_name != logical_id:
+            aliases_by_id.setdefault(logical_id, []).append(registration_name)
+    for node_id, meta in all_metadata.items():
         item_data = dict(meta)
         if "id" not in item_data:
             item_data["id"] = node_id
@@ -69,6 +78,7 @@ def _build_node_registry() -> list[RegistryItem]:
         if item_id in seen_ids:
             continue
         seen_ids.add(item_id)
+        item_data["aliases"] = aliases_by_id.get(item_id, [])
         dynamic.append(RegistryItem(**item_data))
 
     dynamic_ids = {n.id for n in dynamic}

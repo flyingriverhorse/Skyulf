@@ -5,6 +5,8 @@ import { Toaster } from 'sonner'
 import App from './App.tsx'
 import './index.css'
 import { initializeRegistry } from './core/registry/init'
+import { registryApi } from './core/api/registry'
+import { applyRegistryLeakageFlags } from './core/utils/pipelineLeakageValidation'
 import { ErrorBoundary, ConfirmProvider } from './components/shared'
 // Dev-only side-effect import: exposes `window.__skyulfTest` for
 // Playwright. Stripped from production by Vite's DCE on the
@@ -24,6 +26,17 @@ const ReactQueryDevtools = import.meta.env.DEV
 
 // Initialize node registry before rendering
 initializeRegistry();
+
+// Sync the canvas leakage gate with the backend node registry (each node's
+// `learns_from_data` / `is_splitter` flags, single-sourced from skyulf-core
+// `@node_meta`). Until this lands — or if it fails — the bundled fallback
+// lists in pipelineLeakageValidation.ts stay active.
+registryApi
+  .getAllNodes()
+  .then(applyRegistryLeakageFlags)
+  .catch((err) =>
+    console.warn('Leakage gate running on bundled fallback (registry fetch failed):', err),
+  );
 
 const queryClient = new QueryClient()
 
