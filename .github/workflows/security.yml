@@ -39,7 +39,18 @@ jobs:
       - name: Install pyscan
         run: uv pip install --system "pyscan-rs>=2.1.3"
 
-      # pyscan reads uv.lock at the repo root and honours .pyscanignore.
-      # It exits non-zero when an un-ignored vulnerability is found, failing the gate.
-      - name: Scan dependencies (uv.lock vs OSV)
-        run: pyscan
+      # pyscan cannot parse the uv.lock (revision 3): on a bare runner it
+      # falls back to pip/PyPI lookups and substitutes unreleased prerelease
+      # versions (e.g. "sqlalchemy 2.1.0-0b3"), producing bogus findings.
+      # Export the lockfile to fully-pinned requirements and scan those, so
+      # OSV checks run against exactly the versions we ship. .pyscanignore
+      # is still honoured. Exit is non-zero on any un-ignored vulnerability.
+      - name: Export locked versions
+        run: uv export --frozen --format requirements-txt --no-hashes --no-emit-project -o locked-requirements.txt
+
+      - name: Scan dependencies (locked pins vs OSV)
+        run: |
+          mkdir scan-root
+          mv locked-requirements.txt scan-root/requirements.txt
+          cp .pyscanignore scan-root/
+          pyscan -d scan-root
