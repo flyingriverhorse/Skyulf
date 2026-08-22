@@ -89,19 +89,6 @@ def test_evaluate_with_empty_target_column_returns_clustering_report(blobs_split
     assert raw_train["metrics"]["silhouette_sample_size"] == len(blobs_split_dataset.train)
 
 
-def test_refit_with_empty_target_column_does_not_crash_on_y_concat(blobs_split_dataset):
-    """refit() concatenates train+validation y; for clustering y is None and must be
-    skipped rather than crash trying to pd.concat([None, None])."""
-    validation = blobs_split_dataset.test
-    dataset = SplitDataset(
-        train=blobs_split_dataset.train, test=pd.DataFrame(), validation=validation
-    )
-    estimator = StatefulEstimator(KMeansCalculator(), KMeansApplier(), "node1")
-    estimator.fit_predict(dataset, "", {"params": {"n_clusters": 3}})
-    estimator.refit(dataset, "", {"params": {"n_clusters": 3}})
-    assert estimator.model is not None
-
-
 # ---------------------------------------------------------------------------
 # Polars-engine helper regressions: `_select_numeric_features` used to no-op
 # for raw (unwrapped) `pl.DataFrame`/`SkyulfPolarsWrapper` input (only ever

@@ -67,6 +67,47 @@ def test_woe_engine_parity_pandas_vs_polars():
         assert np.isclose(woe, pl_params["mappings"]["city"][cat])
 
 
+def _woe_frame_with_nulls() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "city": ["A", "A", None, "B", "B", None, "C", "C"],
+            "target": [1, 1, 1, 0, 0, 0, 1, 0],
+        }
+    )
+
+
+def test_woe_null_category_key_matches_across_engines():
+    """F-28: fit keys for null-bearing columns must be identical on both engines."""
+    df = _woe_frame_with_nulls()
+    pd_params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), {"columns": ["city"]})
+    pl_X = pl.from_pandas(df[["city"]])
+    pl_y = pl.from_pandas(df[["target"]])["target"]
+    pl_params = WOEEncoderCalculator().fit((pl_X, pl_y), {"columns": ["city"]})
+    assert set(pd_params["mappings"]["city"]) == set(pl_params["mappings"]["city"])
+    for cat, woe in pd_params["mappings"]["city"].items():
+        assert np.isclose(woe, pl_params["mappings"]["city"][cat])
+
+
+def test_woe_null_row_hits_learned_mapping_cross_engine():
+    """Serving always builds a pandas frame, so a polars-fitted artifact must
+    map pandas null rows to the learned null WOE, not fall back to default."""
+    df = _woe_frame_with_nulls()
+    pl_X = pl.from_pandas(df[["city"]])
+    pl_y = pl.from_pandas(df[["target"]])["target"]
+    pl_params = WOEEncoderCalculator().fit((pl_X, pl_y), {"columns": ["city"]})
+    null_woe = pl_params["mappings"]["city"]["nan"]
+
+    out = WOEEncoderApplier().apply(pd.DataFrame({"city": [None, "A"]}), pl_params)
+    assert np.isclose(out.loc[0, "city"], null_woe)
+    assert np.isclose(out.loc[1, "city"], pl_params["mappings"]["city"]["A"])
+
+    # The reverse replay (pandas-fitted artifact applied on Polars) must agree.
+    pd_params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), {"columns": ["city"]})
+    out_pl = WOEEncoderApplier().apply(pl.DataFrame({"city": [None, "A"]}), pd_params)
+    assert np.isclose(out_pl["city"].to_list()[0], pd_params["mappings"]["city"]["nan"])
+    assert np.isclose(out_pl["city"].to_list()[1], pd_params["mappings"]["city"]["A"])
+
+
 def test_woe_non_binary_target_is_skipped():
     df = pd.DataFrame({"city": ["A", "B", "C"], "target": [0, 1, 2]})
     params = WOEEncoderCalculator().fit((df[["city"]], df["target"]), {"columns": ["city"]})

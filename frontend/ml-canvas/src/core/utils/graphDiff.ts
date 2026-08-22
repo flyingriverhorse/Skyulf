@@ -80,7 +80,12 @@ const IGNORED_DATA_KEYS = new Set<string>([
 
 /** Stable, deterministic JSON for deep-equality comparisons. */
 function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (value === null || typeof value !== 'object') {
+    // JSON.stringify renders NaN as "null", which would make a NaN ↔ null
+    // change diff as "unchanged" (F-45).
+    if (typeof value === 'number' && Number.isNaN(value)) return 'NaN';
+    return JSON.stringify(value);
+  }
   if (Array.isArray(value)) {
     return `[${value.map((v) => stableStringify(v)).join(',')}]`;
   }

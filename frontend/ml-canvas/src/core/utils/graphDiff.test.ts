@@ -52,6 +52,20 @@ describe('diffGraphs', () => {
     expect(node?.changeDescriptions[0]).toContain('median');
   });
 
+  it('treats NaN and null as different values (F-45)', () => {
+    // JSON.stringify renders both NaN and null as "null", so a naive
+    // stringify-based equality reports this change as "unchanged".
+    const diff = diffGraphs(
+      [n('a', { threshold: Number.NaN })],
+      [],
+      [n('a', { threshold: null })],
+      [],
+    );
+    const node = diff.nodes.get('a');
+    expect(node?.status).toBe('modified');
+    expect(node?.changedKeys).toEqual(['threshold']);
+  });
+
   it('ignores presentation-only keys (executionResult, lastRunAt, …)', () => {
     const diff = diffGraphs(
       [n('a', { method: 'mean', executionResult: { rows: 100 }, lastRunAt: 'old' })],

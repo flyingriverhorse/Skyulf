@@ -232,3 +232,54 @@ def test_fit_transform_train_dual_engine_dispatches_to_polars_path():
     )
     assert params == {"mean_a": 2.0}
     assert result["a"].to_list() == [101, 102, 103]
+
+
+# ---------------------------------------------------------------------------
+# F-27: mixed-engine (X, y) pairs must fail with a clear TypeError
+# ---------------------------------------------------------------------------
+
+
+def test_apply_dual_engine_rejects_mixed_engine_tuple():
+    """pandas X with a polars y must raise TypeError, not a downstream AttributeError."""
+    X = pd.DataFrame({"a": [1, 2]})
+    y = pl.Series("t", [0, 1])
+    with pytest.raises(TypeError, match="[Mm]ixed engines"):
+        apply_dual_engine((X, y), {}, _polars_apply, _pandas_apply)
+
+
+def test_apply_dual_engine_rejects_polars_x_with_pandas_y():
+    """polars X with a pandas y must raise TypeError too."""
+    X = pl.DataFrame({"a": [1, 2]})
+    y = pd.Series([0, 1])
+    with pytest.raises(TypeError, match="[Mm]ixed engines"):
+        apply_dual_engine((X, y), {}, _polars_apply, _pandas_apply)
+
+
+def test_fit_dual_engine_rejects_mixed_engine_tuple():
+    """The fit entry point must reject mixed engines as well."""
+    X = pl.DataFrame({"a": [1.0, 2.0]})
+    y = pd.Series([0, 1])
+    with pytest.raises(TypeError, match="[Mm]ixed engines"):
+        fit_dual_engine((X, y), {}, _polars_fit, _pandas_fit)
+
+
+def test_fit_transform_train_dual_engine_rejects_mixed_engine_tuple():
+    """The fit_transform_train entry point must reject mixed engines as well."""
+    X = pd.DataFrame({"a": [1, 2]})
+    y = pl.Series("t", [0, 1])
+    with pytest.raises(TypeError, match="[Mm]ixed engines"):
+        fit_transform_train_dual_engine(
+            (X, y), {}, _polars_fit_transform_train, _pandas_fit_transform_train
+        )
+
+
+def test_apply_dual_engine_allows_engine_neutral_y():
+    """A plain list y carries no engine and must stay accepted on either path."""
+    X_pd = pd.DataFrame({"a": [1, 2]})
+    result = apply_dual_engine((X_pd, [0, 1]), {}, _polars_apply, _pandas_apply)
+    assert list(result[0]["a"]) == [2, 3]
+
+    X_pl = pl.DataFrame({"a": [1, 2]})
+    result_pl = apply_dual_engine((X_pl, [0, 1]), {}, _polars_apply, _pandas_apply)
+    X_out = result_pl[0]
+    assert X_out["a"].to_list() == [2, 3]

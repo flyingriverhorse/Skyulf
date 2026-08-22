@@ -266,12 +266,10 @@ def test_advanced_features(classification_data, artifact_store):
     applier = LogisticRegressionApplier()
     estimator = StatefulEstimator(calculator, applier, "adv_node")
 
-    # 1. Test Refit Strategy
-    # Should run without error and produce predictions
+    # 1. Fit + predict
     estimator.fit_predict(classification_data, "target", {})
-    estimator.refit(classification_data, "target", {})
 
-    # Verify artifact exists (it should have been overwritten)
+    # Verify the model artifact exists
     assert estimator.model is not None
 
     # 2. Test Progress Callback

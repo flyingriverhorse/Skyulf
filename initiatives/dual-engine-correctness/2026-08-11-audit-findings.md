@@ -332,12 +332,12 @@ imputation means, scaler statistics and encodings. **This is architectural**, no
 
 | ID | Finding | Location |
 |---|---|---|
-| F-27 ⚪ | Mixed-engine row filters raise `AttributeError` instead of a clear `TypeError`. | `drop_rows.py:69`, `outliers/_common.py:25` |
-| F-28 ⚪ | WOE artifact null key is `None` on one engine, `nan` on the other. | `woe.py:167-186` |
-| F-29 ⚪ | `SimpleImputer` median dtype: `Int64` vs `Float64`. | `imputation/simple.py` |
-| F-30 ⚪ | `_pretty_dtype` is pandas-only → Polars deployments show `unknown` for Date, Duration, Categorical. | `service.py:613-638` |
-| F-31 ⚪ | `_normalize_train_frame` returns `None` for Polars (drift reference + SHAP frame). **Not reachable** — backend catalog is pandas-only and `7485ade6` added a guard. Latent only. | `_artifacts.py:154-178` |
-| F-32 ⚪ | `_feature_names_for_importance` pandas-only → `feature_importances = None` on Polars. Same reachability caveat as F-31. | `_artifacts.py:38-58` |
+| F-27 ⚪ | Mixed-engine row filters raise `AttributeError` instead of a clear `TypeError`. **Status:** ✅ Fixed (T4 cleanup on `081`) — all three dispatcher entry points now reject mixed-engine `(X, y)` pairs with a clear `TypeError`; engine-neutral y (lists/numpy) unaffected. | `drop_rows.py:69`, `outliers/_common.py:25` |
+| F-28 ⚪ | WOE artifact null key is `None` on one engine, `nan` on the other. **Status:** ✅ Fixed (T4 cleanup on `081`) — pandas fit/apply/cross-fit now normalise nulls to the `"nan"` key via `_string_keys_with_nan`, matching the Polars path. ⚠️ Pre-release pandas-fitted artifacts keep their `"None"` key until re-fit. | `woe.py:167-186` |
+| F-29 ⚪ | `SimpleImputer` median dtype: `Int64` vs `Float64`. **Status:** ✅ Already resolved by the Polars migration (verified on `081`: both engines record a Python `float`). | `imputation/simple.py` |
+| F-30 ⚪ | `_pretty_dtype` is pandas-only → Polars deployments show `unknown` for Date, Duration, Categorical. **Status:** ✅ Already resolved (verified on `081`: Polars dtype names recognised). | `service.py:613-638` |
+| F-31 ⚪ | `_normalize_train_frame` returns `None` for Polars (drift reference + SHAP frame). **Status:** ✅ Already resolved by the Polars migration (verified on `081`: Polars frames and `(X, y)` tuples handled; `_shap_input_frame` converts at the boundary). | `_artifacts.py:154-178` |
+| F-32 ⚪ | `_feature_names_for_importance` pandas-only → `feature_importances = None` on Polars. **Status:** ✅ Already resolved by the Polars migration (verified on `081`: accepts `pl.DataFrame` on all data shapes). | `_artifacts.py:38-58` |
 
 ---
 
@@ -412,7 +412,7 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 | **T2** | F-04 … F-14 (excl. F-15) | core **0.6.0** · backend/frontend **0.8.0** | **Minor.** Behaviour changes: rows previously dropped are now kept (F-06), imputers that previously no-opped now impute (F-04), HashEncoder buckets change (F-11 — artifacts fitted before this release will not reproduce, needs a release note). |
 | **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend ~~0.8.0~~ → **0.8.1** | **Done on `080` 2026-08-22; slipped 0.8.0, ships in 0.8.1** (F-43 already shipped via core 0.6.0). Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — called out in the 0.8.1 changelog. |
 | **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | Patch/minor. F-22 changes a param name users may rely on. |
-| **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.2** · backend/frontend **0.8.2** | Patch. Cosmetic and latent-only. |
+| **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.1** · backend/frontend **0.8.1** | **Done on `081` 2026-08-22; folded into the upcoming 0.8.1 release.** F-26 and F-29–F-32 were already resolved by the Polars migration; F-27/F-28/F-45–F-48 fixed red-green. |
 | **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. Design note first. |
 
 **Cross-cutting, do in T1:** add engine-parity tests that use **float NaN** (not only nulls) and
@@ -627,10 +627,10 @@ test covers a renamed-and-modified node appearing once; red-green.
 | F-42 | 🟡 | ✅ Fixed (batch 2) | Task `'other'` always reports "unsupported" even when the artifact exists. **Fix:** `artifactCoverage.ts` precedence reordered to failed > not-terminal > has-artifact (`available`) > unsupported > not_computed, and `task === 'other'` no longer counts as unsupported; 3 unit tests; red-green. | `utils/artifactCoverage.ts` |
 | F-43 | 🟡 | **LIVE in the published `skyulf-core` SDK**, latent in the app | Polars reference crosstab invents a `"nan"` segment — `is_not_null()` misses float NaN, inflating segment counts. Docstring wrongly claims pandas parity. Same root cause as §1. | `skyulf-core/skyulf/modeling/_evaluation/clustering.py` |
 | F-44 | 🟡 | ✅ Fixed (batch 2) | `changeDescriptions` renders `"v: 5 → 5"` for a real int/str coercion, so users dismiss a genuine config change. Detection is correct; only the rendering is wrong. **Fix:** `describeValue` quotes strings, so the coercion now renders `5 → "5"`; unit test plus the PipelineDiffView swap test updated to the quoted rendering; red-green. | `graphDiff.ts:93-99` |
-| F-45 | ⚪ | LATENT | `stableStringify` collapses `NaN` and `null` → false "unchanged" | `graphDiff.ts` |
-| F-46 | ⚪ | LATENT | Numeric class labels sort lexicographically when `y_proba` is absent | experiments |
-| F-47 | ⚪ | info | `shortRunId` 8-char collisions | `utils/jobMeta.ts` |
-| F-48 | ⚪ | — | `StatefulEstimator.refit()` is **dead code** — zero callers. Notable because it is the only code that would have trained on train+validation, so that concern is moot. | `skyulf-core/skyulf/modeling/base.py:368-399` |
+| F-45 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | `stableStringify` collapsed `NaN` and `null` → false "unchanged". **Fix:** `stableStringify` emits a distinct `NaN` token; unit test covers a NaN↔null diff. | `graphDiff.ts` |
+| F-46 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | Numeric class labels sorted lexicographically when `y_proba` is absent. **Fix:** `classLabelComparator` sorts all-numeric labels by value; unit tests cover numeric and string labels. | experiments |
+| F-47 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | `shortRunId` 8-char collisions. **Fix:** widened to 10 chars. | `utils/jobMeta.ts` |
+| F-48 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | `StatefulEstimator.refit()` was dead code — zero production callers. **Fix:** method and its four test call sites removed. | `skyulf-core/skyulf/modeling/base.py` |
 
 ### Proven correct in this subsystem
 
