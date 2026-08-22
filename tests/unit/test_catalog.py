@@ -1,3 +1,4 @@
+from datetime import UTC
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -60,6 +61,18 @@ class TestFileSystemCatalog:
         # Should resolve to base_path/secret.txt (basename check), NOT outside
         path = catalog._get_path(dataset_id)
         assert path == str(tmp_path / "secret.txt")
+
+    @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow not installed")
+    def test_unknown_extension_falls_back_to_parquet_with_pandas(self, tmp_path):
+        """Under the pandas engine, an unrecognized extension is read as
+        parquet via pandas (the else side of the engine check)."""
+        catalog = FileSystemCatalog(base_path=str(tmp_path))
+        MOCK_DF.to_parquet(tmp_path / "data.bin")
+
+        loaded = catalog.load("data.bin")
+
+        assert isinstance(loaded, pd.DataFrame)
+        pd.testing.assert_frame_equal(MOCK_DF, loaded)
 
 
 class TestSmartCatalog:
@@ -227,3 +240,145 @@ class TestS3Catalog:
             assert (
                 prepared["client_kwargs"]["endpoint_url"] == "https://trusted-minio.internal:9000"
             )
+
+
+class TestS3CatalogPolarsPaths:
+    """S3Catalog reads/writes must honor SKYULF_ENGINE=polars end to end."""
+
+    def _catalog(self) -> "S3Catalog":
+        with patch.dict("sys.modules", {"s3fs": MagicMock()}):
+            return S3Catalog(bucket_name="my-bucket")
+
+    def test_fresh_csv_cache_is_read_with_polars(self, tmp_path, monkeypatch):
+        """A fresh local CSV cache is returned as a Polars frame under the
+        polars engine, not a pandas frame."""
+        pl = pytest.importorskip("polars")
+        from datetime import datetime, timedelta, timezone
+
+        from backend.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
+        catalog = self._catalog()
+        cache_path = tmp_path / "data.csv"
+        pd.DataFrame({"a": [1, 2]}).to_csv(cache_path, index=False)
+        catalog.fs.info.return_value = {"LastModified": datetime.now(UTC) - timedelta(days=1)}
+
+        out = catalog._load_from_cache_if_fresh(
+            "s3://my-bucket/data.csv", str(cache_path), None, {}
+        )
+
+        assert isinstance(out, pl.DataFrame)
+        assert out["a"].to_list() == [1, 2]
+
+    @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow not installed")
+    def test_fresh_parquet_cache_is_read_with_polars(self, tmp_path, monkeypatch):
+        """Same for parquet caches, with the row limit applied after the read."""
+        pl = pytest.importorskip("polars")
+        from datetime import datetime, timedelta, timezone
+
+        from backend.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "polars", raising=False)
+        catalog = self._catalog()
+        cache_path = tmp_path / "data.parquet"
+        pd.DataFrame({"a": [1, 2, 3]}).to_parquet(cache_path)
+        catalog.fs.info.return_value = {"LastModified": datetime.now(UTC) - timedelta(days=1)}
+
+        out = catalog._load_from_cache_if_fresh(
+            "s3://my-bucket/data.parquet", str(cache_path), 2, {}
+        )
+
+        assert isinstance(out, pl.DataFrame)
+        assert out["a"].to_list() == [1, 2]
+
+    @patch("pandas.read_parquet")
+    def test_read_from_source_dispatches_parquet(self, mock_read_parquet):
+        """The S3 source-read dispatcher must route `.parquet` paths to the
+        parquet reader (not the fallback), regardless of engine."""
+        with patch("backend.data.catalog.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(SKYULF_ENGINE="pandas")
+            mock_read_parquet.return_value = pd.DataFrame({"a": [1]})
+
+            out = S3Catalog._read_from_source("s3://my-bucket/data.parquet", None, {})
+
+        mock_read_parquet.assert_called_once_with("s3://my-bucket/data.parquet", storage_options={})
+        assert isinstance(out, pd.DataFrame)
+
+    @patch("pandas.read_json")
+    def test_read_from_source_dispatches_json(self, mock_read_json):
+        """`.json` paths route to the JSON reader — the else sides of the
+        csv/parquet checks."""
+        with patch("backend.data.catalog.get_settings") as mock_settings:
+            mock_settings.return_value = MagicMock(SKYULF_ENGINE="pandas")
+            mock_read_json.return_value = pd.DataFrame({"a": [1]})
+
+            out = S3Catalog._read_from_source("s3://my-bucket/data.json", None, {})
+
+        mock_read_json.assert_called_once_with("s3://my-bucket/data.json", storage_options={})
+        assert isinstance(out, pd.DataFrame)
+
+    def test_write_to_cache_accepts_polars_frames(self, tmp_path):
+        """A Polars frame must be cached via its native writers — the pandas
+        `to_csv`/`to_parquet` API does not exist on pl.DataFrame."""
+        pl = pytest.importorskip("polars")
+        df = pl.DataFrame({"a": [1, 2]})
+
+        csv_path = tmp_path / "cache.csv"
+        S3Catalog._write_to_cache(df, str(csv_path), "s3://my-bucket/data.csv")
+        assert pl.read_csv(csv_path)["a"].to_list() == [1, 2]
+
+        parquet_path = tmp_path / "cache.parquet"
+        S3Catalog._write_to_cache(df, str(parquet_path), "s3://my-bucket/data.parquet")
+        assert pl.read_parquet(parquet_path)["a"].to_list() == [1, 2]
+
+    def test_fresh_csv_cache_is_read_with_pandas(self, tmp_path, monkeypatch):
+        """The else side of the cache engine check: under the pandas engine a
+        fresh CSV cache stays a pandas frame."""
+        from datetime import datetime, timedelta, timezone
+
+        from backend.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "pandas", raising=False)
+        catalog = self._catalog()
+        cache_path = tmp_path / "data.csv"
+        pd.DataFrame({"a": [1, 2]}).to_csv(cache_path, index=False)
+        catalog.fs.info.return_value = {"LastModified": datetime.now(UTC) - timedelta(days=1)}
+
+        out = catalog._load_from_cache_if_fresh(
+            "s3://my-bucket/data.csv", str(cache_path), None, {}
+        )
+
+        assert isinstance(out, pd.DataFrame)
+        assert out["a"].tolist() == [1, 2]
+
+    @pytest.mark.skipif(not _has_pyarrow(), reason="pyarrow not installed")
+    def test_fresh_parquet_cache_is_read_with_pandas(self, tmp_path, monkeypatch):
+        """Same else side for parquet caches."""
+        from datetime import datetime, timedelta, timezone
+
+        from backend.config import get_settings
+
+        monkeypatch.setattr(get_settings(), "SKYULF_ENGINE", "pandas", raising=False)
+        catalog = self._catalog()
+        cache_path = tmp_path / "data.parquet"
+        pd.DataFrame({"a": [1, 2, 3]}).to_parquet(cache_path)
+        catalog.fs.info.return_value = {"LastModified": datetime.now(UTC) - timedelta(days=1)}
+
+        out = catalog._load_from_cache_if_fresh(
+            "s3://my-bucket/data.parquet", str(cache_path), None, {}
+        )
+
+        assert isinstance(out, pd.DataFrame)
+        assert out["a"].tolist() == [1, 2, 3]
+
+    def test_write_to_cache_accepts_pandas_frames(self, tmp_path):
+        """The non-Polars branch of the cache writer keeps using the pandas API."""
+        df = pd.DataFrame({"a": [1, 2]})
+
+        csv_path = tmp_path / "cache.csv"
+        S3Catalog._write_to_cache(df, str(csv_path), "s3://my-bucket/data.csv")
+        assert pd.read_csv(csv_path)["a"].tolist() == [1, 2]
+
+        parquet_path = tmp_path / "cache.parquet"
+        S3Catalog._write_to_cache(df, str(parquet_path), "s3://my-bucket/data.parquet")
+        assert pd.read_parquet(parquet_path)["a"].tolist() == [1, 2]

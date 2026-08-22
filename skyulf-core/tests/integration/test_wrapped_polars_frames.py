@@ -100,6 +100,10 @@ def test_vectorizers_accept_wrapped_polars_frame(calculator_cls: type, applier_c
 
 def test_sentence_embedder_accepts_wrapped_polars_frame() -> None:
     try:
+        # The module imports sentence_transformers lazily inside _load_model,
+        # so probe the optional extra here or fit() would raise ImportError.
+        import sentence_transformers  # noqa: F401
+
         from skyulf.preprocessing.vectorization.sentence_embedder import (
             SentenceEmbedderApplier,
             SentenceEmbedderCalculator,
