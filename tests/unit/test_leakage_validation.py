@@ -156,7 +156,105 @@ def test_validate_returns_passed_verdict_for_a_clean_graph():
         _node("scale", "StandardScaler", ["split"]),
     ]
     verdict = validate_no_preprocessing_before_split(nodes)
-    assert verdict == {"status": "passed", "messages": []}
+    assert verdict == {
+        "status": "passed",
+        "messages": [],
+        "splitters": ["split"],
+        "checked": [
+            {
+                "node_id": "scale",
+                "step_type": "StandardScaler",
+                "before_split": False,
+                "violation": False,
+            }
+        ],
+        "exempted": [],
+    }
+
+
+def test_verdict_marks_checked_nodes_running_before_the_split():
+    """A data-dependent node wired before the splitter is reported with
+    before_split=True so the modal can explain exactly what was checked."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("impute", "SimpleImputer", ["load"], params={"strategy": "median"}),
+        _node("split", "TrainTestSplitter", ["impute"]),
+        _node("scale", "StandardScaler", ["split"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+    by_id = {c["node_id"]: c for c in verdict["checked"]}
+    assert by_id["impute"]["before_split"] is True
+    assert by_id["impute"]["violation"] is True
+    assert by_id["scale"]["before_split"] is False
+    assert by_id["scale"]["violation"] is False
+    assert verdict["splitters"] == ["split"]
+
+
+def test_verdict_lists_exemptions_with_their_reasons():
+    """Param-aware exemptions are reported so the modal can explain why a
+    data-dependent node type was allowed before the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("fill", "SimpleImputer", ["load"], params={"strategy": "constant"}),
+        _node("drop", "DropMissingColumns", ["load"], params={"columns": ["id"]}),
+        _node("flags", "MissingIndicator", ["load"], params={"columns": ["age"]}),
+        _node("hash", "HashEncoder", ["load"], params={"columns": ["city"]}),
+        _node("encode", "LabelEncoder", ["load"], params={"columns": ["species"]}),
+        _node(
+            "split",
+            "TrainTestSplitter",
+            ["fill", "drop", "flags", "hash", "encode"],
+            params={"target_column": "species"},
+        ),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict["status"] == "passed"
+    by_id = {e["node_id"]: e for e in verdict["exempted"]}
+    assert set(by_id) == {"fill", "drop", "flags", "hash", "encode"}
+    assert "constant" in by_id["fill"]["reason"].lower()
+    assert all(e["reason"] for e in verdict["exempted"])
+
+
+def test_warn_mode_verdict_carries_detail_alongside_messages():
+    """The structured detail accompanies violation messages in warn mode."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+    assert verdict["status"] == "warnings"
+    assert verdict["checked"] == [
+        {
+            "node_id": "scale",
+            "step_type": "StandardScaler",
+            "before_split": True,
+            "violation": True,
+        }
+    ]
+    assert verdict["splitters"] == ["split"]
+
+
+def test_no_split_verdict_still_lists_what_would_be_checked():
+    """Without a splitter the verdict keeps its detail so the modal can show
+    which data-dependent nodes were examined."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("fill", "SimpleImputer", ["load"], params={"strategy": "constant"}),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="ignore")
+    assert verdict["status"] == "no_split"
+    assert verdict["splitters"] == []
+    assert verdict["checked"] == [
+        {
+            "node_id": "scale",
+            "step_type": "StandardScaler",
+            "before_split": False,
+            "violation": False,
+        }
+    ]
+    assert [e["node_id"] for e in verdict["exempted"]] == ["fill"]
 
 
 def test_validate_returns_no_split_verdict_with_the_advisory_diagnostic(caplog):
