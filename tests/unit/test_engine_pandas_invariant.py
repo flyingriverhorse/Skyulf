@@ -113,13 +113,97 @@ def test_normalize_train_frame_reattaches_series_target() -> None:
     assert out["target"].tolist() == [0, 1, 0]
 
 
-def test_normalize_train_frame_ignores_multi_column_dataframe_target() -> None:
-    """A multi-column `y` is not a target; X is returned without a bogus column."""
-    X = pd.DataFrame({"f": [1, 2, 3]})
-    y = pd.DataFrame({"a": [0, 1, 0], "b": [1, 1, 1]})
+def test_normalize_train_frame_ignores_multi_column_polars_dataframe_target() -> None:
+    """A multi-column Polars `y` is not a target; X is returned without a
+    bogus column — mirroring the pandas guard."""
+    pl = pytest.importorskip("polars")
+    X = pl.DataFrame({"f": [1, 2, 3]})
+    y = pl.DataFrame({"a": [0, 1, 0], "b": [1, 1, 1]})
     out = _Artifacts()._normalize_train_frame((X, y), target_col="target")
     assert out is not None
     assert "target" not in out.columns
+    assert list(out.columns) == ["f"]
+
+
+def test_normalize_train_frame_returns_none_for_non_frame_tuple() -> None:
+    """A (X, y) tuple whose X is neither a pandas nor a Polars frame cannot
+    be normalized into a drift-reference frame; return None."""
+    import numpy as np
+
+    out = _Artifacts()._normalize_train_frame(
+        (np.array([[1.0], [2.0]]), [0, 1]), target_col="target"
+    )
+    assert out is None
+
+
+def test_normalize_train_frame_polars_skips_unrecognized_target_type() -> None:
+    """A Polars X with a y of an unrecognized type is returned without a
+    target column instead of raising or fabricating data."""
+    pl = pytest.importorskip("polars")
+    X = pl.DataFrame({"f": [1, 2, 3]})
+    out = _Artifacts()._normalize_train_frame((X, "not-a-target"), target_col="target")
+    assert out is not None
+    assert list(out.columns) == ["f"]
+
+
+def test_save_reference_data_skips_empty_polars_frame() -> None:
+    """An empty training frame must not be persisted as a drift reference."""
+    pl = pytest.importorskip("polars")
+
+    class _Store(ArtifactsMixin):
+        def __init__(self) -> None:
+            self.artifact_store = MagicMock()
+            self.dataset_name = "ds"
+            self.logs: list[str] = []
+
+        def log(self, msg: str) -> None:
+            self.logs.append(msg)
+
+    store = _Store()
+    store._persist_reference_frame(pl.DataFrame(), job_id="job-empty")
+    store.artifact_store.save.assert_not_called()
+
+
+def test_data_preview_accepts_plain_polars_frame() -> None:
+    """A bare Polars frame input must produce a fit_transform preview with a
+    'full' data summary, not fall through with an unknown operation mode."""
+    pl = pytest.importorskip("polars")
+
+    class _Preview(NodeRunnersMixin):
+        def __init__(self, data: Any) -> None:
+            self._data = data
+            self.artifact_store = MagicMock()
+            self.executed_transformers: list = []
+
+        def _get_input(self, node: Any) -> Any:
+            return self._data
+
+    runner = _Preview(pl.DataFrame({"a": [1, 2]}))
+    node_id, info = runner._run_data_preview(_node())
+
+    assert node_id == "n1"
+    assert info["operation_mode"] == "fit_transform"
+    assert info["data_summary"]["full"]["shape"] == (2, 1)
+
+
+def test_data_preview_leaves_unknown_mode_for_non_frame_input() -> None:
+    """An input shape that is neither SplitDataset nor a frame must not be
+    mis-described; operation_mode stays unknown."""
+
+    class _Preview(NodeRunnersMixin):
+        def __init__(self, data: Any) -> None:
+            self._data = data
+            self.artifact_store = MagicMock()
+            self.executed_transformers: list = []
+
+        def _get_input(self, node: Any) -> Any:
+            return self._data
+
+    runner = _Preview((pd.DataFrame({"a": [1]}), pd.Series([0])))
+    _, info = runner._run_data_preview(_node())
+
+    assert info["operation_mode"] == "unknown"
+    assert info["data_summary"] == {}
 
 
 # ── F-31/F-32: polars frames must produce drift references + feature names ──
@@ -160,6 +244,29 @@ def test_normalize_train_frame_reattaches_target_for_polars_xy_tuple() -> None:
     assert out is not None
     assert "target" in out.columns
     assert out["target"].to_list() == [0, 1, 0]
+
+
+def test_normalize_train_frame_reattaches_polars_single_column_dataframe_target() -> None:
+    """A single-column Polars DataFrame `y` (a legitimate `split_xy` output)
+    must be squeezed back into the reference frame, mirroring the pandas path."""
+    pl = pytest.importorskip("polars")
+    X = pl.DataFrame({"f": [1, 2, 3]})
+    y = pl.DataFrame({"target": [0, 1, 0]})
+    out = _Artifacts()._normalize_train_frame((X, y), target_col="target")
+    assert out is not None
+    assert "target" in out.columns
+    assert out["target"].to_list() == [0, 1, 0]
+
+
+def test_preview_slot_info_accepts_polars_frame() -> None:
+    """A non-empty Polars test/validation slot must produce a preview, not None."""
+    pl = pytest.importorskip("polars")
+    runner = _Loader(pd.DataFrame())
+    info = runner._preview_slot_info(pl.DataFrame({"a": [1, 2]}), "test")
+    assert info is not None
+    assert info["name"] == "test"
+    assert info["shape"] == (2, 1)
+    assert info["columns"] == ["a"]
 
 
 def test_feature_names_for_importance_accepts_polars() -> None:
