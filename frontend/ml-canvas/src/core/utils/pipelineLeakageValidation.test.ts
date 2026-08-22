@@ -72,19 +72,29 @@ describe('findPreprocessingBeforeSplitIssues', () => {
     expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
   });
 
-  it.each(['HashEncoder', 'MissingIndicator', 'DropMissingColumns', 'Deduplicate', 'Oversampling', 'Undersampling'])(
-    'flags reclassified stateful node %s before the splitter',
-    (stepType) => {
-      const nodes = [
-        node('load', 'DataLoader'),
-        node('step', stepType, ['load']),
-        node('split', 'TrainTestSplitter', ['step']),
-        node('model', 'LogisticRegression', ['split']),
-      ];
-      const issues = findPreprocessingBeforeSplitIssues(nodes);
-      expect(issues.map((i) => i.nodeId)).toEqual(['step']);
-    },
-  );
+  it.each([
+    // Keyless HashEncoder auto-detects its columns from the rows (gated);
+    // an explicit column list makes it stateless, see the exemptions below.
+    ['HashEncoder', { n_features: 8 }],
+    // Keyless MissingIndicator auto-detects which columns carry missing
+    // values (gated); an explicit list is exempt, see below.
+    ['MissingIndicator', {}],
+    // Param-less DropMissingColumns is the explicit/no-op mode (exempt);
+    // its data-dependent mode is the positive missing-% threshold.
+    ['DropMissingColumns', { missing_threshold: 50 }],
+    ['Deduplicate', {}],
+    ['Oversampling', {}],
+    ['Undersampling', {}],
+  ])('flags reclassified stateful node %s before the splitter', (stepType, params) => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('step', stepType, ['load'], params),
+      node('split', 'TrainTestSplitter', ['step']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    const issues = findPreprocessingBeforeSplitIssues(nodes);
+    expect(issues.map((i) => i.nodeId)).toEqual(['step']);
+  });
 
   it('flags an indirect ancestor reached through intermediate stateless nodes', () => {
     const nodes = [
@@ -151,6 +161,95 @@ describe('findPreprocessingBeforeSplitIssues', () => {
       expect(issues.map((i) => i.nodeId)).toEqual(['encode_mixed']);
     },
   );
+
+  it('allows an explicit named-column drop before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('drop_id', 'DropMissingColumns', ['load'], {
+        columns: ['passenger_id'],
+        missing_threshold: 0,
+      }),
+      node('split', 'TrainTestSplitter', ['drop_id']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+  });
+
+  it('still flags a missing-percentage drop before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('drop_sparse', 'DropMissingColumns', ['load'], { missing_threshold: 50 }),
+      node('split', 'TrainTestSplitter', ['drop_sparse']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    const issues = findPreprocessingBeforeSplitIssues(nodes);
+    expect(issues.map((i) => i.nodeId)).toEqual(['drop_sparse']);
+  });
+
+  it('allows a constant-strategy imputer before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('fill', 'SimpleImputer', ['load'], { strategy: 'constant', fill_value: 0 }),
+      node('split', 'TrainTestSplitter', ['fill']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+  });
+
+  it.each(['mean', 'median', 'most_frequent'])(
+    'still flags a %s-strategy imputer before the splitter',
+    (strategy) => {
+      const nodes = [
+        node('load', 'DataLoader'),
+        node('fill', 'SimpleImputer', ['load'], { strategy }),
+        node('split', 'TrainTestSplitter', ['fill']),
+        node('model', 'LogisticRegression', ['split']),
+      ];
+      const issues = findPreprocessingBeforeSplitIssues(nodes);
+      expect(issues.map((i) => i.nodeId)).toEqual(['fill']);
+    },
+  );
+
+  it('allows a MissingIndicator with explicitly named columns before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('flags', 'MissingIndicator', ['load'], { columns: ['age', 'fare'] }),
+      node('split', 'TrainTestSplitter', ['flags']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+  });
+
+  it('still flags a MissingIndicator with an empty column list before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('flags', 'MissingIndicator', ['load'], { columns: [] }),
+      node('split', 'TrainTestSplitter', ['flags']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    const issues = findPreprocessingBeforeSplitIssues(nodes);
+    expect(issues.map((i) => i.nodeId)).toEqual(['flags']);
+  });
+
+  it('allows a HashEncoder with explicitly named columns before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('hash', 'HashEncoder', ['load'], { columns: ['city'], n_features: 8 }),
+      node('split', 'TrainTestSplitter', ['hash']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+  });
+
+  it('allows a HashEncoder with the empty-selection no-op before the splitter', () => {
+    const nodes = [
+      node('load', 'DataLoader'),
+      node('hash', 'HashEncoder', ['load'], { columns: [] }),
+      node('split', 'TrainTestSplitter', ['hash']),
+      node('model', 'LogisticRegression', ['split']),
+    ];
+    expect(findPreprocessingBeforeSplitIssues(nodes)).toEqual([]);
+  });
 });
 
 describe('formatLeakageIssueMessage', () => {

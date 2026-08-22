@@ -36,7 +36,8 @@ const BUNDLED_DATA_DEPENDENT_FIT_STEP_TYPES: readonly string[] = [
   'RobustScaler',
   'MaxAbsScaler',
   // Encoding (category vocabulary / frequency / target statistics;
-  // HashEncoder's bucket occupancy also depends on the fitted rows)
+  // HashEncoder only when it auto-detects its columns — an explicit
+  // column list makes it stateless, see isExplicitHashEncoding)
   'OneHotEncoder',
   'LabelEncoder',
   'OrdinalEncoder',
@@ -173,6 +174,67 @@ export function isTargetOnlyEncoding(
   );
 }
 
+/**
+ * True if a `DropMissingColumns` node is configured to drop only explicitly
+ * named columns — a fixed user decision ("exclude this column from the
+ * model"), not a learned statistic, so it is safe before the train/test
+ * split. With a positive `missing_threshold` the node's fit decides WHICH
+ * columns to drop from the rows it sees, and that must stay after the
+ * split. Mirrors `skyulf.leakage.is_explicit_column_drop` (and the node's
+ * own two-mode split in `infer_output_schema`). Keep in sync.
+ */
+export function isExplicitColumnDrop(stepType: string, params: Record<string, unknown>): boolean {
+  if (stepType !== 'DropMissingColumns') return false;
+  const raw = params.missing_threshold;
+  const threshold =
+    typeof raw === 'number' ? raw : typeof raw === 'string' && raw !== '' ? Number(raw) : NaN;
+  return !(threshold > 0);
+}
+
+/**
+ * True if a `SimpleImputer` node fills with a user-fixed constant
+ * (`strategy: 'constant'`) — the fill value comes from the config, not
+ * from the fitted rows, so nothing is learned and it is safe before the
+ * split. `mean`/`median`/`most_frequent` compute statistics from the data
+ * and stay gated. Mirrors `skyulf.leakage.is_constant_imputation`.
+ * Keep in sync.
+ */
+export function isConstantImputation(stepType: string, params: Record<string, unknown>): boolean {
+  return stepType === 'SimpleImputer' && params.strategy === 'constant';
+}
+
+/**
+ * True if a `MissingIndicator` node flags explicitly named columns — the
+ * column list comes from the config, so nothing is learned from the rows
+ * and it is safe before the split. With no explicit list the fit discovers
+ * WHICH columns contain missing values from the data it sees, and that
+ * must stay after the split. Mirrors
+ * `skyulf.leakage.is_explicit_missing_indicator` (and the node's own
+ * two-mode split in `infer_output_schema`). Keep in sync.
+ */
+export function isExplicitMissingIndicator(
+  stepType: string,
+  params: Record<string, unknown>,
+): boolean {
+  if (stepType !== 'MissingIndicator') return false;
+  const columns = params.columns;
+  return Array.isArray(columns) && columns.length > 0;
+}
+
+/**
+ * True if a `HashEncoder` node operates on a user-chosen column list — the
+ * hashing itself is deterministic (fixed `n_features` from the config), so
+ * fit learns nothing and it is safe before the split. An explicit empty
+ * list is the "nothing selected" no-op, equally safe. Only when `columns`
+ * is absent does fit auto-detect WHICH columns are categorical from the
+ * rows it sees, and that must stay after the split. Mirrors
+ * `skyulf.leakage.is_explicit_hash_encoding` (and the node's own
+ * `user_picked_no_columns` short-circuit). Keep in sync.
+ */
+export function isExplicitHashEncoding(stepType: string, params: Record<string, unknown>): boolean {
+  return stepType === 'HashEncoder' && Array.isArray(params.columns);
+}
+
 export interface LeakageIssue {
   nodeId: string;
   stepType: string;
@@ -223,6 +285,10 @@ export function findPreprocessingBeforeSplitIssues(nodes: NodeConfigModel[]): Le
   for (const n of nodes) {
     if (!DATA_DEPENDENT_FIT_STEP_TYPES.has(n.step_type)) continue;
     if (isTargetOnlyEncoding(n.step_type, n.params, targetColumn)) continue;
+    if (isExplicitColumnDrop(n.step_type, n.params)) continue;
+    if (isConstantImputation(n.step_type, n.params)) continue;
+    if (isExplicitMissingIndicator(n.step_type, n.params)) continue;
+    if (isExplicitHashEncoding(n.step_type, n.params)) continue;
     const reachable = collect(n.node_id);
     const hitSplitter = [...splitterIds].find((id) => reachable.has(id));
     if (hitSplitter) {

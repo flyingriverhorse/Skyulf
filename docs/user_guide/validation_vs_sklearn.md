@@ -297,12 +297,12 @@ If an imputer learns the mean from the full dataset, it will be pulled toward th
 Skyulf's pattern learns from train only (Calculator) and applies to test (Applier).
 
 **Scope of this proof:** it shows that the *demonstrated steps* (imputation here; scaling and
-target encoding in the [leakage proof](../examples/leakage_proof.md)) learn exclusively from
+target encoding in the [leakage proof](../examples/leakage_proof_pandas.md)) learn exclusively from
 training rows, relative to the split defined in your pipeline. Skyulf also enforces this
 structurally: every node declares whether it learns from data, and pipelines that fit a
 data-dependent step before the train/test split are rejected before execution
 (`on_leakage="raise"` is the default). See
-["What is and is not covered"](../examples/leakage_proof.md#what-is-and-is-not-covered) for the
+["What is and is not covered"](../examples/leakage_proof_pandas.md#what-is-and-is-not-covered) for the
 current limits — notably that cross-validation/tuning scores do not yet re-fit preprocessing per
 fold and are therefore optimistic.
 

@@ -1,4 +1,8 @@
-# Proof of Trust: Preventing Data Leakage with Skyulf
+# Proof of Trust: Preventing Data Leakage with Skyulf (pandas engine)
+
+> Running on the Polars engine? The identical experiment on Polars frames is in
+> [leakage_proof_polars.md](leakage_proof_polars.md) — same dataset, same
+> split seed, bit-identical artifacts.
 
 One of the biggest risks in Machine Learning is **Data Leakage**: when information from the test set (or the future) accidentally "leaks" into the training process. This creates models that look perfect during training but fail in production.
 
@@ -464,6 +468,6 @@ This guarantee applies per preprocessing step, relative to the split defined in 
 
 **Covered — the per-node guarantee.** The `fit()` (Calculator) / `transform()` (Applier) split is enforced for every node: learned preprocessing artifacts are computed only from training-designated data and applied unchanged to validation and test data. The adversarial checks above verify this for imputation, scaling and target encoding.
 
-**Covered — the pipeline-structure gate.** Every node declares whether its `fit()` learns from the data it is given (`learns_from_data` on its node metadata), and both the standalone diagnostic (`skyulf.validate_leakage_safety`) and the pre-execution gate derive their node lists from that registry — there is no hand-maintained allow-list to drift. A pipeline that fits a data-dependent node before its train/test split is rejected by default (`on_leakage="raise"`; set `"warn"` or `"ignore"` to opt out). Unknown nodes fail closed, and a pipeline with no train/test split at all gets an explicit diagnostic stating that the leakage guarantee does not apply to it.
+**Covered — the pipeline-structure gate.** Every node declares whether its `fit()` learns from the data it is given (`learns_from_data` on its node metadata), and both the standalone diagnostic (`skyulf.validate_leakage_safety`) and the pre-execution gate derive their node lists from that registry — there is no hand-maintained allow-list to drift. A pipeline that fits a data-dependent node before its train/test split is rejected by default (`on_leakage="raise"`; set `"warn"` or `"ignore"` to opt out). Unknown nodes fail closed, and a pipeline with no train/test split at all gets an explicit diagnostic stating that the leakage guarantee does not apply to it. The gate is also *param-aware* for dual-mode nodes: a `DropMissingColumns` node dropping explicitly named columns, a `SimpleImputer` with `strategy="constant"`, a `MissingIndicator` flagging explicitly named columns, a `HashEncoder` given an explicit column list, and target-only Label/Ordinal encoding learn nothing from the rows and are allowed before the split — while their data-learning modes (missing-% threshold, statistic strategies, auto-detected missingness/categorical columns, feature encoding) remain gated. `SkyulfPipeline.fit()` surfaces the same verdict as warnings before training when you fit on an unsplit frame.
 
 **Not covered — cross-validation scores, yet.** CV and hyperparameter tuning do not re-fit preprocessing inside each fold: preprocessing is fitted once on the full training set, so every fold's validation rows influenced the statistics used to transform them. Reported CV and tuning scores are therefore optimistic. Per-fold refitting is planned; until it lands, treat CV/tuning scores as an upper bound rather than a leakage-free estimate.

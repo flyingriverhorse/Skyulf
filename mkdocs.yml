@@ -66,7 +66,8 @@ nav:
     - Data Drift Roadmap: guides/data_drift_roadmap.md
   - Examples:
     - Quickstart: examples/quickstart.md
-    - Leakage Proof: examples/leakage_proof.md
+    - Leakage Proof (pandas): examples/leakage_proof_pandas.md
+    - Leakage Proof (polars): examples/leakage_proof_polars.md
   - Contributing:
     - Writing Docs: contributing/writing_docs.md
   - User Guide:

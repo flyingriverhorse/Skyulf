@@ -62,7 +62,7 @@ The safe pattern is:
 Skyulf enforces this pattern: pipeline configurations that fit a data-dependent step before the
 train/test split are rejected before execution (`validate_leakage_safety`, `on_leakage="raise"`
 by default). For the demonstrated guarantee and its current limits (including the CV caveat), see
-[Leakage Proof — What is and is not covered](../examples/leakage_proof.md#what-is-and-is-not-covered).
+[Leakage Proof — What is and is not covered](../examples/leakage_proof_pandas.md#what-is-and-is-not-covered).
 
 ## Where things live
 
