@@ -10,7 +10,7 @@ import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
 import { formatMetricName, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
 import { MetricsGrid } from './MetricsGrid';
-import { useConfirm, RecordLink, NodeInspectorLink } from '../../shared';
+import { useConfirm, RecordLink, NodeInspectorLink, ModalShell } from '../../shared';
 import { toast } from '../../../core/toast';
 
 /** Parse a log line into its level and message parts. */
@@ -415,6 +415,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
     const [autoScroll, setAutoScroll] = useState(true);
     const [wrapLines, setWrapLines] = useState(true);
     const [copied, setCopied] = useState(false);
+    const [gateModalOpen, setGateModalOpen] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
 
     // Poll the single job until terminal. We feed an empty array once
@@ -629,9 +630,11 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                 </div>
                             </div>
                             {leakageGate && (
-                                <div
-                                    className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700"
-                                    title={leakageGate.messages.length > 0 ? leakageGate.messages.join('\n') : undefined}
+                                <button
+                                    type="button"
+                                    onClick={() => setGateModalOpen(true)}
+                                    className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700 text-left hover:border-gray-300 dark:hover:border-gray-500 transition-colors"
+                                    title="Show what the leakage gate checked for this run"
                                 >
                                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Leakage Gate</div>
                                     <div className={`font-medium ${
@@ -643,7 +646,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                     }`}>
                                         {leakageGate.status === 'passed' ? 'Passed' : leakageGate.status === 'no_split' ? 'No split' : 'Warnings'}
                                     </div>
-                                </div>
+                                </button>
                             )}
                         </div>
 
@@ -1006,6 +1009,102 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                     </div>
                 )}
             </div>
+
+            {leakageGate && (
+                <ModalShell
+                    isOpen={gateModalOpen}
+                    onClose={() => setGateModalOpen(false)}
+                    title="Leakage Gate"
+                    size="lg"
+                >
+                    <div className="p-6 space-y-5 text-sm">
+                        <p className="text-gray-700 dark:text-gray-300">
+                            {leakageGate.status === 'passed' &&
+                                'Every node that learns from data was checked against the train/test split — none of them fits on data that still contains test rows, so the evaluation is uncontaminated.'}
+                            {leakageGate.status === 'no_split' &&
+                                'This pipeline has no train/test split, so the leakage guarantee does not apply: every fit saw the whole dataset.'}
+                            {leakageGate.status === 'warnings' &&
+                                'Nodes that learn from data were found fitting before the train/test split — their statistics saw test rows.'}
+                        </p>
+
+                        {leakageGate.checked && leakageGate.checked.length > 0 && (
+                            <div>
+                                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                    Data-learning nodes checked
+                                </h4>
+                                <ul className="space-y-2">
+                                    {leakageGate.checked.map((c) => (
+                                        <li
+                                            key={c.node_id}
+                                            className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700"
+                                        >
+                                            <div>
+                                                <span className="font-medium text-gray-800 dark:text-gray-200">{c.step_type}</span>
+                                                <span className="ml-2 font-mono text-xs text-gray-400">{c.node_id}</span>
+                                            </div>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                                                c.violation
+                                                    ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800'
+                                                    : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800'
+                                            }`}>
+                                                {c.violation ? 'fits before the split' : 'runs after the split'}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {leakageGate.exempted && leakageGate.exempted.length > 0 && (
+                            <div>
+                                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                    Allowed before the split (learns nothing in this configuration)
+                                </h4>
+                                <ul className="space-y-2">
+                                    {leakageGate.exempted.map((e) => (
+                                        <li
+                                            key={e.node_id}
+                                            className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700"
+                                        >
+                                            <span className="font-medium text-gray-800 dark:text-gray-200">{e.step_type}</span>
+                                            <span className="ml-2 font-mono text-xs text-gray-400">{e.node_id}</span>
+                                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{e.reason}</p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {leakageGate.splitters && leakageGate.splitters.length > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Split boundary:{' '}
+                                {leakageGate.splitters.map((id) => (
+                                    <code key={id} className="font-mono bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded mr-1">{id}</code>
+                                ))}
+                            </p>
+                        )}
+
+                        {leakageGate.messages.length > 0 && (
+                            <div>
+                                <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                                    Gate messages
+                                </h4>
+                                <ul className="space-y-1">
+                                    {leakageGate.messages.map((m, i) => (
+                                        <li key={i} className="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{m}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {!leakageGate.checked && !leakageGate.exempted && !leakageGate.splitters && (
+                            <p className="text-xs text-gray-400 dark:text-gray-500 italic">
+                                This job ran before detailed gate reporting was added, so only the verdict and its messages are available.
+                            </p>
+                        )}
+                    </div>
+                </ModalShell>
+            )}
         </div>
     );
 };

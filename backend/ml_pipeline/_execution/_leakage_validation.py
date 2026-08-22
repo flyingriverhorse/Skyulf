@@ -167,6 +167,28 @@ def _build_descendant_map(nodes: list[NodeConfig]) -> dict[str, set[str]]:
     return descendants
 
 
+def _exemption_reason(step_type: str, params: dict, target_column: str | None) -> str | None:
+    """Human-readable reason when a data-dependent node type is exempted by
+    its params (a stateless configuration of a stateful node), else None."""
+    if _is_target_only_encoding(step_type, params, target_column):
+        return (
+            "Encodes only the target column — a deterministic label-to-integer "
+            "mapping, no feature statistics learned."
+        )
+    if is_explicit_column_drop(step_type, params):
+        return "Drops explicitly named columns — a fixed user decision, nothing learned from rows."
+    if is_constant_imputation(step_type, params):
+        return (
+            "Constant imputation — the fill value comes from the config "
+            '(strategy="constant"), nothing learned from rows.'
+        )
+    if is_explicit_missing_indicator(step_type, params):
+        return "Flags explicitly named columns — no missingness discovery from rows."
+    if is_explicit_hash_encoding(step_type, params):
+        return "Deterministic hashing of a user-chosen column list — no column auto-detection from rows."
+    return None
+
+
 def validate_no_preprocessing_before_split(
     nodes: list[NodeConfig], on_leakage: OnLeakage = "raise"
 ) -> dict[str, Any]:
@@ -186,7 +208,12 @@ def validate_no_preprocessing_before_split(
 
     Returns the gate verdict so the engine can persist it on the job record
     (Job Details shows it as factual per-job information):
-    ``{"status": "passed" | "no_split" | "warnings", "messages": [...]}``.
+    ``{"status": "passed" | "no_split" | "warnings", "messages": [...],
+    "splitters": [...], "checked": [{"node_id", "step_type", "before_split",
+    "violation"}, ...], "exempted": [{"node_id", "step_type", "reason"},
+    ...]}``. ``checked`` lists every data-dependent node the gate examined
+    and ``exempted`` the ones allowed before the split via the param-aware
+    exemptions (with why) — the detail powers the Job Details verdict modal.
     The verdict reflects the graph analysis regardless of ``on_leakage``;
     the mode only controls whether violations raise or log. Under ``"raise"``
     a violating graph never returns — it raises first.
@@ -203,31 +230,31 @@ def validate_no_preprocessing_before_split(
         )
 
     splitter_ids = {n.node_id for n in nodes if n.step_type in train_test_split_step_types()}
-    if not splitter_ids:
-        if on_leakage != "ignore":
-            logger.warning(NO_SPLIT_DIAGNOSTIC)
-        return {"status": "no_split", "messages": [NO_SPLIT_DIAGNOSTIC]}
-
     descendants = _build_descendant_map(nodes)
     target_column = _find_target_column(nodes)
     data_dependent = data_dependent_step_types()
 
+    checked: list[dict[str, Any]] = []
+    exempted: list[dict[str, Any]] = []
     messages: list[str] = []
     for n in nodes:
         if n.step_type not in data_dependent:
             continue
-        if _is_target_only_encoding(n.step_type, n.params, target_column):
-            continue
-        if is_explicit_column_drop(n.step_type, n.params):
-            continue
-        if is_constant_imputation(n.step_type, n.params):
-            continue
-        if is_explicit_missing_indicator(n.step_type, n.params):
-            continue
-        if is_explicit_hash_encoding(n.step_type, n.params):
+        reason = _exemption_reason(n.step_type, n.params, target_column)
+        if reason:
+            exempted.append({"node_id": n.node_id, "step_type": n.step_type, "reason": reason})
             continue
         leaking_splitters = descendants.get(n.node_id, set()) & splitter_ids
-        if leaking_splitters:
+        violation = bool(leaking_splitters)
+        checked.append(
+            {
+                "node_id": n.node_id,
+                "step_type": n.step_type,
+                "before_split": violation,
+                "violation": violation,
+            }
+        )
+        if violation:
             splitter_name = sorted(leaking_splitters)[0]
             message = (
                 f"Data leakage risk: node '{n.node_id}' ({n.step_type}) fits on "
@@ -245,6 +272,11 @@ def validate_no_preprocessing_before_split(
                 logger.warning(message)
             messages.append(message)
 
+    detail = {"splitters": sorted(splitter_ids), "checked": checked, "exempted": exempted}
+    if not splitter_ids:
+        if on_leakage != "ignore":
+            logger.warning(NO_SPLIT_DIAGNOSTIC)
+        return {"status": "no_split", "messages": [NO_SPLIT_DIAGNOSTIC], **detail}
     if messages:
-        return {"status": "warnings", "messages": messages}
-    return {"status": "passed", "messages": []}
+        return {"status": "warnings", "messages": messages, **detail}
+    return {"status": "passed", "messages": [], **detail}

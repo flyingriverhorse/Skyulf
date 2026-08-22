@@ -330,4 +330,78 @@ describe('JobDetailsView', () => {
     renderDetails(makeJob({ status: 'completed', result: { metrics: { accuracy: 0.9 } } }));
     expect(screen.queryByText('Leakage Gate')).not.toBeInTheDocument();
   });
+
+  it('opens a verdict modal listing what the gate checked and why exemptions were allowed', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'passed',
+            messages: [],
+            splitters: ['split'],
+            checked: [
+              { node_id: 'scale', step_type: 'StandardScaler', before_split: false, violation: false },
+            ],
+            exempted: [
+              { node_id: 'fill', step_type: 'SimpleImputer', reason: 'Constant imputation — nothing learned from rows.' },
+            ],
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Leakage Gate/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('StandardScaler')).toBeInTheDocument();
+    expect(within(dialog).getByText(/runs after the split/i)).toBeInTheDocument();
+    expect(within(dialog).getByText('SimpleImputer')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Constant imputation/)).toBeInTheDocument();
+  });
+
+  it('flags violating nodes in the modal for a warnings verdict', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'warnings',
+            messages: ['Data leakage risk: node \'scale\' (StandardScaler) fits on the whole dataset.'],
+            splitters: ['split'],
+            checked: [
+              { node_id: 'scale', step_type: 'StandardScaler', before_split: true, violation: true },
+            ],
+            exempted: [],
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Leakage Gate/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('StandardScaler')).toBeInTheDocument();
+    expect(within(dialog).getByText(/fits before the split/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Data leakage risk/)).toBeInTheDocument();
+  });
+
+  it('falls back to the recorded messages for legacy verdicts without detail', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'no_split',
+            messages: ['No train/test split is defined in this pipeline graph.'],
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Leakage Gate/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/No train\/test split is defined/)).toBeInTheDocument();
+  });
 });
