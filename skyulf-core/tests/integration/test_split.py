@@ -352,6 +352,8 @@ def test_data_splitter_polars_split_preserves_dtypes() -> None:
     )
     splitter = DataSplitter(test_size=0.2, random_state=42)
     result = splitter.split(typing.cast(Any, df))
+    assert isinstance(result.train, pl.DataFrame)
+    assert isinstance(result.test, pl.DataFrame)
     assert result.train.schema["feature"] == pl.Int64
     assert result.test.schema["feature"] == pl.Int64
 
@@ -364,6 +366,8 @@ def test_data_splitter_polars_split_xy_preserves_dtypes() -> None:
     result = splitter.split_xy(typing.cast(Any, X), typing.cast(Any, y))
     X_train, _ = result.train
     X_test, _ = result.test
+    assert isinstance(X_train, pl.DataFrame)
+    assert isinstance(X_test, pl.DataFrame)
     assert X_train.schema["feature"] == pl.Int64
     assert X_test.schema["feature"] == pl.Int64
 
