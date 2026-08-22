@@ -385,10 +385,32 @@ class DeploymentService:
             )
 
     @staticmethod
+    def _warn_on_engine_mismatch(artifact: dict) -> None:
+        """Warn when a bundle trained on one engine is served on another (F-25).
+
+        The deployment bundle records the DataFrame engine the model was
+        trained on (``engine``). Prediction input is always served as pandas,
+        so a polars-trained bundle is the mismatch case: dual-engine nodes
+        keep their artifacts engine-neutral and this is normally safe, but
+        the warning makes the one place to look obvious when predictions
+        ever come out wrong after an engine change.
+        """
+        train_engine = artifact.get("engine")
+        if not train_engine or train_engine == "pandas":
+            return
+        logger.warning(
+            "Deployed model was trained on the '%s' engine but prediction input "
+            "is served as pandas. Dual-engine artifacts are engine-neutral, so "
+            "this is normally safe; check here first if predictions look wrong.",
+            train_engine,
+        )
+
+    @staticmethod
     def _predict_with_bundled_artifact(
         artifact: dict, df: pd.DataFrame, thresholds: dict[str, float] | None = None
     ) -> tuple[list, dict[str, float] | None]:
         """Predicts using the new SDK bundled artifact format: {"feature_engineer": ..., "model": ...}."""
+        DeploymentService._warn_on_engine_mismatch(artifact)
         feature_engineer = artifact["feature_engineer"]
         estimator = artifact["model"]
 

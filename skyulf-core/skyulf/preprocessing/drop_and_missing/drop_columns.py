@@ -41,9 +41,22 @@ def _resolve_threshold(raw: Any) -> float | None:
 
 def _high_missing_cols_polars(X: Any, threshold_pct: float) -> list:
     """Polars: list of columns whose missing-% >= ``threshold_pct``."""
-    null_counts = X.null_count()
+    import polars as pl
+
     total = X.height or 1
-    return [c for c in X.columns if (null_counts[c][0] / total) * 100 >= threshold_pct]
+    # pandas' isna() counts NaN as missing; polars' null_count() does not, so
+    # float columns need an explicit NaN count to keep both engines in parity
+    # (F-19) — same convention as imputation._common._polars_missing_counts.
+    exprs = [
+        (
+            pl.col(c).is_null().sum() + pl.col(c).is_nan().sum()
+            if X.schema[c].is_float()
+            else pl.col(c).null_count()
+        ).alias(c)
+        for c in X.columns
+    ]
+    raw = X.select(exprs).to_dict(as_series=False)
+    return [c for c in X.columns if (raw[c][0] / total) * 100 >= threshold_pct]
 
 
 def _high_missing_cols_pandas(X: Any, threshold_pct: float) -> list:
@@ -88,7 +101,7 @@ def _drop_missing_cols_fit_pandas(
     name="Drop Missing Columns",
     category="Cleaning",
     description="Drop columns that exceed missing value threshold.",
-    params={"threshold": 0.5},
+    params={"missing_threshold": 50},
 )
 class DropMissingColumnsCalculator(BaseCalculator):
     def infer_output_schema(

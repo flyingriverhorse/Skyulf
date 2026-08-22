@@ -784,3 +784,28 @@ async def test_get_deployment_details_handles_exception(async_session):
     # Exception is swallowed; schema fields remain at their defaults
     assert info["input_schema"] is None
     assert info["output_schema"] is None
+
+
+# ---------------------------------------------------------------------------
+# _warn_on_engine_mismatch (F-25)
+# ---------------------------------------------------------------------------
+
+
+def test_warn_on_engine_mismatch_flags_polars_trained_bundle(caplog):
+    """A bundle trained on Polars but served on pandas must log a warning —
+    the recorded ``engine`` key exists precisely so serving can surface this
+    instead of silently assuming pandas."""
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="backend.ml_pipeline.deployment.service"):
+        DeploymentService._warn_on_engine_mismatch({"engine": "polars"})
+    assert "polars" in caplog.text
+
+
+def test_warn_on_engine_mismatch_silent_for_pandas_or_missing(caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="backend.ml_pipeline.deployment.service"):
+        DeploymentService._warn_on_engine_mismatch({"engine": "pandas"})
+        DeploymentService._warn_on_engine_mismatch({})
+    assert caplog.text == ""
