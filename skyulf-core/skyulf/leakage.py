@@ -39,6 +39,74 @@ def train_test_splitters() -> frozenset[str]:
     )
 
 
+def is_explicit_column_drop(step_type: str, params: dict[str, Any]) -> bool:
+    """True when a ``DropMissingColumns`` step only drops explicitly named columns.
+
+    With no positive ``missing_threshold`` the node's ``fit()`` just records a
+    fixed, user-chosen column list (e.g. "exclude this id column from the
+    model") — no statistic is learned from the rows, so running it before the
+    train/test split is safe. A positive threshold makes ``fit()`` decide
+    WHICH columns to drop from the data it sees; that decision must stay
+    after the split, so this returns ``False`` there. Mirrors the node's own
+    ``infer_output_schema`` split between its two modes.
+    """
+    if step_type != "DropMissingColumns":
+        return False
+    raw = params.get("missing_threshold")
+    try:
+        threshold = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        threshold = None
+    return threshold is None or threshold <= 0
+
+
+def is_constant_imputation(step_type: str, params: dict[str, Any]) -> bool:
+    """True when a ``SimpleImputer`` step fills with a user-fixed constant.
+
+    With ``strategy='constant'`` the fill value comes from the config
+    (``fill_value``, defaulting to 0), not from the fitted rows — nothing is
+    learned, so running it before the train/test split is safe. The
+    ``mean``/``median``/``most_frequent`` strategies compute statistics from
+    the data and must stay after the split. Mirrors
+    ``imputation._common._compute_polars_fill_values``' constant branch.
+    """
+    if step_type != "SimpleImputer":
+        return False
+    return params.get("strategy") == "constant"
+
+
+def is_explicit_missing_indicator(step_type: str, params: dict[str, Any]) -> bool:
+    """True when a ``MissingIndicator`` step flags explicitly named columns.
+
+    With a non-empty ``columns`` list the fit only records that user-chosen
+    list — no decision is learned from the rows, so running it before the
+    train/test split is safe. With no explicit list the fit discovers WHICH
+    columns contain missing values from the data it sees; that decision must
+    stay after the split. Mirrors the node's own ``infer_output_schema``
+    split between its two modes.
+    """
+    if step_type != "MissingIndicator":
+        return False
+    return bool(params.get("columns"))
+
+
+def is_explicit_hash_encoding(step_type: str, params: dict[str, Any]) -> bool:
+    """True when a ``HashEncoder`` step operates on a user-chosen column list.
+
+    Hashing itself is deterministic (fixed ``n_features`` from the config),
+    so with an explicit ``columns`` list fit() only records config values —
+    nothing is learned from the rows and running before the split is safe.
+    An explicit empty list is the UI's "nothing selected" no-op (fit returns
+    ``{}``), equally learning nothing. Only when the key is absent does fit
+    auto-detect WHICH columns are categorical from the rows it sees; that
+    decision must stay after the split. Mirrors the node's own
+    ``user_picked_no_columns`` short-circuit in ``fit()``.
+    """
+    if step_type != "HashEncoder":
+        return False
+    return isinstance(params.get("columns"), list)
+
+
 def validate_leakage_safety(
     pipeline_config: PipelineConfig | dict[str, Any],
     on_leakage: OnLeakage = "raise",
@@ -72,8 +140,16 @@ def validate_leakage_safety(
     learners = data_dependent_transformers()
     violations = []
     for index, step in enumerate(preprocessing[:splitter_index]):
-        transformer = step.get("transformer")
+        transformer = step.get("transformer") or ""
         if transformer in splitters:
+            continue
+        if is_explicit_column_drop(transformer, step.get("params") or {}):
+            continue
+        if is_constant_imputation(transformer, step.get("params") or {}):
+            continue
+        if is_explicit_missing_indicator(transformer, step.get("params") or {}):
+            continue
+        if is_explicit_hash_encoding(transformer, step.get("params") or {}):
             continue
         if transformer in learners:
             reason = "fits its statistics on the full dataset including the test set"

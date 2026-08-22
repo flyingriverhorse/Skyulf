@@ -171,10 +171,18 @@ def test_invalid_on_leakage_value_rejected():
 
 def test_reclassified_nodes_flagged_before_split():
     """F-16: the previously exempted stateful nodes are now gated."""
-    for node_id in ("MissingIndicator", "DropMissingColumns", "Deduplicate", "HashEncoder"):
+    # Param-less DropMissingColumns is the explicit/no-op mode (exempt);
+    # its data-dependent mode is the positive missing-% threshold.
+    params_by_node = {
+        "MissingIndicator": {},
+        "DropMissingColumns": {"missing_threshold": 50},
+        "Deduplicate": {},
+        "HashEncoder": {},
+    }
+    for node_id, params in params_by_node.items():
         config = _config(
             [
-                {"name": "step", "transformer": node_id, "params": {}},
+                {"name": "step", "transformer": node_id, "params": params},
                 {"name": "split", "transformer": "TrainTestSplitter", "params": {}},
             ]
         )

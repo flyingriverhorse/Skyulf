@@ -206,6 +206,16 @@ class SkyulfPipeline:
         """
         metrics = {}
 
+        # Leakage structure check (advisory): the backend execution gate
+        # hard-blocks data-dependent preprocessing before the split; in the
+        # SDK the same verdict is surfaced as warnings before any fit
+        # happens. Skipped when the caller supplies a SplitDataset — the
+        # train/test boundary is then provided externally and enforced by
+        # construction, and a flat config legitimately has no splitter node.
+        if not isinstance(data, SplitDataset):
+            for warning in validate_leakage_safety(self.config, on_leakage="warn"):
+                logger.warning(warning)
+
         # 1. Feature Engineering
         logger.info("Starting Feature Engineering...")
         transformed_data, fe_metrics = self.feature_engineer.fit_transform(data)

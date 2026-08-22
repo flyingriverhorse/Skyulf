@@ -99,16 +99,23 @@ def test_stateless_nodes_before_splitter_are_allowed():
 
 
 @pytest.mark.parametrize(
-    "step_type",
-    ["HashEncoder", "MissingIndicator", "DropMissingColumns", "Deduplicate"],
+    ("step_type", "params"),
+    [
+        ("HashEncoder", {}),
+        ("MissingIndicator", {}),
+        # Param-less DropMissingColumns is the explicit/no-op mode (exempt);
+        # its data-dependent mode is the positive missing-% threshold.
+        ("DropMissingColumns", {"missing_threshold": 50}),
+        ("Deduplicate", {}),
+    ],
 )
-def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type):
+def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type, params):
     """F-16: nodes previously exempted as 'stateless' do learn from the data
     they are fitted on (hash bucket occupancy, missingness structure, drop
     lists, duplicate sets) and are now gated."""
     nodes = [
         _node("load", "DataLoader", []),
-        _node("step", step_type, ["load"]),
+        _node("step", step_type, ["load"], params=params),
         _node("split", "TrainTestSplitter", ["step"]),
         _node("model", "LogisticRegression", ["split"]),
     ]
@@ -227,6 +234,125 @@ def test_target_plus_feature_columns_before_split_still_raises(step_type):
             ["encode_mixed"],
             params={"target_column": "species"},
         ),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_explicit_column_drop_before_split_is_allowed():
+    """Dropping explicitly named columns is a fixed user decision (no
+    learned statistic), so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "drop_id",
+            "DropMissingColumns",
+            ["load"],
+            params={"columns": ["passenger_id"], "missing_threshold": 0},
+        ),
+        _node("split", "TrainTestSplitter", ["drop_id"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_threshold_based_column_drop_before_split_still_raises():
+    """With a positive missing-% threshold the node learns WHICH columns to
+    drop from the fitted rows — that decision must stay after the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "drop_sparse",
+            "DropMissingColumns",
+            ["load"],
+            params={"missing_threshold": 50},
+        ),
+        _node("split", "TrainTestSplitter", ["drop_sparse"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_constant_imputation_before_split_is_allowed():
+    """strategy='constant' fills with a user-fixed value — nothing is
+    learned from the rows, so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "fill",
+            "SimpleImputer",
+            ["load"],
+            params={"strategy": "constant", "fill_value": 0, "columns": ["age"]},
+        ),
+        _node("split", "TrainTestSplitter", ["fill"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_statistic_imputation_before_split_still_raises():
+    """mean/median/most_frequent learn from the fitted rows."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("fill", "SimpleImputer", ["load"], params={"strategy": "median"}),
+        _node("split", "TrainTestSplitter", ["fill"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_explicit_missing_indicator_before_split_is_allowed():
+    """Flagging explicitly named columns for missingness learns nothing
+    from the rows, so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "flags",
+            "MissingIndicator",
+            ["load"],
+            params={"columns": ["age", "fare"]},
+        ),
+        _node("split", "TrainTestSplitter", ["flags"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_auto_detected_missing_indicator_before_split_still_raises():
+    """With no explicit column list the node discovers WHICH columns contain
+    missing values from the fitted rows — must stay after the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("flags", "MissingIndicator", ["load"], params={}),
+        _node("split", "TrainTestSplitter", ["flags"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_explicit_hash_encoding_before_split_is_allowed():
+    """HashEncoder with a user-chosen column list learns nothing (deterministic
+    hashing), so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("hash", "HashEncoder", ["load"], params={"columns": ["city"], "n_features": 8}),
+        _node("split", "TrainTestSplitter", ["hash"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_auto_detected_hash_encoding_before_split_still_raises():
+    """With no columns key the node auto-detects WHICH columns are categorical
+    from the fitted rows — must stay after the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("hash", "HashEncoder", ["load"], params={"n_features": 8}),
+        _node("split", "TrainTestSplitter", ["hash"]),
         _node("model", "LogisticRegression", ["split"]),
     ]
     with pytest.raises(ValueError, match="Data leakage risk"):
