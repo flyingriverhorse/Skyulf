@@ -157,7 +157,16 @@ class EDAAnalyzer(
 
     def _compute_frame_stats(self, stats_df: pl.DataFrame) -> tuple[float, int, float]:
         """Compute missing-cell percentage, duplicate row count, and memory usage (MB)."""
-        missing_cells = stats_df.null_count().sum_horizontal()[0]
+        # pandas' isna() counts NaN as missing; polars' null_count() does not,
+        # so float columns need an explicit NaN count — otherwise a NaN-bearing
+        # column profiles as "0 missing" while its mean is NaN (F-20).
+        missing_exprs = [
+            pl.col(c).is_null().sum() + pl.col(c).is_nan().sum()
+            if stats_df.schema[c].is_float()
+            else pl.col(c).null_count()
+            for c in stats_df.columns
+        ]
+        missing_cells = stats_df.select(missing_exprs).sum_horizontal()[0] if missing_exprs else 0
         total_cells = self.row_count * len(self.columns)
         missing_pct = (missing_cells / total_cells) * 100 if total_cells > 0 else 0.0
         duplicate_rows = int(stats_df.is_duplicated().sum())
@@ -168,9 +177,15 @@ class EDAAnalyzer(
         """Batched query 1: null_count + n_unique for every column (A3 optimization)."""
         basic_aggs = []
         for col in self.columns:
+            # Float columns: count NaN as missing too (pandas isna() parity, F-20).
+            null_agg = (
+                pl.col(col).is_null().sum() + pl.col(col).is_nan().sum()
+                if self.df.schema[col].is_float()
+                else pl.col(col).null_count()
+            )
             basic_aggs.extend(
                 [
-                    pl.col(col).null_count().alias(f"{col}__null"),
+                    null_agg.alias(f"{col}__null"),
                     pl.col(col).n_unique().alias(f"{col}__unique"),
                 ]
             )
