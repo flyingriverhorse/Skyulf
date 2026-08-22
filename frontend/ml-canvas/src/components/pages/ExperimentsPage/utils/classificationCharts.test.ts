@@ -3,8 +3,25 @@
 // dropdown feature (accuracy/f1/f1_weighted/precision/recall).
 
 import { describe, it, expect } from 'vitest';
-import { findBestThreshold, applyMulticlassThresholds } from './classificationCharts';
+import {
+  findBestThreshold,
+  applyMulticlassThresholds,
+  calculateConfusionMatrix,
+} from './classificationCharts';
 import type { YProba, EvaluationSplit } from '../types';
+
+describe('calculateConfusionMatrix — class ordering', () => {
+  it('sorts numeric class labels numerically, not lexicographically (F-46)', () => {
+    // Without a numeric-aware sort, [2, 10] stringifies to ["10", "2"] order.
+    const { classes } = calculateConfusionMatrix([10, 2], [2, 10]);
+    expect(classes).toEqual([2, 10]);
+  });
+
+  it('keeps lexicographic order for string labels', () => {
+    const { classes } = calculateConfusionMatrix(['b', 'a'], ['a', 'b']);
+    expect(classes).toEqual(['a', 'b']);
+  });
+});
 
 describe('findBestThreshold — binary', () => {
   // 4 samples, P(pos) scores [0.9, 0.4, 0.6, 0.1], true labels [pos, pos, neg, neg].

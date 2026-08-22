@@ -154,14 +154,16 @@ export function getDisplayScore(
 }
 
 /**
- * Short 8-char run ID derived from a job's pipeline_id.
+ * Short 10-char run ID derived from a job's pipeline_id.
  * Strips the "preview_" prefix and any "__branch_N" suffix so all
  * experiments from the same batch share the same display ID.
+ * (10 chars rather than 8: batch IDs are UUID-shaped, and 8-char
+ * prefixes collided often enough to be confusing — F-47.)
  */
 export function shortRunId(job: { pipeline_id: string; parent_pipeline_id?: string | null }): string {
   const raw = job.parent_pipeline_id || job.pipeline_id;
   const clean = raw.replace(/^preview_/, '').replace(/__branch_.*$/, '');
-  return clean.slice(0, 8);
+  return clean.slice(0, 10);
 }
 
 /**

@@ -347,40 +347,6 @@ class StatefulEstimator:
 
         return predictions
 
-    def refit(
-        self,
-        dataset: SplitDataset,
-        target_column: str,
-        config: dict[str, Any],
-        job_id: str = "unknown",
-    ) -> None:
-        """
-        Refits the model on Train + Validation data and updates the artifact.
-        """
-        if dataset.validation is None:
-            # Fallback to normal fit if no validation set
-            self.fit_predict(dataset, target_column, config, job_id=job_id)
-            return
-
-        # 1. Prepare Combined Data
-        X_train, y_train = self._extract_xy(dataset.train, target_column)
-        X_val, y_val = self._extract_xy(dataset.validation, target_column)
-
-        # y_train/y_val are None for unsupervised calculators (e.g. clustering,
-        # see `_extract_xy`'s "no target" sentinel) — skip the y-concat rather
-        # than crash trying to concatenate `None`.
-        if get_engine(X_train).name == EngineName.POLARS:
-            import polars as pl
-
-            X_combined = pl.concat([X_train, X_val])
-            y_combined = None if y_train is None else pl.concat([y_train, y_val])
-        else:
-            X_combined = pd.concat([X_train, X_val], axis=0)
-            y_combined = None if y_train is None else pd.concat([y_train, y_val], axis=0)
-
-        # 2. Train Model
-        self.model = self.calculator.fit(X_combined, y_combined, config)
-
     def evaluate(
         self,
         dataset: SplitDataset,

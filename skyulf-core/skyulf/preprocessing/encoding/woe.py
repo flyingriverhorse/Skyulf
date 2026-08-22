@@ -16,14 +16,16 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 import numpy as np
+import pandas as pd
 
 from ...core.meta.decorators import node_meta
+from ...engines import SkyulfDataFrame
 from ...registry import NodeRegistry
 from ...utils import resolve_columns, user_picked_no_columns
 from .._helpers import select_then_to_pandas
 from .._schema import SkyulfSchema
 from ..base import BaseApplier, BaseCalculator, apply_method, fit_method
-from ..dispatcher import apply_dual_engine, fit_dual_engine
+from ..dispatcher import apply_dual_engine, fit_dual_engine, fit_transform_train_dual_engine
 from ._common import _exclude_target_column, _extract_target, detect_categorical_columns
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,17 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], di
     return valid_cols, mappings
 
 
+def _string_keys_with_nan(series: Any) -> Any:
+    """Coerce a pandas column to string keys, rendering missing as ``"nan"``.
+
+    Mirrors the Polars path's ``fill_null("nan")``: a bare ``astype(str)``
+    would render ``None`` in an object column as ``"None"``, so the two
+    engines would learn different artifact keys for the same null category
+    and cross-engine replay would silently fall back to the default (F-28).
+    """
+    return series.where(series.notna(), "nan").astype(str)
+
+
 def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
@@ -52,10 +65,9 @@ def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
         return X, y
 
     default = float(params.get("default", 0.0))
-    # `astype(str)` on the pandas side turns NaN into the literal "nan" string
-    # (and the fit step learns a WOE for that category the same way). Mirror
-    # that here so nulls hit the learned mapping instead of always falling
-    # back to `default` on the polars path.
+    # ``fill_null("nan")`` matches the pandas side's ``_string_keys_with_nan``
+    # so null rows hit the learned mapping on both engines instead of always
+    # falling back to ``default``.
     exprs = [
         pl.col(col)
         .cast(pl.Utf8)
@@ -75,7 +87,7 @@ def _woe_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
     default = float(params.get("default", 0.0))
     X_out = X.copy()
     for col in valid_cols:
-        mapped = X_out[col].astype(str).map(mappings[col])
+        mapped = _string_keys_with_nan(X_out[col]).map(mappings[col])
         X_out[col] = mapped.fillna(default).astype(float)
     return X_out, y
 
@@ -141,7 +153,7 @@ def _build_woe_artifact(
     mappings: dict[str, dict[str, float]] = {}
     iv_scores: dict[str, float] = {}
     for col in cols:
-        values = frame[col].astype(str).to_numpy()
+        values = _string_keys_with_nan(frame[col]).to_numpy()
         mappings[col], iv_scores[col] = _column_woe(values, y_bin, reg)
     return {
         "type": "woe_encoder",
@@ -164,6 +176,28 @@ def _woe_fit_common(
     return _build_woe_artifact(frame, y_bin, cols, reg)
 
 
+def _categorical_frame_for_fit(X: Any, cols: list[str]) -> Any:
+    """Return a pandas frame of ``cols`` with string keys matching the apply path.
+
+    For a Polars ``X``, casting to Utf8 and filling nulls with the literal
+    "nan" string natively (before the pandas conversion) mirrors
+    ``_woe_apply_polars``'s representation exactly (e.g. integer category ``1``
+    stays "1", not "1.0", and nulls become "nan" instead of the pandas-only
+    "None"/NaN-object quirks). Without this, an all-Polars column's fit-time
+    keys can silently diverge from its own apply-time keys -- e.g. any integer
+    categorical column containing nulls gets upcast to float by pandas'
+    ``.to_pandas()`` conversion, so ``.astype(str)`` on the fit side yields
+    "1.0" while the Polars apply path renders "1", and every known category
+    ends up falling back to ``default`` at apply time.
+    """
+    if hasattr(X, "fill_null"):  # polars DataFrame
+        import polars as pl
+
+        exprs = [pl.col(col).cast(pl.Utf8).fill_null("nan") for col in cols]
+        return X.select(exprs).to_pandas()
+    return select_then_to_pandas(X, cols)[cols]
+
+
 def _woe_fit(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     """Fit WOE for either dataframe engine using one narrow Pandas boundary."""
     y = _extract_target(X, y, config.get("target_column"))
@@ -178,8 +212,102 @@ def _woe_fit(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, Any]:
     )
     if not cols:
         return {}
-    frame = select_then_to_pandas(X, cols)
-    return _woe_fit_common(frame[cols], y, cols, config)
+    frame = _categorical_frame_for_fit(X, cols)
+    return _woe_fit_common(frame, y, cols, config)
+
+
+# -----------------------------------------------------------------------------
+# fit_transform_train — leakage-safe cross-fitting of the training rows
+# -----------------------------------------------------------------------------
+
+
+def _resolve_woe_cv(y_bin: np.ndarray) -> int:
+    """Return the fold count for out-of-fold encoding, shrunk for small data."""
+    n_samples = len(y_bin)
+    if n_samples < 2:
+        raise ValueError(
+            "WOEEncoder pipeline training requires at least 2 training rows for "
+            f"leakage-safe cross-fitting; got {n_samples}."
+        )
+    min_class_count = int(min(float(y_bin.sum()), float(n_samples - y_bin.sum())))
+    return min(5, max(2, min_class_count))
+
+
+def _cross_fit_woe_values(
+    frame: Any, y_bin: np.ndarray, cols: list[str], reg: float, n_folds: int
+) -> dict[str, np.ndarray]:
+    """Encode every training row with the WOE map fit on the other folds.
+
+    A category absent from a fold's complement falls back to the apply-time
+    default (0.0), matching unseen-category behaviour at serving time.
+    """
+    from sklearn.model_selection import KFold
+
+    n = len(frame)
+    encoded = {col: np.zeros(n, dtype=float) for col in cols}
+    kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+    for train_idx, hold_idx in kf.split(np.arange(n)):
+        mappings = _build_woe_artifact(frame.iloc[train_idx], y_bin[train_idx], cols, reg)[
+            "mappings"
+        ]
+        for col in cols:
+            held_values = _string_keys_with_nan(frame[col].iloc[hold_idx]).to_numpy()
+            mapping = mappings[col]
+            encoded[col][hold_idx] = np.array([mapping.get(v, 0.0) for v in held_values])
+    return encoded
+
+
+def _woe_fit_transform_train_common(
+    X: Any, y: Any, config: dict[str, Any]
+) -> tuple[Mapping[str, Any], list[str], dict[str, np.ndarray] | None]:
+    """Shared fit+cross-fit: returns ``(artifact, cols, encoded-or-None)``."""
+    fit_y = _extract_target(X, y, config.get("target_column"))
+    if fit_y is None:
+        logger.warning("WOEEncoder requires a target variable (y). Skipping.")
+        return {}, [], None
+    cols = _exclude_target_column(
+        resolve_columns(X, config, detect_categorical_columns),
+        config,
+        "WOEEncoder",
+        fit_y,
+    )
+    if not cols:
+        return {}, [], None
+    frame = _categorical_frame_for_fit(X, cols)
+    y_bin = _binary_target(fit_y)
+    if y_bin is None:
+        logger.warning("WOEEncoder requires a binary target (exactly 2 classes). Skipping.")
+        return {}, [], None
+    reg = float(config.get("regularization", 0.5))
+    artifact = _build_woe_artifact(frame, y_bin, cols, reg)
+    encoded = _cross_fit_woe_values(frame, y_bin, cols, reg, _resolve_woe_cv(y_bin))
+    return artifact, cols, encoded
+
+
+def _woe_fit_transform_train_pandas(
+    X: Any, y: Any, config: dict[str, Any]
+) -> tuple[Mapping[str, Any], Any, Any]:
+    """Fit the full-data artifact and cross-fit the pandas training rows."""
+    artifact, cols, encoded = _woe_fit_transform_train_common(X, y, config)
+    if encoded is None:
+        return artifact, X, y
+    X_out = X.copy()
+    for col in cols:
+        X_out[col] = encoded[col]
+    return artifact, X_out, y
+
+
+def _woe_fit_transform_train_polars(
+    X: Any, y: Any, config: dict[str, Any]
+) -> tuple[Mapping[str, Any], Any, Any]:
+    """Fit the full-data artifact and cross-fit the Polars training rows."""
+    import polars as pl
+
+    artifact, cols, encoded = _woe_fit_transform_train_common(X, y, config)
+    if encoded is None:
+        return artifact, X, y
+    X_out = X.with_columns([pl.Series(col, encoded[col]) for col in cols])
+    return artifact, X_out, y
 
 
 @NodeRegistry.register("WOEEncoder", WOEEncoderApplier)
@@ -207,6 +335,21 @@ class WOEEncoderCalculator(BaseCalculator):
                 pandas_func=_woe_fit,
             ),
         )
+
+    def fit_transform_train(
+        self, df: pd.DataFrame | SkyulfDataFrame | tuple, config: dict[str, Any]
+    ) -> tuple[Mapping[str, Any], Any]:
+        """Fit the full-data WOE artifact and cross-fit the training rows."""
+        if user_picked_no_columns(config):
+            return {}, df
+
+        artifact, transformed = fit_transform_train_dual_engine(
+            df,
+            config,
+            polars_func=_woe_fit_transform_train_polars,
+            pandas_func=_woe_fit_transform_train_pandas,
+        )
+        return artifact, transformed
 
     def infer_output_schema(
         self,

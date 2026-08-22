@@ -17,10 +17,52 @@ from typing import Any
 
 import pandas as pd
 
-from ..engines import EngineName, SkyulfDataFrame, get_engine
+from ..engines import EngineName, SkyulfDataFrame, SkyulfPolarsWrapper, get_engine
 from ..utils import pack_pipeline_output, unpack_pipeline_input
 
 logger = logging.getLogger(__name__)
+
+
+def _unwrap_polars_wrapper(X: Any) -> tuple[Any, bool]:
+    """Return ``(frame, was_wrapped)`` for the Polars dispatch branch.
+
+    ``SkyulfPolarsWrapper`` is a documented public input type, but node
+    implementations reach for native polars APIs (``pl.concat``,
+    ``fill_null``, ...) that crash on the wrapper (F-09). Hand them the raw
+    ``pl.DataFrame`` instead; callers re-wrap the output so the result keeps
+    the caller's engine.
+    """
+    if isinstance(X, SkyulfPolarsWrapper):
+        return X._df, True
+    return X, False
+
+
+def _rewrap_polars_output(X_out: Any, was_wrapped: bool) -> Any:
+    if was_wrapped and type(X_out).__module__.startswith("polars"):
+        return SkyulfPolarsWrapper(X_out)
+    return X_out
+
+
+def _check_xy_engine_parity(X: Any, y: Any) -> None:
+    """Reject ``(X, y)`` pairs whose frames come from different engines (F-27).
+
+    A pandas X cannot be indexed by a polars y (or vice versa); without this
+    guard the mismatch surfaces deep inside an engine-specific implementation
+    as a confusing ``AttributeError``. Engine-neutral y values (lists, numpy
+    arrays) are always accepted.
+    """
+    if y is None:
+        return
+    x_is_polars = isinstance(X, SkyulfPolarsWrapper) or type(X).__module__.startswith("polars")
+    y_is_polars = type(y).__module__.startswith("polars")
+    y_is_pandas = isinstance(y, (pd.DataFrame, pd.Series))
+    if (x_is_polars and y_is_pandas) or (y_is_polars and not x_is_polars):
+        raise TypeError(
+            "Mixed engines in (X, y): X is "
+            f"{'polars' if x_is_polars else 'pandas'} but y is "
+            f"{'polars' if y_is_polars else 'pandas'}. "
+            "Both must use the same engine."
+        )
 
 
 def _callable_name(func: Callable[..., Any]) -> str:
@@ -79,16 +121,21 @@ def apply_dual_engine(
         Packed output matching the input format.
     """
     X, y, is_tuple = unpack_pipeline_input(df)
+    _check_xy_engine_parity(X, y)
     engine = get_engine(X)
 
     if engine.name == EngineName.POLARS:
         # Polars path
-        # We pass X directly. The func should handle typing (X_pl: Any = X)
+        # Unwrap SkyulfPolarsWrapper so polars_func sees a raw pl.DataFrame
+        # (native pl APIs crash on the wrapper, F-09); re-wrap afterwards
+        # so the output keeps the caller's engine.
+        X_pl, was_wrapped = _unwrap_polars_wrapper(X)
         try:
-            X_out, y_out = polars_func(X, y, params)
+            X_out, y_out = polars_func(X_pl, y, params)
         except Exception as exc:
             _log_dispatch_failure(exc, "Polars", "apply", polars_func)
             raise
+        X_out = _rewrap_polars_output(X_out, was_wrapped)
     else:
         # Pandas path
         # Ensure X is pandas
@@ -122,11 +169,13 @@ def fit_dual_engine(
         Dictionary of fitted parameters.
     """
     X, y, _ = unpack_pipeline_input(df)
+    _check_xy_engine_parity(X, y)
     engine = get_engine(X)
 
     if engine.name == EngineName.POLARS:
+        X_pl, _ = _unwrap_polars_wrapper(X)
         try:
-            return dict(polars_func(X, y, params))
+            return dict(polars_func(X_pl, y, params))
         except Exception as exc:
             _log_dispatch_failure(exc, "Polars", "fit", polars_func)
             raise
@@ -147,14 +196,17 @@ def fit_transform_train_dual_engine(
 ) -> tuple[dict[str, Any], Any]:
     """Dispatch an optional fit+train-transform hook across supported engines."""
     X, y, is_tuple = unpack_pipeline_input(df)
+    _check_xy_engine_parity(X, y)
     engine = get_engine(X)
 
     if engine.name == EngineName.POLARS:
+        X_pl, was_wrapped = _unwrap_polars_wrapper(X)
         try:
-            artifact, X_out, y_out = polars_func(X, y, params)
+            artifact, X_out, y_out = polars_func(X_pl, y, params)
         except Exception as exc:
             _log_dispatch_failure(exc, "Polars", "fit_transform_train", polars_func)
             raise
+        X_out = _rewrap_polars_output(X_out, was_wrapped)
     else:
         X_pd = X.to_pandas() if hasattr(X, "to_pandas") else X
         try:

@@ -408,38 +408,6 @@ def test_evaluate_polars_test_and_validation_splits_are_not_silently_dropped():
     assert "accuracy" in report["splits"]["validation"].metrics
 
 
-# ---------------------------------------------------------------------------
-# StatefulEstimator.refit
-# ---------------------------------------------------------------------------
-
-
-def test_refit_without_validation_is_noop_fit():
-    """refit() without a validation split should still train the model."""
-    dataset, _ = _classification_dataset()
-    estimator = StatefulEstimator(
-        calculator=LogisticRegressionCalculator(),
-        applier=LogisticRegressionApplier(),
-        node_id="e9",
-    )
-    estimator.refit(dataset, "target", config={})
-    assert estimator.model is not None
-
-
-def test_refit_with_validation_combines_train_val():
-    """refit() with validation should train on train+val combined."""
-    dataset, df = _classification_dataset()
-    val_df = df.sample(20, random_state=77)
-    dataset_with_val = SplitDataset(train=df.iloc[:160], test=df.iloc[160:], validation=val_df)
-    estimator = StatefulEstimator(
-        calculator=LogisticRegressionCalculator(),
-        applier=LogisticRegressionApplier(),
-        node_id="e10",
-    )
-    estimator.fit_predict(dataset_with_val, "target", config={})
-    estimator.refit(dataset_with_val, "target", config={})
-    assert estimator.model is not None
-
-
 def test_fit_predict_validation_predictions_support_polars_dataset():
     """fit_predict()'s validation-prediction branch must support polars data.
 
@@ -464,31 +432,6 @@ def test_fit_predict_validation_predictions_support_polars_dataset():
     )
     predictions = estimator.fit_predict(dataset_pl, "target", config={})
     assert "validation" in predictions
-
-
-def test_refit_with_validation_supports_polars_dataset():
-    """refit() must combine train+val for polars data too, not just pandas.
-
-    Regression test for a bug where refit() unconditionally used pd.concat,
-    which raises a TypeError on polars DataFrames/Series (_extract_xy returns
-    polars objects when the engine is polars).
-    """
-    import polars as pl
-
-    _, df = _classification_dataset()
-    train_pl = pl.from_pandas(df.iloc[:160].reset_index(drop=True))
-    val_pl = pl.from_pandas(df.iloc[160:180].reset_index(drop=True))
-    test_pl = pl.from_pandas(df.iloc[180:].reset_index(drop=True))
-    dataset_pl = SplitDataset(train=train_pl, test=test_pl, validation=val_pl)
-
-    estimator = StatefulEstimator(
-        calculator=LogisticRegressionCalculator(),
-        applier=LogisticRegressionApplier(),
-        node_id="e10b",
-    )
-    estimator.fit_predict(dataset_pl, "target", config={})
-    estimator.refit(dataset_pl, "target", config={})
-    assert estimator.model is not None
 
 
 # ---------------------------------------------------------------------------
