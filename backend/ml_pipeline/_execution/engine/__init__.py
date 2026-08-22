@@ -187,10 +187,12 @@ class PipelineEngine(ArtifactsMixin, MergeMixin, FeatureEngMixin, NodeRunnersMix
         # data-dependent preprocessing node is wired upstream of a
         # train/test splitter — that ordering fits the transformer's
         # statistics on the whole dataset (train+test), leaking test data
-        # into what should be train-only parameters.
-        validate_no_preprocessing_before_split(config.nodes)
+        # into what should be train-only parameters. The returned verdict
+        # is stamped onto the job metrics so Job Details can show it.
+        leakage_verdict = validate_no_preprocessing_before_split(config.nodes)
 
         _, pipeline_result = self._init_run_state(config, dataset_name)
+        pipeline_result.leakage_verdict = leakage_verdict
 
         # C7 Phase B: walk the topology once and ask each Calculator's
         # ``infer_output_schema`` what its output columns/dtypes will be.

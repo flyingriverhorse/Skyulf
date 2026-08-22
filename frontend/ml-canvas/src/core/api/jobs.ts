@@ -3,6 +3,13 @@ import axios from 'axios';
 
 export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed' | 'cancelled' | 'pending';
 
+// Verdict the leakage gate stamps into a job's metrics at run time.
+// Absent for legacy jobs that predate the stamp.
+export interface LeakageGateVerdict {
+  status: 'passed' | 'no_split' | 'warnings';
+  messages: string[];
+}
+
 export interface JobInfo {
   job_id: string;
   pipeline_id: string;
