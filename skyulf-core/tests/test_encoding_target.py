@@ -768,3 +768,49 @@ class TestRealShapedDataset:
         # Binary target encoding produces values in (0, 1) representing the smoothed churn rate.
         assert X_out["plan_type"].between(0.0, 1.0).all()
         assert list(y_out) == list(y)
+
+
+# ---------------------------------------------------------------------------
+# Pure-noise leakage guard (companion to the WOE noise test in
+# test_encoding_woe.py): with a target that carries no signal, the
+# cross-fitted training rows must stay near chance while a leaky full-fit
+# encoding of the same rows memorises the labels.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("engine", ["pandas", "polars"])
+def test_fit_transform_train_noise_target_auc_stays_near_chance(engine: str) -> None:
+    """On a pure-noise target, cross-fitted train rows must not leak the label.
+
+    With many categories and few rows per category, the leaky full-fit
+    encoding memorises each row's own label into its category's smoothed
+    mean, becoming strongly predictive of the noise target. Measure
+    discriminative power as ``max(auc, 1 - auc)``.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    def discriminative_power(y_true: Any, values: np.ndarray) -> float:
+        auc = roc_auc_score(y_true, values)
+        return max(auc, 1.0 - auc)
+
+    rng = np.random.default_rng(42)
+    n, n_categories = 400, 200
+    X_pd = pd.DataFrame({"city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)]})
+    y_pd = pd.Series(rng.integers(0, 2, size=n), name="target")
+    config: dict[str, Any] = {"columns": ["city"], "target_type": "binary"}
+
+    leaky_params = TargetEncoderCalculator().fit((X_pd, y_pd), config)
+    leaky_out, _ = TargetEncoderApplier().apply((X_pd, y_pd), dict(leaky_params))
+    disc_leaky = discriminative_power(y_pd, leaky_out["city"].to_numpy())
+
+    if engine == "pandas":
+        _, (X_out, _) = TargetEncoderCalculator().fit_transform_train((X_pd, y_pd), config)
+    else:
+        X_pl = pl.from_pandas(X_pd)
+        y_pl = pl.Series("target", y_pd)
+        _, (X_out_pl, _) = TargetEncoderCalculator().fit_transform_train((X_pl, y_pl), config)
+        X_out = X_out_pl.to_pandas()
+    disc_cross = discriminative_power(y_pd, X_out["city"].to_numpy())
+
+    assert disc_leaky > 0.75, f"expected the leaky encoding to memorise labels, got {disc_leaky}"
+    assert disc_cross < 0.60, f"cross-fitted encoding should sit near chance, got {disc_cross}"

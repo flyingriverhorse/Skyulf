@@ -418,7 +418,7 @@ print(f"  Poisoned: {poisoned_encodings[:5]}")
 np.testing.assert_allclose(original_encodings, poisoned_encodings)
 print("✅ Target Encoding is unaffected by Test labels.")
 
-print("\n🎉 FINAL VERDICT: The pipeline is LEAKAGE-RESISTANT by design.")
+print("\n🎉 FINAL VERDICT: The pipeline is LEAKAGE-RESISTANT for the steps tested.")
 ```
 
 **Output:**
@@ -445,7 +445,7 @@ Target Encoding Comparison (First 5 values):
   Poisoned: [0.69350186 0.17924998]
 ✅ Target Encoding is unaffected by Test labels.
 
-🎉 FINAL VERDICT: The pipeline is LEAKAGE-RESISTANT by design.
+🎉 FINAL VERDICT: The pipeline is LEAKAGE-RESISTANT for the steps tested.
 ```
 
 ## Conclusion
@@ -456,4 +456,14 @@ We have mathematically verified that:
 2.  **Scaling** on Test data used the **Train Mean/Std**.
 3.  **Target Encoding** used train-derived target statistics (smoothed/cross-fitted), and is invariant to test labels.
 
-This proves that **Skyulf pipelines are leakage-free by design**. The strict separation of `fit()` (Calculator) and `transform()` (Applier) ensures that no information from the Test set (or future data) can influence the model training. Under adversarial 'poisoned test' conditions, the learned preprocessing artifacts are invariant to test data and test labels, providing strong empirical evidence that the pipeline fits strictly on training data for these steps.
+Skyulf enforces a strict `fit()` / `transform()` separation: preprocessing statistics are learned only from data the pipeline has designated as training data, and are then applied unchanged to validation and test data. Under adversarial conditions — a poisoned test set and flipped test labels — the learned artifacts are provably invariant for the steps shown, demonstrating that no test-set information reaches the fitted parameters.
+
+This guarantee applies per preprocessing step, relative to the split defined in your pipeline. Skyulf additionally validates pipeline *structure* and rejects configurations that fit a data-dependent step before the split (`validate_leakage_safety`, and the pre-execution gate in pipeline runs). See [What is and is not covered](#what-is-and-is-not-covered) below for the current limits.
+
+## What is and is not covered
+
+**Covered — the per-node guarantee.** The `fit()` (Calculator) / `transform()` (Applier) split is enforced for every node: learned preprocessing artifacts are computed only from training-designated data and applied unchanged to validation and test data. The adversarial checks above verify this for imputation, scaling and target encoding.
+
+**Covered — the pipeline-structure gate.** Every node declares whether its `fit()` learns from the data it is given (`learns_from_data` on its node metadata), and both the standalone diagnostic (`skyulf.validate_leakage_safety`) and the pre-execution gate derive their node lists from that registry — there is no hand-maintained allow-list to drift. A pipeline that fits a data-dependent node before its train/test split is rejected by default (`on_leakage="raise"`; set `"warn"` or `"ignore"` to opt out). Unknown nodes fail closed, and a pipeline with no train/test split at all gets an explicit diagnostic stating that the leakage guarantee does not apply to it.
+
+**Not covered — cross-validation scores, yet.** CV and hyperparameter tuning do not re-fit preprocessing inside each fold: preprocessing is fitted once on the full training set, so every fold's validation rows influenced the statistics used to transform them. Reported CV and tuning scores are therefore optimistic. Per-fold refitting is planned; until it lands, treat CV/tuning scores as an upper bound rather than a leakage-free estimate.

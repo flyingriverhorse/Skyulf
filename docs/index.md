@@ -96,7 +96,7 @@ cd frontend/ml-canvas && npm run dev
 - [Segmentation (Clustering)](user_guide/segmentation.md) — Group rows by similarity with K-Means, no target column needed.
 - [Drift Monitoring](user_guide/drift_monitoring.md) — Detect data drift in production.
 - [Extending Skyulf-Core](user_guide/extending_custom_nodes.md) — Add your own nodes.
-- [Validation vs scikit-learn](user_guide/validation_vs_sklearn.md) — Proof that Skyulf avoids leakage.
+- [Validation vs scikit-learn](user_guide/validation_vs_sklearn.md) — Proof that Skyulf avoids leakage for the demonstrated preprocessing steps (and what is not covered yet).
 
 ---
 
