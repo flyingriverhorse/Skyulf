@@ -75,12 +75,14 @@ import polars as pl
 from skyulf import SkyulfPipeline
 
 # Synthetic data, built inline so this runs without any files on disk.
-customers = pl.DataFrame({
-    "age":    [43, 38, None, 52, 61, 29, 47, 55],
-    "income": [52000, 61000, 48000, None, 73000, 41000, 58000, 66000],
-    "city":   ["NY", "LDN", "LDN", "PAR", "NY", "PAR", "NY", "LDN"],
-    "purchased": [1, 0, 0, 1, 1, 0, 0, 1],
-})
+customers = pl.DataFrame(
+    {
+        "age": [43, 38, None, 52, 61, 29, 47, 55],
+        "income": [52000, 61000, 48000, None, 73000, 41000, 58000, 66000],
+        "city": ["NY", "LDN", "LDN", "PAR", "NY", "PAR", "NY", "LDN"],
+        "purchased": [1, 0, 0, 1, 1, 0, 0, 1],
+    }
+)
 pipeline = SkyulfPipeline(
     {
         "preprocessing": [
@@ -109,11 +111,13 @@ pipeline = SkyulfPipeline(
 
 pipeline.fit(customers, target_column="purchased")
 pipeline.save("customer_model.pkl")
-new_customers = pl.DataFrame({
-    "age": [35, 48],
-    "income": [55000, None],
-    "city": ["PAR", "NY"],
-})
+new_customers = pl.DataFrame(
+    {
+        "age": [35, 48],
+        "income": [55000, None],
+        "city": ["PAR", "NY"],
+    }
+)
 predictions = SkyulfPipeline.load("customer_model.pkl").predict(new_customers)
 ```
 
