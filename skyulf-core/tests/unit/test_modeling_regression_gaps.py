@@ -1,35 +1,24 @@
 """Tests targeting gap lines in skyulf.modeling.regression (optional-import guards)."""
 
-import importlib
-import sys
+from tests.utils.reload_guard import reload_module_preserving_registry
 
 
 def test_regression_xgboost_import_failure_sets_flag_false(monkeypatch):
     """Simulating an unimportable xgboost must leave XGBOOST_AVAILABLE False after reload."""
     import skyulf.modeling.regression as reg_mod
 
-    monkeypatch.setitem(sys.modules, "xgboost", None)
-    try:
-        importlib.reload(reg_mod)
-        assert reg_mod.XGBOOST_AVAILABLE is False
-    finally:
-        monkeypatch.delitem(sys.modules, "xgboost", raising=False)
-        importlib.reload(reg_mod)
-        assert reg_mod.XGBOOST_AVAILABLE is True
+    with reload_module_preserving_registry(reg_mod, monkeypatch, "xgboost") as mod:
+        assert mod.XGBOOST_AVAILABLE is False
+    assert reg_mod.XGBOOST_AVAILABLE is True
 
 
 def test_regression_lightgbm_import_failure_sets_flag_false(monkeypatch):
     """Simulating an unimportable lightgbm must leave LIGHTGBM_AVAILABLE False after reload."""
     import skyulf.modeling.regression as reg_mod
 
-    monkeypatch.setitem(sys.modules, "lightgbm", None)
-    try:
-        importlib.reload(reg_mod)
-        assert reg_mod.LIGHTGBM_AVAILABLE is False
-    finally:
-        monkeypatch.delitem(sys.modules, "lightgbm", raising=False)
-        importlib.reload(reg_mod)
-        assert reg_mod.LIGHTGBM_AVAILABLE is True
+    with reload_module_preserving_registry(reg_mod, monkeypatch, "lightgbm") as mod:
+        assert mod.LIGHTGBM_AVAILABLE is False
+    assert reg_mod.LIGHTGBM_AVAILABLE is True
 
 
 def test_regression_silent_lgbm_logger_info_and_warning_are_no_ops():

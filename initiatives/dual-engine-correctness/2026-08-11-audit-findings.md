@@ -316,17 +316,17 @@ imputation means, scaler statistics and encodings. **This is architectural**, no
 
 | ID | Finding | Location |
 |---|---|---|
-| F-16 🟡 | 10 stateful nodes bypass the pre-split leakage gate (`MissingIndicator`, `DropMissingColumns`, Over/Undersampling, `HashEncoder`, `Deduplicate`, …). The comment wrongly calls the first two "stateless"; both provably learn columns from data. | `_leakage_validation.py:30-38` |
-| F-17 🟡 | Pipelines with **no splitter node** get zero leakage protection — the gate is keyed on finding a split. | `leakage.py:53-54` |
-| F-18 🟡 | Row-dropping steps (`Deduplicate`, `DropMissingRows`) still execute at inference; 4 requested rows → 2 predictions, and `PredictionResponse.predictions: list[Any]` carries no row keys, so the caller cannot tell which inputs vanished. | `preprocessing/pipeline.py:64-70` |
-| F-19 🟡 | `DropMissingColumns` `null_count()` misses NaN → different columns dropped per engine. | `drop_and_missing/drop_columns.py:44` |
-| F-20 🟡 | `DatasetProfile` on Polars reports `missing=0` while `mean=NaN` for NaN-bearing columns — self-contradictory profile. | `profiling/` |
-| F-21 🟡 | `lag.py` `drop_nulls()` vs pandas `dropna()` → different row counts. | `time_series/lag.py:54` |
-| F-22 🟡 | `DropMissingColumns` registers param `threshold` but reads `missing_threshold` — the UI value is ignored. | `drop_columns.py:91` |
-| F-23 🟡 | `DummyEncoder` null rows: `0/0` int (pandas) vs `NaN/NaN` float (polars) — dtype divergence distinct from F-01. | `encoding/dummy.py` |
-| F-24 🟡 | `most_frequent` on an all-unique column: pandas silently no-ops, polars raises. | `imputation/simple.py:66` |
-| F-25 🟡 | **No engine identity recorded in the deployment bundle.** Nothing detects "trained on Polars, serving on pandas." Adding `"train_engine": "polars"\|"pandas"` and warning on mismatch would have caught F-11, F-12, F-30, F-31 at deploy time. | deployment bundle |
-| F-26 🟡 | Polars is a **hard dependency** (`pipeline.py:12`; `setup.py:27` `install_requires`), so `polars_engine.py`'s `HAS_POLARS` fallback is unreachable dead code, tested only via monkeypatch. It advertises an optionality that has never worked. Matches packaging, so not a broken promise — but delete the dead branch or make it real. | `polars_engine.py` |
+| F-16 🟡 | 10 stateful nodes bypass the pre-split leakage gate (`MissingIndicator`, `DropMissingColumns`, Over/Undersampling, `HashEncoder`, `Deduplicate`, …). The comment wrongly calls the first two "stateless"; both provably learn columns from data. **Status:** 🔧 In progress (T3 leakage enforcement on `081` — registry-derived `learns_from_data` list, fail-closed unknowns). | `_leakage_validation.py:30-38` |
+| F-17 🟡 | Pipelines with **no splitter node** get zero leakage protection — the gate is keyed on finding a split. **Status:** 🔧 In progress (T3 leakage enforcement on `081` — no-splitter diagnostic + `on_leakage` default `raise`). | `leakage.py:53-54` |
+| F-18 🟡 | Row-dropping steps (`Deduplicate`, `DropMissingRows`) still execute at inference; 4 requested rows → 2 predictions, and `PredictionResponse.predictions: list[Any]` carries no row keys, so the caller cannot tell which inputs vanished. **Status:** ✅ Fixed (T3 parity batch on `081`) — `FeatureEngineer.transform()` now skips row-dropping step types; a null row surfaces as a visible model error instead of a silent misalignment. | `preprocessing/pipeline.py:64-70` |
+| F-19 🟡 | `DropMissingColumns` `null_count()` misses NaN → different columns dropped per engine. **Status:** ✅ Fixed (T3 parity batch on `081`) — Polars path counts `is_null() + is_nan()` on float columns, matching pandas `isna()`; parity test covers a 50%-NaN frame on both engines. | `drop_and_missing/drop_columns.py:44` |
+| F-20 🟡 | `DatasetProfile` on Polars reports `missing=0` while `mean=NaN` for NaN-bearing columns — self-contradictory profile. **Status:** ✅ Fixed (T3 parity batch on `081`) — both `_compute_frame_stats` and `_compute_basic_stats` count NaN as missing on float columns. | `profiling/` |
+| F-21 🟡 | `lag.py` `drop_nulls()` vs pandas `dropna()` → different row counts. **Status:** ✅ Already resolved by the Polars migration (verified on `081`). | `time_series/lag.py:54` |
+| F-22 🟡 | `DropMissingColumns` registers param `threshold` but reads `missing_threshold` — the UI value is ignored. **Status:** ✅ Fixed (T3 parity batch on `081`) — the `@node_meta` declaration now reads `missing_threshold`, matching what fit() consumes and what the frontend sends; declaration-only change, no user-facing param rename. | `drop_columns.py:91` |
+| F-23 🟡 | `DummyEncoder` null rows: `0/0` int (pandas) vs `NaN/NaN` float (polars) — dtype divergence distinct from F-01. **Status:** ✅ Already resolved by the Polars migration (verified on `081`). | `encoding/dummy.py` |
+| F-24 🟡 | `most_frequent` on an all-unique column: pandas silently no-ops, polars raises. **Status:** ✅ Already resolved by the Polars migration (verified on `081`). | `imputation/simple.py:66` |
+| F-25 🟡 | **No engine identity recorded in the deployment bundle.** Nothing detects "trained on Polars, serving on pandas." Adding `"train_engine": "polars"\|"pandas"` and warning on mismatch would have caught F-11, F-12, F-30, F-31 at deploy time. **Status:** ✅ Fixed (T3 parity batch on `081`) — the bundle already records `engine` via `_resolve_train_engine`; serving now logs a warning when a non-pandas-trained bundle receives pandas input. | deployment bundle |
+| F-26 🟡 | Polars is a **hard dependency** (`pipeline.py:12`; `setup.py:27` `install_requires`), so `polars_engine.py`'s `HAS_POLARS` fallback is unreachable dead code, tested only via monkeypatch. It advertises an optionality that has never worked. Matches packaging, so not a broken promise — but delete the dead branch or make it real. **Status:** ✅ Already resolved by the Polars migration (verified on `081` during T4). | `polars_engine.py` |
 
 ### Tier 4 — LOW
 
@@ -411,7 +411,7 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 | **T1** | F-01, F-02, F-03, **F-33, F-34, F-35, F-37** | core **0.5.9** · backend/frontend **0.7.9** | **Patch — ship first, alone.** All engine-independent and LIVE. F-02/F-03 block deployments; F-33 shows the wrong job's evaluation; F-35 makes "Recall" tuning actively harmful; F-37 is a ~2-line SHAP fix restoring 6 model families. |
 | **T2** | F-04 … F-14 (excl. F-15) | core **0.6.0** · backend/frontend **0.8.0** | **Minor.** Behaviour changes: rows previously dropped are now kept (F-06), imputers that previously no-opped now impute (F-04), HashEncoder buckets change (F-11 — artifacts fitted before this release will not reproduce, needs a release note). |
 | **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend ~~0.8.0~~ → **0.8.1** | **Done on `080` 2026-08-22; slipped 0.8.0, ships in 0.8.1** (F-43 already shipped via core 0.6.0). Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — called out in the 0.8.1 changelog. |
-| **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | Patch/minor. F-22 changes a param name users may rely on. |
+| **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | **Parity batch done on `081` 2026-08-22** (F-18/F-19/F-20/F-22/F-25 fixed red-green; F-21/F-23/F-24/F-26 already resolved by the Polars migration). **Remaining:** leakage enforcement for F-16/F-17. F-22 ended up declaration-only — no user-facing param rename. |
 | **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.1** · backend/frontend **0.8.1** | **Done on `081` 2026-08-22; folded into the upcoming 0.8.1 release.** F-26 and F-29–F-32 were already resolved by the Polars migration; F-27/F-28/F-45–F-48 fixed red-green. |
 | **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. Design note first. |
 
@@ -419,9 +419,10 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 **wrapped** frames. Without this the suite will keep passing while broken. Every fix below must be
 verified red-green — write the failing test first, confirm it fails, then fix.
 
-**Frontend sync check required for:** F-22 (`DropMissingColumns` param rename) and F-03 (the
-deployment input-schema drives the UI form). Per repo policy, backend param/enum changes must be
-mirrored in `frontend/ml-canvas/src/modules/nodes/`.
+**Frontend sync check required for:** F-03 (the deployment input-schema drives the UI form).
+F-22 needed no frontend change: `DropColumnsNode.tsx` already sends `missing_threshold`; only
+the core `@node_meta` declaration was corrected. Per repo policy, backend param/enum changes must
+be mirrored in `frontend/ml-canvas/src/modules/nodes/`.
 
 **Docs to update alongside the code:**
 - `docs/examples/leakage_proof.md:459` — scope the "leakage-free by design" conclusion (see the

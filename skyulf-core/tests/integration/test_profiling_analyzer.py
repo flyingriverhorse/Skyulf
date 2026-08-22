@@ -318,6 +318,24 @@ def test_analyze_handles_all_null_column() -> None:
     assert profile.columns["all_null"].numeric_stats.mean is None
 
 
+def test_analyze_counts_nan_as_missing() -> None:
+    """F-20: Polars NaNs must count as missing — a profile reporting
+    ``missing=0`` while ``mean=NaN`` is self-contradictory. Pandas'
+    ``isna()`` counts NaN as missing, so the Polars profiler must too."""
+    df = pl.DataFrame(
+        {
+            "a": [1.0, float("nan"), 3.0, 4.0],
+            "b": [1, 2, 3, 4],
+        }
+    )
+    profile = EDAAnalyzer(df).analyze()
+
+    assert profile.missing_cells_percentage == pytest.approx(100.0 / 8.0)
+    assert profile.columns["a"].missing_count == 1
+    assert profile.columns["a"].missing_percentage == pytest.approx(25.0)
+    assert profile.columns["b"].missing_count == 0
+
+
 def test_get_semantic_type_classifies_common_dtypes() -> None:
     """_get_semantic_type should map dtypes/cardinality to the expected bucket."""
     # Low unique-ratio string column (<5%) should be classified as Categorical.

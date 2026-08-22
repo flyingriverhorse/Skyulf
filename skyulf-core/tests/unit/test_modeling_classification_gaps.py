@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from tests.utils.reload_guard import reload_module_preserving_registry
 
 from skyulf.modeling.classification import CalibratedClassifierCalculator
 
@@ -78,33 +79,17 @@ def test_silent_lgbm_logger_info_and_warning_are_no_ops():
 
 def test_classification_xgboost_import_failure_sets_flag_false(monkeypatch):
     """Simulating an unimportable xgboost must leave XGBOOST_AVAILABLE False after reload."""
-    import importlib
-    import sys
-
     import skyulf.modeling.classification as clf_mod
 
-    monkeypatch.setitem(sys.modules, "xgboost", None)
-    try:
-        importlib.reload(clf_mod)
-        assert clf_mod.XGBOOST_AVAILABLE is False
-    finally:
-        monkeypatch.delitem(sys.modules, "xgboost", raising=False)
-        importlib.reload(clf_mod)
-        assert clf_mod.XGBOOST_AVAILABLE is True
+    with reload_module_preserving_registry(clf_mod, monkeypatch, "xgboost") as mod:
+        assert mod.XGBOOST_AVAILABLE is False
+    assert clf_mod.XGBOOST_AVAILABLE is True
 
 
 def test_classification_lightgbm_import_failure_sets_flag_false(monkeypatch):
     """Simulating an unimportable lightgbm must leave LIGHTGBM_AVAILABLE False after reload."""
-    import importlib
-    import sys
-
     import skyulf.modeling.classification as clf_mod
 
-    monkeypatch.setitem(sys.modules, "lightgbm", None)
-    try:
-        importlib.reload(clf_mod)
-        assert clf_mod.LIGHTGBM_AVAILABLE is False
-    finally:
-        monkeypatch.delitem(sys.modules, "lightgbm", raising=False)
-        importlib.reload(clf_mod)
-        assert clf_mod.LIGHTGBM_AVAILABLE is True
+    with reload_module_preserving_registry(clf_mod, monkeypatch, "lightgbm") as mod:
+        assert mod.LIGHTGBM_AVAILABLE is False
+    assert clf_mod.LIGHTGBM_AVAILABLE is True

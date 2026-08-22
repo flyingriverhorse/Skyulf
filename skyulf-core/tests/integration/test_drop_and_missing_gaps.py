@@ -265,6 +265,32 @@ def test_drop_missing_columns_by_threshold_polars() -> None:
     assert "b" in out.columns
 
 
+def test_drop_missing_columns_counts_nan_as_missing_parity() -> None:
+    """F-19: pandas' ``isna()`` counts NaN as missing; polars ``null_count()``
+    does not — so a float column holding NaNs must still be dropped by the
+    Polars fit path, matching the pandas verdict."""
+    pdf = pd.DataFrame({"a": [float("nan"), float("nan"), 1.0, 2.0], "b": [1.0] * 4})
+    plf = pl.DataFrame({"a": [float("nan"), float("nan"), 1.0, 2.0], "b": [1.0] * 4})
+    art_pd = DropMissingColumnsCalculator().fit(pdf, {"missing_threshold": 50})
+    art_pl = DropMissingColumnsCalculator().fit(plf, {"missing_threshold": 50})
+    assert sorted(art_pd["columns_to_drop"]) == ["a"]
+    assert sorted(art_pl["columns_to_drop"]) == ["a"]
+
+
+def test_drop_missing_columns_declared_default_params_honor_threshold() -> None:
+    """F-22: the params declared by ``@node_meta`` must be the config keys
+    ``fit`` actually reads. The declaration used to say ``threshold`` while
+    fit read ``missing_threshold``, so fitting with the node's own declared
+    defaults silently skipped the threshold path (the registry contract and
+    smoke suites both fit with these defaults)."""
+    declared = DropMissingColumnsCalculator.__node_meta__.params
+    df = _missing_df()
+    art = DropMissingColumnsCalculator().fit(df, dict(declared))
+    # 'a' is 50% missing and 'c' is 100% — the declared default threshold
+    # must drop both, proving the declared key is the one fit reads.
+    assert sorted(art["columns_to_drop"]) == ["a", "c"]
+
+
 class TestDropMissingColumnsThresholdIgnored:
     """A non-numeric or non-positive threshold is treated as "no threshold
     configured" — scenarios loaded from

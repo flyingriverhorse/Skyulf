@@ -262,6 +262,24 @@ def test_transform_applies_scaler_artifact(numeric_df: pd.DataFrame) -> None:
     assert set(result.columns) == {"a", "b"}
 
 
+def test_transform_skips_row_dropping_steps() -> None:
+    """F-18: row-dropping steps (Deduplicate, DropMissingRows) must not run at
+    inference — they would silently vanish requested rows, and prediction
+    responses carry no row keys for callers to tell which inputs disappeared."""
+    train = pd.DataFrame({"a": [1.0, 1.0, 2.0, None], "b": [0, 1, 0, 1]})
+    steps = _steps(
+        _step("dedup", "Deduplicate"),
+        _step("droprows", "DropMissingRows"),
+    )
+    fe = FeatureEngineer(steps_config=steps)
+    out_fit, _ = fe.fit_transform(train)
+    assert len(out_fit) < len(train)  # the steps genuinely drop rows at fit time
+
+    new = pd.DataFrame({"a": [5.0, 5.0, None, 7.0], "b": [0, 1, 0, 1]})
+    result = fe.transform(new)
+    assert len(result) == 4
+
+
 # ---------------------------------------------------------------------------
 # Metrics collection
 # ---------------------------------------------------------------------------
