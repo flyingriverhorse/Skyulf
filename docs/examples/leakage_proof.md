@@ -25,8 +25,6 @@ This example proves this behavior using the **Titanic** dataset. We will:
 ## 1. Setup and Data Loading
 
 ```python
-import sys
-from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.datasets import fetch_openml
@@ -153,6 +151,8 @@ print("Pipeline execution complete.")
 Running pipeline...
 Pipeline execution complete.
 ```
+
+> **Note on the leakage gate:** this example provides the train/test split *externally* via `SplitDataset` — the config itself contains no splitter node. If you run `pipeline.validate_leakage_safety()` on this config, you get the advisory "no train/test split is defined" diagnostic (see [What is and is not covered](#what-is-and-is-not-covered)); it never raises here. The per-step proofs below verify directly that each `fit()` saw only the training half.
 
 ## 4. Verification 1: Imputation Leakage
 

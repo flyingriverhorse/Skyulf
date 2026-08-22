@@ -83,6 +83,7 @@ def test_splitters_are_registry_derived():
 
 def test_top_level_export_still_available():
     assert skyulf.validate_leakage_safety is validate_leakage_safety
+    assert "validate_leakage_safety" in skyulf.__all__
 
 
 # ---------------------------------------------------------------------------
