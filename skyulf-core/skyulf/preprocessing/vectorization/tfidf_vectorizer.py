@@ -116,6 +116,7 @@ def _build_tfidf_artifact(
         "drop_original": False,
     },
     tags=["text", "nlp", "tfidf", "vectorizer"],
+    learns_from_data=True,
 )
 class TfidfVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:

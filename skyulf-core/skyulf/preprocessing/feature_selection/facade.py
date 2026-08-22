@@ -63,6 +63,7 @@ _FS_CALCULATORS: dict[str, Callable[[], BaseCalculator]] = {
     category="Feature Selection",
     description="General wrapper for feature selection strategies.",
     params={"method": "variance", "threshold": 0.0},
+    learns_from_data=True,
 )
 class FeatureSelectionCalculator(BaseCalculator):
     def fit(

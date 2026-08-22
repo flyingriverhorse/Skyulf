@@ -157,6 +157,7 @@ class CorrelationThresholdApplier(BaseApplier):
     category="Feature Selection",
     description="Remove features highly correlated with others.",
     params={"threshold": 0.95, "method": "pearson"},
+    learns_from_data=True,
 )
 class CorrelationThresholdCalculator(BaseCalculator):
     @fit_method

@@ -82,6 +82,7 @@ class RobustScalerApplier(BaseApplier):
         "with_scaling": True,
         "columns": [],
     },
+    learns_from_data=True,
 )
 class RobustScalerCalculator(BaseCalculator):
     def infer_output_schema(

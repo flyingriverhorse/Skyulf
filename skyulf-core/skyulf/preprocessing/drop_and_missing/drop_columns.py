@@ -102,6 +102,7 @@ def _drop_missing_cols_fit_pandas(
     category="Cleaning",
     description="Drop columns that exceed missing value threshold.",
     params={"missing_threshold": 50},
+    learns_from_data=True,
 )
 class DropMissingColumnsCalculator(BaseCalculator):
     def infer_output_schema(

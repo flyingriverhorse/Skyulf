@@ -87,6 +87,7 @@ class DropMissingRowsApplier(BaseApplier):
     category="Cleaning",
     description="Drop rows containing missing values in specified columns.",
     params={"subset": [], "how": "any"},
+    learns_from_data=False,
 )
 class DropMissingRowsCalculator(BaseCalculator):
     def infer_output_schema(

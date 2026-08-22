@@ -61,6 +61,7 @@ class MaxAbsScalerApplier(BaseApplier):
     category="Preprocessing",
     description="Scale each feature by its maximum absolute value.",
     params={"columns": []},
+    learns_from_data=True,
 )
 class MaxAbsScalerCalculator(BaseCalculator):
     def infer_output_schema(

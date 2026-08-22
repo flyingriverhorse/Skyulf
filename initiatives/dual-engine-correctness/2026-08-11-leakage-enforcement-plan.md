@@ -124,13 +124,13 @@ to over-claim just moves the problem.
 
 ## 4. Definition of done
 
-- [ ] One registry-derived data-dependent node list; the duplicate frozenset deleted.
-- [ ] `learns_from_data` is a **required** `@node_meta` field; omitting it is a registration error.
-- [ ] Unknown transformer or unknown splitter → gate fails **closed**, with a test proving it.
-- [ ] `MissingIndicator`, `DropMissingColumns`, `HashEncoder`, `Deduplicate`, resamplers
-      reclassified; misleading comment corrected.
-- [ ] No-splitter pipelines emit an explicit diagnostic instead of silence.
-- [ ] `on_leakage` implemented, default `"raise"` for definite violations, changelog marks it breaking.
+- [x] One registry-derived data-dependent node list; the duplicate frozenset deleted (done on `081` 2026-08-22).
+- [x] `learns_from_data` is a **required** `@node_meta` field; omitting it is a registration error (done on `081` 2026-08-22).
+- [x] Unknown transformer or unknown splitter → gate fails **closed**, with a test proving it (done on `081` 2026-08-22).
+- [x] `MissingIndicator`, `DropMissingColumns`, `HashEncoder`, `Deduplicate`, resamplers
+      reclassified; misleading comment corrected (done on `081` 2026-08-22).
+- [x] No-splitter pipelines emit an explicit diagnostic instead of silence (done on `081` 2026-08-22).
+- [x] `on_leakage` implemented, default `"raise"` for definite violations, changelog marks it breaking (done on `081` 2026-08-22).
 - [x] `WOEEncoder.fit_transform_train` implemented (done on `080`, 2026-08-21, red-green);
       every other target-aware encoder audited — `TargetEncoder` (hook pre-existing) and
       `WOEEncoder` are the only target-aware encoders in the registry.

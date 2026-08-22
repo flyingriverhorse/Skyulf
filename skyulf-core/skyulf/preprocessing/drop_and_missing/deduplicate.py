@@ -67,6 +67,7 @@ class DeduplicateApplier(BaseApplier):
     category="Data Operations",
     description="Drop duplicate rows.",
     params={"subset": [], "keep": "first"},
+    learns_from_data=True,
 )
 class DeduplicateCalculator(BaseCalculator):
     def infer_output_schema(

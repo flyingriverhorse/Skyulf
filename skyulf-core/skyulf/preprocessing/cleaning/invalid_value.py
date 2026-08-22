@@ -206,6 +206,7 @@ class InvalidValueReplacementApplier(BaseApplier):
     category="Cleaning",
     description="Replace specified values with nan.",
     params={"columns": [], "invalid_values": []},
+    learns_from_data=False,
 )
 class InvalidValueReplacementCalculator(BaseCalculator):
     def infer_output_schema(
