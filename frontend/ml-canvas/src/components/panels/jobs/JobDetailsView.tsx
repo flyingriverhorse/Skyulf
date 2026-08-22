@@ -5,7 +5,7 @@ import {
   ChevronsDown, ChevronsUp, RotateCw, Info,
   Link2, FlaskConical, GitBranch, Workflow, ScanEye, Tag, Layers,
 } from 'lucide-react';
-import { JobInfo } from '../../../core/api/jobs';
+import { JobInfo, LeakageGateVerdict } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
 import { formatMetricName, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
@@ -481,6 +481,12 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
         }
     };
 
+    // The engine stamps the leakage gate's verdict into metrics at run time;
+    // legacy jobs predate the stamp, so the tile is omitted for them.
+    const leakageGate = (
+        (job.result as Record<string, unknown> | null)?.metrics as Record<string, unknown> | undefined
+    )?.leakage_gate as LeakageGateVerdict | undefined;
+
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
@@ -576,7 +582,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                 {activeTab === 'overview' ? (
                     <div className="space-y-6">
                         {/* Status Section */}
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                        <div className={`grid grid-cols-2 ${leakageGate ? 'sm:grid-cols-6' : 'sm:grid-cols-5'} gap-4`}>
                             <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Status</div>
                                 <div className="font-medium capitalize flex items-center gap-2 text-gray-800 dark:text-gray-200">
@@ -622,6 +628,23 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                     {job.engine === 'polars' ? 'Polars' : 'pandas'}
                                 </div>
                             </div>
+                            {leakageGate && (
+                                <div
+                                    className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700"
+                                    title={leakageGate.messages.length > 0 ? leakageGate.messages.join('\n') : undefined}
+                                >
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Leakage Gate</div>
+                                    <div className={`font-medium ${
+                                        leakageGate.status === 'passed'
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : leakageGate.status === 'no_split'
+                                                ? 'text-amber-600 dark:text-amber-400'
+                                                : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                        {leakageGate.status === 'passed' ? 'Passed' : leakageGate.status === 'no_split' ? 'No split' : 'Warnings'}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Timeline Section */}

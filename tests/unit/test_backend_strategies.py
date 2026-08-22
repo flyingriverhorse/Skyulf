@@ -62,6 +62,43 @@ class TestBasicTrainingStrategy(unittest.TestCase):
         self.assertEqual(self.job.metrics["accuracy"], 0.95)
         self.assertEqual(self.job.metrics["dropped_columns"], ["col_A"])
 
+    def test_handle_success_stamps_leakage_gate_verdict(self):
+        """The pre-execution leakage verdict is persisted on the job so the
+        Job Details UI can show it as factual per-job information."""
+        node_res = NodeExecutionResult(
+            node_id="node_1",
+            status="success",
+            output_artifact_id="path/to/artifact",
+            metrics={"accuracy": 0.9},
+        )
+        verdict = {"status": "passed", "messages": []}
+        pipeline_res = PipelineExecutionResult(
+            pipeline_id="pipe_123",
+            status="success",
+            node_results={"node_1": node_res},
+            leakage_verdict=verdict,
+        )
+
+        self.strategy.handle_success(self.job, pipeline_res)
+
+        self.assertEqual(self.job.metrics["leakage_gate"], verdict)
+
+    def test_handle_success_omits_leakage_gate_for_legacy_results(self):
+        """Results without a verdict (e.g. previews) leave metrics untouched."""
+        node_res = NodeExecutionResult(
+            node_id="node_1",
+            status="success",
+            output_artifact_id="path/to/artifact",
+            metrics={"accuracy": 0.9},
+        )
+        pipeline_res = PipelineExecutionResult(
+            pipeline_id="pipe_123", status="success", node_results={"node_1": node_res}
+        )
+
+        self.strategy.handle_success(self.job, pipeline_res)
+
+        self.assertNotIn("leakage_gate", self.job.metrics)
+
     def test_handle_success_collects_nested_step_dropped_columns(self):
         """Nested preprocessing step details must still feed dropped_columns rollups."""
         node_res = NodeExecutionResult(
