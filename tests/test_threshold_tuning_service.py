@@ -349,3 +349,70 @@ async def test_save_toggle_clear_raise_for_missing_job(async_session):
         await ThresholdTuningService.toggle(async_session, "nonexistent", enabled=True)
     with pytest.raises(ThresholdTuningError):
         await ThresholdTuningService.clear(async_session, "nonexistent")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("thresholds", "classes", "metric", "split_used"),
+    [
+        # preview() refuses unsupported metrics, so save() must too — otherwise
+        # a hand-crafted payload persists a metric predict-time cannot honor.
+        ({"0": 0.5, "1": 0.5}, [0, 1], "r2", "validation"),
+        # Threshold keys must cover exactly the model's classes: predict-time
+        # silently skips a set that doesn't, so garbage would persist invisibly.
+        ({"0": 0.5}, [0, 1], "f1", "validation"),
+        ({"0": 0.5, "9": 0.5}, [0, 1], "f1", "validation"),
+        # Values must be finite cut-points: NaN/inf can't be applied at predict time.
+        ({"0": float("nan"), "1": 0.5}, [0, 1], "f1", "validation"),
+        ({"0": float("inf"), "1": 0.5}, [0, 1], "f1", "validation"),
+        # No classes means nothing to threshold against.
+        ({}, [], "f1", "validation"),
+        # Only the splits preview() can produce are acceptable.
+        ({"0": 0.5, "1": 0.5}, [0, 1], "f1", "train"),
+    ],
+)
+async def test_save_rejects_invalid_payloads(
+    async_session, thresholds, classes, metric, split_used
+):
+    """save() validates the payload and raises ThresholdTuningError for garbage (F-40)."""
+    await _insert_job(async_session, "job-6")
+
+    with pytest.raises(ThresholdTuningError):
+        await ThresholdTuningService.save(
+            async_session,
+            "job-6",
+            thresholds=thresholds,
+            classes=classes,
+            metric=metric,
+            split_used=split_used,
+        )
+
+    # A rejected save must leave the job untouched.
+    job = (
+        await async_session.execute(select(TrainingJob).where(TrainingJob.id == "job-6"))
+    ).scalar_one()
+    assert job.tuned_thresholds is None
+    assert not job.tuned_thresholds_enabled
+
+
+@pytest.mark.asyncio
+async def test_save_accepts_preview_round_trip_payload(async_session):
+    """save() accepts exactly the payload shape preview() produces (F-40)."""
+    await _insert_job(async_session, "job-7")
+
+    with patch(
+        "backend.ml_pipeline._services.threshold_tuning_service.EvaluationService"
+        "._load_raw_evaluation_data",
+        new=AsyncMock(return_value=(_fake_evaluation_data(), None)),
+    ):
+        previewed = await ThresholdTuningService.preview(async_session, "job-7", metric="f1")
+
+    saved = await ThresholdTuningService.save(
+        async_session,
+        "job-7",
+        thresholds=previewed["thresholds"],
+        classes=previewed["classes"],
+        metric=previewed["metric"],
+        split_used=previewed["split_used"],
+    )
+    assert saved is True

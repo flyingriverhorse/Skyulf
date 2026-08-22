@@ -49,21 +49,17 @@ const TERMINAL_SUCCESS_STATUSES = new Set(['completed', 'succeeded']);
 
 /**
  * Resolves a single run's coverage status and a human-readable reason for a
- * given artifact kind, in the precedence order: unsupported task > failed
- * run > run still in progress > artifact missing on a completed, supported
- * run > available.
+ * given artifact kind, in the precedence order: failed run > run still in
+ * progress > artifact present (available) > unsupported task > artifact
+ * missing on a completed run.
+ *
+ * The task-support list is an *expectation* used only to explain an absent
+ * artifact, never to deny a present one: presence is ground truth, and an
+ * `'other'` task (model task unresolvable, e.g. registry not loaded yet)
+ * must not be reported as "unsupported" (F-42).
  */
 export function getArtifactCoverage(kind: ArtifactKind, input: ArtifactCoverageInput): ArtifactCoverageResult {
   const label = ARTIFACT_LABEL[kind];
-
-  if (!SUPPORTED_TASKS[kind].includes(input.task)) {
-    return {
-      status: 'unsupported',
-      reason: kind === 'segmentation'
-        ? `Not a Segmentation (clustering) run — ${label.toLowerCase()} does not apply to this task.`
-        : `${label} does not apply to this run's task/model family.`,
-    };
-  }
 
   if (FAILED_STATUSES.has(input.status) || input.error) {
     return {
@@ -81,12 +77,21 @@ export function getArtifactCoverage(kind: ArtifactKind, input: ArtifactCoverageI
     };
   }
 
-  if (!input.hasArtifact) {
+  if (input.hasArtifact) {
+    return { status: 'available', reason: `${label} is available for this run.` };
+  }
+
+  if (!SUPPORTED_TASKS[kind].includes(input.task) && input.task !== 'other') {
     return {
-      status: 'not_computed',
-      reason: `${label} was not computed for this run (an older run, or the trainer skipped it).`,
+      status: 'unsupported',
+      reason: kind === 'segmentation'
+        ? `Not a Segmentation (clustering) run — ${label.toLowerCase()} does not apply to this task.`
+        : `${label} does not apply to this run's task/model family.`,
     };
   }
 
-  return { status: 'available', reason: `${label} is available for this run.` };
+  return {
+    status: 'not_computed',
+    reason: `${label} was not computed for this run — not supported for this model type, or this run predates support for it.`,
+  };
 }

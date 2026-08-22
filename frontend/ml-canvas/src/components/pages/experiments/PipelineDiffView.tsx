@@ -24,6 +24,7 @@ import { jobsApi } from '../../../core/api/jobs';
 import { shortRunId } from '../ExperimentsPage/utils/jobMeta';
 import {
   diffGraphs,
+  uniqueNodeDiffs,
   type GraphDiff,
   type NodeDiff,
 } from '../../../core/utils/graphDiff';
@@ -221,7 +222,10 @@ export const PipelineDiffView: React.FC<Props> = ({ jobs }) => {
   if (!styled || !diff || !baselineJob || !candidateJob) return null;
 
   const summary = diff.summary;
-  const modifiedNodes = Array.from(diff.nodes.values()).filter(
+  // uniqueNodeDiffs collapses the double-registration (same NodeDiff
+  // stored under both the baseline and candidate id) before rendering,
+  // otherwise every renamed-and-modified node lists twice.
+  const modifiedNodes = uniqueNodeDiffs(diff.nodes).filter(
     (n: NodeDiff) => n.status !== 'unchanged',
   );
 

@@ -3,12 +3,13 @@ import {
   X, ArrowLeft, Terminal, LayoutDashboard, FileText,
   AlertCircle, CheckCircle, Square, Database, Copy, Check, WrapText,
   ChevronsDown, ChevronsUp, RotateCw, Info,
+  Link2, FlaskConical, GitBranch, Workflow, ScanEye, Tag, Layers,
 } from 'lucide-react';
 import { JobInfo } from '../../../core/api/jobs';
 import { useJobStore } from '../../../core/store/useJobStore';
 import { useJobPolling, isTerminalStatus } from '../../../core/hooks/useJobPolling';
-import { formatMetricName, getMetricDescription, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
-import { InfoTooltip } from '../../ui/InfoTooltip';
+import { formatMetricName, extractEnsembleSummary, formatBaseEstimator, isEnsembleModelType, getEnsembleSubTask, getEnsembleStrategy } from '../../../core/utils/format';
+import { MetricsGrid } from './MetricsGrid';
 import { useConfirm, RecordLink, NodeInspectorLink } from '../../shared';
 import { toast } from '../../../core/toast';
 
@@ -201,11 +202,6 @@ const LogMessageContent: React.FC<{ message: string }> = ({ message }) => {
 
 // ---------------------------------------------------
 
-const formatMetricValue = (key: string, value: number): string => {
-  if (key.endsWith('_std')) return value.toFixed(6);
-  return value.toFixed(4);
-};
-
 const getScoringMetric = (job: JobInfo): string | undefined => {
   const result = job.result as Record<string, unknown> | undefined;
   if (result?.scoring_metric) return result.scoring_metric as string;
@@ -329,49 +325,70 @@ const RelatedPipelineEntry: React.FC<{ job: JobInfo }> = ({ job }) => {
     : context.parentPipelineId
       ? `Branch ${context.branchIndex}`
       : 'Pipeline run';
+  const RunIcon = context.isPreviewRun ? FlaskConical : context.parentPipelineId ? GitBranch : Workflow;
+  const iconTint = context.isPreviewRun
+    ? 'text-purple-500 dark:text-purple-400'
+    : context.parentPipelineId
+      ? 'text-amber-500 dark:text-amber-400'
+      : 'text-blue-500 dark:text-blue-400';
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex min-w-64 flex-1 flex-col gap-1.5">
       <button
         type="button"
         aria-expanded={expanded}
         aria-controls={panelId}
         onClick={() => { setExpanded(v => !v); }}
         title={pipelineId}
-        className="flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-medium transition-colors self-start ${
+          expanded
+            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300'
+            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-blue-600 dark:text-blue-400 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm'
+        }`}
       >
-        {expanded ? <ChevronsUp className="w-3 h-3" /> : <ChevronsDown className="w-3 h-3" />}
+        <RunIcon className={`w-3.5 h-3.5 ${iconTint}`} aria-hidden="true" />
         {summaryLabel}
+        {expanded
+          ? <ChevronsUp className="w-3 h-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+          : <ChevronsDown className="w-3 h-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />}
       </button>
       {expanded && (
-        <div id={panelId} className="ml-1 p-2 space-y-1 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500 dark:text-gray-400">Run id:</span>
-            <span className="font-mono break-all text-gray-700 dark:text-gray-300">{pipelineId}</span>
-            <button
-              type="button"
-              onClick={handleCopy}
-              aria-label={copied ? 'Run id copied' : 'Copy run id'}
-              className="rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-            >
-              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-            </button>
+        <div id={panelId} className="w-full p-3 space-y-2.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+          <div>
+            <div className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">Run id</div>
+            <div className="flex items-start gap-1.5 p-2 rounded bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-700/60">
+              <span className="font-mono break-all text-gray-700 dark:text-gray-300">{pipelineId}</span>
+              <button
+                type="button"
+                onClick={handleCopy}
+                aria-label={copied ? 'Run id copied' : 'Copy run id'}
+                className="shrink-0 rounded p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              </button>
+            </div>
           </div>
-          {context.parentPipelineId && (
-            <div className="text-gray-600 dark:text-gray-300">
-              <span className="text-gray-500 dark:text-gray-400">Parent run:</span>{' '}
-              <span className="font-mono">{context.parentPipelineId}</span> (branch {context.branchIndex})
-            </div>
-          )}
-          {nodeCount !== undefined && (
-            <div className="text-gray-600 dark:text-gray-300">
-              <span className="text-gray-500 dark:text-gray-400">Nodes executed:</span> {nodeCount}
-            </div>
-          )}
-          <div className="text-gray-500 dark:text-gray-400 italic">
-            {context.isPreviewRun
-              ? "Preview run — not a saved pipeline. This id only identifies this job's execution and can't be reopened in the pipeline canvas."
-              : "This is the execution run id for this job, not a separately saved pipeline. Use the Dataset link above to reopen the pipeline that produced it."}
+          <div className="flex flex-wrap gap-1.5">
+            {context.parentPipelineId && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300">
+                <GitBranch className="w-3 h-3 shrink-0" aria-hidden="true" />
+                Parent run: <span className="font-mono break-all">{context.parentPipelineId}</span> (branch {context.branchIndex})
+              </span>
+            )}
+            {nodeCount !== undefined && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300">
+                <Layers className="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                Nodes executed: {nodeCount}
+              </span>
+            )}
+          </div>
+          <div className="flex items-start gap-1.5 p-2 rounded bg-blue-50/60 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/40 text-gray-600 dark:text-gray-400">
+            <Info className="w-3 h-3 mt-0.5 shrink-0 text-blue-400 dark:text-blue-500" aria-hidden="true" />
+            <span className="italic">
+              {context.isPreviewRun
+                ? "Preview run — not a saved pipeline. This id only identifies this job's execution and can't be reopened in the pipeline canvas."
+                : "This is the execution run id for this job, not a separately saved pipeline. Use the Dataset link above to reopen the pipeline that produced it."}
+            </span>
           </div>
         </div>
       )}
@@ -624,29 +641,46 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
 
                         {/* Related Records Section */}
                         {(job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion') || job.promoted_at ? (
-                            <div className="flex flex-wrap items-start gap-4 text-xs p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
-                                <span className="text-gray-500 dark:text-gray-400 font-medium pt-1">Related:</span>
+                            <div className="flex flex-wrap items-start gap-2 text-xs p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                                <span className="flex items-center gap-1.5 pt-1.5 text-gray-500 dark:text-gray-400 font-medium mr-1">
+                                    <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                    Related
+                                </span>
                                 {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && (
                                     <RelatedPipelineEntry job={job} />
                                 )}
-                                {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && job.node_id && (
-                                    <NodeInspectorLink
-                                        nodeId={job.node_id}
-                                        jobId={job.job_id}
-                                        pipelineId={job.pipeline_id}
-                                        label="Inspect node"
-                                        {...(origin !== undefined ? { origin } : {})}
-                                        {...(filters !== undefined ? { filters } : {})}
-                                    />
-                                )}
-                                {job.promoted_at && job.version !== undefined && (
-                                    <RecordLink
-                                        recordRef={{ kind: 'modelVersion', jobId: job.job_id, version: String(job.version) }}
-                                        label={`Model version ${job.version}`}
-                                        {...(origin !== undefined ? { origin } : {})}
-                                        {...(filters !== undefined ? { filters } : {})}
-                                    />
-                                )}
+                                <div className="ml-auto flex shrink-0 items-center gap-2">
+                                    {job.pipeline_id && job.pipeline_id !== 'eda' && job.pipeline_id !== 'ingestion' && job.node_id && (
+                                        <NodeInspectorLink
+                                            nodeId={job.node_id}
+                                            jobId={job.job_id}
+                                            pipelineId={job.pipeline_id}
+                                            label={(
+                                                <>
+                                                    <ScanEye className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" aria-hidden="true" />
+                                                    Inspect node
+                                                </>
+                                            )}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-medium no-underline hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-colors"
+                                            {...(origin !== undefined ? { origin } : {})}
+                                            {...(filters !== undefined ? { filters } : {})}
+                                        />
+                                    )}
+                                    {job.promoted_at && job.version !== undefined && (
+                                        <RecordLink
+                                            recordRef={{ kind: 'modelVersion', jobId: job.job_id, version: String(job.version) }}
+                                            label={(
+                                                <>
+                                                    <Tag className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" aria-hidden="true" />
+                                                    Model version {job.version}
+                                                </>
+                                            )}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 font-medium no-underline hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-sm transition-colors"
+                                            {...(origin !== undefined ? { origin } : {})}
+                                            {...(filters !== undefined ? { filters } : {})}
+                                        />
+                                    )}
+                                </div>
                             </div>
                         ) : null}
 
@@ -680,21 +714,7 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
 
                                 {job.job_type === 'training' && !!(job.result as Record<string, unknown>).metrics && (
                                     <div className="space-y-4">
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                            {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
-                                                .filter(([, v]) => typeof v === 'number' || typeof v === 'string')
-                                                .map(([k, v]) => (
-                                                <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
-                                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize flex items-center gap-1">
-                                                        {k.replace(/_/g, ' ')}
-                                                        {getMetricDescription(k) && <InfoTooltip size="sm" text={getMetricDescription(k)!} />}
-                                                    </div>
-                                                    <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                                                        {typeof v === 'number' ? formatMetricValue(k, v) : String(v)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                        <MetricsGrid metrics={(job.result as Record<string, unknown>).metrics as Record<string, unknown>} />
                                         <FeatureImportancesSection result={job.result as Record<string, unknown>} />
                                     </div>
                                 )}
@@ -860,21 +880,10 @@ export const JobDetailsView: React.FC<JobDetailsViewProps> = ({ job: initialJob,
                                         {!!(job.result as Record<string, unknown>).metrics && (
                                             <div className="space-y-2">
                                                 <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Evaluation Metrics</h4>
-                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                    {Object.entries((job.result as Record<string, unknown>).metrics as Record<string, unknown>)
-                                                        .filter(([k, v]) => !['best_score', 'best_params', 'trials'].includes(k) && (typeof v === 'number' || typeof v === 'string'))
-                                                        .map(([k, v]) => (
-                                                        <div key={k} className={`p-3 border rounded-lg ${k.startsWith('cv_') ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800' : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'}`}>
-                                                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 capitalize flex items-center gap-1">
-                                                                {k.replace(/_/g, ' ')}
-                                                                {getMetricDescription(k) && <InfoTooltip size="sm" text={getMetricDescription(k)!} />}
-                                                            </div>
-                                                            <div className={`font-mono font-medium ${k.startsWith('cv_') ? 'text-purple-600 dark:text-purple-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                                                                {typeof v === 'number' ? formatMetricValue(k, v as number) : String(v)}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                <MetricsGrid
+                                                    metrics={(job.result as Record<string, unknown>).metrics as Record<string, unknown>}
+                                                    excludeKeys={['best_score', 'best_params', 'trials']}
+                                                />
                                             </div>
                                         )}
 

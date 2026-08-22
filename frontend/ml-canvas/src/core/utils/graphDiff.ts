@@ -92,7 +92,10 @@ function stableStringify(value: unknown): string {
 
 function describeValue(v: unknown): string {
   if (v === null || v === undefined) return '∅';
-  if (typeof v === 'string') return v.length > 24 ? `${v.slice(0, 23)}…` : v;
+  // Quote strings so a value's type stays visible — `5` (number) and
+  // `"5"` (string) are a real config change, and unquoted they render
+  // identically ("v: 5 → 5"), making users dismiss genuine edits.
+  if (typeof v === 'string') return v.length > 24 ? `"${v.slice(0, 23)}…"` : `"${v}"`;
   if (typeof v === 'number' || typeof v === 'boolean') return String(v);
   if (Array.isArray(v)) return `[${v.length}]`;
   return '{…}';
@@ -309,6 +312,23 @@ export function diffGraphs(
       edgesUnchanged,
     },
   };
+}
+
+/** Collapse a `diff.nodes` map to one entry per real node. `diffGraphs`
+ *  registers a paired NodeDiff under *both* the baseline and candidate
+ *  id (so each canvas side can look it up when ids drifted between
+ *  runs), which means `nodes.values()` yields the same object twice.
+ *  Any list rendering (e.g. the Changes panel) must go through this
+ *  helper or every renamed-and-modified node shows up twice. */
+export function uniqueNodeDiffs(nodes: Map<string, NodeDiff>): NodeDiff[] {
+  const seen = new Set<NodeDiff>();
+  const result: NodeDiff[] = [];
+  for (const entry of nodes.values()) {
+    if (seen.has(entry)) continue;
+    seen.add(entry);
+    result.push(entry);
+  }
+  return result;
 }
 
 /** Tailwind ring class for the given node-diff status. Used by the
