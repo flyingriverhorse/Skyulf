@@ -371,12 +371,20 @@ def test_fit_predict_preprocessing_routes_payload_to_calculator():
 
     calculator = _RecordingCalculator()
     estimator = StatefulEstimator(calculator=calculator, applier=_DummyApplier(), node_id="p2")
-    preprocessor = object()
+
+    class _PassThroughPreprocessor:
+        def fit_transform(self, X, y):
+            return X, y
+
+        def transform(self, X, y):
+            return X, y
+
+    preprocessor = _PassThroughPreprocessor()
     preds = estimator.fit_predict(
         dataset,
         "target",
         config={},
-        preprocessing=preprocessor,  # type: ignore[arg-type]
+        preprocessing=preprocessor,
         preprocessing_train=(pre_X, pre_y),
     )
     assert len(preds["train"]) == 160
