@@ -141,8 +141,6 @@ def validate_leakage_safety(
     violations = []
     for index, step in enumerate(preprocessing[:splitter_index]):
         transformer = step.get("transformer") or ""
-        if transformer in splitters:
-            continue
         if is_explicit_column_drop(transformer, step.get("params") or {}):
             continue
         if is_constant_imputation(transformer, step.get("params") or {}):

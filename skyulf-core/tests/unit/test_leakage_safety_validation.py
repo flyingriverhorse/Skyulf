@@ -126,6 +126,27 @@ def test_threshold_based_column_drop_before_splitter_still_raises():
         skyulf.validate_leakage_safety(config)
 
 
+def test_non_numeric_threshold_column_drop_before_splitter_is_allowed():
+    """An unparseable ``missing_threshold`` (e.g. a stray string from a
+    hand-edited pipeline JSON) cannot act as a learned threshold, so the
+    node degrades to its explicit/no-op mode and stays allowed before the
+    split — matching the node's own "non-positive/non-numeric threshold is
+    not configured" handling."""
+    config = {
+        "preprocessing": [
+            {
+                "name": "drop id",
+                "transformer": "DropMissingColumns",
+                "params": {"columns": ["passenger_id"], "missing_threshold": "not-a-number"},
+            },
+            {"name": "split", "transformer": "TrainTestSplitter", "params": {}},
+        ],
+        "modeling": {},
+    }
+
+    assert skyulf.validate_leakage_safety(config, on_leakage="warn") == []
+
+
 # ---------------------------------------------------------------------------
 # Pre-fit advisory warnings (surface the gate before model training)
 # ---------------------------------------------------------------------------
