@@ -10,6 +10,7 @@ import polars as pl
 from .._validation import raise_invalid_choice
 from ..data.dataset import SplitDataset
 from ..engines import EngineName, SkyulfDataFrame, get_engine
+from .fold_preprocessing import FoldPreprocessor
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +201,7 @@ class StatefulEstimator:
         time_column: str | None = None,
         progress_callback: Callable[[int, int], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
+        preprocessing: FoldPreprocessor | None = None,
     ) -> dict[str, Any]:
         """
         Performs cross-validation on the training split.
@@ -222,6 +224,7 @@ class StatefulEstimator:
             time_column=time_column,
             progress_callback=progress_callback,
             log_callback=log_callback,
+            preprocessing=preprocessing,
         )
 
     @staticmethod
@@ -318,9 +321,18 @@ class StatefulEstimator:
         progress_callback: Callable[[int, int], None] | None = None,
         log_callback: Callable[[str], None] | None = None,
         job_id: str = "unknown",
+        preprocessing: FoldPreprocessor | None = None,
+        preprocessing_train: tuple[Any, Any] | None = None,
     ) -> dict[str, pd.Series]:
         """
         Fits the model on training data and returns predictions for all splits.
+
+        ``preprocessing`` (F-15): forwarded to calculators that
+        support per-fold refit (``TuningCalculator``). When set,
+        ``preprocessing_train`` must carry the pre-transform ``(X, y)``
+        payload the calculator should fit/tune on, so fold slicing stays
+        aligned with the preprocessor; predictions still run on this
+        dataset's (post-transform) splits.
         """
         # Handle raw DataFrame or Tuple input by wrapping it in a dummy SplitDataset
         dataset = self._normalize_fit_predict_dataset(dataset, target_column, log_callback)
@@ -334,14 +346,30 @@ class StatefulEstimator:
             validation_data = (X_val, y_val)
 
         # 2. Train Model
-        self.model = self.calculator.fit(
-            X_train,
-            y_train,
-            config,
-            progress_callback=progress_callback,
-            log_callback=log_callback,
-            validation_data=validation_data,
-        )
+        if preprocessing is not None:
+            if preprocessing_train is None:
+                raise ValueError("preprocessing requires the preprocessing_train (X, y) payload")
+            # Only TuningCalculator accepts the hook today; the backend only
+            # passes it when wrapping one, so a narrow cast keeps the generic
+            # calculator interface clean.
+            self.model = cast(Any, self.calculator).fit(
+                preprocessing_train[0],
+                preprocessing_train[1],
+                config,
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+                validation_data=validation_data,
+                preprocessing=preprocessing,
+            )
+        else:
+            self.model = self.calculator.fit(
+                X_train,
+                y_train,
+                config,
+                progress_callback=progress_callback,
+                log_callback=log_callback,
+                validation_data=validation_data,
+            )
 
         # 3. Predict on all splits
         predictions = {}

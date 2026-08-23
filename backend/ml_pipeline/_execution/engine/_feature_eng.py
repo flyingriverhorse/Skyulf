@@ -14,14 +14,50 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from skyulf.data.dataset import SplitDataset
+from skyulf.leakage import (
+    data_dependent_transformers,
+    is_constant_imputation,
+    is_explicit_column_drop,
+    is_explicit_hash_encoding,
+    is_explicit_missing_indicator,
+)
+from skyulf.modeling.base import extract_xy
+from skyulf.preprocessing.fold_adapter import SPLITTER_STEP_TYPES, FeatureEngineerFoldAdapter
 from skyulf.preprocessing.pipeline import FeatureEngineer
+from skyulf.registry import NodeRegistry
 
+from ...constants import StepType
 from ..schemas import NodeConfig
 
 if TYPE_CHECKING:
+    from skyulf.modeling.fold_preprocessing import FoldPreprocessor
+
     from ...artifacts.store import ArtifactStore
 
 logger = logging.getLogger(__name__)
+
+
+def _step_learns_from_data(step: dict[str, Any]) -> bool:
+    """Whether a step's ``fit`` reads statistics from the rows it is given.
+
+    Mirrors the leakage gate's per-step verdict (``skyulf.validate_leakage_safety``):
+    the param-aware exemptions for stateless modes come first, then the
+    registry-derived learner list. Unknown transformers fail closed — they
+    cannot be proven stateless, so they are treated as learners.
+    """
+    transformer = str(step.get("transformer") or "")
+    params = step.get("params") or {}
+    if is_explicit_column_drop(transformer, params):
+        return False
+    if is_constant_imputation(transformer, params):
+        return False
+    if is_explicit_missing_indicator(transformer, params):
+        return False
+    if is_explicit_hash_encoding(transformer, params):
+        return False
+    if transformer in data_dependent_transformers():
+        return True
+    return transformer not in NodeRegistry.get_all_metadata()
 
 
 class FeatureEngMixin:
@@ -270,6 +306,164 @@ class FeatureEngMixin:
         except Exception:
             logger.exception("Failed to bundle transformers with model")
             raise
+
+    def _upstream_fe_chain(
+        self, training_node: NodeConfig
+    ) -> tuple[str, list[tuple[str, list[dict[str, Any]]]]] | None:
+        """Follow single-input ancestors from ``training_node`` up to the data loader.
+
+        Returns ``(loader_node_id, chain)`` where ``chain`` is
+        ``[(node_id, unfitted_step_configs), ...]`` in execution order
+        (feature-engineering node steps plus single-transformer nodes wrapped
+        as one-step pipelines, matching ``_run_transformer``). Returns
+        ``None`` when the upstream graph is not a linear chain of
+        feature-engineering/transformer nodes — merged inputs, a missing
+        loader, or an unsupported node type (training/preview in between).
+        """
+        chain: list[tuple[str, list[dict[str, Any]]]] = []
+        if len(dict.fromkeys(training_node.inputs or [])) > 1:
+            return None
+        current_id = training_node.inputs[0] if training_node.inputs else None
+        while current_id is not None:
+            cfg = self._node_configs.get(current_id)
+            if cfg is None:
+                return None
+            if len(dict.fromkeys(cfg.inputs or [])) > 1:
+                return None
+            if cfg.step_type == StepType.DATA_LOADER:
+                return current_id, list(reversed(chain))
+            if cfg.step_type == StepType.FEATURE_ENGINEERING:
+                chain.append((cfg.node_id, list((cfg.params or {}).get("steps", []))))
+            elif cfg.step_type not in (StepType.TRAINING, "data_preview"):
+                # Single-transformer node, wrapped exactly like _run_transformer does.
+                chain.append(
+                    (
+                        cfg.node_id,
+                        [
+                            {
+                                "name": "step",
+                                "transformer": cfg.step_type,
+                                "params": cfg.params or {},
+                            }
+                        ],
+                    )
+                )
+            else:
+                return None
+            current_id = cfg.inputs[0] if cfg.inputs else None
+        return None
+
+    @staticmethod
+    def _split_train_payload(output: Any, target_col: str) -> tuple[Any, Any]:
+        """Extract the pre-transform ``(X, y)`` train payload from a split output."""
+        train = output.train if isinstance(output, SplitDataset) else output
+        return extract_xy(train, target_col)
+
+    def _resolve_fold_preprocessing(
+        self, training_node: NodeConfig, target_col: str
+    ) -> tuple["FoldPreprocessor", tuple[Any, Any]] | None:
+        """Resolve the per-fold preprocessing adapter + pre-transform train payload (F-15).
+
+        Returns ``(adapter, (X_pre, y_pre))`` so CV/tuning folds slice the rows
+        the adapter was built for, or ``None`` to keep pre-transformed scoring.
+        Falls back with an explicit job-log warning when the upstream graph is
+        not a linear chain or the payload cannot be reconstructed — never
+        fails the run.
+        """
+        warning = None
+        try:
+            resolved = self._upstream_fe_chain(training_node)
+            if resolved is None:
+                warning = (
+                    "upstream graph is not a linear chain (merged branches or unsupported nodes)"
+                )
+                return None
+            loader_id, chain = resolved
+
+            flat: list[tuple[dict[str, Any], str, int, int]] = [
+                (step, node_id, idx, len(steps))
+                for node_id, steps in chain
+                for idx, step in enumerate(steps)
+            ]
+            splitter_positions = [
+                i
+                for i, (step, *_) in enumerate(flat)
+                if step.get("transformer") in SPLITTER_STEP_TYPES
+            ]
+            if splitter_positions:
+                last_split = splitter_positions[-1]
+                pre_split_learners = [
+                    step for step, *_ in flat[:last_split] if _step_learns_from_data(step)
+                ]
+                if pre_split_learners:
+                    # Reconstructing the pre-transform payload would re-fit these
+                    # steps on the full frame (held-out rows included), and the
+                    # per-fold adapter would then apply them a second time —
+                    # leaky statistics plus double-transformed features.
+                    names = ", ".join(
+                        sorted({str(step.get("transformer")) for step in pre_split_learners})
+                    )
+                    warning = (
+                        f"data-dependent step(s) before the last splitter ({names}) "
+                        "cannot be re-fit safely per fold"
+                    )
+                    return None
+                # Stateless pre-split steps were already applied during payload
+                # reconstruction (or by the upstream node whose artifact is
+                # loaded below); keep them out of the per-fold chain so every
+                # step is applied exactly once.
+                learning_steps = [
+                    step
+                    for step, *_ in flat[last_split + 1 :]
+                    if step.get("transformer") not in SPLITTER_STEP_TYPES
+                ]
+            else:
+                # No split at all: every non-splitter step refits per fold.
+                learning_steps = [
+                    step for step, *_ in flat if step.get("transformer") not in SPLITTER_STEP_TYPES
+                ]
+            if not learning_steps:
+                # Only splitters (and stateless pre-split steps) upstream:
+                # nothing data-dependent to refit per fold.
+                return None
+
+            if not splitter_positions:
+                # No split at all: the raw loader frame IS the train payload.
+                payload = self._split_train_payload(self.artifact_store.load(loader_id), target_col)
+            else:
+                _step, node_id, idx, total = flat[splitter_positions[-1]]
+                if idx == total - 1:
+                    # The last splitter ends at a node boundary, so its stored
+                    # output artifact is the pre-transform SplitDataset itself.
+                    payload = self._split_train_payload(
+                        self.artifact_store.load(node_id), target_col
+                    )
+                else:
+                    # Splitter + learning steps share one FE node; re-run the
+                    # splitter-only step prefix on the raw loader frame to
+                    # reconstruct the pre-learning train rows.
+                    prefix_steps = [s for s, *_ in flat[: splitter_positions[-1] + 1]]
+                    split_output, _metrics = FeatureEngineer(prefix_steps).fit_transform(
+                        self.artifact_store.load(loader_id)
+                    )
+                    payload = self._split_train_payload(split_output, target_col)
+
+            adapter = FeatureEngineerFoldAdapter(learning_steps, target_column=target_col)
+            self.log(
+                f"Per-fold preprocessing refit enabled: {len(learning_steps)} step(s) "
+                "re-fit inside every CV/tuning fold (scores are leakage-free)."
+            )
+            return adapter, payload
+        except Exception:
+            logger.exception("Failed to resolve per-fold preprocessing")
+            warning = "payload reconstruction failed"
+            return None
+        finally:
+            if warning is not None:
+                self.log(
+                    f"Per-fold preprocessing refit skipped: {warning}; "
+                    "CV/tuning scores may be optimistically biased."
+                )
 
     def _run_feature_engineering(self, node: NodeConfig) -> tuple[str, dict[str, Any]]:
         # Input: DataFrame or SplitDataset (merged when multiple branches feed in).
