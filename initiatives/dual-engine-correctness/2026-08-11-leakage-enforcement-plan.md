@@ -134,7 +134,14 @@ to over-claim just moves the problem.
 - [x] `WOEEncoder.fit_transform_train` implemented (done on `080`, 2026-08-21, red-green);
       every other target-aware encoder audited — `TargetEncoder` (hook pre-existing) and
       `WOEEncoder` are the only target-aware encoders in the registry.
-- [ ] Pure-noise-target regression test covers all target-aware encoders, verified **red-green**.
-- [ ] All doc sites in §3 updated in the same PR as the code.
+- [x] Pure-noise-target regression test covers all target-aware encoders, verified **red-green**
+      (done on `080`/`081`: `test_encoding_woe.py::test_fit_transform_train_noise_target_auc_stays_near_chance`
+      and the companion test in `test_encoding_target.py`, both engines).
+- [x] All doc sites in §3 updated in the same PR as the code (done on `081` 2026-08-22:
+      `leakage_proof.md` split into per-engine twins with a scoped conclusion and a
+      "What is and is not covered" section; `docs/index.md`, `validation_vs_sklearn.md` and
+      `overview.md` link the caveats; `changelog/0.8.x.md` records the breaking `on_leakage` default).
 - [ ] Phase 4 (CV refit) has a written design note; docs carry the CV caveat until it lands.
-- [ ] `ruff check` / `ruff format --check` / `ty check` clean; full backend + core suites pass.
+      *Design note not yet written; the CV caveat is in place in the leakage-proof docs.*
+- [x] `ruff check` / `ruff format --check` / `ty check` clean; full backend + core suites pass
+      (verified 2026-08-23 on `081`: backend 1316 passed, core 3331 passed / 70 skipped).

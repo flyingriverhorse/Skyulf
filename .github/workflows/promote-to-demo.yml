@@ -1,7 +1,7 @@
 # © 2025 Murat Unsal — Skyulf Project
 #
 # Demo promotion: after commits land on master, cherry-pick them onto
-# deploy/demo-mode via scripts/promote_to_demo.sh. The script enforces the
+# deploy/demo-mode via .github/scripts/promote_to_demo.sh. The script enforces the
 # hard guards — demo-specific arrangements (upload block, Iris-only dataset,
 # DEMO_MODE, SlowNodesPage) must survive, versions never drift, frontend
 # tests must not regress — and rebuilds the committed static/ml_canvas
@@ -96,7 +96,7 @@ jobs:
 
       - name: Run promotion script (guarded cherry-pick + bundle rebuild)
         if: steps.commits.outputs.skip != 'true'
-        run: bash scripts/promote_to_demo.sh ${{ steps.commits.outputs.list }} --push
+        run: bash .github/scripts/promote_to_demo.sh ${{ steps.commits.outputs.list }} --push
 
       - name: Summary
         if: always()

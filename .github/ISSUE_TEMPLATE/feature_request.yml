@@ -54,6 +54,8 @@ body:
         - 🎨 Feature Canvas (Nodes, UI, UX)
         - 🧠 Model Training (Algorithms, Tuning)
         - 📦 Deployment & Registry
+        - 📊 Experiments & Evaluation
+        - 🔭 Monitoring & Drift
         - ⚙️ Backend & Infrastructure
         - 📚 Documentation
         - Other
