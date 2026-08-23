@@ -2,7 +2,7 @@
 # Promote commits from the main line onto deploy/demo-mode safely.
 #
 # Usage:
-#   bash scripts/promote_to_demo.sh <commit> [<commit>...] [--push]
+#   bash .github/scripts/promote_to_demo.sh <commit> [<commit>...] [--push]
 #
 # What it does:
 #   1. Creates an isolated worktree of deploy/demo-mode (synced with origin)
@@ -23,7 +23,7 @@
 # Aborts (and leaves the worktree for inspection) on any guard failure.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BRANCH="deploy/demo-mode"
 WT="$REPO_ROOT/.demo-promote-worktree"
 KNOWN_FAILING_TESTS="src/pages/DataSources.test.tsx"
@@ -39,7 +39,7 @@ for arg in "$@"; do
 done
 
 if [ "${#COMMITS[@]}" -eq 0 ]; then
-  echo "FAIL: no commits given. Usage: bash scripts/promote_to_demo.sh <commit> [...] [--push]"
+  echo "FAIL: no commits given. Usage: bash .github/scripts/promote_to_demo.sh <commit> [...] [--push]"
   exit 2
 fi
 
@@ -175,5 +175,5 @@ if [ "$PUSH" = "1" ]; then
   log "pushed to origin/$BRANCH — redeploy the demo host if it does not auto-pull"
 else
   log "NOT pushed. Review with: git -C $WT log --oneline origin/$BRANCH..$BRANCH"
-  log "Publish with: bash scripts/promote_to_demo.sh --push <same commits> (or push manually from $WT)"
+  log "Publish with: bash .github/scripts/promote_to_demo.sh --push <same commits> (or push manually from $WT)"
 fi
