@@ -213,7 +213,7 @@ def test_pack_realigns_mismatched_but_same_length_indices() -> None:
     """Regression test: same row count but non-matching pandas indices (e.g. a
     row-dropping step that reset X's index without resetting y's) must still
     concatenate positionally rather than NaN-padding via index-based concat."""
-    X = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])
+    X = pd.DataFrame({"x": [1, 2, 3]}, index=[10, 11, 12])  # ty: ignore[invalid-argument-type]
     y = pd.Series([100, 200, 300], name="target", index=[0, 1, 2])
     result = pack_pipeline_output(X, y, False)
     assert isinstance(result, pd.DataFrame)

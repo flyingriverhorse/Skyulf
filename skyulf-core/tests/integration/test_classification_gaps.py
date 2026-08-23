@@ -44,7 +44,7 @@ def blobs_dataset() -> SplitDataset:
     base = rng.normal(0.0, 1.0, size=(n, 3))
     X = np.vstack([base, base + 4.0])
     y = np.array([0] * n + [1] * n)
-    df = pd.DataFrame(X, columns=["f0", "f1", "f2"])
+    df = pd.DataFrame(X, columns=["f0", "f1", "f2"])  # ty: ignore[invalid-argument-type]
     df["target"] = y
     order = rng.permutation(len(df))
     df = df.iloc[order].reset_index(drop=True)

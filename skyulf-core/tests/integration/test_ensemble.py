@@ -54,7 +54,7 @@ def clf_dataset() -> SplitDataset:
         np.array([0.0, 1.0, 1.0, 1.5, 0.5]),
     )
     X = means + rng.normal(0.0, 1.0, (n, 5))
-    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(5)])
+    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(5)])  # ty: ignore[invalid-argument-type]
     df["target"] = y
     return SplitDataset(train=df.iloc[:N_TRAIN], test=df.iloc[N_TRAIN:], validation=None)
 
@@ -67,7 +67,7 @@ def reg_dataset() -> SplitDataset:
     X = rng.uniform(-2.0, 2.0, (n, 5))
     weights = np.array([1.5, -1.0, 2.0, 0.5, -0.5])
     y = X @ weights + rng.normal(0.0, 0.5, n)
-    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(5)])
+    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(5)])  # ty: ignore[invalid-argument-type]
     df["target"] = y
     return SplitDataset(train=df.iloc[:N_TRAIN], test=df.iloc[N_TRAIN:], validation=None)
 

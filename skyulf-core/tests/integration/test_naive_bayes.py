@@ -43,7 +43,7 @@ def counts_dataset() -> SplitDataset:
     y = rng.randint(0, 2, n)
     rates = np.where(y[:, None] == 0, [[2.0, 1.0, 3.0]], [[4.0, 0.5, 1.5]])
     X = rng.poisson(rates)
-    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(3)])
+    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(3)])  # ty: ignore[invalid-argument-type]
     df["target"] = y
     return SplitDataset(train=df.iloc[:160], test=df.iloc[160:], validation=None)
 
