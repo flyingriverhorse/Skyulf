@@ -54,7 +54,17 @@ class FeatureEngineerFoldAdapter:
         if self._engineer is None:
             raise RuntimeError("transform() called before fit_transform()")
         self._validate_payload(X)
-        return self._engineer.transform((X, y))
+        # At transform/inference time no step needs the target (target-aware
+        # encoders use their fitted artifact; splitters/resampling are skipped).
+        # Feed a bare frame when y is absent — a ``(X, None)`` tuple would trip
+        # ``pack_pipeline_output``'s tuple-shape-lost diagnostic on every step.
+        payload = (X, y) if y is not None else X
+        transformed = self._engineer.transform(payload)
+        # Some appliers return a bare frame instead of the ``(X, y)`` payload;
+        # re-pair so callers always get the FoldPreprocessor protocol shape.
+        if not (isinstance(transformed, tuple) and len(transformed) == 2):
+            transformed = (transformed, y)
+        return transformed
 
     def _validate_payload(self, X: Any) -> None:
         if hasattr(X, "columns") and self._target_column in X.columns:

@@ -813,20 +813,13 @@ class NodeRunnersMixin:
         # Ensure data is SplitDataset
         data = self._to_split_dataset(data, target_col)
 
-        # F-15: per-fold preprocessing refit is always attempted. Only the
-        # grid/random strategies can run the fold hook today (halving/optuna
-        # delegate CV to sklearn searchers), and holdout tuning with a
-        # validation split is out of scope — both fall back with an explicit
-        # log line instead of failing the run.
+        # F-15: per-fold preprocessing refit is always attempted. All tuning
+        # strategies support it (grid/random via the engine's fold loop,
+        # halving/optuna via a Pipeline wrapper around the searcher's internal
+        # CV); only holdout tuning with a validation split is out of scope and
+        # falls back with an explicit log line instead of failing the run.
         fold_preprocessing = None
-        strategy = str(tuning_params.get("strategy", "random"))
-        if strategy not in ("grid", "random"):
-            self.log(
-                f"Per-fold preprocessing refit skipped: the '{strategy}' tuning "
-                "strategy runs CV inside sklearn searchers where the fold hook "
-                "can't reach yet; tuning scores may be optimistically biased."
-            )
-        elif data.validation is not None:
+        if data.validation is not None:
             self.log(
                 "Per-fold preprocessing refit skipped: a validation split is "
                 "present (holdout tuning path); scores may be optimistically biased."

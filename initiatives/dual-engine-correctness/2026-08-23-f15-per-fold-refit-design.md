@@ -17,15 +17,16 @@ Shipped the same day as **always-on**, collapsing the §6 migration phases:
   migration to manage. The app (`PipelineEngine`) always resolves and threads the adapter.
 - **No frontend toggle** was built (the planned `refit_preprocessing_per_fold` param was dropped
   entirely — core keeps `preprocessing=None` only as the "caller already transformed" default).
-- **Fallbacks instead of rejections:** merged-branch graphs, `halving_*`/`optuna` strategies, and
-  datasets with a validation split fall back to pre-transformed scoring with an explicit job-log
-  warning ("scores may be optimistically biased") — never a failed run. Core still raises if the
-  hook is passed into an unsupported path; the app simply doesn't pass it there.
+- **Fallbacks instead of rejections:** merged-branch graphs and datasets with a validation split
+  fall back to pre-transformed scoring with an explicit job-log warning ("scores may be
+  optimistically biased") — never a failed run. Core still raises if the hook is passed into an
+  unsupported path; the app simply doesn't pass it there.
 - **Payload reconstruction** replaced the planned `cv_preprocessing_steps` job-config key: the
   engine walks the linear upstream chain at training time, re-running the splitter-only step
   prefix on the raw loader frame (or loading the splitter node's artifact) to obtain the
   pre-transform train payload.
-- Halving/optuna support is a tracked follow-up (sklearn `Pipeline` wrapper).
+- Halving/optuna support landed the same release: preprocessing + model are wrapped in an sklearn
+  `Pipeline` (`FoldPreprocessingStep`) whose searcher-internal CV drives the per-fold refit.
 - The `docs/examples/leakage_proof_pandas.md` CV caveat is removed (now "Covered").
 
 Everything else in this note (clone contract, adapter shape, performance budget, semantics,

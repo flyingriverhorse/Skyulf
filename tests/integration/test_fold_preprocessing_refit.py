@@ -2,9 +2,11 @@
 
 The app threads a ``FeatureEngineerFoldAdapter`` + pre-transform train payload
 into every tuning/CV run so preprocessing statistics never see held-out fold
-rows. Graphs the hook cannot serve (merged branches, halving/optuna strategies)
-fall back to pre-transformed scoring with an explicit job-log warning — never
-a failed run, never a silent leak.
+rows — all tuning strategies included (halving/optuna get it via a Pipeline
+wrapper around the searcher's internal CV). Graphs the hook cannot serve
+(merged branches, validation-split holdout) fall back to pre-transformed
+scoring with an explicit job-log warning — never a failed run, never a silent
+leak.
 """
 
 import numpy as np
@@ -51,7 +53,7 @@ def _loader(node_id: str, path: str) -> NodeConfig:
     )
 
 
-def _training(inputs: list[str], **extra) -> NodeConfig:
+def _training(inputs: list[str], node_id: str = "node_training", **extra) -> NodeConfig:
     params = {
         "target_column": "target",
         "algorithm": "logistic_regression",
@@ -62,9 +64,7 @@ def _training(inputs: list[str], **extra) -> NodeConfig:
         "evaluate": True,
     }
     params.update(extra)
-    return NodeConfig(
-        node_id="node_training", step_type=StepType.TRAINING, inputs=inputs, params=params
-    )
+    return NodeConfig(node_id=node_id, step_type=StepType.TRAINING, inputs=inputs, params=params)
 
 
 def _run(tmp_path, nodes, job_id):
@@ -264,8 +264,9 @@ def test_leakage_dominated_contrast_end_to_end(noise_target_csv, tmp_path):
     )
 
 
-def test_halving_strategy_falls_back_with_warning(noise_target_csv, tmp_path):
-    """halving_grid delegates CV to sklearn searchers → fallback with an explicit warning."""
+def test_halving_strategy_refits_per_fold(noise_target_csv, tmp_path):
+    """halving_grid runs CV inside the sklearn searcher; the Pipeline wrapper
+    must refit WOE per fold there too, so the noise-target score stays honest."""
     result, logs = _run(
         tmp_path,
         [
@@ -288,11 +289,140 @@ def test_halving_strategy_falls_back_with_warning(noise_target_csv, tmp_path):
                 },
             ),
         ],
-        job_id="f15-halving-fallback",
+        job_id="f15-halving-refit",
     )
 
     assert result.status == "success"
-    assert any("Per-fold preprocessing refit skipped" in m and "halving_grid" in m for m in logs)
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["best_score"]) < 0.65, (
+        f"inner halving tuning score should sit near chance, got {metrics['best_score']}"
+    )
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"outer CV score should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+def test_halving_with_nan_and_imputer_runs_refit(tmp_path):
+    """NaN-bearing features + imputer step through the halving Pipeline wrapper:
+    the NaN gate must let the pre-transform payload through and the run must
+    complete with refit enabled."""
+    rng = np.random.default_rng(3)
+    n = 300
+    num1 = rng.normal(0, 1, n)
+    num2 = rng.normal(0, 1, n)
+    num2[rng.random(n) < 0.15] = np.nan
+    df = pd.DataFrame(
+        {
+            "num1": num1,
+            "num2": num2,
+            "city": [f"c{v}" for v in rng.integers(0, 8, size=n)],
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "nan_features.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        SPLITTER_STEP,
+                        {
+                            "name": "impute_num2",
+                            "transformer": "SimpleImputer",
+                            "params": {"strategy": "mean", "columns": ["num2"]},
+                        },
+                        WOE_STEP,
+                    ]
+                },
+            ),
+            _training(
+                ["node_features"],
+                run_mode="tuned",
+                tuning_config={
+                    "strategy": "halving_grid",
+                    "metric": "roc_auc",
+                    "cv_folds": 2,
+                    "cv_enabled": True,
+                    "search_space": {"C": [1.0]},
+                },
+            ),
+        ],
+        job_id="f15-halving-nan-imputer",
+    )
+
+    assert result.status == "success"
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert np.isfinite(metrics["best_score"])
+
+
+def test_two_independent_pipelines_both_refit(noise_target_csv, tmp_path):
+    """One job, two disjoint loader→FE→training pipelines: each training node
+    resolves its own chain and stays honest independently."""
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("loader_a", noise_target_csv),
+            _loader("loader_b", noise_target_csv),
+            NodeConfig(
+                node_id="features_a",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["loader_a"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},
+            ),
+            NodeConfig(
+                node_id="features_b",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["loader_b"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},
+            ),
+            _training(
+                ["features_a"],
+                node_id="training_a",
+                run_mode="tuned",
+                tuning_config={
+                    "strategy": "grid",
+                    "metric": "roc_auc",
+                    "cv_folds": 2,
+                    "cv_enabled": True,
+                    "search_space": {"C": [1.0]},
+                },
+            ),
+            _training(
+                ["features_b"],
+                node_id="training_b",
+                run_mode="tuned",
+                tuning_config={
+                    "strategy": "grid",
+                    "metric": "roc_auc",
+                    "cv_folds": 2,
+                    "cv_enabled": True,
+                    "search_space": {"C": [1.0]},
+                },
+            ),
+        ],
+        job_id="f15-two-pipelines",
+    )
+
+    assert result.status == "success"
+    enabled = [m for m in logs if "Per-fold preprocessing refit enabled" in m]
+    assert len(enabled) >= 2, f"expected refit enabled for both branches, logs={logs}"
+    for node_id in ("training_a", "training_b"):
+        metrics = result.node_results[node_id].metrics
+        assert _disc(metrics["best_score"]) < 0.65, (
+            f"{node_id} tuning score should sit near chance, got {metrics['best_score']}"
+        )
+        assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+            f"{node_id} CV score should sit near chance, got {metrics['cv_roc_auc_mean']}"
+        )
 
 
 def test_splitter_only_chain_skips_silently(tmp_path):
