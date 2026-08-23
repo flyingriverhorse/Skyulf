@@ -22,7 +22,7 @@ def blobs_split_dataset():
     blob0 = rng.normal(loc=(-5, -5), scale=0.3, size=(20, 2))
     blob1 = rng.normal(loc=(5, 5), scale=0.3, size=(20, 2))
     blob2 = rng.normal(loc=(5, -5), scale=0.3, size=(20, 2))
-    X = pd.DataFrame(np.vstack([blob0, blob1, blob2]), columns=["x", "y"])
+    X = pd.DataFrame(np.vstack([blob0, blob1, blob2]), columns=["x", "y"])  # ty: ignore[invalid-argument-type]
     train = X.iloc[:45].reset_index(drop=True)
     test = X.iloc[45:].reset_index(drop=True)
     return SplitDataset(train=train, test=test, validation=None)

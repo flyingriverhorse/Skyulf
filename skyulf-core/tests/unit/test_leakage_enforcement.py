@@ -33,7 +33,7 @@ def test_node_meta_requires_learns_from_data():
     """Omitting learns_from_data must be a decoration (registration) error."""
     with pytest.raises(TypeError):
 
-        @node_meta(id="x", name="X", category="Test", description="d")
+        @node_meta(id="x", name="X", category="Test", description="d")  # ty: ignore[missing-argument]
         class _NoFlag:
             pass
 
@@ -166,7 +166,7 @@ def test_on_leakage_ignore_returns_empty_list():
 
 def test_invalid_on_leakage_value_rejected():
     with pytest.raises(ValueError, match="on_leakage"):
-        validate_leakage_safety(_config([]), on_leakage="explode")
+        validate_leakage_safety(_config([]), on_leakage="explode")  # ty: ignore[invalid-argument-type]
 
 
 def test_reclassified_nodes_flagged_before_split():
