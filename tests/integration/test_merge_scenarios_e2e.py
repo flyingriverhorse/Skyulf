@@ -75,7 +75,7 @@ def _summarize_artifact(art: Any) -> dict[str, Any]:
 def _dump(scenario: str, payload: dict[str, Any]) -> Path:
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     target = ARTIFACT_DIR / f"{scenario}.json"
-    target.write_text(json.dumps(payload, indent=2, default=str))
+    target.write_text(json.dumps(payload, indent=2, default=str) + "\n", newline="\n")
     return target
 
 
