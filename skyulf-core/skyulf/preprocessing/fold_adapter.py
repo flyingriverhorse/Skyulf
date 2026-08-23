@@ -15,6 +15,15 @@ from .pipeline import FeatureEngineer
 # them inside a fold would re-split the fold itself.
 SPLITTER_STEP_TYPES = frozenset({"TrainTestSplitter", "Split", "feature_target_split"})
 
+# Steps whose fit_transform changes the row count or the target itself.
+# They cannot run inside an sklearn Pipeline step (transformers may only
+# return X, so the model would be fitted on reshaped X against the original,
+# un-aligned y); the tuning engine reads ``changes_row_count`` to skip the
+# Pipeline wrap for such chains.
+ROW_COUNT_CHANGING_STEP_TYPES = frozenset(
+    {"Oversampling", "Undersampling", "DropMissingRows", "Deduplicate"}
+)
+
 
 class FeatureEngineerFoldAdapter:
     """Re-runs a preprocessing step chain inside each CV/tuning fold.
@@ -34,6 +43,12 @@ class FeatureEngineerFoldAdapter:
             step for step in steps_config if step.get("transformer") not in SPLITTER_STEP_TYPES
         ]
         self._target_column = target_column
+        # True when any step reshapes the rows/target (resampling, row drops):
+        # such chains cannot be wrapped in an sklearn Pipeline step because a
+        # transformer can only hand X to the next step, leaving y un-aligned.
+        self.changes_row_count = any(
+            step.get("transformer") in ROW_COUNT_CHANGING_STEP_TYPES for step in self._steps_config
+        )
         # Validate eagerly (unknown transformer names, bad params) so a
         # misconfigured chain fails at construction, not mid-fold.
         # validate_preprocessing_steps does not check registry membership,
