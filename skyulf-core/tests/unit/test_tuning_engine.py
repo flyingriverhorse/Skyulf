@@ -545,12 +545,15 @@ def test_fit_halving_grid_search():
 
 
 class _StubPreprocessor:
-    """Minimal FoldPreprocessor stub with a configurable alignment flag."""
+    """Minimal FoldPreprocessor stub with configurable flag + fit_transform."""
 
-    def __init__(self, changes_row_count: bool):
+    def __init__(self, changes_row_count: bool, fit_transform=None):
         self.changes_row_count = changes_row_count
+        self._fit_transform = fit_transform
 
     def fit_transform(self, X, y):
+        if self._fit_transform is not None:
+            return self._fit_transform(X, y)
         return X, y
 
     def transform(self, X, y):
@@ -618,6 +621,63 @@ def test_halving_wrap_kept_for_shape_preserving_preprocessing(monkeypatch):
     )
     assert isinstance(estimator, Pipeline)
     assert not any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_refuses_row_dropping_preprocessor(monkeypatch):
+    """The runtime probe catches row drops even when the static flag is False."""
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(
+            changes_row_count=False,
+            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
+        ),
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_refuses_target_mutating_preprocessor(monkeypatch):
+    """A target-only re-encoding keeps rows but changes y values; probe refuses."""
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(
+            changes_row_count=False,
+            fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"})),
+        ),
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_fails_closed_when_fit_transform_raises(monkeypatch):
+    def broken(X, y):
+        raise RuntimeError("cannot probe")
+
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(changes_row_count=False, fit_transform=broken),
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_without_frames_relies_on_static_flag():
+    X, y = _clf_xy(n=30)
+    frames = (pd.DataFrame(X), pd.Series(y))
+    assert engine_mod._preserves_row_and_target_alignment(
+        _StubPreprocessor(changes_row_count=False), frames
+    )
+    assert not engine_mod._preserves_row_and_target_alignment(
+        _StubPreprocessor(
+            changes_row_count=False,
+            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
+        ),
+        frames,
+    )
+    # No named frames to probe (numpy-only library call): nothing to check.
+    assert engine_mod._preserves_row_and_target_alignment(
+        _StubPreprocessor(changes_row_count=False), None
+    )
 
 
 # ---------------------------------------------------------------------------
