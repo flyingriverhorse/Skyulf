@@ -411,9 +411,9 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 | **T1** | F-01, F-02, F-03, **F-33, F-34, F-35, F-37** | core **0.5.9** · backend/frontend **0.7.9** | **Patch — ship first, alone.** All engine-independent and LIVE. F-02/F-03 block deployments; F-33 shows the wrong job's evaluation; F-35 makes "Recall" tuning actively harmful; F-37 is a ~2-line SHAP fix restoring 6 model families. |
 | **T2** | F-04 … F-14 (excl. F-15) | core **0.6.0** · backend/frontend **0.8.0** | **Minor.** Behaviour changes: rows previously dropped are now kept (F-06), imputers that previously no-opped now impute (F-04), HashEncoder buckets change (F-11 — artifacts fitted before this release will not reproduce, needs a release note). |
 | **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend ~~0.8.0~~ → **0.8.1** | **Done on `080` 2026-08-22; slipped 0.8.0, ships in 0.8.1** (F-43 already shipped via core 0.6.0). Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — called out in the 0.8.1 changelog. |
-| **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | **All findings fixed on `081` 2026-08-22.** Parity batch (F-18/F-19/F-20/F-22/F-25) and leakage enforcement (F-16/F-17, ⚠️ breaking `on_leakage="raise"` default) landed red-green; F-21/F-23/F-24/F-26 already resolved by the Polars migration. Remaining T3 work: pure-noise encoder regression test + doc-site updates. |
+| **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | **All findings fixed on `081` 2026-08-22.** Parity batch (F-18/F-19/F-20/F-22/F-25) and leakage enforcement (F-16/F-17, ⚠️ breaking `on_leakage="raise"` default) landed red-green; F-21/F-23/F-24/F-26 already resolved by the Polars migration. The former "remaining T3 work" (pure-noise encoder regression test + doc-site updates) is done — verified 2026-08-23. |
 | **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.1** · backend/frontend **0.8.1** | **Done on `081` 2026-08-22; folded into the upcoming 0.8.1 release.** F-26 and F-29–F-32 were already resolved by the Polars migration; F-27/F-28/F-45–F-48 fixed red-green. |
-| **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. Design note first. |
+| **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. **Design note delivered 2026-08-23** (`2026-08-23-f15-per-fold-refit-design.md`); implementation opt-in first. |
 
 **Cross-cutting, do in T1:** add engine-parity tests that use **float NaN** (not only nulls) and
 **wrapped** frames. Without this the suite will keep passing while broken. Every fix below must be
@@ -661,7 +661,11 @@ math for the families where data *is* present; `ClassificationChartsForSplit` /
 `PerClassConfusionMatrix` prop paths; `ExperimentsPage` effect-dependency exhaustiveness beyond
 F-33; job-list polling against in-flight mutations.
 
-**Unverified, needs a decision:** `promote_job` (`_execution/jobs.py:373`) accepts only
-`status == "completed"`, while `JobStatus.SUCCEEDED = "succeeded"` is treated as terminal in four
-other modules. No site was found that *writes* `"succeeded"`. This is either harmless dead enum
-drift or a latent "cannot promote" bug; proving which needs a state-changing probe.
+**Resolved 2026-08-23 (state-changing probe):** `promote_job` (`_execution/jobs.py:373`) accepts
+only `status == "completed"`, while `JobStatus.SUCCEEDED = "succeeded"` is treated as terminal in
+four other modules. Verdict: **harmless dead enum drift, not a bug.** A repo-wide scan found zero
+writers of `"succeeded"` — every success path writes `"completed"` (`pipeline_execution_service.py`
+sets it directly; no caller ever passes `JobStatus.SUCCEEDED` to the job managers), and a live
+probe against the real `promote_job` confirmed a `completed` job promotes (`promoted_at` set)
+while a hypothetical `succeeded` row is refused. The `SUCCEEDED` member and its defensive readers
+can be deleted as routine cleanup; nothing user-visible depends on it.

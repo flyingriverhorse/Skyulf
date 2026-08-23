@@ -78,9 +78,11 @@ Remaining, tracked here:
 
 1. **Release logistics** — `080`/`081` are not yet merged to `master`.
 2. **F-15 / T5** — per-fold preprocessing refit in CV/tuning: deliberately a separate initiative
-   (core 0.7.0, design note first); docs carry the CV caveat meanwhile.
-3. Open question from §6: `promote_job` accepts `"completed"` while `JobStatus.SUCCEEDED =
-   "succeeded"` is treated as terminal elsewhere — needs a state-changing probe to resolve.
+   (core 0.7.0). **Design note written 2026-08-23** (`2026-08-23-f15-per-fold-refit-design.md`);
+   implementation pending, opt-in first. Docs carry the CV caveat until the default flip lands.
+3. ~~Open question from §6: `promote_job` vs `"succeeded"`~~ — **resolved 2026-08-23 by a
+   state-changing probe: harmless dead enum drift** (nothing ever writes `"succeeded"`); deleting
+   the member is optional routine cleanup. See the findings' §6.
 
 The **experiments subsystem** audit is now complete too (§6 of the findings). It was initially
 mis-reported as "nothing to audit" — an agent grepped for MLflow/W&B, found none, and stopped.

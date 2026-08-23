@@ -141,7 +141,9 @@ to over-claim just moves the problem.
       `leakage_proof.md` split into per-engine twins with a scoped conclusion and a
       "What is and is not covered" section; `docs/index.md`, `validation_vs_sklearn.md` and
       `overview.md` link the caveats; `changelog/0.8.x.md` records the breaking `on_leakage` default).
-- [ ] Phase 4 (CV refit) has a written design note; docs carry the CV caveat until it lands.
-      *Design note not yet written; the CV caveat is in place in the leakage-proof docs.*
+- [x] Phase 4 (CV refit) has a written design note; docs carry the CV caveat until it lands.
+      *Design note written 2026-08-23: `2026-08-23-f15-per-fold-refit-design.md` (refit contract,
+      performance budget, migration plan, opt-in-first rollout). The CV caveat stays in the
+      leakage-proof docs until the default flip (Phase 3 in the note) lands.*
 - [x] `ruff check` / `ruff format --check` / `ty check` clean; full backend + core suites pass
       (verified 2026-08-23 on `081`: backend 1316 passed, core 3331 passed / 70 skipped).
