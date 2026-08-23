@@ -8,25 +8,31 @@
       
       
       
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/python_api/">
       
+      
+        <link rel="prev" href="../guides/recipes/">
+      
+      
+        <link rel="next" href="../data/">
       
       
         
       
       
-      <link rel="icon" href="/Skyulf/assets/images/favicon.png">
+      <link rel="icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Skyulf</title>
+        <title>Python API Usage - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="/Skyulf/assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="/Skyulf/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="/Skyulf/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/Skyulf/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -71,6 +77,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#python-api-guide" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -81,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/Skyulf/." title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href=".." title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -101,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Python API Usage
             
           </span>
         </div>
@@ -212,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/Skyulf/." class="md-tabs__link">
+      <a href=".." class="md-tabs__link">
         
   
   
@@ -229,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="/Skyulf/guides/getting_started/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../guides/getting_started/" class="md-tabs__link">
           
   
   
@@ -253,7 +266,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/reference/execution/" class="md-tabs__link">
+        <a href="../reference/execution/" class="md-tabs__link">
           
   
   
@@ -273,7 +286,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/contributing/writing_docs/" class="md-tabs__link">
+        <a href="../contributing/writing_docs/" class="md-tabs__link">
           
   
   
@@ -309,7 +322,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/Skyulf/." title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href=".." title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -339,7 +352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   
@@ -363,28 +376,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -402,7 +418,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -420,7 +436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/getting_started/" class="md-nav__link">
+      <a href="../guides/getting_started/" class="md-nav__link">
         
   
   
@@ -448,7 +464,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/recipes/" class="md-nav__link">
+      <a href="../guides/recipes/" class="md-nav__link">
         
   
   
@@ -473,10 +489,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/Skyulf/python_api/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Usage
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -492,6 +535,92 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-environment-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Environment Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-data-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Data Ingestion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-defining-the-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Defining the Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-executing-the-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Executing the Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-inference-making-predictions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Inference (Making Predictions)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-advanced-hyperparameter-tuning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Advanced: Hyperparameter Tuning
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -510,10 +639,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -522,7 +654,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
         
           
-          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
             
   
   
@@ -558,7 +690,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/data/" class="md-nav__link">
+      <a href="../data/" class="md-nav__link">
         
   
   
@@ -586,7 +718,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/data/connectors/" class="md-nav__link">
+      <a href="../data/connectors/" class="md-nav__link">
         
   
   
@@ -614,7 +746,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/data/service/" class="md-nav__link">
+      <a href="../data/service/" class="md-nav__link">
         
   
   
@@ -650,7 +782,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/architecture/" class="md-nav__link">
+      <a href="../architecture/" class="md-nav__link">
         
   
   
@@ -678,7 +810,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/experiments/" class="md-nav__link">
+      <a href="../guides/experiments/" class="md-nav__link">
         
   
   
@@ -706,7 +838,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/model_registry/" class="md-nav__link">
+      <a href="../guides/model_registry/" class="md-nav__link">
         
   
   
@@ -734,7 +866,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/inference/" class="md-nav__link">
+      <a href="../guides/inference/" class="md-nav__link">
         
   
   
@@ -823,7 +955,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/execution/" class="md-nav__link">
+      <a href="../reference/execution/" class="md-nav__link">
         
   
   
@@ -851,7 +983,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/data/" class="md-nav__link">
+      <a href="../reference/data/" class="md-nav__link">
         
   
   
@@ -879,7 +1011,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/modeling/" class="md-nav__link">
+      <a href="../reference/modeling/" class="md-nav__link">
         
   
   
@@ -961,7 +1093,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/" class="md-nav__link">
+      <a href="../modeling/" class="md-nav__link">
         
   
   
@@ -989,7 +1121,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/classification/" class="md-nav__link">
+      <a href="../modeling/classification/" class="md-nav__link">
         
   
   
@@ -1017,7 +1149,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/regression/" class="md-nav__link">
+      <a href="../modeling/regression/" class="md-nav__link">
         
   
   
@@ -1045,7 +1177,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/training/" class="md-nav__link">
+      <a href="../modeling/training/" class="md-nav__link">
         
   
   
@@ -1073,7 +1205,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/tuning/" class="md-nav__link">
+      <a href="../modeling/tuning/" class="md-nav__link">
         
   
   
@@ -1163,7 +1295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/cleaning/" class="md-nav__link">
+      <a href="../preprocessing/cleaning/" class="md-nav__link">
         
   
   
@@ -1191,7 +1323,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/drop_and_missing/" class="md-nav__link">
+      <a href="../preprocessing/drop_and_missing/" class="md-nav__link">
         
   
   
@@ -1219,7 +1351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/imputation/" class="md-nav__link">
+      <a href="../preprocessing/imputation/" class="md-nav__link">
         
   
   
@@ -1247,7 +1379,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/outliers/" class="md-nav__link">
+      <a href="../preprocessing/outliers/" class="md-nav__link">
         
   
   
@@ -1275,7 +1407,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/encoding/" class="md-nav__link">
+      <a href="../preprocessing/encoding/" class="md-nav__link">
         
   
   
@@ -1303,7 +1435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/scaling/" class="md-nav__link">
+      <a href="../preprocessing/scaling/" class="md-nav__link">
         
   
   
@@ -1331,7 +1463,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/transformations/" class="md-nav__link">
+      <a href="../preprocessing/transformations/" class="md-nav__link">
         
   
   
@@ -1359,7 +1491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/bucketing/" class="md-nav__link">
+      <a href="../preprocessing/bucketing/" class="md-nav__link">
         
   
   
@@ -1387,7 +1519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/feature_selection/" class="md-nav__link">
+      <a href="../preprocessing/feature_selection/" class="md-nav__link">
         
   
   
@@ -1415,7 +1547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/feature_generation/" class="md-nav__link">
+      <a href="../preprocessing/feature_generation/" class="md-nav__link">
         
   
   
@@ -1443,7 +1575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/split/" class="md-nav__link">
+      <a href="../preprocessing/split/" class="md-nav__link">
         
   
   
@@ -1471,7 +1603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/resampling/" class="md-nav__link">
+      <a href="../preprocessing/resampling/" class="md-nav__link">
         
   
   
@@ -1499,7 +1631,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/inspection/" class="md-nav__link">
+      <a href="../preprocessing/inspection/" class="md-nav__link">
         
   
   
@@ -1527,7 +1659,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/casting/" class="md-nav__link">
+      <a href="../preprocessing/casting/" class="md-nav__link">
         
   
   
@@ -1563,7 +1695,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/recommendations/" class="md-nav__link">
+      <a href="../recommendations/" class="md-nav__link">
         
   
   
@@ -1652,7 +1784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/contributing/writing_docs/" class="md-nav__link">
+      <a href="../contributing/writing_docs/" class="md-nav__link">
         
   
   
@@ -1693,8 +1825,226 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="python-api-guide">Python API Guide</h1>
+<p>This guide provides a comprehensive overview of using Skyulf as a standalone Python library. While the platform includes a web interface, the core logic is decoupled and can be used programmatically for research, automation, or integration into other systems.</p>
+<h2 id="1-environment-setup">1. Environment Setup</h2>
+<p>Ensure you have the necessary dependencies installed and your environment configured.</p>
+<pre><code class="language-bash">pip install -r requirements-fastapi.txt
+</code></pre>
+<pre><code class="language-python">import sys
+import os
+
+# Ensure the project root is in your PYTHONPATH
+sys.path.append(os.getcwd())
+</code></pre>
+<h2 id="2-data-ingestion">2. Data Ingestion</h2>
+<p>The first step is loading your data. Skyulf provides a <code>DataLoader</code> that handles various formats efficiently.</p>
+<pre><code class="language-python">from core.ml_pipeline.data.loader import DataLoader
+from core.ml_pipeline.data.container import SplitDataset
+import pandas as pd
+
+# Initialize Loader
+loader = DataLoader()
+
+# Load Data (Supports CSV and Parquet)
+# For this example, we assume data.csv exists
+df = loader.load_full(&quot;data.csv&quot;)
+
+# Inspect Data
+print(f&quot;Loaded {len(df)} rows&quot;)
+print(df.head())
+</code></pre>
+<h2 id="3-defining-the-pipeline">3. Defining the Pipeline</h2>
+<p>Pipelines are defined using a configuration object (<code>PipelineConfig</code>). This configuration describes the sequence of steps (nodes) to execute.</p>
+<pre><code class="language-python">from core.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
+
+pipeline_config = PipelineConfig(
+    pipeline_id=&quot;my_pipeline_01&quot;,
+    nodes=[
+        # Node 1: Data Loader
+        NodeConfig(
+            node_id=&quot;data_loader&quot;,
+            step_type=&quot;data_loader&quot;,
+            params={
+                &quot;path&quot;: &quot;data.csv&quot;,
+                &quot;type&quot;: &quot;csv&quot;
+            }
+        ),
+        # Node 2: Feature Engineering
+        NodeConfig(
+            node_id=&quot;feature_engineering&quot;,
+            step_type=&quot;feature_engineering&quot;,
+            inputs=[&quot;data_loader&quot;],
+            params={
+                &quot;steps&quot;: [
+                    {
+                        &quot;name&quot;: &quot;impute_age&quot;,
+                        &quot;transformer&quot;: &quot;SimpleImputer&quot;,
+                        &quot;params&quot;: {
+                            &quot;columns&quot;: [&quot;age&quot;],
+                            &quot;strategy&quot;: &quot;mean&quot;
+                        }
+                    },
+                    {
+                        &quot;name&quot;: &quot;encode_city&quot;,
+                        &quot;transformer&quot;: &quot;OneHotEncoder&quot;,
+                        &quot;params&quot;: {
+                            &quot;columns&quot;: [&quot;city&quot;]
+                        }
+                    }
+                ]
+            }
+        ),
+        # Node 3: Model Training
+        NodeConfig(
+            node_id=&quot;model_training&quot;,
+            step_type=&quot;model_training&quot;,
+            inputs=[&quot;feature_engineering&quot;],
+            params={
+                &quot;algorithm&quot;: &quot;random_forest_classifier&quot;,
+                &quot;target_column&quot;: &quot;target&quot;,
+                &quot;params&quot;: {
+                    &quot;n_estimators&quot;: 50
+                }
+            }
+        )
+    ]
+)
+</code></pre>
+<h2 id="4-executing-the-pipeline">4. Executing the Pipeline</h2>
+<p>The <code>PipelineEngine</code> orchestrates the execution. It takes the config, runs each step, and stores the results.</p>
+<pre><code class="language-python">from core.ml_pipeline.execution.engine import PipelineEngine
+from core.ml_pipeline.artifacts.local import LocalArtifactStore
+
+# 1. Setup Artifact Store
+# This is where trained models and preprocessors are saved
+artifact_store = LocalArtifactStore(&quot;./my_artifacts&quot;)
+
+# 2. Initialize Engine
+engine = PipelineEngine(artifact_store=artifact_store)
+
+# 3. Run Pipeline
+result = engine.run(pipeline_config, job_id=&quot;manual_run_001&quot;)
+
+print(f&quot;Status: {result.status}&quot;)
+# Check node results
+for node_id, res in result.node_results.items():
+    print(f&quot;Node {node_id}: {res.status}&quot;)
+</code></pre>
+<h2 id="5-inference-making-predictions">5. Inference (Making Predictions)</h2>
+<p>Once a pipeline is trained, you can use the saved artifacts to make predictions on new data.
+Note that Skyulf uses a <strong>Stateless Applier</strong> pattern. You load the <em>parameters</em> (artifacts) and pass them to an <em>Applier</em> instance.</p>
+<pre><code class="language-python">from core.ml_pipeline.preprocessing.imputation import SimpleImputerApplier
+from core.ml_pipeline.preprocessing.encoding import OneHotEncoderApplier
+from core.ml_pipeline.modeling.classification import RandomForestClassifierApplier
+
+# 1. Load Artifacts (Parameters)
+# The engine saves artifacts using the node ID.
+# For Feature Engineering, it saves steps as &quot;{node_id}_{step_name}&quot;.
+
+impute_params = artifact_store.load(&quot;feature_engineering_impute_age&quot;)
+encode_params = artifact_store.load(&quot;feature_engineering_encode_city&quot;)
+model_params = artifact_store.load(&quot;model_training&quot;)
+
+# 2. Instantiate Appliers
+imputer = SimpleImputerApplier()
+encoder = OneHotEncoderApplier()
+model_applier = RandomForestClassifierApplier()
+
+# 3. New Data
+new_data = pd.DataFrame({
+    &quot;age&quot;: [22, None],
+    &quot;income&quot;: [45000, 85000],
+    &quot;city&quot;: [&quot;NY&quot;, &quot;SF&quot;]
+})
+
+# 4. Apply Transformations
+# Appliers return (df, metadata) tuple, we take the first element
+step1_out = imputer.apply(new_data, impute_params)
+step2_out = encoder.apply(step1_out, encode_params)
+
+# 5. Predict
+predictions = model_applier.predict(step2_out, model_params)
+
+print(&quot;Predictions:&quot;, predictions)
+</code></pre>
+<h2 id="6-advanced-hyperparameter-tuning">6. Advanced: Hyperparameter Tuning</h2>
+<p>You can replace the <code>model_training</code> node with a <code>model_tuning</code> node to automatically find the best hyperparameters. The engine will tune the model and then retrain the final model with the best parameters found.</p>
+<pre><code class="language-python">from core.ml_pipeline.execution.schemas import PipelineConfig, NodeConfig
+
+tuning_pipeline_config = PipelineConfig(
+    pipeline_id=&quot;tuning_pipeline_01&quot;,
+    nodes=[
+        # ... Data Loader and Feature Engineering nodes (same as above) ...
+        NodeConfig(
+            node_id=&quot;data_loader&quot;,
+            step_type=&quot;data_loader&quot;,
+            params={&quot;path&quot;: &quot;data.csv&quot;, &quot;type&quot;: &quot;csv&quot;}
+        ),
+        NodeConfig(
+            node_id=&quot;feature_engineering&quot;,
+            step_type=&quot;feature_engineering&quot;,
+            inputs=[&quot;data_loader&quot;],
+            params={
+                &quot;steps&quot;: [
+                    {&quot;name&quot;: &quot;impute&quot;, &quot;transformer&quot;: &quot;SimpleImputer&quot;, &quot;params&quot;: {&quot;strategy&quot;: &quot;mean&quot;}}
+                ]
+            }
+        ),
+        # Tuning Node
+        NodeConfig(
+            node_id=&quot;model_tuning&quot;,
+            step_type=&quot;model_tuning&quot;,
+            inputs=[&quot;feature_engineering&quot;],
+            params={
+                &quot;algorithm&quot;: &quot;random_forest_classifier&quot;,
+                &quot;target_column&quot;: &quot;target&quot;,
+                &quot;tuning_config&quot;: {
+                    &quot;strategy&quot;: &quot;random&quot;,  # grid, random, optuna
+                    &quot;metric&quot;: &quot;accuracy&quot;,
+                    &quot;n_trials&quot;: 5,
+                    &quot;cv_folds&quot;: 3,
+                    &quot;search_space&quot;: {
+                        &quot;n_estimators&quot;: [10, 50],
+                        &quot;max_depth&quot;: [5, 10, None]
+                    }
+                }
+            }
+        )
+    ]
+)
+
+# Run Tuning
+result = engine.run(tuning_pipeline_config, job_id=&quot;tuning_run_001&quot;)
+
+# The result contains the best parameters and score
+tuning_metrics = result.node_results[&quot;model_tuning&quot;].metrics
+print(&quot;Best Score:&quot;, tuning_metrics[&quot;best_score&quot;])
+print(&quot;Best Params:&quot;, tuning_metrics[&quot;best_params&quot;])
+
+# The artifact at 'model_tuning' is the fully trained model with best params
+best_model = artifact_store.load(&quot;model_tuning&quot;)
+</code></pre>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1733,10 +2083,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/Skyulf/", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "/Skyulf/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/Skyulf/assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

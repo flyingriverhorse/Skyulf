@@ -1,243 +1,143 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/index.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/architecture.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/architecture/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/data_architecture.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/python_api/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/performance.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/contributing/writing_docs/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/contributing/writing_docs.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/data/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/examples/leakage_proof.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/data/connectors/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/examples/quickstart.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/data/service/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/adding_new_engine.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/guides/experiments/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/data_drift_roadmap.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/guides/getting_started/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/engine_mechanics.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/guides/inference/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/faq.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/guides/model_registry/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/getting_started.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/guides/recipes/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/job_idempotency.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/modeling/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/multi_path_pipelines.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/modeling/classification/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/platform_setup.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/modeling/regression/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/platform_walkthrough.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/modeling/training/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/profiling_comparison.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/modeling/tuning/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/guides/recipes.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/bucketing/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/modeling_nodes.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/casting/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/preprocessing_nodes.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/cleaning/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/pipeline.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/drop_and_missing/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/data/dataset.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/encoding/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/index.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/feature_generation/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/base.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/feature_selection/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/classification.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/imputation/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/cross_validation.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/inspection/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/regression.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/outliers/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/sklearn_wrapper.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/resampling/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/modeling/tuning_engine.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/scaling/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/index.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/split/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/base.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/preprocessing/transformations/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/bucketing.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/recommendations/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/casting.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/reference/data/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/cleaning.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/reference/execution/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
     <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/drop_and_missing.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/encoding.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/feature_generation.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/feature_selection.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/imputation.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/inspection.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/outliers.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/pipeline.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/resampling.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/scaling.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/split.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/reference/api/preprocessing/transformations.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/configuration.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/cross_validation.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/drift_monitoring.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/eda_profiling.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/extending_custom_nodes.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/hyperparameter_tuning.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/installation.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/overview.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/pipeline_quickstart.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/serialization.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/splitdataset_and_leakage.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/step_by_step_no_config.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/troubleshooting.html</loc>
-         <lastmod>2026-05-10</lastmod>
-    </url>
-    <url>
-         <loc>https://flyingriverhorse.github.io/Skyulf/user_guide/validation_vs_sklearn.html</loc>
-         <lastmod>2026-05-10</lastmod>
+         <loc>https://flyingriverhorse.github.io/Skyulf/reference/modeling/</loc>
+         <lastmod>2026-08-23</lastmod>
     </url>
 </urlset>

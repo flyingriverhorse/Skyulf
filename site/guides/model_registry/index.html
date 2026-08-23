@@ -8,25 +8,31 @@
       
       
       
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/model_registry/">
       
+      
+        <link rel="prev" href="../experiments/">
+      
+      
+        <link rel="next" href="../inference/">
       
       
         
       
       
-      <link rel="icon" href="/Skyulf/assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
-        <title>Skyulf</title>
+        <title>Model Registry - Skyulf</title>
       
     
     
-      <link rel="stylesheet" href="/Skyulf/assets/stylesheets/main.ec1eaa64.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
-        <link rel="stylesheet" href="/Skyulf/assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -45,9 +51,9 @@
       
     
     
-      <link rel="stylesheet" href="/Skyulf/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/Skyulf/",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -71,6 +77,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#model-registry" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -81,7 +92,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/Skyulf/." title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../.." title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -101,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              Model Registry
             
           </span>
         </div>
@@ -212,7 +223,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="/Skyulf/." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
   
@@ -229,11 +240,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="/Skyulf/guides/getting_started/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting_started/" class="md-tabs__link">
           
   
   
@@ -253,7 +266,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/reference/execution/" class="md-tabs__link">
+        <a href="../../reference/execution/" class="md-tabs__link">
           
   
   
@@ -273,7 +286,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="/Skyulf/contributing/writing_docs/" class="md-tabs__link">
+        <a href="../../contributing/writing_docs/" class="md-tabs__link">
           
   
   
@@ -309,7 +322,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/Skyulf/." title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+    <a href="../.." title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -339,7 +352,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -363,28 +376,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -402,7 +418,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -420,7 +436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/getting_started/" class="md-nav__link">
+      <a href="../getting_started/" class="md-nav__link">
         
   
   
@@ -448,7 +464,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/recipes/" class="md-nav__link">
+      <a href="../recipes/" class="md-nav__link">
         
   
   
@@ -476,7 +492,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/python_api/" class="md-nav__link">
+      <a href="../../python_api/" class="md-nav__link">
         
   
   
@@ -510,10 +526,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -522,7 +541,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_4" >
         
           
-          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_4" id="__nav_2_4_label" tabindex="">
             
   
   
@@ -558,7 +577,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/data/" class="md-nav__link">
+      <a href="../../data/" class="md-nav__link">
         
   
   
@@ -586,7 +605,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/data/connectors/" class="md-nav__link">
+      <a href="../../data/connectors/" class="md-nav__link">
         
   
   
@@ -614,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/data/service/" class="md-nav__link">
+      <a href="../../data/service/" class="md-nav__link">
         
   
   
@@ -650,7 +669,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/architecture/" class="md-nav__link">
+      <a href="../../architecture/" class="md-nav__link">
         
   
   
@@ -678,7 +697,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/experiments/" class="md-nav__link">
+      <a href="../experiments/" class="md-nav__link">
         
   
   
@@ -703,10 +722,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/Skyulf/guides/model_registry/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Registry
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -722,6 +768,159 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How It Works
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-versioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Versioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#using-the-registry-python-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Using the Registry (Python API)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Using the Registry (Python API)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-all-models" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        List All Models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-versions-for-a-specific-model-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Get Versions for a Specific Model Type
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-next-version-number" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Get Next Version Number
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deploying-a-model-for-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploying a Model for Inference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deploying a Model for Inference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#deploy-a-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deploy a Model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#make-predictions-with-the-active-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Make Predictions with the Active Deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deployment-history" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment History
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rest-api-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        REST API Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -734,7 +933,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/guides/inference/" class="md-nav__link">
+      <a href="../inference/" class="md-nav__link">
         
   
   
@@ -823,7 +1022,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/execution/" class="md-nav__link">
+      <a href="../../reference/execution/" class="md-nav__link">
         
   
   
@@ -851,7 +1050,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/data/" class="md-nav__link">
+      <a href="../../reference/data/" class="md-nav__link">
         
   
   
@@ -879,7 +1078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/reference/modeling/" class="md-nav__link">
+      <a href="../../reference/modeling/" class="md-nav__link">
         
   
   
@@ -961,7 +1160,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/" class="md-nav__link">
+      <a href="../../modeling/" class="md-nav__link">
         
   
   
@@ -989,7 +1188,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/classification/" class="md-nav__link">
+      <a href="../../modeling/classification/" class="md-nav__link">
         
   
   
@@ -1017,7 +1216,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/regression/" class="md-nav__link">
+      <a href="../../modeling/regression/" class="md-nav__link">
         
   
   
@@ -1045,7 +1244,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/training/" class="md-nav__link">
+      <a href="../../modeling/training/" class="md-nav__link">
         
   
   
@@ -1073,7 +1272,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/modeling/tuning/" class="md-nav__link">
+      <a href="../../modeling/tuning/" class="md-nav__link">
         
   
   
@@ -1163,7 +1362,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/cleaning/" class="md-nav__link">
+      <a href="../../preprocessing/cleaning/" class="md-nav__link">
         
   
   
@@ -1191,7 +1390,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/drop_and_missing/" class="md-nav__link">
+      <a href="../../preprocessing/drop_and_missing/" class="md-nav__link">
         
   
   
@@ -1219,7 +1418,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/imputation/" class="md-nav__link">
+      <a href="../../preprocessing/imputation/" class="md-nav__link">
         
   
   
@@ -1247,7 +1446,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/outliers/" class="md-nav__link">
+      <a href="../../preprocessing/outliers/" class="md-nav__link">
         
   
   
@@ -1275,7 +1474,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/encoding/" class="md-nav__link">
+      <a href="../../preprocessing/encoding/" class="md-nav__link">
         
   
   
@@ -1303,7 +1502,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/scaling/" class="md-nav__link">
+      <a href="../../preprocessing/scaling/" class="md-nav__link">
         
   
   
@@ -1331,7 +1530,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/transformations/" class="md-nav__link">
+      <a href="../../preprocessing/transformations/" class="md-nav__link">
         
   
   
@@ -1359,7 +1558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/bucketing/" class="md-nav__link">
+      <a href="../../preprocessing/bucketing/" class="md-nav__link">
         
   
   
@@ -1387,7 +1586,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/feature_selection/" class="md-nav__link">
+      <a href="../../preprocessing/feature_selection/" class="md-nav__link">
         
   
   
@@ -1415,7 +1614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/feature_generation/" class="md-nav__link">
+      <a href="../../preprocessing/feature_generation/" class="md-nav__link">
         
   
   
@@ -1443,7 +1642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/split/" class="md-nav__link">
+      <a href="../../preprocessing/split/" class="md-nav__link">
         
   
   
@@ -1471,7 +1670,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/resampling/" class="md-nav__link">
+      <a href="../../preprocessing/resampling/" class="md-nav__link">
         
   
   
@@ -1499,7 +1698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/inspection/" class="md-nav__link">
+      <a href="../../preprocessing/inspection/" class="md-nav__link">
         
   
   
@@ -1527,7 +1726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/preprocessing/casting/" class="md-nav__link">
+      <a href="../../preprocessing/casting/" class="md-nav__link">
         
   
   
@@ -1563,7 +1762,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/recommendations/" class="md-nav__link">
+      <a href="../../recommendations/" class="md-nav__link">
         
   
   
@@ -1652,7 +1851,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/Skyulf/contributing/writing_docs/" class="md-nav__link">
+      <a href="../../contributing/writing_docs/" class="md-nav__link">
         
   
   
@@ -1693,8 +1892,151 @@
               
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="model-registry">Model Registry</h1>
+<p>The Model Registry is a centralized system for managing the lifecycle of your ML models. It tracks model versions, lineage (which training job created each model), and deployment status.</p>
+<h2 id="how-it-works">How It Works</h2>
+<p>The registry is <strong>not a separate store</strong>—it is a unified view that aggregates completed <code>TrainingJob</code> and <code>HyperparameterTuningJob</code> records from the database. When you train a model through the UI or API, the resulting artifact is automatically tracked here.</p>
+<pre><code>┌─────────────────────────────────────────────────────────────────┐
+│                        Model Registry                           │
+│  (Aggregates TrainingJob + HyperparameterTuningJob tables)      │
+├─────────────────────────────────────────────────────────────────┤
+│  RandomForest (Dataset: customers.csv)                          │
+│    └── v3 [DEPLOYED] - training - accuracy: 0.92                │
+│    └── v2            - tuning   - best_score: 0.91              │
+│    └── v1            - training - accuracy: 0.85                │
+│                                                                  │
+│  LogisticRegression (Dataset: sales.csv)                        │
+│    └── v1            - training - accuracy: 0.78                │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre>
+<h2 id="model-versioning">Model Versioning</h2>
+<p>Every time a training or tuning job completes successfully, a new version is created. The <code>ModelRegistryService</code> automatically calculates the next version number for each <code>(dataset_id, model_type)</code> pair.</p>
+<ul>
+<li><strong>Training Jobs</strong>: Produce a single model version.</li>
+<li><strong>Advanced training with tuning Jobs</strong>: Produce a model version for the best hyperparameter configuration found.</li>
+</ul>
+<h2 id="using-the-registry-python-api">Using the Registry (Python API)</h2>
+<h3 id="list-all-models">List All Models</h3>
+<pre><code class="language-python">from core.ml_pipeline.model_registry.service import ModelRegistryService
+
+async def list_models(session):
+    entries = await ModelRegistryService.list_models(session)
+
+    for entry in entries:
+        print(f&quot;{entry.model_type} ({entry.dataset_name})&quot;)
+        for v in entry.versions:
+            deployed = &quot;[DEPLOYED]&quot; if v.is_deployed else &quot;&quot;
+            print(f&quot;  v{v.version} - {v.source} - {v.metrics} {deployed}&quot;)
+</code></pre>
+<h3 id="get-versions-for-a-specific-model-type">Get Versions for a Specific Model Type</h3>
+<pre><code class="language-python">async def get_versions(session, model_type: str):
+    versions = await ModelRegistryService.get_model_versions(session, model_type)
+    return versions
+</code></pre>
+<h3 id="get-next-version-number">Get Next Version Number</h3>
+<pre><code class="language-python">async def get_next_version(session):
+    next_ver = await ModelRegistryService.get_next_version(
+        session, 
+        dataset_id=&quot;ds_123&quot;, 
+        model_type=&quot;LogisticRegression&quot;, 
+        job_type=&quot;training&quot;
+    )
+    print(f&quot;Next version will be: {next_ver}&quot;)
+</code></pre>
+<hr />
+<h2 id="deploying-a-model-for-inference">Deploying a Model for Inference</h2>
+<p>The <code>DeploymentService</code> takes a model from the registry and makes it the <strong>active deployment</strong>. Only one model can be active at a time.</p>
+<h3 id="deploy-a-model">Deploy a Model</h3>
+<pre><code class="language-python">from core.ml_pipeline.deployment.service import DeploymentService
+
+async def deploy(session, job_id: str):
+    # This deactivates any previous deployment and sets the new one as active
+    deployment = await DeploymentService.deploy_model(session, job_id)
+    print(f&quot;Deployed {deployment.model_type} from job {deployment.job_id}&quot;)
+</code></pre>
+<h3 id="make-predictions-with-the-active-deployment">Make Predictions with the Active Deployment</h3>
+<p>Once a model is deployed, you can send data to it for inference. The service automatically:</p>
+<ol>
+<li>Loads the model artifact (including any fitted transformers from the pipeline).</li>
+<li>Applies the same preprocessing steps used during training.</li>
+<li>Runs the model's <code>.predict()</code> method.</li>
+</ol>
+<pre><code class="language-python">async def predict(session, input_data: list[dict]):
+    # Example: [{&quot;age&quot;: 30, &quot;income&quot;: 50000}, {&quot;age&quot;: 25, &quot;income&quot;: 60000}]
+    predictions = await DeploymentService.predict(session, input_data)
+    return predictions  # e.g., [0, 1]
+</code></pre>
+<h3 id="deployment-history">Deployment History</h3>
+<pre><code class="language-python">async def list_deployments(session):
+    deployments = await DeploymentService.list_deployments(session)
+    for d in deployments:
+        status = &quot;ACTIVE&quot; if d.is_active else &quot;inactive&quot;
+        print(f&quot;{d.model_type} ({d.created_at}) - {status}&quot;)
+</code></pre>
+<hr />
+<h2 id="rest-api-endpoints">REST API Endpoints</h2>
+<p>You can also interact with the registry and deployments via the FastAPI endpoints:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/registry/stats</code></td>
+<td>GET</td>
+<td>Get registry statistics</td>
+</tr>
+<tr>
+<td><code>/api/registry/models</code></td>
+<td>GET</td>
+<td>List all models and versions</td>
+</tr>
+<tr>
+<td><code>/api/registry/models/{model_type}/versions</code></td>
+<td>GET</td>
+<td>Get versions for a model type</td>
+</tr>
+<tr>
+<td><code>/api/deployments/deploy</code></td>
+<td>POST</td>
+<td>Deploy a model by <code>job_id</code></td>
+</tr>
+<tr>
+<td><code>/api/deployments/predict</code></td>
+<td>POST</td>
+<td>Make predictions with active model</td>
+</tr>
+<tr>
+<td><code>/api/deployments/</code></td>
+<td>GET</td>
+<td>List deployment history</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1733,10 +2075,10 @@
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": "/Skyulf/", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "/Skyulf/assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="/Skyulf/assets/javascripts/bundle.d7400e89.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

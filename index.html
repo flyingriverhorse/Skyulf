@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Skyulf is a local-first MLOps workspace. Ingest, clean, train, and deploy models without leaving your infrastructure.">
-    <meta name="keywords" content="Local MLOps, Privacy-First Machine Learning, AutoML, Feature Engineering Canvas, Model Registry, Python, FastAPI, Polars, On-Premise AI, Data Sovereignty, Scikit-learn, Data Science">
+    <meta name="keywords" content="Local MLOps, Privacy-First Machine Learning, AutoML, Feature Engineering Canvas, Model Registry, Python, FastAPI, On-Premise AI, Data Sovereignty, Scikit-learn, Data Science">
     <meta name="author" content="Skyulf Team">
     
     <!-- Open Graph / Facebook -->
@@ -44,29 +44,17 @@
         "name": "Skyulf",
         "url": "https://www.skyulf.com"
       },
-      "featureList": "Visual ML Canvas, Model Registry, Local Deployment, Data Ingestion, Data Science, Experiment Tracking, Model Training, Feature Engineering, Deployment, Monitoring, Visualization, Collaboration, Workflow, Automation, Privacy, Causal Discovery, Decision Trees, Notebook Export, Hyperparameter Tuning",
-      "softwareRequirements": "Python 3.12"
+      "featureList": "Visual ML Canvas, Model Registry, Local Deployment, Data Ingestion, Data Science, Experiment Tracking, Model Training, Feature Engineering, Deployment, Monitoring, Visualization, Collaboration, Workflow, Automation, Privacy",
+      "softwareRequirements": "Python 3.10+"
     }
     </script>
     
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/feather-icons"></script>
-    <noscript>
-        <style>.zoomable { cursor: default !important; } #lightbox { display: none !important; }</style>
-    </noscript>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .no-scrollbar {
-            -ms-overflow-style: none; /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
-        }
-    </style>
     <script>
         tailwind.config = {
             theme: {
@@ -83,16 +71,11 @@
                     animation: {
                         'float': 'float 6s ease-in-out infinite',
                         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'scroll': 'scroll 40s linear infinite',
                     },
                     keyframes: {
                         float: {
                             '0%, 100%': { transform: 'translateY(0)' },
                             '50%': { transform: 'translateY(-20px)' },
-                        },
-                        scroll: {
-                            '0%': { transform: 'translateX(0)' },
-                            '100%': { transform: 'translateX(-50%)' },
                         }
                     }
                 }
@@ -102,24 +85,6 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; }
-        
-        /* Lightbox Styles */
-        #lightbox {
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-        #lightbox.active {
-            opacity: 1;
-            pointer-events: all;
-        }
-        .lightbox-content {
-            transform: scale(0.9);
-            transition: transform 0.3s ease;
-        }
-        #lightbox.active .lightbox-content {
-            transform: scale(1);
-        }
         
         /* Custom Gradient Text */
         .text-gradient {
@@ -201,61 +166,27 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"> 
             <h1 class="text-5xl md:text-7xl font-bold text-white tracking-tight mb-6 leading-tight">
                 Own Your <br class="hidden md:block" />
-                <span class="text-gradient">ML Pipeline</span> Locally
+                <span class="text-gradient">ML Pipeline</span> Locally.
             </h1>
             
             <p class="max-w-2xl mx-auto text-lg md:text-xl text-slate-400 mb-10 leading-relaxed">
                 The privacy-first MLOps workspace. Ingest data, engineer features visually, and train models without your data ever leaving your infrastructure.
             </p>
             
-            <!-- Quick install snippet -->
-            <div class="max-w-lg mx-auto mb-8 flex flex-col items-center gap-3">
-                <div class="w-full rounded-xl bg-slate-900/80 border border-slate-800 px-5 py-3 flex items-center justify-between gap-3">
-                    <code class="text-sm text-slate-300 font-mono">pip install skyulf-core</code>
-                    <div class="flex items-center gap-3 flex-shrink-0">
-                        <a href="https://pypi.org/project/skyulf-core/" target="_blank" title="View on PyPI">
-                            <img src="https://img.shields.io/pypi/dm/skyulf-core?style=flat-square&color=6366f1&label=downloads" alt="PyPI downloads" class="h-5">
-                        </a>
-                        <button onclick="navigator.clipboard.writeText('pip install skyulf-core'); this.querySelector('i').setAttribute('data-feather','check'); feather.replace();" class="text-slate-500 hover:text-white transition-colors" title="Copy">
-                            <i data-feather="copy" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="flex items-center gap-3">
-                    <a href="https://pypi.org/project/skyulf-core/" target="_blank">
-                        <img src="https://img.shields.io/pypi/v/skyulf-core?style=flat-square&color=38bdf8&label=latest" alt="PyPI version" class="h-5">
-                    </a>
-                    <a href="https://pypi.org/project/skyulf-core/" target="_blank">
-                        <img src="https://img.shields.io/pypi/pyversions/skyulf-core?style=flat-square&color=a855f7" alt="Python versions" class="h-5">
-                    </a>
-                    <a href="https://github.com/flyingriverhorse/skyulf" target="_blank">
-                        <img src="https://img.shields.io/github/stars/flyingriverhorse/skyulf?style=flat-square&color=f59e0b&label=stars" alt="GitHub stars" class="h-5">
-                    </a>
-                </div>
-            </div>
-
             <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
                 <a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-brand text-white font-semibold text-lg hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2">
                     <i data-feather="github" class="w-5 h-5"></i>
                     Star on GitHub
-                </a>
-                <a href="./site/guides/platform_setup.html" class="w-full sm:w-auto px-8 py-4 rounded-xl bg-slate-800 text-white font-semibold text-lg hover:bg-slate-700 transition-colors border border-slate-700 flex items-center justify-center gap-2">
-                    <i data-feather="book-open" class="w-5 h-5"></i>
-                    Get Started
                 </a>
             </div>
 
             <!-- Hero Image / Dashboard Preview -->
             <div class="relative max-w-5xl mx-auto animate-float">
                 <div class="absolute -inset-1 bg-gradient-brand rounded-2xl blur opacity-30"></div>
-                <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900 group cursor-pointer zoomable">
-                    <img src="./static/img/dashboard.jpg" alt="Skyulf Dashboard" class="w-full h-auto object-cover transition-transform duration-500 group-hover:scale-105">
+                <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900">
+                    <img src="./static/img/dashboard.jpg" alt="Skyulf Dashboard" class="w-full h-auto object-cover">
                     <!-- Overlay Gradient -->
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60 pointer-events-none"></div>
-                    <!-- Zoom Icon -->
-                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
-                        <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
-                    </div>
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-60"></div>
                 </div>
             </div>
         </div>
@@ -286,9 +217,9 @@
                     <div class="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                         <i data-feather="cpu" class="w-6 h-6 text-indigo-400"></i>
                     </div>
-                    <h3 class="text-xl font-semibold text-white mb-3">Background Training</h3>
+                    <h3 class="text-xl font-semibold text-white mb-3">Async Training</h3>
                     <p class="text-slate-400 leading-relaxed">
-                        Run heavy training jobs in the background. Powered by our <strong>Dual Engine (Polars + NumPy)</strong> for high-speed processing and Celery for robust task management.
+                        Powered by Celery & Redis. Run heavy training jobs in the background while you keep working.
                     </p>
                 </div>
 
@@ -299,7 +230,7 @@
                     </div>
                     <h3 class="text-xl font-semibold text-white mb-3">One-Click Deploy</h3>
                     <p class="text-slate-400 leading-relaxed">
-                        Go from experiment to production instantly. Serve predictions via a built-in REST API.
+                        Move from experiment to production instantly. Serve your models via a high-performance FastAPI endpoint.
                     </p>
                 </div>
             </div>
@@ -313,246 +244,28 @@
             <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
                 <div class="lg:w-1/2">
                     <div class="inline-block px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold mb-6">DATA INGESTION</div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Load your data.<br>Keep it on your machine.</h2>
+                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Connect your data.<br>Anywhere it lives.</h2>
                     <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        Import CSV, Excel, JSON, Parquet, or S3 datasets directly. <strong>Powered by Polars</strong>, Skyulf auto-detects column types and caches everything for fast, repeatable experiments.
+                        Ingest data from CSVs, Parquet files, or SQL databases. Skyulf automatically detects schemas and caches datasets for rapid iteration.
                     </p>
                     <ul class="space-y-4 mb-8">
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
-                            <span>Smart column type detection</span>
+                            <span>Zero-copy Polars integration</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
-                            <span>Built-in dataset caching</span>
+                            <span>Automatic type inference</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-emerald-500"></i>
-                            <span>No data leaves your network</span>
-                        </li>
-                    </ul>
-                </div>
-                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
-                    <div class="absolute -inset-4 bg-emerald-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
-                        <img src="./static/img/datasource.jpg" alt="Data Ingestion" class="w-full transition-transform duration-500 group-hover:scale-105">
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
-                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- EDA Section -->
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
-            <div class="flex flex-col lg:flex-row items-center gap-16">
-                <div class="lg:w-1/2">
-                    <div class="inline-block px-3 py-1 rounded-full bg-pink-500/10 text-pink-400 text-xs font-semibold mb-6">EXPLORATORY DATA ANALYSIS</div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Understand your data.<br>Before you train.</h2>
-                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        Automated profiling, outlier detection, and causal discovery. Spot data quality issues instantly with our high-performance Dual Engine (Polars for ETL, zero-copy Apache Arrow to NumPy).
-                    </p>
-                    <ul class="space-y-4 mb-8">
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-pink-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Decision Trees:</strong> Extract human-readable rules (e.g., "IF Age > 30...") to find key segments.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-pink-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Causal Discovery:</strong> Discover hidden cause-effect relationships using the PC Algorithm.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-pink-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Decomposition Trees:</strong> Interactively drill down into metrics across multiple dimensions.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-pink-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-pink-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Interactive Plots:</strong> 3D PCA, Time Series decomposition, and Geospatial maps.</span>
+                            <span>Local file system support</span>
                         </li>
                     </ul>
                 </div>
                 <div class="lg:w-1/2 relative">
-                    <div class="absolute -inset-4 bg-pink-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    
-                    <!-- Carousel Container -->
-                    <div id="eda-carousel" class="rounded-2xl border border-slate-800 shadow-2xl w-full bg-slate-900 aspect-video relative group overflow-hidden cursor-pointer">
-                        <!-- Slides Container -->
-                        <div id="eda-slides" class="flex transition-transform duration-500 ease-out h-full">
-                            <!-- Dashboard -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/dashboardeda.jpg" class="absolute inset-0 w-full h-full object-cover" alt="EDA Dashboard">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">EDA Dashboard</span>
-                                </div>
-                            </div>
-                            <!-- Smart Insights -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/smart insights.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Smart Insights">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Smart Insights</span>
-                                </div>
-                            </div>
-                            <!-- Numeric Distribution -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/numeric_distrubtion.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Numeric Distribution">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Numeric Distribution</span>
-                                </div>
-                            </div>
-                            <!-- Text Distribution -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/text_distrubtion.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Text Distribution">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Text Distribution</span>
-                                </div>
-                            </div>
-                            <!-- Correlation Matrix -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/correlations.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Correlation Matrix">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Correlation Matrix</span>
-                                </div>
-                            </div>
-                            <!-- Detailed Interactions -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/detailedinteractions.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Detailed Interactions">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Detailed Interactions</span>
-                                </div>
-                            </div>
-                            <!-- 2D Bivariate Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/2dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="2D Bivariate Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">2D Bivariate Analysis</span>
-                                </div>
-                            </div>
-                            <!-- 3D Bivariate Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/3dbivariate.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D Bivariate Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">3D Bivariate Analysis</span>
-                                </div>
-                            </div>
-                            <!-- 2D PCA Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/2dpca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="2D PCA Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">2D PCA Analysis</span>
-                                </div>
-                            </div>
-                            <!-- 3D PCA Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/3dpca.jpg" class="absolute inset-0 w-full h-full object-cover" alt="3D PCA Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">3D PCA Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Feature Importance -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/featureimportance.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Feature Importance">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Feature Importance</span>
-                                </div>
-                            </div>
-                            <!-- Decision Tree Rules -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/decisiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decision Tree Rules">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Decision Tree Rules</span>
-                                </div>
-                            </div>
-                            <!-- Decomposition Tree -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/decompositiontree.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Decomposition Tree">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Decomposition Tree</span>
-                                </div>
-                            </div>
-                            <!-- Causal Discovery -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/causal.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Causal Discovery">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Causal Discovery</span>
-                                </div>
-                            </div>
-                            <!-- Outlier Detection -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/outliers.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Outlier Detection">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Outlier Detection</span>
-                                </div>
-                            </div>
-                            <!-- Target Analysis -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/target analysis.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Target Analysis">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Target Analysis</span>
-                                </div>
-                            </div>
-                            <!-- Cluster Segmentation -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/cluster_Segmentation.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Cluster Segmentation">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Cluster Segmentation</span>
-                                </div>
-                            </div>
-                            <!-- Sample Data -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 eda-slide-content">
-                                <img src="./static/img/eda/sampledata.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Sample Data">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Sample Data</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Zoom Hint -->
-                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 bg-slate-900/60 p-2 rounded-full backdrop-blur-sm">
-                            <i data-feather="maximize-2" class="text-white w-5 h-5"></i>
-                        </div>
-
-                        <!-- Navigation Buttons -->
-                        <button id="eda-prev" class="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/80 text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100 z-20">
-                            <i data-feather="chevron-left" class="w-6 h-6"></i>
-                        </button>
-                        <button id="eda-next" class="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/80 text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100 z-20">
-                            <i data-feather="chevron-right" class="w-6 h-6"></i>
-                        </button>
-
-                        <!-- Indicators -->
-                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20 overflow-x-auto max-w-full px-4 no-scrollbar">
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                            <button class="flex-shrink-0 w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors eda-dot"></button>
-                        </div>
-                    </div>
+                    <div class="absolute -inset-4 bg-emerald-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/datasource.jpg" alt="Data Ingestion" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
                 </div>
             </div>
         </div>
@@ -564,20 +277,16 @@
                     <div class="inline-block px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 text-xs font-semibold mb-6">FEATURE ENGINEERING</div>
                     <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Stop writing boilerplate.<br>Start designing pipelines.</h2>
                     <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        The ML Canvas lets you visualize your data transformations. Handle missing values, encode categories, scale features, and more—all with drag-and-drop nodes. Build multi-branch pipelines that merge or run in parallel.
+                        The Feature Canvas lets you visualize your data flow. Handle missing values, encode categoricals, and scale features with pre-built nodes and more.
                     </p>
                     <ul class="space-y-4 mb-8">
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
-                            <span>30+ Built-in processing nodes</span>
+                            <span>25+ Built-in processing nodes</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
-                            <span>Multi-path merge & parallel branches</span>
-                        </li>
-                        <li class="flex items-center gap-3 text-slate-300">
-                            <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
-                            <span>Copy-paste nodes with Ctrl+C / Ctrl+V</span>
+                            <span>Real-time schema validation</span>
                         </li>
                         <li class="flex items-center gap-3 text-slate-300">
                             <i data-feather="check-circle" class="w-5 h-5 text-blue-500"></i>
@@ -585,88 +294,9 @@
                         </li>
                     </ul>
                 </div>
-                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
-                    <div class="absolute -inset-4 bg-blue-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
-                        <img src="./static/img/canvas.jpg" alt="ML Canvas" class="w-full transition-transform duration-500 group-hover:scale-105">
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
-                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Notebook Export Section -->
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
-            <div class="flex flex-col lg:flex-row-reverse items-center gap-16">
-                <div class="lg:w-1/2">
-                    <div class="inline-block px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 text-xs font-semibold mb-6">NOTEBOOK EXPORT</div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Canvas to Jupyter.<br>One click.</h2>
-                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        Export any pipeline directly to a self-contained <strong>Jupyter notebook</strong>. Every preprocessing node, training step, and metric table is generated automatically — ready to run, share, or drop into CI.
-                    </p>
-                    <ul class="space-y-4 mb-8">
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-violet-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Full mode:</strong> One cell per node — tweak params, inspect intermediate state, debug every step.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-violet-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Compact mode:</strong> Clean single-call pipeline per branch — ideal for sharing or CI reproducibility.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-violet-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Live tuning output:</strong> Advanced Tuning nodes print each Optuna / grid / random trial as it completes — <code class="text-violet-300 text-xs bg-slate-800 px-1 rounded">Trial 7/10 — score=0.9497</code>.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-violet-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Multi-branch comparison:</strong> 5-branch canvases get 5 independent training sections + a coloured branch × split metrics table.</span>
-                        </li>
-                    </ul>
-                    <a href="./site/guides/platform_walkthrough.html#step-5b-export-to-jupyter-notebook" class="inline-flex items-center gap-2 text-violet-400 hover:text-violet-300 font-medium transition-colors">
-                        <i data-feather="book-open" class="w-4 h-4"></i>
-                        Read the export guide
-                    </a>
-                </div>
                 <div class="lg:w-1/2 relative">
-                    <div class="absolute -inset-4 bg-violet-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900">
-                        <!-- Code preview card -->
-                        <div class="px-4 pt-4 pb-2 flex items-center gap-2 border-b border-slate-800">
-                            <div class="w-3 h-3 rounded-full bg-red-500/70"></div>
-                            <div class="w-3 h-3 rounded-full bg-yellow-500/70"></div>
-                            <div class="w-3 h-3 rounded-full bg-green-500/70"></div>
-                            <span class="ml-2 text-xs text-slate-500 font-mono">pipeline_export.ipynb</span>
-                        </div>
-                        <pre class="text-xs font-mono text-slate-300 p-5 overflow-x-auto leading-relaxed"><code><span class="text-slate-500"># Auto-generated by Skyulf — Advanced Tuning node</span>
-<span class="text-violet-400">from</span> skyulf.modeling._tuning.engine <span class="text-violet-400">import</span> TuningCalculator
-
-tuner_calc = TuningCalculator(base_calc)
-estimator = StatefulEstimator(<span class="text-emerald-400">node_id=</span><span class="text-amber-300">'advanced_tuning-…'</span>,
-                               calculator=tuner_calc, …)
-
-<span class="text-violet-400">def</span> <span class="text-blue-400">_on_trial</span>(current, total, score=<span class="text-violet-400">None</span>, …):
-    print(<span class="text-amber-300">f'Trial {current}/{total} — score={score:.4f}'</span>)
-
-_ = estimator.fit_predict(
-    dataset=dataset, target_column=TARGET_COLUMN,
-    config=tuning_config[<span class="text-amber-300">'tuning_config'</span>],
-    progress_callback=_on_trial, log_callback=print,
-)
-
-<span class="text-slate-500"># Trial 1/10 — score=0.9221</span>
-<span class="text-slate-500"># Trial 7/10 — score=0.9497  ← best</span>
-<span class="text-slate-500"># Tuning Completed. Best Score: 0.9497</span></code></pre>
-                    </div>
+                    <div class="absolute -inset-4 bg-blue-500/20 rounded-3xl blur-2xl -z-10"></div>
+                    <img src="./static/img/canvas.jpg" alt="Feature Canvas" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
                 </div>
             </div>
         </div>
@@ -678,7 +308,7 @@ _ = estimator.fit_predict(
                     <div class="inline-block px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold mb-6">EXPERIMENT TRACKING</div>
                     <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Compare runs.<br>Pick the winner.</h2>
                     <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        Don't guess which model is better. Run parallel experiments across separate branches and compare results side by side. Track every hyperparameter, metric, and artifact.
+                        Don't guess which model is better. Track every hyperparameter, metric, and artifact. Visualize performance with interactive charts.
                     </p>
                     <div class="grid grid-cols-2 gap-4">
                         <div class="p-3 rounded-lg bg-slate-900 border border-slate-800">
@@ -699,14 +329,9 @@ _ = estimator.fit_predict(
                         </div>
                     </div>
                 </div>
-                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
+                <div class="lg:w-1/2 relative">
                     <div class="absolute -inset-4 bg-indigo-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
-                        <img src="./static/img/experiments.jpg" alt="Experiments" class="w-full transition-transform duration-500 group-hover:scale-105">
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
-                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
-                        </div>
-                    </div>
+                    <img src="./static/img/experiments.jpg" alt="Experiments" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
                 </div>
             </div>
         </div>
@@ -721,14 +346,9 @@ _ = estimator.fit_predict(
                         Once you're happy with a model, deploy it to a local inference endpoint. Verify predictions immediately with the built-in JSON editor before moving to production.
                     </p>
                 </div>
-                <div class="lg:w-1/2 relative group cursor-pointer zoomable">
+                <div class="lg:w-1/2 relative">
                     <div class="absolute -inset-4 bg-purple-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    <div class="relative rounded-2xl overflow-hidden border border-slate-800 shadow-2xl w-full">
-                        <img src="./static/img/deployment.jpg" alt="Deployment" class="w-full transition-transform duration-500 group-hover:scale-105">
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-slate-900/40">
-                            <i data-feather="maximize-2" class="text-white w-12 h-12 drop-shadow-lg"></i>
-                        </div>
-                    </div>
+                    <img src="./static/img/deployment.jpg" alt="Deployment" class="rounded-2xl border border-slate-800 shadow-2xl w-full">
                 </div>
             </div>
         </div>
@@ -764,85 +384,6 @@ _ = estimator.fit_predict(
             </div>
         </div>
 
-        <!-- Monitoring / Drift Section -->
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-20">
-            <div class="flex flex-col lg:flex-row items-center gap-16">
-                <!-- Text Content -->
-                <div class="lg:w-1/2">
-                    <div class="inline-block px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 text-xs font-semibold mb-6">MONITORING</div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-white mb-6">Detect Drift.<br>Maintain Performance.</h2>
-                    <p class="text-slate-400 text-lg mb-8 leading-relaxed">
-                        Continuous monitoring of your deployed models. Detect data drift, concept drift, and prediction anomalies in real-time to ensure model reliability.
-                    </p>
-                    <ul class="space-y-4 mb-8">
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-orange-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Drift Detection:</strong> Automatically compare production data against training baselines.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-orange-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Feature Analysis:</strong> Visualize distributions to pinpoint exactly which features are drifting.</span>
-                        </li>
-                        <li class="flex items-start gap-3">
-                            <div class="mt-1 w-5 h-5 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0">
-                                <i data-feather="check" class="w-3 h-3 text-orange-400"></i>
-                            </div>
-                            <span class="text-slate-300"><strong class="text-white">Automated Reports:</strong> Generate comprehensive HTML reports for stakeholders.</span>
-                        </li>
-                    </ul>
-                </div>
-                
-                <!-- Carousel -->
-                <div class="lg:w-1/2 relative">
-                    <div class="absolute -inset-4 bg-orange-500/20 rounded-3xl blur-2xl -z-10"></div>
-                    
-                    <!-- Carousel Container -->
-                    <div id="drift-carousel" class="rounded-2xl border border-slate-800 shadow-2xl w-full bg-slate-900 aspect-video relative group overflow-hidden cursor-pointer">
-                        <!-- Slides Container -->
-                        <div id="drift-slides" class="flex transition-transform duration-500 ease-out h-full">
-                            <!-- Slide 1: Drift Dashboard -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 drift-slide-content">
-                                <img src="./static/img/drift/drift.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Drift Dashboard">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Drift Dashboard</span>
-                                </div>
-                            </div>
-                            <!-- Slide 2: Drift Report -->
-                            <div class="w-full h-full flex-shrink-0 flex items-center justify-center relative bg-slate-900 drift-slide-content">
-                                <img src="./static/img/drift/drift_report.jpg" class="absolute inset-0 w-full h-full object-cover" alt="Comprehensive Drift Report">
-                                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-slate-950/90 to-transparent">
-                                    <span class="text-white font-medium drop-shadow-md">Comprehensive Drift Report</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Zoom Hint -->
-                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 bg-slate-900/60 p-2 rounded-full backdrop-blur-sm">
-                            <i data-feather="maximize-2" class="text-white w-5 h-5"></i>
-                        </div>
-
-                        <!-- Navigation Buttons -->
-                        <button id="drift-prev" class="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/80 text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100 z-20">
-                            <i data-feather="chevron-left" class="w-6 h-6"></i>
-                        </button>
-                        <button id="drift-next" class="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-slate-800/80 text-white hover:bg-slate-700 transition-colors opacity-0 group-hover:opacity-100 z-20">
-                            <i data-feather="chevron-right" class="w-6 h-6"></i>
-                        </button>
-
-                        <!-- Indicators -->
-                        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-                            <button class="w-2 h-2 rounded-full bg-white hover:bg-white transition-colors drift-dot"></button>
-                            <button class="w-2 h-2 rounded-full bg-white/20 hover:bg-white transition-colors drift-dot"></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Use Cases Section -->
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="text-center mb-16">
@@ -861,8 +402,8 @@ _ = estimator.fit_predict(
                         Train models on patient data or research datasets that can't leave your infrastructure due to GDPR or institutional policies.
                     </p>
                     <ul class="space-y-2 text-sm text-slate-500">
-                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>HIPAA and GDPR friendly workflows</li>
-                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>100% on-premise processing</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>Local CSV/Parquet ingestion</li>
+                        <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-400 rounded-full"></span>No cloud uploads</li>
                     </ul>
                 </div>
 
@@ -918,19 +459,6 @@ _ = estimator.fit_predict(
                         <p class="text-slate-400 leading-relaxed">
                             Skyulf is a self-hosted MLOps platform. It lets you build, train, and monitor machine learning pipelines entirely on your infrastructure.
                             Unlike cloud-based solutions, your data never leaves your servers—perfect for privacy-sensitive or regulated environments.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- FAQ Item 1.5 -->
-                <div class="rounded-xl bg-slate-900/50 border border-slate-800 overflow-hidden">
-                    <button class="w-full text-left px-6 py-4 flex items-center justify-between group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('i').classList.toggle('rotate-180')">
-                        <span class="font-semibold text-white group-hover:text-blue-400 transition-colors">What is the meaning of Skyulf?</span>
-                        <i data-feather="chevron-down" class="w-5 h-5 text-slate-500 transition-transform duration-300"></i>
-                    </button>
-                    <div class="hidden px-6 pb-4 pt-0">
-                        <p class="text-slate-400 leading-relaxed">
-                            I named it Skyulf after two ideas. Sky is the open space above Earth, where the sun, moon, stars, and clouds live. Ulf means “wolf,” with Nordic roots, and the wolf is also a strong symbol in Turkic tradition. Together it fits the project: independent and community-driven.
                         </p>
                     </div>
                 </div>
@@ -1042,8 +570,8 @@ _ = estimator.fit_predict(
                 <div class="order-2 lg:order-1">
                     <div class="rounded-2xl border border-slate-800 bg-slate-950 p-2 shadow-2xl">
                         <div class="relative w-full aspect-video overflow-hidden rounded-xl bg-slate-900">
-                            <video id="product-tour-video" class="w-full h-full object-cover" controls poster="./static/img/dashboard.jpg">
-                                <source src="./static/video/Canvas.mp4" type="video/mp4">
+                            <video id="product-tour-video" class="w-full h-full object-cover" controls poster="./static/app-preview.gif">
+                                <source src="./static/video/ML_Canvas.mp4" type="video/mp4">
                                 Your browser does not support the video tag.
                             </video>
                         </div>
@@ -1066,7 +594,7 @@ _ = estimator.fit_predict(
                             <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-blue-400 font-bold text-sm">1</div>
                             <div>
                                 <h3 class="text-lg font-semibold text-white mb-1">Load your data</h3>
-                                <p class="text-slate-400 text-sm">Point to CSV, Excel, JSON, Parquet, or S3 sources. Schema gets detected automatically.</p>
+                                <p class="text-slate-400 text-sm">Point to CSV, Parquet, or SQL sources. Schema gets detected automatically.</p>
                             </div>
                         </div>
                         <div class="flex gap-4">
@@ -1090,43 +618,27 @@ _ = estimator.fit_predict(
     </section>
 
     <!-- Tech Stack -->
-    <section id="stack" class="py-16 overflow-hidden">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-8">
-            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider">Powered by modern open source</p>
-        </div>
-        
-        <div class="relative flex overflow-x-hidden group">
-            <div class="animate-scroll whitespace-nowrap flex gap-16 items-center">
-                <!-- First Set -->
-                <span class="text-2xl font-bold text-orange-400/80">Scikit-learn</span>
-                <span class="text-2xl font-bold text-blue-400/80">Pandas</span>
-                <span class="text-2xl font-bold text-teal-400/80">FastAPI</span>
-                <span class="text-2xl font-bold text-cyan-400/80">React</span>
-                <span class="text-2xl font-bold text-purple-400/80">Optuna</span>
-                <span class="text-2xl font-bold text-lime-400/80">Celery</span>
-                <span class="text-2xl font-bold text-red-400/80">Redis</span>
-                <span class="text-2xl font-bold text-indigo-400/80">Polars</span>
-                <span class="text-2xl font-bold text-yellow-400/80">NumPy</span>
-                <span class="text-2xl font-bold text-pink-400/80">Imbalanced-learn</span>
-                <span class="text-2xl font-bold text-emerald-400/80">SQLAlchemy</span>
-
-                <!-- Duplicate Set for Seamless Loop -->
-                <span class="text-2xl font-bold text-orange-400/80">Scikit-learn</span>
-                <span class="text-2xl font-bold text-blue-400/80">Pandas</span>
-                <span class="text-2xl font-bold text-teal-400/80">FastAPI</span>
-                <span class="text-2xl font-bold text-cyan-400/80">React</span>
-                <span class="text-2xl font-bold text-purple-400/80">Optuna</span>
-                <span class="text-2xl font-bold text-lime-400/80">Celery</span>
-                <span class="text-2xl font-bold text-red-400/80">Redis</span>
-                <span class="text-2xl font-bold text-indigo-400/80">Polars</span>
-                <span class="text-2xl font-bold text-yellow-400/80">NumPy</span>
-                <span class="text-2xl font-bold text-pink-400/80">Imbalanced-learn</span>
-                <span class="text-2xl font-bold text-emerald-400/80">SQLAlchemy</span>
+    <section id="stack" class="py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <p class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-8">Powered by modern open source</p>
+            <div class="flex flex-wrap justify-center items-center gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
+                <!-- Simple text representations for logos to keep it clean/fast without external SVGs -->
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-teal-400">FastAPI</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-blue-400">React</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-green-400">Celery</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-red-400">Redis</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xl font-bold text-blue-300">Polars</span>
+                </div>
             </div>
-            
-            <!-- Fade Edges -->
-            <div class="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-slate-950 to-transparent z-10"></div>
-            <div class="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-slate-950 to-transparent z-10"></div>
         </div>
     </section>
 
@@ -1158,10 +670,10 @@ _ = estimator.fit_predict(
                 <div>
                     <h4 class="text-white font-semibold mb-4">Product</h4>
                     <ul class="space-y-2 text-slate-400 text-sm">
-                        <li><a href="#features" class="hover:text-white transition-colors">Features</a></li>
-                        <li><a href="#workflow" class="hover:text-white transition-colors">Workflow</a></li>
-                        <li><a href="#faq" class="hover:text-white transition-colors">FAQ</a></li>
-                        <li><a href="https://pypi.org/project/skyulf-core/" target="_blank" class="hover:text-white transition-colors">PyPI Package</a></li>
+                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Automated feature stores</li>
+                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Continuous evaluation</li>
+                        <li><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block mr-2"></span>Production backfills</li>
+                        <li><a href="#" class="hover:text-white transition-colors">API Reference</a></li>
                     </ul>
                 </div>
                 
@@ -1170,25 +682,24 @@ _ = estimator.fit_predict(
                     <ul class="space-y-2 text-slate-400 text-sm">
                         <li><a href="https://github.com/flyingriverhorse/skyulf" target="_blank" class="hover:text-white transition-colors">GitHub Repository</a></li>
                         <li><a href="./site/index.html" class="hover:text-white transition-colors">Documentation</a></li>
-                        <li><a href="./site/guides/platform_setup.html" class="hover:text-white transition-colors">Quick Start</a></li>
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/discussions" target="_blank" class="hover:text-white transition-colors">Community</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
+                        <li><a href="#" class="hover:text-white transition-colors">Community</a></li>
                     </ul>
                 </div>
                 
                 <div>
                     <h4 class="text-white font-semibold mb-4">Project</h4>
                     <ul class="space-y-2 text-slate-400 text-sm">
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/ROADMAP.md" target="_blank" class="hover:text-white transition-colors">Roadmap</a></li>
+                        <li><a href="#roadmap" class="hover:text-white transition-colors">Roadmap</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/CONTRIBUTING.md" target="_blank" class="hover:text-white transition-colors">Contributing</a></li>
                         <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/SECURITY.md" target="_blank" class="hover:text-white transition-colors">Security</a></li>
-                        <li><a href="https://github.com/flyingriverhorse/skyulf/blob/master/LICENSE" target="_blank" class="hover:text-white transition-colors">License</a></li>
                     </ul>
                 </div>
             </div>
             
             <div class="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="text-slate-500 text-sm">
-                    &copy; 2025–2026 Murat Unsal. Apache 2.0 License.
+                    &copy; 2025 Murat Unsal. Apache 2.0 License.
                 </div>
                 <div class="flex gap-6">
                     <a href="https://www.linkedin.com/in/murat-u/" class="text-slate-500 hover:text-white transition-colors"><i data-feather="linkedin" class="w-5 h-5"></i></a>
@@ -1197,25 +708,6 @@ _ = estimator.fit_predict(
             </div>
         </div>
     </footer>
-
-    <!-- Lightbox Modal -->
-    <div id="lightbox" class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm" aria-hidden="true" role="dialog" aria-label="Image preview">
-        <button id="lightbox-close" class="absolute top-6 right-6 text-slate-400 hover:text-white transition-colors z-50">
-            <i data-feather="x" class="w-10 h-10"></i>
-        </button>
-        
-        <div id="lightbox-container" class="lightbox-content relative max-w-[90vw] max-h-[90vh] w-full h-full flex items-center justify-center">
-            <!-- Content will be injected here -->
-        </div>
-
-        <!-- Lightbox Navigation (for carousel) -->
-        <button id="lightbox-prev" class="absolute left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-slate-800/50 text-white hover:bg-slate-700 transition-colors hidden">
-            <i data-feather="chevron-left" class="w-8 h-8"></i>
-        </button>
-        <button id="lightbox-next" class="absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-slate-800/50 text-white hover:bg-slate-700 transition-colors hidden">
-            <i data-feather="chevron-right" class="w-8 h-8"></i>
-        </button>
-    </div>
 
     <script>
         feather.replace();
@@ -1226,312 +718,6 @@ _ = estimator.fit_predict(
             if (video) {
                 video.defaultPlaybackRate = 2.0;
                 video.playbackRate = 2.0;
-            }
-
-            // --- Lightbox Logic ---
-            const lightbox = document.getElementById('lightbox');
-            const lightboxContainer = document.getElementById('lightbox-container');
-            const lightboxClose = document.getElementById('lightbox-close');
-            const lightboxPrev = document.getElementById('lightbox-prev');
-            const lightboxNext = document.getElementById('lightbox-next');
-            
-            let isCarouselMode = false;
-            let currentCarouselIndex = 0;
-            let carouselSlides = []; // Will hold the content to show
-
-            function openLightbox(content, isCarousel = false) {
-                lightboxContainer.innerHTML = ''; // Clear previous
-                lightboxContainer.appendChild(content);
-                
-                lightbox.classList.add('active');
-                document.body.style.overflow = 'hidden'; // Prevent scrolling
-                
-                isCarouselMode = isCarousel;
-                if (isCarousel) {
-                    lightboxPrev.classList.remove('hidden');
-                    lightboxNext.classList.remove('hidden');
-                } else {
-                    lightboxPrev.classList.add('hidden');
-                    lightboxNext.classList.add('hidden');
-                }
-                feather.replace();
-            }
-
-            function closeLightbox() {
-                lightbox.classList.remove('active');
-                document.body.style.overflow = '';
-                setTimeout(() => {
-                    lightboxContainer.innerHTML = '';
-                }, 300);
-            }
-
-            lightboxClose.addEventListener('click', closeLightbox);
-            lightbox.addEventListener('click', (e) => {
-                if (e.target === lightbox) closeLightbox();
-            });
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && lightbox.classList.contains('active')) closeLightbox();
-                if (!isCarouselMode) return;
-                if (e.key === 'ArrowLeft') showLightboxSlide(currentCarouselIndex - 1);
-                if (e.key === 'ArrowRight') showLightboxSlide(currentCarouselIndex + 1);
-            });
-
-            // --- Static Images Zoom ---
-            const zoomableImages = document.querySelectorAll('.zoomable');
-            zoomableImages.forEach(container => {
-                container.addEventListener('click', () => {
-                    const img = container.querySelector('img');
-                    if (img) {
-                        const clone = img.cloneNode(true);
-                        clone.classList.remove('group-hover:scale-105', 'transition-transform');
-                        clone.classList.add('max-w-full', 'max-h-full', 'object-contain', 'rounded-lg', 'shadow-2xl');
-                        openLightbox(clone, false);
-                    }
-                });
-            });
-
-            // --- EDA Carousel Logic ---
-            const slidesContainer = document.getElementById('eda-slides');
-            if (slidesContainer) {
-                const slides = Array.from(slidesContainer.children); // Get actual slide elements
-                const prevBtn = document.getElementById('eda-prev');
-                const nextBtn = document.getElementById('eda-next');
-                const dots = document.querySelectorAll('.eda-dot');
-                
-                let currentSlide = 0;
-                const totalSlides = slides.length;
-                let autoSlideInterval;
-
-                // Prepare carousel content for lightbox
-                // We clone the content of each slide to use in the lightbox
-                carouselSlides = slides.map(slide => {
-                    const content = slide.cloneNode(true);
-                    // Style the clone for lightbox
-                    content.className = 'w-full h-full flex items-center justify-center relative bg-slate-900 rounded-xl overflow-hidden';
-                    // If it has an image, ensure it fits
-                    const img = content.querySelector('img');
-                    if (img) {
-                        img.className = 'w-full h-full object-contain';
-                    }
-                    return content;
-                });
-
-                function updateSlide() {
-                    slidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
-                    // Update dots
-                    dots.forEach((dot, index) => {
-                        if (index === currentSlide) {
-                            dot.classList.remove('bg-white/20');
-                            dot.classList.add('bg-white');
-                        } else {
-                            dot.classList.add('bg-white/20');
-                            dot.classList.remove('bg-white');
-                        }
-                    });
-                }
-
-                function nextSlide() {
-                    currentSlide = (currentSlide + 1) % totalSlides;
-                    updateSlide();
-                }
-
-                function prevSlide() {
-                    currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
-                    updateSlide();
-                }
-
-                function startAutoSlide() {
-                    stopAutoSlide();
-                    autoSlideInterval = setInterval(nextSlide, 5000); 
-                }
-
-                function stopAutoSlide() {
-                    clearInterval(autoSlideInterval);
-                }
-
-                // Event Listeners for Main Carousel
-                if (nextBtn) {
-                    nextBtn.addEventListener('click', (e) => {
-                        e.stopPropagation(); // Prevent opening lightbox
-                        nextSlide();
-                        startAutoSlide();
-                    });
-                }
-
-                if (prevBtn) {
-                    prevBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        prevSlide();
-                        startAutoSlide();
-                    });
-                }
-
-                dots.forEach((dot, index) => {
-                    dot.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        currentSlide = index;
-                        updateSlide();
-                        startAutoSlide();
-                    });
-                });
-
-                // Pause on hover
-                const carousel = document.getElementById('eda-carousel');
-                if (carousel) {
-                    carousel.addEventListener('mouseenter', stopAutoSlide);
-                    carousel.addEventListener('mouseleave', startAutoSlide);
-                    
-                    // Open Lightbox on Click
-                    carousel.addEventListener('click', () => {
-                        // Restore global slides to EDA content
-                        carouselSlides = slides.map(slide => {
-                            const content = slide.cloneNode(true);
-                            content.className = 'w-full h-full flex items-center justify-center relative bg-slate-900 rounded-xl overflow-hidden';
-                            const img = content.querySelector('img');
-                            if (img) img.className = 'w-full h-full object-contain';
-                            return content;
-                        });
-
-                        // Ensure generic slide shower is active
-                        window.showLightboxSlide = (index) => {
-                            const max = carouselSlides.length;
-                            if (index < 0) index = max - 1;
-                            if (index >= max) index = 0;
-                            currentCarouselIndex = index;
-                            const content = carouselSlides[currentCarouselIndex].cloneNode(true);
-                            openLightbox(content, true);
-                        };
-
-                        currentCarouselIndex = currentSlide;
-                        showLightboxSlide(currentCarouselIndex);
-                    });
-                }
-
-                // Lightbox Carousel Navigation
-                window.showLightboxSlide = (index) => {
-                    // Handle wrapping
-                    if (index < 0) index = totalSlides - 1;
-                    if (index >= totalSlides) index = 0;
-                    
-                    currentCarouselIndex = index;
-                    
-                    // Get content
-                    const content = carouselSlides[currentCarouselIndex].cloneNode(true);
-                    openLightbox(content, true);
-                };
-
-                lightboxPrev.addEventListener('click', () => showLightboxSlide(currentCarouselIndex - 1));
-                lightboxNext.addEventListener('click', () => showLightboxSlide(currentCarouselIndex + 1));
-
-                // Initialize
-                startAutoSlide();
-            }
-
-            // --- Drift Carousel Logic ---
-            const driftSlidesContainer = document.getElementById('drift-slides');
-            if (driftSlidesContainer) {
-                const slides = Array.from(driftSlidesContainer.children);
-                const prevBtn = document.getElementById('drift-prev');
-                const nextBtn = document.getElementById('drift-next');
-                const dots = document.querySelectorAll('.drift-dot');
-                
-                let currentSlide = 0;
-                const totalSlides = slides.length;
-                let autoSlideInterval;
-
-                // Prepare content for lightbox
-                const mySlidesContent = slides.map(slide => {
-                    const content = slide.cloneNode(true);
-                    content.className = 'w-full h-full flex items-center justify-center relative bg-slate-900 rounded-xl overflow-hidden';
-                    const img = content.querySelector('img');
-                    if (img) img.className = 'w-full h-full object-contain';
-                    return content;
-                });
-
-                function updateDriftSlide() {
-                    driftSlidesContainer.style.transform = `translateX(-${currentSlide * 100}%)`;
-                    dots.forEach((dot, index) => {
-                        if (index === currentSlide) {
-                            dot.classList.remove('bg-white/20');
-                            dot.classList.add('bg-white');
-                        } else {
-                            dot.classList.add('bg-white/20');
-                            dot.classList.remove('bg-white');
-                        }
-                    });
-                }
-
-                function nextDriftSlide() {
-                    currentSlide = (currentSlide + 1) % totalSlides;
-                    updateDriftSlide();
-                }
-
-                function prevDriftSlide() {
-                    currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
-                    updateDriftSlide();
-                }
-
-                function startDriftAutoSlide() {
-                    stopDriftAutoSlide();
-                    autoSlideInterval = setInterval(nextDriftSlide, 5000); 
-                }
-
-                function stopDriftAutoSlide() {
-                    clearInterval(autoSlideInterval);
-                }
-
-                if (nextBtn) {
-                    nextBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        nextDriftSlide();
-                        startDriftAutoSlide();
-                    });
-                }
-
-                if (prevBtn) {
-                    prevBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        prevDriftSlide();
-                        startDriftAutoSlide();
-                    });
-                }
-
-                dots.forEach((dot, index) => {
-                    dot.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        currentSlide = index;
-                        updateDriftSlide();
-                        startDriftAutoSlide();
-                    });
-                });
-
-                const carousel = document.getElementById('drift-carousel');
-                if (carousel) {
-                    carousel.addEventListener('mouseenter', stopDriftAutoSlide);
-                    carousel.addEventListener('mouseleave', startDriftAutoSlide);
-                    
-                    carousel.addEventListener('click', () => {
-                        // Switch global carousel content to Drift
-                        carouselSlides = mySlidesContent;
-                        currentCarouselIndex = currentSlide;
-
-                        // Redefine showLightboxSlide to use correct length (since EDA logic hardcodes its own length)
-                        window.showLightboxSlide = (index) => {
-                            const max = carouselSlides.length;
-                            if (index < 0) index = max - 1;
-                            if (index >= max) index = 0;
-                            
-                            currentCarouselIndex = index;
-                            
-                            const content = carouselSlides[currentCarouselIndex].cloneNode(true);
-                            openLightbox(content, true);
-                        };
-
-                        showLightboxSlide(currentCarouselIndex);
-                    });
-                }
-                
-                startDriftAutoSlide();
             }
         });
     </script>
