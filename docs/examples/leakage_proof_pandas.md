@@ -470,4 +470,23 @@ This guarantee applies per preprocessing step, relative to the split defined in 
 
 **Covered — the pipeline-structure gate.** Every node declares whether its `fit()` learns from the data it is given (`learns_from_data` on its node metadata), and both the standalone diagnostic (`skyulf.validate_leakage_safety`) and the pre-execution gate derive their node lists from that registry — there is no hand-maintained allow-list to drift. A pipeline that fits a data-dependent node before its train/test split is rejected by default (`on_leakage="raise"`; set `"warn"` or `"ignore"` to opt out). Unknown nodes fail closed, and a pipeline with no train/test split at all gets an explicit diagnostic stating that the leakage guarantee does not apply to it. The gate is also *param-aware* for dual-mode nodes: a `DropMissingColumns` node dropping explicitly named columns, a `SimpleImputer` with `strategy="constant"`, a `MissingIndicator` flagging explicitly named columns, a `HashEncoder` given an explicit column list, and target-only Label/Ordinal encoding learn nothing from the rows and are allowed before the split — while their data-learning modes (missing-% threshold, statistic strategies, auto-detected missingness/categorical columns, feature encoding) remain gated. `SkyulfPipeline.fit()` surfaces the same verdict as warnings before training when you fit on an unsplit frame.
 
-**Not covered — cross-validation scores, yet.** CV and hyperparameter tuning do not re-fit preprocessing inside each fold: preprocessing is fitted once on the full training set, so every fold's validation rows influenced the statistics used to transform them. Reported CV and tuning scores are therefore optimistic. Per-fold refitting is planned; until it lands, treat CV/tuning scores as an upper bound rather than a leakage-free estimate.
+**Covered — cross-validation and tuning scores (Skyulf app).** As of
+skyulf-core 0.7.0 the app re-fits preprocessing inside every CV fold and
+every tuning candidate fold (a `FoldPreprocessor` threaded through
+`perform_cross_validation`, `StatefulEstimator.cross_validate` and
+`TuningCalculator.fit`): each fold's statistics are learned from that fold's
+training rows only, so CV and tuning scores are no longer optimistically
+biased. The measured size of that bias in the leakage-dominated case (a
+target-aware WOE encoder over a pure-noise target, 400 rows / 200
+categories): legacy full-split scoring reports a CV AUC of **0.867** and a
+tuning best score of **0.867** — pure memorisation of held-out rows — while
+per-fold refit reports **0.495 / 0.494**, exactly chance. On real-signal
+data the honest scores stay close to the old ones (the drop is the bias
+leaving, not the signal). Two graph shapes fall back to pre-transformed scoring with an
+explicit job-log warning: pipelines whose branches merge before training,
+and the `halving_*`/`optuna` tuning strategies (their CV runs inside sklearn
+searchers where the fold hook can't reach yet — `grid`/`random` are
+covered). Library users calling CV/tuning directly get the same guarantee by
+passing a preprocessor — e.g. `FeatureEngineerFoldAdapter(steps_config,
+target_column)` — via the `preprocessing` parameter; without it, CV/tuning
+scores the pre-transformed data and remains an optimistic estimate.

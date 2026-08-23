@@ -31,6 +31,7 @@ from .ensemble import (
     VotingRegressorApplier,
     VotingRegressorCalculator,
 )
+from .fold_preprocessing import FoldPreprocessor
 from .hyperparameters import (
     HyperparameterField,
     get_default_search_space,
@@ -77,6 +78,7 @@ __all__ = [
     "StackingRegressorCalculator",
     "StackingRegressorApplier",
     "perform_cross_validation",
+    "FoldPreprocessor",
     "HyperparameterField",
     "get_hyperparameters",
     "get_default_search_space",
