@@ -71,6 +71,7 @@ class ZScoreApplier(BaseApplier):
     category="Preprocessing",
     description="Remove outliers using Z-Score.",
     params={"threshold": 3.0, "columns": []},
+    learns_from_data=True,
 )
 class ZScoreCalculator(BaseCalculator):
     def infer_output_schema(

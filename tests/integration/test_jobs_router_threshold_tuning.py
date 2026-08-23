@@ -235,6 +235,23 @@ def test_save_endpoint_returns_400_for_missing_job(client):
     assert response.status_code == 400
 
 
+@pytest.mark.asyncio
+async def test_save_endpoint_returns_400_for_invalid_payload(async_session, client):
+    """POST .../thresholds/save returns 400 for a payload predict-time cannot honor (F-40)."""
+    await _insert_job(async_session, "job-1")
+
+    response = client.post(
+        f"{BASE}/jobs/job-1/thresholds/save",
+        json={
+            "thresholds": {"0": 0.5},
+            "classes": [0, 1],
+            "metric": "f1",
+            "split_used": "validation",
+        },
+    )
+    assert response.status_code == 400
+
+
 def test_clear_endpoint_returns_400_for_missing_job(client):
     """DELETE .../thresholds returns 400 when the job doesn't exist."""
     response = client.delete(f"{BASE}/jobs/nonexistent/thresholds")

@@ -215,6 +215,7 @@ def _onehot_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, A
         "columns": [],
         "include_missing": False,
     },
+    learns_from_data=True,
 )
 class OneHotEncoderCalculator(BaseCalculator):
     @fit_method

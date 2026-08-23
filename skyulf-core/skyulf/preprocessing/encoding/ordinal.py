@@ -321,6 +321,7 @@ def _ordinal_fit_pandas(X: Any, y: Any, config: dict[str, Any]) -> Mapping[str, 
         "unknown_value": -1,
         "categories_order": "",
     },
+    learns_from_data=True,
 )
 class OrdinalEncoderCalculator(BaseCalculator):
     def infer_output_schema(

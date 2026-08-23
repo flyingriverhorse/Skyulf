@@ -27,6 +27,7 @@ from skyulf.preprocessing.drop_and_missing.missing_indicator import (
     MissingIndicatorApplier,
     MissingIndicatorCalculator,
 )
+from skyulf.registry import NodeRegistry
 
 _threshold_ignored_cases = TestCaseLoader(
     "preprocessing/drop_and_missing_gaps", group="threshold_ignored"
@@ -263,6 +264,34 @@ def test_drop_missing_columns_by_threshold_polars() -> None:
     assert "a" not in out.columns
     assert "c" not in out.columns
     assert "b" in out.columns
+
+
+def test_drop_missing_columns_counts_nan_as_missing_parity() -> None:
+    """F-19: pandas' ``isna()`` counts NaN as missing; polars ``null_count()``
+    does not — so a float column holding NaNs must still be dropped by the
+    Polars fit path, matching the pandas verdict."""
+    pdf = pd.DataFrame({"a": [float("nan"), float("nan"), 1.0, 2.0], "b": [1.0] * 4})
+    plf = pl.DataFrame({"a": [float("nan"), float("nan"), 1.0, 2.0], "b": [1.0] * 4})
+    art_pd = DropMissingColumnsCalculator().fit(pdf, {"missing_threshold": 50})
+    art_pl = DropMissingColumnsCalculator().fit(plf, {"missing_threshold": 50})
+    assert sorted(art_pd["columns_to_drop"]) == ["a"]
+    assert sorted(art_pl["columns_to_drop"]) == ["a"]
+
+
+def test_drop_missing_columns_declared_default_params_honor_threshold() -> None:
+    """F-22: the params declared by ``@node_meta`` must be the config keys
+    ``fit`` actually reads. The declaration used to say ``threshold`` while
+    fit read ``missing_threshold``, so fitting with the node's own declared
+    defaults silently skipped the threshold path (the registry contract and
+    smoke suites both fit with these defaults)."""
+    # Read the declared params through the registry — the same source the
+    # registry contract and smoke suites consume (`__node_meta__` feeds it).
+    declared = NodeRegistry.get_all_metadata()["DropMissingColumns"]["params"]
+    df = _missing_df()
+    art = DropMissingColumnsCalculator().fit(df, dict(declared))
+    # 'a' is 50% missing and 'c' is 100% — the declared default threshold
+    # must drop both, proving the declared key is the one fit reads.
+    assert sorted(art["columns_to_drop"]) == ["a", "c"]
 
 
 class TestDropMissingColumnsThresholdIgnored:

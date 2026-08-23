@@ -46,6 +46,17 @@ def _resolve_apply_inputs(X: Any, params: dict[str, Any]) -> tuple[list[str], di
     return valid_cols, mappings
 
 
+def _string_keys_with_nan(series: Any) -> Any:
+    """Coerce a pandas column to string keys, rendering missing as ``"nan"``.
+
+    Mirrors the Polars path's ``fill_null("nan")``: a bare ``astype(str)``
+    would render ``None`` in an object column as ``"None"``, so the two
+    engines would learn different artifact keys for the same null category
+    and cross-engine replay would silently fall back to the default (F-28).
+    """
+    return series.where(series.notna(), "nan").astype(str)
+
+
 def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]:
     import polars as pl
 
@@ -54,10 +65,9 @@ def _woe_apply_polars(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
         return X, y
 
     default = float(params.get("default", 0.0))
-    # `astype(str)` on the pandas side turns NaN into the literal "nan" string
-    # (and the fit step learns a WOE for that category the same way). Mirror
-    # that here so nulls hit the learned mapping instead of always falling
-    # back to `default` on the polars path.
+    # ``fill_null("nan")`` matches the pandas side's ``_string_keys_with_nan``
+    # so null rows hit the learned mapping on both engines instead of always
+    # falling back to ``default``.
     exprs = [
         pl.col(col)
         .cast(pl.Utf8)
@@ -77,7 +87,7 @@ def _woe_apply_pandas(X: Any, y: Any, params: dict[str, Any]) -> tuple[Any, Any]
     default = float(params.get("default", 0.0))
     X_out = X.copy()
     for col in valid_cols:
-        mapped = X_out[col].astype(str).map(mappings[col])
+        mapped = _string_keys_with_nan(X_out[col]).map(mappings[col])
         X_out[col] = mapped.fillna(default).astype(float)
     return X_out, y
 
@@ -143,7 +153,7 @@ def _build_woe_artifact(
     mappings: dict[str, dict[str, float]] = {}
     iv_scores: dict[str, float] = {}
     for col in cols:
-        values = frame[col].astype(str).to_numpy()
+        values = _string_keys_with_nan(frame[col]).to_numpy()
         mappings[col], iv_scores[col] = _column_woe(values, y_bin, reg)
     return {
         "type": "woe_encoder",
@@ -241,7 +251,7 @@ def _cross_fit_woe_values(
             "mappings"
         ]
         for col in cols:
-            held_values = frame[col].iloc[hold_idx].astype(str).to_numpy()
+            held_values = _string_keys_with_nan(frame[col].iloc[hold_idx]).to_numpy()
             mapping = mappings[col]
             encoded[col][hold_idx] = np.array([mapping.get(v, 0.0) for v in held_values])
     return encoded
@@ -310,6 +320,7 @@ def _woe_fit_transform_train_polars(
         "category with its log-odds and records Information Value per column."
     ),
     params={"regularization": 0.5, "columns": []},
+    learns_from_data=True,
 )
 class WOEEncoderCalculator(BaseCalculator):
     @fit_method

@@ -147,6 +147,7 @@ class RollingAggregateApplier(BaseApplier):
         "sort_by": None,
     },
     tags=["time-series"],
+    learns_from_data=False,
 )
 class RollingAggregateCalculator(BaseCalculator):
     def fit(

@@ -15,6 +15,13 @@ function findClassIndex(y_proba: YProba, targetClass: string | number): number {
   return (labelList ?? y_proba.classes).findIndex(c => String(c) === targetStr);
 }
 
+/** Numeric-aware label sort: all-numeric labels sort by value, so classes
+ * like 2 and 10 don't end up in lexicographic "10, 2" order (F-46). */
+function classLabelComparator(a: string | number, b: string | number): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+}
+
 /** Confusion matrix for an arbitrary set of classes. classOrder forces row/column order. */
 export function calculateConfusionMatrix(
   y_true: (string | number)[],
@@ -23,7 +30,7 @@ export function calculateConfusionMatrix(
 ): { classes: (string | number)[]; matrix: number[][] } {
   const classes = (classOrder && classOrder.length > 0)
     ? [...classOrder]
-    : Array.from(new Set([...y_true, ...y_pred])).sort((a, b) => String(a).localeCompare(String(b)));
+    : Array.from(new Set([...y_true, ...y_pred])).sort(classLabelComparator);
   const matrix = classes.map(trueClass =>
     classes.map(predClass =>
       y_true.reduce((count: number, t, i) => {

@@ -93,12 +93,24 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      description: Which execution engine was in use when the problem occurred? (the `SKYULF_ENGINE` setting; Polars is the default)
+      options:
+        - Polars (default)
+        - Pandas
+        - Not sure / not applicable
+    validations:
+      required: false
+
   - type: input
     id: version
     attributes:
       label: Skyulf Version
-      description: Which version are you running? (e.g., v0.1.6, main branch commit SHA)
-      placeholder: v0.1.6
+      description: Which version are you running? (latest release tag, or master branch commit SHA)
+      placeholder: e.g., v0.8.1
     validations:
       required: true
 
@@ -130,5 +142,5 @@ body:
       label: Reproduction Script (Optional)
       description: |
         If this is a backend/core issue, providing a standalone script is the **fastest** way to get it fixed.
-        See `tests/reproduce_issue_template.py` for inspiration.
+        A minimal script that builds a small DataFrame and calls the failing node or API is ideal.
       render: python

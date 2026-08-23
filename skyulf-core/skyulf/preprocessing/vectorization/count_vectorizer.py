@@ -122,6 +122,7 @@ def _build_count_artifact(
         "drop_original": False,
     },
     tags=["text", "nlp", "vectorizer", "bag-of-words"],
+    learns_from_data=True,
 )
 class CountVectorizerCalculator(BaseCalculator):
     def infer_output_schema(self, input_schema: Any, config: dict[str, Any]) -> None:

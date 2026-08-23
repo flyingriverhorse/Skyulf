@@ -43,6 +43,28 @@ def _rewrap_polars_output(X_out: Any, was_wrapped: bool) -> Any:
     return X_out
 
 
+def _check_xy_engine_parity(X: Any, y: Any) -> None:
+    """Reject ``(X, y)`` pairs whose frames come from different engines (F-27).
+
+    A pandas X cannot be indexed by a polars y (or vice versa); without this
+    guard the mismatch surfaces deep inside an engine-specific implementation
+    as a confusing ``AttributeError``. Engine-neutral y values (lists, numpy
+    arrays) are always accepted.
+    """
+    if y is None:
+        return
+    x_is_polars = isinstance(X, SkyulfPolarsWrapper) or type(X).__module__.startswith("polars")
+    y_is_polars = type(y).__module__.startswith("polars")
+    y_is_pandas = isinstance(y, (pd.DataFrame, pd.Series))
+    if (x_is_polars and y_is_pandas) or (y_is_polars and not x_is_polars):
+        raise TypeError(
+            "Mixed engines in (X, y): X is "
+            f"{'polars' if x_is_polars else 'pandas'} but y is "
+            f"{'polars' if y_is_polars else 'pandas'}. "
+            "Both must use the same engine."
+        )
+
+
 def _callable_name(func: Callable[..., Any]) -> str:
     """Best-effort display name for a dispatch-target callable.
 
@@ -99,6 +121,7 @@ def apply_dual_engine(
         Packed output matching the input format.
     """
     X, y, is_tuple = unpack_pipeline_input(df)
+    _check_xy_engine_parity(X, y)
     engine = get_engine(X)
 
     if engine.name == EngineName.POLARS:
@@ -146,6 +169,7 @@ def fit_dual_engine(
         Dictionary of fitted parameters.
     """
     X, y, _ = unpack_pipeline_input(df)
+    _check_xy_engine_parity(X, y)
     engine = get_engine(X)
 
     if engine.name == EngineName.POLARS:
@@ -172,6 +196,7 @@ def fit_transform_train_dual_engine(
 ) -> tuple[dict[str, Any], Any]:
     """Dispatch an optional fit+train-transform hook across supported engines."""
     X, y, is_tuple = unpack_pipeline_input(df)
+    _check_xy_engine_parity(X, y)
     engine = get_engine(X)
 
     if engine.name == EngineName.POLARS:

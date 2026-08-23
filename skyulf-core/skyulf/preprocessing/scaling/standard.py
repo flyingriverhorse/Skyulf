@@ -102,6 +102,7 @@ class StandardScalerApplier(BaseApplier):
     category="Preprocessing",
     description="Standardize features by removing the mean and scaling to unit variance.",
     params={"columns": [], "with_mean": True, "with_std": True},
+    learns_from_data=True,
 )
 class StandardScalerCalculator(BaseCalculator):
     def infer_output_schema(

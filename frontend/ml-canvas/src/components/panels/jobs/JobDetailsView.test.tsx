@@ -194,6 +194,18 @@ describe('JobDetailsView', () => {
     expect(screen.getByText('Something exploded')).toBeInTheDocument();
   });
 
+  it('lets the user hide CV metrics in the results grid', () => {
+    renderDetails(makeJob({
+      job_type: 'training',
+      status: 'completed',
+      result: { metrics: { test_f1_weighted: 0.91, cv_f1_weighted_mean: 0.9 } },
+    }));
+    expect(screen.getByText('cv f1 weighted mean')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /show cv metrics/i }));
+    expect(screen.queryByText('cv f1 weighted mean')).not.toBeInTheDocument();
+    expect(screen.getByText('test f1 weighted')).toBeInTheDocument();
+  });
+
   it('links the dataset using the shared RecordLink primitive', () => {
     renderDetails(
       makeJob({ dataset_id: 'ds-1', dataset_name: 'Sales Data', pipeline_id: 'pipe-42' }),
@@ -287,5 +299,109 @@ describe('JobDetailsView', () => {
     const progressLabel = screen.getByText('Progress');
     const progressValue = within(progressLabel.parentElement as HTMLElement).getByText('Not reported');
     expect(progressValue).toBeInTheDocument();
+  });
+
+  it('shows a passed leakage-gate verdict tile for jobs that ran through the gate', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: { metrics: { leakage_gate: { status: 'passed', messages: [] } } },
+    }));
+    const label = screen.getByText('Leakage Gate');
+    expect(within(label.parentElement as HTMLElement).getByText('Passed')).toBeInTheDocument();
+  });
+
+  it('flags jobs trained without a train/test split in the gate tile', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'no_split',
+            messages: ['No train/test split is defined in this pipeline graph.'],
+          },
+        },
+      },
+    }));
+    const label = screen.getByText('Leakage Gate');
+    expect(within(label.parentElement as HTMLElement).getByText('No split')).toBeInTheDocument();
+  });
+
+  it('omits the gate tile for legacy jobs without a verdict', () => {
+    renderDetails(makeJob({ status: 'completed', result: { metrics: { accuracy: 0.9 } } }));
+    expect(screen.queryByText('Leakage Gate')).not.toBeInTheDocument();
+  });
+
+  it('opens a verdict modal listing what the gate checked and why exemptions were allowed', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'passed',
+            messages: [],
+            splitters: ['split'],
+            checked: [
+              { node_id: 'scale', step_type: 'StandardScaler', before_split: false, violation: false },
+            ],
+            exempted: [
+              { node_id: 'fill', step_type: 'SimpleImputer', reason: 'Constant imputation — nothing learned from rows.' },
+            ],
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Leakage Gate/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('StandardScaler')).toBeInTheDocument();
+    expect(within(dialog).getByText(/runs after the split/i)).toBeInTheDocument();
+    expect(within(dialog).getByText('SimpleImputer')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Constant imputation/)).toBeInTheDocument();
+  });
+
+  it('flags violating nodes in the modal for a warnings verdict', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'warnings',
+            messages: ['Data leakage risk: node \'scale\' (StandardScaler) fits on the whole dataset.'],
+            splitters: ['split'],
+            checked: [
+              { node_id: 'scale', step_type: 'StandardScaler', before_split: true, violation: true },
+            ],
+            exempted: [],
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Leakage Gate/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('StandardScaler')).toBeInTheDocument();
+    expect(within(dialog).getByText(/fits before the split/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Data leakage risk/)).toBeInTheDocument();
+  });
+
+  it('falls back to the recorded messages for legacy verdicts without detail', () => {
+    renderDetails(makeJob({
+      status: 'completed',
+      result: {
+        metrics: {
+          leakage_gate: {
+            status: 'no_split',
+            messages: ['No train/test split is defined in this pipeline graph.'],
+          },
+        },
+      },
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Leakage Gate/ }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/No train\/test split is defined/)).toBeInTheDocument();
   });
 });

@@ -8,9 +8,12 @@ this is the fastest, most reliable way to *trigger* the
 dataset or a full pipeline run.
 """
 
+import logging
+
 import pytest
 
 from backend.ml_pipeline._execution._leakage_validation import (
+    NO_SPLIT_DIAGNOSTIC,
     validate_no_preprocessing_before_split,
 )
 from backend.ml_pipeline._execution.schemas import NodeConfig
@@ -46,14 +49,32 @@ def test_allows_scaler_after_splitter():
     validate_no_preprocessing_before_split(nodes)  # must not raise
 
 
-def test_noop_when_no_splitter_in_graph():
-    """Inference-only pipelines (no train/test boundary) are never flagged."""
+def test_no_splitter_logs_explicit_diagnostic(caplog):
+    """Pipelines with no train/test boundary get an explicit diagnostic
+    instead of silence (G1) — still non-blocking."""
     nodes = [
         _node("load", "DataLoader", []),
         _node("impute", "SimpleImputer", ["load"]),
         _node("scale", "StandardScaler", ["impute"]),
     ]
-    validate_no_preprocessing_before_split(nodes)  # must not raise
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        validate_no_preprocessing_before_split(nodes)  # must not raise
+    assert any("No train/test split" in r.message for r in caplog.records)
+
+
+def test_no_splitter_silent_under_ignore(caplog):
+    """on_leakage='ignore' suppresses even the advisory diagnostic."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("impute", "SimpleImputer", ["load"]),
+    ]
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        validate_no_preprocessing_before_split(nodes, on_leakage="ignore")
+    assert caplog.records == []
 
 
 def test_feature_target_split_does_not_trigger_leakage():
@@ -68,15 +89,196 @@ def test_feature_target_split_does_not_trigger_leakage():
 
 
 def test_stateless_nodes_before_splitter_are_allowed():
-    """Rule-based/stateless nodes (fixed bounds, hashing) never leak."""
+    """Rule-based/stateless nodes (fixed bounds) never leak."""
     nodes = [
         _node("load", "DataLoader", []),
         _node("bounds", "ManualBounds", ["load"]),
-        _node("hash", "HashEncoder", ["bounds"]),
-        _node("split", "TrainTestSplitter", ["hash"]),
+        _node("split", "TrainTestSplitter", ["bounds"]),
         _node("model", "LogisticRegression", ["split"]),
     ]
     validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+@pytest.mark.parametrize(
+    ("step_type", "params"),
+    [
+        ("HashEncoder", {}),
+        ("MissingIndicator", {}),
+        # Param-less DropMissingColumns is the explicit/no-op mode (exempt);
+        # its data-dependent mode is the positive missing-% threshold.
+        ("DropMissingColumns", {"missing_threshold": 50}),
+        ("Deduplicate", {}),
+    ],
+)
+def test_reclassified_stateful_nodes_before_splitter_are_blocked(step_type, params):
+    """F-16: nodes previously exempted as 'stateless' do learn from the data
+    they are fitted on (hash bucket occupancy, missingness structure, drop
+    lists, duplicate sets) and are now gated."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("step", step_type, ["load"], params=params),
+        _node("split", "TrainTestSplitter", ["step"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_step_type_lists_are_derived_from_the_core_registry():
+    """G2: the backend gate consumes the skyulf-core registry-derived lists;
+    there is no second hand-maintained copy to drift."""
+    from backend.ml_pipeline._execution import _leakage_validation
+    from skyulf.leakage import data_dependent_transformers, train_test_splitters
+
+    assert _leakage_validation.data_dependent_step_types() == data_dependent_transformers()
+    assert _leakage_validation.train_test_split_step_types() == train_test_splitters()
+
+
+def test_on_leakage_warn_logs_instead_of_raising(caplog):
+    """on_leakage='warn' restores the old non-blocking behaviour."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        validate_no_preprocessing_before_split(nodes, on_leakage="warn")  # must not raise
+    assert any("Data leakage risk" in r.message for r in caplog.records)
+
+
+def test_validate_returns_passed_verdict_for_a_clean_graph():
+    """The gate returns a structured verdict the engine persists on the job."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("split", "TrainTestSplitter", ["load"]),
+        _node("scale", "StandardScaler", ["split"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict == {
+        "status": "passed",
+        "messages": [],
+        "splitters": ["split"],
+        "checked": [
+            {
+                "node_id": "scale",
+                "step_type": "StandardScaler",
+                "before_split": False,
+                "violation": False,
+            }
+        ],
+        "exempted": [],
+    }
+
+
+def test_verdict_marks_checked_nodes_running_before_the_split():
+    """A data-dependent node wired before the splitter is reported with
+    before_split=True so the modal can explain exactly what was checked."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("impute", "SimpleImputer", ["load"], params={"strategy": "median"}),
+        _node("split", "TrainTestSplitter", ["impute"]),
+        _node("scale", "StandardScaler", ["split"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+    by_id = {c["node_id"]: c for c in verdict["checked"]}
+    assert by_id["impute"]["before_split"] is True
+    assert by_id["impute"]["violation"] is True
+    assert by_id["scale"]["before_split"] is False
+    assert by_id["scale"]["violation"] is False
+    assert verdict["splitters"] == ["split"]
+
+
+def test_verdict_lists_exemptions_with_their_reasons():
+    """Param-aware exemptions are reported so the modal can explain why a
+    data-dependent node type was allowed before the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("fill", "SimpleImputer", ["load"], params={"strategy": "constant"}),
+        _node("drop", "DropMissingColumns", ["load"], params={"columns": ["id"]}),
+        _node("flags", "MissingIndicator", ["load"], params={"columns": ["age"]}),
+        _node("hash", "HashEncoder", ["load"], params={"columns": ["city"]}),
+        _node("encode", "LabelEncoder", ["load"], params={"columns": ["species"]}),
+        _node(
+            "split",
+            "TrainTestSplitter",
+            ["fill", "drop", "flags", "hash", "encode"],
+            params={"target_column": "species"},
+        ),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict["status"] == "passed"
+    by_id = {e["node_id"]: e for e in verdict["exempted"]}
+    assert set(by_id) == {"fill", "drop", "flags", "hash", "encode"}
+    assert "constant" in by_id["fill"]["reason"].lower()
+    assert all(e["reason"] for e in verdict["exempted"])
+
+
+def test_warn_mode_verdict_carries_detail_alongside_messages():
+    """The structured detail accompanies violation messages in warn mode."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+    assert verdict["status"] == "warnings"
+    assert verdict["checked"] == [
+        {
+            "node_id": "scale",
+            "step_type": "StandardScaler",
+            "before_split": True,
+            "violation": True,
+        }
+    ]
+    assert verdict["splitters"] == ["split"]
+
+
+def test_no_split_verdict_still_lists_what_would_be_checked():
+    """Without a splitter the verdict keeps its detail so the modal can show
+    which data-dependent nodes were examined."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("fill", "SimpleImputer", ["load"], params={"strategy": "constant"}),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="ignore")
+    assert verdict["status"] == "no_split"
+    assert verdict["splitters"] == []
+    assert verdict["checked"] == [
+        {
+            "node_id": "scale",
+            "step_type": "StandardScaler",
+            "before_split": False,
+            "violation": False,
+        }
+    ]
+    assert [e["node_id"] for e in verdict["exempted"]] == ["fill"]
+
+
+def test_validate_returns_no_split_verdict_with_the_advisory_diagnostic(caplog):
+    """A splitter-less graph gets the advisory diagnostic in the verdict."""
+    nodes = [_node("load", "DataLoader", []), _node("scale", "StandardScaler", ["load"])]
+    with caplog.at_level(
+        logging.WARNING, logger="backend.ml_pipeline._execution._leakage_validation"
+    ):
+        verdict = validate_no_preprocessing_before_split(nodes)
+    assert verdict["status"] == "no_split"
+    assert verdict["messages"] == [NO_SPLIT_DIAGNOSTIC]
+
+
+def test_validate_returns_warning_verdict_in_warn_mode():
+    """warn mode returns the violation messages instead of raising."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("scale", "StandardScaler", ["load"]),
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    verdict = validate_no_preprocessing_before_split(nodes, on_leakage="warn")
+    assert verdict["status"] == "warnings"
+    assert len(verdict["messages"]) == 1
+    assert "Data leakage risk" in verdict["messages"][0]
 
 
 def test_raises_for_indirect_ancestor_through_branching_graph():
@@ -170,3 +372,146 @@ def test_target_plus_feature_columns_before_split_still_raises(step_type):
     ]
     with pytest.raises(ValueError, match="Data leakage risk"):
         validate_no_preprocessing_before_split(nodes)
+
+
+def test_explicit_column_drop_before_split_is_allowed():
+    """Dropping explicitly named columns is a fixed user decision (no
+    learned statistic), so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "drop_id",
+            "DropMissingColumns",
+            ["load"],
+            params={"columns": ["passenger_id"], "missing_threshold": 0},
+        ),
+        _node("split", "TrainTestSplitter", ["drop_id"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_threshold_based_column_drop_before_split_still_raises():
+    """With a positive missing-% threshold the node learns WHICH columns to
+    drop from the fitted rows — that decision must stay after the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "drop_sparse",
+            "DropMissingColumns",
+            ["load"],
+            params={"missing_threshold": 50},
+        ),
+        _node("split", "TrainTestSplitter", ["drop_sparse"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_constant_imputation_before_split_is_allowed():
+    """strategy='constant' fills with a user-fixed value — nothing is
+    learned from the rows, so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "fill",
+            "SimpleImputer",
+            ["load"],
+            params={"strategy": "constant", "fill_value": 0, "columns": ["age"]},
+        ),
+        _node("split", "TrainTestSplitter", ["fill"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_statistic_imputation_before_split_still_raises():
+    """mean/median/most_frequent learn from the fitted rows."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("fill", "SimpleImputer", ["load"], params={"strategy": "median"}),
+        _node("split", "TrainTestSplitter", ["fill"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_explicit_missing_indicator_before_split_is_allowed():
+    """Flagging explicitly named columns for missingness learns nothing
+    from the rows, so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node(
+            "flags",
+            "MissingIndicator",
+            ["load"],
+            params={"columns": ["age", "fare"]},
+        ),
+        _node("split", "TrainTestSplitter", ["flags"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_auto_detected_missing_indicator_before_split_still_raises():
+    """With no explicit column list the node discovers WHICH columns contain
+    missing values from the fitted rows — must stay after the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("flags", "MissingIndicator", ["load"], params={}),
+        _node("split", "TrainTestSplitter", ["flags"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_explicit_hash_encoding_before_split_is_allowed():
+    """HashEncoder with a user-chosen column list learns nothing (deterministic
+    hashing), so it may run before the train/test split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("hash", "HashEncoder", ["load"], params={"columns": ["city"], "n_features": 8}),
+        _node("split", "TrainTestSplitter", ["hash"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    validate_no_preprocessing_before_split(nodes)  # must not raise
+
+
+def test_auto_detected_hash_encoding_before_split_still_raises():
+    """With no columns key the node auto-detects WHICH columns are categorical
+    from the fitted rows — must stay after the split."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("hash", "HashEncoder", ["load"], params={"n_features": 8}),
+        _node("split", "TrainTestSplitter", ["hash"]),
+        _node("model", "LogisticRegression", ["split"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_cyclic_preprocessing_graph_still_detects_leakage():
+    """A hand-built cycle between preprocessing nodes must not hang the
+    descendant walk (cycle guard returns an empty set) and the violation
+    through the non-cyclic edge to the splitter must still be detected."""
+    nodes = [
+        _node("scale", "StandardScaler", ["impute"]),
+        _node("impute", "SimpleImputer", ["scale"]),  # cycle: scale <-> impute
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_invalid_on_leakage_mode_rejected():
+    """An unknown on_leakage mode is a programming error, rejected up front
+    rather than silently treated as one of the known modes."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("split", "TrainTestSplitter", ["load"]),
+    ]
+    with pytest.raises(ValueError, match="on_leakage"):
+        validate_no_preprocessing_before_split(nodes, on_leakage="explode")  # ty: ignore[invalid-argument-type]

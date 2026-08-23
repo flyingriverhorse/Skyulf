@@ -71,6 +71,7 @@ class LogisticRegressionApplier(SklearnApplier):
     # well-performing baseline for text classification (alongside Naive Bayes
     # and the SGD-based linear SVM approximation below).
     tags=["requires_scaling", "classification", "text", "nlp"],
+    learns_from_data=True,
 )
 class LogisticRegressionCalculator(SklearnCalculator):
     """Logistic Regression Calculator."""
@@ -189,6 +190,7 @@ class CalibratedClassifierApplier(SklearnApplier):
     ),
     params={"base_estimator": "logistic_regression", "method": "sigmoid", "cv": 5},
     tags=["requires_scaling", "classification"],
+    learns_from_data=True,
 )
 class CalibratedClassifierCalculator(SklearnCalculator):
     """Calibrated Classifier Calculator with a selectable base estimator.
@@ -274,6 +276,7 @@ class RandomForestClassifierApplier(SklearnApplier):
     description="Ensemble of decision trees.",
     params={"n_estimators": 50, "max_depth": 10, "min_samples_split": 5},
     tags=["classification"],
+    learns_from_data=True,
 )
 class RandomForestClassifierCalculator(SklearnCalculator):
     """Random Forest Classifier Calculator."""
@@ -306,6 +309,7 @@ class SVCApplier(SklearnApplier):
     description="C-Support Vector Classification.",
     params={"C": 1.0, "kernel": "rbf", "gamma": "scale"},
     tags=["requires_scaling", "classification"],
+    learns_from_data=True,
 )
 class SVCCalculator(SklearnCalculator):
     """SVC Calculator."""
@@ -337,6 +341,7 @@ class KNeighborsClassifierApplier(SklearnApplier):
     description="Classifier implementing the k-nearest neighbors vote.",
     params={"n_neighbors": 5, "weights": "uniform", "algorithm": "auto"},
     tags=["requires_scaling", "classification"],
+    learns_from_data=True,
 )
 class KNeighborsClassifierCalculator(SklearnCalculator):
     """K-Neighbors Classifier Calculator."""
@@ -367,6 +372,7 @@ class DecisionTreeClassifierApplier(SklearnApplier):
     description="A non-parametric supervised learning method used for classification.",
     params={"max_depth": None, "min_samples_split": 2, "criterion": "gini"},
     tags=["classification"],
+    learns_from_data=True,
 )
 class DecisionTreeClassifierCalculator(SklearnCalculator):
     """Decision Tree Classifier Calculator."""
@@ -397,6 +403,7 @@ class GradientBoostingClassifierApplier(SklearnApplier):
     description="Gradient Boosting for classification.",
     params={"n_estimators": 100, "learning_rate": 0.1, "max_depth": 3},
     tags=["classification"],
+    learns_from_data=True,
 )
 class GradientBoostingClassifierCalculator(SklearnCalculator):
     """Gradient Boosting Classifier Calculator."""
@@ -427,6 +434,7 @@ class AdaBoostClassifierApplier(SklearnApplier):
     description="An AdaBoost classifier.",
     params={"n_estimators": 50, "learning_rate": 1.0},
     tags=["classification"],
+    learns_from_data=True,
 )
 class AdaBoostClassifierCalculator(SklearnCalculator):
     """AdaBoost Classifier Calculator."""
@@ -457,6 +465,7 @@ if XGBOOST_AVAILABLE:
         description="Extreme Gradient Boosting classifier.",
         params={"n_estimators": 100, "max_depth": 6, "learning_rate": 0.3},
         tags=["classification"],
+        learns_from_data=True,
     )
     class XGBClassifierCalculator(SklearnCalculator):
         """XGBoost Classifier Calculator."""
@@ -490,6 +499,7 @@ class ExtraTreesClassifierApplier(SklearnApplier):
     description="Extremely randomised trees — faster than Random Forest, often comparably accurate.",
     params={"n_estimators": 100, "max_depth": None, "min_samples_split": 2},
     tags=["classification"],
+    learns_from_data=True,
 )
 class ExtraTreesClassifierCalculator(SklearnCalculator):
     """Extra Trees Classifier Calculator."""
@@ -524,6 +534,7 @@ class HistGradientBoostingClassifierApplier(SklearnApplier):
     description="Histogram-based gradient boosting — sklearn's fast LightGBM-style implementation.",
     params={"max_iter": 100, "learning_rate": 0.1, "max_leaf_nodes": 31},
     tags=["classification"],
+    learns_from_data=True,
 )
 class HistGradientBoostingClassifierCalculator(SklearnCalculator):
     """HistGradientBoosting Classifier Calculator."""
@@ -581,6 +592,7 @@ if LIGHTGBM_AVAILABLE:
         description="LightGBM: leaf-wise gradient boosting, fast and memory-efficient with categorical support.",
         params={"n_estimators": 100, "num_leaves": 31, "learning_rate": 0.1},
         tags=["classification"],
+        learns_from_data=True,
     )
     class LGBMClassifierCalculator(SklearnCalculator):
         """LightGBM Classifier Calculator."""
@@ -637,6 +649,7 @@ class GaussianNBApplier(SklearnApplier):
     description="Gaussian Naive Bayes (GaussianNB).",
     params={"var_smoothing": 1e-9},
     tags=["classification"],
+    learns_from_data=True,
 )
 class GaussianNBCalculator(SklearnCalculator):
     """Gaussian Naive Bayes Calculator."""
@@ -679,6 +692,7 @@ class SGDClassifierApplier(SklearnApplier):
     # general Classification node, which already has logistic_regression and
     # other dense-feature-friendly linear models covering that role.
     tags=["text", "nlp", "linear", "requires_scaling"],
+    learns_from_data=True,
 )
 class SGDClassifierCalculator(SklearnCalculator):
     """SGD Classifier Calculator."""

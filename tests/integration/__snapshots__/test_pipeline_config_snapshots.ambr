@@ -42,9 +42,13 @@
 # ---
 # name: test_node_registry_data_loader_item
   dict({
+    'aliases': list([
+    ]),
     'category': 'Data Source',
     'description': 'Loads data from a source.',
     'id': 'data_loader',
+    'is_splitter': False,
+    'learns_from_data': False,
     'name': 'Data Loader',
     'params': dict({
       'date_range': 'optional[dict]',
@@ -56,9 +60,13 @@
 # ---
 # name: test_node_registry_random_forest_classifier_item
   dict({
+    'aliases': list([
+    ]),
     'category': 'Modeling',
     'description': 'Ensemble of decision trees.',
     'id': 'random_forest_classifier',
+    'is_splitter': False,
+    'learns_from_data': True,
     'name': 'Random Forest Classifier',
     'params': dict({
       'max_depth': 10,
@@ -72,9 +80,13 @@
 # ---
 # name: test_node_registry_standard_scaler_item
   dict({
+    'aliases': list([
+    ]),
     'category': 'Preprocessing',
     'description': 'Standardize features by removing the mean and scaling to unit variance.',
     'id': 'StandardScaler',
+    'is_splitter': False,
+    'learns_from_data': True,
     'name': 'Standard Scaler',
     'params': dict({
       'columns': list([

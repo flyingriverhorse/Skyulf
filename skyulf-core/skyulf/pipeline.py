@@ -14,7 +14,7 @@ import polars as pl
 from .config_validation import validate_pipeline_config
 from .data.dataset import SplitDataset
 from .engines import SkyulfDataFrame, get_engine
-from .leakage import validate_leakage_safety
+from .leakage import OnLeakage, validate_leakage_safety
 from .modeling._evaluation.thresholds import apply_thresholds, optimize_thresholds
 from .modeling._tuning.engine import TuningApplier, TuningCalculator
 from .modeling.base import BaseModelApplier, BaseModelCalculator, StatefulEstimator, extract_xy
@@ -205,6 +205,16 @@ class SkyulfPipeline:
             Dictionary containing execution metrics.
         """
         metrics = {}
+
+        # Leakage structure check (advisory): the backend execution gate
+        # hard-blocks data-dependent preprocessing before the split; in the
+        # SDK the same verdict is surfaced as warnings before any fit
+        # happens. Skipped when the caller supplies a SplitDataset — the
+        # train/test boundary is then provided externally and enforced by
+        # construction, and a flat config legitimately has no splitter node.
+        if not isinstance(data, SplitDataset):
+            for warning in validate_leakage_safety(self.config, on_leakage="warn"):
+                logger.warning(warning)
 
         # 1. Feature Engineering
         logger.info("Starting Feature Engineering...")
@@ -467,9 +477,9 @@ class SkyulfPipeline:
 
         return "\n".join(lines)
 
-    def validate_leakage_safety(self) -> list[str]:
-        """Return warnings for preprocessing steps ordered before the train/test split."""
-        return validate_leakage_safety(self.config)
+    def validate_leakage_safety(self, on_leakage: OnLeakage = "raise") -> list[str]:
+        """Diagnose preprocessing steps ordered before the train/test split."""
+        return validate_leakage_safety(self.config, on_leakage=on_leakage)
 
     def to_mermaid(self) -> str:
         """Render the pipeline as a Mermaid ``flowchart`` string.

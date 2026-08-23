@@ -66,11 +66,23 @@ suggested first commit is 7 engine-independent fixes that clear every CRITICAL.
 ## Status
 
 Investigation complete across engine, nodes, modeling, persistence, inference, monitoring and
-experiments. A **product gap** was also found and planned for: Skyulf is presented as
-Polars-backed, but the backend runs 100% pandas.
-**No fixes applied yet** — see the tier table at the end of the findings document for the
-recommended order and target versions. Start with Tier 1 (3 CRITICAL, engine-independent, blocks
-deployment).
+experiments. The **product gap** found — Skyulf presented as Polars-backed while the backend ran
+100% pandas — is **closed**: the backend Polars migration landed on `080` (all five phases,
+benchmark published in `docs/performance.md`).
+
+**Fixes: all applied.** T1 (0.7.9), T2 (core 0.6.0), T2b/T3/T4 on `080`/`081` — see the status
+notes on each finding in the findings document and the tier table at its end. Leakage enforcement
+(F-16/F-17, `on_leakage="raise"` default) shipped on `081`.
+
+Remaining, tracked here:
+
+1. **Release logistics** — `080`/`081` are not yet merged to `master`.
+2. **F-15 / T5** — per-fold preprocessing refit in CV/tuning: deliberately a separate initiative
+   (core 0.7.0). **Design note written 2026-08-23** (`2026-08-23-f15-per-fold-refit-design.md`);
+   implementation pending, opt-in first. Docs carry the CV caveat until the default flip lands.
+3. ~~Open question from §6: `promote_job` vs `"succeeded"`~~ — **resolved 2026-08-23 by a
+   state-changing probe: harmless dead enum drift** (nothing ever writes `"succeeded"`); deleting
+   the member is optional routine cleanup. See the findings' §6.
 
 The **experiments subsystem** audit is now complete too (§6 of the findings). It was initially
 mis-reported as "nothing to audit" — an agent grepped for MLflow/W&B, found none, and stopped.

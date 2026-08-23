@@ -42,6 +42,7 @@ class MultinomialNBApplier(SklearnApplier):
     ),
     params={"alpha": 1.0, "fit_prior": True},
     tags=["text", "nlp", "naive_bayes"],
+    learns_from_data=True,
 )
 class MultinomialNBCalculator(SklearnCalculator):
     """Multinomial Naive Bayes Calculator."""
@@ -77,6 +78,7 @@ class BernoulliNBApplier(SklearnApplier):
     ),
     params={"alpha": 1.0, "binarize": 0.0, "fit_prior": True},
     tags=["text", "nlp", "naive_bayes"],
+    learns_from_data=True,
 )
 class BernoulliNBCalculator(SklearnCalculator):
     """Bernoulli Naive Bayes Calculator."""
