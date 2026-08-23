@@ -482,11 +482,18 @@ categories): legacy full-split scoring reports a CV AUC of **0.867** and a
 tuning best score of **0.867** — pure memorisation of held-out rows — while
 per-fold refit reports **0.495 / 0.494**, exactly chance. On real-signal
 data the honest scores stay close to the old ones (the drop is the bias
-leaving, not the signal). Two graph shapes fall back to pre-transformed scoring with an
-explicit job-log warning: pipelines whose branches merge before training,
-and the `halving_*`/`optuna` tuning strategies (their CV runs inside sklearn
-searchers where the fold hook can't reach yet — `grid`/`random` are
-covered). Library users calling CV/tuning directly get the same guarantee by
-passing a preprocessor — e.g. `FeatureEngineerFoldAdapter(steps_config,
-target_column)` — via the `preprocessing` parameter; without it, CV/tuning
-scores the pre-transformed data and remains an optimistic estimate.
+leaving, not the signal). All five tuning strategies are covered:
+`grid`/`random` through the engine's own fold loop, and
+`halving_grid`/`halving_random`/`optuna` through a preprocessing step
+wrapped around the candidate model inside the sklearn/optuna searcher, whose
+searcher-internal CV drives the same fit-on-train-only discipline. Two
+shapes fall back to pre-transformed scoring with an explicit job-log
+warning: pipelines whose branches merge before training, and preprocessing
+chains that change the row count or the target (resampling, row drops) under
+`halving_*`/`optuna` — an sklearn pipeline transformer can only hand `X`
+forward, so the reshaped rows would lose alignment with `y`; the engine
+refuses that wrap rather than silently misalign them. Library users calling
+CV/tuning directly get the same guarantee by passing a preprocessor — e.g.
+`FeatureEngineerFoldAdapter(steps_config, target_column)` — via the
+`preprocessing` parameter; without it, CV/tuning scores the pre-transformed
+data and remains an optimistic estimate.

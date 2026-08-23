@@ -153,3 +153,22 @@ def test_adapter_rejects_unknown_transformer():
             steps_config=[{"name": "x", "transformer": "NoSuchNode", "params": {}}],
             target_column="target",
         )
+
+
+@pytest.mark.parametrize(
+    "transformer", ["Oversampling", "Undersampling", "DropMissingRows", "Deduplicate"]
+)
+def test_adapter_flags_row_count_changing_steps(transformer: str):
+    adapter = FeatureEngineerFoldAdapter(
+        steps_config=[{"name": "s", "transformer": transformer, "params": {}}],
+        target_column="target",
+    )
+    assert adapter.changes_row_count is True
+
+
+def test_adapter_reports_row_alignment_for_shape_preserving_steps():
+    adapter = FeatureEngineerFoldAdapter(
+        steps_config=[{"name": "s", "transformer": "StandardScaler", "params": {}}],
+        target_column="target",
+    )
+    assert adapter.changes_row_count is False

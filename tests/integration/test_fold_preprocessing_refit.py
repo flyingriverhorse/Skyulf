@@ -455,3 +455,96 @@ def test_splitter_only_chain_skips_silently(tmp_path):
 
     assert result.status == "success"
     assert not any("Per-fold preprocessing refit" in m for m in logs)
+
+
+def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
+    """A data-dependent step configured BEFORE the splitter cannot be re-fit
+    per fold: payload reconstruction would fit it on the full frame (leaking
+    held-out rows) and the per-fold adapter would apply it twice. The resolver
+    must fall back to pre-transformed scoring with an explicit warning."""
+    rng = np.random.default_rng(11)
+    n = 240
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "numeric_pre_split.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        {"name": "scale", "transformer": "StandardScaler", "params": {}},
+                        SPLITTER_STEP,
+                    ]
+                },
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-pre-split-learner-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "before the last splitter" in m
+        for m in logs
+    ), f"expected the pre-splitter fallback warning, logs={logs}"
+    assert not any("Per-fold preprocessing refit enabled" in m for m in logs)
+
+
+def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
+    """Param-aware exemption: an explicit-column DropMissingColumns before the
+    splitter learns nothing from the rows, so per-fold refit stays enabled."""
+    rng = np.random.default_rng(7)
+    n, n_categories = 400, 200
+    df = pd.DataFrame(
+        {
+            "id_col": [f"id{i}" for i in range(n)],
+            "city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)],
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "noise_with_id.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        {
+                            "name": "drop_id",
+                            "transformer": "DropMissingColumns",
+                            "params": {"columns": ["id_col"]},
+                        },
+                        SPLITTER_STEP,
+                        WOE_STEP,
+                    ]
+                },
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-stateless-pre-split",
+    )
+
+    assert result.status == "success"
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"per-fold refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )

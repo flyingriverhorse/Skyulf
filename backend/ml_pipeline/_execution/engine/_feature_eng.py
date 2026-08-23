@@ -14,9 +14,17 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from skyulf.data.dataset import SplitDataset
+from skyulf.leakage import (
+    data_dependent_transformers,
+    is_constant_imputation,
+    is_explicit_column_drop,
+    is_explicit_hash_encoding,
+    is_explicit_missing_indicator,
+)
 from skyulf.modeling.base import extract_xy
 from skyulf.preprocessing.fold_adapter import SPLITTER_STEP_TYPES, FeatureEngineerFoldAdapter
 from skyulf.preprocessing.pipeline import FeatureEngineer
+from skyulf.registry import NodeRegistry
 
 from ...constants import StepType
 from ..schemas import NodeConfig
@@ -27,6 +35,29 @@ if TYPE_CHECKING:
     from ...artifacts.store import ArtifactStore
 
 logger = logging.getLogger(__name__)
+
+
+def _step_learns_from_data(step: dict[str, Any]) -> bool:
+    """Whether a step's ``fit`` reads statistics from the rows it is given.
+
+    Mirrors the leakage gate's per-step verdict (``skyulf.validate_leakage_safety``):
+    the param-aware exemptions for stateless modes come first, then the
+    registry-derived learner list. Unknown transformers fail closed — they
+    cannot be proven stateless, so they are treated as learners.
+    """
+    transformer = str(step.get("transformer") or "")
+    params = step.get("params") or {}
+    if is_explicit_column_drop(transformer, params):
+        return False
+    if is_constant_imputation(transformer, params):
+        return False
+    if is_explicit_missing_indicator(transformer, params):
+        return False
+    if is_explicit_hash_encoding(transformer, params):
+        return False
+    if transformer in data_dependent_transformers():
+        return True
+    return transformer not in NodeRegistry.get_all_metadata()
 
 
 class FeatureEngMixin:
@@ -366,6 +397,25 @@ class FeatureEngMixin:
                 for i, (step, *_) in enumerate(flat)
                 if step.get("transformer") in SPLITTER_STEP_TYPES
             ]
+            if splitter_positions:
+                pre_split_learners = [
+                    step
+                    for step, *_ in flat[: splitter_positions[-1]]
+                    if _step_learns_from_data(step)
+                ]
+                if pre_split_learners:
+                    # Reconstructing the pre-transform payload would re-fit these
+                    # steps on the full frame (held-out rows included), and the
+                    # per-fold adapter would then apply them a second time —
+                    # leaky statistics plus double-transformed features.
+                    names = ", ".join(
+                        sorted({str(step.get("transformer")) for step in pre_split_learners})
+                    )
+                    warning = (
+                        f"data-dependent step(s) before the last splitter ({names}) "
+                        "cannot be re-fit safely per fold"
+                    )
+                    return None
             if not splitter_positions:
                 # No split at all: the raw loader frame IS the train payload.
                 payload = self._split_train_payload(self.artifact_store.load(loader_id), target_col)

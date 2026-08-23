@@ -311,8 +311,11 @@ class TuningCalculator(BaseModelCalculator):
         stop leaking held-out rows into preprocessing statistics. The custom
         ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``
         get it via a Pipeline wrapper whose searcher-internal CV drives the
-        refit. When set, the final best-model refit runs the full split
-        through the preprocessor once — the artifact serving uses.
+        refit. Chains that change the row count or the target (resampling,
+        row drops) cannot stay aligned inside that wrapper and fall back to
+        pre-transformed scoring with an explicit log instead. When set, the
+        final best-model refit runs the full split through the preprocessor
+        once — the artifact serving uses.
         """
         tuning_config = self._build_tuning_config(config)
 
@@ -1245,6 +1248,26 @@ class TuningCalculator(BaseModelCalculator):
         # per-fold hook cannot reach; wrap preprocessing + model in a Pipeline
         # so the searcher's own folds refit the preprocessor (F-15).
         wrapped = preprocessing is not None
+        if (
+            wrapped
+            and config.strategy in ("halving_grid", "halving_random", "optuna")
+            and getattr(preprocessing, "changes_row_count", False)
+        ):
+            # An sklearn transformer step can only hand X to the next step, so
+            # a chain that resamples or drops rows would leave the model
+            # fitting reshaped X against the original, un-aligned y. The
+            # grid/random custom loop threads the transformed y itself and
+            # stays enabled; the searcher-backed strategies fall back to
+            # pre-transformed scoring with an explicit log instead.
+            wrapped = False
+            if log_callback:
+                log_callback(
+                    "Per-fold preprocessing refit skipped for this tuning strategy: "
+                    "the step chain changes row count or the target (resampling / "
+                    "row drops), which cannot stay aligned inside the searcher's "
+                    "pipeline. Tuning scores the pre-transformed data and may be "
+                    "optimistically biased."
+                )
         estimator: Any = base_estimator
         search_config = config
         if wrapped:
