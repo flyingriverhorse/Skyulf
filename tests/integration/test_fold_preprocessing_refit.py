@@ -548,3 +548,161 @@ def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
     assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
         f"per-fold refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
     )
+
+
+# ---------------------------------------------------------------------------
+# _step_learns_from_data — the resolver's per-step verdict
+# ---------------------------------------------------------------------------
+
+
+def test_step_learns_from_data_mirrors_the_leakage_gate():
+    from backend.ml_pipeline._execution.engine._feature_eng import _step_learns_from_data
+
+    # Param-aware stateless exemptions.
+    assert not _step_learns_from_data(
+        {"transformer": "SimpleImputer", "params": {"strategy": "constant"}}
+    )
+    assert not _step_learns_from_data(
+        {"transformer": "MissingIndicator", "params": {"columns": ["x"]}}
+    )
+    assert not _step_learns_from_data({"transformer": "HashEncoder", "params": {"columns": ["x"]}})
+    assert not _step_learns_from_data(
+        {"transformer": "DropMissingColumns", "params": {"columns": ["id"]}}
+    )
+    # Data-dependent modes of the same nodes, and plain learners.
+    assert _step_learns_from_data({"transformer": "SimpleImputer", "params": {"strategy": "mean"}})
+    assert _step_learns_from_data(
+        {"transformer": "DropMissingColumns", "params": {"missing_threshold": 50}}
+    )
+    assert _step_learns_from_data({"transformer": "StandardScaler", "params": {}})
+    # Registered but stateless node.
+    assert not _step_learns_from_data({"transformer": "DropMissingRows", "params": {}})
+    # Unknown transformers fail closed.
+    assert _step_learns_from_data({"transformer": "NoSuchNode", "params": {}})
+
+
+# ---------------------------------------------------------------------------
+# Remaining resolver branches: no-split payload, reconstruction failure,
+# validation-split holdout tuning
+# ---------------------------------------------------------------------------
+
+
+def test_no_split_chain_refits_from_the_raw_loader_frame(tmp_path):
+    """No splitter upstream: the raw loader frame is the pre-transform payload
+    and the learning step refits per fold."""
+    rng = np.random.default_rng(13)
+    n = 240
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "no_split.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [{"name": "scale", "transformer": "StandardScaler", "params": {}}]
+                },
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-no-split-payload",
+    )
+
+    assert result.status == "success"
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs)
+
+
+def test_payload_reconstruction_failure_never_fails_the_run(
+    noise_target_csv, tmp_path, monkeypatch
+):
+    """If payload reconstruction raises, the resolver must swallow the error,
+    warn explicitly, and let the job finish on pre-transformed scoring."""
+    from backend.ml_pipeline._execution.engine._feature_eng import FeatureEngMixin
+
+    def boom(self, output, target_col):
+        raise RuntimeError("simulated artifact corruption")
+
+    monkeypatch.setattr(FeatureEngMixin, "_split_train_payload", boom)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-reconstruction-failure",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "payload reconstruction failed" in m
+        for m in logs
+    ), f"expected the reconstruction-failure warning, logs={logs}"
+
+
+def test_validation_split_tuning_falls_back_with_warning(tmp_path):
+    """Holdout tuning with a validation split cannot refit per fold (the
+    tuning engine rejects the hook alongside validation_data); the runner
+    skips the hook with an explicit log instead of failing."""
+    rng = np.random.default_rng(17)
+    n = 240
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "validation_split.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_split",
+                step_type="TrainTestSplitter",
+                inputs=["node_data"],
+                params={
+                    "target_column": "target",
+                    "test_size": 0.2,
+                    "validation_size": 0.2,
+                },
+            ),
+            _training(
+                ["node_split"],
+                run_mode="tuned",
+                tuning_config={
+                    "strategy": "grid",
+                    "metric": "roc_auc",
+                    "cv_folds": 2,
+                    "cv_enabled": True,
+                    "search_space": {"C": [0.1, 1.0]},
+                },
+            ),
+        ],
+        job_id="f15-validation-split-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "validation split" in m for m in logs
+    ), f"expected the validation-split fallback warning, logs={logs}"
