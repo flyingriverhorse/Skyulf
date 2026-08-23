@@ -33,6 +33,8 @@ export interface JobInfo {
   model_type?: string;
   /** Server-resolved model family (e.g. "classification", "ensemble"); `null`/absent when unresolvable. */
   model_family?: string | null;
+  /** DataFrame engine the job trained on ("pandas" | "polars"); absent for legacy jobs. */
+  engine?: string | null;
   hyperparameters?: Record<string, unknown>;
   created_at: string;
   metrics?: Record<string, number>;
