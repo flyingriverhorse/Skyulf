@@ -325,6 +325,66 @@ def test_fit_predict_regression():
     )
 
 
+def test_fit_predict_preprocessing_without_payload_raises():
+    """fit_predict(preprocessing=...) without preprocessing_train should raise."""
+    dataset, _ = _classification_dataset()
+
+    class _NoopPreprocessor:
+        def fit_transform(self, X, y):
+            return X, y
+
+        def transform(self, X, y):
+            return X, y
+
+    estimator = StatefulEstimator(
+        calculator=_DummyCalculator(), applier=_DummyApplier(), node_id="p1"
+    )
+    with pytest.raises(ValueError, match="preprocessing_train"):
+        estimator.fit_predict(dataset, "target", config={}, preprocessing=_NoopPreprocessor())
+
+
+def test_fit_predict_preprocessing_routes_payload_to_calculator():
+    """fit_predict(preprocessing=...) should fit the calculator on the pre-transform payload."""
+    dataset, df = _classification_dataset()
+    pre_X = df.drop(columns=["target"]).iloc[:160]
+    pre_y = df["target"].iloc[:160]
+
+    class _RecordingCalculator(_DummyCalculator):
+        def __init__(self):
+            self.fit_kwargs: dict[str, Any] = {}
+            self.fit_X_len = 0
+
+        def fit(
+            self,
+            X,
+            y,
+            config,
+            progress_callback=None,
+            log_callback=None,
+            validation_data=None,
+            preprocessing=None,
+        ):
+            self.fit_kwargs = {"validation_data": validation_data, "preprocessing": preprocessing}
+            self.fit_X_len = len(X)
+            assert preprocessing is not None
+            return super().fit(X, y, config, progress_callback, log_callback, validation_data)
+
+    calculator = _RecordingCalculator()
+    estimator = StatefulEstimator(calculator=calculator, applier=_DummyApplier(), node_id="p2")
+    preprocessor = object()
+    preds = estimator.fit_predict(
+        dataset,
+        "target",
+        config={},
+        preprocessing=preprocessor,  # type: ignore[arg-type]
+        preprocessing_train=(pre_X, pre_y),
+    )
+    assert len(preds["train"]) == 160
+    assert len(preds["test"]) == 40
+    assert calculator.fit_X_len == 160
+    assert calculator.fit_kwargs["preprocessing"] is preprocessor
+
+
 # ---------------------------------------------------------------------------
 # StatefulEstimator.evaluate
 # ---------------------------------------------------------------------------

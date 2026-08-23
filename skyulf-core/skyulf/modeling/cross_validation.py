@@ -17,6 +17,7 @@ from ..engines.sklearn_bridge import SklearnBridge
 
 if TYPE_CHECKING:
     from .base import BaseModelApplier, BaseModelCalculator
+    from .fold_preprocessing import FoldPreprocessor
 
 from ._evaluation.common import sanitize_metrics
 from ._evaluation.metrics import (
@@ -79,6 +80,7 @@ def perform_cross_validation(
     time_column: str | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
+    preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
     """
     Performs K-Fold cross-validation.
@@ -96,6 +98,10 @@ def perform_cross_validation(
         time_column: Optional column name for sorting when using time_series_split.
         progress_callback: Optional callback(current_fold, total_folds).
         log_callback: Optional callback for logging messages.
+        preprocessing: Optional per-fold preprocessor (F-15). When given, it is
+            re-fit on each fold's training rows and applied to the held-out rows,
+            so preprocessing statistics never see held-out data. ``None`` means
+            the caller already transformed the data before splitting.
 
     Returns:
         Dict containing aggregated metrics and per-fold details.
@@ -127,6 +133,7 @@ def perform_cross_validation(
             random_state=random_state,
             progress_callback=progress_callback,
             log_callback=log_callback,
+            preprocessing=preprocessing,
         )
 
     # 1. Setup Splitter (delegates to _build_splitter so unknown cv_type
@@ -159,6 +166,7 @@ def perform_cross_validation(
                 n_folds=n_folds,
                 progress_callback=progress_callback,
                 log_callback=log_callback,
+                preprocessing=preprocessing,
             )
         )
 
@@ -205,6 +213,24 @@ def _slice_fold_data(X: Any, y: Any, train_idx: Any, val_idx: Any) -> tuple[Any,
     return X_train_fold, X_val_fold, y_train_fold, y_val_fold
 
 
+def _apply_fold_preprocessing(
+    preprocessing: "FoldPreprocessor | None",
+    X_train: Any,
+    y_train: Any,
+    X_val: Any,
+    y_val: Any,
+) -> tuple[Any, Any, Any, Any]:
+    """Re-fit preprocessing on this fold's training rows and apply it to the held-out rows.
+
+    No-op when ``preprocessing`` is None (data already transformed by caller).
+    """
+    if preprocessing is None:
+        return X_train, y_train, X_val, y_val
+    X_train, y_train = preprocessing.fit_transform(X_train, y_train)
+    X_val, y_val = preprocessing.transform(X_val, y_val)
+    return X_train, y_train, X_val, y_val
+
+
 def _run_cv_fold(
     calculator: "BaseModelCalculator",
     X: Any,
@@ -217,6 +243,7 @@ def _run_cv_fold(
     n_folds: int,
     progress_callback: Callable[[int, int], None] | None,
     log_callback: Callable[[str], None] | None,
+    preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
     """Fit and evaluate a single CV fold, reporting progress/logging, and return its result entry."""
     if progress_callback:
@@ -226,6 +253,9 @@ def _run_cv_fold(
         log_callback(f"Processing Fold {fold_idx + 1}/{n_folds}...")
 
     X_train_fold, X_val_fold, y_train_fold, y_val_fold = _slice_fold_data(X, y, train_idx, val_idx)
+    X_train_fold, y_train_fold, X_val_fold, y_val_fold = _apply_fold_preprocessing(
+        preprocessing, X_train_fold, y_train_fold, X_val_fold, y_val_fold
+    )
 
     # Fit
     model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
@@ -457,6 +487,7 @@ def _run_inner_cv(
     random_state: int,
     logger: Any,
     log_callback: Callable[[str], None] | None,
+    preprocessing: "FoldPreprocessor | None" = None,
 ) -> float:
     """Run the inner CV diagnostic loop and return the mean inner score (NaN if none valid).
 
@@ -476,6 +507,9 @@ def _run_inner_cv(
         X_inner_val = _slice_by_index(X_train_fold, inner_val_idx)
         y_inner_train = _slice_by_index(y_train_fold, inner_train_idx)
         y_inner_val = _slice_by_index(y_train_fold, inner_val_idx)
+        X_inner_train, y_inner_train, X_inner_val, y_inner_val = _apply_fold_preprocessing(
+            preprocessing, X_inner_train, y_inner_train, X_inner_val, y_inner_val
+        )
 
         try:
             inner_artifact = calculator.fit(X_inner_train, y_inner_train, config)
@@ -508,8 +542,12 @@ def _evaluate_outer_fold(
     fold_idx: int,
     inner_mean: float,
     log_callback: Callable[[str], None] | None,
+    preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
     """Fit on the outer training fold, evaluate on the outer validation fold, and log."""
+    X_train_fold, y_train_fold, X_val_fold, y_val_fold = _apply_fold_preprocessing(
+        preprocessing, X_train_fold, y_train_fold, X_val_fold, y_val_fold
+    )
     model_artifact = calculator.fit(X_train_fold, y_train_fold, config)
     metrics = _score_metrics_for_problem(model_artifact, X_val_fold, y_val_fold, problem_type)
 
@@ -540,6 +578,7 @@ def _perform_nested_cv(
     random_state: int = 42,
     progress_callback: Callable[[int, int], None] | None = None,
     log_callback: Callable[[str], None] | None = None,
+    preprocessing: "FoldPreprocessor | None" = None,
 ) -> dict[str, Any]:
     """
     Performs nested cross-validation with an outer loop for generalization
@@ -595,6 +634,7 @@ def _perform_nested_cv(
             random_state,
             logger,
             log_callback,
+            preprocessing,
         )
 
         # --- Outer evaluation: train on full outer train, evaluate on outer val ---
@@ -610,6 +650,7 @@ def _perform_nested_cv(
                 fold_idx,
                 inner_mean,
                 log_callback,
+                preprocessing,
             )
         )
 

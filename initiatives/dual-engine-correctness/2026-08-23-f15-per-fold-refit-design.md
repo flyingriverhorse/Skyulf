@@ -1,11 +1,35 @@
 # F-15 — Per-Fold Preprocessing Refit: Design Note
 
 **Date:** 2026-08-23
-**Status:** Design approved for planning; implementation is a **separate initiative** (target: core 0.7.0).
+**Status:** **Shipped** — skyulf-core 0.7.0, branch `082` (see amendment below).
 **Mandate:** Leakage-enforcement plan §Phase 4, item 10 — "Deliver a design note first — refit contract,
 performance budget (`n_splits`× preprocessing cost), migration plan for users whose scores will drop,
 and whether to land it opt-in (`refit_preprocessing_per_fold=True`) before flipping the default."
 **Companion:** `2026-08-11-audit-findings.md` §4 (the architectural question) and F-15.
+
+---
+
+## Amendment — implementation outcome (2026-08-23)
+
+Shipped the same day as **always-on**, collapsing the §6 migration phases:
+
+- **No users exist**, so the opt-in → bake → default-flip sequence was skipped; there was no
+  migration to manage. The app (`PipelineEngine`) always resolves and threads the adapter.
+- **No frontend toggle** was built (the planned `refit_preprocessing_per_fold` param was dropped
+  entirely — core keeps `preprocessing=None` only as the "caller already transformed" default).
+- **Fallbacks instead of rejections:** merged-branch graphs, `halving_*`/`optuna` strategies, and
+  datasets with a validation split fall back to pre-transformed scoring with an explicit job-log
+  warning ("scores may be optimistically biased") — never a failed run. Core still raises if the
+  hook is passed into an unsupported path; the app simply doesn't pass it there.
+- **Payload reconstruction** replaced the planned `cv_preprocessing_steps` job-config key: the
+  engine walks the linear upstream chain at training time, re-running the splitter-only step
+  prefix on the raw loader frame (or loading the splitter node's artifact) to obtain the
+  pre-transform train payload.
+- Halving/optuna support is a tracked follow-up (sklearn `Pipeline` wrapper).
+- The `docs/examples/leakage_proof_pandas.md` CV caveat is removed (now "Covered").
+
+Everything else in this note (clone contract, adapter shape, performance budget, semantics,
+test plan) landed as designed.
 
 ---
 
@@ -189,5 +213,5 @@ Your model did not get worse; the old estimate was too high."*
 ---
 
 *Definition-of-Done update:* this note satisfies the leakage-enforcement plan's Phase 4 requirement
-"Phase 4 (CV refit) has a written design note". The docs CV caveat stays in place until Phase 3
-(default flip) lands.
+"Phase 4 (CV refit) has a written design note". The docs CV caveat was removed when F-15 shipped
+always-on (see amendment).

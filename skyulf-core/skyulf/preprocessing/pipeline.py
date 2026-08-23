@@ -56,7 +56,7 @@ class FeatureEngineer:
         self.steps_config = steps_config
         self.fitted_steps: list[dict[str, Any]] = []
 
-    def transform(self, data: pd.DataFrame | SkyulfDataFrame) -> pd.DataFrame | SkyulfDataFrame:
+    def transform(self, data: pd.DataFrame | SkyulfDataFrame | Any) -> Any:
         """
         Apply fitted transformations to new data.
         """

@@ -62,6 +62,7 @@ class NodeRunnersMixin:
     _extract_feature_importances: Any
     _extract_shap_explanation: Any
     _pipeline_has_training_node: Any
+    _resolve_fold_preprocessing: Any
 
     def _record_split_dataset_shape_metrics(
         self, metrics: dict[str, Any], data: SplitDataset, target_col: str
@@ -716,12 +717,18 @@ class NodeRunnersMixin:
         tuning_params: dict[str, Any],
         tuning_result: Any,
         node: NodeConfig,
+        fold_preprocessing: tuple[Any, tuple[Any, Any]] | None = None,
     ) -> dict[str, Any]:
         """Run post-tuning cross-validation with the tuned model's best params.
 
         For ``nested_cv``, the inner CV loop already ran during the search, so
         post-tuning CV only needs the outer evaluation and downgrades to
         ``stratified_k_fold`` (classification) or ``k_fold`` (regression).
+
+        ``fold_preprocessing`` (F-15): ``(adapter, (X_pre, y_pre))`` — CV must
+        slice the pre-transform rows so the per-fold refit stays aligned with
+        the preprocessor; ``data.test`` is kept only so the dataset shape is
+        preserved (cross_validate reads ``.train`` only).
         """
         if not tuning_params.get("cv_enabled", False):
             return {}
@@ -737,10 +744,16 @@ class NodeRunnersMixin:
                 f"Using {post_cv_type} for post-tuning evaluation."
             )
 
+        preprocessing = None
+        cv_data = data
+        if fold_preprocessing is not None:
+            preprocessing, pre_train = fold_preprocessing
+            cv_data = SplitDataset(train=pre_train, test=data.test, validation=None)
+
         self.log("Running cross-validation on tuned model with best parameters...")
         try:
             cv_results = cv_estimator.cross_validate(
-                data,
+                cv_data,
                 target_col,
                 {"params": best_params},
                 n_folds=tuning_params.get("cv_folds", 5),
@@ -749,6 +762,7 @@ class NodeRunnersMixin:
                 random_state=tuning_params.get("cv_random_state", 42),
                 time_column=tuning_params.get("cv_time_column") or None,
                 log_callback=self.log,
+                preprocessing=preprocessing,
             )
             return self._aggregate_cv_metrics(cv_results)
         except Exception:
@@ -799,6 +813,27 @@ class NodeRunnersMixin:
         # Ensure data is SplitDataset
         data = self._to_split_dataset(data, target_col)
 
+        # F-15: per-fold preprocessing refit is always attempted. Only the
+        # grid/random strategies can run the fold hook today (halving/optuna
+        # delegate CV to sklearn searchers), and holdout tuning with a
+        # validation split is out of scope — both fall back with an explicit
+        # log line instead of failing the run.
+        fold_preprocessing = None
+        strategy = str(tuning_params.get("strategy", "random"))
+        if strategy not in ("grid", "random"):
+            self.log(
+                f"Per-fold preprocessing refit skipped: the '{strategy}' tuning "
+                "strategy runs CV inside sklearn searchers where the fold hook "
+                "can't reach yet; tuning scores may be optimistically biased."
+            )
+        elif data.validation is not None:
+            self.log(
+                "Per-fold preprocessing refit skipped: a validation split is "
+                "present (holdout tuning path); scores may be optimistically biased."
+            )
+        else:
+            fold_preprocessing = self._resolve_fold_preprocessing(node, target_col)
+
         def progress_callback(current, total, score=None, params=None):
             msg = f"Tuning progress: Trial {current}/{total}"
             if score is not None:
@@ -810,6 +845,11 @@ class NodeRunnersMixin:
         # 1. Run tuning (TunerCalculator.fit)
         # 2. Refit the best model on the full training set (TunerCalculator.fit)
         # 3. Generate predictions on train/test/val splits (TunerApplier.predict)
+        fit_kwargs: dict[str, Any] = {}
+        if fold_preprocessing is not None:
+            adapter, pre_train = fold_preprocessing
+            fit_kwargs["preprocessing"] = adapter
+            fit_kwargs["preprocessing_train"] = pre_train
         estimator.fit_predict(
             data,
             target_col,
@@ -817,6 +857,7 @@ class NodeRunnersMixin:
             progress_callback=progress_callback,
             log_callback=self.log,
             job_id=job_id,
+            **fit_kwargs,
         )
 
         completion_log = (
@@ -832,7 +873,14 @@ class NodeRunnersMixin:
 
         # Cross-Validation on the tuned/fixed model (using best/fixed params)
         cv_metrics = self._run_tuned_cv(
-            calculator, applier, data, target_col, tuning_params, tuning_result, node
+            calculator,
+            applier,
+            data,
+            target_col,
+            tuning_params,
+            tuning_result,
+            node,
+            fold_preprocessing=fold_preprocessing,
         )
 
         return node.node_id, self._finalize_training_run(
