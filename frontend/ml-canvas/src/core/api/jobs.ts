@@ -3,6 +3,18 @@ import axios from 'axios';
 
 export type JobStatus = 'queued' | 'running' | 'completed' | 'succeeded' | 'failed' | 'cancelled' | 'pending';
 
+// Verdict the leakage gate stamps into a job's metrics at run time.
+// Absent for legacy jobs that predate the stamp. The structured detail
+// (splitters/checked/exempted) was added later — older verdicts only
+// carry status + messages, so consumers must treat it as optional.
+export interface LeakageGateVerdict {
+  status: 'passed' | 'no_split' | 'warnings';
+  messages: string[];
+  splitters?: string[];
+  checked?: Array<{ node_id: string; step_type: string; before_split: boolean; violation: boolean }>;
+  exempted?: Array<{ node_id: string; step_type: string; reason: string }>;
+}
+
 export interface JobInfo {
   job_id: string;
   pipeline_id: string;

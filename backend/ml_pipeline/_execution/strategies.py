@@ -138,6 +138,12 @@ class JobStrategy(ABC):
             if summary:
                 final_metrics["summary"] = summary
 
+            # Persist the pre-execution leakage-gate verdict so Job Details
+            # can show it as factual per-job information (legacy/preview
+            # runs carry none and simply omit the tile).
+            if result.leakage_verdict is not None:
+                final_metrics["leakage_gate"] = result.leakage_verdict
+
             job.metrics = final_metrics
 
     def handle_failure(self, job: MLJob, error_msg: str) -> None:

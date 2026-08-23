@@ -12,7 +12,14 @@ class _DummyApplier:
     """Minimal stand-in applier class for registry tests."""
 
 
-@node_meta(id="dummy_node", name="Dummy", category="Test", description="A dummy node.", params={})
+@node_meta(
+    id="dummy_node",
+    name="Dummy",
+    category="Test",
+    description="A dummy node.",
+    params={},
+    learns_from_data=False,
+)
 class _DummyCalculatorWithMeta:
     """Calculator carrying __node_meta__ via the decorator."""
 

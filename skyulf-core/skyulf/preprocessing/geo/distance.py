@@ -158,6 +158,7 @@ class GeoDistanceApplier(BaseApplier):
         "unit": "km",
         "output_column": "geo_distance_km",
     },
+    learns_from_data=False,
 )
 class GeoDistanceCalculator(BaseCalculator):
     @fit_method

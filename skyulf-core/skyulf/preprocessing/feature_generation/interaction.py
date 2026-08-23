@@ -161,6 +161,7 @@ class FeatureInteractionApplier(BaseApplier):
         "numeric columns, using deterministic regularization-friendly names."
     ),
     params={"columns": [], "degree": 2, "interaction_only": True, "include_bias": False},
+    learns_from_data=False,
 )
 class FeatureInteractionCalculator(BaseCalculator):
     @fit_method

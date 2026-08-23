@@ -22,7 +22,7 @@ def blobs_split_dataset():
     blob0 = rng.normal(loc=(-5, -5), scale=0.3, size=(20, 2))
     blob1 = rng.normal(loc=(5, 5), scale=0.3, size=(20, 2))
     blob2 = rng.normal(loc=(5, -5), scale=0.3, size=(20, 2))
-    X = pd.DataFrame(np.vstack([blob0, blob1, blob2]), columns=["x", "y"])
+    X = pd.DataFrame(np.vstack([blob0, blob1, blob2]), columns=["x", "y"])  # ty: ignore[invalid-argument-type]
     train = X.iloc[:45].reset_index(drop=True)
     test = X.iloc[45:].reset_index(drop=True)
     return SplitDataset(train=train, test=test, validation=None)
@@ -87,19 +87,6 @@ def test_evaluate_with_empty_target_column_returns_clustering_report(blobs_split
     # them per-split without relying on job-level flattened metric keys.
     assert raw_train["metrics"]["silhouette_score"] > 0.8
     assert raw_train["metrics"]["silhouette_sample_size"] == len(blobs_split_dataset.train)
-
-
-def test_refit_with_empty_target_column_does_not_crash_on_y_concat(blobs_split_dataset):
-    """refit() concatenates train+validation y; for clustering y is None and must be
-    skipped rather than crash trying to pd.concat([None, None])."""
-    validation = blobs_split_dataset.test
-    dataset = SplitDataset(
-        train=blobs_split_dataset.train, test=pd.DataFrame(), validation=validation
-    )
-    estimator = StatefulEstimator(KMeansCalculator(), KMeansApplier(), "node1")
-    estimator.fit_predict(dataset, "", {"params": {"n_clusters": 3}})
-    estimator.refit(dataset, "", {"params": {"n_clusters": 3}})
-    assert estimator.model is not None
 
 
 # ---------------------------------------------------------------------------

@@ -89,6 +89,7 @@ class DatasetProfileApplier(BaseApplier):
     category="Inspection",
     description="Generate a statistical profile of the dataset.",
     params={},
+    learns_from_data=False,
 )
 class DatasetProfileCalculator(BaseCalculator):
     def infer_output_schema(
@@ -136,6 +137,7 @@ class DataSnapshotApplier(BaseApplier):
     category="Inspection",
     description="Take a snapshot of the first N rows of the dataset.",
     params={"n_rows": 5},
+    learns_from_data=False,
 )
 class DataSnapshotCalculator(BaseCalculator):
     def infer_output_schema(

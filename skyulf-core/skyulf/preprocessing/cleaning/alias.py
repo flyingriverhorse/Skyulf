@@ -122,6 +122,7 @@ class AliasReplacementApplier(BaseApplier):
     category="Cleaning",
     description="Standardize common variations in text values (e.g. Yes/No, Country names).",
     params={"columns": [], "domain": "boolean"},
+    learns_from_data=False,
 )
 class AliasReplacementCalculator(BaseCalculator):
     def infer_output_schema(

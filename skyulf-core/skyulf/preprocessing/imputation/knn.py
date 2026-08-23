@@ -44,6 +44,7 @@ class KNNImputerApplier(BaseApplier):
     category="Preprocessing",
     description="Impute missing values using k-Nearest Neighbors.",
     params={"n_neighbors": 5, "weights": "uniform", "columns": []},
+    learns_from_data=True,
 )
 class KNNImputerCalculator(BaseCalculator):
     def infer_output_schema(

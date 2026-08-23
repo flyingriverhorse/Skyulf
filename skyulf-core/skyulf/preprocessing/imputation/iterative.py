@@ -46,6 +46,7 @@ class IterativeImputerApplier(BaseApplier):
     category="Preprocessing",
     description="Multivariate imputation using chained equations.",
     params={"max_iter": 10, "random_state": 0, "estimator": "BayesianRidge", "columns": []},
+    learns_from_data=True,
 )
 class IterativeImputerCalculator(BaseCalculator):
     def infer_output_schema(

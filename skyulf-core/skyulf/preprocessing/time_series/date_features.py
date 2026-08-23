@@ -147,6 +147,7 @@ class DateFeaturesApplier(BaseApplier):
     description="Extract calendar parts (year, month, day-of-week, ...) from datetime columns.",
     params={"columns": [], "features": DEFAULT_FEATURES, "drop_original": False},
     tags=["time-series"],
+    learns_from_data=False,
 )
 class DateFeaturesCalculator(BaseCalculator):
     def fit(

@@ -6,6 +6,11 @@ from pathlib import Path
 
 import pytest
 
+# Make the repo root importable before anything below touches `backend.*`.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 # Force Celery to use in-memory broker/backend for tests to avoid Redis connection issues
 # and the lingering _connection_worker_thread.
 # NOTE: We prefer using a real Redis service in CI, but for local tests or if CI service fails,
@@ -20,24 +25,14 @@ os.environ["TESTING"] = "True"
 # "testserver" to be accepted by TrustedHostMiddleware. Add it to
 # the runtime settings ALLOWED_HOSTS here so tests that call the app
 # via TestClient don't get rejected with "Invalid host header".
-try:
-    # Import lazily so tests that don't import config aren't impacted
-    from backend.config import get_settings
+# A local .env may restrict ALLOWED_HOSTS, so this must run even though
+# the code default already contains "testserver".
+from backend.config import get_settings  # noqa: E402
 
-    settings = get_settings()
-    if isinstance(settings, object):
-        allowed = getattr(settings, "ALLOWED_HOSTS", None)
-        if isinstance(allowed, list) and "testserver" not in allowed:
-            allowed.append("testserver")
-except Exception:
-    # If anything goes wrong here we still want tests to run; they may
-    # patch settings themselves. Silence errors to avoid hiding real
-    # failures in test collection.
-    pass
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+settings = get_settings()
+allowed = settings.ALLOWED_HOSTS
+if isinstance(allowed, list) and "testserver" not in allowed:
+    allowed.append("testserver")
 
 
 @pytest.fixture(scope="session", autouse=True)

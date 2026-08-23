@@ -39,6 +39,30 @@ def test_get_registry_has_no_duplicate_ids(client):
     assert len(ids) == len(set(ids)), f"Duplicate ids in /registry response: {ids}"
 
 
+def test_registry_exposes_leakage_gate_flags(client):
+    """The frontend canvas leakage check derives its node lists from this
+    endpoint (instead of a hand-synced TS copy), so every item must carry
+    both flags."""
+    response = client.get("/api/pipeline/registry")
+    assert response.status_code == 200
+    data = response.json()
+    assert all("learns_from_data" in item for item in data)
+    assert all("is_splitter" in item for item in data)
+
+    by_id = {item["id"]: item for item in data}
+    assert by_id["StandardScaler"]["learns_from_data"] is True
+    assert by_id["ManualBounds"]["learns_from_data"] is False
+    assert by_id["TrainTestSplitter"]["is_splitter"] is True
+    assert by_id["StandardScaler"]["is_splitter"] is False
+    # Static entry merged in by the backend, not a registry node.
+    assert by_id["data_loader"]["learns_from_data"] is False
+    assert by_id["data_loader"]["is_splitter"] is False
+    # Alias registration names are surfaced so the frontend gate keeps
+    # recognising every spelling used in saved graphs ('Split' is the
+    # alias of 'TrainTestSplitter'; dedupe keeps only one card).
+    assert "Split" in by_id["TrainTestSplitter"]["aliases"]
+
+
 def test_preview_pipeline(client):
     # Create a dummy CSV for testing
     Path("temp_test_data").mkdir(parents=True, exist_ok=True)

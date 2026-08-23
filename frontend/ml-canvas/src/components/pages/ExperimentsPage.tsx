@@ -7,6 +7,7 @@ import { toPng } from 'html-to-image';
 import { deploymentApi } from '../../core/api/deployment';
 import { apiClient } from '../../core/api/client';
 import { formatDuration } from '../../core/utils/format';
+import { filterMetricKeysBySplitVisibility } from '../../core/utils/metricMeta';
 import { PipelineDiffView } from './experiments/PipelineDiffView';
 import type { ShapExplanationData } from './ExperimentsPage/types';
 import { getTaskForModelType, shortRunId } from './ExperimentsPage/utils/jobMeta';
@@ -391,21 +392,18 @@ export const ExperimentsPage: React.FC = () => {
   const hasCvMetrics = useMemo(() => rawMetricKeys.some(k => k.startsWith('cv_') || k === 'best_score'), [rawMetricKeys]);
 
   // Get all unique metric keys from selected jobs (numeric only, filtered by visibility)
-  const metricKeys = useMemo(() => Array.from(new Set(
-    selectedJobs.flatMap(job => {
-      const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
-      return Object.keys(m).filter(k => {
-        const val = m[k];
-        return typeof val === 'number' && !isNaN(val);
-      });
-    })
-  )).filter(key => {
-    if (key.startsWith('train_') && !showTrainMetrics) return false;
-    if (key.startsWith('test_') && !showTestMetrics) return false;
-    if (key.startsWith('val_') && !showValMetrics) return false;
-    if (key.startsWith('cv_') && !showCvMetrics) return false;
-    return true;
-  }), [selectedJobs, showTrainMetrics, showTestMetrics, showValMetrics, showCvMetrics]);
+  const metricKeys = useMemo(() => filterMetricKeysBySplitVisibility(
+    Array.from(new Set(
+      selectedJobs.flatMap(job => {
+        const m = (job.metrics || job.result?.metrics || {}) as Record<string, unknown>;
+        return Object.keys(m).filter(k => {
+          const val = m[k];
+          return typeof val === 'number' && !isNaN(val);
+        });
+      })
+    )),
+    { train: showTrainMetrics, test: showTestMetrics, val: showValMetrics, cv: showCvMetrics },
+  ), [selectedJobs, showTrainMetrics, showTestMetrics, showValMetrics, showCvMetrics]);
 
   // Group keys by base metric name for the metric-tab selector
   const metricGroups = useMemo(() => {

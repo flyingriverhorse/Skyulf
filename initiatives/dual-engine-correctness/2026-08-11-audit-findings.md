@@ -316,28 +316,28 @@ imputation means, scaler statistics and encodings. **This is architectural**, no
 
 | ID | Finding | Location |
 |---|---|---|
-| F-16 🟡 | 10 stateful nodes bypass the pre-split leakage gate (`MissingIndicator`, `DropMissingColumns`, Over/Undersampling, `HashEncoder`, `Deduplicate`, …). The comment wrongly calls the first two "stateless"; both provably learn columns from data. | `_leakage_validation.py:30-38` |
-| F-17 🟡 | Pipelines with **no splitter node** get zero leakage protection — the gate is keyed on finding a split. | `leakage.py:53-54` |
-| F-18 🟡 | Row-dropping steps (`Deduplicate`, `DropMissingRows`) still execute at inference; 4 requested rows → 2 predictions, and `PredictionResponse.predictions: list[Any]` carries no row keys, so the caller cannot tell which inputs vanished. | `preprocessing/pipeline.py:64-70` |
-| F-19 🟡 | `DropMissingColumns` `null_count()` misses NaN → different columns dropped per engine. | `drop_and_missing/drop_columns.py:44` |
-| F-20 🟡 | `DatasetProfile` on Polars reports `missing=0` while `mean=NaN` for NaN-bearing columns — self-contradictory profile. | `profiling/` |
-| F-21 🟡 | `lag.py` `drop_nulls()` vs pandas `dropna()` → different row counts. | `time_series/lag.py:54` |
-| F-22 🟡 | `DropMissingColumns` registers param `threshold` but reads `missing_threshold` — the UI value is ignored. | `drop_columns.py:91` |
-| F-23 🟡 | `DummyEncoder` null rows: `0/0` int (pandas) vs `NaN/NaN` float (polars) — dtype divergence distinct from F-01. | `encoding/dummy.py` |
-| F-24 🟡 | `most_frequent` on an all-unique column: pandas silently no-ops, polars raises. | `imputation/simple.py:66` |
-| F-25 🟡 | **No engine identity recorded in the deployment bundle.** Nothing detects "trained on Polars, serving on pandas." Adding `"train_engine": "polars"\|"pandas"` and warning on mismatch would have caught F-11, F-12, F-30, F-31 at deploy time. | deployment bundle |
-| F-26 🟡 | Polars is a **hard dependency** (`pipeline.py:12`; `setup.py:27` `install_requires`), so `polars_engine.py`'s `HAS_POLARS` fallback is unreachable dead code, tested only via monkeypatch. It advertises an optionality that has never worked. Matches packaging, so not a broken promise — but delete the dead branch or make it real. | `polars_engine.py` |
+| F-16 🟡 | 10 stateful nodes bypass the pre-split leakage gate (`MissingIndicator`, `DropMissingColumns`, Over/Undersampling, `HashEncoder`, `Deduplicate`, …). The comment wrongly calls the first two "stateless"; both provably learn columns from data. **Status:** ✅ Fixed (T3 leakage enforcement on `081`) — every node now declares a required `learns_from_data` on `@node_meta`; both gates derive their lists from the registry (duplicate backend frozenset deleted); the six stateful nodes are reclassified and gated; unknown transformers fail closed. ⚠️ Breaking: `on_leakage` defaults to `"raise"`. | `_leakage_validation.py:30-38` |
+| F-17 🟡 | Pipelines with **no splitter node** get zero leakage protection — the gate is keyed on finding a split. **Status:** ✅ Fixed (T3 leakage enforcement on `081`) — both gates now emit an explicit advisory diagnostic ("the leakage guarantee does not apply") instead of returning nothing; silence removed. | `leakage.py:53-54` |
+| F-18 🟡 | Row-dropping steps (`Deduplicate`, `DropMissingRows`) still execute at inference; 4 requested rows → 2 predictions, and `PredictionResponse.predictions: list[Any]` carries no row keys, so the caller cannot tell which inputs vanished. **Status:** ✅ Fixed (T3 parity batch on `081`) — `FeatureEngineer.transform()` now skips row-dropping step types; a null row surfaces as a visible model error instead of a silent misalignment. | `preprocessing/pipeline.py:64-70` |
+| F-19 🟡 | `DropMissingColumns` `null_count()` misses NaN → different columns dropped per engine. **Status:** ✅ Fixed (T3 parity batch on `081`) — Polars path counts `is_null() + is_nan()` on float columns, matching pandas `isna()`; parity test covers a 50%-NaN frame on both engines. | `drop_and_missing/drop_columns.py:44` |
+| F-20 🟡 | `DatasetProfile` on Polars reports `missing=0` while `mean=NaN` for NaN-bearing columns — self-contradictory profile. **Status:** ✅ Fixed (T3 parity batch on `081`) — both `_compute_frame_stats` and `_compute_basic_stats` count NaN as missing on float columns. | `profiling/` |
+| F-21 🟡 | `lag.py` `drop_nulls()` vs pandas `dropna()` → different row counts. **Status:** ✅ Already resolved by the Polars migration (verified on `081`). | `time_series/lag.py:54` |
+| F-22 🟡 | `DropMissingColumns` registers param `threshold` but reads `missing_threshold` — the UI value is ignored. **Status:** ✅ Fixed (T3 parity batch on `081`) — the `@node_meta` declaration now reads `missing_threshold`, matching what fit() consumes and what the frontend sends; declaration-only change, no user-facing param rename. | `drop_columns.py:91` |
+| F-23 🟡 | `DummyEncoder` null rows: `0/0` int (pandas) vs `NaN/NaN` float (polars) — dtype divergence distinct from F-01. **Status:** ✅ Already resolved by the Polars migration (verified on `081`). | `encoding/dummy.py` |
+| F-24 🟡 | `most_frequent` on an all-unique column: pandas silently no-ops, polars raises. **Status:** ✅ Already resolved by the Polars migration (verified on `081`). | `imputation/simple.py:66` |
+| F-25 🟡 | **No engine identity recorded in the deployment bundle.** Nothing detects "trained on Polars, serving on pandas." Adding `"train_engine": "polars"\|"pandas"` and warning on mismatch would have caught F-11, F-12, F-30, F-31 at deploy time. **Status:** ✅ Fixed (T3 parity batch on `081`) — the bundle already records `engine` via `_resolve_train_engine`; serving now logs a warning when a non-pandas-trained bundle receives pandas input. | deployment bundle |
+| F-26 🟡 | Polars is a **hard dependency** (`pipeline.py:12`; `setup.py:27` `install_requires`), so `polars_engine.py`'s `HAS_POLARS` fallback is unreachable dead code, tested only via monkeypatch. It advertises an optionality that has never worked. Matches packaging, so not a broken promise — but delete the dead branch or make it real. **Status:** ✅ Already resolved by the Polars migration (verified on `081` during T4). | `polars_engine.py` |
 
 ### Tier 4 — LOW
 
 | ID | Finding | Location |
 |---|---|---|
-| F-27 ⚪ | Mixed-engine row filters raise `AttributeError` instead of a clear `TypeError`. | `drop_rows.py:69`, `outliers/_common.py:25` |
-| F-28 ⚪ | WOE artifact null key is `None` on one engine, `nan` on the other. | `woe.py:167-186` |
-| F-29 ⚪ | `SimpleImputer` median dtype: `Int64` vs `Float64`. | `imputation/simple.py` |
-| F-30 ⚪ | `_pretty_dtype` is pandas-only → Polars deployments show `unknown` for Date, Duration, Categorical. | `service.py:613-638` |
-| F-31 ⚪ | `_normalize_train_frame` returns `None` for Polars (drift reference + SHAP frame). **Not reachable** — backend catalog is pandas-only and `7485ade6` added a guard. Latent only. | `_artifacts.py:154-178` |
-| F-32 ⚪ | `_feature_names_for_importance` pandas-only → `feature_importances = None` on Polars. Same reachability caveat as F-31. | `_artifacts.py:38-58` |
+| F-27 ⚪ | Mixed-engine row filters raise `AttributeError` instead of a clear `TypeError`. **Status:** ✅ Fixed (T4 cleanup on `081`) — all three dispatcher entry points now reject mixed-engine `(X, y)` pairs with a clear `TypeError`; engine-neutral y (lists/numpy) unaffected. | `drop_rows.py:69`, `outliers/_common.py:25` |
+| F-28 ⚪ | WOE artifact null key is `None` on one engine, `nan` on the other. **Status:** ✅ Fixed (T4 cleanup on `081`) — pandas fit/apply/cross-fit now normalise nulls to the `"nan"` key via `_string_keys_with_nan`, matching the Polars path. ⚠️ Pre-release pandas-fitted artifacts keep their `"None"` key until re-fit. | `woe.py:167-186` |
+| F-29 ⚪ | `SimpleImputer` median dtype: `Int64` vs `Float64`. **Status:** ✅ Already resolved by the Polars migration (verified on `081`: both engines record a Python `float`). | `imputation/simple.py` |
+| F-30 ⚪ | `_pretty_dtype` is pandas-only → Polars deployments show `unknown` for Date, Duration, Categorical. **Status:** ✅ Already resolved (verified on `081`: Polars dtype names recognised). | `service.py:613-638` |
+| F-31 ⚪ | `_normalize_train_frame` returns `None` for Polars (drift reference + SHAP frame). **Status:** ✅ Already resolved by the Polars migration (verified on `081`: Polars frames and `(X, y)` tuples handled; `_shap_input_frame` converts at the boundary). | `_artifacts.py:154-178` |
+| F-32 ⚪ | `_feature_names_for_importance` pandas-only → `feature_importances = None` on Polars. **Status:** ✅ Already resolved by the Polars migration (verified on `081`: accepts `pl.DataFrame` on all data shapes). | `_artifacts.py:38-58` |
 
 ---
 
@@ -410,18 +410,19 @@ Commits are grouped by tier; each tier is one commit with its own tests.
 |---|---|---|---|
 | **T1** | F-01, F-02, F-03, **F-33, F-34, F-35, F-37** | core **0.5.9** · backend/frontend **0.7.9** | **Patch — ship first, alone.** All engine-independent and LIVE. F-02/F-03 block deployments; F-33 shows the wrong job's evaluation; F-35 makes "Recall" tuning actively harmful; F-37 is a ~2-line SHAP fix restoring 6 model families. |
 | **T2** | F-04 … F-14 (excl. F-15) | core **0.6.0** · backend/frontend **0.8.0** | **Minor.** Behaviour changes: rows previously dropped are now kept (F-06), imputers that previously no-opped now impute (F-04), HashEncoder buckets change (F-11 — artifacts fitted before this release will not reproduce, needs a release note). |
-| **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend **0.8.0** | Ships with T2. Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — call it out in the changelog. |
-| **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | Patch/minor. F-22 changes a param name users may rely on. |
-| **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.2** · backend/frontend **0.8.2** | Patch. Cosmetic and latent-only. |
-| **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. Design note first. |
+| **T2b** | F-36, F-38, F-39, F-40, F-41, F-42, F-43, F-44 | backend/frontend ~~0.8.0~~ → **0.8.1** | **Done on `080` 2026-08-22; slipped 0.8.0, ships in 0.8.1** (F-43 already shipped via core 0.6.0). Experiments correctness: metric comparability, diff rendering, threshold validation. F-36 changes what the comparison table displays — called out in the 0.8.1 changelog. |
+| **T3** | F-16 … F-26 + leakage enforcement | core **0.6.1** · backend/frontend **0.8.1** | **All findings fixed on `081` 2026-08-22.** Parity batch (F-18/F-19/F-20/F-22/F-25) and leakage enforcement (F-16/F-17, ⚠️ breaking `on_leakage="raise"` default) landed red-green; F-21/F-23/F-24/F-26 already resolved by the Polars migration. The former "remaining T3 work" (pure-noise encoder regression test + doc-site updates) is done — verified 2026-08-23. |
+| **T4** | F-27 … F-32, F-45 … F-48 + dead-code cleanup (F-26 fallback, F-48 `refit()`) | core **0.6.1** · backend/frontend **0.8.1** | **Done on `081` 2026-08-22; folded into the upcoming 0.8.1 release.** F-26 and F-29–F-32 were already resolved by the Polars migration; F-27/F-28/F-45–F-48 fixed red-green. |
+| **T5** | F-15 per-fold refit | core **0.7.0** | **Minor/major — separate initiative.** Changes reported scores. **Design note delivered 2026-08-23** (`2026-08-23-f15-per-fold-refit-design.md`); implementation opt-in first. |
 
 **Cross-cutting, do in T1:** add engine-parity tests that use **float NaN** (not only nulls) and
 **wrapped** frames. Without this the suite will keep passing while broken. Every fix below must be
 verified red-green — write the failing test first, confirm it fails, then fix.
 
-**Frontend sync check required for:** F-22 (`DropMissingColumns` param rename) and F-03 (the
-deployment input-schema drives the UI form). Per repo policy, backend param/enum changes must be
-mirrored in `frontend/ml-canvas/src/modules/nodes/`.
+**Frontend sync check required for:** F-03 (the deployment input-schema drives the UI form).
+F-22 needed no frontend change: `DropColumnsNode.tsx` already sends `missing_threshold`; only
+the core `@node_meta` declaration was corrected. Per repo policy, backend param/enum changes must
+be mirrored in `frontend/ml-canvas/src/modules/nodes/`.
 
 **Docs to update alongside the code:**
 - `docs/examples/leakage_proof.md:459` — scope the "leakage-free by design" conclusion (see the
@@ -534,6 +535,15 @@ options "Recall (weighted)" etc. and add explicit binary variants.
 ### F-36 🟠 HIGH · LIVE — "Best Score" compares different metrics under one label
 `ComparisonTableView.tsx:370-371`, `MetricsComparisonChart.tsx:39,141`, `BranchComparisonCard.tsx:101-102`
 
+**Status:** ✅ Fixed (Experiments batch 2) — `best_score` is now expanded
+into one row per scoring metric via `groupJobsByScoringMetric` in both
+starring surfaces (`ComparisonTableView`, `BranchComparisonCard`): each row
+is labelled from its own metric ("Best Score (F1 Weighted)"), values are
+masked to the jobs that optimised that metric, and `pickBestIndex` stars
+only within the group. `MetricsComparisonChart` was checked and carries no
+`selectedJobs[0]`-derived label — its bar is split-labelled ("CV mean"), so
+no change was needed there. Helper covered by 4 unit tests; red-green.
+
 ```
 basic run (run_mode=fixed) : best_score=0.9   scoring_metric=accuracy
 tuned run (run_mode=tuned) : best_score=0.92  scoring_metric=f1_weighted
@@ -581,6 +591,13 @@ permutation importance; change the UI text to *"not supported for this model typ
 ### F-38 🟠 HIGH · LIVE — `f1_macro` conflated with binary/weighted F1
 `ExperimentsPage/utils/jobMeta.ts:41`
 
+**Status:** ✅ Fixed (Experiments batch 2) — `mapJobMetricToDropdown` now
+maps only exact `accuracy`/`f1_weighted`/`f1` (plus non-macro/micro
+precision/recall prefixes); `f1_macro` and other averaged or
+threshold-independent variants fall back to the documented `f1_weighted`
+default instead of being routed onto the binary positive-class F1 scan.
+5 unit tests; red-green.
+
 ```
 f1_macro    = 0.7957   <- what the job was tuned on
 f1_weighted = 0.9232
@@ -597,19 +614,24 @@ the same `NodeDiff` object under both `left.id` and `right.id`. Node-id drift be
 **normal** case, so nearly every real diff double-lists every change, plus a React duplicate-key
 warning that can mis-reconcile rows. Fix: dedupe by object identity before rendering.
 
+**Status:** ✅ Fixed (Experiments batch 2) — new `uniqueNodeDiffs` helper
+in `graphDiff.ts` dedupes by object identity; `PipelineDiffView` renders
+`uniqueNodeDiffs(diff.nodes)` before filtering to modified nodes. Unit
+test covers a renamed-and-modified node appearing once; red-green.
+
 ### F-40 … F-48
 
 | ID | Sev | Live? | Finding | Location |
 |---|---|---|---|---|
-| F-40 | 🟡 | LIVE | `thresholds/save` validates nothing; garbage persists and is silently discarded at predict time | `threshold_tuning_service.py:169-190`, `deployment/service.py:304-328` |
-| F-41 | 🟡 | LIVE | "Show CV metrics" checkbox does not hide `best_score` | `ExperimentsPage.tsx` |
-| F-42 | 🟡 | LIVE | Task `'other'` always reports "unsupported" even when the artifact exists | `utils/artifactCoverage.ts` |
+| F-40 | 🟡 | ✅ Fixed (batch 2) | `thresholds/save` validates nothing; garbage persists and is silently discarded at predict time. **Fix:** `save()` now validates metric ∈ supported set, non-empty classes, threshold keys exactly matching the stringified classes, finite values, and split ∈ {validation, test}; 7 rejection cases + a preview→save round-trip acceptance test + 1 HTTP-400 integration case; red-green. | `threshold_tuning_service.py:169-190`, `deployment/service.py:304-328` |
+| F-41 | 🟡 | ✅ Fixed (batch 2) | "Show CV metrics" checkbox does not hide `best_score`. **Fix:** `metricKeys` is filtered through new `splitOfMetric`/`filterMetricKeysBySplitVisibility` helpers (`metricMeta.ts`), so `best_score` follows the CV checkbox; 7 unit tests; red-green. | `ExperimentsPage.tsx` |
+| F-42 | 🟡 | ✅ Fixed (batch 2) | Task `'other'` always reports "unsupported" even when the artifact exists. **Fix:** `artifactCoverage.ts` precedence reordered to failed > not-terminal > has-artifact (`available`) > unsupported > not_computed, and `task === 'other'` no longer counts as unsupported; 3 unit tests; red-green. | `utils/artifactCoverage.ts` |
 | F-43 | 🟡 | **LIVE in the published `skyulf-core` SDK**, latent in the app | Polars reference crosstab invents a `"nan"` segment — `is_not_null()` misses float NaN, inflating segment counts. Docstring wrongly claims pandas parity. Same root cause as §1. | `skyulf-core/skyulf/modeling/_evaluation/clustering.py` |
-| F-44 | 🟡 | LATENT | `changeDescriptions` renders `"v: 5 → 5"` for a real int/str coercion, so users dismiss a genuine config change. Detection is correct; only the rendering is wrong. | `graphDiff.ts:93-99` |
-| F-45 | ⚪ | LATENT | `stableStringify` collapses `NaN` and `null` → false "unchanged" | `graphDiff.ts` |
-| F-46 | ⚪ | LATENT | Numeric class labels sort lexicographically when `y_proba` is absent | experiments |
-| F-47 | ⚪ | info | `shortRunId` 8-char collisions | `utils/jobMeta.ts` |
-| F-48 | ⚪ | — | `StatefulEstimator.refit()` is **dead code** — zero callers. Notable because it is the only code that would have trained on train+validation, so that concern is moot. | `skyulf-core/skyulf/modeling/base.py:368-399` |
+| F-44 | 🟡 | ✅ Fixed (batch 2) | `changeDescriptions` renders `"v: 5 → 5"` for a real int/str coercion, so users dismiss a genuine config change. Detection is correct; only the rendering is wrong. **Fix:** `describeValue` quotes strings, so the coercion now renders `5 → "5"`; unit test plus the PipelineDiffView swap test updated to the quoted rendering; red-green. | `graphDiff.ts:93-99` |
+| F-45 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | `stableStringify` collapsed `NaN` and `null` → false "unchanged". **Fix:** `stableStringify` emits a distinct `NaN` token; unit test covers a NaN↔null diff. | `graphDiff.ts` |
+| F-46 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | Numeric class labels sorted lexicographically when `y_proba` is absent. **Fix:** `classLabelComparator` sorts all-numeric labels by value; unit tests cover numeric and string labels. | experiments |
+| F-47 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | `shortRunId` 8-char collisions. **Fix:** widened to 10 chars. | `utils/jobMeta.ts` |
+| F-48 | ⚪ | ✅ Fixed (T4 cleanup on `081`) | `StatefulEstimator.refit()` was dead code — zero production callers. **Fix:** method and its four test call sites removed. | `skyulf-core/skyulf/modeling/base.py` |
 
 ### Proven correct in this subsystem
 
@@ -639,7 +661,11 @@ math for the families where data *is* present; `ClassificationChartsForSplit` /
 `PerClassConfusionMatrix` prop paths; `ExperimentsPage` effect-dependency exhaustiveness beyond
 F-33; job-list polling against in-flight mutations.
 
-**Unverified, needs a decision:** `promote_job` (`_execution/jobs.py:373`) accepts only
-`status == "completed"`, while `JobStatus.SUCCEEDED = "succeeded"` is treated as terminal in four
-other modules. No site was found that *writes* `"succeeded"`. This is either harmless dead enum
-drift or a latent "cannot promote" bug; proving which needs a state-changing probe.
+**Resolved 2026-08-23 (state-changing probe):** `promote_job` (`_execution/jobs.py:373`) accepts
+only `status == "completed"`, while `JobStatus.SUCCEEDED = "succeeded"` is treated as terminal in
+four other modules. Verdict: **harmless dead enum drift, not a bug.** A repo-wide scan found zero
+writers of `"succeeded"` — every success path writes `"completed"` (`pipeline_execution_service.py`
+sets it directly; no caller ever passes `JobStatus.SUCCEEDED` to the job managers), and a live
+probe against the real `promote_job` confirmed a `completed` job promotes (`promoted_at` set)
+while a hypothetical `succeeded` row is refused. The `SUCCEEDED` member and its defensive readers
+can be deleted as routine cleanup; nothing user-visible depends on it.

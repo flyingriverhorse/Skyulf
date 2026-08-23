@@ -8,6 +8,7 @@ threshold dict's keys match the live model's actual ``estimator.classes_``
 values at predict time.
 """
 
+import math
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -213,6 +214,40 @@ class ThresholdTuningService:
         }
 
     @staticmethod
+    def _validate_save_payload(
+        thresholds: dict[str, float], classes: list, metric: str, split_used: str
+    ) -> None:
+        """Reject payloads that predict-time cannot honor.
+
+        Without this, garbage persists silently: ``_resolve_thresholds_for_predict``
+        skips any saved set that doesn't cover every model class, so a bad save
+        looks active but is quietly ignored at predict time.
+        """
+        if metric not in _SUPPORTED_METRICS:
+            raise ThresholdTuningError(f"Unsupported metric: {metric}")
+        if not classes:
+            raise ThresholdTuningError("classes must be a non-empty list of class labels")
+        expected_keys = {str(c) for c in classes}
+        if set(thresholds.keys()) != expected_keys:
+            raise ThresholdTuningError(
+                f"thresholds keys {sorted(thresholds.keys())} do not match "
+                f"classes {sorted(expected_keys)}"
+            )
+        for key, value in thresholds.items():
+            # No [0, 1] bound on purpose: optimize_thresholds' nelder-mead
+            # strategy legitimately returns out-of-range cut-points for
+            # multiclass jobs, and apply_thresholds' scaled argmax handles
+            # them arithmetically. Finite-ness is the real invariant.
+            if not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ThresholdTuningError(
+                    f"threshold for class {key!r} must be a finite number, got {value!r}"
+                )
+        if split_used not in ("validation", "test"):
+            raise ThresholdTuningError(
+                f"split_used must be 'validation' or 'test', got {split_used!r}"
+            )
+
+    @staticmethod
     async def save(
         session: AsyncSession,
         job_id: str,
@@ -223,6 +258,7 @@ class ThresholdTuningService:
     ) -> bool:
         """Persist a tuned threshold set on the job, enabling it by default."""
         job = await ThresholdTuningService._get_job_or_raise(session, job_id)
+        ThresholdTuningService._validate_save_payload(thresholds, classes, metric, split_used)
 
         job.tuned_thresholds = {
             "thresholds": thresholds,

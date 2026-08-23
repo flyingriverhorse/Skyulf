@@ -258,7 +258,7 @@ def test_returns_none_on_model_failure(classification_data):
 
 def test_returns_none_for_empty_dataframe():
     """An empty DataFrame yields `None` rather than raising."""
-    empty = pd.DataFrame(columns=["a", "b"])
+    empty = pd.DataFrame(columns=["a", "b"])  # ty: ignore[invalid-argument-type]
 
     result = compute_shap_explanation(RandomForestClassifier(), empty)
 

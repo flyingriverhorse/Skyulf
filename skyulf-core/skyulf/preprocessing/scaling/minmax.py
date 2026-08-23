@@ -62,6 +62,7 @@ class MinMaxScalerApplier(BaseApplier):
     category="Preprocessing",
     description="Transform features by scaling each feature to a given range.",
     params={"feature_range": [0, 1], "columns": []},
+    learns_from_data=True,
 )
 class MinMaxScalerCalculator(BaseCalculator):
     def infer_output_schema(

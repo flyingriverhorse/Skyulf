@@ -37,6 +37,13 @@ class FeatureEngineer:
     # and `_collect_step_metrics` can't drift out of sync with each other.
     _RESAMPLING_TYPES = {"Oversampling", "Undersampling"}
 
+    # Row-dropping steps are train-time cleaning only (F-18). Running them at
+    # inference would silently vanish requested input rows -- prediction
+    # responses carry no row keys, so callers could never tell which inputs
+    # lost their prediction. Skipping them means a null row surfaces as a
+    # visible model error instead of a silent misalignment.
+    _ROW_DROPPING_TYPES = {"Deduplicate", "DropMissingRows"}
+
     def __init__(
         self,
         steps_config: Sequence[PreprocessingStepConfig | dict[str, Any]],
@@ -66,6 +73,7 @@ class FeatureEngineer:
                 "TrainTestSplitter",
                 "feature_target_split",
                 *self._RESAMPLING_TYPES,
+                *self._ROW_DROPPING_TYPES,
             ]:
                 continue
 

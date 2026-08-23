@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from sklearn.calibration import CalibratedClassifierCV
+from tests.utils.reload_guard import reload_module_preserving_registry
 
 from skyulf.modeling.ensemble import (
     StackingClassifierCalculator,
@@ -187,35 +188,19 @@ def test_absorb_nested_keys_routes_final_estimator_params():
 
 def test_ensemble_xgboost_import_failure_sets_flag_false(monkeypatch):
     """Simulating an unimportable xgboost must leave XGBOOST_AVAILABLE False after reload."""
-    import importlib
-    import sys
-
     import skyulf.modeling.ensemble as ensemble_mod
 
-    monkeypatch.setitem(sys.modules, "xgboost", None)
-    try:
-        importlib.reload(ensemble_mod)
-        assert ensemble_mod.XGBOOST_AVAILABLE is False
-        assert "xgboost" not in ensemble_mod.BASE_ESTIMATORS_CLF
-    finally:
-        monkeypatch.delitem(sys.modules, "xgboost", raising=False)
-        importlib.reload(ensemble_mod)
-        assert ensemble_mod.XGBOOST_AVAILABLE is True
+    with reload_module_preserving_registry(ensemble_mod, monkeypatch, "xgboost") as mod:
+        assert mod.XGBOOST_AVAILABLE is False
+        assert "xgboost" not in mod.BASE_ESTIMATORS_CLF
+    assert ensemble_mod.XGBOOST_AVAILABLE is True
 
 
 def test_ensemble_lightgbm_import_failure_sets_flag_false(monkeypatch):
     """Simulating an unimportable lightgbm must leave LIGHTGBM_AVAILABLE False after reload."""
-    import importlib
-    import sys
-
     import skyulf.modeling.ensemble as ensemble_mod
 
-    monkeypatch.setitem(sys.modules, "lightgbm", None)
-    try:
-        importlib.reload(ensemble_mod)
-        assert ensemble_mod.LIGHTGBM_AVAILABLE is False
-        assert "lightgbm" not in ensemble_mod.BASE_ESTIMATORS_CLF
-    finally:
-        monkeypatch.delitem(sys.modules, "lightgbm", raising=False)
-        importlib.reload(ensemble_mod)
-        assert ensemble_mod.LIGHTGBM_AVAILABLE is True
+    with reload_module_preserving_registry(ensemble_mod, monkeypatch, "lightgbm") as mod:
+        assert mod.LIGHTGBM_AVAILABLE is False
+        assert "lightgbm" not in mod.BASE_ESTIMATORS_CLF
+    assert ensemble_mod.LIGHTGBM_AVAILABLE is True

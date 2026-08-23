@@ -112,6 +112,7 @@ class PowerTransformerApplier(BaseApplier):
     category="Preprocessing",
     description="Apply a power transform featurewise to make data more Gaussian-like.",
     params={"method": "yeo-johnson", "standardize": True, "columns": []},
+    learns_from_data=True,
 )
 class PowerTransformerCalculator(BaseCalculator):
     def infer_output_schema(
