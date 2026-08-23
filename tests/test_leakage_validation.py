@@ -491,3 +491,27 @@ def test_auto_detected_hash_encoding_before_split_still_raises():
     ]
     with pytest.raises(ValueError, match="Data leakage risk"):
         validate_no_preprocessing_before_split(nodes)
+
+
+def test_cyclic_preprocessing_graph_still_detects_leakage():
+    """A hand-built cycle between preprocessing nodes must not hang the
+    descendant walk (cycle guard returns an empty set) and the violation
+    through the non-cyclic edge to the splitter must still be detected."""
+    nodes = [
+        _node("scale", "StandardScaler", ["impute"]),
+        _node("impute", "SimpleImputer", ["scale"]),  # cycle: scale <-> impute
+        _node("split", "TrainTestSplitter", ["scale"]),
+    ]
+    with pytest.raises(ValueError, match="Data leakage risk"):
+        validate_no_preprocessing_before_split(nodes)
+
+
+def test_invalid_on_leakage_mode_rejected():
+    """An unknown on_leakage mode is a programming error, rejected up front
+    rather than silently treated as one of the known modes."""
+    nodes = [
+        _node("load", "DataLoader", []),
+        _node("split", "TrainTestSplitter", ["load"]),
+    ]
+    with pytest.raises(ValueError, match="on_leakage"):
+        validate_no_preprocessing_before_split(nodes, on_leakage="explode")  # ty: ignore[invalid-argument-type]
