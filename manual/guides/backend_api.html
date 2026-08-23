@@ -1,0 +1,4621 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://flyingriverhorse.github.io/Skyulf/guides/backend_api.html">
+      
+      
+        <link rel="prev" href="platform_walkthrough.html">
+      
+      
+        <link rel="next" href="backend_configuration.html">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>API Reference - Skyulf</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#backend-api-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="Skyulf" class="md-header__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Skyulf
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              API Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="light-blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="platform_setup.html" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="getting_started.html" class="md-tabs__link">
+          
+  
+  
+  Guides
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../examples/quickstart.html" class="md-tabs__link">
+          
+  
+  
+  Examples
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/writing_docs.html" class="md-tabs__link">
+          
+  
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../user_guide/overview.html" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../reference/preprocessing_nodes.html" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="Skyulf" class="md-nav__button md-logo" aria-label="Skyulf" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Skyulf
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/flyingriverhorse/Skyulf" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    flyingriverhorse/Skyulf
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="platform_setup.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Setup
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="platform_walkthrough.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Platform Walkthrough
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="backend_api.html" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#route-map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Route Map
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Health">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-healthping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/ping
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-health" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-healthdetailed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/detailed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-healthready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/ready
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data Sources
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data Sources">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcesusable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/usable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcessource_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/{source_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcessource_idsample" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/{source_id}/sample
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-dataapisourcessource_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /data/api/sources/{source_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-dataapisourcessource_idexport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /data/api/sources/{source_id}/export
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File Ingestion
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="File Ingestion">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiingestionupload-rate-limited-10min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/ingestion/upload — Rate limited: 10/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiingestionsource_idstatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/ingestion/{source_id}/status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiingestionsource_idcancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/ingestion/{source_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ml-pipeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ML Pipeline
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ML Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinerun-rate-limited-20min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/run — Rate limited: 20/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinepreview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelineschema-preview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/schema-preview
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobsjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinejobsjob_idcancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/jobs/{job_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinejobsjob_idpromote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/jobs/{job_id}/promote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apipipelinejobsjob_idpromote" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/pipeline/jobs/{job_id}/promote
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobsjob_idevaluation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/{job_id}/evaluation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinejobsnode-summaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/jobs/node-summaries
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tuning-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tuning Jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelineregistry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/registry
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinestats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinedatasetslist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/datasets/list
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinedatasetsdataset_idschema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/datasets/{dataset_id}/schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinehyperparametersmodel_type" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/hyperparameters/{model_type}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apipipelinehyperparametersmodel_typedefaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/pipeline/hyperparameters/{model_type}/defaults
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-save-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Save / Load
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-versions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notebook-export" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notebook Export
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Notebook Export">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apipipelinepipelinedataset_idexport-notebook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/pipeline/pipeline/{dataset_id}/export-notebook
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deployment-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deployment &amp; Inference
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Deployment &amp; Inference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apideploymentdeployjob_id-rate-limited-10min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/deployment/deploy/{job_id} — Rate limited: 10/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apideploymentactive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/deployment/active
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apideploymenthistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/deployment/history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apideploymentdeactivate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/deployment/deactivate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apideploymentpredict-rate-limited-60min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/deployment/predict — Rate limited: 60/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#model-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Model Registry
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Model Registry">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistrystats" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/stats
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistrymodels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/models
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistrymodelsmodel_typeversions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/models/{model_type}/versions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiregistryartifactsjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/registry/artifacts/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#eda-profiling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        EDA &amp; Profiling
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="EDA &amp; Profiling">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiedadataset_idanalyze-rate-limited-20min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/eda/{dataset_id}/analyze — Rate limited: 20/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedadataset_idlatest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/{dataset_id}/latest
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedadataset_idhistory" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/{dataset_id}/history
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedareportsreport_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/reports/{report_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiedareportsreport_idcancel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/eda/reports/{report_id}/cancel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiedadataset_iddecomposition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/eda/{dataset_id}/decomposition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiedajobsall" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/eda/jobs/all
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Monitoring
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Monitoring">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#drift-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Drift Detection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Drift Detection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringjobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apimonitoringdriftcalculate-rate-limited-20min" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/monitoring/drift/calculate — Rate limited: 20/min
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringdrifthistoryjob_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/drift/history/{job_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringdriftstatus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/drift/status
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#performance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Performance
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Performance">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringslow-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/slow-nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-tracking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Tracking
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Error Tracking">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorscount" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/count
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorsgrouped" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/grouped
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorstimeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/timeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringerrorserror_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/errors/{error_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apimonitoringerrorserror_idresolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/monitoring/errors/{error_id}/resolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apimonitoringerrorserror_idunresolve" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/monitoring/errors/{error_id}/unresolve
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apimonitoringerrors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/monitoring/errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pipeline-run-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pipeline Run Logs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pipeline Run Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apimonitoringpipeline-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/monitoring/pipeline-logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apimonitoringpipeline-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/monitoring/pipeline-logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apimonitoringjobsjob_iddescription" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/monitoring/jobs/{job_id}/description
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apimonitoringpipeline-logs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/monitoring/pipeline-logs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#websocket-job-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WebSocket — Job Events
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="WebSocket — Job Events">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ws-wsjobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WS /ws/jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rate-limiting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rate Limiting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-responses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error Responses
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="backend_configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="job_idempotency.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Job Idempotency
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="getting_started.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="core-release.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Release Process
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="multi_path_pipelines.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-Path Pipelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="faq.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ & Comparison
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="recipes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Recipes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sklearn_migration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="profiling_comparison.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Skyulf vs. YData vs. Sweetviz
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="adding_new_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding New Engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="engine_mechanics.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Mechanics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="engine_data_paths.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engine Data Paths
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="data_drift_roadmap.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Drift Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Examples
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_pandas.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (pandas)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples/leakage_proof_polars.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Leakage Proof (polars)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/writing_docs.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Writing Docs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/overview.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/pipeline_quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Quickstart
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/step_by_step_no_config.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Step-by-Step (No Config)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/eda_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Automated EDA
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/text_nlp.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Text & NLP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/validation_vs_sklearn.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Validation vs scikit-learn
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/configuration.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    skyulf-core Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/hyperparameter_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hyperparameter Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/shap_explainability.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SHAP Explainability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/threshold_tuning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Threshold Tuning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/splitdataset_and_leakage.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset & Leakage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/drift_monitoring.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Drift Monitoring
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/serialization.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/extending_custom_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending Skyulf-Core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/troubleshooting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/preprocessing_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/modeling_nodes.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/data_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/deprecation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deprecation Policy
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_2" id="__nav_7_5_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/data/dataset.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    SplitDataset
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_3" id="__nav_7_5_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Preprocessing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Preprocessing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/pipeline.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    pipeline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/split.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    split
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/cleaning.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cleaning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/drop_and_missing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    drop_and_missing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/imputation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    imputation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/encoding.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    encoding
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/scaling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    scaling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/outliers.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    outliers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/transformations.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    transformations
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/bucketing.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    bucketing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/casting.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    casting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_generation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_generation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/feature_selection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    feature_selection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/resampling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    resampling
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/preprocessing/inspection.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    inspection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_7_5_4" id="__nav_7_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Modeling
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_7_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Modeling
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/base.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    base
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/sklearn_wrapper.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    sklearn_wrapper
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/classification.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    classification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/regression.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    regression
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/cross_validation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    cross_validation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/api/modeling/tuning_engine.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    tuning/engine
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="backend-api-reference">Backend API Reference</h1>
+<p>The Skyulf backend exposes a REST API on port <code>8000</code> by default.
+Interactive docs are available at <a href="http://127.0.0.1:8000/docs"><code>/docs</code></a> (Swagger UI)
+and <a href="http://127.0.0.1:8000/redoc"><code>/redoc</code></a> (ReDoc) when <code>DEBUG=true</code>.</p>
+<hr />
+<h2 id="route-map">Route Map</h2>
+<table>
+<thead>
+<tr>
+<th>Prefix</th>
+<th>Area</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/health*</code></td>
+<td>Health &amp; readiness probes</td>
+</tr>
+<tr>
+<td><code>/data/api/*</code></td>
+<td>Data source management</td>
+</tr>
+<tr>
+<td><code>/api/ingestion/*</code></td>
+<td>File upload &amp; ingestion jobs</td>
+</tr>
+<tr>
+<td><code>/api/pipeline/*</code></td>
+<td>ML pipeline execution, preview, jobs, versions</td>
+</tr>
+<tr>
+<td><code>/api/eda/*</code></td>
+<td>Automated EDA &amp; profiling</td>
+</tr>
+<tr>
+<td><code>/api/deployment/*</code></td>
+<td>Model deployment &amp; inference</td>
+</tr>
+<tr>
+<td><code>/api/registry/*</code></td>
+<td>Model registry</td>
+</tr>
+<tr>
+<td><code>/api/monitoring/*</code></td>
+<td>Drift monitoring, error tracking, pipeline logs</td>
+</tr>
+<tr>
+<td><code>/ws/jobs</code></td>
+<td>WebSocket job event stream</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="health">Health</h2>
+<h3 id="get-healthping"><code>GET /health/ping</code></h3>
+<p>Minimal liveness probe — returns <code>{ "message": "pong" }</code>. Fastest possible health check with no database involvement.</p>
+<h3 id="get-health"><code>GET /health</code></h3>
+<p>Basic health probe for load balancers. Returns HTTP 200 when the server is running.</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;timestamp&quot;: &quot;2025-06-30T12:00:00Z&quot;,
+  &quot;version&quot;: &quot;0.6.3&quot;,
+  &quot;environment&quot;: &quot;development&quot;,
+  &quot;uptime_seconds&quot;: 3600.0
+}
+</code></pre>
+<h3 id="get-healthdetailed"><code>GET /health/detailed</code></h3>
+<p>Detailed diagnostics. Checks database connectivity and Redis (if <code>USE_CELERY=true</code>).</p>
+<pre><code class="language-json">{
+  &quot;status&quot;: &quot;healthy&quot;,
+  &quot;database_status&quot;: &quot;healthy&quot;,
+  &quot;cache_status&quot;: &quot;healthy&quot;,
+  &quot;external_services&quot;: { &quot;snowflake&quot;: &quot;not_configured&quot; }
+}
+</code></pre>
+<h3 id="get-healthready"><code>GET /health/ready</code></h3>
+<p>Readiness probe — fits a tiny sklearn pipeline to verify the ML stack is functional.
+Returns <code>503</code> if the ML dependencies are broken.</p>
+<hr />
+<h2 id="data-sources">Data Sources</h2>
+<h3 id="get-dataapisources"><code>GET /data/api/sources</code></h3>
+<p>List all data sources. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
+<h3 id="get-dataapisourcesusable"><code>GET /data/api/sources/usable</code></h3>
+<p>List data sources that have completed ingestion and are ready for pipeline use.</p>
+<h3 id="get-dataapisourcessource_id"><code>GET /data/api/sources/{source_id}</code></h3>
+<p>Get a single data source by ID.</p>
+<blockquote>
+<p><strong>Note:</strong> The <code>config</code> field in all data source responses has sensitive keys (<code>storage_options</code>, AWS credentials, passwords) automatically redacted.</p>
+</blockquote>
+<h3 id="get-dataapisourcessource_idsample"><code>GET /data/api/sources/{source_id}/sample</code></h3>
+<p>Get a sample of rows from the data source.</p>
+<h3 id="delete-dataapisourcessource_id"><code>DELETE /data/api/sources/{source_id}</code></h3>
+<p>Delete a data source and its associated files.</p>
+<h3 id="get-dataapisourcessource_idexport"><code>GET /data/api/sources/{source_id}/export</code></h3>
+<p>Export the full dataset as a downloadable file.</p>
+<hr />
+<h2 id="file-ingestion">File Ingestion</h2>
+<h3 id="post-apiingestionupload-rate-limited-10min"><code>POST /api/ingestion/upload</code> — Rate limited: 10/min</h3>
+<p>Upload a dataset file. Starts an asynchronous ingestion job.</p>
+<p><strong>Request:</strong> <code>multipart/form-data</code> with a <code>file</code> field.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{ &quot;job_id&quot;: &quot;...&quot;, &quot;status&quot;: &quot;pending&quot;, &quot;message&quot;: &quot;File upload started&quot;, &quot;file_id&quot;: &quot;...&quot; }
+</code></pre>
+<p><strong>Allowed extensions:</strong> <code>.csv</code>, <code>.xlsx</code>, <code>.xls</code>, <code>.parquet</code>, <code>.json</code>, <code>.txt</code>, <code>.pkl</code>, <code>.pickle</code>, <code>.feather</code>, <code>.h5</code>, <code>.hdf5</code></p>
+<p><strong>Size limit:</strong> <code>MAX_UPLOAD_SIZE</code> (default 10 GB).</p>
+<h3 id="get-apiingestionsource_idstatus"><code>GET /api/ingestion/{source_id}/status</code></h3>
+<p>Poll the status of an ingestion job. Returns <code>pending</code>, <code>processing</code>, <code>completed</code>, or <code>failed</code>.</p>
+<h3 id="post-apiingestionsource_idcancel"><code>POST /api/ingestion/{source_id}/cancel</code></h3>
+<p>Cancel an in-progress ingestion job.</p>
+<hr />
+<h2 id="ml-pipeline">ML Pipeline</h2>
+<p>All pipeline endpoints are under <code>/api/pipeline/*</code>.</p>
+<h3 id="post-apipipelinerun-rate-limited-20min"><code>POST /api/pipeline/run</code> — Rate limited: 20/min</h3>
+<p>Submit a pipeline for asynchronous execution. Accepts a <code>PipelineConfigModel</code> JSON body describing the node graph.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{
+  &quot;message&quot;: &quot;Pipeline execution started&quot;,
+  &quot;pipeline_id&quot;: &quot;...&quot;,
+  &quot;job_id&quot;: &quot;...&quot;,
+  &quot;job_ids&quot;: [&quot;...&quot;]
+}
+</code></pre>
+<p>Multiple <code>job_ids</code> are returned when the pipeline is split into parallel branches.</p>
+<h3 id="post-apipipelinepreview"><code>POST /api/pipeline/preview</code></h3>
+<p>Run the pipeline in preview mode (synchronous, limited to 1000 rows). Returns per-node output samples.</p>
+<h3 id="post-apipipelineschema-preview"><code>POST /api/pipeline/schema-preview</code></h3>
+<p>Returns predicted output column schema for a node without executing the pipeline.</p>
+<h3 id="get-apipipelinejobs"><code>GET /api/pipeline/jobs</code></h3>
+<p>List all training jobs with status and metrics.</p>
+<h3 id="get-apipipelinejobsjob_id"><code>GET /api/pipeline/jobs/{job_id}</code></h3>
+<p>Get detailed status, metrics, and logs for a specific job.</p>
+<h3 id="post-apipipelinejobsjob_idcancel"><code>POST /api/pipeline/jobs/{job_id}/cancel</code></h3>
+<p>Cancel a running or queued job.</p>
+<h3 id="post-apipipelinejobsjob_idpromote"><code>POST /api/pipeline/jobs/{job_id}/promote</code></h3>
+<p>Mark a completed job as the "promoted winner" — sets the <code>promoted_at</code> timestamp.</p>
+<h3 id="delete-apipipelinejobsjob_idpromote"><code>DELETE /api/pipeline/jobs/{job_id}/promote</code></h3>
+<p>Remove the promoted status from a job (unpromote).</p>
+<h3 id="get-apipipelinejobsjob_idevaluation"><code>GET /api/pipeline/jobs/{job_id}/evaluation</code></h3>
+<p>Get full evaluation results for a completed job — model metrics, preprocessing artifacts, and tuning trial history (if applicable).</p>
+<h3 id="get-apipipelinejobsnode-summaries"><code>GET /api/pipeline/jobs/node-summaries</code></h3>
+<p>Returns per-node aggregated metrics across all jobs. Useful for comparing model types. Query param: <code>limit</code> (default 200).</p>
+<h3 id="tuning-jobs">Tuning Jobs</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/jobs/tuning/latest/{node_id}</code></td>
+<td>Most recent tuning job for a canvas node</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/jobs/tuning/best/{model_type}</code></td>
+<td>Best-scoring tuning job for a model type</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/jobs/tuning/history/{model_type}</code></td>
+<td>Full tuning history for a model type</td>
+</tr>
+</tbody>
+</table>
+<h3 id="get-apipipelineregistry"><code>GET /api/pipeline/registry</code></h3>
+<p>Returns the full node registry — all available step types with their parameter schemas.</p>
+<h3 id="get-apipipelinestats"><code>GET /api/pipeline/stats</code></h3>
+<p>Aggregate statistics across all jobs (counts by status, model type, etc.).</p>
+<h3 id="get-apipipelinedatasetslist"><code>GET /api/pipeline/datasets/list</code></h3>
+<p>List datasets available for pipeline use.</p>
+<h3 id="get-apipipelinedatasetsdataset_idschema"><code>GET /api/pipeline/datasets/{dataset_id}/schema</code></h3>
+<p>Get the column schema of a dataset.</p>
+<h3 id="get-apipipelinehyperparametersmodel_type"><code>GET /api/pipeline/hyperparameters/{model_type}</code></h3>
+<p>Get hyperparameter definitions for a model type.</p>
+<h3 id="get-apipipelinehyperparametersmodel_typedefaults"><code>GET /api/pipeline/hyperparameters/{model_type}/defaults</code></h3>
+<p>Get default hyperparameter values for a model type.</p>
+<h3 id="pipeline-save-load">Pipeline Save / Load</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/pipeline/save/{dataset_id}</code></td>
+<td>Save a pipeline configuration for a dataset</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/load/{dataset_id}</code></td>
+<td>Load the current pipeline configuration for a dataset</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pipeline-versions">Pipeline Versions</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}</code></td>
+<td>List all saved versions for a dataset</td>
+</tr>
+<tr>
+<td><code>POST</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}</code></td>
+<td>Save a new named version</td>
+</tr>
+<tr>
+<td><code>PATCH</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}/{version_id}</code></td>
+<td>Update version metadata</td>
+</tr>
+<tr>
+<td><code>DELETE</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}/{version_id}</code></td>
+<td>Delete a version</td>
+</tr>
+<tr>
+<td><code>GET</code></td>
+<td><code>/api/pipeline/versions/{dataset_source_id}/audit</code></td>
+<td>Version change audit log</td>
+</tr>
+</tbody>
+</table>
+<h3 id="notebook-export">Notebook Export</h3>
+<h4 id="post-apipipelinepipelinedataset_idexport-notebook"><code>POST /api/pipeline/pipeline/{dataset_id}/export-notebook</code></h4>
+<p>Generate and download a Jupyter notebook (<code>.ipynb</code>) for a pipeline. Supports <code>full</code> and <code>compact</code> export modes. See <a href="platform_walkthrough.html#step-5b-export-to-jupyter-notebook">Platform Walkthrough</a> for details.</p>
+<hr />
+<h2 id="deployment-inference">Deployment &amp; Inference</h2>
+<h3 id="post-apideploymentdeployjob_id-rate-limited-10min"><code>POST /api/deployment/deploy/{job_id}</code> — Rate limited: 10/min</h3>
+<p>Deploy a trained model from a completed job. Sets it as the active deployment.</p>
+<h3 id="get-apideploymentactive"><code>GET /api/deployment/active</code></h3>
+<p>Get the currently active deployment.</p>
+<h3 id="get-apideploymenthistory"><code>GET /api/deployment/history</code></h3>
+<p>List deployment history. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
+<h3 id="post-apideploymentdeactivate"><code>POST /api/deployment/deactivate</code></h3>
+<p>Deactivate the current active deployment.</p>
+<h3 id="post-apideploymentpredict-rate-limited-60min"><code>POST /api/deployment/predict</code> — Rate limited: 60/min</h3>
+<p>Run inference using the active model.</p>
+<p><strong>Request:</strong></p>
+<pre><code class="language-json">{ &quot;data&quot;: [{ &quot;feature1&quot;: 1.5, &quot;feature2&quot;: &quot;value&quot; }] }
+</code></pre>
+<p><code>data</code> is an <strong>array</strong> of records — even for a single prediction, wrap it in a list.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{ &quot;predictions&quot;: [...], &quot;model_version&quot;: &quot;job-id-here&quot; }
+</code></pre>
+<p>Returns <code>404</code> if no deployment is active.</p>
+<hr />
+<h2 id="model-registry">Model Registry</h2>
+<p>The model registry is <strong>read-only</strong> — models are auto-registered when jobs complete and promoted via the jobs API.</p>
+<h3 id="get-apiregistrystats"><code>GET /api/registry/stats</code></h3>
+<p>Aggregate registry statistics (model counts by type, total versions, etc.).</p>
+<h3 id="get-apiregistrymodels"><code>GET /api/registry/models</code></h3>
+<p>List all registered models.</p>
+<h3 id="get-apiregistrymodelsmodel_typeversions"><code>GET /api/registry/models/{model_type}/versions</code></h3>
+<p>List all versions for a specific model type (e.g., <code>random_forest_classifier</code>).</p>
+<h3 id="get-apiregistryartifactsjob_id"><code>GET /api/registry/artifacts/{job_id}</code></h3>
+<p>List all stored artifacts (model files, preprocessing pickles) for a job.</p>
+<hr />
+<h2 id="eda-profiling">EDA &amp; Profiling</h2>
+<h3 id="post-apiedadataset_idanalyze-rate-limited-20min"><code>POST /api/eda/{dataset_id}/analyze</code> — Rate limited: 20/min</h3>
+<p>Trigger a full automated EDA analysis for a dataset. Returns a <code>report_id</code> immediately; the analysis runs asynchronously.</p>
+<p><strong>Response:</strong></p>
+<pre><code class="language-json">{ &quot;report_id&quot;: 42, &quot;status&quot;: &quot;pending&quot;, &quot;dataset_id&quot;: 7 }
+</code></pre>
+<h3 id="get-apiedadataset_idlatest"><code>GET /api/eda/{dataset_id}/latest</code></h3>
+<p>Get the most recently completed EDA report for a dataset (distributions, correlations, outliers, smart alerts).</p>
+<h3 id="get-apiedadataset_idhistory"><code>GET /api/eda/{dataset_id}/history</code></h3>
+<p>List all past EDA reports for a dataset.</p>
+<h3 id="get-apiedareportsreport_id"><code>GET /api/eda/reports/{report_id}</code></h3>
+<p>Get a specific EDA report by ID.</p>
+<h3 id="post-apiedareportsreport_idcancel"><code>POST /api/eda/reports/{report_id}/cancel</code></h3>
+<p>Cancel a running EDA analysis.</p>
+<h3 id="post-apiedadataset_iddecomposition"><code>POST /api/eda/{dataset_id}/decomposition</code></h3>
+<p>Run time-series decomposition on a dataset column.</p>
+<h3 id="get-apiedajobsall"><code>GET /api/eda/jobs/all</code></h3>
+<p>List all EDA jobs with status. Query params: <code>limit</code> (default 50), <code>skip</code> (default 0).</p>
+<hr />
+<h2 id="monitoring">Monitoring</h2>
+<h3 id="drift-detection">Drift Detection</h3>
+<h4 id="get-apimonitoringjobs"><code>GET /api/monitoring/jobs</code></h4>
+<p>List jobs that have reference data available for drift comparison.</p>
+<h4 id="post-apimonitoringdriftcalculate-rate-limited-20min"><code>POST /api/monitoring/drift/calculate</code> — Rate limited: 20/min</h4>
+<p>Calculate data drift between a job's reference data and a new uploaded file.</p>
+<p><strong>Request:</strong> <code>multipart/form-data</code>
+- <code>job_id</code> — the training job whose reference data to compare against
+- <code>file</code> — current data file (CSV or Parquet)
+- <code>dataset_name</code> <em>(optional)</em> — dataset name to match reference data
+- <code>threshold_psi</code>, <code>threshold_ks</code>, <code>threshold_wasserstein</code>, <code>threshold_kl</code> <em>(optional)</em> — custom thresholds</p>
+<p><strong>Size limit:</strong> <code>MAX_UPLOAD_SIZE</code> (default 10 GB).</p>
+<h4 id="get-apimonitoringdrifthistoryjob_id"><code>GET /api/monitoring/drift/history/{job_id}</code></h4>
+<p>List past drift check results for a job.</p>
+<h4 id="get-apimonitoringdriftstatus"><code>GET /api/monitoring/drift/status</code></h4>
+<p>Drift health summary across all monitored jobs.</p>
+<h3 id="performance">Performance</h3>
+<h4 id="get-apimonitoringslow-nodes"><code>GET /api/monitoring/slow-nodes</code></h4>
+<p>Returns the top N step types by cumulative execution time over the last N days.
+Query params: <code>days</code> (1–90, default 7), <code>limit</code> (1–50, default 10).</p>
+<h3 id="error-tracking">Error Tracking</h3>
+<p>The backend automatically records unhandled 5xx errors to the <code>error_events</code> database table.</p>
+<h4 id="get-apimonitoringerrors"><code>GET /api/monitoring/errors</code></h4>
+<p>List recorded error events. Supports <code>since</code>, <code>limit</code>, <code>show_resolved</code> (default <code>false</code>) query params.</p>
+<h4 id="get-apimonitoringerrorscount"><code>GET /api/monitoring/errors/count</code></h4>
+<p>Count of unresolved errors.</p>
+<h4 id="get-apimonitoringerrorsgrouped"><code>GET /api/monitoring/errors/grouped</code></h4>
+<p>Errors grouped by <code>error_type</code>.</p>
+<h4 id="get-apimonitoringerrorstimeline"><code>GET /api/monitoring/errors/timeline</code></h4>
+<p>Error counts over time (for trend charts).</p>
+<h4 id="get-apimonitoringerrorserror_id"><code>GET /api/monitoring/errors/{error_id}</code></h4>
+<p>Get a specific error event (includes full traceback — <strong>admin-only in production</strong>).</p>
+<h4 id="patch-apimonitoringerrorserror_idresolve"><code>PATCH /api/monitoring/errors/{error_id}/resolve</code></h4>
+<p>Mark an error as resolved.</p>
+<h4 id="patch-apimonitoringerrorserror_idunresolve"><code>PATCH /api/monitoring/errors/{error_id}/unresolve</code></h4>
+<p>Reopen a resolved error.</p>
+<h4 id="delete-apimonitoringerrors"><code>DELETE /api/monitoring/errors</code></h4>
+<p>Delete all error events. ⚠️ Irreversible.</p>
+<h3 id="pipeline-run-logs">Pipeline Run Logs</h3>
+<h4 id="post-apimonitoringpipeline-logs"><code>POST /api/monitoring/pipeline-logs</code></h4>
+<p>Ingest pipeline execution log entries.</p>
+<h4 id="get-apimonitoringpipeline-logs"><code>GET /api/monitoring/pipeline-logs</code></h4>
+<p>List pipeline run logs. Supports <code>pipeline_id</code>, <code>since</code>, <code>limit</code> (max 500) query params.</p>
+<h4 id="patch-apimonitoringjobsjob_iddescription"><code>PATCH /api/monitoring/jobs/{job_id}/description</code></h4>
+<p>Update the description/notes for a monitored job.</p>
+<h4 id="delete-apimonitoringpipeline-logs"><code>DELETE /api/monitoring/pipeline-logs</code></h4>
+<p>Delete all pipeline run logs. ⚠️ Irreversible.</p>
+<hr />
+<h2 id="websocket-job-events">WebSocket — Job Events</h2>
+<h3 id="ws-wsjobs"><code>WS /ws/jobs</code></h3>
+<p>A WebSocket stream that pushes real-time job status events to connected clients.</p>
+<p><strong>Connection:</strong> <code>ws://127.0.0.1:8000/ws/jobs</code></p>
+<p><strong>Message envelope:</strong></p>
+<pre><code class="language-json">{ &quot;channel&quot;: &quot;jobs&quot;, &quot;data&quot;: { &quot;event&quot;: &quot;progress&quot;, &quot;job_id&quot;: &quot;abc123&quot;, &quot;status&quot;: &quot;running&quot;, &quot;progress&quot;: 42 } }
+</code></pre>
+<p>Messages are wrapped in a <code>channel</code>/<code>data</code> envelope. The <code>data</code> object is a <code>JobEvent</code>.</p>
+<p><strong>Event types (<code>data.event</code>):</strong></p>
+<table>
+<thead>
+<tr>
+<th><code>event</code></th>
+<th>When</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>created</code></td>
+<td>A new job was submitted</td>
+</tr>
+<tr>
+<td><code>progress</code></td>
+<td>Job progress updated (0–100, in <code>data.progress</code>)</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>Job status changed (running → completed, etc.)</td>
+</tr>
+<tr>
+<td><code>deleted</code></td>
+<td>Job was deleted</td>
+</tr>
+</tbody>
+</table>
+<p><strong>JavaScript example:</strong></p>
+<pre><code class="language-js">const ws = new WebSocket(&quot;ws://127.0.0.1:8000/ws/jobs&quot;);
+ws.onmessage = (msg) =&gt; {
+  const { channel, data } = JSON.parse(msg.data);
+  if (channel === &quot;jobs&quot;) {
+    console.log(`Job ${data.job_id}: ${data.event} (${data.status})`);
+  }
+};
+</code></pre>
+<blockquote>
+<p><strong>Important:</strong> WebSocket events are best-effort hints. Maintain a polling fallback (<code>GET /api/pipeline/jobs/{job_id}</code>) for critical status checks.</p>
+</blockquote>
+<hr />
+<h2 id="rate-limiting">Rate Limiting</h2>
+<p>The following endpoints are rate-limited by client IP address:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Limit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /api/pipeline/run</code></td>
+<td>20/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/eda/{dataset_id}/analyze</code></td>
+<td>20/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/ingestion/upload</code></td>
+<td>10/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/monitoring/drift/calculate</code></td>
+<td>20/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/deployment/deploy/{job_id}</code></td>
+<td>10/minute</td>
+</tr>
+<tr>
+<td><code>POST /api/deployment/predict</code></td>
+<td>60/minute</td>
+</tr>
+</tbody>
+</table>
+<p>Requests over the limit receive <strong>HTTP 429 Too Many Requests</strong>.</p>
+<hr />
+<h2 id="error-responses">Error Responses</h2>
+<p>Error responses share a common shape, though some fields may be absent depending on the handler:</p>
+<pre><code class="language-json">{
+  &quot;success&quot;: false,
+  &quot;error&quot;: &quot;HTTP 404&quot;,
+  &quot;message&quot;: &quot;The requested resource was not found&quot;,
+  &quot;request_id&quot;: &quot;550e8400-e29b-41d4-a716-446655440000&quot;
+}
+</code></pre>
+<p>The <code>request_id</code> is also returned in the <code>X-Request-ID</code> response header for log correlation.</p>
+<p>Common status codes:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>400</code></td>
+<td>Bad request (invalid parameters or business logic error)</td>
+</tr>
+<tr>
+<td><code>404</code></td>
+<td>Resource not found</td>
+</tr>
+<tr>
+<td><code>405</code></td>
+<td>Method not allowed</td>
+</tr>
+<tr>
+<td><code>413</code></td>
+<td>File too large</td>
+</tr>
+<tr>
+<td><code>422</code></td>
+<td>Validation error (malformed request body)</td>
+</tr>
+<tr>
+<td><code>429</code></td>
+<td>Rate limit exceeded</td>
+</tr>
+<tr>
+<td><code>500</code></td>
+<td>Internal server error</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "toc.integrate", "content.code.copy", "content.tabs.link"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
