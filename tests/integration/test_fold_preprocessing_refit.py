@@ -15,6 +15,7 @@ import pytest
 
 from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
+from backend.ml_pipeline._execution.engine._feature_eng import FeatureEngMixin
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.constants import StepType
@@ -543,7 +544,11 @@ def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
     )
 
     assert result.status == "success"
-    assert any("Per-fold preprocessing refit enabled" in m for m in logs)
+    enabled = [m for m in logs if "Per-fold preprocessing refit enabled" in m]
+    assert enabled
+    # The stateless pre-split step was already applied during payload
+    # reconstruction; only the post-split WOE step re-fits per fold.
+    assert "1 step(s)" in enabled[0]
     metrics = result.node_results["node_training"].metrics
     assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
         f"per-fold refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
@@ -706,3 +711,48 @@ def test_validation_split_tuning_falls_back_with_warning(tmp_path):
     assert any(
         "Per-fold preprocessing refit skipped" in m and "validation split" in m for m in logs
     ), f"expected the validation-split fallback warning, logs={logs}"
+
+
+# ---------------------------------------------------------------------------
+# _upstream_fe_chain — graph-shape edge branches
+# ---------------------------------------------------------------------------
+
+
+def _chain_mixin(configs: list[NodeConfig]) -> FeatureEngMixin:
+    mixin = object.__new__(FeatureEngMixin)
+    mixin._node_configs = {cfg.node_id: cfg for cfg in configs}
+    return mixin
+
+
+def test_upstream_chain_rejects_multi_input_training_node():
+    mixin = _chain_mixin([_loader("node_data", "x.csv")])
+    assert mixin._upstream_fe_chain(_training(["a", "b"])) is None
+
+
+def test_upstream_chain_rejects_missing_node_reference():
+    fe = NodeConfig(
+        node_id="node_features",
+        step_type=StepType.FEATURE_ENGINEERING,
+        inputs=["ghost"],
+        params={"steps": []},
+    )
+    mixin = _chain_mixin([fe])
+    assert mixin._upstream_fe_chain(_training(["node_features"])) is None
+
+
+def test_upstream_chain_rejects_unsupported_node_in_between():
+    first = _training(["node_data"], node_id="node_training_a")
+    second = _training(["node_training_a"], node_id="node_training_b")
+    mixin = _chain_mixin([_loader("node_data", "x.csv"), first])
+    assert mixin._upstream_fe_chain(second) is None
+
+
+def test_upstream_chain_rejects_chain_without_loader():
+    fe = NodeConfig(
+        node_id="node_features",
+        step_type=StepType.FEATURE_ENGINEERING,
+        inputs=[],
+        params={"steps": []},
+    )
+    mixin = _chain_mixin([fe])
+    assert mixin._upstream_fe_chain(_training(["node_features"])) is None

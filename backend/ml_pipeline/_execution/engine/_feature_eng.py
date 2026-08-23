@@ -385,23 +385,15 @@ class FeatureEngMixin:
                 for node_id, steps in chain
                 for idx, step in enumerate(steps)
             ]
-            learning_steps = [
-                step for step, *_ in flat if step.get("transformer") not in SPLITTER_STEP_TYPES
-            ]
-            if not learning_steps:
-                # Only splitters upstream: nothing data-dependent to refit per fold.
-                return None
-
             splitter_positions = [
                 i
                 for i, (step, *_) in enumerate(flat)
                 if step.get("transformer") in SPLITTER_STEP_TYPES
             ]
             if splitter_positions:
+                last_split = splitter_positions[-1]
                 pre_split_learners = [
-                    step
-                    for step, *_ in flat[: splitter_positions[-1]]
-                    if _step_learns_from_data(step)
+                    step for step, *_ in flat[:last_split] if _step_learns_from_data(step)
                 ]
                 if pre_split_learners:
                     # Reconstructing the pre-transform payload would re-fit these
@@ -416,6 +408,25 @@ class FeatureEngMixin:
                         "cannot be re-fit safely per fold"
                     )
                     return None
+                # Stateless pre-split steps were already applied during payload
+                # reconstruction (or by the upstream node whose artifact is
+                # loaded below); keep them out of the per-fold chain so every
+                # step is applied exactly once.
+                learning_steps = [
+                    step
+                    for step, *_ in flat[last_split + 1 :]
+                    if step.get("transformer") not in SPLITTER_STEP_TYPES
+                ]
+            else:
+                # No split at all: every non-splitter step refits per fold.
+                learning_steps = [
+                    step for step, *_ in flat if step.get("transformer") not in SPLITTER_STEP_TYPES
+                ]
+            if not learning_steps:
+                # Only splitters (and stateless pre-split steps) upstream:
+                # nothing data-dependent to refit per fold.
+                return None
+
             if not splitter_positions:
                 # No split at all: the raw loader frame IS the train payload.
                 payload = self._split_train_payload(self.artifact_store.load(loader_id), target_col)

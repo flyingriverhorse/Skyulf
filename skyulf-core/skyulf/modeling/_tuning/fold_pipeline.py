@@ -10,9 +10,11 @@ grid/random loop applies.
 Because a transformer step can only hand ``X`` to the next step (``y`` is
 threaded through unchanged by the Pipeline), this wrap is only valid for
 preprocessors that keep the rows and the target aligned. The tuning engine
-reads the preprocessor's ``changes_row_count`` flag and refuses the wrap —
-falling back to pre-transformed scoring with an explicit log — when the
-chain resamples or drops rows.
+refuses the wrap — falling back to pre-transformed scoring with an explicit
+log — when the chain resamples, drops rows, or re-encodes the target: a
+static ``changes_row_count`` flag is the cheap fast path, and a runtime
+alignment probe (fit_transform on a small slice, failing closed) is the
+authoritative check so future step types cannot drift past it.
 """
 
 import copy
