@@ -27,6 +27,7 @@ from skyulf.preprocessing.drop_and_missing.missing_indicator import (
     MissingIndicatorApplier,
     MissingIndicatorCalculator,
 )
+from skyulf.registry import NodeRegistry
 
 _threshold_ignored_cases = TestCaseLoader(
     "preprocessing/drop_and_missing_gaps", group="threshold_ignored"
@@ -283,7 +284,9 @@ def test_drop_missing_columns_declared_default_params_honor_threshold() -> None:
     fit read ``missing_threshold``, so fitting with the node's own declared
     defaults silently skipped the threshold path (the registry contract and
     smoke suites both fit with these defaults)."""
-    declared = DropMissingColumnsCalculator.__node_meta__.params
+    # Read the declared params through the registry — the same source the
+    # registry contract and smoke suites consume (`__node_meta__` feeds it).
+    declared = NodeRegistry.get_all_metadata()["DropMissingColumns"]["params"]
     df = _missing_df()
     art = DropMissingColumnsCalculator().fit(df, dict(declared))
     # 'a' is 50% missing and 'c' is 100% — the declared default threshold
