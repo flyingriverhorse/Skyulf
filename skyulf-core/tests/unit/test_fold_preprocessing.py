@@ -153,3 +153,42 @@ def test_adapter_rejects_unknown_transformer():
             steps_config=[{"name": "x", "transformer": "NoSuchNode", "params": {}}],
             target_column="target",
         )
+
+
+@pytest.mark.parametrize(
+    "transformer", ["Oversampling", "Undersampling", "DropMissingRows", "Deduplicate"]
+)
+def test_adapter_flags_row_count_changing_steps(transformer: str):
+    adapter = FeatureEngineerFoldAdapter(
+        steps_config=[{"name": "s", "transformer": transformer, "params": {}}],
+        target_column="target",
+    )
+    assert adapter.changes_row_count is True
+
+
+def test_adapter_reports_row_alignment_for_shape_preserving_steps():
+    adapter = FeatureEngineerFoldAdapter(
+        steps_config=[{"name": "s", "transformer": "StandardScaler", "params": {}}],
+        target_column="target",
+    )
+    assert adapter.changes_row_count is False
+
+
+def test_adapter_transform_before_fit_raises():
+    adapter = FeatureEngineerFoldAdapter(
+        steps_config=[{"name": "s", "transformer": "StandardScaler", "params": {}}],
+        target_column="target",
+    )
+    X, y = _frame("pandas")
+    with pytest.raises(RuntimeError, match="before fit_transform"):
+        adapter.transform(X, y)
+
+
+def test_adapter_rejects_payload_still_carrying_the_target():
+    adapter = FeatureEngineerFoldAdapter(
+        steps_config=[{"name": "s", "transformer": "StandardScaler", "params": {}}],
+        target_column="target",
+    )
+    pdf = pd.DataFrame({"x": [1.0, 2.0], "target": [0, 1]})
+    with pytest.raises(ValueError, match="already present in X"):
+        adapter.fit_transform(pdf, pdf["target"])

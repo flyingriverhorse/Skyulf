@@ -471,7 +471,7 @@ This guarantee applies per preprocessing step, relative to the split defined in 
 **Covered — the pipeline-structure gate.** Every node declares whether its `fit()` learns from the data it is given (`learns_from_data` on its node metadata), and both the standalone diagnostic (`skyulf.validate_leakage_safety`) and the pre-execution gate derive their node lists from that registry — there is no hand-maintained allow-list to drift. A pipeline that fits a data-dependent node before its train/test split is rejected by default (`on_leakage="raise"`; set `"warn"` or `"ignore"` to opt out). Unknown nodes fail closed, and a pipeline with no train/test split at all gets an explicit diagnostic stating that the leakage guarantee does not apply to it. The gate is also *param-aware* for dual-mode nodes: a `DropMissingColumns` node dropping explicitly named columns, a `SimpleImputer` with `strategy="constant"`, a `MissingIndicator` flagging explicitly named columns, a `HashEncoder` given an explicit column list, and target-only Label/Ordinal encoding learn nothing from the rows and are allowed before the split — while their data-learning modes (missing-% threshold, statistic strategies, auto-detected missingness/categorical columns, feature encoding) remain gated. `SkyulfPipeline.fit()` surfaces the same verdict as warnings before training when you fit on an unsplit frame.
 
 **Covered — cross-validation and tuning scores (Skyulf app).** As of
-skyulf-core 0.8.0 the app re-fits preprocessing inside every CV fold and
+skyulf-core 0.8.3 the app re-fits preprocessing inside every CV fold and
 every tuning candidate fold (a `FoldPreprocessor` threaded through
 `perform_cross_validation`, `StatefulEstimator.cross_validate` and
 `TuningCalculator.fit`): each fold's statistics are learned from that fold's
@@ -489,12 +489,19 @@ full-split scoring reports a CV AUC of **0.867** and a tuning best score of
 **0.867** — pure memorisation of held-out rows — while per-fold refit
 reports **~0.50** across all strategies, exactly chance. On real-signal
 data the honest scores stay close to the old ones (the drop is the bias
-leaving, not the signal). Only two shapes still fall back to pre-transformed
+leaving, not the signal). The shapes that still fall back to pre-transformed
 scoring with an explicit job-log warning: merged graphs that are not
 fork-join (nested merges, row-count-changing branches, splitters mid-chain),
-and holdout tuning with an explicit `validation_data` split (no folds to
-refit around). Library users calling CV/tuning directly get the same
-guarantee by passing a preprocessor — e.g. `FeatureEngineerFoldAdapter(
+holdout tuning with an explicit `validation_data` split (no folds to refit
+around), preprocessing chains that change the row count or the target
+(resampling, row drops, target re-encoding) under `halving_*`/`optuna` — an
+sklearn pipeline transformer can only hand `X` forward, so the reshaped rows
+would lose alignment with `y`; the engine refuses that wrap via a static
+`changes_row_count` flag plus a runtime alignment probe that fails closed,
+rather than silently misaligning them — and any graph with a data-dependent
+step configured before the last splitter (payload reconstruction would
+re-fit it on the full frame). Library users calling CV/tuning directly get
+the same guarantee by passing a preprocessor — e.g. `FeatureEngineerFoldAdapter(
 steps_config, target_column)` — via the `preprocessing` parameter; without
 it, CV/tuning scores the pre-transformed data and remains an optimistic
 estimate.

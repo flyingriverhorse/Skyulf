@@ -362,3 +362,28 @@ def test_merged_branch_adapter_refits_woe_noise_near_chance(
         f"per-fold merged-branch refit ({strategy}) should sit near chance, "
         f"got {refit_result.best_score}"
     )
+
+
+def test_merged_branch_adapter_survives_the_halving_wrap() -> None:
+    """The halving/optuna wrap guards (static flag + runtime alignment probe)
+    accept the merged adapter, and the searcher-internal CV refits both
+    branches per fold — noise-target tuning stays near chance."""
+    from skyulf.preprocessing.fold_adapter import MergedBranchFoldAdapter
+
+    X, y, woe_branch, scaler_branch = _merged_branch_setup()
+    config = TuningConfig(
+        strategy="halving_grid", metric="roc_auc", search_space={"C": [1.0]}, cv_folds=5
+    )
+
+    adapter = MergedBranchFoldAdapter(
+        [scaler_branch, woe_branch], merge_strategy="last_wins", target_column="target"
+    )
+    assert not adapter.changes_row_count
+    _m, refit_result = TuningCalculator(LogisticRegressionCalculator()).fit(
+        X, y, config=config, preprocessing=adapter
+    )
+
+    assert _disc(refit_result.best_score) < 0.65, (
+        f"per-fold merged-branch refit under halving_grid should sit near chance, "
+        f"got {refit_result.best_score}"
+    )

@@ -11,6 +11,7 @@ import polars as pl
 import pytest
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
 from tests.utils.test_case_loader import TestCaseLoader
 
 from skyulf.modeling._tuning import engine as engine_mod
@@ -536,6 +537,147 @@ def test_fit_halving_grid_search():
     model, result = tuner.fit(X, y, config=cfg.__dict__)
     assert hasattr(model, "predict")
     assert result.best_score > 0
+
+
+# ---------------------------------------------------------------------------
+# Halving/optuna Pipeline wrap: row-count-changing preprocessing guard
+# ---------------------------------------------------------------------------
+
+
+class _StubPreprocessor:
+    """Minimal FoldPreprocessor stub with configurable flag + fit_transform."""
+
+    def __init__(self, changes_row_count: bool, fit_transform=None):
+        self.changes_row_count = changes_row_count
+        self._fit_transform = fit_transform
+
+    def fit_transform(self, X, y):
+        if self._fit_transform is not None:
+            return self._fit_transform(X, y)
+        return X, y
+
+    def transform(self, X, y):
+        return X, y
+
+
+def _tune_with_spied_halving_build(monkeypatch, preprocessing):
+    """Run halving_grid tune() with the searcher machinery spied/stubbed.
+
+    Returns ``(estimator_passed_to_searcher, logs, result)`` without running a
+    real search.
+    """
+    built: dict[str, Any] = {}
+    logs: list[str] = []
+
+    def fake_build(self, search_config, estimator, cv, metric, log_callback):
+        built["estimator"] = estimator
+        return object()
+
+    monkeypatch.setattr(TuningCalculator, "_build_halving_searcher", fake_build)
+    monkeypatch.setattr(TuningCalculator, "_execute_search", lambda self, *a, **k: None)
+    monkeypatch.setattr(
+        TuningCalculator, "_extract_best_result", lambda self, searcher: ({"C": 1.0}, 0.9)
+    )
+    monkeypatch.setattr(TuningCalculator, "_collect_trials", lambda self, searcher, config: [])
+    monkeypatch.setattr(TuningCalculator, "_log_final_completion", lambda self, *a: None)
+
+    X, y = _clf_xy(n=60)
+    cfg = TuningConfig(
+        strategy="halving_grid",
+        metric="accuracy",
+        search_space={"C": [0.1, 1.0]},
+        cv_folds=3,
+    )
+    result = _tuner_clf().tune(
+        X,
+        y,
+        cfg,
+        log_callback=logs.append,
+        preprocessing=preprocessing,
+        preprocessing_frames=(pd.DataFrame(X), pd.Series(y)),
+    )
+    return built["estimator"], logs, result
+
+
+def test_halving_wrap_refused_for_row_shaping_preprocessing(monkeypatch):
+    """A resampling/row-dropping chain must not enter the searcher Pipeline.
+
+    An sklearn transformer step can only hand X forward, so the model would be
+    fitted on reshaped rows against the original y; the engine skips the wrap
+    and falls back to pre-transformed scoring with an explicit log instead.
+    """
+    estimator, logs, result = _tune_with_spied_halving_build(
+        monkeypatch, _StubPreprocessor(changes_row_count=True)
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+    # No wrap means no ``model__`` key prefixing to strip back out.
+    assert result.best_params == {"C": 1.0}
+
+
+def test_halving_wrap_kept_for_shape_preserving_preprocessing(monkeypatch):
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch, _StubPreprocessor(changes_row_count=False)
+    )
+    assert isinstance(estimator, Pipeline)
+    assert not any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_refuses_row_dropping_preprocessor(monkeypatch):
+    """The runtime probe catches row drops even when the static flag is False."""
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(
+            changes_row_count=False,
+            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
+        ),
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_refuses_target_mutating_preprocessor(monkeypatch):
+    """A target-only re-encoding keeps rows but changes y values; probe refuses."""
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(
+            changes_row_count=False,
+            fit_transform=lambda X, y: (X, y.map({0: "neg", 1: "pos"})),
+        ),
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_fails_closed_when_fit_transform_raises(monkeypatch):
+    def broken(X, y):
+        raise RuntimeError("cannot probe")
+
+    estimator, logs, _result = _tune_with_spied_halving_build(
+        monkeypatch,
+        _StubPreprocessor(changes_row_count=False, fit_transform=broken),
+    )
+    assert not isinstance(estimator, Pipeline)
+    assert any("Per-fold preprocessing refit skipped" in message for message in logs)
+
+
+def test_alignment_probe_without_frames_relies_on_static_flag():
+    X, y = _clf_xy(n=30)
+    frames = (pd.DataFrame(X), pd.Series(y))
+    assert engine_mod._preserves_row_and_target_alignment(
+        _StubPreprocessor(changes_row_count=False), frames
+    )
+    assert not engine_mod._preserves_row_and_target_alignment(
+        _StubPreprocessor(
+            changes_row_count=False,
+            fit_transform=lambda X, y: (X.iloc[:-1], y.iloc[:-1]),
+        ),
+        frames,
+    )
+    # No named frames to probe (numpy-only library call): nothing to check.
+    assert engine_mod._preserves_row_and_target_alignment(
+        _StubPreprocessor(changes_row_count=False), None
+    )
 
 
 # ---------------------------------------------------------------------------

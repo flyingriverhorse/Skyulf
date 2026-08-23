@@ -15,6 +15,7 @@ import pytest
 
 from backend.data.catalog import FileSystemCatalog
 from backend.ml_pipeline._execution.engine import PipelineEngine
+from backend.ml_pipeline._execution.engine._feature_eng import FeatureEngMixin
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
 from backend.ml_pipeline.constants import StepType
@@ -346,6 +347,110 @@ def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, 
     ), logs
 
 
+def _numeric_csv(tmp_path) -> str:
+    rng = np.random.default_rng(11)
+    n = 400
+    df = pd.DataFrame(
+        {
+            "id_col": [f"id{i}" for i in range(n)],
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "fork_join_numeric.csv"
+    df.to_csv(path, index=False)
+    return str(path)
+
+
+def _scaler_node(node_id: str, inputs: list[str], columns: list[str]) -> NodeConfig:
+    return NodeConfig(
+        node_id=node_id,
+        step_type="StandardScaler",
+        inputs=inputs,
+        params={"columns": columns},
+    )
+
+
+def test_learning_trunk_step_before_fork_splitter_falls_back(tmp_path):
+    """A data-dependent trunk step before the fork splitter learned from the
+    full trunk frame (held-out rows included) — fork-join falls back with a
+    warning, exactly like the linear path does."""
+    csv = _numeric_csv(tmp_path)
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", csv),
+            NodeConfig(
+                node_id="node_trunk",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        {
+                            "name": "drop_id",
+                            "transformer": "DropMissingColumns",
+                            "params": {"columns": ["id_col"]},
+                        },
+                        {
+                            "name": "scale_f1",
+                            "transformer": "StandardScaler",
+                            "params": {"columns": ["f1"]},
+                        },
+                        SPLITTER_STEP,
+                    ]
+                },
+            ),
+            _scaler_node("scale_a", ["node_trunk"], ["f2"]),
+            _scaler_node("scale_b", ["node_trunk"], ["f2"]),
+            _training(["scale_a", "scale_b"]),
+        ],
+        job_id="f15-trunk-learner-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "before the fork splitter" in m
+        for m in logs
+    ), logs
+
+
+def test_stateless_trunk_step_before_fork_splitter_keeps_refit(tmp_path):
+    """A stateless trunk step (explicit column drop) before the fork splitter
+    is already applied by the fork artifact once — fork-join stays enabled."""
+    csv = _numeric_csv(tmp_path)
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", csv),
+            NodeConfig(
+                node_id="node_trunk",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        {
+                            "name": "drop_id",
+                            "transformer": "DropMissingColumns",
+                            "params": {"columns": ["id_col"]},
+                        },
+                        SPLITTER_STEP,
+                    ]
+                },
+            ),
+            _scaler_node("scale_a", ["node_trunk"], ["f1"]),
+            _scaler_node("scale_b", ["node_trunk"], ["f2"]),
+            _training(["scale_a", "scale_b"]),
+        ],
+        job_id="f15-trunk-stateless-refit",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit enabled" in m and "merged branch(es)" in m for m in logs
+    ), logs
+
+
 def test_leakage_dominated_contrast_end_to_end(noise_target_csv, tmp_path):
     """The leakage-dominated case, measured both ways on the same CSV.
 
@@ -603,3 +708,303 @@ def test_splitter_only_chain_skips_silently(tmp_path):
 
     assert result.status == "success"
     assert not any("Per-fold preprocessing refit" in m for m in logs)
+
+
+def test_learning_step_before_splitter_falls_back_with_warning(tmp_path):
+    """A data-dependent step configured BEFORE the splitter cannot be re-fit
+    per fold: payload reconstruction would fit it on the full frame (leaking
+    held-out rows) and the per-fold adapter would apply it twice. The resolver
+    must fall back to pre-transformed scoring with an explicit warning."""
+    rng = np.random.default_rng(11)
+    n = 240
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "numeric_pre_split.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        {"name": "scale", "transformer": "StandardScaler", "params": {}},
+                        SPLITTER_STEP,
+                    ]
+                },
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-pre-split-learner-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "before the last splitter" in m
+        for m in logs
+    ), f"expected the pre-splitter fallback warning, logs={logs}"
+    assert not any("Per-fold preprocessing refit enabled" in m for m in logs)
+
+
+def test_stateless_step_before_splitter_keeps_refit_enabled(tmp_path):
+    """Param-aware exemption: an explicit-column DropMissingColumns before the
+    splitter learns nothing from the rows, so per-fold refit stays enabled."""
+    rng = np.random.default_rng(7)
+    n, n_categories = 400, 200
+    df = pd.DataFrame(
+        {
+            "id_col": [f"id{i}" for i in range(n)],
+            "city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)],
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "noise_with_id.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [
+                        {
+                            "name": "drop_id",
+                            "transformer": "DropMissingColumns",
+                            "params": {"columns": ["id_col"]},
+                        },
+                        SPLITTER_STEP,
+                        WOE_STEP,
+                    ]
+                },
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-stateless-pre-split",
+    )
+
+    assert result.status == "success"
+    enabled = [m for m in logs if "Per-fold preprocessing refit enabled" in m]
+    assert enabled
+    # The stateless pre-split step was already applied during payload
+    # reconstruction; only the post-split WOE step re-fits per fold.
+    assert "1 step(s)" in enabled[0]
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"per-fold refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# _step_learns_from_data — the resolver's per-step verdict
+# ---------------------------------------------------------------------------
+
+
+def test_step_learns_from_data_mirrors_the_leakage_gate():
+    from backend.ml_pipeline._execution.engine._feature_eng import _step_learns_from_data
+
+    # Param-aware stateless exemptions.
+    assert not _step_learns_from_data(
+        {"transformer": "SimpleImputer", "params": {"strategy": "constant"}}
+    )
+    assert not _step_learns_from_data(
+        {"transformer": "MissingIndicator", "params": {"columns": ["x"]}}
+    )
+    assert not _step_learns_from_data({"transformer": "HashEncoder", "params": {"columns": ["x"]}})
+    assert not _step_learns_from_data(
+        {"transformer": "DropMissingColumns", "params": {"columns": ["id"]}}
+    )
+    # Data-dependent modes of the same nodes, and plain learners.
+    assert _step_learns_from_data({"transformer": "SimpleImputer", "params": {"strategy": "mean"}})
+    assert _step_learns_from_data(
+        {"transformer": "DropMissingColumns", "params": {"missing_threshold": 50}}
+    )
+    assert _step_learns_from_data({"transformer": "StandardScaler", "params": {}})
+    # Registered but stateless node.
+    assert not _step_learns_from_data({"transformer": "DropMissingRows", "params": {}})
+    # Unknown transformers fail closed.
+    assert _step_learns_from_data({"transformer": "NoSuchNode", "params": {}})
+
+
+# ---------------------------------------------------------------------------
+# Remaining resolver branches: no-split payload, reconstruction failure,
+# validation-split holdout tuning
+# ---------------------------------------------------------------------------
+
+
+def test_no_split_chain_refits_from_the_raw_loader_frame(tmp_path):
+    """No splitter upstream: the raw loader frame is the pre-transform payload
+    and the learning step refits per fold."""
+    rng = np.random.default_rng(13)
+    n = 240
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "no_split.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={
+                    "steps": [{"name": "scale", "transformer": "StandardScaler", "params": {}}]
+                },
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-no-split-payload",
+    )
+
+    assert result.status == "success"
+    assert any("Per-fold preprocessing refit enabled" in m for m in logs)
+
+
+def test_payload_reconstruction_failure_never_fails_the_run(
+    noise_target_csv, tmp_path, monkeypatch
+):
+    """If payload reconstruction raises, the resolver must swallow the error,
+    warn explicitly, and let the job finish on pre-transformed scoring."""
+    from backend.ml_pipeline._execution.engine._feature_eng import FeatureEngMixin
+
+    def boom(self, output, target_col):
+        raise RuntimeError("simulated artifact corruption")
+
+    monkeypatch.setattr(FeatureEngMixin, "_split_train_payload", boom)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            NodeConfig(
+                node_id="node_features",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},
+            ),
+            _training(["node_features"]),
+        ],
+        job_id="f15-reconstruction-failure",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "payload reconstruction failed" in m
+        for m in logs
+    ), f"expected the reconstruction-failure warning, logs={logs}"
+
+
+def test_validation_split_tuning_falls_back_with_warning(tmp_path):
+    """Holdout tuning with a validation split cannot refit per fold (the
+    tuning engine rejects the hook alongside validation_data); the runner
+    skips the hook with an explicit log instead of failing."""
+    rng = np.random.default_rng(17)
+    n = 240
+    df = pd.DataFrame(
+        {
+            "f1": rng.normal(0, 1, n),
+            "f2": rng.normal(0, 1, n),
+            "target": rng.integers(0, 2, size=n),
+        }
+    )
+    path = tmp_path / "validation_split.csv"
+    df.to_csv(path, index=False)
+
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", str(path)),
+            NodeConfig(
+                node_id="node_split",
+                step_type="TrainTestSplitter",
+                inputs=["node_data"],
+                params={
+                    "target_column": "target",
+                    "test_size": 0.2,
+                    "validation_size": 0.2,
+                },
+            ),
+            _training(
+                ["node_split"],
+                run_mode="tuned",
+                tuning_config={
+                    "strategy": "grid",
+                    "metric": "roc_auc",
+                    "cv_folds": 2,
+                    "cv_enabled": True,
+                    "search_space": {"C": [0.1, 1.0]},
+                },
+            ),
+        ],
+        job_id="f15-validation-split-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "validation split" in m for m in logs
+    ), f"expected the validation-split fallback warning, logs={logs}"
+
+
+# ---------------------------------------------------------------------------
+# _upstream_fe_chain — graph-shape edge branches
+# ---------------------------------------------------------------------------
+
+
+def _chain_mixin(configs: list[NodeConfig]) -> FeatureEngMixin:
+    mixin = object.__new__(FeatureEngMixin)
+    mixin._node_configs = {cfg.node_id: cfg for cfg in configs}
+    return mixin
+
+
+def test_upstream_chain_rejects_multi_input_training_node():
+    mixin = _chain_mixin([_loader("node_data", "x.csv")])
+    assert mixin._upstream_fe_chain(_training(["a", "b"])) is None
+
+
+def test_upstream_chain_rejects_missing_node_reference():
+    fe = NodeConfig(
+        node_id="node_features",
+        step_type=StepType.FEATURE_ENGINEERING,
+        inputs=["ghost"],
+        params={"steps": []},
+    )
+    mixin = _chain_mixin([fe])
+    assert mixin._upstream_fe_chain(_training(["node_features"])) is None
+
+
+def test_upstream_chain_rejects_unsupported_node_in_between():
+    first = _training(["node_data"], node_id="node_training_a")
+    second = _training(["node_training_a"], node_id="node_training_b")
+    mixin = _chain_mixin([_loader("node_data", "x.csv"), first])
+    assert mixin._upstream_fe_chain(second) is None
+
+
+def test_upstream_chain_rejects_chain_without_loader():
+    fe = NodeConfig(
+        node_id="node_features",
+        step_type=StepType.FEATURE_ENGINEERING,
+        inputs=[],
+        params={"steps": []},
+    )
+    mixin = _chain_mixin([fe])
+    assert mixin._upstream_fe_chain(_training(["node_features"])) is None

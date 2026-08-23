@@ -1,5 +1,6 @@
 """Hyperparameter Tuner implementation."""
 
+import copy
 import logging
 import warnings
 from collections.abc import Callable
@@ -103,6 +104,38 @@ def _ensure_optuna_loaded() -> bool:
                     "Optuna installed but OptunaSearchCV not found. Install 'optuna-integration'."
                 )
     return HAS_OPTUNA
+
+
+# Rows sampled to probe whether a preprocessor keeps X/y aligned inside the
+# halving/optuna Pipeline wrap (see _preserves_row_and_target_alignment).
+_ALIGNMENT_PROBE_ROWS = 200
+
+
+def _preserves_row_and_target_alignment(preprocessing: Any, frames: tuple[Any, Any] | None) -> bool:
+    """Whether the preprocessor's fit_transform keeps rows and target aligned.
+
+    An sklearn Pipeline transformer can only hand ``X`` to the next step, so
+    the wrap is only valid when the chain preserves the row count and leaves
+    ``y`` untouched. Static step lists drift, so this probes the real
+    implementation on a small slice: any row-count change or target
+    transformation (resampling, row drops, target-only label/ordinal
+    encoding) is detected. Fails closed — a probe that raises refuses the
+    wrap. Without named frames (numpy-only library calls) there is nothing
+    to probe; the caller's static flag is the only check there.
+    """
+    if frames is None:
+        return True
+    X, y = frames
+    try:
+        sample_x, sample_y = X.head(_ALIGNMENT_PROBE_ROWS), y.head(_ALIGNMENT_PROBE_ROWS)
+        X_out, y_out = copy.deepcopy(preprocessing).fit_transform(sample_x, sample_y)
+        if len(X_out) != len(sample_x):
+            return False
+        y_in = SklearnBridge.to_sklearn((sample_x, sample_y))[1]
+        y_probed = SklearnBridge.to_sklearn((X_out, y_out))[1]
+        return y_in.shape == y_probed.shape and bool(np.array_equal(y_in, y_probed))
+    except Exception:
+        return False
 
 
 class TuningCalculator(BaseModelCalculator):
@@ -311,8 +344,11 @@ class TuningCalculator(BaseModelCalculator):
         stop leaking held-out rows into preprocessing statistics. The custom
         ``grid``/``random`` loop applies it directly; ``halving_*``/``optuna``
         get it via a Pipeline wrapper whose searcher-internal CV drives the
-        refit. When set, the final best-model refit runs the full split
-        through the preprocessor once — the artifact serving uses.
+        refit. Chains that change the row count or the target (resampling,
+        row drops) cannot stay aligned inside that wrapper and fall back to
+        pre-transformed scoring with an explicit log instead. When set, the
+        final best-model refit runs the full split through the preprocessor
+        once — the artifact serving uses.
         """
         tuning_config = self._build_tuning_config(config)
 
@@ -1245,6 +1281,29 @@ class TuningCalculator(BaseModelCalculator):
         # per-fold hook cannot reach; wrap preprocessing + model in a Pipeline
         # so the searcher's own folds refit the preprocessor (F-15).
         wrapped = preprocessing is not None
+        if wrapped and config.strategy in ("halving_grid", "halving_random", "optuna"):
+            # An sklearn transformer step can only hand X to the next step, so
+            # a chain that resamples, drops rows or transforms the target
+            # would leave the model fitting reshaped X against the original,
+            # un-aligned y. The static flag is a cheap fast path; the probe is
+            # authoritative (it catches any shape-changing step, including
+            # future ones) and fails closed. The grid/random custom loop
+            # threads the transformed y itself and stays enabled; the
+            # searcher-backed strategies fall back to pre-transformed scoring
+            # with an explicit log instead.
+            misaligned = getattr(
+                preprocessing, "changes_row_count", False
+            ) or not _preserves_row_and_target_alignment(preprocessing, preprocessing_frames)
+            if misaligned:
+                wrapped = False
+                if log_callback:
+                    log_callback(
+                        "Per-fold preprocessing refit skipped for this tuning strategy: "
+                        "the step chain changes row count or the target (resampling / "
+                        "row drops / target re-encoding), which cannot stay aligned "
+                        "inside the searcher's pipeline. Tuning scores the "
+                        "pre-transformed data and may be optimistically biased."
+                    )
         estimator: Any = base_estimator
         search_config = config
         if wrapped:

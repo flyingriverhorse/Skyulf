@@ -18,16 +18,20 @@ from .pipeline import FeatureEngineer
 # them inside a fold would re-split the fold itself.
 SPLITTER_STEP_TYPES = frozenset({"TrainTestSplitter", "Split", "feature_target_split"})
 
-# Steps whose output row count differs from their input. Inside a fold they
-# would desynchronise the column-wise branch merge (which requires equal row
-# counts) and/or corrupt held-out rows, so merged-branch adapters reject them.
-ROW_COUNT_CHANGING_TYPES = frozenset(
+# Steps whose fit_transform changes the row count (resampling, row drops,
+# outlier removal). They cannot run inside an sklearn Pipeline step — a
+# transformer may only return X, so the model would be fitted on reshaped X
+# against the original, un-aligned y — and the tuning engine reads
+# ``changes_row_count`` to skip the Pipeline wrap for such chains. Inside a
+# merged-branch fold they would also desynchronise the column-wise branch
+# merge (which requires equal row counts), so merged adapters reject them.
+ROW_COUNT_CHANGING_STEP_TYPES = frozenset(
     FeatureEngineer._ROW_DROPPING_TYPES
     | FeatureEngineer._RESAMPLING_TYPES
     | {"IQR", "ZScore", "Winsorize", "EllipticEnvelope"}
 )
 
-UNSAFE_BRANCH_STEP_TYPES = SPLITTER_STEP_TYPES | ROW_COUNT_CHANGING_TYPES
+UNSAFE_BRANCH_STEP_TYPES = SPLITTER_STEP_TYPES | ROW_COUNT_CHANGING_STEP_TYPES
 
 
 def _merge_branch_frames_columnwise(frames: list[pd.DataFrame], strategy: str) -> pd.DataFrame:
@@ -101,6 +105,10 @@ class MergedBranchFoldAdapter:
         self._target_column = target_column
         self._drop_columns = list(drop_columns)
         self._engineers: list[FeatureEngineer] | None = None
+        # Branch steps are screened against UNSAFE_BRANCH_STEP_TYPES, so the
+        # merge keeps every row; the tuning engine's runtime alignment probe
+        # is still the authoritative check before the Pipeline wrap.
+        self.changes_row_count = False
 
     def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
         self._validate_payload(X)
@@ -168,6 +176,12 @@ class FeatureEngineerFoldAdapter:
             step for step in steps_config if step.get("transformer") not in SPLITTER_STEP_TYPES
         ]
         self._target_column = target_column
+        # True when any step reshapes the rows/target (resampling, row drops):
+        # such chains cannot be wrapped in an sklearn Pipeline step because a
+        # transformer can only hand X to the next step, leaving y un-aligned.
+        self.changes_row_count = any(
+            step.get("transformer") in ROW_COUNT_CHANGING_STEP_TYPES for step in self._steps_config
+        )
         # Validate eagerly (unknown transformer names, bad params) so a
         # misconfigured chain fails at construction, not mid-fold.
         # validate_preprocessing_steps does not check registry membership,
