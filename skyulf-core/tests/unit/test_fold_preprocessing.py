@@ -23,16 +23,15 @@ def _frame(engine: str, with_outlier: bool = False) -> tuple:
     statistics must NOT reflect the held-out tail (where the outlier lives).
     """
     n = 40
-    values = [float(i) for i in range(n)]
+    values: list[float | None] = [float(i) for i in range(n)]
     values[5] = None  # missing value for the imputer to learn a fill for
     if with_outlier:
         values[-1] = 10000.0  # only present in the held-out portion
-    df = pd.DataFrame({"x": values, "target": [i % 2 for i in range(n)]})
+    pdf = pd.DataFrame({"x": values, "target": [i % 2 for i in range(n)]})
     if engine == "polars":
-        df = pl.from_pandas(df)
-    X = df.drop("target", axis=1) if engine == "pandas" else df.drop("target")
-    y = df["target"]
-    return X, y
+        df = pl.from_pandas(pdf)
+        return df.drop("target"), df["target"]
+    return pdf.drop("target", axis=1), pdf["target"]
 
 
 def _split(engine: str, X, y, n_train: int = 30):
