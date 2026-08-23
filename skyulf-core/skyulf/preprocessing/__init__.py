@@ -53,7 +53,7 @@ from .feature_selection import (
     VarianceThresholdApplier,
     VarianceThresholdCalculator,
 )
-from .fold_adapter import FeatureEngineerFoldAdapter
+from .fold_adapter import FeatureEngineerFoldAdapter, MergedBranchFoldAdapter
 from .geo import (
     GeoDistanceApplier,
     GeoDistanceCalculator,
@@ -138,6 +138,7 @@ __all__ = [
     "validate_schema",
     "FeatureEngineer",
     "FeatureEngineerFoldAdapter",
+    "MergedBranchFoldAdapter",
     "SplitCalculator",
     "SplitApplier",
     "TextCleaningCalculator",

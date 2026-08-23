@@ -298,3 +298,67 @@ def test_validation_data_with_preprocessing_is_rejected() -> None:
             validation_data=(X.iloc[:20], y.iloc[:20]),
             preprocessing=RecordingPreprocessor(),
         )
+
+
+def _merged_branch_setup() -> tuple[
+    pd.DataFrame, pd.Series, list[dict[str, Any]], list[dict[str, Any]]
+]:
+    """Noise target + memorising WOE branch next to an innocent scaler branch."""
+    rng = np.random.default_rng(42)
+    n, n_categories = 400, 200
+    X = pd.DataFrame(
+        {
+            "city": [f"c{v}" for v in rng.integers(0, n_categories, size=n)],
+            "num": rng.normal(size=n),
+        }
+    )
+    y = pd.Series(rng.integers(0, 2, size=n), name="target")
+    woe_branch: list[dict[str, Any]] = [
+        {
+            "name": "woe_city",
+            "transformer": "WOEEncoder",
+            "params": {"columns": ["city"], "regularization": 0.5},
+        }
+    ]
+    scaler_branch: list[dict[str, Any]] = [
+        {"name": "scale_num", "transformer": "StandardScaler", "params": {"columns": ["num"]}}
+    ]
+    return X, y, woe_branch, scaler_branch
+
+
+@pytest.mark.parametrize(
+    ("strategy", "branch_order"),
+    [
+        # Both branches carry both columns, so the pure-strategy merge hands
+        # every column to one branch; order the branches so the memorising
+        # WOE branch wins under each strategy.
+        ("last_wins", "woe_last"),
+        ("first_wins", "woe_first"),
+    ],
+)
+def test_merged_branch_adapter_refits_woe_noise_near_chance(
+    strategy: str, branch_order: str
+) -> None:
+    """Fork-join merge honesty: the adapter re-runs + re-merges both branches
+    inside every candidate fold and CV stays near chance on a noise target.
+    (The leaky contrast lives in the end-to-end backend suite, where the
+    engine's one-shot fit_transform path feeds the merged training input.)"""
+    from skyulf.preprocessing.fold_adapter import MergedBranchFoldAdapter
+
+    X, y, woe_branch, scaler_branch = _merged_branch_setup()
+    branches = (
+        [woe_branch, scaler_branch] if branch_order == "woe_first" else [scaler_branch, woe_branch]
+    )
+    config = TuningConfig(
+        strategy="random", metric="roc_auc", n_trials=1, search_space={"C": [1.0]}, cv_folds=5
+    )
+
+    adapter = MergedBranchFoldAdapter(branches, merge_strategy=strategy, target_column="target")
+    _m, refit_result = TuningCalculator(LogisticRegressionCalculator()).fit(
+        X, y, config=config, preprocessing=adapter
+    )
+
+    assert _disc(refit_result.best_score) < 0.65, (
+        f"per-fold merged-branch refit ({strategy}) should sit near chance, "
+        f"got {refit_result.best_score}"
+    )

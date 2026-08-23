@@ -198,6 +198,154 @@ def test_merged_branches_fall_back_with_warning(noise_target_csv, tmp_path):
     assert any("Per-fold preprocessing refit skipped" in m and "linear chain" in m for m in logs)
 
 
+def _splitter(node_id: str, inputs: list[str]) -> NodeConfig:
+    return NodeConfig(
+        node_id=node_id,
+        step_type="TrainTestSplitter",
+        inputs=inputs,
+        params={"target_column": "target", "test_size": 0.2},
+    )
+
+
+def _woe_node(node_id: str, inputs: list[str], regularization: float) -> NodeConfig:
+    return NodeConfig(
+        node_id=node_id,
+        step_type="WOEEncoder",
+        inputs=inputs,
+        params={"columns": ["city"], "regularization": regularization},
+    )
+
+
+def _fork_join_nodes(csv: str, training_params: dict | None = None) -> list[NodeConfig]:
+    """Scenario-06 shape: loader -> splitter -> two WOE branches -> training."""
+    nodes = [
+        _loader("node_data", csv),
+        _splitter("node_split", ["node_data"]),
+        _woe_node("woe_a", ["node_split"], 0.5),
+        _woe_node("woe_b", ["node_split"], 1.0),
+        _training(["woe_a", "woe_b"], **(training_params or {})),
+    ]
+    return nodes
+
+
+def test_fork_join_merged_branches_refit_per_fold(noise_target_csv, tmp_path):
+    """Fork-join merge (last_wins): both WOE branches re-fit inside every fold,
+    so the noise-target CV stays near chance instead of memorising."""
+    result, logs = _run(tmp_path, _fork_join_nodes(noise_target_csv), job_id="f15-fork-join")
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit enabled" in m and "merged branch(es)" in m for m in logs
+    ), logs
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65, (
+        f"fork-join refit CV should sit near chance, got {metrics['cv_roc_auc_mean']}"
+    )
+
+
+def test_fork_join_first_wins_refit_per_fold(noise_target_csv, tmp_path):
+    """The first_wins merge strategy gets the same per-fold honesty guarantee."""
+    nodes = _fork_join_nodes(noise_target_csv, training_params={"_merge_strategy": "first_wins"})
+    result, logs = _run(tmp_path, nodes, job_id="f15-fork-join-first-wins")
+
+    assert result.status == "success"
+    assert any("merged branch(es)" in m for m in logs)
+    metrics = result.node_results["node_training"].metrics
+    assert _disc(metrics["cv_roc_auc_mean"]) < 0.65
+
+
+def test_nested_merge_falls_back_with_warning(noise_target_csv, tmp_path):
+    """A merge node nested inside a branch is outside fork-join scope: warn + skip."""
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            _splitter("node_split", ["node_data"]),
+            _woe_node("woe_a", ["node_split"], 0.5),
+            _woe_node("woe_b", ["node_split"], 1.0),
+            NodeConfig(
+                node_id="node_inner_merge",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["woe_a", "woe_b"],
+                params={"steps": []},
+            ),
+            _training(["node_inner_merge", "woe_b"]),
+        ],
+        job_id="f15-nested-merge-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "linear transformer chain" in m
+        for m in logs
+    ), logs
+
+
+def test_row_count_changing_branch_falls_back_with_warning(noise_target_csv, tmp_path):
+    """A branch containing a row-count-changing step cannot run fold-wise:
+    warn + skip (the branch itself keeps working in the full run)."""
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            _splitter("node_split", ["node_data"]),
+            _woe_node("woe_a", ["node_split"], 0.5),
+            NodeConfig(
+                node_id="woe_b_drop",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_split"],
+                params={
+                    "steps": [
+                        {
+                            "name": "woe_b",
+                            "transformer": "WOEEncoder",
+                            "params": {"columns": ["city"], "regularization": 1.0},
+                        },
+                        {
+                            "name": "drop_rows",
+                            "transformer": "DropMissingRows",
+                            "params": {"columns": ["city"]},
+                        },
+                    ]
+                },
+            ),
+            _training(["woe_a", "woe_b_drop"]),
+        ],
+        job_id="f15-row-count-fallback",
+    )
+
+    assert result.status == "success"
+    assert any("Per-fold preprocessing refit skipped" in m and "row counts" in m for m in logs), (
+        logs
+    )
+
+
+def test_learning_step_after_splitter_falls_back_with_warning(noise_target_csv, tmp_path):
+    """A trunk node whose last step is not a splitter (splitter mid-chain) is
+    outside fork-join scope: warn + skip."""
+    result, logs = _run(
+        tmp_path,
+        [
+            _loader("node_data", noise_target_csv),
+            NodeConfig(
+                node_id="node_trunk",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={"steps": [SPLITTER_STEP, WOE_STEP]},  # splitter NOT last
+            ),
+            _woe_node("woe_a", ["node_trunk"], 0.5),
+            _woe_node("woe_b", ["node_trunk"], 1.0),
+            _training(["woe_a", "woe_b"]),
+        ],
+        job_id="f15-mid-chain-splitter-fallback",
+    )
+
+    assert result.status == "success"
+    assert any(
+        "Per-fold preprocessing refit skipped" in m and "must end with" in m for m in logs
+    ), logs
+
+
 def test_leakage_dominated_contrast_end_to_end(noise_target_csv, tmp_path):
     """The leakage-dominated case, measured both ways on the same CSV.
 

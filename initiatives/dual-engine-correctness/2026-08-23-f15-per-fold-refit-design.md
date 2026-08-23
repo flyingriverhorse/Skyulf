@@ -1,7 +1,8 @@
 # F-15 — Per-Fold Preprocessing Refit: Design Note
 
 **Date:** 2026-08-23
-**Status:** **Shipped** — skyulf-core 0.7.0, branch `082` (see amendment below).
+**Status:** **Shipped** — skyulf-core 0.8.0 (0.7.0 + halving/optuna + merged-branch follow-ups),
+branch `082` (see amendments below).
 **Mandate:** Leakage-enforcement plan §Phase 4, item 10 — "Deliver a design note first — refit contract,
 performance budget (`n_splits`× preprocessing cost), migration plan for users whose scores will drop,
 and whether to land it opt-in (`refit_preprocessing_per_fold=True`) before flipping the default."
@@ -31,6 +32,22 @@ Shipped the same day as **always-on**, collapsing the §6 migration phases:
 
 Everything else in this note (clone contract, adapter shape, performance budget, semantics,
 test plan) landed as designed.
+
+---
+
+## Amendment 2 — merged-branch (fork-join) refit (2026-08-23)
+
+The "merged-branch graphs fall back" bullet above is now narrower: graphs in **fork-join shape**
+(shared trunk ending in a node whose last step is a `TrainTestSplitter`/`Split`, N parallel
+single-transformer branches, one merge straight into the training node) take the refit path via
+`MergedBranchFoldAdapter` (`skyulf.preprocessing.fold_adapter`). Per fold it re-runs every branch
+step list on the fold-train payload and re-merges the branch frames with a faithful copy of the
+engine's pure-strategy column-wise merge (`last_wins`/`first_wins` — ownership analysis is inert
+in this shape because the fork's stored artifact is a SplitDataset), so fold columns match the
+full-run merge exactly. The fork's stored SplitDataset is the single payload source; branches
+containing splitters or row-count-changing steps, nested merges, divergent loaders, and
+splitters mid-chain all keep the explicit warn-and-fall-back behaviour. Full design and test
+plan: `2026-08-23-task11-merged-branch-fold-refit-plan.md`.
 
 ---
 

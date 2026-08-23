@@ -15,7 +15,12 @@ from typing import TYPE_CHECKING, Any
 
 from skyulf.data.dataset import SplitDataset
 from skyulf.modeling.base import extract_xy
-from skyulf.preprocessing.fold_adapter import SPLITTER_STEP_TYPES, FeatureEngineerFoldAdapter
+from skyulf.preprocessing.fold_adapter import (
+    SPLITTER_STEP_TYPES,
+    UNSAFE_BRANCH_STEP_TYPES,
+    FeatureEngineerFoldAdapter,
+    MergedBranchFoldAdapter,
+)
 from skyulf.preprocessing.pipeline import FeatureEngineer
 
 from ...constants import StepType
@@ -39,6 +44,9 @@ class FeatureEngMixin:
     executed_transformers: list[dict[str, Any]]
     log: Callable[[str], None]
     _get_input: Any
+    _merge_input_order: Any
+    _get_merge_strategy: Any
+    _upstream_dropped_columns: Any
 
     def _resolve_feature_engineer_artifact_key(self, node: NodeConfig) -> str | None:
         if not node.inputs:
@@ -328,6 +336,124 @@ class FeatureEngMixin:
         train = output.train if isinstance(output, SplitDataset) else output
         return extract_xy(train, target_col)
 
+    def _branch_chain_up_to_loader(
+        self, start_id: str
+    ) -> tuple[str, list[tuple[str, list[dict[str, Any]]]]] | None:
+        """Walk one branch from ``start_id`` up to its data loader.
+
+        Returns ``(loader_id, chain)`` with ``chain`` in execution order
+        (single-transformer nodes wrapped exactly like ``_run_transformer``).
+        Returns ``None`` when the walk hits a nested merge, a missing node,
+        no loader, or an unsupported node type (training/preview mid-branch).
+        """
+        chain: list[tuple[str, list[dict[str, Any]]]] = []
+        current_id: str | None = start_id
+        while current_id is not None:
+            cfg = self._node_configs.get(current_id)
+            if cfg is None:
+                return None
+            if len(dict.fromkeys(cfg.inputs or [])) > 1:
+                return None
+            if cfg.step_type == StepType.DATA_LOADER:
+                return current_id, list(reversed(chain))
+            if cfg.step_type == StepType.FEATURE_ENGINEERING:
+                chain.append((cfg.node_id, list((cfg.params or {}).get("steps", []))))
+            elif cfg.step_type not in (StepType.TRAINING, "data_preview"):
+                chain.append(
+                    (
+                        cfg.node_id,
+                        [
+                            {
+                                "name": "step",
+                                "transformer": cfg.step_type,
+                                "params": cfg.params or {},
+                            }
+                        ],
+                    )
+                )
+            else:
+                return None
+            current_id = cfg.inputs[0] if cfg.inputs else None
+        return None
+
+    def _try_fork_join_refit(
+        self, training_node: NodeConfig, target_col: str
+    ) -> tuple[tuple["FoldPreprocessor", tuple[Any, Any]] | None, str | None]:
+        """Resolve per-fold refit for a fork-join merged graph (task #11).
+
+        Supported shape: a shared trunk ending in a node whose last step is a
+        ``TrainTestSplitter``/``Split`` (the fork point), N parallel
+        transformer branches, and a column-wise merge straight into the
+        training node. Returns ``(resolved, reason)`` — ``(adapter, payload)``
+        on a match, else ``None`` plus the bail reason for the job log.
+        Anything else keeps the skip-with-warning fallback: never fail a run,
+        never leak silently.
+        """
+        inputs = list(dict.fromkeys(self._merge_input_order(training_node)))
+        if len(inputs) < 2:
+            return None, "training node has fewer than two merged inputs"
+
+        chains: list[tuple[str, list[tuple[str, list[dict[str, Any]]]]]] = []
+        for input_id in inputs:
+            walked = self._branch_chain_up_to_loader(input_id)
+            if walked is None:
+                return None, (
+                    f"branch '{input_id}' is not a linear transformer chain from a loader"
+                )
+            chains.append(walked)
+
+        loaders = {loader_id for loader_id, _ in chains}
+        if len(loaders) != 1:
+            return None, f"branches do not share one data loader (found {sorted(loaders)})"
+
+        # Fork point = last node of the longest common node-id prefix.
+        node_sequences = [[node_id for node_id, _steps in chain] for _loader, chain in chains]
+        prefix_len = 0
+        for position in range(min(len(seq) for seq in node_sequences)):
+            ids_at_position = {seq[position] for seq in node_sequences}
+            if len(ids_at_position) != 1:
+                break
+            prefix_len += 1
+        if prefix_len == 0:
+            return None, "branches share no common trunk"
+        fork_id = node_sequences[0][prefix_len - 1]
+        fork_steps = dict(chains[0][1]).get(fork_id)
+        if fork_steps is None or fork_id == loaders.pop():
+            return None, "no splitter fork point on the shared trunk"
+        fork_splitter = fork_steps[-1].get("transformer")
+        if fork_splitter not in ("TrainTestSplitter", "Split"):
+            return None, (
+                f"fork node '{fork_id}' must end with a TrainTestSplitter/Split "
+                f"step, found '{fork_splitter}'"
+            )
+
+        branch_lists: list[list[dict[str, Any]]] = []
+        for (_loader, chain), input_id in zip(chains, inputs, strict=True):
+            branch_steps = [step for node_id, steps in chain[prefix_len:] for step in steps]
+            if not branch_steps:
+                return None, f"branch '{input_id}' has no steps after the fork point"
+            for step in branch_steps:
+                transformer = step.get("transformer")
+                if transformer in UNSAFE_BRANCH_STEP_TYPES:
+                    return None, (f"branch step '{transformer}' splits data or changes row counts")
+            branch_lists.append(branch_steps)
+
+        strategy = self._get_merge_strategy(training_node.node_id)
+        payload = self._split_train_payload(self.artifact_store.load(fork_id), target_col)
+        adapter = MergedBranchFoldAdapter(
+            branch_lists,
+            merge_strategy=strategy,
+            target_column=target_col,
+            drop_columns=self._upstream_dropped_columns(training_node),
+        )
+        n_steps = sum(len(steps) for steps in branch_lists)
+        self.log(
+            f"Per-fold preprocessing refit enabled: {n_steps} step(s) across "
+            f"{len(branch_lists)} merged branch(es) re-fit inside every CV/tuning "
+            "fold (scores are leakage-free)."
+        )
+        return (adapter, payload), None
+
     def _resolve_fold_preprocessing(
         self, training_node: NodeConfig, target_col: str
     ) -> tuple["FoldPreprocessor", tuple[Any, Any]] | None:
@@ -343,9 +469,18 @@ class FeatureEngMixin:
         try:
             resolved = self._upstream_fe_chain(training_node)
             if resolved is None:
-                warning = (
-                    "upstream graph is not a linear chain (merged branches or unsupported nodes)"
-                )
+                if len(dict.fromkeys(training_node.inputs or [])) > 1:
+                    merged, merged_reason = self._try_fork_join_refit(training_node, target_col)
+                    if merged is not None:
+                        return merged
+                    warning = merged_reason or (
+                        "merged graph is not a supported fork-join of transformer branches"
+                    )
+                else:
+                    warning = (
+                        "upstream graph is not a linear chain (merged branches or "
+                        "unsupported nodes)"
+                    )
                 return None
             loader_id, chain = resolved
 

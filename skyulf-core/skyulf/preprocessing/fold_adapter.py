@@ -1,4 +1,4 @@
-"""Adapter exposing ``FeatureEngineer`` as a :class:`FoldPreprocessor` (F-15).
+"""Adapters exposing preprocessing chains as :class:`FoldPreprocessor` (F-15).
 
 Cloning is free here by construction: ``FeatureEngineer`` rebuilds every
 step's calculator/applier fresh from ``steps_config`` via the node registry
@@ -8,12 +8,146 @@ clone operation — no fitted state is ever copied or reset.
 
 from typing import Any
 
+import pandas as pd
+import polars as pl
+
 from ..registry import NodeRegistry
 from .pipeline import FeatureEngineer
 
 # Splitter steps already ran upstream of the CV/tuning boundary; re-running
 # them inside a fold would re-split the fold itself.
 SPLITTER_STEP_TYPES = frozenset({"TrainTestSplitter", "Split", "feature_target_split"})
+
+# Steps whose output row count differs from their input. Inside a fold they
+# would desynchronise the column-wise branch merge (which requires equal row
+# counts) and/or corrupt held-out rows, so merged-branch adapters reject them.
+ROW_COUNT_CHANGING_TYPES = frozenset(
+    FeatureEngineer._ROW_DROPPING_TYPES
+    | FeatureEngineer._RESAMPLING_TYPES
+    | {"IQR", "ZScore", "Winsorize", "EllipticEnvelope"}
+)
+
+UNSAFE_BRANCH_STEP_TYPES = SPLITTER_STEP_TYPES | ROW_COUNT_CHANGING_TYPES
+
+
+def _merge_branch_frames_columnwise(frames: list[pd.DataFrame], strategy: str) -> pd.DataFrame:
+    """Merge equal-row-count branch frames column-wise per the engine's pure path.
+
+    Mirror of the ownership-free path in
+    ``MergeMixin._merge_frames_columnwise``: in fork-join graphs the merge's
+    nearest-common-ancestor artifact is a SplitDataset, so ownership analysis
+    is inert and the configured strategy decides every overlapping column.
+    ``last_wins`` iterates inputs in order; ``first_wins`` iterates them
+    reversed — column *position* is first-seen in either case, so train and
+    test merges stay column-aligned.
+    """
+    indexed = list(enumerate(frames))
+    ordered = indexed if strategy == "last_wins" else list(reversed(indexed))
+    result_cols: dict[str, pd.Series] = {}
+    for _idx, df in ordered:
+        df_aligned = df.reset_index(drop=True)
+        for col in df_aligned.columns:
+            result_cols[col] = df_aligned[col]
+    return pd.DataFrame(result_cols)
+
+
+class MergedBranchFoldAdapter:
+    """Re-runs fork-join preprocessing branches inside each CV/tuning fold.
+
+    Built for graphs where a shared trunk ends in a splitter (fork point) and
+    N parallel transformer branches fan back into one training node. Per fold
+    it re-runs every branch step list on the fold-train payload and merges the
+    branch frames exactly like the engine's pure-strategy column-wise merge,
+    so the fold sees the same columns the full run produces — without any
+    pre-fit statistics leaking from outside the fold.
+
+    Args:
+        branch_step_lists: One unfitted step list per branch, in the engine's
+            merge input order.
+        merge_strategy: ``"last_wins"`` (default engine behaviour) or
+            ``"first_wins"`` — must match the training node's configured
+            strategy so fold columns match the full-run merge.
+        target_column: Target name, kept to reject payloads that still embed
+            it; target-aware branch steps receive ``y`` through the payload.
+        drop_columns: Columns removed upstream (e.g. by Drop Columns nodes);
+            stripped again after each merge so a branch cannot resurrect them.
+    """
+
+    def __init__(
+        self,
+        branch_step_lists: list[list[dict[str, Any]]],
+        merge_strategy: str,
+        target_column: str,
+        drop_columns: list[str] | tuple[str, ...] = (),
+    ):
+        if merge_strategy not in ("last_wins", "first_wins"):
+            raise ValueError(f"unknown merge strategy '{merge_strategy}'")
+        if not branch_step_lists:
+            raise ValueError("at least one branch step list is required")
+        for steps in branch_step_lists:
+            if not steps:
+                raise ValueError("branch step list must not be empty")
+            FeatureEngineer(list(steps))
+            for step in steps:
+                transformer = step["transformer"]
+                if transformer in UNSAFE_BRANCH_STEP_TYPES:
+                    raise ValueError(
+                        f"branch step '{transformer}' cannot run inside a fold: "
+                        "it splits the data or changes row counts"
+                    )
+                NodeRegistry.get_calculator(transformer)
+        self._branch_step_lists = [list(steps) for steps in branch_step_lists]
+        self._merge_strategy = merge_strategy
+        self._target_column = target_column
+        self._drop_columns = list(drop_columns)
+        self._engineers: list[FeatureEngineer] | None = None
+
+    def fit_transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        self._validate_payload(X)
+        engineers = [FeatureEngineer(list(steps)) for steps in self._branch_step_lists]
+        frames, ys = self._run_branches(engineers, (X, y), fit=True)
+        self._engineers = engineers
+        return self._finalize(frames, ys)
+
+    def transform(self, X: Any, y: Any) -> tuple[Any, Any]:
+        if self._engineers is None:
+            raise RuntimeError("transform() called before fit_transform()")
+        self._validate_payload(X)
+        payload = (X, y) if y is not None else X
+        frames, ys = self._run_branches(self._engineers, payload, fit=False)
+        return self._finalize(frames, ys)
+
+    def _run_branches(
+        self, engineers: list[FeatureEngineer], payload: Any, *, fit: bool
+    ) -> tuple[list[pd.DataFrame], list[Any]]:
+        frames: list[pd.DataFrame] = []
+        ys: list[Any] = []
+        input_y = payload[1] if isinstance(payload, tuple) else None
+        for engineer in engineers:
+            out = engineer.fit_transform(payload)[0] if fit else engineer.transform(payload)
+            if isinstance(out, tuple) and len(out) == 2:
+                frame, y_out = out
+            else:
+                # Appliers that return a bare frame pass the target through.
+                frame, y_out = out, input_y
+            if isinstance(frame, pl.DataFrame):
+                frame = frame.to_pandas()
+            frames.append(frame)
+            ys.append(y_out)
+        return frames, ys
+
+    def _finalize(self, frames: list[pd.DataFrame], ys: list[Any]) -> tuple[Any, Any]:
+        merged = _merge_branch_frames_columnwise(frames, self._merge_strategy)
+        drop = [col for col in self._drop_columns if col in merged.columns]
+        if drop:
+            merged = merged.drop(columns=drop)
+        # Mirrors the engine's SplitDataset merge: the first branch supplies
+        # the target (branches are screened to never change row counts).
+        return merged, ys[0]
+
+    def _validate_payload(self, X: Any) -> None:
+        if hasattr(X, "columns") and self._target_column in X.columns:
+            raise ValueError(f"target column '{self._target_column}' already present in X")
 
 
 class FeatureEngineerFoldAdapter:
