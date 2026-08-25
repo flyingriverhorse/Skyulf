@@ -449,7 +449,7 @@ class FeatureEngMixin:
             return None, "branches share no common trunk"
         fork_id = node_sequences[0][prefix_len - 1]
         fork_steps = dict(chains[0][1]).get(fork_id)
-        if fork_steps is None or fork_id == loaders.pop():
+        if not fork_steps or fork_id == loaders.pop():
             return None, "no splitter fork point on the shared trunk"
         fork_splitter = fork_steps[-1].get("transformer")
         if fork_splitter not in ("TrainTestSplitter", "Split"):

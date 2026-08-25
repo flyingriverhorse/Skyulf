@@ -1008,3 +1008,108 @@ def test_upstream_chain_rejects_chain_without_loader():
     )
     mixin = _chain_mixin([fe])
     assert mixin._upstream_fe_chain(_training(["node_features"])) is None
+
+
+# ---------------------------------------------------------------------------
+# _branch_chain_up_to_loader / _try_fork_join_refit — fork-join bail branches
+# ---------------------------------------------------------------------------
+
+
+def test_branch_chain_rejects_missing_upstream_node():
+    branch = NodeConfig(
+        node_id="branch_a",
+        step_type="WOEEncoder",
+        inputs=["ghost"],
+        params={"columns": ["city"]},
+    )
+    mixin = _chain_mixin([branch])
+    assert mixin._branch_chain_up_to_loader("branch_a") is None
+
+
+def test_branch_chain_rejects_training_node_mid_branch():
+    branch = NodeConfig(
+        node_id="branch_a",
+        step_type="WOEEncoder",
+        inputs=["node_training"],
+        params={"columns": ["city"]},
+    )
+    mixin = _chain_mixin([branch, _training([], node_id="node_training")])
+    assert mixin._branch_chain_up_to_loader("branch_a") is None
+
+
+def test_branch_chain_rejects_branch_without_loader():
+    branch = NodeConfig(
+        node_id="branch_a",
+        step_type="WOEEncoder",
+        inputs=[],
+        params={"columns": ["city"]},
+    )
+    mixin = _chain_mixin([branch])
+    assert mixin._branch_chain_up_to_loader("branch_a") is None
+
+
+def _refit_mixin(configs: list[NodeConfig], merge_order: list[str]) -> FeatureEngMixin:
+    mixin = _chain_mixin(configs)
+    mixin._merge_input_order = lambda _node: list(merge_order)
+    return mixin
+
+
+def test_fork_join_rejects_fewer_than_two_merged_inputs():
+    mixin = _refit_mixin([], ["only_one"])
+    resolved, reason = mixin._try_fork_join_refit(_training(["only_one"]), "target")
+    assert resolved is None
+    assert "fewer than two merged inputs" in reason
+
+
+def test_fork_join_rejects_divergent_loaders():
+    mixin = _refit_mixin(
+        [
+            _loader("loader_a", "a.csv"),
+            _loader("loader_b", "b.csv"),
+            _splitter("split_a", ["loader_a"]),
+            _splitter("split_b", ["loader_b"]),
+        ],
+        ["split_a", "split_b"],
+    )
+    resolved, reason = mixin._try_fork_join_refit(_training(["split_a", "split_b"]), "target")
+    assert resolved is None
+    assert "do not share one data loader" in reason
+
+
+def test_fork_join_rejects_branch_with_no_steps_after_fork():
+    # Branch "node_split" IS the fork point (nothing after it); branch "woe_a"
+    # continues past it. The shared-trunk prefix scan exhausts the shorter
+    # branch without diverging, and that branch's post-fork step list is empty.
+    mixin = _refit_mixin(
+        [
+            _loader("node_data", "x.csv"),
+            _splitter("node_split", ["node_data"]),
+            _woe_node("woe_a", ["node_split"], 0.5),
+        ],
+        ["node_split", "woe_a"],
+    )
+    resolved, reason = mixin._try_fork_join_refit(_training(["node_split", "woe_a"]), "target")
+    assert resolved is None
+    assert "no steps after the fork point" in reason
+
+
+def test_fork_join_rejects_empty_fork_node():
+    # An empty steps list on the shared-trunk end means there is no splitter
+    # to fork on — bail with the fork-point reason, not an IndexError.
+    mixin = _refit_mixin(
+        [
+            _loader("node_data", "x.csv"),
+            NodeConfig(
+                node_id="node_relay",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_data"],
+                params={"steps": []},
+            ),
+            _woe_node("woe_a", ["node_relay"], 0.5),
+            _woe_node("woe_b", ["node_relay"], 1.0),
+        ],
+        ["woe_a", "woe_b"],
+    )
+    resolved, reason = mixin._try_fork_join_refit(_training(["woe_a", "woe_b"]), "target")
+    assert resolved is None
+    assert "no splitter fork point" in reason
