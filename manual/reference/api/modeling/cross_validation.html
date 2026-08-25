@@ -3158,7 +3158,7 @@
 
 
 <h3 id="skyulf.modeling.cross_validation.perform_cross_validation" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">perform_cross_validation</span><span class="p">(</span><span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">cv_type</span><span class="o">=</span><span class="s1">'k_fold'</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">time_column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">perform_cross_validation</span><span class="p">(</span><span class="n">calculator</span><span class="p">,</span> <span class="n">applier</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">n_folds</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">cv_type</span><span class="o">=</span><span class="s1">'k_fold'</span><span class="p">,</span> <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">time_column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">progress_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">log_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">preprocessing</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -3371,6 +3371,25 @@
                   <code>None</code>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                <code>preprocessing</code>
+            </td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="FoldPreprocessor (skyulf.modeling.fold_preprocessing.FoldPreprocessor)" href="index.html#skyulf.modeling.FoldPreprocessor">FoldPreprocessor</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Optional per-fold preprocessor (F-15). When given, it is
+re-fit on each fold's training rows and applied to the held-out rows,
+so preprocessing statistics never see held-out data. <code>None</code> means
+the caller already transformed the data before splitting.</p>
+              </div>
+            </td>
+            <td>
+                  <code>None</code>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -3400,8 +3419,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>skyulf-core/skyulf/modeling/cross_validation.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 69</span>
-<span class="normal"> 70</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 70</span>
 <span class="normal"> 71</span>
 <span class="normal"> 72</span>
 <span class="normal"> 73</span>
@@ -3512,7 +3530,15 @@
 <span class="normal">178</span>
 <span class="normal">179</span>
 <span class="normal">180</span>
-<span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_cross_validation</span><span class="p">(</span>
     <span class="n">calculator</span><span class="p">:</span> <span class="s2">"BaseModelCalculator"</span><span class="p">,</span>
     <span class="n">applier</span><span class="p">:</span> <span class="s2">"BaseModelApplier"</span><span class="p">,</span>
     <span class="n">X</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">|</span> <span class="n">SkyulfDataFrame</span><span class="p">,</span>
@@ -3525,6 +3551,7 @@
     <span class="n">time_column</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">log_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">preprocessing</span><span class="p">:</span> <span class="s2">"FoldPreprocessor | None"</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Performs K-Fold cross-validation.</span>
@@ -3542,6 +3569,10 @@
 <span class="sd">        time_column: Optional column name for sorting when using time_series_split.</span>
 <span class="sd">        progress_callback: Optional callback(current_fold, total_folds).</span>
 <span class="sd">        log_callback: Optional callback for logging messages.</span>
+<span class="sd">        preprocessing: Optional per-fold preprocessor (F-15). When given, it is</span>
+<span class="sd">            re-fit on each fold's training rows and applied to the held-out rows,</span>
+<span class="sd">            so preprocessing statistics never see held-out data. ``None`` means</span>
+<span class="sd">            the caller already transformed the data before splitting.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Dict containing aggregated metrics and per-fold details.</span>
@@ -3573,6 +3604,7 @@
             <span class="n">random_state</span><span class="o">=</span><span class="n">random_state</span><span class="p">,</span>
             <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span>
             <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
+            <span class="n">preprocessing</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="c1"># 1. Setup Splitter (delegates to _build_splitter so unknown cv_type</span>
@@ -3605,6 +3637,7 @@
                 <span class="n">n_folds</span><span class="o">=</span><span class="n">n_folds</span><span class="p">,</span>
                 <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span>
                 <span class="n">log_callback</span><span class="o">=</span><span class="n">log_callback</span><span class="p">,</span>
+                <span class="n">preprocessing</span><span class="o">=</span><span class="n">preprocessing</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="p">)</span>
 
