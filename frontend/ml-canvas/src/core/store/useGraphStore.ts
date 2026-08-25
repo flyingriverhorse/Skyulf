@@ -25,12 +25,13 @@ import {
 } from '../types/executionMode';
 import { toast } from '../toast';
 import { convertGraphToPipelineConfig } from '../utils/pipelineConverter';
+import { findCycleIssues } from '../utils/pipelineCycleValidation';
 import { findPreprocessingBeforeSplitIssues } from '../utils/pipelineLeakageValidation';
 
 export interface GraphValidationIssue {
   nodeId: string;
   nodeLabel: string;
-  category: 'configuration' | 'connection' | 'leakage';
+  category: 'configuration' | 'connection' | 'leakage' | 'cycle';
   message: string;
 }
 
@@ -284,6 +285,22 @@ export function collectGraphValidationIssues(nodes: Node[], edges: Edge[]): Grap
       nodeLabel: getNodeLabel(node),
       category: 'leakage',
       message: `Move ${getNodeLabel(node)} after ${getNodeLabel(splitter)} so it only fits on training data.`,
+    });
+  }
+
+  const cycleIssues = findCycleIssues(pipelineConfig.nodes);
+  for (const cycle of cycleIssues) {
+    const loopNodes = cycle.loopNodeIds
+      .map((id) => activeNodes.find((candidate) => candidate.id === id))
+      .filter((candidate): candidate is Node => Boolean(candidate));
+    if (loopNodes.length === 0) continue;
+    issues.push({
+      nodeId: loopNodes[0]!.id,
+      nodeLabel: getNodeLabel(loopNodes[0]!),
+      category: 'cycle',
+      message:
+        `Cycle detected: ${loopNodes.map((loopNode) => getNodeLabel(loopNode)).join(' -> ')} ` +
+        'feed back into each other. Remove one of these connections so the pipeline flows in one direction.',
     });
   }
 

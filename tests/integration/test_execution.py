@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from backend.data.catalog import FileSystemCatalog
+from backend.ml_pipeline._execution._cycle_validation import PipelineCycleError
 from backend.ml_pipeline._execution.engine import PipelineEngine
 from backend.ml_pipeline._execution.schemas import NodeConfig, PipelineConfig
 from backend.ml_pipeline.artifacts.local import LocalArtifactStore
@@ -153,3 +154,41 @@ def test_pipeline_tuning_flow(pipeline_data_csv, tmp_path):
     assert result.node_results["node_tuning"].status == "success"
     assert "best_score" in result.node_results["node_tuning"].metrics
     assert artifact_store.saved_keys.count("node_tuning") == 1
+
+
+def test_cyclic_graph_fails_fast_before_execution(pipeline_data_csv, tmp_path):
+    """A cyclic graph must be rejected up front with a message naming the
+    loop, instead of dying late on a missing artifact mid-run."""
+    artifact_store = LocalArtifactStore(str(tmp_path / "artifacts_cycle"))
+    config = PipelineConfig(
+        pipeline_id="test_pipeline_cycle",
+        nodes=[
+            NodeConfig(
+                node_id="node_data",
+                step_type=StepType.DATA_LOADER,
+                params={"source": "csv", "path": pipeline_data_csv},
+            ),
+            NodeConfig(
+                node_id="node_a",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_b"],
+                params={"steps": []},
+            ),
+            NodeConfig(
+                node_id="node_b",
+                step_type=StepType.FEATURE_ENGINEERING,
+                inputs=["node_a"],
+                params={"steps": []},
+            ),
+        ],
+    )
+
+    engine = PipelineEngine(artifact_store, catalog=FileSystemCatalog())
+    with pytest.raises(PipelineCycleError) as excinfo:
+        engine.run(config)
+
+    message = str(excinfo.value)
+    assert "node_a" in message and "node_b" in message
+    assert "Artifact not found" not in message
+    # Nothing ran: no artifacts were written for any node.
+    assert not artifact_store.exists("node_data")
