@@ -429,7 +429,7 @@ class AliasReplacementArtifact(TypedDict, total=False):
 class DatasetProfileArtifact(TypedDict, total=False):
     type: str
     # Profile is a deeply nested dict produced by EDAAnalyzer; intentionally
-    # left as Dict[str, Any] — schema is unstable and evolves with new metrics.
+    # left as dict[str, Any] — schema is unstable and evolves with new metrics.
     profile: dict[str, Any]
 
 

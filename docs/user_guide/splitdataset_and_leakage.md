@@ -37,8 +37,6 @@ Use the `TrainTestSplitter` transformer early.
 ### Pattern B: create `SplitDataset` yourself
 
 ```python
-from __future__ import annotations
-
 import pandas as pd
 from sklearn.model_selection import train_test_split
 

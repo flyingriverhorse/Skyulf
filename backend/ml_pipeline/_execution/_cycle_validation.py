@@ -7,8 +7,6 @@ late with a cryptic "Artifact not found" error; here we fail fast with a
 message naming the loop.
 """
 
-from __future__ import annotations
-
 from backend.ml_pipeline._execution.schemas import NodeConfig
 
 

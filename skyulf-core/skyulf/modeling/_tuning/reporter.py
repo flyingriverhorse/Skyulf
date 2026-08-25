@@ -16,8 +16,6 @@ Output is deliberately ASCII-only: a Unicode glyph can raise
 must never break the run it reports on.
 """
 
-from __future__ import annotations
-
 import sys
 from typing import Any, TextIO
 
